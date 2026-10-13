@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.routes.me_routes import router as me_router
+from app.routes.products_routes import router as products_router
 from app.routes.sessions_routes import router as sessions_router
 from app.settings import get_settings
 
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 app.include_router(sessions_router)
 app.include_router(me_router)
+app.include_router(products_router)
 
 
 # GET /healthz is answered by Google's frontend with a 404 on *.run.app (seen Oct 13 on both

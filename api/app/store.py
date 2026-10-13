@@ -24,6 +24,10 @@ class Store(Protocol):
     def sessions_list(self, uid: str) -> list[tuple[str, Doc]]: ...
     def baseline_get(self, uid: str, site: str) -> Doc | None: ...
     def baseline_set(self, uid: str, site: str, doc: Doc) -> None: ...
+    def routine_list(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def routine_get(self, uid: str, entry_id: str) -> Doc | None: ...
+    def routine_set(self, uid: str, entry_id: str, doc: Doc) -> None: ...
+    def routine_delete(self, uid: str, entry_id: str) -> None: ...
     def delete_user(self, uid: str) -> None: ...
 
 
@@ -53,6 +57,19 @@ class FirestoreStore:
     def baseline_set(self, uid: str, site: str, doc: Doc) -> None:
         self._db().document(f"users/{uid}/baselines/{site}").set(doc)
 
+    def routine_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(s.id, s.to_dict()) for s in self._db().collection(f"users/{uid}/routine").stream()]
+
+    def routine_get(self, uid: str, entry_id: str) -> Doc | None:
+        snap = self._db().document(f"users/{uid}/routine/{entry_id}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def routine_set(self, uid: str, entry_id: str, doc: Doc) -> None:
+        self._db().document(f"users/{uid}/routine/{entry_id}").set(doc)
+
+    def routine_delete(self, uid: str, entry_id: str) -> None:
+        self._db().document(f"users/{uid}/routine/{entry_id}").delete()
+
     def delete_user(self, uid: str) -> None:
         db = self._db()
         db.recursive_delete(db.document(f"users/{uid}"))
@@ -62,6 +79,7 @@ class MemoryStore:
     def __init__(self) -> None:
         self.sessions: dict[tuple[str, str], Doc] = {}
         self.baselines: dict[tuple[str, str], Doc] = {}
+        self.routine: dict[tuple[str, str], Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -83,11 +101,23 @@ class MemoryStore:
     def baseline_set(self, uid: str, site: str, doc: Doc) -> None:
         self.baselines[(uid, site)] = copy.deepcopy(doc)
 
+    def routine_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(eid, copy.deepcopy(d)) for (u, eid), d in self.routine.items() if u == uid]
+
+    def routine_get(self, uid: str, entry_id: str) -> Doc | None:
+        doc = self.routine.get((uid, entry_id))
+        return copy.deepcopy(doc) if doc is not None else None
+
+    def routine_set(self, uid: str, entry_id: str, doc: Doc) -> None:
+        self.routine[(uid, entry_id)] = copy.deepcopy(doc)
+
+    def routine_delete(self, uid: str, entry_id: str) -> None:
+        self.routine.pop((uid, entry_id), None)
+
     def delete_user(self, uid: str) -> None:
-        for key in [k for k in self.sessions if k[0] == uid]:
-            del self.sessions[key]
-        for key in [k for k in self.baselines if k[0] == uid]:
-            del self.baselines[key]
+        for table in (self.sessions, self.baselines, self.routine):
+            for key in [k for k in table if k[0] == uid]:
+                del table[key]
 
 
 @lru_cache
