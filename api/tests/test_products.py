@@ -181,6 +181,12 @@ def test_import_script_round_trips_the_sheet(tmp_path, monkeypatch):
         assert mod.validate(parsed) == []
     broken = dict(back[0], category="perfume", stores=[])
     assert mod.validate(broken) == ["category 'perfume'", "no store links"]
+    linked = dict(back[0], image_url="https://brand.example/p.jpg", image_source=None)
+    assert mod.validate(linked) == ["image_source (the page the image is shown on)"]
+    assert (
+        mod.from_row(mod.to_row(dict(linked, image_source="https://brand.example/p")))["image_url"]
+        == "https://brand.example/p.jpg"
+    )
 
 
 def test_tidy_strips_list_punctuation():

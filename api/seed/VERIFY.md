@@ -4,6 +4,8 @@ Researched by Claude Code from brand and retailer pages on Oct 13, 2026. Every p
 
 Prices are in the currency of the page they came from (29 USD, 19 INR). The advisor's `max_price` filter compares within one currency.
 
+Images: every product has `image_url` (a linked packshot, checked by eye on Oct 13) and `image_source`. 47 come from the brand's own site; Clinique's comes from Ulta because the brand page only has infographics and before/after photos.
+
 ## Global brands (18)
 
 - **The Ordinary Niacinamide 10% + Zinc 1%** (`the-ordinary-niacinamide-10-zinc-1`): Price from brand site (US), 30 ml variant; Ulta 1.0 oz also $6.00. Nykaa listed at INR 600. Nykaa URL taken from Nykaa's own search-results page (Nykaa product pages returned an HTTP header-overflow error to the fetcher); Nykaa price shown in search listing without size.
