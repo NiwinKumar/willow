@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-public.mjs && tsc -b && vite build",
     "lint": "oxlint && tsc -b --noEmit",
     "preview": "vite preview"
   },

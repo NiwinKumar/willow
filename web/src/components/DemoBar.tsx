@@ -15,7 +15,7 @@ export function DemoBar() {
         <strong className="font-semibold">Demo mode</strong> · {data.demoSource === 'real' ? "our team's measured test" : 'illustrative sample journey'} · nothing is saved to a real account
       </span>
       <span className="flex shrink-0 items-center gap-1">
-        <button type="button" onClick={() => setAbout(true)} className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) px-2 hover:bg-warn/20" aria-label="About the demo data">
+        <button type="button" onClick={() => setAbout(true)} className="inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 hover:bg-warn/20" aria-label="About the demo data">
           <Info size={16} aria-hidden /> About
         </button>
         <button
@@ -24,7 +24,7 @@ export function DemoBar() {
             leaveDemo()
             navigate('/')
           }}
-          className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) px-2 hover:bg-warn/20"
+          className="inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 hover:bg-warn/20"
         >
           <RotateCcw size={16} aria-hidden /> Reset
         </button>

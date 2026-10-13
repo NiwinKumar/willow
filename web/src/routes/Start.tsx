@@ -19,7 +19,7 @@ const cards = [
     icon: FlaskConical,
     title: 'How we measure',
     body: 'Classical image analysis measures colour, spots, redness and texture against your own earlier photos. An AI assistant explains results and only repeats numbers we measured. It never guesses a skin age, score or diagnosis.',
-    more: 'Every number comes from calibrated computer vision: a colour card in the frame corrects each photo, face landmarks pick the regions, and five reference photos give your personal noise band. Gemini writes the explanation from those numbers; any digit it invents is rejected before you see it.',
+    more: 'Every number comes from calibrated computer vision: a white reference in the frame (plain paper or a colour card) corrects each photo, pen dots or face landmarks pick the regions, and five reference photos give your personal noise band. Gemini writes the explanation from those numbers; any digit it invents is rejected before you see it.',
   },
   {
     id: 'medical',
@@ -47,7 +47,7 @@ export function Start() {
               <div className="min-w-0">
                 <h2 className="text-[15px] font-semibold">{c.title}</h2>
                 <p className="mt-1 text-[15px] leading-relaxed text-text-2">{c.body}</p>
-                <button type="button" onClick={() => setMore(c)} className="mt-2 min-h-9 text-[13px] font-medium text-willow-700 underline-offset-2 hover:underline">
+                <button type="button" onClick={() => setMore(c)} className="mt-2 min-h-11 text-[13px] font-medium text-willow-700 underline-offset-2 hover:underline">
                   Learn more
                 </button>
               </div>

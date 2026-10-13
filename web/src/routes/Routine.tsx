@@ -1,4 +1,4 @@
-import { AlertTriangle, Camera, Check, CircleAlert, Copy, Info, Octagon, Plus, Search } from 'lucide-react'
+import { AlertTriangle, Camera, Check, CircleAlert, Copy, Info, Octagon, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -62,6 +62,18 @@ export function Routine() {
   const [entries, setEntries] = useState<RoutineEntry[]>(live ? [] : DEMO_ROUTINE)
   const [check, setCheck] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
   const [checking, setChecking] = useState(false)
+  // Removing a product deletes the entry (one added by mistake or no longer used); the check reruns.
+  const removeEntry = async (e: RoutineEntry) => {
+    const before = entries
+    setEntries((xs) => xs.filter((x) => x.id !== e.id))
+    if (!live) return
+    try {
+      await api.deleteRoutine(await getIdToken(), e.id)
+    } catch {
+      setEntries(before)
+      toast.error('Could not remove it. Try again.')
+    }
+  }
   const routineKey = entries.map((e) => `${e.id}:${e.slots.join('')}:${e.ended_at ?? ''}`).join('|')
 
   // Live: re-check compatibility whenever the routine changes (rules always, AI additions marked).
@@ -236,7 +248,7 @@ export function Routine() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-medium">{e.brand} {name(e)}</span>
-                    {flagged ? <span aria-label="part of a compatibility note" className="h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
+                    {flagged ? <span role="img" aria-label="part of a compatibility note" title="Part of a compatibility note" className="h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
                     {e.slots.length === 2 ? <Chip tone="neutral" className="shrink-0 whitespace-nowrap">AM + PM</Chip> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -250,6 +262,9 @@ export function Routine() {
                     </button>
                   ) : null}
                 </div>
+                <button type="button" onClick={() => void removeEntry(e)} aria-label={`Remove ${e.brand} ${name(e)} from the routine`} title="Remove from the routine" className="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-(--radius-control) text-text-3 hover:bg-surface-2 hover:text-text">
+                  <X size={16} aria-hidden />
+                </button>
               </li>
             )
           })}

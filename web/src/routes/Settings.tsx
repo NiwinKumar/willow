@@ -42,7 +42,7 @@ export function Settings() {
       }
       prefs.clearAll()
       setConfirm(false)
-      toast('Deleted: photos, results and your account.')
+      toast(data.mode === 'demo' ? 'Cleared everything stored on this device.' : 'Deleted: photos, results and your account.')
       navigate('/')
     } catch {
       toast.error('Could not delete right now. Nothing was removed; try again.')
