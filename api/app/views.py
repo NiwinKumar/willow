@@ -6,12 +6,12 @@ the baseline for the scrubber, the person's note and deviation flag, and whether
 explanation came from Gemini or the template (`explanation_source`).
 """
 
-import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
 
-from app import engine, storage
+from app import storage
+from app.results import measured_result
 from app.store import iso
 
 
@@ -35,17 +35,6 @@ def sign_all(names: list[str]) -> dict[str, str]:
         return {}
     with ThreadPoolExecutor(max_workers=8) as pool:
         return dict(zip(unique, pool.map(storage.signed_get_url, unique), strict=True))
-
-
-def measured_result(doc: dict[str, Any]) -> dict[str, Any] | None:
-    """The stored result if it is a measurement; None for placeholders (old docs included)."""
-    if not doc.get("result_json"):
-        return None
-    result = json.loads(doc["result_json"])
-    measured = doc.get("measured")
-    if measured is None:  # sessions analysed before the measured flag existed
-        measured = not engine.is_placeholder(result)
-    return result if measured else None
 
 
 def wanted_urls(
@@ -87,6 +76,14 @@ def session_view(
         name = storage.name_from_uri(overlay["uri"])
         if name in signed:
             overlay_urls[overlay["metric_id"]] = signed[name]
+    # The baseline this session was actually compared with (stored at analysis time), so a later
+    # "Make this my baseline" never relabels old results; older docs fall back to today's.
+    if (
+        doc.get("compared_with") is not None
+        or doc.get("is_baseline") is False
+        and "compared_with" in doc
+    ):
+        baseline = doc.get("compared_with")
     hours = None
     if baseline:
         hours = _hours_between(doc.get("created_at"), baseline.get("session_created_at"))

@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, Product, RoutineEntry } from '../data/types'
+import type { AnalysisResult, Explanation, Product, RoutineCheck, RoutineEntry } from '../data/types'
 import { DEV_UID } from './devAuth'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
@@ -56,6 +56,15 @@ export type LabelScan = {
   confidence: 'low' | 'medium' | 'high'
 }
 export type LabelScanResponse = { scan: LabelScan; match: { product_id: string; brand: string; name: string; score: number } | null }
+
+export type AdvisorReply = {
+  message: string
+  product_ids: string[]
+  products: Product[]
+  follow_up_suggestions: string[]
+  retrieval: string[]
+  remaining_today: number
+}
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
 
@@ -128,6 +137,9 @@ export const api = {
   patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
+  routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
+  advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[]) =>
+    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json({ messages }) }),
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */

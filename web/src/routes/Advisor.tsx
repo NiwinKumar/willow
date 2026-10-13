@@ -7,13 +7,18 @@ import { Chip } from '../components/Chip'
 import { ProductImage } from '../components/ProductImage'
 import type { Product } from '../data/types'
 import { useData } from '../data/useData'
+import { ApiError, api } from '../lib/api'
 import { fmtPrice, imageCredit } from '../lib/format'
 import { METRIC_META } from '../lib/metrics'
+import { useAuth } from '../lib/useAuth'
 import { CONCERN_LABEL } from '../mock/catalog'
 import { STARTERS, answer, productById, type Turn } from '../mock/advisor'
 
+const LIVE_STARTERS = ['What do my latest results mean?', 'Is my routine OK together?', 'Find a sunscreen under ₹1,000', 'How should I take my next photos?']
+
 export function Advisor() {
   const data = useData()
+  const { user, getIdToken, continueAsGuest } = useAuth()
   const [params] = useSearchParams()
   const sessions = useMemo(() => data.series('face_full')?.sessions ?? [], [data])
   const [turns, setTurns] = useState<Turn[]>([])
@@ -30,14 +35,35 @@ export function Advisor() {
       toast('That is 20 questions for today. Back tomorrow.')
       return
     }
-    setTurns((t) => [...t, { role: 'user', text }])
+    const history = [...turns, { role: 'user' as const, text }]
+    setTurns(history)
     setInput('')
     setThinking(true)
-    setLeft((n) => n - 1)
-    window.setTimeout(() => {
-      setTurns((t) => [...t, answer(text, sessions)])
-      setThinking(false)
-    }, 900)
+    if (data.mode === 'demo') {
+      setLeft((n) => n - 1)
+      window.setTimeout(() => {
+        setTurns((t) => [...t, answer(text, sessions)])
+        setThinking(false)
+      }, 900)
+      return
+    }
+    // Live: Gemini with the person's own results, routine and the catalog (validated in the api).
+    void (async () => {
+      try {
+        if (!user) await continueAsGuest()
+        const reply = await api.advisorChat(await getIdToken(), history.slice(-20).map((t) => ({ role: t.role, text: t.text })))
+        setLeft(reply.remaining_today)
+        setTurns((t) => [...t, { role: 'willow', text: reply.message, retrieval: reply.retrieval, product_ids: reply.product_ids, follow_ups: reply.follow_up_suggestions }])
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 429) {
+          setLeft(0)
+          toast('That is 20 questions for today. Back tomorrow.')
+        }
+        setTurns((t) => [...t, { role: 'willow', text: e instanceof ApiError && e.status === 429 ? 'That is 20 questions for today. Back tomorrow.' : 'The advisor could not answer just now. Try again in a moment.' }])
+      } finally {
+        setThinking(false)
+      }
+    })()
   }
 
   useEffect(() => {
@@ -53,21 +79,8 @@ export function Advisor() {
   }, [turns, thinking])
 
   const last = turns[turns.length - 1]
-  const chips = last?.role === 'willow' && last.follow_ups?.length ? last.follow_ups : STARTERS
-
-  // The canned answers describe the sample journey; never show them to a real person.
-  if (data.mode === 'live')
-    return (
-      <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-6 sm:px-8">
-        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">The advisor is not connected yet</h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-text-2">
-          It will answer from your own measurements, your routine and the product catalog, and quote only numbers Willow measured. Until then, try it on the sample journey.
-        </p>
-        <Link to="/advisor?demo=1" className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
-          Try it on the sample journey
-        </Link>
-      </div>
-    )
+  const starters = data.mode === 'demo' ? STARTERS : LIVE_STARTERS
+  const chips = last?.role === 'willow' && last.follow_ups?.length ? last.follow_ups : starters
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-56px)] w-full max-w-[1120px] flex-col px-5 sm:px-8 lg:grid lg:grid-cols-[minmax(0,680px)_1fr] lg:gap-8">
@@ -140,7 +153,7 @@ export function Advisor() {
           ))}
           {turns.length === 0 ? <li className="text-text-3">Nothing yet.</li> : null}
         </ul>
-        {data.mode === 'demo' ? <p className="mt-6 text-[12px] text-text-3">Demo: answers are prepared from the sample data; Gemini connects in M4 with the same validation.</p> : null}
+        {data.mode === 'demo' ? <p className="mt-6 text-[12px] text-text-3">Demo: answers are prepared from the sample data. Signed in, the advisor uses Gemini with your own results, and every number it quotes is checked against them.</p> : <p className="mt-6 text-[12px] text-text-3">Answers come from Gemini, grounded in your results, your routine and the catalog. Every number is checked against your data before you see it.</p>}
       </aside>
     </div>
   )

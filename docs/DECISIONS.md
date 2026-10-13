@@ -2,6 +2,7 @@
 
 | Date | Decision | Supersedes |
 |---|---|---|
+| Oct 13 | Gemini features shipped with validators and deterministic fallbacks: routine rule table in code (Gemini only adds marked extras), explanations rounded to display precision, advisor context-first with three tools and a 20/day limit | Gemini applies the rule table itself; separate get_my_metrics / get_my_routine tools |
 | Oct 13 | **Baselines:** one per site *and* capture mode (quick selfies never compared with RAW); the first measured session with passing quality becomes it automatically, any frame count. A one-photo baseline has no noise band, so later sessions show deltas but no verdict ("No noise band yet"); "Make this my baseline" picks a better one. **Never show placeholder numbers:** engine results marked `-placeholder` are stored as `measured: false` and the web says "Saved, not measured yet". Processing shows only real progress (elapsed time, then each stage's real outcome). | Auto baseline = first passing 5-frame calibrated session; quick selfies had no auto baseline |
 | Oct 13 | api calls the real engine (`ENGINE_MODE=http`) as soon as it deployed, not on Thursday: forearm sites are measured; face and macro return the engine's labelled placeholder until those pipelines land | "fixture until Thursday" |
 | Oct 13 | Catalog shows each product's official packshot, **linked** from the brand's site (or a major retailer) with a credit to the source page; never downloaded, committed or re-hosted; category icon as fallback | CATALOG_SPEC "no product images" |

@@ -15,6 +15,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
+from app.results import measured_result
 from app.store import Store
 
 NOISE_BAND_FRAMES = 2  # the engine needs at least two frames to measure photo-to-photo noise
@@ -25,7 +26,30 @@ def key(site: str, capture_mode: str) -> str:
 
 
 def get(store: Store, uid: str, site: str, capture_mode: str) -> dict[str, Any] | None:
-    return store.baseline_get(uid, key(site, capture_mode))
+    doc = store.baseline_get(uid, key(site, capture_mode))
+    if not doc or "capture_mode" in doc:
+        return doc
+    # Written before Oct 13: trust it only if its session is a real measurement, and work out
+    # whether it has a noise band from the frame counts it recorded.
+    session = store.session_get(uid, doc["session_id"])
+    if session is None or measured_result(session) is None:
+        return None
+    frames = min((m.get("n_frames", 0) for m in doc.get("metrics", {}).values()), default=0)
+    return {
+        **doc,
+        "capture_mode": session["capture_mode"],
+        "frames": frames,
+        "has_noise_band": frames >= NOISE_BAND_FRAMES,
+    }
+
+
+def compared_with(baseline: dict[str, Any] | None) -> dict[str, Any] | None:
+    """What a session stores about the baseline it was compared with."""
+    if not baseline:
+        return None
+    return {
+        k: baseline.get(k) for k in ("session_id", "frames", "has_noise_band", "session_created_at")
+    }
 
 
 def for_request(baseline: dict[str, Any] | None) -> dict[str, Any] | None:
