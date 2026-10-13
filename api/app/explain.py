@@ -142,7 +142,8 @@ UNIT_DISPLAY = {
 def _shown(x: float | None, unit: str) -> float | None:
     if x is None:
         return None
-    return round(x, UNIT_DISPLAY.get(unit, ("", 2))[1])
+    # "+ 0.0" reads better than "-0.0": a delta that rounds to zero is written as zero.
+    return round(x, UNIT_DISPLAY.get(unit, ("", 2))[1]) + 0.0
 
 
 def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
