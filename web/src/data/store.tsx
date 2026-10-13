@@ -2,22 +2,16 @@
  * Data seam. Demo mode serves the illustrative sample journeys; live mode will read the api
  * (sessions list per site) once those routes exist (M2). Screens never know which one they got.
  */
-import { createContext, useMemo, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
+
+import { DataContext, type DataState } from './context'
 import { useSearchParams } from 'react-router-dom'
 
 import { DEMO_SERIES, DEMO_SITES } from '../mock/series'
-import type { Site, SiteSeries } from './types'
 
 export type DataMode = 'demo' | 'live'
 
-export type DataState = {
-  mode: DataMode
-  sites: Site[]
-  series: (site: Site) => SiteSeries | null
-  goals: string[]
-}
 
-export const DataContext = createContext<DataState | null>(null)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [params] = useSearchParams()

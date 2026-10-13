@@ -1,6 +1,6 @@
 import { useContext } from 'react'
 
-import { DataContext, type DataState } from './store'
+import { DataContext, type DataState } from './context'
 
 export function useData(): DataState {
   const ctx = useContext(DataContext)
