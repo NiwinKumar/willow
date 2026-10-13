@@ -1,12 +1,13 @@
 # Gemini spec (owner: Niwin)
 
 ## Setup
-- SDK: `google-genai` (Python) with `vertexai=True`, `project=$PROJECT_ID`, `location="us-central1"`.
-- Model: env `GEMINI_MODEL` = latest GA Gemini **Flash** model available on Vertex AI in us-central1 (check Model Garden; pin the exact ID). Optional `GEMINI_MODEL_PRO` for the weekly summary only.
+- SDK: `google-genai` (Python) with `vertexai=True`, `project=$PROJECT_ID`, `location="global"`. Gemini 3.x GA models are served only from the global endpoint (verified Oct 13: regional `us-central1` returns model-not-found; `gemini-2.5-flash` is regional but retires on Vertex around Oct 20, during judging). Every other GCP resource stays in `us-central1`.
+- Model: env `GEMINI_MODEL` = `gemini-3.8-flash` (GA since Sep 2, 2026). It is a thinking model: set `thinking_config` to the lowest level/budget for labelling, extraction and routine checks, and always give a generous `max_output_tokens` (thinking tokens otherwise truncate the JSON). Optional `GEMINI_MODEL_PRO` for the weekly summary only.
 - Always `response_mime_type="application/json"` + `response_schema` (pydantic). Temperature 0 for labelling/extraction, 0.3 for explanations/chat. Set `max_output_tokens`.
 - Never send more than needed: crops, not full faces, for labelling; metrics JSON, not images, for explanations.
 - Log prompt id, latency, token counts (no images, no PII) to Cloud Logging.
 - Retry once on schema-validation failure; then deterministic fallback.
+- Function calling and `response_schema` cannot be combined in one request: the advisor runs the tool loop with plain text, then one final call with `response_schema` to produce the structured message.
 
 ## Global system rules (prepend to every call)
 "You are Willow's skincare assistant. Cosmetic guidance only, not medical advice. Never diagnose or name diseases. Never estimate or invent measurements, scores, skin tone, or age; only quote numbers given to you in the input. Never imply lighter skin is better. Be calm, inclusive, brief. If something looks concerning (changing mole, bleeding, pain), suggest seeing a dermatologist."
