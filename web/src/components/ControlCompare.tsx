@@ -16,7 +16,8 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
   const band = Math.hypot(tb.mdc95 ?? 0, cb.mdc95 ?? 0)
   const treatedReal = t.verdict === 'real_change'
   const controlReal = c.verdict === 'real_change'
-  const ddReal = !noBand && Math.abs(dd) > band
+  // The gap counts only beyond the noise for a difference and in the direction the treated side moved.
+  const ddReal = !noBand && Math.abs(dd) > band && Math.sign(dd) === Math.sign(t.delta)
   const tr = fmtSigned(t.delta, t)
   const un = fmtSigned(c.delta, c)
   const kind = noBand
@@ -27,12 +28,15 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
         ? 'both_more'
         : controlReal
           ? 'not_attributable'
-          : 'noise'
+          : treatedReal
+            ? 'treated_small_gap'
+            : 'noise'
   const headline = {
     no_band: 'No noise band yet',
     treated: 'Real change on the treated side',
     both_more: 'Both sides changed, the treated side more',
     not_attributable: treatedReal ? 'Both sides changed by a similar amount' : 'Only the untreated side changed',
+    treated_small_gap: 'The treated side changed, but not clearly more than the untreated side',
     noise: 'Within normal photo variation on both sides',
   }[kind]
   const body = {
@@ -40,6 +44,7 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
     treated: `The treated side changed by ${tr} and the untreated side by ${un}. The gap (${fmtSigned(dd, t)}) is outside photo noise for a difference (±${fmtValue(band, t)}), so lighting or time of day are unlikely to explain it and it may be linked to the product. The untreated side staying inside its band is the test working as expected.`,
     both_more: `Both sides moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated side moved more by ${fmtSigned(dd, t)}, beyond the noise for a difference (±${fmtValue(band, t)}); that extra part may be linked to the product.`,
     not_attributable: `Treated moved ${tr} and untreated ${un}. ${treatedReal ? 'Both moved outside their bands by a similar amount' : 'The untreated side moved outside its band'}, so something other than the product, such as lighting, sun or temperature, likely moved the reading. We can't attribute this to the product.`,
+    treated_small_gap: `The treated side moved ${tr}, outside its own band, while the untreated side moved ${un}. The gap (${fmtSigned(dd, t)}) is still inside the noise for a difference (±${fmtValue(band, t)}), so the change cannot yet be separated from drift such as light or time of day.`,
     noise: `Treated moved ${tr} and untreated ${un}; the gap (${fmtSigned(dd, t)}) is inside the noise for a difference (±${fmtValue(band, t)}). Nothing measurable yet.`,
   }[kind]
   return (

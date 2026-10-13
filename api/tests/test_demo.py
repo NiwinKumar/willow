@@ -91,3 +91,29 @@ def test_status_reports_each_service(client, monkeypatch):
         "synthetic": 500,
     }
     assert body["catalog"]["products"] > 0
+
+
+def test_global_cap_bounds_cost_across_guest_accounts(client, fake, samples, monkeypatch):
+    from app import limits
+
+    monkeypatch.setitem(limits.CAPS, "sample_runs", (12, 2))
+    for uid in ("g1", "g2"):
+        res = client.post("/v1/demo/samples/forearm_base/session", headers={"X-Dev-Uid": uid})
+        assert res.status_code == 200
+    res = client.post("/v1/demo/samples/forearm_base/session", headers={"X-Dev-Uid": "g3"})
+    assert res.status_code == 429 and res.json()["detail"]["code"] == "busy"
+
+
+def test_judge_setup_never_touches_a_signed_in_account(client, fake, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings.get_settings(), "auth_mode", "firebase")
+    from app.auth import AuthUser, current_user
+    from app.main import app
+
+    app.dependency_overrides[current_user] = lambda: AuthUser(uid="real", is_anonymous=False)
+    try:
+        assert client.post("/v1/demo/judge-setup").json()["routine_added"] == 0
+    finally:
+        app.dependency_overrides.pop(current_user, None)
+    assert fake.store.routine_list("real") == []

@@ -31,8 +31,12 @@ export function QuickCapture() {
   const data = useData()
   const site = (params.get('site') as Site) ?? 'face_full'
   const firstSession = baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
-  // Fixed for the whole session, even if the session list refreshes while the camera is open.
-  const [n] = useState(() => Math.min(5, Math.max(1, Number(params.get('n') ?? (firstSession ? '5' : '3')))))
+  // Fixed once the person's sessions are known (a deep link may arrive before they load), then kept
+  // for the whole capture even if the list refreshes while the camera is open.
+  const known = data.mode === 'demo' || data.status === 'ready' || data.status === 'error' || data.status === 'idle'
+  const [fixedN, setFixedN] = useState<number | null>(() => (params.get('n') ? Number(params.get('n')) : null))
+  if (fixedN === null && known) setFixedN(firstSession ? 5 : 3)
+  const n = Math.min(5, Math.max(1, fixedN ?? 5))
   const steps = photoSteps(site, 'uncalibrated')
   const faceSite = site === 'face_full' || site === 'cheek_macro' || site === 'nose_macro'
   const [phase, setPhase] = useState<Phase>('ask')
@@ -175,6 +179,13 @@ export function QuickCapture() {
   const allPass = gates.light && gates.even && gates.still
 
   if (data.mode === 'live' && !prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture/camera?${params.toString()}`)}`} replace />
+
+  if (fixedN === null)
+    return (
+      <p className="mx-auto max-w-[36rem] px-5 pt-6 text-[15px] text-text-3 sm:px-8" role="status">
+        Loading your sessions…
+      </p>
+    )
 
   if (phase === 'ask' || phase === 'denied')
     return (
