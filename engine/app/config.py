@@ -1,6 +1,8 @@
 """All engine thresholds and constants in one place (tunable, see docs/CONTRACT.md 2.3)."""
 
-ENGINE_VERSION = "0.1.0"
+from app import __version__
+
+ENGINE_VERSION = __version__  # single source of truth: app/__init__.py
 
 # Quality gates (docs/CONTRACT.md 2.3)
 # Variance of Laplacian on the skin ROI (0-255 grey). Contract default was 100, but smooth

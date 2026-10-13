@@ -25,7 +25,7 @@ def test_placeholder_analyze_roundtrip():
         "schema_version": "1.0",
         "session_id": "s_test",
         "user_id": "u_test",
-        "site": "forearm_treated",
+        "site": "face_full",
         "capture_mode": "calibrated_raw",
         "frames": [{"uri": "gs://bucket/uploads/u_test/s_test/frame_1.dng"}],
     }
@@ -33,4 +33,4 @@ def test_placeholder_analyze_roundtrip():
     assert res.status_code == 200
     body = res.json()
     validate(body, _load("schemas/analysis_result.schema.json"))
-    assert body["site"] == "forearm_treated"
+    assert body["site"] == "face_full"

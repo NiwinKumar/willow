@@ -11,7 +11,8 @@ from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
 from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
-from app.markers import find_dot_squares, paper_pixels
+from app.errors import EngineError
+from app.markers import SpotNotFound, find_dot_squares, paper_pixels
 from app.metrics.redness import redness
 from app.metrics.tone import ita_band, tone_ita
 from app.quality import FrameQuality, check_frame
@@ -44,10 +45,13 @@ def capture_mode_for(files: list[str]) -> str:
 
 def _load(path: str) -> tuple[np.ndarray, np.ndarray]:
     """-> (linear sRGB float 0..1, 8-bit sRGB) for DNG or normal photos."""
-    if Path(path).suffix.lower() == ".dng":
-        linear = decode_dng_srgb(path)
-        return linear, linear_to_srgb8(linear)
-    srgb8, _ = load_photo_srgb8(path)
+    try:
+        if Path(path).suffix.lower() == ".dng":
+            linear = decode_dng_srgb(path)
+            return linear, linear_to_srgb8(linear)
+        srgb8, _ = load_photo_srgb8(path)
+    except Exception as exc:  # rawpy / Pillow raise many types for corrupt files
+        raise EngineError("frame_unreadable", f"{Path(path).name}: {exc}") from exc
     return srgb_to_linear(srgb8), srgb8
 
 
@@ -101,20 +105,31 @@ def analyze_forearm(
     card_detected=false and a warning; normal photos are uncalibrated and 'indicative'.
     """
     if site not in FOREARM_SITES:
-        raise ValueError(f"M1 supports {sorted(FOREARM_SITES)} only, got {site!r}")
+        raise EngineError("bad_request", f"forearm pipeline got site {site!r}")
     t0 = time.perf_counter()
-    mode = capture_mode_for(files)
+    try:
+        mode = capture_mode_for(files)
+    except ValueError as exc:
+        raise EngineError("bad_request", str(exc)) from exc
     confidence = "measured" if mode == "calibrated_raw" else "indicative"
     per_frame, passed_values, passed_extras, shape = [], [], [], None
-    used_rois, white_ok = [], []
+    used_rois, white_ok, qs, warnings = [], [], [], []
     for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
-        values, extras, q, frame_shape, used_roi, balanced = _frame_metrics(
-            path, roi, white, auto_white, square
-        )
+        try:
+            values, extras, q, frame_shape, used_roi, balanced = _frame_metrics(
+                path, roi, white, auto_white, square
+            )
+        except SpotNotFound:
+            # no contract reason code fits yet (see CONTRACT_CHANGES 'roi_not_found'):
+            # fail the frame and say why in warnings
+            per_frame.append({"index": i, "passed": False, "reasons": []})
+            warnings.append(f"photo {i + 1}: pen-dot square not found")
+            continue
         shape = shape or frame_shape
         used_rois.append(used_roi)
         white_ok.append(balanced)
-        per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons, "_q": q})
+        qs.append(q)
+        per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons})
         if q.passed:
             passed_values.append(values)
             passed_extras.append(extras)
@@ -149,14 +164,13 @@ def analyze_forearm(
             }
         )
 
-    qs = [f.pop("_q") for f in per_frame]
     reasons = sorted({r for f in per_frame for r in f["reasons"]})
     if not passed_values:
         reasons.append("too_few_frames")
     if mode == "uncalibrated":
-        warnings = ["uncalibrated photo: results are a trend only, not a measurement"]
+        warnings.insert(0, "uncalibrated photo: results are a trend only, not a measurement")
     else:
-        warnings = ["no colour card: colours corrected with the white paper only"]
+        warnings.insert(0, "no colour card: colours corrected with the white paper only")
     if not all(white_ok):
         warnings.append("no white reference found in some photos: lamp colour not corrected")
 
@@ -172,8 +186,8 @@ def analyze_forearm(
             "passed": bool(passed_values),
             "card_detected": False,
             "card_delta_e_mean": None,
-            "sharpness": round(float(np.mean([q.sharpness for q in qs])), 1),
-            "clipped_pct": round(float(np.mean([q.clipped_pct for q in qs])), 2),
+            "sharpness": round(float(np.mean([q.sharpness for q in qs])), 1) if qs else None,
+            "clipped_pct": round(float(np.mean([q.clipped_pct for q in qs])), 2) if qs else None,
             "pose": None,
             "per_frame": per_frame,
             "reasons": reasons,
@@ -181,10 +195,13 @@ def analyze_forearm(
         "metrics": metrics,
         "candidates": [],
         "overlays": [],
-        "rois": [{"name": "forearm_square", "polygon": used_rois[0].polygon()}],
-        "image_size": {"width": int(shape[1]), "height": int(shape[0])},
+        "rois": [{"name": "forearm_square", "polygon": used_rois[0].polygon()}]
+        if used_rois
+        else [],
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
     }
+    if shape is not None:
+        result["image_size"] = {"width": int(shape[1]), "height": int(shape[0])}
     validate(result, json.loads(SCHEMA.read_text()))
     return result
