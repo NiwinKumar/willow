@@ -1,8 +1,9 @@
-"""Command line: python -m app.cli analyze --site forearm_treated --roi x,y,w,h photo.dng ...
+"""Command line: python -m app.cli analyze --site forearm_control photo1.dng photo2.dng ...
 
 Mode is picked from the files: .dng -> calibrated_raw, .heic/.jpg -> uncalibrated.
 
---roi / --white can be given once (same box for every photo) or once per photo, in order.
+By default the skin square is found from 4 pen dots and the white paper is found automatically.
+--roi / --white override that: give once (same box for every photo) or once per photo, in order.
 """
 
 import argparse
@@ -32,8 +33,9 @@ def main(argv: list[str] | None = None) -> None:
     a = sub.add_parser("analyze", help="analyze 1-5 photos of one forearm square")
     a.add_argument("files", nargs="+")
     a.add_argument("--site", required=True, choices=["forearm_treated", "forearm_control"])
-    a.add_argument("--roi", action="append", required=True, help="skin square x,y,w,h")
-    a.add_argument("--white", action="append", help="white paper x,y,w,h (optional)")
+    a.add_argument("--roi", action="append", help="skin square x,y,w,h (default: find 4 pen dots)")
+    a.add_argument("--white", action="append", help="white paper x,y,w,h (default: find paper)")
+    a.add_argument("--no-white", action="store_true", help="skip white-paper correction")
     a.add_argument("--baseline", help="baseline.json: {metric_id: {mean, mdc95}}")
     a.add_argument("--out", help="directory for result.json")
     args = p.parse_args(argv)
@@ -47,6 +49,7 @@ def main(argv: list[str] | None = None) -> None:
         args.site,
         _per_frame(args.roi, n, "roi"),
         _per_frame(args.white, n, "white"),
+        auto_white=not args.no_white,
         baseline=baseline,
     )
 

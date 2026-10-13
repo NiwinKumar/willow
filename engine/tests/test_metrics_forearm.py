@@ -93,9 +93,37 @@ def test_white_paper_cancels_lamp_tint(tmp_path):
     _fake_photo(tmp_path / "warm.jpg", np.random.default_rng(1), tint=TINT)
 
     def ita(name, white):
-        r = analyze_forearm([str(tmp_path / name)], "forearm_control", [skin], [white])
+        r = analyze_forearm(
+            [str(tmp_path / name)], "forearm_control", [skin], [white], auto_white=white is not None
+        )
         return r["metrics"][0]["value"]
 
     plain = ita("plain.jpg", paper)
     assert abs(ita("warm.jpg", paper) - plain) < 1.5  # corrected: close to the truth
     assert abs(ita("warm.jpg", None) - plain) > 5  # uncorrected: lamp shifts the tone a lot
+
+
+def test_find_dot_square_on_synthetic_arm():
+    from app.markers import find_dot_square
+
+    img = np.full((1200, 1000, 3), (190, 140, 110), np.uint8)  # plain skin
+    rng = np.random.default_rng(2)
+    img = np.clip(img + rng.normal(0, 4, img.shape), 0, 255).astype(np.uint8)
+    for cx, cy in [(400, 500), (600, 500), (400, 700), (600, 700)]:  # 4 pen dots, 200 px apart
+        yy, xx = np.ogrid[:1200, :1000]
+        img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 14**2] = (40, 35, 35)
+    img[100:140, 100:900] = (60, 40, 30)  # a dark stripe (e.g. table edge) must be ignored
+    box, _ = find_dot_square(img)
+    assert abs(box.x + box.w / 2 - 500) < 8 and abs(box.y + box.h / 2 - 600) < 8
+    assert 100 < box.w < 141  # inside the dots: 0.6 x spacing = 120 px
+
+
+def test_paper_found_automatically(tmp_path):
+    from app.markers import paper_pixels
+
+    _fake_photo(tmp_path / "p.jpg", np.random.default_rng(3))
+    from app.pipeline import _load
+
+    linear, srgb8 = _load(str(tmp_path / "p.jpg"))
+    px = paper_pixels(linear, srgb8)
+    assert len(px) > 300 and px.mean() > 0.7  # paper is the bright patch, not skin/background
