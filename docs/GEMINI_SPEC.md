@@ -56,6 +56,11 @@ Tools (implemented in api, results are the only source of product facts):
 - `check_routine(proposed_change?: object)` -> runs feature 4
 Response schema: `{message: string, product_ids: string[], follow_up_suggestions: string[]}`. UI renders product cards with all store links. Max 5 tool calls per turn.
 
+## 6. Ask the retailer data (added Oct 13)
+- Input: the same aggregates as `GET /v1/retailer/insights` (groups under 10 already suppressed, no rows) plus the question. Output schema `Answer {answer, chart?: {title, unit: percent|count|weeks, bars[2..8]: {label, value}}, follow_ups[]}`.
+- Validators: every number in the answer must be in the aggregates (a fraction may be written as a whole percent); every bar label must be a product, brand, goal, tile or routine issue in the aggregates; every bar value must be a number from them; banned words. One retry, then a fixed "could not answer" message. `POST /v1/retailer/ask` (sign-in, guest is fine; 20 a day).
+- Advisor tools `search_catalog` and `compare_products` now return `measured_outcomes` from the cohort (`product_outcomes`, labelled `synthetic_cohort`); the advisor may quote a rate as a whole percent with its n. Each advisor answer returns `checks {model, tool_calls, numbers_checked, products_from_tools}` and the web shows the steps and checks under the answer.
+
 ## Status (Oct 13)
 - Explanation: live (`api/app/explain.py`). Gemini gets the metrics rounded the way the app shows them; the validator rejects unknown numbers, disease or "lighter/fairer" wording, change language for anything but `real_change`, and unknown metric ids; at most two Gemini calls, then the template. `explanation_source` says which one the person sees.
 - Routine check: live (`api/app/routine_check.py`). The rule table runs as code (`source: "rule"`), so it is deterministic; Gemini may add `source: "model"` findings, kept only if they name known products, add no numbers, never flag niacinamide + vitamin C and do not repeat a rule finding.

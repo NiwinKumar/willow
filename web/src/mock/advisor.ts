@@ -1,7 +1,16 @@
 import type { Session } from '../data/types'
 import { METRIC_META, fmtSigned, fmtValue } from '../lib/metrics'
 
-export type Turn = { role: 'user' | 'willow'; text: string; retrieval?: string[]; product_ids?: string[]; follow_ups?: string[]; numbers?: { token: string; metric: string }[] }
+export type Turn = {
+  role: 'user' | 'willow'
+  text: string
+  retrieval?: string[]
+  product_ids?: string[]
+  follow_ups?: string[]
+  numbers?: { token: string; metric: string }[]
+  /** Live answers: what the validator checked (api advisor.py). */
+  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number }
+}
 
 /** Canned advisor turns for demo mode. Every quoted number is read from the session data, never typed in. */
 export function answer(q: string, sessions: Session[]): Turn {

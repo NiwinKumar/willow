@@ -1,6 +1,7 @@
 import { Download } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { AskData } from '../components/AskData'
 import { Chip } from '../components/Chip'
 import { api, type RetailerInsights } from '../lib/api'
 
@@ -55,6 +56,7 @@ export function Retailer() {
         <div className="flex flex-wrap items-end justify-between gap-3 pt-4">
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Willow Retailer</h1>
         </div>
+        <AskData />
         <nav className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0" aria-label="Retailer views">
           <ul className="flex gap-1 border-b border-border">
             {TABS.map((t) => (
