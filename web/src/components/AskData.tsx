@@ -59,7 +59,7 @@ export function AskData() {
       {!asked ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {STARTERS.map((s) => (
-            <button key={s} type="button" onClick={() => void ask(s)} className="min-h-9 rounded-full border border-border bg-bg px-3 text-[13px] hover:bg-surface-2">
+            <button key={s} type="button" onClick={() => void ask(s)} className="min-h-11 rounded-full border border-border bg-bg px-3 text-[13px] hover:bg-surface-2">
               {s}
             </button>
           ))}
@@ -97,7 +97,7 @@ export function AskData() {
               {reply.follow_ups.length ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {reply.follow_ups.map((f) => (
-                    <button key={f} type="button" onClick={() => void ask(f)} className="min-h-9 rounded-full border border-border bg-bg px-3 text-[13px] hover:bg-surface-2">
+                    <button key={f} type="button" onClick={() => void ask(f)} className="min-h-11 rounded-full border border-border bg-bg px-3 text-[13px] hover:bg-surface-2">
                       {f}
                     </button>
                   ))}

@@ -29,7 +29,7 @@ People spend weeks on a serum and still cannot tell whether it worked: phone pho
 | **Cloud Storage** | Photos via V4 signed URLs (deleted after 30 days), engine outputs, hosted judge samples |
 | **Gemini on Vertex AI** (`gemini-3.8-flash`) | Six jobs, all structured JSON validated before use (below) |
 | **BigQuery** | Outcome tables for the retailer view and the "Ask this data" assistant |
-| **Data Studio** (formerly Looker Studio) | A shareable retailer report on the same suppressed aggregates |
+| **Data Studio** (formerly Looker Studio) | [A shareable retailer report](https://datastudio.google.com/reporting/5147af6b-c268-470a-a420-2277dfcfe7df) on the same suppressed aggregates (`api/scripts/publish_looker.py`) |
 
 ```mermaid
 flowchart LR

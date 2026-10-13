@@ -1,5 +1,5 @@
 import type { Session } from '../data/types'
-import { fmtSigned, fmtValue } from '../lib/metrics'
+import { UNIT_LABEL, fmtSigned, fmtValue } from '../lib/metrics'
 import { BandBar } from './BandBar'
 import { Chip, VerdictChip } from './Chip'
 
@@ -18,8 +18,9 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
   const controlReal = c.verdict === 'real_change'
   // The gap counts only beyond the noise for a difference and in the direction the treated side moved.
   const ddReal = !noBand && Math.abs(dd) > band && Math.sign(dd) === Math.sign(t.delta)
-  const tr = fmtSigned(t.delta, t)
-  const un = fmtSigned(c.delta, c)
+  const u = UNIT_LABEL[t.unit]
+  const tr = `${fmtSigned(t.delta, t)}${u}`
+  const un = `${fmtSigned(c.delta, c)}${u}`
   const kind = noBand
     ? 'no_band'
     : treatedReal && !controlReal && ddReal
@@ -41,11 +42,11 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
   }[kind]
   const body = {
     no_band: `Treated moved ${tr} and untreated ${un}. A baseline with one photo has no noise band, so the difference cannot be judged yet. Take 5 photos of each square and make them your baselines.`,
-    treated: `The treated side changed by ${tr} and the untreated side by ${un}. The gap (${fmtSigned(dd, t)}) is outside photo noise for a difference (±${fmtValue(band, t)}), so lighting or time of day are unlikely to explain it and it may be linked to the product. The untreated side staying inside its band is the test working as expected.`,
-    both_more: `Both sides moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated side moved more by ${fmtSigned(dd, t)}, beyond the noise for a difference (±${fmtValue(band, t)}); that extra part may be linked to the product.`,
+    treated: `The treated side changed by ${tr} and the untreated side by ${un}. The gap (${fmtSigned(dd, t)}${u}) is outside photo noise for a difference (±${fmtValue(band, t)}${u}), so lighting or time of day are unlikely to explain it and it may be linked to the product. The untreated side staying inside its band is the test working as expected.`,
+    both_more: `Both sides moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated side moved more by ${fmtSigned(dd, t)}${u}, beyond the noise for a difference (±${fmtValue(band, t)}${u}); that extra part may be linked to the product.`,
     not_attributable: `Treated moved ${tr} and untreated ${un}. ${treatedReal ? 'Both moved outside their bands by a similar amount' : 'The untreated side moved outside its band'}, so something other than the product, such as lighting, sun or temperature, likely moved the reading. We can't attribute this to the product.`,
-    treated_small_gap: `The treated side moved ${tr}, outside its own band, while the untreated side moved ${un}. The gap (${fmtSigned(dd, t)}) is still inside the noise for a difference (±${fmtValue(band, t)}), so the change cannot yet be separated from drift such as light or time of day.`,
-    noise: `Treated moved ${tr} and untreated ${un}; the gap (${fmtSigned(dd, t)}) is inside the noise for a difference (±${fmtValue(band, t)}). Nothing measurable yet.`,
+    treated_small_gap: `The treated side moved ${tr}, outside its own band, while the untreated side moved ${un}. The gap (${fmtSigned(dd, t)}${u}) is still inside the noise for a difference (±${fmtValue(band, t)}${u}), so the change cannot yet be separated from drift such as light or time of day.`,
+    noise: `Treated moved ${tr} and untreated ${un}; the gap (${fmtSigned(dd, t)}${u}) is inside the noise for a difference (±${fmtValue(band, t)}${u}). Nothing measurable yet.`,
   }[kind]
   return (
     <div className="rounded-(--radius-tile) border border-border bg-surface p-4">
@@ -62,8 +63,8 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
         <BandBar value={c.value} baseline={cb.value} mdc95={cb.mdc95} verdict={c.verdict} reach={Math.abs(t.delta)} label={`Untreated side ${fmtSigned(c.delta, c)}`} />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[13px] text-text-2">
-        <Chip tone="neutral">difference {fmtSigned(dd, t)}</Chip>
-        <Chip tone="neutral">band for the difference ±{fmtValue(band, t)}</Chip>
+        <Chip tone="neutral">difference {fmtSigned(dd, t)}{u}</Chip>
+        <Chip tone="neutral">band for the difference ±{fmtValue(band, t)}{u}</Chip>
       </div>
     </div>
   )

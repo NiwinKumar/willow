@@ -1,7 +1,7 @@
 import { Check, X } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { DemoBar } from '../components/DemoBar'
@@ -12,10 +12,11 @@ import type { Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { ApiError, api, type SessionView } from '../lib/api'
 import { plural } from '../lib/format'
-import { QUALITY_COPY, SITE_LABEL } from '../lib/metrics'
+import { SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { useAuth } from '../lib/useAuth'
 import { useJudgeOn } from '../lib/useJudge'
+import { failureReasons } from '../lib/warnings'
 import { DEMO_SERIES } from '../mock/series'
 
 const LABELS = ['Checking photo quality', 'Correcting colours', 'Measuring', 'Explaining']
@@ -28,12 +29,12 @@ function outcomes(view: SessionView): string[] {
     return [`${n} ${n === 1 ? 'photo' : 'photos'} received and saved`, `${SITE_LABEL[view.session.site]} is not measured yet`, 'Nothing measured, so no numbers', 'Nothing to explain']
   }
   const q = r.quality
-  const quality = q.passed ? `${r.frames_used} of ${n} ${n === 1 ? 'photo' : 'photos'} passed the quality check` : (q.reasons.map((x) => QUALITY_COPY[x]?.text).filter(Boolean)[0] ?? 'Photo quality too low to compare')
+  const quality = q.passed ? `${r.frames_used} of ${n} ${n === 1 ? 'photo' : 'photos'} passed the quality check` : (failureReasons(r)[0] ?? 'Photo quality too low to compare')
   const warnings = r.warnings ?? []
   const paper = warnings.some((w) => w.includes('white paper')) && !warnings.some((w) => w.includes('no white reference'))
   const colour =
     r.capture_mode === 'uncalibrated'
-      ? 'No colour card: results are a trend'
+      ? 'Phone photo, no colour reference: results are a trend'
       : q.card_detected
         ? `Colour card found${q.card_delta_e_mean != null ? `, ΔE ${q.card_delta_e_mean.toFixed(1)}` : ''}`
         : paper
@@ -182,6 +183,13 @@ export function Processing() {
   return (
     <div className="flex min-h-dvh flex-col">
       {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
+      <header className="flex h-12 items-center justify-between px-5 sm:px-8">
+        <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-signal-500" />
+          Willow
+        </Link>
+        {!scripted && !view && !error ? <span className="text-[12px] text-text-3">You can leave this page; the measurement keeps going.</span> : null}
+      </header>
       <div className="h-[40dvh]">
         {scripted || view ? (
           <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'frame', 'frames')} />

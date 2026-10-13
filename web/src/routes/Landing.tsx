@@ -48,7 +48,7 @@ export function Landing() {
         {/* The live Lens: drag before you read. On phones it sits right under the headline. */}
         <div className="rounded-(--radius-tile) border border-border bg-surface p-3 sm:p-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">
           <div className="flex items-center justify-between gap-2 px-1 pb-2">
-            <span className="text-[13px] font-semibold">Self-tanner on the left square, nothing on the right</span>
+            <span className="text-[13px] font-semibold">Self-tanner on one square, nothing on the other</span>
             <Chip tone="neutral">sample</Chip>
           </div>
           <div className="h-[260px] sm:h-[320px]">
@@ -108,10 +108,10 @@ export function Landing() {
             ) : (
               <>
                 <span>No sign-in needed to try it.</span>
-                <Button variant="quiet" className="!min-h-9 !px-2" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
+                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
                   Continue as guest
                 </Button>
-                <Button variant="quiet" className="!min-h-9 !px-2" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
+                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
                   Sign in with Google to keep your results
                 </Button>
               </>
