@@ -93,3 +93,12 @@ def test_edge_hair_keeps_bumpy_forehead_that_only_touches_the_ear_side():
     ear = np.zeros_like(skin)
     ear[:, :40] = True
     assert not edge_hair(lab, skin, ref, PX_PER_MM, ear)[50, 150]
+
+
+def test_skin_colour_keeps_inflamed_red_skin():
+    lab = _skin(L=70.0, a=6.0, b=14.0)  # clear cheek, hue about 67°
+    lab[150:220, 40:200] = (68.0, 18.0, 13.0)  # inflamed patch, hue about 36°: redder
+    mask = np.ones((240, 240), bool)
+    ref = np.zeros_like(mask)
+    ref[20:120, 40:200] = True
+    assert skin_colour(lab, mask, ref, PX_PER_MM)[185, 120]
