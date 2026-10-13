@@ -51,3 +51,19 @@ def only_known(text: str, allowed: set[str]) -> bool:
         if clean not in allowed:
             return False
     return True
+
+
+def percents(obj: Any) -> set[str]:
+    """Fractions in the aggregates written as whole (or one-decimal) percents."""
+    out: set[str] = set()
+    if isinstance(obj, bool) or obj is None:
+        return out
+    if isinstance(obj, float) and -1 <= obj <= 1:
+        out |= collect(round(obj * 100)) | collect(round(obj * 100, 1))
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            out |= percents(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            out |= percents(v)
+    return out
