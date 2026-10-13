@@ -1,0 +1,22 @@
+# Uploaded to Cloud Build when building from the repo root (engine image). Keep it small.
+.git/
+.github/
+docs/
+prompts/
+data/
+web/
+api/
+infra/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+*.dng
+*.DNG
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.log
+.env*
