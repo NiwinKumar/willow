@@ -2,7 +2,8 @@
 
 Mode is picked from the files: .dng -> calibrated_raw, .heic/.jpg -> uncalibrated.
 
-By default the skin square is found from 4 pen dots and the white paper is found automatically.
+Forearm: the skin square is found from 4 pen dots and the white paper automatically.
+Face: no markers or paper; the face is found by landmarks.
 --roi / --white override that: give once (same box for every photo) or once per photo, in order.
 """
 
@@ -37,14 +38,18 @@ def main(argv: list[str] | None = None) -> None:
         "--site", required=True, choices=["forearm_treated", "forearm_control", "face_full"]
     )
     a.add_argument("--roi", action="append", help="skin square x,y,w,h (default: find 4 pen dots)")
-    a.add_argument("--white", action="append", help="white paper x,y,w,h (default: find paper)")
+    a.add_argument(
+        "--white", action="append", help="forearm only: white paper x,y,w,h (default: find paper)"
+    )
     a.add_argument(
         "--square",
         type=int,
         choices=[1, 2],
         help="two dotted squares in the photo: 1 = upper one, 2 = lower one",
     )
-    a.add_argument("--no-white", action="store_true", help="skip white-paper correction")
+    a.add_argument(
+        "--no-white", action="store_true", help="forearm only: skip white-paper correction"
+    )
     a.add_argument("--baseline", help="baseline.json: {metric_id: {mean, mdc95}}")
     a.add_argument("--out", help="directory for result.json")
     args = p.parse_args(argv)
@@ -54,7 +59,7 @@ def main(argv: list[str] | None = None) -> None:
     n = len(args.files)
     baseline = json.loads(Path(args.baseline).read_text()) if args.baseline else None
     if args.site == "face_full":
-        result = analyze_face(args.files, baseline=baseline, auto_white=not args.no_white)
+        result = analyze_face(args.files, baseline=baseline)
     else:
         result = analyze_forearm(
             args.files,

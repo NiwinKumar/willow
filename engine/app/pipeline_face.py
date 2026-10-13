@@ -1,4 +1,4 @@
-"""face_full analysis (M2): landmarks -> ROIs -> white paper -> Lab -> A-tier face metrics."""
+"""face_full analysis (M2): landmarks -> ROIs + face skin mask -> Lab -> A-tier face metrics."""
 
 import json
 import time
@@ -8,10 +8,9 @@ from jsonschema import validate
 
 from app import config
 from app.aggregate import summarize
-from app.color import linear_srgb_to_lab, white_balance
+from app.color import linear_srgb_to_lab
 from app.errors import EngineError
 from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, refine_skin
-from app.markers import paper_pixels
 from app.metrics.evenness import tone_evenness
 from app.metrics.pigment import pigment_spots
 from app.metrics.redness import erythema_index
@@ -50,7 +49,7 @@ def _pose_ok(face: Face) -> bool:
     )
 
 
-def _frame(path: str, auto_white: bool) -> dict:
+def _frame(path: str) -> dict:
     """Everything measured on one photo; raises FaceNotFound."""
     linear, srgb8 = _load(path)
     face = detect_face(srgb8)
@@ -69,26 +68,8 @@ def _frame(path: str, auto_white: bool) -> dict:
     if not _pose_ok(face):
         quality.reasons.append("pose_out_of_range")
 
-    white_px = None
-    if auto_white:
-        try:
-            # paper must be held beside the face, level with the cheeks; never use a wall
-            # or a shirt (the biggest white thing in a selfie) as the white reference
-            white_px = paper_pixels(
-                linear,
-                srgb8,
-                near=cheek_box,
-                require_near=True,
-                max_gap=config.PAPER_MAX_GAP_FACE_WIDTHS * cheek_box.w,
-            )
-            paper_lab = linear_srgb_to_lab(np.median(white_px, axis=0))
-            if np.hypot(paper_lab[1], paper_lab[2]) > config.PAPER_MAX_CHROMA:
-                white_px = None  # beige wall / coloured fabric, not white paper
-        except ValueError:
-            white_px = None
+    # colours as the phone captured them: users do not hold a white reference
     lin = box.crop(linear)
-    if white_px is not None:
-        lin = white_balance(lin, white_px)
     lab = linear_srgb_to_lab(lin)
 
     skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
@@ -128,7 +109,6 @@ def _frame(path: str, auto_white: bool) -> dict:
         "face": face,
         "polygons": polys,
         "shape": srgb8.shape,
-        "white_ok": white_px is not None,
         "face_skin": (box, face_skin),
     }
 
@@ -144,7 +124,6 @@ def analyze_face(
     session_id: str = "s_local",
     user_id: str = "local",
     baseline: dict | None = None,
-    auto_white: bool = True,
 ) -> dict:
     """Analyze 1-5 front-on face photos of one session (site face_full)."""
     t0 = time.perf_counter()
@@ -157,7 +136,7 @@ def analyze_face(
     per_frame, frames, warnings = [], [], []
     for i, path in enumerate(files):
         try:
-            f = _frame(path, auto_white)
+            f = _frame(path)
         except FaceNotFound:
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
@@ -204,11 +183,7 @@ def analyze_face(
     if mode == "uncalibrated":
         warnings.insert(0, "uncalibrated photo: results are a trend only, not a measurement")
     else:
-        warnings.insert(0, "no colour card: colours corrected with the white paper only")
-    if frames and not all(f["white_ok"] for f in frames):
-        warnings.append(
-            "no white paper held beside the face in some photos: light colour not corrected"
-        )
+        warnings.insert(0, "no colour card: colours as captured by the camera")
 
     ref = frames[0] if frames else None
     qs = [f["quality"] for f in frames]

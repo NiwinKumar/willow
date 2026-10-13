@@ -38,12 +38,6 @@ ITA_BANDS = [
 
 MDC_Z = 1.96  # 95% two-sided
 
-# White paper for faces must start within this many cheek-span widths of the cheeks
-PAPER_MAX_GAP_FACE_WIDTHS = 0.6
-# ...and be nearly colourless: real paper measured Oct 13 at chroma 2.0-4.4 (Lab a*,b*);
-# a beige wardrobe behind a selfie measured 12.
-PAPER_MAX_CHROMA = 7.0
-
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
 FACE_ROI_SHRINK = 0.85  # pull ROI hulls 15% toward their centre to stay off edges
