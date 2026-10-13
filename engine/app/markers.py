@@ -8,6 +8,11 @@ from skimage.filters import gaussian
 
 from app.roi import Box
 
+
+class SpotNotFound(ValueError):
+    """The pen-dot square(s) could not be found in a photo."""
+
+
 SCALE = 4  # work on a 4x smaller copy: dots are still ~5-15 px across, and it is 16x faster
 DOT_MIN_CONTRAST = 15.0  # dot must differ from the skin around it by this many grey levels
 SKIN_MIN_WARMTH = 0.12  # (R - B) / R: skin is warm at every tone, paper is ~0
@@ -111,7 +116,7 @@ def find_dot_squares(
     elif n not in (1, 2):
         raise ValueError("only 1 or 2 squares supported")
     if chosen is None:
-        raise ValueError(f"could not find {n} dotted square(s) ({len(cands)} dark spots seen)")
+        raise SpotNotFound(f"could not find {n} dotted square(s) ({len(cands)} dark spots seen)")
     found = [(_inner_box(pts[c], side), pts[c]) for _, side, c in chosen]
     return sorted(found, key=lambda f: f[1][:, 1].mean())
 
