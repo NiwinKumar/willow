@@ -33,17 +33,20 @@ function outcomes(view: SessionView): string[] {
     r.capture_mode === 'uncalibrated'
       ? 'No colour card: results are a trend'
       : q.card_detected
-        ? `Colour card found${q.card_delta_e_mean != null ? `, ΔE ${q.card_delta_e_mean}` : ''}`
+        ? `Colour card found${q.card_delta_e_mean != null ? `, ΔE ${q.card_delta_e_mean.toFixed(1)}` : ''}`
         : paper
           ? 'Colours corrected with the white paper'
           : 'No colour reference found: colours not corrected'
-  const count = `${r.metrics.length} ${r.metrics.length === 1 ? 'metric' : 'metrics'}`
-  const measured = view.session.is_baseline
+  const usable = r.metrics.filter((m) => m.value !== null).length
+  const count = `${usable} ${usable === 1 ? 'metric' : 'metrics'}`
+  const measured = usable === 0
+    ? 'Nothing measured: the photos did not pass the quality check'
+    : view.session.is_baseline
     ? `${count} measured. This is your baseline`
     : view.session.baseline?.has_noise_band === false
       ? `${count} compared with your baseline (no noise band yet)`
       : `${count} compared with your baseline`
-  const explained = view.session.explanation_source === 'gemini' ? 'Numbers verified, nothing invented' : 'Written from your numbers'
+  const explained = usable === 0 ? 'Nothing to explain' : view.session.explanation_source === 'gemini' ? 'Explained by AI, every number checked' : 'Written from your numbers'
   return [quality, colour, measured, explained]
 }
 
@@ -68,7 +71,7 @@ async function analyzeOnce(token: string, sessionId: string): Promise<SessionVie
 }
 
 const ERROR_COPY: Record<string, string> = {
-  frames_missing: 'Some photos have not finished uploading. Go back and let the upload finish.',
+  frames_missing: 'Some photos never reached Willow, so there is nothing to measure yet. Upload them again.',
   engine_timeout: 'The measurement took too long. Your photos are safe; try again.',
   engine_unreachable: 'The measurement service did not answer. Your photos are safe; try again.',
   frame_unreadable: 'One of the files could not be read. Check that it is the original DNG or JPEG.',
@@ -84,7 +87,7 @@ export function Processing() {
   const { sessionId = '' } = useParams()
   const [params] = useSearchParams()
   const data = useData()
-  const { getIdToken } = useAuth()
+  const { getIdToken, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const site = (params.get('site') as Site) ?? 'face_full'
@@ -125,7 +128,8 @@ export function Processing() {
     }
   }, [])
   useEffect(() => {
-    if (scripted || ran.current === attempt) return
+    // Wait for Firebase to restore the signed-in person after a reload before asking the api.
+    if (scripted || authLoading || ran.current === attempt) return
     ran.current = attempt
     const later = (ms: number, f: () => void) => window.setTimeout(() => mounted.current && f(), ms)
     // No stage is ticked before the engine answers: progress shown is real or not shown at all.
@@ -152,7 +156,7 @@ export function Processing() {
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scripted, attempt, sessionId])
+  }, [scripted, attempt, sessionId, authLoading])
 
   // Live: once every stage shows its result, open the report on this session (unless nothing
   // was measured; then this page says what happened and offers what works today).
@@ -175,7 +179,13 @@ export function Processing() {
     <div className="flex min-h-dvh flex-col">
       {data.mode === 'demo' ? <DemoBar /> : null}
       <div className="h-[40dvh]">
-        <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'frame', 'frames')} />
+        {scripted || view ? (
+          <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'frame', 'frames')} />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-surface-2 px-8 text-center text-[13px] text-text-3">
+            {plural(n, 'photo', 'photos')} received. Measuring them now.
+          </div>
+        )}
       </div>
       <div className="mx-auto w-full max-w-[36rem] px-5 py-6 sm:px-8">
         <h1 className="text-[22px] font-bold tracking-[-0.02em]">{error ? 'Measuring stopped' : done < LABELS.length ? 'Measuring…' : unmeasured ? 'Saved, not measured yet' : failed ? 'Done, with a photo problem' : 'Done'}</h1>
@@ -224,7 +234,7 @@ export function Processing() {
             <p className="text-[15px] text-text-2">{error.message}</p>
             <div className="flex flex-wrap gap-3">
               {error.code === 'frames_missing' ? (
-                <Button onClick={() => navigate(-1)}>Back to the upload</Button>
+                <Button onClick={() => navigate(`/capture?site=${site}`)}>Upload the photos again</Button>
               ) : (
                 <Button
                   onClick={() => {
@@ -240,7 +250,7 @@ export function Processing() {
           </div>
         ) : null}
         {data.mode === 'demo' ? <p className="mt-6 text-[12px] text-text-3">Demo: the stages are played, then the sample journey opens.</p> : null}
-        {data.mode === 'live' && sessionId === 'sample' ? <p className="mt-6 text-[12px] text-text-3">Sample run: the stages are played, then the sample journey opens. Hosted sample sessions run the real pipeline once the engine is connected.</p> : null}
+        {data.mode === 'live' && sessionId === 'sample' ? <p className="mt-6 text-[12px] text-text-3">Sample run: the stages are played, then the sample journey opens. Nothing here is measured.</p> : null}
       </div>
     </div>
   )

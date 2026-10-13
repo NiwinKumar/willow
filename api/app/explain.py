@@ -127,6 +127,24 @@ class _Explanation(BaseModel):
     disclaimer: str = Field(max_length=120)
 
 
+# How the app displays each unit (web/src/lib/metrics.ts): Gemini quotes these, not raw floats.
+UNIT_DISPLAY = {
+    "deg": ("°", 1),
+    "a_star": (" a*", 1),
+    "pct_area": ("% of area", 1),
+    "index": ("", 2),
+    "count": ("", 0),
+    "per_cm2": (" per cm²", 0),
+    "delta_l_star": (" ΔL*", 1),
+}
+
+
+def _shown(x: float | None, unit: str) -> float | None:
+    if x is None:
+        return None
+    return round(x, UNIT_DISPLAY.get(unit, ("", 2))[1])
+
+
 def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     return {
         "site": result["site"],
@@ -137,18 +155,15 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
         "warnings": result.get("warnings", []),
         "metrics": [
             {
-                k: m.get(k)
-                for k in (
-                    "id",
-                    "label",
-                    "value",
-                    "unit",
-                    "delta",
-                    "mdc95",
-                    "verdict",
-                    "direction",
-                    "confidence",
-                )
+                "id": m["id"],
+                "label": m["label"],
+                "verdict": m["verdict"],
+                "direction": m["direction"],
+                "confidence": m["confidence"],
+                "unit": UNIT_DISPLAY.get(m["unit"], ("", 2))[0].strip() or m["unit"],
+                "value": _shown(m["value"], m["unit"]),
+                "delta": _shown(m.get("delta"), m["unit"]),
+                "mdc95": _shown(m.get("mdc95"), m["unit"]),
             }
             for m in result["metrics"]
         ],
@@ -182,7 +197,7 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
         return template(result), "template"
     data = gemini_input(result, context)
     prompt = f"Session data (JSON):\n{json.dumps(data)}"
-    for _ in range(2):
+    for _ in range(2):  # at most two Gemini calls, then the template: analysis must stay quick
         try:
             exp = gemini.generate_json(
                 "explanation",
@@ -191,6 +206,7 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
                 instructions=INSTRUCTIONS,
                 temperature=0.3,
                 max_output_tokens=4096,
+                attempts=1,
             )
         except gemini.GeminiError:
             break

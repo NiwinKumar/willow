@@ -18,12 +18,18 @@ export function Settings() {
   const consent = prefs.consent()
   const [confirm, setConfirm] = useState(false)
   const [optIn, setOptIn] = useState(consent?.aggregate_opt_in ?? false)
-  const [deleteDate] = useState(() => new Date(Date.now() + 30 * 86_400_000).toISOString())
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   async function deleteEverything() {
     setDeleting(true)
     try {
+      if (data.mode === 'live' && !user) {
+        prefs.clearAll()
+        setConfirm(false)
+        toast('Not signed in, so there was nothing stored on the server. This device is cleared.')
+        return
+      }
       if (data.mode === 'live' && user) {
         await api.deleteMe(await getIdToken())
         try {
@@ -52,7 +58,7 @@ export function Settings() {
         <dl className="mt-3 space-y-2 text-[15px]">
           {[
             ['Account', user ? (user.isAnonymous ? 'Guest (anonymous)' : user.email ?? 'Google') : 'Not signed in'],
-            ['Photos', `Private bucket, us-central1. Next automatic deletion by ${fmtDate(deleteDate)}.`],
+            ['Photos', 'Private bucket, us-central1. Each photo is deleted automatically 30 days after upload.'],
             ['Measurements', 'Kept in your account until you delete them.'],
             ['Face identification', 'None. Regions are found for measurement only; no identity template is computed.'],
             ['Consent', consent ? `Version ${consent.version}, accepted ${fmtDate(consent.accepted_at)}` : 'Not recorded on this device'],
@@ -87,10 +93,17 @@ export function Settings() {
         <p className="mt-1 text-[13px] text-text-2">Removes photos, results and your account. Minutes, not days. There is no undo.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" className="!min-h-10 !text-danger" onClick={() => setConfirm(true)}>Delete my data</Button>
-          {user ? <Button variant="quiet" className="!min-h-10" onClick={() => void signOutUser()}>Sign out</Button> : null}
+          {user ? <Button variant="quiet" className="!min-h-10" onClick={() => (user.isAnonymous ? setConfirmSignOut(true) : void signOutUser())}>Sign out</Button> : null}
         </div>
       </section>
 
+      <Sheet open={confirmSignOut} onOpenChange={setConfirmSignOut} title="Sign out of the guest account?">
+        <p className="text-[15px] text-text-2">A guest account has no password. Once you sign out you cannot get back to its sessions and routine.</p>
+        <div className="mt-4 flex gap-2">
+          <Button onClick={() => { setConfirmSignOut(false); void signOutUser() }}>Sign out anyway</Button>
+          <Button variant="secondary" onClick={() => setConfirmSignOut(false)}>Stay signed in</Button>
+        </div>
+      </Sheet>
       <Sheet open={confirm} onOpenChange={setConfirm} title="Delete everything?">
         <p className="text-[15px] text-text-2">This removes photos, results and your account. There is no undo.</p>
         <div className="mt-4 flex gap-2">

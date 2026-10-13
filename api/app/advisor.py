@@ -232,10 +232,12 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
     final_prompt = (
         f"CONTEXT (JSON):\n{json.dumps(ctx)}\n\nTOOL RESULTS (JSON):\n"
         f"{json.dumps(tool_outputs)}\n\nCONVERSATION:\n{transcript}\n\n"
-        "Write the reply to the last USER message. product_ids: only ids from TOOL RESULTS that "
-        "you actually recommend or discuss. follow_up_suggestions: up to 3 short questions the "
-        "person might ask next."
+        "Write the reply to the last USER message. product_ids: only ids from TOOL RESULTS or "
+        "the routine in CONTEXT that you actually recommend or discuss. "
+        "follow_up_suggestions: up to 3 short questions the person might ask next."
     )
+    # Products it may show: anything a tool returned, plus the person's own routine products.
+    product_ids |= {r["product_id"] for r in ctx["routine"] if r.get("product_id")}
     allowed = numbers.collect(ctx) | numbers.collect(tool_outputs)
     for m in messages:
         if m["role"] == "user":

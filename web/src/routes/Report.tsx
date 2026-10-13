@@ -15,7 +15,7 @@ import { NumberValue } from '../components/NumberValue'
 import { Scrubber } from '../components/Scrubber'
 import { Sheet } from '../components/Sheet'
 import { Stage } from '../components/Stage'
-import { baselineFor, isSampleEngine, isUnmeasured } from '../data/live'
+import { baselineFor, isSampleEngine, isUnmeasured, matchControl } from '../data/live'
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { fmtDate, plural } from '../lib/format'
@@ -39,9 +39,14 @@ export function Report() {
   const index = Math.min(sessions.length - 1, Math.max(0, view.t ?? sessions.length - 1))
   const session: Session | null = sessions[index] ?? null
   const baseline = useMemo(() => baselineFor(session, sessions), [session, sessions])
-  const { getIdToken } = useAuth()
+  const { getIdToken, loading: authLoading, user, continueAsGuest, signInWithGoogle } = useAuth()
   const [settingBaseline, setSettingBaseline] = useState(false)
   const unmeasured = isUnmeasured(session)
+  const qualityFailed = Boolean(session?.result && !session.result.quality.passed)
+  const nothingMeasured = Boolean(session?.result && session.result.metrics.every((m) => m.value === null))
+  const controlSessions = useMemo(() => data.series('forearm_control')?.sessions ?? [], [data])
+  // Demo journeys are aligned by index; live pairs the nearest control photo in time.
+  const controlSession = data.mode === 'demo' ? (controlSessions[index] ?? null) : matchControl(session, controlSessions)
   const noBand = Boolean(session && !session.is_baseline && session.baseline_ref && !session.baseline_ref.has_noise_band)
 
   const makeBaseline = async () => {
@@ -65,11 +70,13 @@ export function Report() {
 
   const metrics = session?.result?.metrics ?? []
   const baselineMetric = useCallback((id: MetricId) => baseline?.result?.metrics.find((m) => m.id === id) ?? null, [baseline])
+  // Quick selfies and RAW sessions are never compared, so charts and band scales use one mode.
+  const sameMode = useMemo(() => sessions.filter((s) => s.capture_mode === session?.capture_mode && s.measured !== false), [sessions, session])
   const reach = useMemo(() => {
     const r: Partial<Record<MetricId, number>> = {}
-    for (const s of sessions) for (const m of s.result?.metrics ?? []) r[m.id] = Math.max(r[m.id] ?? 0, Math.abs(m.delta ?? 0))
+    for (const s of sameMode) for (const m of s.result?.metrics ?? []) r[m.id] = Math.max(r[m.id] ?? 0, Math.abs(m.delta ?? 0))
     return r
-  }, [sessions])
+  }, [sameMode])
   const realCount = metrics.filter((m) => m.verdict === 'real_change').length
   const groups = orderedGroups(data.goals)
   const grouped = groups
@@ -91,6 +98,19 @@ export function Report() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [index, sessions.length, view])
+
+  if (data.mode === 'live' && !authLoading && !user) {
+    return (
+      <div className="mx-auto max-w-[36rem] px-5 py-12">
+        <h1 className="text-[28px] font-bold tracking-[-0.02em]">Sign in to see your results</h1>
+        <p className="mt-3 text-[15px] text-text-2">Your sessions belong to your account. A guest account keeps them on this device; Google keeps them across devices.</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button onClick={() => continueAsGuest().catch(() => toast.error('Could not sign in. Check your connection and try again.'))}>Continue as guest</Button>
+          <Button variant="secondary" onClick={() => signInWithGoogle().catch(() => toast.error('Google sign-in did not finish. Try again.'))}>Sign in with Google</Button>
+        </div>
+      </div>
+    )
+  }
 
   if (data.mode === 'live' && (data.status === 'loading' || data.status === 'idle') && sessions.length === 0) {
     return (
@@ -140,6 +160,21 @@ export function Report() {
             </p>
             <Link to="/capture?site=forearm_control" className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
               Photograph a forearm
+            </Link>
+          </>
+        ) : qualityFailed && session ? (
+          <>
+            <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">These photos could not be measured</h1>
+            <p className="mt-1 text-[13px] text-text-2">
+              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · {session.result?.frames_used ?? 0} passed the quality check
+            </p>
+            <ul className="mt-3 space-y-1 text-[15px] text-text-2">
+              {[...new Set(session.result?.quality.reasons ?? [])].map((r) => (
+                <li key={r}>{QUALITY_COPY[r]?.text ?? r}</li>
+              ))}
+            </ul>
+            <Link to={`/capture?site=${session.site}${session.capture_mode === 'uncalibrated' ? '&mode=quick' : ''}`} className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+              Retake
             </Link>
           </>
         ) : session?.is_baseline ? (
@@ -200,7 +235,7 @@ export function Report() {
           </ul>
         </div>
       ) : null}
-      {session?.result && !session.result.quality.passed ? (
+      {session?.result && !session.result.quality.passed && !qualityFailed ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold text-warn-text">Photo quality differed from your reference.</span>{' '}
           {session.result.quality.reasons.map((r) => QUALITY_COPY[r]?.text).join(' ')}
@@ -210,14 +245,14 @@ export function Report() {
         <div className="mx-5 mb-3 sm:mx-6">
           <ControlCompare
             treated={session}
-            control={data.series('forearm_control')?.sessions[index] ?? null}
+            control={controlSession}
             treatedBaseline={baseline}
-            controlBaseline={data.series('forearm_control')?.sessions.find((s) => s.is_baseline) ?? null}
+            controlBaseline={baselineFor(controlSession, controlSessions)}
             metricId={(metricId === 'redness' ? 'redness' : 'tone_ita') as 'tone_ita' | 'redness'}
           />
         </div>
       ) : null}
-      {grouped.map(({ group, items }) => (
+      {(nothingMeasured ? [] : grouped).map(({ group, items }) => (
         <section key={group} aria-labelledby={`g-${group}`}>
           <h2 id={`g-${group}`} className="border-b border-border px-5 pb-1 pt-4 text-[15px] font-semibold text-text-2 sm:px-6">
             {GROUP_META[group as MetricGroup].label}
@@ -242,7 +277,7 @@ export function Report() {
                     if (snap === 'peek') setSnap('full')
                   }}
                 >
-                  <MetricDetail metricId={m.id} sessions={sessions} current={m} baseline={baseline} />
+                  <MetricDetail metricId={m.id} sessions={sameMode} current={m} baseline={baseline} />
                 </MetricRow>
               )
             })}

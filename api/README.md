@@ -29,6 +29,8 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | GET | `/v1/catalog/{product_id}` | One product |
 | POST | `/v1/label-scan` | `{images:[{mime_type, data_base64}]}` -> `{scan, match}` via Gemini; saves nothing |
 | GET/POST | `/v1/routine` | List / add entries (catalog facts win for a `product_id`) |
+| POST | `/v1/routine/check` | Compatibility: rule table (`source: rule`) plus validated Gemini additions (`source: model`) |
+| POST | `/v1/advisor/chat` | `{messages:[{role, text}]}` -> `{message, products, follow_up_suggestions, retrieval, remaining_today}`; 20 a day |
 | PATCH/DELETE | `/v1/routine/{id}` | Stop (`ended_at`) or move AM/PM / remove a mistaken entry |
 
 `SessionView.session` also carries `measured` (false when the engine returned a placeholder; `result` is then null), `baseline` (`{session_id, frames, has_noise_band}` of the baseline this session is compared with, same site and capture mode), `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
