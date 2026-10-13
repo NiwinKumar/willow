@@ -123,7 +123,7 @@ const WHAT: Record<Metric['id'], string> = {
   glow: 'A composite of lightness versus your baseline, chroma and fine-scale smoothness. Change only, indicative.',
 }
 const OTHER: Record<Metric['id'], string> = {
-  tone_ita: 'A different lamp or colour card position, sun exposure, a tan, and time of day.',
+  tone_ita: 'A different lamp, a moved paper or colour card, sun exposure, a tan, and time of day.',
   pigment_spots: 'Hair across the cheek, shadows, makeup residue, and a card that is in shadow or glare.',
   tone_evenness: 'Lighting gradients across the face, hair, and a slight head turn.',
   redness: 'Exercise, heat, a hot shower, cleansing minutes before the photo, and emotion.',

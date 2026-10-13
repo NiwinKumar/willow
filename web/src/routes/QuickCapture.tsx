@@ -1,7 +1,7 @@
 import { Camera, RotateCcw, X } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { FirstSessionGuide } from '../components/BaselineGuide'
@@ -190,7 +190,7 @@ export function QuickCapture() {
   if (phase === 'ask' || phase === 'denied')
     return (
       <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-6 sm:px-8">
-        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? 'Willow needs your camera for this selfie' : 'Camera is blocked'}</h1>
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? (faceSite ? 'Willow needs your camera for this selfie' : 'Willow needs your camera for this photo') : 'Camera is blocked'}</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-2">
           {phase === 'ask'
             ? `Photos stay in your private space and are deleted after 30 days. ${n} photos, uncalibrated, so the result is a trend, not a measurement.${firstSession ? '' : ` Between photos: ${steps.between.charAt(0).toLowerCase() + steps.between.slice(1)}`}`
@@ -249,6 +249,9 @@ export function QuickCapture() {
           </ul>
         ) : null}
         {!faceSite ? null : <p className="mt-6 text-[12px] text-text-3">Laptop camera? Expect lower quality; the checks are looser on desktop.</p>}
+        <Link to={`/capture?site=${site}&mode=quick`} className="mt-6 inline-flex min-h-11 items-center text-[15px] text-text-2 underline-offset-2 hover:text-text hover:underline">
+          Back to the photo guide
+        </Link>
       </div>
     )
 
@@ -305,7 +308,9 @@ export function QuickCapture() {
             {uploadMode === 'calibrated_raw' ? <p className="mb-3 text-[13px] text-text-2">RAW files: sent as a calibrated session.</p> : null}
             <UploadList site={site} mode={uploadMode} rows={rows} onRows={setRows} onDone={(sid) => {
               leaveDemo()
-              navigate(`/processing/${sid}?site=${site}&n=${rows.length}`)
+              // "Something is different today" from the capture guide travels with the session.
+              const dev = params.get('dev') ? `&dev=1&note=${encodeURIComponent(params.get('note') ?? '')}` : ''
+              navigate(`/processing/${sid}?site=${site}&n=${rows.length}${dev}`)
             }} />
           </div>
         )}
@@ -349,7 +354,7 @@ export function QuickCapture() {
             <span key={i} className={`h-2 w-6 rounded-full ${i < shots.length ? 'bg-willow-500' : 'bg-white/50'}`} />
           ))}
         </div>
-        <span className="absolute bottom-4 right-4 rounded-(--radius-chip) bg-surface/85 px-1.5 py-0.5 text-[11px] text-text-2">Quick selfie · trend only</span>
+        <span className="absolute bottom-4 right-4 rounded-(--radius-chip) bg-surface/85 px-1.5 py-0.5 text-[11px] text-text-2">Phone photo · trend only</span>
       </div>
       <div className="flex items-center justify-center gap-6 bg-bg px-5 py-4 pb-[max(16px,env(safe-area-inset-bottom))]">
         <button

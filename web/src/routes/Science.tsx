@@ -29,7 +29,7 @@ export function Science() {
         {[
           ['5', 'reference photos per baseline'],
           ['95%', 'confidence behind each noise band'],
-          ['24', 'patches on the colour card'],
+          ['1', 'white reference or colour card in every photo'],
           ['11', 'cosmetic parameters, 0 scores'],
         ].map(([v, l]) => (
           <div key={l} className="rounded-(--radius-tile) bg-surface p-3">
@@ -46,15 +46,15 @@ export function Science() {
           <p className="mt-1 text-[12px] text-text-3">Example: baseline 14.2, band ±1.1, today 12.4. Outside the band, so a real change.</p>
         </div>
         <h2 className="pt-4 text-[17px] font-semibold text-text">How a photo becomes numbers</h2>
-        <p>A RAW (DNG) photo skips the phone's beautifying and HDR processing. A 24-patch colour card in the frame lets the engine fit a colour correction to each photo and report how well it fit. Face landmarks pick the regions (cheeks, forehead, under-eye) and mask out hair, eyes and lips. Each metric is computed per frame, then averaged across the frames that passed quality checks. Every threshold is relative to your own skin, never an absolute cut-off.</p>
+        <p>A RAW (DNG) photo skips the phone's beautifying and HDR processing. A white reference in the frame (a sheet of plain paper beside the forearm, or a 24-patch colour card) lets the engine correct each photo for the colour of the light. On the forearm, four pen dots mark the same 4 cm square every time; on the face, landmarks pick the regions (cheeks, forehead, under-eye) and mask out hair, eyes and lips. Each metric is computed per frame, then averaged across the frames that passed quality checks. Every threshold is relative to your own skin, never an absolute cut-off.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Why we never rank skin tone</h2>
         <p>Skin tone (ITA°) is reported as a description with its change, never a score, and no direction is called better. Lighter is not better. Redness is harder to read on deep skin tones; when the contrast is too low the metric is shown as indicative, and the report says so.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">What Gemini does and does not do</h2>
         <p>Gemini labels the regions the engine found, explains the results in plain words, reads ingredient labels, checks routines against a rule table, and acts as a shopping advisor over a facts-only catalog. It never estimates a measurement, a skin tone, a skin age or a diagnosis. Every number in its explanation is checked against the measurements; a number that is not there is rejected.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Limits, stated plainly</h2>
-        <p>Willow is a cosmetic measurement tool, not a medical assessment. It cannot measure hydration, firmness, UV damage or skin age, and does not try to. For a changing mole, bleeding or pain, see a dermatologist. Quick selfies are uncalibrated and shown as trends only.</p>
+        <p>Willow is a cosmetic measurement tool, not a medical assessment. It cannot measure hydration, firmness, UV damage or skin age, and does not try to. For a changing mole, bleeding or pain, see a dermatologist. Phone photos are uncalibrated and shown as trends only.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Validation</h2>
-        <p>Repeatability numbers per metric, the self-tanner split-forearm result and the per-tone-band checks are published here as they are measured during the build (Oct 13 to 17, 2026), including where Willow is weak.</p>
+        <p>Repeatability numbers per metric, the self-tanner split-forearm result and the per-tone-band checks will be added here once the team's test captures are measured, including where Willow is weak. Until then, no accuracy claim is made.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Algorithm versions</h2>
         <Versions />
       </section>
