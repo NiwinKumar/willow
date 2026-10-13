@@ -10,7 +10,7 @@ from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
 from app.errors import EngineError
-from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask
+from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, refine_skin
 from app.markers import paper_pixels
 from app.metrics.evenness import tone_evenness
 from app.metrics.pigment import pigment_spots
@@ -27,8 +27,10 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "redness": ("redness", "Redness", "a_star"),
 }
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
-SPOT_ROIS = ("forehead", "right_cheek", "left_cheek")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
+# Dark spots stay on these flatter ROIs until the round-dot detector lands: over the whole
+# face the current detector mistakes shadows beside the nose and eye sockets for spots.
+SPOT_ROIS = ("forehead", "right_cheek", "left_cheek")
 
 
 def _bbox(polygons: list[np.ndarray], shape: tuple[int, int]) -> Box:
@@ -53,19 +55,35 @@ def _frame(path: str, auto_white: bool) -> dict:
     linear, srgb8 = _load(path)
     face = detect_face(srgb8)
     polys = face.roi_polygons()
-    box = _bbox(list(polys.values()), srgb8.shape[:2])  # work on the face area only
+    face_mask_full = face.skin_mask(srgb8.shape[:2])
+    ys, xs = np.nonzero(face_mask_full)
+    face_outline = np.array([[xs.min(), ys.min()], [xs.max() + 1, ys.max() + 1]], float)
+    box = _bbox([*polys.values(), face_outline], srgb8.shape[:2])  # face area only
     cheek_box = _bbox([polys[c] for c in CHEEKS], srgb8.shape[:2])
 
     masks = {n: box.crop(polygon_mask(srgb8.shape[:2], p)) for n, p in polys.items()}
     # sharpness/exposure on the cheek area (2-D patch the Laplacian needs)
-    quality: FrameQuality = check_frame(cheek_box.crop(linear), cheek_box.crop(srgb8))
+    quality: FrameQuality = check_frame(
+        cheek_box.crop(linear), cheek_box.crop(srgb8), px_per_mm=face.px_per_mm
+    )
     if not _pose_ok(face):
         quality.reasons.append("pose_out_of_range")
 
     white_px = None
     if auto_white:
         try:
-            white_px = paper_pixels(linear, srgb8, near=cheek_box)
+            # paper must be held beside the face, level with the cheeks; never use a wall
+            # or a shirt (the biggest white thing in a selfie) as the white reference
+            white_px = paper_pixels(
+                linear,
+                srgb8,
+                near=cheek_box,
+                require_near=True,
+                max_gap=config.PAPER_MAX_GAP_FACE_WIDTHS * cheek_box.w,
+            )
+            paper_lab = linear_srgb_to_lab(np.median(white_px, axis=0))
+            if np.hypot(paper_lab[1], paper_lab[2]) > config.PAPER_MAX_CHROMA:
+                white_px = None  # beige wall / coloured fabric, not white paper
         except ValueError:
             white_px = None
     lin = box.crop(linear)
@@ -83,6 +101,10 @@ def _frame(path: str, auto_white: bool) -> dict:
     evenness, _ = tone_evenness(
         {n: (lab[..., 0], lin[..., 0], skin[n]) for n in EVENNESS_ROIS}, px_per_mm
     )
+    # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair); used by
+    # blemishes next. Dark spots still use the flatter ROIs (see SPOT_ROIS).
+    zones = {k: box.crop(v) for k, v in face.feature_zones(srgb8.shape[:2]).items()}
+    face_skin = refine_skin(lab[..., 0], box.crop(face_mask_full), zones, px_per_mm)
     spots_pct, spot_extras = pigment_spots(
         {n: (lin[..., 0], skin[n]) for n in SPOT_ROIS}, px_per_mm
     )
@@ -107,6 +129,7 @@ def _frame(path: str, auto_white: bool) -> dict:
         "polygons": polys,
         "shape": srgb8.shape,
         "white_ok": white_px is not None,
+        "face_skin": (box, face_skin),
     }
 
 
@@ -184,7 +207,7 @@ def analyze_face(
         warnings.insert(0, "no colour card: colours corrected with the white paper only")
     if frames and not all(f["white_ok"] for f in frames):
         warnings.append(
-            "no white paper found next to the cheek in some photos: lamp colour not corrected"
+            "no white paper held beside the face in some photos: light colour not corrected"
         )
 
     ref = frames[0] if frames else None
