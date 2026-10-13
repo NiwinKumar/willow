@@ -70,18 +70,24 @@ def _names(insights: dict[str, Any]) -> set[str]:
 
 
 def problems(reply: Answer, insights: dict[str, Any], question: str) -> list[str]:
-    allowed = numbers.collect(insights) | numbers.percents(insights) | numbers.in_text(question)
+    """Everything shown is checked: answer, chart title, follow-ups, bar labels and values.
+    The question's own digits are not allowed back ("is it 95%?" must not be echoed)."""
+    plain, pct = numbers.collect(insights), numbers.percents(insights)
+    allowed = plain | pct
     found = []
-    if not numbers.only_known(reply.answer, allowed):
-        found.append("answer quotes a number that is not in the data")
-    if BANNED.search(reply.answer):
+    texts = [reply.answer, *reply.follow_ups, reply.chart.title if reply.chart else ""]
+    if not all(numbers.only_known(t, allowed) for t in texts):
+        found.append("text quotes a number that is not in the data")
+    if any(BANNED.search(t) for t in texts):
         found.append("banned wording")
     if reply.chart:
         names = _names(insights)
+        # A percent bar must come from a share; a count or weeks bar from the number itself.
+        source = pct if reply.chart.unit == "percent" else plain
         for bar in reply.chart.bars:
             if bar.label.lower() not in names:
                 found.append(f"chart label not in the data: {bar.label}")
-            if not numbers.collect(bar.value) & allowed:
+            if not numbers.collect(bar.value) & source:
                 found.append(f"chart value not in the data: {bar.value}")
     return found
 

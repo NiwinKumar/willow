@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app import analysis, baselines, engine, sessions, storage, views
+from app import analysis, baselines, engine, limits, sessions, storage, views
 from app.auth import AuthUser, current_user
 from app.models import (
     CONTENT_TYPES,
@@ -143,6 +143,7 @@ def analyze_session(
             409,
             {"code": "frames_missing", "message": f"frames not uploaded yet: {missing}"},
         )
+    limits.take(store, uid, "analyze")
 
     try:
         doc = analysis.run(store, settings.bucket, uid, session_id, doc)

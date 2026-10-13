@@ -69,4 +69,4 @@ Response schema: `{message: string, product_ids: string[], follow_up_suggestions
 - Every call has a 25 s timeout; failures log the error and fall back.
 
 ## Cost and quota guardrails
-Flash for everything interactive; cache explanations per session; label once per candidate; cap advisor to 20 turns per user per day; budget alerts are already set.
+Flash for everything interactive; cache explanations per session; label once per candidate; budget alerts are already set. Daily caps per person and across everyone (`api/app/limits.py`, Oct 13): advisor 20 / 3000, retailer questions 20 / 1500, label scans 30 / 1500, analyses 60 / 2000, judge sample runs 12 / 600. Guest accounts are free to create, so the global cap is what bounds cost; over it the api answers 429 "busy".

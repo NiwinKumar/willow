@@ -20,6 +20,7 @@ const HONEST = [
   ['Every number Gemini writes is checked.', 'A digit that is not in your measurements, your routine or a tool result rejects the answer.'],
   ['Products come only from tool calls.', 'The advisor can name a product only if search_catalog or compare_products returned it.'],
   ['Routine clashes come from a rule table in code.', 'Gemini may add a finding, marked as AI-suggested, never remove one.'],
+  ['The retailer assistant sees aggregates only.', 'No rows, groups under 10 people hidden; chart labels and values must exist in the data.'],
 ] as const
 
 /** /judge: the guided tour. A guest account of your own, five stops, every one of them live. */
@@ -61,7 +62,7 @@ export function Judge() {
     else leaveDemo()
     navigate(to)
   }
-  const ran = (['forearm_treated', 'forearm_control', 'face_full'] as const)
+  const ran = (data.mode === 'live' ? (['forearm_treated', 'forearm_control', 'face_full'] as const) : [])
     .flatMap((s) => data.series(s)?.sessions ?? [])
     .filter((s) => s.status === 'done')
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -128,7 +129,7 @@ export function Judge() {
             </Stop>
             <Stop n={2} done={seen('proof')} title="See how Willow proves a change" eta="about 1 min" tech="per-person noise band · treated vs untreated control">
               <p>A self-tanner split-forearm test over four days: one square treated, one left alone. Drag through time and watch the treated square clear its noise band while the control stays inside it.</p>
-              <Button variant="secondary" className="mt-3" onClick={() => go('proof', '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', true)}>
+              <Button variant="secondary" className="mt-3" onClick={() => go('proof', '/s/forearm_treated?demo=1&m=tone_ita&layer=1', true)}>
                 Open the test
               </Button>
             </Stop>
@@ -144,8 +145,8 @@ export function Judge() {
                 Open the routine
               </Button>
             </Stop>
-            <Stop n={5} done={seen('retailer')} title="See what a retailer learns" eta="about 30 s" tech="BigQuery · groups under 10 hidden · synthetic cohort labelled">
-              <p>Outcomes, not purchases: which products produced real, measured change for which goals, from a labelled synthetic cohort of 500 people plus anyone who opted in.</p>
+            <Stop n={5} done={seen('retailer')} title="See what a retailer learns" eta="about 1 min" tech="BigQuery · Gemini over aggregates · groups under 10 hidden">
+              <p>Outcomes, not purchases: which products produced real, measured change for which goals, from a labelled synthetic cohort of 500 people plus anyone who opted in. Ask it a question and Gemini answers with a chart, every number checked against the aggregates. The same outcome rates appear on the advisor's product cards.</p>
               <Button variant="secondary" className="mt-3" onClick={() => go('retailer', '/retailer')}>
                 Open the retailer view
               </Button>

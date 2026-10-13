@@ -17,7 +17,7 @@ export function JudgeBar() {
         <ArrowLeft size={16} aria-hidden /> Judge tour
       </Link>
       <span className="truncate text-right">
-        {data.mode === 'demo' ? 'Illustrative sample journey · ' : 'Live, in your guest account · '}
+        {data.mode === 'demo' ? (data.demoSource === 'real' ? "Our team's measured test · " : 'Illustrative sample journey · ') : 'Live, in your guest account · '}
         {tour.seen.length} of {JUDGE_STOPS.length} stops
       </span>
     </div>

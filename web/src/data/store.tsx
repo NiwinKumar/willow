@@ -12,8 +12,17 @@ import { useAuth } from '../lib/useAuth'
 import { DEMO_SERIES, DEMO_SITES } from '../mock/series'
 import { DataContext, type DataState, type DataStatus } from './context'
 import { groupBySite, sitesWithResults } from './live'
+import { DEMO_EVENT } from './useData'
 
 const noop = async () => {}
+
+function storedDemo(): boolean {
+  try {
+    return sessionStorage.getItem('willow.demo') === '1'
+  } catch {
+    return false
+  }
+}
 
 function demoGoals(): string[] {
   try {
@@ -26,7 +35,13 @@ function demoGoals(): string[] {
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [params] = useSearchParams()
-  const demo = params.get('demo') === '1' || sessionStorage.getItem('willow.demo') === '1'
+  const [stored, setStored] = useState(storedDemo)
+  useEffect(() => {
+    const on = () => setStored(storedDemo())
+    window.addEventListener(DEMO_EVENT, on)
+    return () => window.removeEventListener(DEMO_EVENT, on)
+  }, [])
+  const demo = params.get('demo') === '1' || stored
   const { user, getIdToken } = useAuth()
   const uid = user?.uid ?? null
   const [views, setViews] = useState<SessionView[]>([])
@@ -68,14 +83,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [demo, uid, load, apply])
 
   // Demo mode prefers the seeded real journey (api /v1/demo/journey) and falls back to the illustration.
-  const [journey, setJourney] = useState<SessionView[] | null>(null)
+  // Signed photo URLs last about an hour: refetch when demo mode is entered again after 10 minutes.
+  const [journey, setJourney] = useState<{ views: SessionView[]; at: number } | null>(null)
   useEffect(() => {
-    if (!demo || journey !== null) return
+    if (!demo || (journey && Date.now() - journey.at < 600_000)) return
     let alive = true
     api
       .demoJourney()
-      .then((r) => alive && setJourney(r.sessions.filter((v) => v.session.status === 'done')))
-      .catch(() => alive && setJourney([]))
+      .then((r) => alive && setJourney({ views: r.sessions.filter((v) => v.session.status === 'done'), at: Date.now() }))
+      .catch(() => alive && setJourney({ views: [], at: Date.now() }))
     return () => {
       alive = false
     }
@@ -87,8 +103,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DataState>(() => {
     if (demo) {
-      if (journey?.length) {
-        const real = groupBySite(journey)
+      if (journey?.views.length) {
+        const real = groupBySite(journey.views)
         return { mode: 'demo', demoSource: 'real', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
       }
       return { mode: 'demo', demoSource: 'illustrative', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }

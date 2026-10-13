@@ -47,7 +47,31 @@ def test_rates_may_be_written_as_percents_but_nothing_new():
     assert retailer_ask.problems(ok, INSIGHTS, "which works?") == []
     derived = Answer(answer="Azelaic Gel beats Plain Cream by 41 points.")
     assert retailer_ask.problems(derived, INSIGHTS, "q") == [
-        "answer quotes a number that is not in the data"
+        "text quotes a number that is not in the data"
+    ]
+    echoed = Answer(answer="Yes, 95% of people.")
+    assert retailer_ask.problems(echoed, INSIGHTS, "is it 95%?") != []
+    raw_rate_as_percent = Answer(
+        answer="Rates.",
+        chart=Chart(
+            title="t",
+            unit="percent",
+            bars=[Bar(label="Azelaic Gel", value=0.61), Bar(label="Plain Cream", value=0.2)],
+        ),
+    )
+    assert "chart value not in the data: 0.61" in retailer_ask.problems(
+        raw_rate_as_percent, INSIGHTS, "q"
+    )
+    sneaky_title = Answer(
+        answer="See chart.",
+        chart=Chart(
+            title="Up 41 points",
+            unit="percent",
+            bars=[Bar(label="Azelaic Gel", value=61), Bar(label="Plain Cream", value=20)],
+        ),
+    )
+    assert retailer_ask.problems(sneaky_title, INSIGHTS, "q") == [
+        "text quotes a number that is not in the data"
     ]
     made_up = Answer(
         answer="Two products.",
