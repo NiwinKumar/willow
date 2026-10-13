@@ -4,10 +4,10 @@ version = "0.0.1"
 description = "Willow image pipeline (stateless CV service)"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-  "fastapi",
-  "uvicorn[standard]",
-  "pydantic>=2",
-  "jsonschema",
+  "fastapi==0.142.1",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.13.5",
+  "jsonschema==4.26.0",
   "numpy>=2.4.6",
   "rawpy>=0.27.1",
   "pillow>=12.3.0",
