@@ -60,10 +60,12 @@ def _frame_metrics(
             white_px = paper_pixels(linear, srgb8, near=roi)
         except ValueError:
             white_px = None  # reported as a warning below
+    # judge exposure on the photo as the camera took it: the paper correction can brighten
+    # very light skin to 1.0, which is not the camera's fault and must not fail the photo
+    quality = check_frame(roi.crop(linear), roi.crop(srgb8))
     if white_px is not None:
         linear = white_balance(linear, white_px)
     skin_lin = roi.crop(linear)
-    quality = check_frame(skin_lin, roi.crop(srgb8))
     lab = linear_srgb_to_lab(skin_lin)
     mask = skin_mask(lab)
     ita, ita_extras = tone_ita(lab, mask)
