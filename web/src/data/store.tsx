@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useSearchParams } from 'react-router-dom'
 
 import { api, type SessionView } from '../lib/api'
+import { syncConsent } from '../lib/consent'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 import { DEMO_SERIES, DEMO_SITES } from '../mock/series'
@@ -49,6 +50,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (demo || !uid) return
     apply(await load(uid))
   }, [demo, uid, load, apply])
+
+  // Consent given on this device belongs to the account once someone is signed in.
+  useEffect(() => {
+    if (demo || !uid) return
+    syncConsent(uid, getIdToken).catch(() => undefined)
+  }, [demo, uid, getIdToken])
 
   // Until this uid's first answer arrives, status derives as loading (see value below).
   useEffect(() => {

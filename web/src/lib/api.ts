@@ -156,6 +156,8 @@ export const api = {
   patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
+  putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
+    request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
   advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[]) =>
     request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json({ messages }) }),

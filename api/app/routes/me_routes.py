@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 
 from app import baselines, storage
 from app.auth import AuthUser, current_user
@@ -91,3 +92,42 @@ def delete_me(
     storage.delete_prefix(f"results/{user.uid}/")
     store.delete_user(user.uid)
     return Response(status_code=204)
+
+
+class ConsentRequest(BaseModel):
+    version: str = Field(min_length=1, max_length=20)
+    aggregate_insights_opt_in: bool
+
+
+@router.put("/me/consent")
+def put_consent(
+    body: ConsentRequest,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """CONTRACT section 4 users/{uid}.consent; the retailer export reads the opt-in from here."""
+    previous = (store.user_get(user.uid) or {}).get("consent") or {}
+    consent = {
+        "version": body.version,
+        "accepted_at": previous.get("accepted_at")
+        if previous.get("version") == body.version
+        else datetime.now(UTC),
+        "aggregate_insights_opt_in": body.aggregate_insights_opt_in,
+        "updated_at": datetime.now(UTC),
+    }
+    store.user_merge(user.uid, {"consent": consent, "is_demo": False})
+    return {"consent": {k: iso(v) if isinstance(v, datetime) else v for k, v in consent.items()}}
+
+
+@router.get("/me")
+def get_me(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    doc = store.user_get(user.uid) or {}
+    consent = doc.get("consent")
+    return {
+        "uid": user.uid,
+        "consent": {k: iso(v) if isinstance(v, datetime) else v for k, v in consent.items()}
+        if consent
+        else None,
+    }
