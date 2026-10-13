@@ -415,7 +415,14 @@ export function Report() {
         </SnapSheet>
         {scrubber}
       </div>
-      <CoachMarks id="lens" />
+      <CoachMarks
+        id="lens"
+        tips={[
+          ...(sessions.length > 1 ? (['scrub'] as const) : []),
+          ...(metrics.some((m) => m.mdc95 !== null) ? (['band'] as const) : []),
+          ...(baseline && session && baseline.id !== session.id && baseline.preview && session.preview ? (['flicker'] as const) : []),
+        ]}
+      />
       <Sheet open={keys} onOpenChange={setKeys} title="Keyboard">
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[15px]">
           {[['← →', 'Move through sessions'], ['Home / End', 'Baseline / latest'], ['L', 'Toggle the layer on the photo'], ['Hold B', 'Flicker to the baseline'], ['?', 'This list']].map(([k, v]) => (

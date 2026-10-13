@@ -41,6 +41,7 @@ export function Retailer() {
     )
 
   const best = [...d.products].sort((a, b) => b.rate - a.rate)[0]
+  const evidence = d.product_outcomes ? Object.keys(d.product_outcomes).length : d.products.length
   const zeroTiers = d.gaps.flatMap((g) => (['budget', 'mid', 'premium'] as const).filter((t) => g[t].options === 0).map((t) => `${g.goal}, ${t}`))
   const thinTiers = d.gaps.flatMap((g) => (['budget', 'mid', 'premium'] as const).filter((t) => g[t].options === 1).map((t) => `${g.goal}, ${t}`))
   const spf = d.conflicts.find((c) => c.pair.startsWith('No morning sunscreen'))
@@ -86,7 +87,7 @@ export function Retailer() {
         ) : null}
 
         {tab === 'Product outcomes' ? (
-          <Section q="Which products actually help which profiles?" csv={d.products.map(({ cells, ...p }) => ({ ...p, ...Object.fromEntries(cells.map((c, i) => [d.tone_bands[i], c.suppressed ? '' : c.value])) }))} tiles={[{ label: 'Products with evidence', value: String(d.products.length), n: d.products.length, sub: 'n ≥ 10 users' }, { label: 'Best outcome rate', value: best ? `${Math.round(best.rate * 100)}%` : '–', n: best?.n ?? 0, sub: best ? `${best.brand} ${best.product}` : '' }, { label: 'Median weeks to change', value: d.tiles[3].value, n: d.tiles[3].n, sub: 'held to week 8' }, { label: 'Users at week 8', value: String(routines), n: routines, sub: `${Math.round(d.cohort.dropout * 100)}% dropped out` }]}>
+          <Section q="Which products actually help which profiles?" csv={d.products.map(({ cells, ...p }) => ({ ...p, ...Object.fromEntries(cells.map((c, i) => [d.tone_bands[i], c.suppressed ? '' : c.value])) }))} tiles={[{ label: 'Products with evidence', value: String(evidence), n: evidence, sub: `n ≥ 10 users each; top ${d.products.length} shown` }, { label: 'Best outcome rate', value: best ? `${Math.round(best.rate * 100)}%` : '–', n: best?.n ?? 0, sub: best ? `${best.brand} ${best.product}` : '' }, { label: 'Median weeks to change', value: d.tiles[3].value, n: d.tiles[3].n, sub: 'held to week 8' }, { label: 'Users at week 8', value: String(routines), n: routines, sub: `${Math.round(d.cohort.dropout * 100)}% dropped out` }]}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] border-collapse text-[13px]">
                 <thead>

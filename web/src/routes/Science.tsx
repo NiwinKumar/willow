@@ -1,4 +1,25 @@
+import { useEffect, useState } from 'react'
+
 import { BandBar } from '../components/BandBar'
+import { api, type DemoStatus } from '../lib/api'
+import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
+
+/** Versions read live from the running services, so this line is never stale. */
+function Versions() {
+  const [s, setS] = useState<DemoStatus | null>(null)
+  useEffect(() => {
+    let alive = true
+    api.demoStatus().then((r) => alive && setS(r)).catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  return (
+    <p className="font-mono text-[13px]">
+      engine {s?.engine.version ?? '…'} ({MEASURED_SITES.map((m) => SITE_LABEL[m].toLowerCase()).join(' and ')} measured today) · api {s?.api.version ?? '…'} · web {__APP_VERSION__} · {s?.gemini.model ?? 'Gemini'}
+    </p>
+  )
+}
 
 export function Science() {
   return (
@@ -35,7 +56,7 @@ export function Science() {
         <h2 className="pt-4 text-[17px] font-semibold text-text">Validation</h2>
         <p>Repeatability numbers per metric, the self-tanner split-forearm result and the per-tone-band checks are published here as they are measured during the build (Oct 13 to 17, 2026), including where Willow is weak.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Algorithm versions</h2>
-        <p className="font-mono text-[13px]">engine 0.2.0 (forearm measured; face and close-ups in progress) · api 0.2.0 · web 0.2.0</p>
+        <Versions />
       </section>
     </article>
   )

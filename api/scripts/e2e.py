@@ -184,7 +184,35 @@ def main() -> int:
         f"{len(body.get('products', []))} products, {len(body.get('brands', []))} brands",
     )
 
-    # 7. Pick a different baseline by hand.
+    ask = c.post("/v1/retailer/ask", json={"question": "Which routine problems are most common?"})
+    body = ask.json() if ask.status_code == 200 else {}
+    check(
+        "retailer question answered by Gemini, numbers checked",
+        ask.status_code == 200 and body.get("checks") is not None,
+        f"{(body.get('checks') or {}).get('numbers_checked')} numbers, "
+        f"chart: {bool(body.get('chart'))}",
+    )
+
+    # 8. Judge mode: status, a sample run in this account, the routine setup.
+    st = httpx.get(f"{args.api}/v1/demo/status", timeout=60).json()
+    check(
+        "judge status: engine and BigQuery up",
+        st["engine"]["status"] == "ok" and st["bigquery"]["status"] == "ok",
+        f"engine {st['engine'].get('version')}",
+    )
+    samples = httpx.get(f"{args.api}/v1/demo/samples", timeout=30).json()["samples"]
+    if check("hosted samples listed", bool(samples), ", ".join(x["id"] for x in samples)):
+        started = c.post(f"/v1/demo/samples/{samples[0]['id']}/session")
+        sv = c.post(f"/v1/sessions/{started.json()['session_id']}/analyze").json()
+        check(
+            "sample run measured in the judge's own account",
+            sv.get("session", {}).get("sample_id") == samples[0]["id"]
+            and sv["session"]["status"] == "done"
+            and bool(sv["session"].get("preview")),
+            f"explanation: {sv['session'].get('explanation_source')}",
+        )
+
+    # 9. Pick a different baseline by hand.
     res = c.post("/v1/baselines/forearm_control", json={"session_id": v2["session"]["id"]})
     check(
         "make this my baseline",
