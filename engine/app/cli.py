@@ -35,6 +35,12 @@ def main(argv: list[str] | None = None) -> None:
     a.add_argument("--site", required=True, choices=["forearm_treated", "forearm_control"])
     a.add_argument("--roi", action="append", help="skin square x,y,w,h (default: find 4 pen dots)")
     a.add_argument("--white", action="append", help="white paper x,y,w,h (default: find paper)")
+    a.add_argument(
+        "--square",
+        type=int,
+        choices=[1, 2],
+        help="two dotted squares in the photo: 1 = upper one, 2 = lower one",
+    )
     a.add_argument("--no-white", action="store_true", help="skip white-paper correction")
     a.add_argument("--baseline", help="baseline.json: {metric_id: {mean, mdc95}}")
     a.add_argument("--out", help="directory for result.json")
@@ -50,6 +56,7 @@ def main(argv: list[str] | None = None) -> None:
         _per_frame(args.roi, n, "roi"),
         _per_frame(args.white, n, "white"),
         auto_white=not args.no_white,
+        square=args.square or 0,
         baseline=baseline,
     )
 

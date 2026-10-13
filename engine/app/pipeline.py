@@ -11,7 +11,7 @@ from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
 from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
-from app.markers import find_dot_square, paper_pixels
+from app.markers import find_dot_squares, paper_pixels
 from app.metrics.redness import redness
 from app.metrics.tone import tone_ita
 from app.quality import FrameQuality, check_frame
@@ -43,16 +43,21 @@ def _load(path: str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _frame_metrics(
-    path: str, roi: Box | None, white: Box | None, auto_white: bool = True
+    path: str, roi: Box | None, white: Box | None, auto_white: bool = True, square: int = 0
 ) -> tuple[dict, dict, FrameQuality, tuple, Box, bool]:
-    """Metrics for one photo. roi=None -> find the 4 pen dots; white=None -> find the paper."""
+    """Metrics for one photo.
+
+    roi=None -> find pen-dot squares (square=0: the only one; 1/2: top/bottom of a pair);
+    white=None -> find the paper beside the skin box.
+    """
     linear, srgb8 = _load(path)
     if roi is None:
-        roi, _ = find_dot_square(srgb8)
+        squares = find_dot_squares(srgb8, 1 if square == 0 else 2)
+        roi = squares[max(square, 1) - 1][0]
     white_px = white.crop(linear) if white is not None else None
     if white_px is None and auto_white:
         try:
-            white_px = paper_pixels(linear, srgb8)
+            white_px = paper_pixels(linear, srgb8, near=roi)
         except ValueError:
             white_px = None  # reported as a warning below
     if white_px is not None:
@@ -74,6 +79,7 @@ def analyze_forearm(
     rois: list[Box | None],
     whites: list[Box | None],
     auto_white: bool = True,
+    square: int = 0,
     session_id: str = "s_local",
     user_id: str = "local",
     baseline: dict | None = None,
@@ -92,7 +98,7 @@ def analyze_forearm(
     used_rois, white_ok = [], []
     for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
         values, extras, q, frame_shape, used_roi, balanced = _frame_metrics(
-            path, roi, white, auto_white
+            path, roi, white, auto_white, square
         )
         shape = shape or frame_shape
         used_rois.append(used_roi)
