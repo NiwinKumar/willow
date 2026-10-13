@@ -1,0 +1,44 @@
+# Images and raw captures: NEVER commit
+*.dng
+*.DNG
+*.heic
+*.HEIC
+*.jpg
+*.JPG
+*.jpeg
+*.png
+!web/public/**/*.png
+!docs/img/**/*.png
+data/*
+!data/README.md
+!data/.gitkeep
+
+# Secrets
+.env
+.env.*
+*.pem
+*service-account*.json
+*-key.json
+.firebaserc.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+.firebase/
+
+# Models downloaded at build time
+engine/models/*.task
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

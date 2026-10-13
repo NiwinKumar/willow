@@ -1,0 +1,9 @@
+# Build the engine image from the repo root (needs schemas/ and fixtures/).
+# gcloud builds submit --config infra/cloudbuild.engine.yaml --substitutions=_TAG=latest .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "engine/Dockerfile", "-t", "us-central1-docker.pkg.dev/$PROJECT_ID/skinproof/engine:${_TAG}", "."]
+images:
+  - us-central1-docker.pkg.dev/$PROJECT_ID/skinproof/engine:${_TAG}
+substitutions:
+  _TAG: latest

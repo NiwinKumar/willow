@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skinproof.dev/schemas/analyze_request.schema.json",
+  "title": "AnalyzeRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "user_id", "site", "capture_mode", "frames"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "session_id": {"type": "string", "minLength": 1},
+    "user_id": {"type": "string", "minLength": 1},
+    "site": {"$ref": "#/$defs/site"},
+    "capture_mode": {"enum": ["calibrated_raw", "uncalibrated"]},
+    "frames": {
+      "type": "array", "minItems": 1, "maxItems": 5,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["uri"],
+        "properties": {
+          "uri": {"type": "string"},
+          "content_type": {"type": "string"}
+        }
+      }
+    },
+    "baseline": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false, "required": ["mean", "mdc95"],
+        "properties": {
+          "mean": {"type": "number"},
+          "mdc95": {"type": ["number", "null"]},
+          "n_frames": {"type": "integer"},
+          "session_id": {"type": "string"}
+        }
+      }
+    },
+    "output_prefix": {"type": ["string", "null"]},
+    "options": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "compute_overlays": {"type": "boolean", "default": true},
+        "max_candidates": {"type": "integer", "minimum": 0, "maximum": 200, "default": 40}
+      }
+    }
+  },
+  "$defs": {
+    "site": {"enum": ["face_full", "cheek_macro", "nose_macro", "forearm_treated", "forearm_control"]}
+  }
+}
