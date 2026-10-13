@@ -1,4 +1,4 @@
-# Plan summary (full version in Notion: "SkinProof: Technical Lock Sheet and Build Plan")
+# Plan summary (full version in Notion: "Willow: Technical Lock Sheet and Build Plan"; detailed specs in the other docs listed in CLAUDE.md)
 
 - **What:** proof engine for skincare. Calibrated phone photos -> 11 cosmetic skin parameters -> change vs the person's own noise floor (MDC95) -> Gemini explains, labels regions, reads ingredient labels, checks routine compatibility, advises with multi-store links -> multi-brand retailer insights in BigQuery/Looker.
 - **Theme:** Retail & Commerce: Intelligent Customer and Business Experiences.

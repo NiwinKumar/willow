@@ -1,6 +1,6 @@
-# SkinProof
+# Willow
 
-**The proof engine for skincare.** SkinProof turns standardized phone photos into calibrated skin measurements and tells you whether a product *measurably* changed your skin, beyond the noise of the camera. Multi-brand retailers get outcome-based personalization and assortment insights.
+**The proof engine for skincare.** Willow turns standardized phone photos into calibrated skin measurements and tells you whether a product *measurably* changed your skin, beyond the noise of the camera. Multi-brand retailers get outcome-based personalization and assortment insights.
 
 Built for the **Google Cloud AI Builder Cup 2026** (Hack2skill), theme **Retail & Commerce: Intelligent Customer and Business Experiences**. Built Oct 12-18, 2026.
 
@@ -22,9 +22,12 @@ Users capture RAW (DNG) photos with a color card in frame (or a quick "uncalibra
 | `prompts/` | both | Kickoff prompts for Claude Code |
 
 ## Start here
-1. Read `docs/SPLIT.md` (who does what, today's tasks).
-2. Read `docs/CONTRACT.md` (the interface between engine and api).
-3. Open Claude Code at the repo root and paste your prompt from `prompts/`.
+1. `docs/PRODUCT.md` (what we're building and why), then `docs/DECISIONS.md`.
+2. `docs/SPLIT.md` (who does what, today's tasks) and your prerequisites.
+3. `docs/CONTRACT.md` (the interface between engine and api).
+4. Open Claude Code at the repo root and paste your prompt from `prompts/`.
+
+The full knowledge base index is in `CLAUDE.md`. A mirror lives in Notion ("Willow: Team Split, Contract & Claude Code Kickoff" under the plan page).
 
 ## Never commit
 Photos of people, RAW files, credentials, `.env` files, service-account keys. Images live in Cloud Storage only. See `data/README.md`.

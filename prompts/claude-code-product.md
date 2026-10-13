@@ -1,43 +1,45 @@
 # Kickoff prompt: PRODUCT (Niwin)
 
-Paste everything below the line into Claude Code, opened at the repo root.
+Open Claude Code at the repo root (`willow/`) and paste everything below the line.
 
 ---
 
-You are my pair programmer for the **product** side of SkinProof, a hackathon project (Google Cloud AI Builder Cup 2026, theme Retail & Commerce). Deadline Oct 18, 2026. I own `api/`, `web/`, `infra/`. My teammate owns `engine/` (image pipeline) and we connect only through `docs/CONTRACT.md`.
+You are my senior pair programmer for the **product** side of **Willow**, a hackathon project for the Google Cloud AI Builder Cup 2026, theme **Retail & Commerce: Intelligent Customer and Business Experiences**. Deadline Oct 18, 2026 (we submit Sat Oct 17 night IST). I own `api/`, `web/`, `infra/`. My teammate Harshini owns `engine/` (the image pipeline). We connect only through `docs/CONTRACT.md` and `schemas/`; the integration checkpoint is **Thu Oct 15, 14:00 IST**.
 
-## Read first, in this order
+## The knowledge base has everything
+The `docs/` folder (indexed in `CLAUDE.md`) is the complete, authoritative specification: product brief, decision log, contract, UX spec, Gemini spec, catalog spec, retailer insights, local dev, risks, demo and submission plans. Treat it as the source of truth. Do not invent features, fields or flows that aren't there. If something is ambiguous or missing, stop and ask me with a concrete proposal. If docs conflict, `docs/DECISIONS.md` wins, then `docs/CONTRACT.md`.
+
+## Read first (in order), then report back
 1. `CLAUDE.md`, `api/CLAUDE.md`, `web/CLAUDE.md`
-2. `docs/CONTRACT.md`, `schemas/*.json`, `fixtures/analysis_result.sample.json`
-3. `docs/SPLIT.md` (my tasks + milestones), `docs/PLAN.md`, `docs/DEMO_PLAN.md`, `infra/README.md`
-Summarize back in 10 bullets what you will build and in what order, then wait for my "go".
+2. `docs/PRODUCT.md`, `docs/DECISIONS.md`
+3. `docs/CONTRACT.md`, `schemas/*.json`, `fixtures/analysis_result.sample.json`
+4. `docs/UX_SPEC.md`, `docs/GEMINI_SPEC.md`, `docs/CATALOG_SPEC.md`, `docs/RETAILER_INSIGHTS.md`
+5. `docs/SPLIT.md` (my tasks, milestones, cut order), `docs/LOCAL_DEV.md`, `docs/RISKS.md`, `docs/DEMO_PLAN.md`, `docs/SUBMISSION.md`, `infra/README.md`, `infra/setup.sh`, `infra/firestore.rules`
+Then give me: (a) a 10-bullet summary of what I'm building, (b) the build plan mapped to M1-M5 with a rough hour estimate per item, (c) questions or contradictions. Wait for my "go".
 
 ## What I'm building
-1. **web/** React + Vite + TypeScript + Tailwind on Firebase Hosting, Firebase Auth (Google + anonymous for judges). Mobile-first, works great on iPhone Safari, good on desktop.
-2. **api/** Python 3.12 FastAPI on Cloud Run (`skinproof-api`): verifies Firebase ID tokens (firebase-admin), issues V4 signed upload URLs (signed with the service account via IAM signBlob, no key file), calls the engine (`ENGINE_URL`, ID-token auth; mock mode `ENGINE_MODE=fixture` returns the fixture), writes Firestore, calls **Gemini on Vertex AI** using the `google-genai` SDK with `vertexai=True`, `location=us-central1`, model from env `GEMINI_MODEL` (latest GA Flash available on Vertex AI; verify the exact ID in the Vertex AI Model Garden).
-3. **Gemini features** (all structured output with response schemas, temperature 0-0.3):
-   - **Candidate labeller:** for each engine candidate crop, label one of the enum in CONTRACT 2.6 + confidence; run twice, keep agreeing labels, else `uncertain`. Never produce numbers.
-   - **Explanation:** input = metrics JSON + verdicts + routine; output = `Explanation` schema. Validator rejects any number not present in the input; retry once, then template fallback.
-   - **Label scan:** product photo -> brand, name, INCI list, key actives (+ % if printed).
-   - **Routine compatibility check:** routine INCI lists -> conflicts (e.g., retinoid + strong AHA/BHA same routine, benzoyl peroxide + vitamin C/retinoid, multiple exfoliants), duplicated actives, likely cancel-outs, gaps vs the user's goal. Cosmetic guidance only, with "check with a dermatologist if irritated".
-   - **Advisor chat:** function calling with tools `get_my_metrics()`, `get_my_routine()`, `search_catalog(concern, max_price, exclude_ingredients)`, `compare_products(ids)`; answers grounded only in returned catalog items; every product shows **multi-store links** (user chooses the store).
-4. **Firestore** model + security rules exactly as CONTRACT section 4. Catalog seeded from `api/seed/products.json` (40-60 real SKUs, global brands, ingredients, concerns, price, store links; facts only).
-5. **Retailer view:** BigQuery dataset `skinproof_insights` loaded by `api/scripts/export_bq.py` (Firestore -> flat rows) + `api/scripts/synthetic_cohort.py` (500 synthetic users with effect sizes sampled from our measured MDC/noise; `is_synthetic=true` on every row). Looker Studio report + an in-app `/retailer` page using `GET /v1/retailer/insights`: what customers need next, which products help which profiles (measured outcomes), brand/category performance, assortment gaps, routine-conflict rates. Banner: "Synthetic demo cohort".
-6. **Judge mode:** landing with 3 buttons (Explore a real journey / Try with sample photos / Try your own selfie). Seeded read-only demo user with real team sessions (DHA arm timeline etc.). Sample photo pack downloadable from `demo/` in GCS.
+1. **web/**: React + Vite + TypeScript + Tailwind, Firebase Hosting, Firebase Auth (Google + anonymous for judges). Mobile-first (iPhone Safari is the main device), good on desktop. Screens, states and copy exactly per `docs/UX_SPEC.md`.
+2. **api/**: Python 3.12 FastAPI on Cloud Run (`willow-api`). Verifies Firebase ID tokens (`firebase-admin`); issues V4 signed PUT URLs signed via IAM signBlob (no key files); calls the engine (`ENGINE_MODE=fixture|http`, `ENGINE_URL`, Google ID-token auth to the private service); owns Firestore; all Gemini calls; BigQuery exports; endpoints exactly as CONTRACT section 3.
+3. **Gemini on Vertex AI** with the `google-genai` SDK (`vertexai=True`, `location=us-central1`, model from `GEMINI_MODEL`; look up and pin the latest GA Flash model ID in Vertex AI Model Garden). Five features per `docs/GEMINI_SPEC.md`: candidate labeller, explanation with number validator, label scan, routine compatibility check (rule table), advisor with function calling (tools listed in the spec). Structured output + schema validation everywhere. Gemini never outputs measurements.
+4. **Firestore** model exactly as CONTRACT section 4; rules from `infra/firestore.rules`; catalog seeded from `api/seed/products.json` built per `docs/CATALOG_SPEC.md`.
+5. **Retailer view** per `docs/RETAILER_INSIGHTS.md`: batch export to BigQuery `willow_insights`, synthetic cohort generator (`is_synthetic=true`), Looker Studio report, in-app `/retailer` page from `GET /v1/retailer/insights`, "Synthetic demo cohort" banner, groups < 10 hidden.
+6. **Judge mode** per `docs/DEMO_PLAN.md`: landing with 3 buttons, seeded read-only demo user `demo_willow` with real team sessions (DHA arm timeline), sample photo pack from `gs://<bucket>/demo/`.
+7. **infra/**: run/finish `setup.sh`, deploy scripts, budgets, CORS tightened to our Hosting domains.
 
-## Screens (web)
-Landing -> Consent (versioned, aggregate-insights opt-in, delete-my-data) -> Goal picker -> Capture guide (site picker, checklist: card visible, distance, light, neutral face; DNG upload via Files; or browser selfie = uncalibrated) -> Processing (progress) -> Report (grouped metrics, confidence chips "Measured/Indicative", verdict badges "Real change / Within noise / No baseline", overlays toggle, Gemini explanation, disclaimer) -> Timeline/compare (metric chart with shaded MDC band, before/after slider, treated vs control) -> Routine (label scan, list, compatibility check) -> Advisor chat -> Retailer dashboard -> About/science. Calm, inclusive, no "bad skin" wording.
+## Build order (stop after each step: show how to verify manually, run lint/tests, propose a commit message)
+1. **M1 (today):** repo tooling (uv for api, Vite app for web, ruff, eslint/prettier); deploy `willow-api` `/healthz` and the engine placeholder to Cloud Run; web shell on Firebase Hosting; Auth working; `POST /v1/sessions` returns signed URLs; upload a DNG from iPhone Safari (via Files) to GCS and prove it's byte-identical (size + MD5).
+2. **M2 (Wed):** Firestore model + rules; session + analyze flow with `ENGINE_MODE=fixture`; Report screen from the fixture with confidence chips, verdict badges and copy from `UX_SPEC.md`; label scan; catalog import script + 40-60 SKUs.
+3. **M3 (Thu 14:00):** switch to the real engine (`ENGINE_MODE=http`), grant `roles/run.invoker`, end-to-end on a real DNG; baseline logic (first passing 5-frame calibrated session per site).
+4. **M4 (Fri):** candidate labeller, explanation + validator, routine check, advisor chat with tools and multi-store product cards, timeline/compare (MDC band, slider, treated vs control), retailer dashboard + BigQuery + Looker, judge mode with seeded data.
+5. **M5 (Sat 12:00 freeze):** error/empty/loading states, accessibility pass, performance (cold starts), README submission section, help me draft the deck and description from `docs/SUBMISSION.md`.
 
-## Build order (show me results after each step)
-1. **M1 today:** deploy `api` hello (`/healthz`) and the engine placeholder (`engine/app/main.py` already returns the fixture) to Cloud Run; web shell on Firebase Hosting; Auth working; `POST /v1/sessions` returns signed URLs; upload a DNG from iPhone Safari to GCS and verify the object is byte-identical (not converted to JPEG).
-2. **M2:** Firestore model + rules; analyze flow with `ENGINE_MODE=fixture`; Report page from fixture; label scan.
-3. **M3 (Thu 14:00):** switch to the real engine; end-to-end on a real DNG.
-4. **M4:** candidate labeller, explanation + validator, routine check, advisor with function calling, timeline UI, retailer dashboard, judge mode, seeded data.
-5. **M5:** polish, error states, loading states, accessibility pass, README section for the submission.
+## Non-negotiable rules
+- Follow `CLAUDE.md`. Gemini never produces numbers, skin tone, age or diagnoses; every Gemini response is schema-validated; explanation numbers must exist in the input.
+- Inclusive, calm copy; tone is descriptive only; cosmetic disclaimer on every report.
+- Never commit secrets, `.env*`, images or keys. ADC locally; service accounts on Cloud Run.
+- Don't edit `engine/`, `schemas/` or `docs/CONTRACT.md`; propose changes in `docs/CONTRACT_CHANGES.md`.
+- Keep costs near zero: `min-instances=0`, `max-instances=3`, Flash model, cache explanations.
+- Tests: pytest for every api route with fixture engine + mocked Gemini; number-validator tests; a Playwright smoke test (landing -> demo journey -> report) if time allows.
 
-## Rules
-- Follow `CLAUDE.md`. Gemini never outputs measurements. Validate every Gemini response against its schema.
-- Never commit secrets, images, or `.env*`. Use ADC locally (`gcloud auth application-default login`) and service accounts on Cloud Run.
-- Keep the engine contract untouched; propose changes in `docs/CONTRACT_CHANGES.md`.
-- Tests: pytest for api routes (with fixture engine + mocked Gemini), a Playwright or Vitest smoke test for the main web flow if time allows.
-- After each step: lint, test, show me how to verify manually, and propose a commit message.
+## Definition of done (hackathon)
+Public link where a judge, without installing anything, can explore the seeded journey, upload sample photos and get a real analysis, see Gemini explanations, scan a label, run a routine check, chat with the advisor (multi-store links) and view the retailer dashboard. Repo public and clean, deck and video ready, description pasted.

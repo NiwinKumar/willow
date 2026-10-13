@@ -1,7 +1,7 @@
 [project]
-name = "skinproof-engine"
+name = "willow-engine"
 version = "0.0.1"
-description = "SkinProof image pipeline (stateless CV service)"
+description = "Willow image pipeline (stateless CV service)"
 requires-python = ">=3.11,<3.13"
 dependencies = [
   "fastapi",

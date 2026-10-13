@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://skinproof.dev/schemas/analyze_request.schema.json",
+  "$id": "https://willow.dev/schemas/analyze_request.schema.json",
   "title": "AnalyzeRequest",
   "type": "object",
   "additionalProperties": false,

@@ -1,4 +1,4 @@
-"""SkinProof engine placeholder.
+"""Willow engine placeholder.
 
 Returns the contract fixture so the api and web can integrate from day 1.
 Replace `analyze` with the real pipeline (see prompts/claude-code-engine.md).
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = ROOT / "schemas"
 FIXTURE = ROOT / "fixtures" / "analysis_result.sample.json"
 
-app = FastAPI(title="SkinProof engine", version=__version__)
+app = FastAPI(title="Willow engine", version=__version__)
 
 
 def _load(path: Path) -> dict:
