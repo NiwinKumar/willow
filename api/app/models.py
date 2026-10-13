@@ -56,3 +56,12 @@ class ObjectStatus(BaseModel):
 class SessionObjectsResponse(BaseModel):
     session_id: str
     objects: list[ObjectStatus]
+
+
+class PatchSessionRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=280)
+    deviation: bool | None = None
+
+
+class SetBaselineRequest(BaseModel):
+    session_id: str
