@@ -52,7 +52,7 @@ flowchart LR
 | Check a routine | Routine | A rule table in code is final; Gemini may only add findings, marked AI-suggested, never remove one |
 | Shopping advisor | Advisor | Function calling with three tools (`search_catalog`, `compare_products`, `check_routine`); products only from tool results; every number checked; the steps and checks are shown under each answer |
 | Answer a retailer's question | Retailer, "Ask this data" | Sees aggregates only (groups under 10 hidden); answer, chart labels and chart values must exist in the data |
-| Label regions the engine finds | Report (waits for the engine's face crops) | Two runs must agree; marked AI-suggested |
+| Label spots the engine finds | Report, "Spots on this photo" (switches on with the engine's face crops) | Asked twice in different orders; a name is kept only if both agree confidently; marked AI-suggested; moles carry the dermatologist note |
 
 Shared rules: cosmetic language only, no disease names, never ranks skin tone ("lighter is better" is banned wording), daily caps per person and across everyone.
 
