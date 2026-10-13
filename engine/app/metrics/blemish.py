@@ -1,6 +1,8 @@
 """blemishes (docs/METRICS.md B2): small round spots redder than this person's own skin
-nearby. Shading makes skin darker, not redder, so shadows by the nose and eyes are not
-picked up. Indicative only: Gemini labels each crop (pimple, mark, mole...) later."""
+nearby. On deeper skin a pimple is often only a little redder but clearly darker, so the
+score adds part of the darkness, but a spot must still be somewhat redder: shading makes
+skin darker, not redder, so shadows by the nose and eyes are not picked up. Indicative
+only: Gemini labels each crop (pimple, mark, mole...) later."""
 
 from dataclasses import dataclass
 
@@ -48,18 +50,29 @@ def working_scale(
     return small, small_masks, px_per_mm * scale, 1.0 / scale
 
 
-def find_blemishes(lab: np.ndarray, skin: np.ndarray, px_per_mm: float) -> list[Blemish]:
-    """Blemishes inside `skin` (bool mask over the `lab` crop), strongest first.
-    Coordinates and areas are in the input's pixels."""
-    lab, (skin,), px_per_mm, back = working_scale(lab, [skin], px_per_mm)
+def find_blemishes(
+    lab: np.ndarray, skin: np.ndarray, px_per_mm: float, search: np.ndarray | None = None
+) -> list[Blemish]:
+    """Blemishes inside `skin` (bool mask over the `lab` crop) whose centre lies in `search`
+    (default: all of `skin`), strongest first. `skin` is the local background, so guarded
+    skin still counts as 'nearby'. Coordinates and areas are in the input's pixels."""
+    if search is None:
+        search = skin
+    lab, (skin, search), px_per_mm, back = working_scale(lab, [skin, search], px_per_mm)
     sigma_bg = config.BLEMISH_BACKGROUND_MM * px_per_mm
     a_bg = _local_mean(lab[..., 1], skin, sigma_bg)
     l_bg = _local_mean(lab[..., 0], skin, sigma_bg)
+    smooth = max(0.15 * px_per_mm, 0.5)
     redder = cv2.GaussianBlur(
-        np.where(skin, lab[..., 1] - a_bg, 0).astype(np.float32), (0, 0), max(0.15 * px_per_mm, 0.5)
+        np.where(skin, lab[..., 1] - a_bg, 0).astype(np.float32), (0, 0), smooth
     )
-    spread = np.median(np.abs(redder[skin])) * 1.4826  # robust SD of this person's skin
-    z = np.clip(redder / max(spread, 1e-6), 0, None)
+    darker = cv2.GaussianBlur(
+        np.where(skin, l_bg - lab[..., 0], 0).astype(np.float32), (0, 0), smooth
+    )
+    # robust SDs of this person's skin, from the half that blemishes do not touch
+    z_red = np.clip(redder / robust_spread(redder[skin]), 0, None)
+    z_dark = np.clip(darker / robust_spread(darker[skin]), 0, None)
+    z = z_red + config.BLEMISH_DARK_WEIGHT * z_dark
 
     # round-blob search at sizes from ~1 to ~5 mm across
     r_min, r_max = (d * px_per_mm / 2 for d in config.BLEMISH_DIAMETER_MM)
@@ -72,7 +85,7 @@ def find_blemishes(lab: np.ndarray, skin: np.ndarray, px_per_mm: float) -> list[
         overlap=0.3,
     )
     edge = round(config.BLEMISH_EDGE_MM * px_per_mm)
-    inner = ndimage.binary_erosion(skin, iterations=max(edge, 1))  # not on the mask edge
+    inner = ndimage.binary_erosion(skin, iterations=max(edge, 1)) & search  # not on the edge
     yy, xx = np.ogrid[: skin.shape[0], : skin.shape[1]]
     found = []
     for y, x, s in blobs:
@@ -82,21 +95,36 @@ def find_blemishes(lab: np.ndarray, skin: np.ndarray, px_per_mm: float) -> list[
         r = s * 1.414
         disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin
         score = float(z[disk].mean())
-        if score < config.BLEMISH_MIN_SCORE:
-            continue
+        a_contrast = float((lab[..., 1] - a_bg)[disk].mean())
+        l_contrast = float((lab[..., 0] - l_bg)[disk].mean())
+        if (
+            score < config.BLEMISH_MIN_SCORE
+            or z_red[disk].mean() < config.BLEMISH_MIN_RED_Z
+            or a_contrast < config.BLEMISH_MIN_A_CONTRAST
+            or a_contrast < config.BLEMISH_MIN_RED_RATIO * -l_contrast
+        ):
+            continue  # too faint, or mostly darker (a brown mark, a shadow, hair)
         found.append(
             Blemish(
                 x=float(x * back),  # plain floats: numpy float32 is not JSON-serialisable
                 y=float(y * back),
                 radius=float(r * back),
                 score=score,
-                a_star_contrast=float((lab[..., 1] - a_bg)[disk].mean()),
-                l_star_contrast=float((lab[..., 0] - l_bg)[disk].mean()),
+                a_star_contrast=a_contrast,
+                l_star_contrast=l_contrast,
                 area_px=round(disk.sum() * back * back),
             )
         )
     gap = config.BLEMISH_MERGE_MM * px_per_mm * back  # in input pixels
     return _merge(sorted(found, key=lambda b: -b.score), gap)
+
+
+def robust_spread(values: np.ndarray) -> float:
+    """SD of skin texture from the half of a contrast map that spots do not reach (values
+    are oriented so spots are positive): a face with many marks does not raise its own
+    bar. For normal noise, median - 25th percentile = 0.674 SD."""
+    q25, q50 = np.percentile(values, [25, 50])
+    return float(max((q50 - q25) / 0.6745, 1e-6))
 
 
 def _merge(blemishes: list[Blemish], min_gap_px: float) -> list[Blemish]:

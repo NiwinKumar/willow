@@ -111,7 +111,18 @@ NOSE_SIDES = [
     294,
 ]
 SUBNASAL = [2, 164, 0, 37, 267, 97, 326, 167, 393]
+EYE_CORNERS = (133, 362, 33, 263)  # inner (right, left), outer (right, left)
+MOUTH_CORNERS = (61, 291)  # shadowed creases at the lip corners
+GLABELLA = [107, 55, 168, 285, 336, 9]  # between the inner brow ends, down to the bridge
 NOSE_BASE = [64, 98, 97, 2, 326, 327, 294, 129, 358, 240, 460]  # area where nostrils can be
+
+
+# Face midline from chin to forehead (side views cut the face here; 152 and 10 are the
+# outline's own end points)
+MIDLINE = [175, 199, 200, 18, 17, 0, 164, 2, 1, 4, 5, 195, 197, 6, 168, 8, 9, 151]
+NOSE_ALL = NOSE_SIDES + NOSE_BASE + [1, 4, 5, 195, 197, 6]
+OVAL_RIGHT_HALF = slice(18, 36)  # FACE_OVAL from 152 round the subject's right to 109
+OVAL_LEFT_HALF = slice(0, 19)  # FACE_OVAL from 10 round the subject's left to 152
 
 
 class FaceNotFound(ValueError):
@@ -144,11 +155,46 @@ class Face:
             hull = cv2.convexHull(pts).reshape(-1, 2)
             centre = hull.mean(axis=0)
             out[name] = centre + (hull - centre) * config.FACE_ROI_SHRINK
+        if self.view != "front":  # only the cheek and under-eye facing the camera
+            out = {n: p for n, p in out.items() if n.startswith(self.view + "_")}
         return out
 
     @property
     def px_per_mm(self) -> float:
-        return self.eye_distance_px / config.EYE_DISTANCE_MM
+        if self.view == "front":
+            return self.eye_distance_px / config.EYE_DISTANCE_MM
+        # a turned head shortens the eye distance but not the nose-bridge-to-chin height
+        height = float(np.hypot(*(self.points[168] - self.points[152])))
+        if height <= 0:  # no usable height: fall back to the eye scale
+            return self.eye_distance_px / config.EYE_DISTANCE_MM
+        return height / config.FACE_HEIGHT_MM
+
+    @property
+    def view(self) -> str:
+        """'front', or the subject's side that faces the camera: 'right' / 'left'."""
+        if abs(self.yaw) <= config.MAX_ABS_YAW:
+            return "front"
+        right = np.hypot(*(self.points[1] - self.points[234]))  # nose tip to right cheek edge
+        left = np.hypot(*(self.points[1] - self.points[454]))
+        return "right" if right > left else "left"
+
+    def ear_side(self, shape: tuple[int, int], origin: tuple[int, int] = (0, 0)) -> np.ndarray:
+        """Side views: the part of the image beyond the visible cheek's centre, away from
+        the nose (toward the ear, sideburn and temple). Front views: all False."""
+        if self.view == "front":
+            return np.zeros(shape, bool)
+        nose = self.points[1] - np.asarray(origin, float)
+        cheek = self.points[ROI_POINTS[self.view + "_cheek"]].mean(axis=0) - np.asarray(
+            origin, float
+        )
+        d = (cheek - nose) / np.linalg.norm(cheek - nose)
+        yy, xx = np.mgrid[: shape[0], : shape[1]].astype(np.float32)
+        return (xx - cheek[0]) * d[0] + (yy - cheek[1]) * d[1] > 0
+
+    @property
+    def cheeks(self) -> tuple[str, ...]:
+        """Cheek ROIs that face the camera."""
+        return {"front": CHEEKS, "right": ("right_cheek",), "left": ("left_cheek",)}[self.view]
 
     def _disk(self, mm: float) -> np.ndarray:
         r = max(round(mm * self.px_per_mm), 1)
@@ -171,7 +217,14 @@ class Face:
         rel = (oval - self.points[168]) @ up  # 168: between the eyes
         weight = np.clip(rel / np.linalg.norm(self.points[10] - self.points[168]), 0, 1)
         oval[rel > 0] += np.outer(weight[rel > 0], up) * lift
-        return oval
+        if self.view == "front":
+            return oval
+        # side view: the half facing the camera, closed along the midline
+        half = oval[OVAL_RIGHT_HALF if self.view == "right" else OVAL_LEFT_HALF]
+        mid = self.points[MIDLINE]
+        if self.view == "right":  # half runs chin -> forehead, so return forehead -> chin
+            mid = mid[::-1]
+        return np.vstack([half, mid])
 
     def skin_mask(self, shape: tuple[int, int]) -> np.ndarray:
         """Face outline minus eyes (lash/lid-rim margin), upper eyelids and lips, following
@@ -193,9 +246,77 @@ class Face:
             guard |= polygon_mask(shape, hull)
         polys = self.roi_polygons()
         for name in ("right_under_eye", "left_under_eye"):
-            guard |= polygon_mask(shape, polys[name])
+            if name in polys:
+                guard |= polygon_mask(shape, polys[name])
+        if self.view != "front":  # a turned nose: shine on the ridge, shadow on the far side
+            hull = cv2.convexHull(self.points[NOSE_ALL].astype(np.float32)).reshape(-1, 2)
+            guard |= polygon_mask(shape, hull)
         grown = cv2.dilate(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
         return grown.astype(bool)
+
+    def nose_mask(self, shape: tuple[int, int]) -> np.ndarray:
+        """The whole nose (bridge, sides, tip, wings), grown by SHADOW_GUARD_MM."""
+        hull = cv2.convexHull(self.points[NOSE_ALL].astype(np.float32)).reshape(-1, 2)
+        grown = cv2.dilate(
+            polygon_mask(shape, hull).astype(np.uint8), self._disk(config.SHADOW_GUARD_MM)
+        )
+        return grown.astype(bool)
+
+    def eye_corner_guard(self, shape: tuple[int, int]) -> np.ndarray:
+        """A CANTHUS_GUARD_MM circle at each eye corner (deep shadow, lid redness)."""
+        corners = np.zeros(shape, np.uint8)
+        r = max(round(config.CANTHUS_GUARD_MM * self.px_per_mm), 1)
+        for i in EYE_CORNERS:
+            cv2.circle(corners, tuple(int(v) for v in self.points[i]), r, 1, -1)
+        return corners.astype(bool)
+
+    def lip_band(self, shape: tuple[int, int], mm: float) -> np.ndarray:
+        """The lips grown by `mm` (the lip edge is naturally redder and darker)."""
+        return self._shape(shape, LIPS, mm)
+
+    def edge_guard(self, shape: tuple[int, int]) -> np.ndarray:
+        """Where shading sits right next to a feature, for dark spots: brows (BROW_GUARD_MM),
+        the glabella, the eye corners, the mouth corners, a SPOT_LIP_GUARD_MM band around
+        the lips (the crease above the chin) and under the nostrils. Only these spots are
+        guarded; elsewhere the round test rejects shadow edges (see also border_band)."""
+        guard = self.brow_guard(shape) | self.eye_corner_guard(shape)
+        hull = cv2.convexHull(self.points[GLABELLA].astype(np.float32)).reshape(-1, 2)
+        guard |= polygon_mask(shape, hull)
+        guard |= self.lip_band(shape, config.SPOT_LIP_GUARD_MM)
+        nose = cv2.convexHull(self.points[NOSE_BASE].astype(np.float32)).reshape(-1, 2)
+        guard |= cv2.dilate(
+            polygon_mask(shape, nose).astype(np.uint8), self._disk(config.SPOT_NOSTRIL_GUARD_MM)
+        ).astype(bool)
+        corners = np.zeros(shape, np.uint8)
+        r = max(round(config.CANTHUS_GUARD_MM * self.px_per_mm), 1)
+        for i in MOUTH_CORNERS:
+            cv2.circle(corners, tuple(int(v) for v in self.points[i]), r, 1, -1)
+        return guard | corners.astype(bool)
+
+    def brow_guard(self, shape: tuple[int, int]) -> np.ndarray:
+        """The brows grown by BROW_GUARD_MM (stray brow hairs; brow edges look red too)."""
+        guard = self._shape(shape, RIGHT_BROW, config.BROW_GUARD_MM)
+        return guard | self._shape(shape, LEFT_BROW, config.BROW_GUARD_MM)
+
+    def border_band(
+        self, skin: np.ndarray, origin: tuple[int, int] = (0, 0), hairline_mm: float | None = None
+    ) -> np.ndarray:
+        """Band inside the OUTER edge of a skin mask (whose top-left pixel is `origin` in
+        the photo): `hairline_mm` (default HAIRLINE_GUARD_MM) above the eyes, where baby
+        hairs too fine for the colour trim remain, and JAW_GUARD_MM below (jaw shadow, neck,
+        background). Measured from where the skin really ends, not from the outline lifted
+        into the hair."""
+        if hairline_mm is None:
+            hairline_mm = config.HAIRLINE_GUARD_MM
+        outer = binary_fill_holes(skin).astype(np.uint8)
+        inside = cv2.distanceTransform(outer, cv2.DIST_L2, 5) / self.px_per_mm  # mm
+        up = self.points[10] - self.points[152]
+        up = up / np.linalg.norm(up)
+        cx, cy = self.points[168] - np.asarray(origin, float)  # 168: between the eyes
+        yy, xx = np.mgrid[: skin.shape[0], : skin.shape[1]].astype(np.float32)
+        above_eyes = (xx - cx) * up[0] + (yy - cy) * up[1] > 0
+        band_mm = np.where(above_eyes, hairline_mm, config.JAW_GUARD_MM)
+        return outer.astype(bool) & (inside < band_mm)
 
     def feature_zones(self, shape: tuple[int, int]) -> dict[str, np.ndarray]:
         """Where brows and nostrils can be; refine_skin removes only their dark pixels."""
@@ -203,7 +324,14 @@ class Face:
         brow_zone = cv2.dilate(brow_core.astype(np.uint8), self._disk(config.BROW_ZONE_MM))
         nose = cv2.convexHull(self.points[NOSE_BASE].astype(np.float32)).reshape(-1, 2)
         nose_zone = cv2.dilate(polygon_mask(shape, nose).astype(np.uint8), self._disk(1.0))
+        # below the nose (where a beard / stubble grows), as a half-plane across the face
+        up = self.points[10] - self.points[152]
+        up = up / np.linalg.norm(up)
+        yy, xx = np.mgrid[: shape[0], : shape[1]].astype(np.float32)
+        sx, sy = self.points[2]  # 2: just under the nose tip
+        lower = (xx - sx) * up[0] + (yy - sy) * up[1] < 0
         return {
+            "lower_face": lower,
             "brow_core": brow_core,
             "brow_zone": brow_zone.astype(bool),
             "nostril_zone": nose_zone.astype(bool),
@@ -265,10 +393,16 @@ def _local_mean(values: np.ndarray, mask: np.ndarray, sigma: float) -> np.ndarra
     return total / np.maximum(weight, 1e-6)
 
 
-def facial_hair(l_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
+def facial_hair(
+    l_star: np.ndarray,
+    skin: np.ndarray,
+    px_per_mm: float,
+    near_features: np.ndarray | None = None,
+) -> np.ndarray:
     """Moustache, beard and stubble: many hair-thin pixels much darker than the skin
     right next to them (within ~1 mm). Hair is stripy; a shadow is smooth, and a dark spot
-    is one small patch, so neither reaches the density."""
+    is one small patch, so neither reaches the density. Patches smaller than
+    FACIAL_HAIR_MIN_AREA_MM2 (a cluster of small dark bumps) are kept as skin."""
     fine = cv2.GaussianBlur(
         l_star.astype(np.float32), (0, 0), config.FACIAL_HAIR_FINE_MM * px_per_mm
     )
@@ -276,9 +410,139 @@ def facial_hair(l_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.nd
     window = round(config.FACIAL_HAIR_WINDOW_MM * px_per_mm) | 1
     density = cv2.blur(strands.astype(np.float32), (window, window))
     beard = (density > config.FACIAL_HAIR_DENSITY).astype(np.uint8)
+    # a moustache or stubble covers a big patch; a small cluster of dark bumps is marks
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(beard, connectivity=8)
+    min_area = config.FACIAL_HAIR_MIN_AREA_MM2 * px_per_mm**2
+    # hair darkens a patch; shine (bright highlights between dark pores) only looks stripy
+    median = float(np.median(l_star[skin])) if skin.any() else 0.0
+    shiny = {k for k in range(1, n) if l_star[labels == k].mean() > median}
+    hair = {k for k in range(1, n) if stats[k, cv2.CC_STAT_AREA] >= min_area} - shiny
+    if near_features is not None:
+        hair |= set(np.unique(labels[near_features & (labels > 0)]).tolist()) - shiny
+    beard = np.isin(labels, list(hair)).astype(np.uint8)
     r = max(round(config.HAIR_MARGIN_MM * px_per_mm), 1)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     return cv2.dilate(beard, kernel).astype(bool)
+
+
+def skin_colour(lab: np.ndarray, mask: np.ndarray, ref: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """Pixels of `mask` whose colour matches this person's skin in `ref` (visible cheek):
+    enough chroma and a similar hue (hair and background are grey), not much brighter
+    (shine) or far darker (hair). Holes up to SIDE_FILL_HOLES_MM2 are refilled so marks that
+    lose colour stay skin. Used on side views, where hair and background crowd the cheek."""
+    L, a, b = lab[..., 0], lab[..., 1], lab[..., 2]
+    chroma = np.hypot(a, b)
+    hue = np.degrees(np.arctan2(b, a))
+    l_ref = float(np.median(L[ref]))
+    c_ref = float(np.median(chroma[ref]))
+    h_ref = float(np.median(hue[ref]))
+    d_hue = np.abs((hue - h_ref + 180) % 360 - 180)
+    keep = (
+        mask
+        & (chroma >= config.SIDE_MIN_CHROMA_FRAC * c_ref)
+        & (d_hue <= config.SIDE_MAX_HUE_DEG)
+        & (L <= l_ref + config.SIDE_MAX_BRIGHTER_L)
+        & (L >= l_ref - config.SIDE_MAX_DARKER_L)
+    )
+    # small round dark blobs are marks or moles, not hair (hair is thin or large), even
+    # where they touch the mask edge
+    dark = mask & ~keep & (L < l_ref)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(dark.astype(np.uint8), connectivity=8)
+    max_area = config.SIDE_FILL_HOLES_MM2 * px_per_mm**2
+    for k in range(1, n):
+        w, h, area = (
+            stats[k, cv2.CC_STAT_WIDTH],
+            stats[k, cv2.CC_STAT_HEIGHT],
+            stats[k, cv2.CC_STAT_AREA],
+        )
+        if (
+            area < max_area
+            and min(w, h) >= px_per_mm
+            and area >= 0.5 * w * h
+            and max(w, h) <= 2 * min(w, h)
+        ):
+            keep |= labels == k
+    holes = binary_fill_holes(keep) & ~keep
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(holes.astype(np.uint8), connectivity=8)
+    small = [
+        k
+        for k in range(1, n)
+        if stats[k, cv2.CC_STAT_AREA] < config.SIDE_FILL_HOLES_MM2 * px_per_mm**2
+    ]
+    keep |= np.isin(labels, small) & mask
+    r = max(round(0.7 * px_per_mm), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    keep = cv2.morphologyEx(keep.astype(np.uint8), cv2.MORPH_OPEN, kernel)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(keep, connectivity=8)
+    if n > 1:
+        keep = (labels == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))).astype(np.uint8)
+    return keep.astype(bool) & mask
+
+
+def edge_hair(
+    lab: np.ndarray,
+    skin: np.ndarray,
+    ref: np.ndarray,
+    px_per_mm: float,
+    ear_side: np.ndarray | None = None,
+) -> np.ndarray:
+    """Sideburns / temple hair on side views: rough (fine texture well above this
+    person's skin) AND greyer than the cheek, over a SIDE_HAIR_WINDOW_MM window, in
+    patches that touch the outer edge of the skin mask on the ear side (`ear_side`; marks
+    inside the cheek are rough too, but they do not reach that edge)."""
+    L = lab[..., 0].astype(np.float32)
+    hp = L - cv2.GaussianBlur(L, (0, 0), 0.7 * px_per_mm)
+    w = round(config.SIDE_HAIR_WINDOW_MM * px_per_mm) | 1
+    tex = np.sqrt(cv2.blur(hp * hp, (w, w)))
+    chroma = cv2.blur(np.hypot(lab[..., 1], lab[..., 2]).astype(np.float32), (w, w))
+    rough = tex > config.SIDE_HAIR_TEXTURE * float(np.median(tex[skin]))
+    grey = chroma < config.SIDE_HAIR_CHROMA * float(np.median(chroma[ref]))
+    hair = (skin & rough & grey).astype(np.uint8)
+    hair = cv2.morphologyEx(hair, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    outer = binary_fill_holes(skin).astype(np.uint8)
+    # (borderValue 0: a mask that runs to the crop border has an edge there too)
+    inner = cv2.erode(
+        outer, np.ones((5, 5), np.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0
+    )
+    edge = outer.astype(bool) & ~inner.astype(bool)
+    if ear_side is not None:
+        edge &= ear_side
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(hair, connectivity=8)
+    min_area = config.FACIAL_HAIR_MIN_AREA_MM2 * px_per_mm**2
+    ids = [
+        k
+        for k in range(1, n)
+        if stats[k, cv2.CC_STAT_AREA] >= min_area and (edge & (labels == k)).any()
+    ]
+    r = max(round(config.HAIR_MARGIN_MM * px_per_mm), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    return cv2.dilate(np.isin(labels, ids).astype(np.uint8), kernel).astype(bool)
+
+
+def stubble(l_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """Short stubble in a phone photo: not strands but a dense field of small dark dots.
+    Share of pixels STUBBLE_DELTA_L darker than the skin within ~0.5 mm, over a
+    STUBBLE_WINDOW_MM window; big patches above STUBBLE_DENSITY are beard. Call it on the
+    lower face only. Oct 13: beard 0.11 (median at its spots); dense freckles and acne
+    below the nose at most 0.02."""
+    fine = cv2.GaussianBlur(l_star.astype(np.float32), (0, 0), 0.5 * px_per_mm)
+    specks = skin & (l_star < fine - config.STUBBLE_DELTA_L)
+    w = round(config.STUBBLE_WINDOW_MM * px_per_mm) | 1
+    share = cv2.blur(specks.astype(np.float32), (w, w)) / np.maximum(
+        cv2.blur(skin.astype(np.float32), (w, w)), 1e-3
+    )
+    patch = (skin & (share > config.STUBBLE_DENSITY)).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(patch, connectivity=8)
+    min_area = config.FACIAL_HAIR_MIN_AREA_MM2 * px_per_mm**2
+    median = float(np.median(l_star[skin])) if skin.any() else 0.0
+    big = [
+        k
+        for k in range(1, n)
+        if stats[k, cv2.CC_STAT_AREA] >= min_area and l_star[labels == k].mean() <= median
+    ]  # (a shiny patch is speckled too, but brighter than this person's skin, not darker)
+    r = max(round(config.HAIR_MARGIN_MM * px_per_mm), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    return cv2.dilate(np.isin(labels, big).astype(np.uint8), kernel).astype(bool)
 
 
 def refine_skin(
@@ -304,7 +568,12 @@ def refine_skin(
     nostril = cv2.morphologyEx(nostril.astype(np.uint8), cv2.MORPH_CLOSE, disk(1.0))
     cut = cv2.dilate((brow | nostril.astype(bool)).astype(np.uint8), disk(config.FEATURE_EDGE_MM))
     skin = remove_hair(l_star, mask & ~cut.astype(bool), px_per_mm)
-    skin &= ~facial_hair(l_star, skin, px_per_mm)
+    # eyes, lids, lips (holes in the mask) and brows, grown a little: lashes/brow tails
+    features = (binary_fill_holes(mask) & ~mask) | cut.astype(bool)
+    features = cv2.dilate(features.astype(np.uint8), disk(config.HAIR_MARGIN_MM)).astype(bool)
+    skin &= ~facial_hair(l_star, skin, px_per_mm, near_features=features)
+    if "lower_face" in zones:
+        skin &= ~stubble(l_star, skin & zones["lower_face"], px_per_mm)
 
     # smooth: fill pin-holes, shave ragged spurs, keep the one face region
     smooth = cv2.morphologyEx(skin.astype(np.uint8), cv2.MORPH_CLOSE, disk(0.7))

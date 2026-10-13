@@ -87,9 +87,10 @@ def test_brown_spots_found_at_every_tone(L):
     assert extras["count"] == 3 and extras["mean_contrast"] > 3 and 0 < pct < 15
 
 
-def test_shadow_that_loses_colour_is_not_a_spot():
-    lab = _dot(_lab(60), 150, 150, r=15, d_l=-8.0, chroma_scale=0.7)  # darker AND greyer
-    assert _spots(lab) == []
+def test_grey_mark_on_deep_skin_is_a_spot():
+    # post-acne marks on deep skin go darker AND greyer, like shading; they still count
+    lab = _dot(_lab(32), 150, 150, r=15, d_l=-8.0, chroma_scale=0.7)
+    assert len(_spots(lab)) == 1
 
 
 def test_specks_smaller_than_min_size_are_ignored():
@@ -148,6 +149,21 @@ class FakeFace(Face):
     def shadow_guard(self, shape):
         return np.zeros(shape, bool)
 
+    def edge_guard(self, shape):
+        return np.zeros(shape, bool)
+
+    def brow_guard(self, shape):
+        return np.zeros(shape, bool)
+
+    def eye_corner_guard(self, shape):
+        return np.zeros(shape, bool)
+
+    def lip_band(self, shape, mm):
+        return np.zeros(shape, bool)
+
+    def border_band(self, skin, origin=(0, 0), hairline_mm=None):
+        return np.zeros(skin.shape, bool)
+
     def feature_zones(self, shape):
         none = np.zeros(shape, bool)
         return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
@@ -174,7 +190,25 @@ def fake_landmarks(monkeypatch):
         if srgb8.mean() < 5:  # an all-black photo stands in for "no face"
             raise FaceNotFound("no face")
         pts = np.zeros((478, 2))
-        pts[33], pts[263] = (300, 380), (700, 380)  # 400 px between outer eye corners
+        # rigid points used to line photos up (eye corners, nose, mouth, chin, forehead,
+        # cheek edges), spread like a real face mesh
+        for i, xy in {
+            33: (300, 380),
+            133: (430, 380),
+            362: (570, 380),
+            263: (700, 380),
+            168: (500, 380),
+            6: (500, 430),
+            1: (500, 560),
+            4: (500, 540),
+            61: (420, 700),
+            291: (580, 700),
+            152: (500, 880),
+            10: (500, 130),
+            234: (210, 480),
+            454: (790, 480),
+        }.items():
+            pts[i] = xy
         return FakeFace(points=pts, **pose)
 
     monkeypatch.setattr("app.pipeline_face.detect_face", fake_detect)
@@ -198,7 +232,7 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
 
 
 def test_face_pose_gate(tmp_path, fake_landmarks):
-    fake_landmarks["yaw"] = config.MAX_ABS_YAW + 5
+    fake_landmarks["yaw"] = config.SIDE_MAX_YAW + 5  # beyond even a side view
     _face_photo(tmp_path / "turned.jpg")
     r = analyze_face([str(tmp_path / "turned.jpg")])
     assert not r["quality"]["passed"] and "pose_out_of_range" in r["quality"]["reasons"]
@@ -248,3 +282,27 @@ def test_blemish_candidates_with_crops(tmp_path, fake_landmarks):
     assert c["kind"] == "blemish" and abs(c["bbox"][0] + c["bbox"][2] / 2 - 500) < 6
     assert Image.open(c["crop_uri"]).size[0] >= 64
     assert Image.open(c["context_crop_uri"]).size[0] == 3 * Image.open(c["crop_uri"]).size[0]
+
+
+def _bump_photo(path, bumps, seed=0):
+    rng = np.random.default_rng(seed)
+    img = np.full((1000, 1000, 3), (198, 148, 115), np.float64) + rng.normal(0, 3, (1000, 1000, 1))
+    yy, xx = np.ogrid[:1000, :1000]
+    for cx, cy in bumps:
+        img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 9**2] = (215, 120, 105)
+    Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(path, quality=95)
+
+
+def test_spot_persistence_across_photos(tmp_path, fake_landmarks):
+    # the bump at (500, 600) is in all 3 photos; the one at (350, 750) only in the first
+    files = []
+    for i in range(3):
+        bumps = [(500, 600)] + ([(350, 750)] if i == 0 else [])
+        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i)
+        files.append(str(tmp_path / f"f{i}.jpg"))
+    r = analyze_face(files)
+    seen = {
+        round(c["bbox"][0] + c["bbox"][2] / 2, -2): c["features"]["seen_in_fraction"]
+        for c in r["candidates"]
+    }
+    assert seen == {500.0: 1.0, 400.0: 0.33}
