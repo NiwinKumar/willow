@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { DemoBar } from '../components/DemoBar'
+import { JudgeBar } from '../components/JudgeBar'
 import { Stage } from '../components/Stage'
 import { toSession } from '../data/live'
 import type { Session, Site } from '../data/types'
@@ -14,6 +15,7 @@ import { plural } from '../lib/format'
 import { QUALITY_COPY, SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { useAuth } from '../lib/useAuth'
+import { useJudgeOn } from '../lib/useJudge'
 import { DEMO_SERIES } from '../mock/series'
 
 const LABELS = ['Checking photo quality', 'Correcting colours', 'Measuring', 'Explaining']
@@ -87,12 +89,14 @@ export function Processing() {
   const { sessionId = '' } = useParams()
   const [params] = useSearchParams()
   const data = useData()
+  const judging = useJudgeOn()
   const { getIdToken, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const site = (params.get('site') as Site) ?? 'face_full'
   const n = Number(params.get('n') ?? '3')
-  const scripted = data.mode === 'demo' || sessionId === 'sample'
+  // Only the sample replay is scripted; a real session id is always analysed, even if demo mode was on.
+  const scripted = sessionId === 'sample'
   const step = reduce ? 400 : 1100
 
   const [done, setDone] = useState(0)
@@ -177,13 +181,13 @@ export function Processing() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {data.mode === 'demo' ? <DemoBar /> : null}
+      {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
       <div className="h-[40dvh]">
         {scripted || view ? (
           <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'frame', 'frames')} />
         ) : (
           <div className="flex h-full items-center justify-center bg-surface-2 px-8 text-center text-[13px] text-text-3">
-            {plural(n, 'photo', 'photos')} received. Measuring them now.
+            {plural(n, 'photo', 'photos')} received. Measuring {n === 1 ? 'it' : 'them'} now.
           </div>
         )}
       </div>

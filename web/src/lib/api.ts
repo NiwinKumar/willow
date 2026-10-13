@@ -40,6 +40,8 @@ export type SessionView = {
     preview: { url: string; width: number | null; height: number | null } | null
     overlay_urls: Record<string, string>
     hours_since_baseline: number | null
+    /** Judge mode: the hosted sample these photos were copied from. */
+    sample_id?: string | null
   }
   result: AnalysisResult | null
   labels: Record<string, string>
@@ -122,6 +124,26 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
 
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
 
+/** Hosted sample photos for judge mode (api/app/demo.py). */
+export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number }
+
+type ServiceState = { status: 'ok' | 'unreachable' | 'unavailable'; error?: string }
+export type DemoStatus = {
+  api: ServiceState & { version: string; runtime: string }
+  engine: ServiceState & { version?: string; mode: string; latency_ms?: number }
+  gemini: { model: string; endpoint: string }
+  bigquery: ServiceState & { dataset?: string; people?: number; synthetic?: number }
+  catalog: { products: number }
+  storage: { bucket: string }
+  checked_at: string
+}
+
+async function publicGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`)
+  if (!res.ok) throw new ApiError(res.status, `${path} unavailable`)
+  return (await res.json()) as T
+}
+
 export const api = {
   /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
   retailerInsights: async () => {
@@ -159,6 +181,12 @@ export const api = {
   putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
+  demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
+  demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
+  demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),
+  startSample: (token: string, sampleId: string) =>
+    request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }),
+  judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }),
   advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[]) =>
     request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json({ messages }) }),
 }

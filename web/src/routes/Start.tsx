@@ -1,10 +1,10 @@
 import { Camera, FlaskConical, ShieldCheck, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { Sheet } from '../components/Sheet'
-import { CONSENT_VERSION, prefs } from '../lib/prefs'
+import { CONSENT_VERSION, nextPath, prefs } from '../lib/prefs'
 
 const cards = [
   {
@@ -34,6 +34,7 @@ export function Start() {
   const [optIn, setOptIn] = useState(false)
   const [more, setMore] = useState<(typeof cards)[number] | null>(null)
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
       <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Before your first photo</h1>
@@ -77,7 +78,7 @@ export function Start() {
         <Button
           onClick={() => {
             prefs.setConsent({ version: CONSENT_VERSION, accepted_at: new Date().toISOString(), aggregate_opt_in: optIn })
-            navigate('/goals')
+            navigate(`/goals?next=${encodeURIComponent(nextPath(params.get('next'), '/capture'))}`)
           }}
         >
           Agree and continue

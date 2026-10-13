@@ -8,6 +8,8 @@ export type DataStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export type DataState = {
   mode: DataMode
+  /** demo only: real analyses of the team's consented captures, or the illustrative journey. */
+  demoSource?: 'real' | 'illustrative'
   /** live: idle until someone is signed in, then loading -> ready (or error). demo is always ready. */
   status: DataStatus
   sites: Site[]

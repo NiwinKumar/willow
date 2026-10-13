@@ -12,29 +12,41 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
   if (!t || !c || !tb || !cb || t.delta === null || c.delta === null) return null
   const noBand = tb.mdc95 === null || cb.mdc95 === null
   const dd = t.delta - c.delta
-  const band = Math.max(tb.mdc95 ?? 0, cb.mdc95 ?? 0)
+  // The difference of two readings carries both arms' photo noise (independent errors add in quadrature).
+  const band = Math.hypot(tb.mdc95 ?? 0, cb.mdc95 ?? 0)
   const treatedReal = t.verdict === 'real_change'
   const controlReal = c.verdict === 'real_change'
   const ddReal = !noBand && Math.abs(dd) > band
-  const headline = noBand
-    ? 'No noise band yet'
-    : controlReal
-    ? 'Both sides changed'
-    : treatedReal && ddReal
-      ? 'Real change on the treated side'
-      : 'Within normal photo variation on both sides'
-  const body = noBand
-    ? `Treated moved ${fmtSigned(t.delta, t)} and untreated ${fmtSigned(c.delta, c)}. A baseline with one photo has no noise band, so the difference cannot be judged yet. Take 5 photos of each square and make them your baselines.`
-    : controlReal
-    ? `Both sides moved outside their bands (treated ${fmtSigned(t.delta, t)}, untreated ${fmtSigned(c.delta, c)}). Something other than the product, such as lighting, sun or temperature, likely moved the reading. We can't attribute this change to the product.`
-    : treatedReal && ddReal
-      ? `The treated side changed by ${fmtSigned(t.delta, t)} and the untreated side by ${fmtSigned(c.delta, c)}. The gap (${fmtSigned(dd, t)}) is outside photo noise (±${fmtValue(band, t)}), so lighting or time of day are unlikely to explain it and it may be linked to the product. The untreated side staying inside its band is the test working as expected.`
-      : `Treated moved ${fmtSigned(t.delta, t)} and untreated ${fmtSigned(c.delta, c)}; both inside their noise bands (±${fmtValue(band, t)}). Nothing measurable yet.`
+  const tr = fmtSigned(t.delta, t)
+  const un = fmtSigned(c.delta, c)
+  const kind = noBand
+    ? 'no_band'
+    : treatedReal && !controlReal && ddReal
+      ? 'treated'
+      : treatedReal && controlReal && ddReal
+        ? 'both_more'
+        : controlReal
+          ? 'not_attributable'
+          : 'noise'
+  const headline = {
+    no_band: 'No noise band yet',
+    treated: 'Real change on the treated side',
+    both_more: 'Both sides changed, the treated side more',
+    not_attributable: treatedReal ? 'Both sides changed by a similar amount' : 'Only the untreated side changed',
+    noise: 'Within normal photo variation on both sides',
+  }[kind]
+  const body = {
+    no_band: `Treated moved ${tr} and untreated ${un}. A baseline with one photo has no noise band, so the difference cannot be judged yet. Take 5 photos of each square and make them your baselines.`,
+    treated: `The treated side changed by ${tr} and the untreated side by ${un}. The gap (${fmtSigned(dd, t)}) is outside photo noise for a difference (±${fmtValue(band, t)}), so lighting or time of day are unlikely to explain it and it may be linked to the product. The untreated side staying inside its band is the test working as expected.`,
+    both_more: `Both sides moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated side moved more by ${fmtSigned(dd, t)}, beyond the noise for a difference (±${fmtValue(band, t)}); that extra part may be linked to the product.`,
+    not_attributable: `Treated moved ${tr} and untreated ${un}. ${treatedReal ? 'Both moved outside their bands by a similar amount' : 'The untreated side moved outside its band'}, so something other than the product, such as lighting, sun or temperature, likely moved the reading. We can't attribute this to the product.`,
+    noise: `Treated moved ${tr} and untreated ${un}; the gap (${fmtSigned(dd, t)}) is inside the noise for a difference (±${fmtValue(band, t)}). Nothing measurable yet.`,
+  }[kind]
   return (
     <div className="rounded-(--radius-tile) border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[15px] font-semibold">Treated vs control</span>
-        {noBand ? <VerdictChip verdict="no_baseline" noBand /> : controlReal ? <Chip tone="warn">not attributable</Chip> : <VerdictChip verdict={treatedReal && ddReal ? 'real_change' : 'within_noise'} />}
+        {kind === 'no_band' ? <VerdictChip verdict="no_baseline" noBand /> : kind === 'not_attributable' ? <Chip tone="warn">not attributable</Chip> : <VerdictChip verdict={kind === 'treated' || kind === 'both_more' ? 'real_change' : 'within_noise'} />}
       </div>
       <p className="mt-1 text-[17px] font-semibold leading-tight">{headline}</p>
       <p className="mt-2 text-[15px] leading-relaxed text-text-2">{body}</p>
@@ -46,7 +58,7 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[13px] text-text-2">
         <Chip tone="neutral">difference {fmtSigned(dd, t)}</Chip>
-        <Chip tone="neutral">band ±{fmtValue(band, t)}</Chip>
+        <Chip tone="neutral">band for the difference ±{fmtValue(band, t)}</Chip>
       </div>
     </div>
   )
