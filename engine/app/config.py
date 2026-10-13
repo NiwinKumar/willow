@@ -55,6 +55,11 @@ FOREHEAD_LIFT = 2.0  # push the top outline past the hairline (2 x mesh top -> g
 HAIR_DELTA_L = 15.0
 HAIR_DELTA_L_GLOBAL = 25.0  # or this much darker than the face median (big hair patches)
 HAIR_MARGIN_MM = 1.0
+# ...or this much darker than the face median AND below this share of its chroma (black
+# hair / braids are nearly grey). Oct 14 braids on deep skin: L* 17-23 vs face 42, chroma
+# 3-6 vs 30; skin and marks keep most of their colour.
+HAIR_GREY_DELTA_L = 12.0
+HAIR_GREY_CHROMA = 0.35
 HAIR_BACKGROUND_MM = 4.0  # "nearby skin" for hair darkness (Gaussian sigma)
 HAIR_MAX_WIDTH_MM = 1.0  # ...and no thicker than this (an under-eye shadow is long but wide)
 HAIR_MIN_LENGTH_MM = 3.0
@@ -70,7 +75,8 @@ STUBBLE_WINDOW_MM = 8.0
 STUBBLE_DENSITY = 0.05  # share of stubble dots; beard ~0.11, freckles / acne <= 0.02
 FOREHEAD_BAND = (0.25, 0.70)  # fraction of the way from hairline to brows: top, bottom
 FOREHEAD_WIDTH = 0.70  # keep the central 70% of the forehead width (temples carry hair)
-MAX_ABS_YAW = 8.0  # front view; beyond this the photo is analysed as a side view
+MAX_ABS_YAW = 15.0  # front view up to this turn; beyond it, a side view. Oct 14: a 9° turn
+# as a side view lost half the face; the full outline still fits at 15°
 # Side / three-quarter views (face_full): only the half of the face toward the camera is
 # analysed. Rotation does not matter for spots, so pitch and roll limits are looser.
 SIDE_MAX_YAW = 65.0

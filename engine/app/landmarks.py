@@ -560,7 +560,11 @@ def stubble(l_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarra
 
 
 def refine_skin(
-    l_star: np.ndarray, mask: np.ndarray, zones: dict[str, np.ndarray], px_per_mm: float
+    l_star: np.ndarray,
+    mask: np.ndarray,
+    zones: dict[str, np.ndarray],
+    px_per_mm: float,
+    chroma: np.ndarray | None = None,
 ) -> np.ndarray:
     """Cut brows, nostrils and hair by their actual dark pixels, then smooth the edges.
 
@@ -581,7 +585,7 @@ def refine_skin(
     nostril = zones["nostril_zone"] & (darker > config.NOSTRIL_DELTA_L)
     nostril = cv2.morphologyEx(nostril.astype(np.uint8), cv2.MORPH_CLOSE, disk(1.0))
     cut = cv2.dilate((brow | nostril.astype(bool)).astype(np.uint8), disk(config.FEATURE_EDGE_MM))
-    skin = remove_hair(l_star, mask & ~cut.astype(bool), px_per_mm)
+    skin = remove_hair(l_star, mask & ~cut.astype(bool), px_per_mm, chroma)
     # eyes, lids, lips (holes in the mask) and brows, grown a little: lashes/brow tails
     features = (binary_fill_holes(mask) & ~mask) | cut.astype(bool)
     features = cv2.dilate(features.astype(np.uint8), disk(config.HAIR_MARGIN_MM)).astype(bool)
@@ -598,7 +602,9 @@ def refine_skin(
     return smooth.astype(bool) & mask & ~cut.astype(bool)
 
 
-def remove_hair(l_star: np.ndarray, mask: np.ndarray, px_per_mm: float) -> np.ndarray:
+def remove_hair(
+    l_star: np.ndarray, mask: np.ndarray, px_per_mm: float, chroma: np.ndarray | None = None
+) -> np.ndarray:
     """Drop hair from a face skin mask without dropping dark spots or shaded skin.
 
     Hair is much darker than this person's own skin *nearby* (so gradual shading on the
@@ -613,6 +619,12 @@ def remove_hair(l_star: np.ndarray, mask: np.ndarray, px_per_mm: float) -> np.nd
     # darker than nearby skin (fine strands), or far darker than this person's typical skin
     # (a large patch of hair is its own "nearby", so the first test alone misses it)
     very_dark = l_star < np.median(l_star[mask]) - config.HAIR_DELTA_L_GLOBAL
+    if chroma is not None:
+        # dark AND grey: black hair and braids on deep skin are only ~25 L* darker than the
+        # face (the test above can miss them) but have almost no colour, unlike skin or marks
+        very_dark |= (l_star < np.median(l_star[mask]) - config.HAIR_GREY_DELTA_L) & (
+            chroma < config.HAIR_GREY_CHROMA * np.median(chroma[mask])
+        )
     dark = mask & ((l_star < local - config.HAIR_DELTA_L) | very_dark)
     n, labels, stats, _ = cv2.connectedComponentsWithStats(dark.astype(np.uint8), connectivity=8)
     # only the OUTER edge (hairline, face border) counts: holes cut for eyes/lips/brows have

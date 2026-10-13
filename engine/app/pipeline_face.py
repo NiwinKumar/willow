@@ -106,7 +106,9 @@ def _frame(path: str) -> dict:
     # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair) for blemishes
     # and dark spots
     zones = {k: box.crop(v) for k, v in face.feature_zones(srgb8.shape[:2]).items()}
-    face_skin = refine_skin(lab[..., 0], box.crop(face_mask_full), zones, px_per_mm)
+    face_skin = refine_skin(
+        lab[..., 0], box.crop(face_mask_full), zones, px_per_mm, np.hypot(lab[..., 1], lab[..., 2])
+    )
     if face.view != "front":  # hair, background and shine crowd a turned cheek
         face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
         # sideburns and temple hair beside the ear (beards: the lower-face stubble test in
