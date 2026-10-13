@@ -15,6 +15,9 @@ Template:
 - Impact: engine writes one extra JPEG per request (cheap); api turns the gs:// URI into a signed GET URL in `SessionView`; web draws overlays on it. Schema: one new optional object; `schema_version` 1.1.
 - Approved by: [ ] Harshini [x] Niwin
 
+### What this is about, in plain words (for Harshini)
+Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes and aligns the frames to compute the metrics, so the web app needs one small JPEG of that aligned reference frame to draw the overlays on, to show before/after, and to cross-fade between sessions. Without it, the Report has numbers but no picture. The cheapest way (1b below) is a file written by convention next to the overlays you already write: no schema change, about 15 lines, and it also applies to the CLI output so the seeded demo gets previews too. Paste-ready instructions for Claude Code are in `prompts/harshini-preview-jpg.md`.
+
 ### 1b. Same need, zero schema change (fallback if 1 is not agreed in time)
 - Change: by convention the engine also writes `{output_prefix}preview.jpg`: an sRGB JPEG of the aligned reference frame at exactly `image_size` (or at an integer downscale; the api reads the JPEG's own dimensions and scales `rois`, `candidates[].bbox` and overlay PNGs by `preview_width / image_size.width`). No new field; `schema_version` stays 1.0. The CLI writes the same file into `--out`.
 - Engine effort: about 15 lines (convert the aligned reference frame to sRGB, `cv2.imwrite`, upload). Needed for the Report overlay toggle, the before/after slider and the timeline compare; without it browsers have nothing to draw on because they cannot render DNG.
