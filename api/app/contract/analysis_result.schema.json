@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://willow.dev/schemas/analysis_result.schema.json",
+  "title": "AnalysisResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "engine_version", "session_id", "user_id", "site", "capture_mode", "frames_used", "quality", "metrics", "candidates", "overlays"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "engine_version": {"type": "string"},
+    "session_id": {"type": "string"},
+    "user_id": {"type": "string"},
+    "site": {"enum": ["face_full", "cheek_macro", "nose_macro", "forearm_treated", "forearm_control"]},
+    "capture_mode": {"enum": ["calibrated_raw", "uncalibrated"]},
+    "frames_used": {"type": "integer", "minimum": 0},
+    "quality": {
+      "type": "object", "additionalProperties": false,
+      "required": ["passed", "card_detected", "reasons"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "card_detected": {"type": "boolean"},
+        "card_delta_e_mean": {"type": ["number", "null"]},
+        "sharpness": {"type": ["number", "null"]},
+        "clipped_pct": {"type": ["number", "null"]},
+        "pose": {
+          "type": ["object", "null"], "additionalProperties": false,
+          "properties": {"yaw": {"type": "number"}, "pitch": {"type": "number"}, "roll": {"type": "number"}}
+        },
+        "per_frame": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["index", "passed", "reasons"],
+            "properties": {"index": {"type": "integer"}, "passed": {"type": "boolean"}, "reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}}}
+          }
+        },
+        "reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}}
+      }
+    },
+    "metrics": {"type": "array", "items": {"$ref": "#/$defs/metric"}},
+    "candidates": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+    "overlays": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["metric_id", "uri"],
+        "properties": {"metric_id": {"$ref": "#/$defs/metric_id"}, "uri": {"type": "string"}}
+      }
+    },
+    "rois": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["name", "polygon"],
+        "properties": {
+          "name": {"type": "string"},
+          "polygon": {"type": "array", "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}}
+        }
+      }
+    },
+    "image_size": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"width": {"type": "integer"}, "height": {"type": "integer"}}
+    },
+    "timings_ms": {"type": "object", "additionalProperties": {"type": "number"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "reason": {"enum": ["card_not_found", "card_delta_e_high", "blurry", "overexposed", "underexposed", "pose_out_of_range", "face_not_found", "occlusion_suspected", "too_few_frames"]},
+    "metric_id": {"enum": ["tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes", "pores", "texture", "lines", "dark_circles", "shine", "glow"]},
+    "metric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "group", "label", "value", "unit", "confidence", "verdict", "direction"],
+      "properties": {
+        "id": {"$ref": "#/$defs/metric_id"},
+        "group": {"enum": ["tone_pigment", "redness", "clarity", "texture_pores", "lines", "eye_area", "oil_glow"]},
+        "label": {"type": "string"},
+        "value": {"type": ["number", "null"]},
+        "unit": {"enum": ["deg", "pct_area", "index", "a_star", "count", "per_cm2", "delta_l_star"]},
+        "confidence": {"enum": ["measured", "indicative"]},
+        "within_session_sd": {"type": ["number", "null"]},
+        "mdc95": {"type": ["number", "null"]},
+        "delta": {"type": ["number", "null"]},
+        "verdict": {"enum": ["no_baseline", "within_noise", "real_change", "low_quality"]},
+        "direction": {"enum": ["increase", "decrease", "none"]},
+        "extras": {"type": "object"}
+      }
+    },
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "bbox"],
+      "properties": {
+        "id": {"type": "string"},
+        "kind": {"enum": ["blemish", "spot"]},
+        "bbox": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+        "crop_uri": {"type": ["string", "null"]},
+        "context_crop_uri": {"type": ["string", "null"]},
+        "features": {"type": "object", "additionalProperties": {"type": "number"}}
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 | Date | Decision | Supersedes |
 |---|---|---|
+| Oct 13 | api stores `AnalysisResult` as a JSON string (`result_json`) on the session doc: Firestore cannot hold arrays of arrays (ROI polygons). Auto baseline = first calibrated session with quality passed and 5 usable frames; uncalibrated sessions get a baseline only when picked by hand (`POST /v1/baselines/{site}`). Until Thursday the api runs the fixture engine, which labels its output as a sample | CONTRACT section 4 `result (AnalysisResult)` as a map |
 | Oct 13 | Design direction **"Lens"** (`docs/DESIGN.md` v2): the aligned photo is the canvas, metrics are layers on it, one scrubber replaces the Timeline and Compare screens, hold-to-flicker replaces the slider, the landing is a live Lens on seeded data; web-native (URL state, installable, offline demo, command palette). Visual base kept from v1: warm low-chroma paper, ink, sage, one signal accent, neutral grey stage, Atkinson Hyperlegible (no serif in the app shell), no dark mode | "Field notebook" v1 structure (kept as the degraded fallback), UX_SPEC screens 6-7 as separate screens |
 | Oct 13 | Judges run "Try with sample photos" on hosted frames in `demo/` (server-side sample sessions), never a download-and-upload path | DEMO_PLAN "download a sample pack" |
 | Oct 13 | Gemini model `gemini-3.8-flash` (latest GA Flash) via the Vertex AI **global** endpoint; all other resources stay in `us-central1` | "Gemini in us-central1" (3.x GA models are global-only; 2.5 Flash retires Oct 20) |
