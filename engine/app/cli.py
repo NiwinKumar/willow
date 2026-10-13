@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from app.pipeline import analyze_forearm
+from app.pipeline_face import analyze_face
 from app.roi import Box
 
 
@@ -32,7 +33,9 @@ def main(argv: list[str] | None = None) -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("analyze", help="analyze 1-5 photos of one forearm square")
     a.add_argument("files", nargs="+")
-    a.add_argument("--site", required=True, choices=["forearm_treated", "forearm_control"])
+    a.add_argument(
+        "--site", required=True, choices=["forearm_treated", "forearm_control", "face_full"]
+    )
     a.add_argument("--roi", action="append", help="skin square x,y,w,h (default: find 4 pen dots)")
     a.add_argument("--white", action="append", help="white paper x,y,w,h (default: find paper)")
     a.add_argument(
@@ -50,15 +53,18 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit("give 1-5 photos")
     n = len(args.files)
     baseline = json.loads(Path(args.baseline).read_text()) if args.baseline else None
-    result = analyze_forearm(
-        args.files,
-        args.site,
-        _per_frame(args.roi, n, "roi"),
-        _per_frame(args.white, n, "white"),
-        auto_white=not args.no_white,
-        square=args.square or 0,
-        baseline=baseline,
-    )
+    if args.site == "face_full":
+        result = analyze_face(args.files, baseline=baseline, auto_white=not args.no_white)
+    else:
+        result = analyze_forearm(
+            args.files,
+            args.site,
+            _per_frame(args.roi, n, "roi"),
+            _per_frame(args.white, n, "white"),
+            auto_white=not args.no_white,
+            square=args.square or 0,
+            baseline=baseline,
+        )
 
     q = result["quality"]
     print(f"{args.site}: {result['frames_used']}/{n} photos passed quality checks")

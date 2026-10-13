@@ -1,8 +1,7 @@
 """Willow engine HTTP service (docs/CONTRACT.md section 2).
 
-Forearm sites run the real pipeline. Face and macro sites still return the contract
-fixture (clearly marked in `warnings`) until the face pipeline lands, so the api and web
-keep integrating against the same endpoint.
+Forearm sites and face_full run the real pipeline. Macro sites (cheek_macro, nose_macro)
+still return the contract fixture, clearly marked in `warnings`, until M3.
 """
 
 import json
@@ -19,6 +18,7 @@ from app import __version__
 from app.errors import EngineError
 from app.io import fetch_frames
 from app.pipeline import FOREARM_SITES, analyze_forearm
+from app.pipeline_face import analyze_face
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = ROOT / "schemas"
@@ -80,7 +80,7 @@ async def analyze(http_request: Request) -> dict:
     except ValueError as exc:  # body is not JSON
         raise EngineError("bad_request", f"invalid JSON: {exc}") from exc
 
-    if request["site"] not in FOREARM_SITES:
+    if request["site"] not in FOREARM_SITES | {"face_full"}:
         result = _placeholder(request)
     else:
         _check_mode(request)
@@ -89,15 +89,18 @@ async def analyze(http_request: Request) -> dict:
             t_fetch = time.perf_counter()
             paths = fetch_frames([f["uri"] for f in request["frames"]], Path(tmp))
             fetch_ms = (time.perf_counter() - t_fetch) * 1000
-            result = analyze_forearm(
-                paths,
-                request["site"],
-                [None] * n,  # forearm square found from the pen dots
-                [None] * n,  # white paper found automatically
-                session_id=request["session_id"],
-                user_id=request["user_id"],
-                baseline=request.get("baseline"),
-            )
+            ids = {"session_id": request["session_id"], "user_id": request["user_id"]}
+            if request["site"] == "face_full":
+                result = analyze_face(paths, baseline=request.get("baseline"), **ids)
+            else:
+                result = analyze_forearm(
+                    paths,
+                    request["site"],
+                    [None] * n,  # forearm square found from the pen dots
+                    [None] * n,  # white paper found automatically
+                    baseline=request.get("baseline"),
+                    **ids,
+                )
         result["timings_ms"]["fetch"] = round(fetch_ms, 1)
 
     result["timings_ms"]["request"] = round((time.perf_counter() - t0) * 1000, 1)
