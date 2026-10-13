@@ -1,7 +1,7 @@
 import { ArrowLeft, ChevronDown, Link2 } from 'lucide-react'
 import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '../components/Button'
@@ -20,6 +20,7 @@ import { baselineFor, isSampleEngine, isUnmeasured, matchControl } from '../data
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { missingBaselines } from '../lib/baselineGuide'
+import { failureReasons, readableWarnings } from '../lib/warnings'
 import { fmtDate, plural } from '../lib/format'
 import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
 import { ApiError, api } from '../lib/api'
@@ -36,6 +37,8 @@ export function Report() {
   const data = useData()
   const judging = useJudgeOn()
   const navigate = useNavigate()
+  // Opened from a shared link there is no page to go back to: the arrow goes home instead.
+  const location = useLocation()
   const reduce = useReducedMotion()
   const series = data.series(site)
   const sessions = useMemo(() => series?.sessions.filter((s) => s.status === 'done') ?? [], [series])
@@ -144,7 +147,7 @@ export function Report() {
       <div className="flex min-h-dvh flex-col">
         {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
         <div className="mx-auto max-w-[36rem] px-5 py-12">
-          <h1 className="text-[28px] font-bold tracking-[-0.02em]">No sessions yet for {SITE_LABEL[site]}</h1>
+          <h1 className="text-[28px] font-bold tracking-[-0.02em]">No sessions yet for {SITE_LABEL[site] ?? 'this place'}</h1>
           <p className="mt-3 text-[15px] text-text-2">Take a baseline of five photos to start. Every later session is compared to it.</p>
           <Link to={`/capture?site=${site}`} className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
             Start a baseline
@@ -176,8 +179,8 @@ export function Report() {
               {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · {session.result?.frames_used ?? 0} passed the quality check
             </p>
             <ul className="mt-3 space-y-1 text-[15px] text-text-2">
-              {[...new Set(session.result?.quality.reasons ?? [])].map((r) => (
-                <li key={r}>{QUALITY_COPY[r]?.text ?? r}</li>
+              {failureReasons(session.result).map((r) => (
+                <li key={r}>{r}</li>
               ))}
             </ul>
             <Link to={`/capture?site=${session.site}${session.capture_mode === 'uncalibrated' ? '&mode=quick' : ''}`} className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
@@ -188,7 +191,7 @@ export function Report() {
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Your baseline</h1>
             <p className="mt-1 text-[13px] text-text-2">
-              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · {session.capture_mode === 'uncalibrated' ? 'quick selfie' : 'calibrated'} · later {session.capture_mode === 'uncalibrated' ? 'quick selfies are' : 'calibrated sessions are'} compared to this
+              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · {session.capture_mode === 'uncalibrated' ? 'phone photo' : 'calibrated'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'calibrated sessions are'} compared to this
             </p>
             {session.n_frames < 2 ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
@@ -260,15 +263,13 @@ export function Report() {
           <span className="font-semibold">Sample numbers.</span> Your photos are saved. Until the measurement engine is connected, these readings come from a fixed sample, not from your skin.
         </div>
       ) : null}
-      {data.mode === 'live' && session?.result?.warnings?.filter((w) => !w.startsWith('placeholder:')).length ? (
+      {data.mode === 'live' && readableWarnings(session?.result).length ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) border border-border p-3 text-[13px] sm:mx-6">
           <p className="font-semibold">Notes from the measurement</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4 text-text-2">
-            {session.result.warnings
-              .filter((w) => !w.startsWith('placeholder:'))
-              .map((w) => (
-                <li key={w}>{w.charAt(0).toUpperCase() + w.slice(1)}</li>
-              ))}
+            {readableWarnings(session?.result).map((w) => (
+              <li key={w}>{w}</li>
+            ))}
           </ul>
         </div>
       ) : null}
@@ -346,13 +347,13 @@ export function Report() {
           {session.explanation.disclaimer.startsWith('Cosmetic appearance tracking, not a diagnosis') ? null : <p className="mt-3 text-[12px] text-text-3">{session.explanation.disclaimer}</p>}
         </section>
       ) : null}
-      <p className="px-5 pb-6 text-[12px] text-text-3 sm:px-6">Cosmetic appearance tracking, not a diagnosis. Photos delete 30 days after capture; measurements stay in your account until you delete them.</p>
+      <p className="px-5 pb-6 text-[12px] text-text-3 sm:px-6">Cosmetic appearance tracking, not a diagnosis. Photos delete 30 days after upload; measurements stay in your account until you delete them.</p>
     </>
   )
 
   const topBar = (
     <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-bg/85 px-3 backdrop-blur-md sm:px-6">
-      <button type="button" onClick={() => navigate(-1)} className="inline-flex h-11 w-11 items-center justify-center rounded-(--radius-control) hover:bg-surface-2" aria-label="Back">
+      <button type="button" onClick={() => (location.key === 'default' ? navigate('/') : navigate(-1))} className="inline-flex h-11 w-11 items-center justify-center rounded-(--radius-control) hover:bg-surface-2" aria-label={location.key === 'default' ? 'Home' : 'Back'}>
         <ArrowLeft size={20} aria-hidden />
       </button>
       <button type="button" onClick={() => setSiteSheet(true)} className="inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 text-[15px] font-semibold hover:bg-surface-2" aria-haspopup="dialog">

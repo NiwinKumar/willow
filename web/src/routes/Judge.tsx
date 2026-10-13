@@ -80,7 +80,9 @@ export function Judge() {
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-2" role="status">
             <span aria-hidden className={`h-2 w-2 rounded-full ${setup === 'ready' ? 'bg-willow-500' : setup === 'failed' ? 'bg-danger' : 'animate-pulse bg-border'}`} />
             {setup === 'ready'
-              ? `Your guest account is ready${routineAdded ? `, with a ${routineAdded}-product routine to check` : ''}.`
+              ? user?.isAnonymous
+                ? `Your guest account is ready${routineAdded ? `, with a ${routineAdded}-product routine to check` : ''}.`
+                : `Signed in${user?.email ? ` as ${user.email}` : ''}: the stops use your own account and routine.`
               : setup === 'failed'
                 ? 'Could not make a guest account. Reload the page to try again.'
                 : 'Making you a guest account…'}
@@ -101,7 +103,7 @@ export function Judge() {
           <ol className="mt-8 border-t border-border">
             <Stop n={1} done={seen('run') || Boolean(lastRun)} title="Measure real photos" eta="about 40 s" tech="Cloud Run engine · RAW decoding · noise band · Gemini explanation">
               <p>
-                One tap copies a set of consented RAW photos into your account and runs the full pipeline: quality checks, colour correction against a white reference, the measured square, then a plain-language explanation whose every number is checked.
+                One tap copies consented RAW photos into your account and runs the full pipeline: quality checks, colour correction, the measured square, then a plain-language explanation whose every number is checked.
               </p>
               <div className="mt-3">
                 {samples.state === 'ready' && samples.samples.length ? (
@@ -122,7 +124,7 @@ export function Judge() {
                     <Link to={`/s/${lastRun.site}`} className="font-medium text-willow-700 underline-offset-2 hover:underline">
                       Open your latest result
                     </Link>
-                    <span className="text-text-2">. Run a second sample to see it compared with the first.</span>
+                    {samples.state === 'ready' && samples.samples.length > 1 ? <span className="text-text-2">. Run another sample to see it compared with the first.</span> : '.'}
                   </p>
                 ) : null}
               </div>
@@ -140,16 +142,21 @@ export function Judge() {
               </Button>
             </Stop>
             <Stop n={4} done={seen('routine')} title="Check a routine, scan a label" eta="about 1 min" tech="rule table in code · Gemini vision for labels">
-              <p>Your guest routine pairs a retinoid with a BHA at night and has no sunscreen. The check finds both. Scan any ingredient label with the camera or a photo and Gemini reads it into a product.</p>
+              <p>{user && !user.isAnonymous ? 'The check runs on your own routine.' : 'Your guest routine pairs a retinoid with a BHA at night and has no sunscreen. The check finds both.'} Scan any ingredient label with the camera or a photo and Gemini reads it into a product.</p>
               <Button variant="secondary" className="mt-3" onClick={() => go('routine', '/routine')}>
                 Open the routine
               </Button>
             </Stop>
             <Stop n={5} done={seen('retailer')} title="See what a retailer learns" eta="about 1 min" tech="BigQuery · Gemini over aggregates · groups under 10 hidden">
               <p>Outcomes, not purchases: which products produced real, measured change for which goals, from a labelled synthetic cohort of 500 people plus anyone who opted in. Ask it a question and Gemini answers with a chart, every number checked against the aggregates. The same outcome rates appear on the advisor's product cards.</p>
-              <Button variant="secondary" className="mt-3" onClick={() => go('retailer', '/retailer')}>
-                Open the retailer view
-              </Button>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button variant="secondary" onClick={() => go('retailer', '/retailer')}>
+                  Open the retailer view
+                </Button>
+                <a href="https://datastudio.google.com/reporting/5147af6b-c268-470a-a420-2277dfcfe7df" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 text-[15px] font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('retailer')}>
+                  The same data in Data Studio <ExternalLink size={14} aria-hidden />
+                </a>
+              </div>
             </Stop>
           </ol>
           <p className="mt-6 text-[13px] text-text-2">

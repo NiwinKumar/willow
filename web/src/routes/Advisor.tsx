@@ -8,7 +8,7 @@ import { ProductImage } from '../components/ProductImage'
 import type { Product } from '../data/types'
 import { useData } from '../data/useData'
 import { ApiError, api } from '../lib/api'
-import { fmtPrice, imageCredit } from '../lib/format'
+import { fmtDate, fmtPrice, imageCredit } from '../lib/format'
 import { METRIC_META } from '../lib/metrics'
 import { useAuth } from '../lib/useAuth'
 import { useOutcomes } from '../lib/useOutcomes'
@@ -134,7 +134,7 @@ export function Advisor() {
         <div className="sticky bottom-0 bg-bg pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
           <div className="mb-2 flex flex-wrap gap-2">
             {chips.slice(0, 4).map((c) => (
-              <button key={c} type="button" onClick={() => ask(c)} className="min-h-9 rounded-full border border-border bg-surface px-3 text-[13px] hover:bg-surface-2 active:scale-[0.98]">
+              <button key={c} type="button" onClick={() => ask(c)} className="min-h-11 rounded-full border border-border bg-surface px-3 text-[13px] hover:bg-surface-2 active:scale-[0.98]">
                 {c}
               </button>
             ))}
@@ -154,7 +154,7 @@ export function Advisor() {
           {left <= 5 ? <p className="mt-1 text-[12px] text-text-3">{left} questions left today</p> : null}
         </div>
       </div>
-      <aside className="hidden lg:block lg:pt-4">
+      <aside className={data.mode === 'demo' ? 'hidden lg:block lg:pt-4' : 'hidden'}>
         <h2 className="text-[13px] font-semibold text-text-2">Your numbers used in this chat</h2>
         <ul className="mt-2 space-y-1 text-[13px]">
           {Array.from(new Set(turns.flatMap((t) => t.numbers?.map((n) => n.metric) ?? []))).map((m) => (
@@ -224,21 +224,21 @@ function ProductCard({ p }: { p: Product }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {p.stores.map((s) => (
-          <a key={s.store} href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-border px-3 text-[13px] hover:bg-surface-2">
+          <a key={s.store} href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) border border-border px-3 text-[13px] hover:bg-surface-2">
             {s.store} <ExternalLink size={12} aria-hidden />
           </a>
         ))}
-        <button type="button" onClick={() => setInci((v) => !v)} aria-expanded={inci} className="min-h-9 px-2 text-[13px] text-text-2 underline-offset-2 hover:underline">Ingredients</button>
+        <button type="button" onClick={() => setInci((v) => !v)} aria-expanded={inci} className="min-h-11 px-2 text-[13px] text-text-2 underline-offset-2 hover:underline">Ingredients</button>
       </div>
       {inci ? <p className="mt-2 text-[12px] text-text-2">{p.inci.join(', ')}</p> : null}
       {outcome ? (
         <p className="mt-2 text-[13px]">
-          <span className="font-mono">{Math.round(outcome.rate * 100)}%</span> of {outcome.n} people with this goal were still improved at week 8
+          <span className="font-mono">{Math.round(outcome.rate * 100)}%</span> of {outcome.n} people who used it for this goal were still improved at week 8
           <span className="text-text-3">{outcomes?.synthetic ? ' (synthetic demo cohort)' : ''}</span>
         </p>
       ) : null}
       <p className="mt-2 text-[11px] text-text-3">
-        Price as of {p.last_verified}
+        Price as of {fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}
         {credit ? ` · Image: ${credit}` : ''}
       </p>
     </div>

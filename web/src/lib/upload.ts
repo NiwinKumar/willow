@@ -22,7 +22,7 @@ export function validateFiles(files: File[], mode: CaptureMode, expected: number
     const ct = contentTypeFor(file)
     const key = `${file.name}-${file.size}-${file.lastModified}`
     if (!ct) {
-      errors.push(`${file.name}: only .dng (calibrated) or .jpg / .heic (quick selfie).`)
+      errors.push(`${file.name}: only .dng (calibrated) or .jpg / .heic (phone photo).`)
       continue
     }
     if (seen.has(key)) {

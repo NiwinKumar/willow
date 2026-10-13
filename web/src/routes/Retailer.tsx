@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Download, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { AskData } from '../components/AskData'
@@ -6,6 +6,9 @@ import { Chip } from '../components/Chip'
 import { api, type RetailerInsights } from '../lib/api'
 
 type Cell = RetailerInsights['products'][number]['cells'][number]
+
+/** The same suppressed aggregates as a shareable Data Studio report (api/scripts/publish_looker.py). */
+const DATA_STUDIO = 'https://datastudio.google.com/reporting/5147af6b-c268-470a-a420-2277dfcfe7df'
 
 const TABS = ['Needs next', 'Product outcomes', 'Brands', 'Assortment gaps', 'Routine conflicts', 'About this data'] as const
 
@@ -56,6 +59,9 @@ export function Retailer() {
       <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3 pt-4">
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Willow Retailer</h1>
+          <a href={DATA_STUDIO} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-border bg-surface px-3 text-[13px] font-medium hover:bg-surface-2">
+            Open the Data Studio report <ExternalLink size={14} aria-hidden />
+          </a>
         </div>
         <AskData />
         <nav className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0" aria-label="Retailer views">
@@ -217,7 +223,7 @@ function Section({ q, tiles, csv, children }: { q: string; tiles: { label: strin
       </dl>
       <div className="mt-5 rounded-(--radius-tile) border border-border bg-surface p-4">{children}</div>
       <div className="mt-2 flex justify-end">
-        <button type="button" className="inline-flex min-h-9 items-center gap-1 text-[13px] text-text-2 hover:text-text" onClick={() => downloadCsv(q, csv)}>
+        <button type="button" className="inline-flex min-h-11 items-center gap-1 text-[13px] text-text-2 hover:text-text" onClick={() => downloadCsv(q, csv)}>
           <Download size={14} aria-hidden /> CSV
         </button>
       </div>

@@ -134,7 +134,7 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
             {r.error ? (
               <div className="mt-1 flex items-center justify-between text-[13px] text-danger">
                 <span>{r.error}</span>
-                <button type="button" disabled={busy} className="min-h-9 px-2 font-medium underline-offset-2 hover:underline disabled:opacity-50" onClick={() => void run()}>
+                <button type="button" disabled={busy} className="min-h-11 px-2 font-medium underline-offset-2 hover:underline disabled:opacity-50" onClick={() => void run()}>
                   Retry
                 </button>
               </div>
@@ -145,7 +145,7 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
       {fatal ? (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px]">
           <span className="text-danger">Upload stopped: {fatal}</span>
-          <button type="button" disabled={busy} onClick={() => void run()} className="min-h-9 shrink-0 px-2 font-medium underline-offset-2 hover:underline disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => void run()} className="min-h-11 shrink-0 px-2 font-medium underline-offset-2 hover:underline disabled:opacity-50">
             Try again
           </button>
         </div>

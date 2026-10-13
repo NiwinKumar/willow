@@ -40,7 +40,7 @@ export function photoSteps(site: Site, mode: CaptureMode): { same: string; betwe
       }
     case 'forearm':
       return {
-        same: `Arm flat on the table, inner side up, same spot under the light. Phone straight above the square, level with the skin, about 30 to 40 cm away, with all four dots, the white paper${mode === 'calibrated_raw' ? ' and the colour card' : ''} in the frame.`,
+        same: `Arm flat on the table, inner side up, same spot under the light. Phone straight above the square, level with the skin, about 30 to 40 cm away, with all four dots and the white paper in the frame${mode === 'calibrated_raw' ? ' (and a colour card, if you have one)' : ''}.`,
         between: 'Lift your arm off the table and put it back, and lift the phone away, then line it up again.',
       }
     case 'macro':

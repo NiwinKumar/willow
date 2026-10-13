@@ -23,7 +23,7 @@ const RITUAL = [
   { icon: Sun, text: 'Same lamp, same spot, curtains closed.', why: 'Lighting is the biggest source of photo-to-photo change. Keeping it fixed is what makes the noise band small.' },
   { icon: Timer, text: 'Clean skin, nothing applied, waited 15 minutes.', why: 'Water, products and rubbing all change redness and shine for a while.' },
   { icon: Wind, text: 'Hair back, glasses off, neutral face.', why: 'Hair and glasses cover regions; expressions move the landmarks the regions are built from.', faceOnly: true },
-  { icon: Thermometer, text: 'Colour card next to the skin, flat, not in shadow.', why: 'The card is how each photo gets colour-corrected. Shadow or glare on it fails the quality check.', calibratedOnly: true },
+  { icon: Thermometer, text: 'Colour card next to the skin, flat, not in shadow.', why: 'The card is how each photo gets colour-corrected. Shadow or glare on it fails the quality check.', calibratedOnly: true, faceOnly: true },
   { icon: PenLine, text: 'Four pen dots mark the corners of a 4 cm square on the forearm; all four in frame.', why: 'Willow finds the square from the dots, so every photo measures exactly the same patch of skin. A white marker works on deep skin tones.', forearmOnly: true },
   { icon: FileText, text: 'A sheet of plain white paper beside the arm, in the same light.', why: 'The paper tells Willow the colour of your lamp, so a change in light is not mistaken for a change in skin.', forearmOnly: true },
 ]
@@ -106,7 +106,7 @@ export function Capture() {
             {(
               [
                 ['calibrated_raw', 'Calibrated', 'RAW photo + colour card. Measured results.'],
-                ['uncalibrated', 'Quick selfie', 'Phone camera in the browser. Trend only.'],
+                ['uncalibrated', 'Phone photo', 'Phone camera in the browser. Trend only.'],
               ] as const
             ).map(([id, label, sub]) => (
               <button key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)} className={`rounded-(--radius-tile) border p-3 text-left transition-[border-color,background-color] ${mode === id ? 'border-text bg-surface' : 'border-border hover:bg-surface-2'}`}>
@@ -158,13 +158,13 @@ export function Capture() {
               <span className="block text-[13px] text-text-2">Sick, sunburn, new product, different light. It shows next to this reading, so a change is never misread.</span>
             </span>
           </label>
-          {deviation ? <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What changed?" className="mt-2 w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" /> : null}
+          {deviation ? <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What changed?" aria-label="What changed today" className="mt-2 w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" /> : null}
 
           <div className="mt-8 flex flex-wrap gap-3">
             {mode === 'calibrated_raw' ? (
               <Button onClick={() => setStep(prefs.lightroomDone() ? 'ring' : 'lightroom')}>I'm set up</Button>
             ) : (
-              <Button onClick={() => navigate(`/capture/camera?site=${site}&n=${expected}`)}>Open camera</Button>
+              <Button onClick={() => navigate(`/capture/camera?site=${site}&n=${expected}${deviation ? `&dev=1&note=${encodeURIComponent(note)}` : ''}`)}>Open camera</Button>
             )}
           </div>
         </>
@@ -342,7 +342,7 @@ function Samples() {
         <p className="mt-2 text-[15px] text-text-3">Loading the sample photos…</p>
       ) : live ? (
         <>
-          <p className="mt-2 text-[15px] text-text-2">The photos are copied into a guest account of your own and measured for real: the engine on Cloud Run, then a Gemini explanation with every number checked. Run a second one to see it compared with the first.</p>
+          <p className="mt-2 text-[15px] text-text-2">The photos are copied into a guest account of your own and measured for real: the engine on Cloud Run, then a Gemini explanation with every number checked. Each run is measured like anyone's photos.</p>
           <div className="mt-5">
             <SampleRuns samples={samples.samples} />
           </div>

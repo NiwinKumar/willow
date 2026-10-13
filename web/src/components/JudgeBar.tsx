@@ -12,8 +12,8 @@ export function JudgeBar() {
   const { pathname } = useLocation()
   if (!tour.on || pathname === '/judge') return null
   return (
-    <div role="status" className="flex min-h-10 items-center justify-between gap-3 bg-willow-100 px-5 text-[13px] text-willow-700 sm:px-8">
-      <Link to="/judge" className="inline-flex min-h-9 items-center gap-1.5 font-semibold underline-offset-2 hover:underline">
+    <div role="status" className="flex min-h-11 items-center justify-between gap-3 bg-willow-100 px-5 text-[13px] text-willow-700 sm:px-8">
+      <Link to="/judge" className="inline-flex min-h-11 items-center gap-1.5 font-semibold underline-offset-2 hover:underline">
         <ArrowLeft size={16} aria-hidden /> Judge tour
       </Link>
       <span className="truncate text-right">
