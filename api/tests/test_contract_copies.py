@@ -27,3 +27,9 @@ def test_sample_fixture_is_schema_valid():
         contract.errors("analysis_result.schema.json", contract.load("analysis_result.sample.json"))
         == []
     )
+
+
+def test_api_image_ships_the_catalog():
+    # The api serves catalog search from seed/products.json; the image must carry it.
+    dockerfile = (contract.HERE.parents[1] / "Dockerfile").read_text()
+    assert "COPY seed ./seed" in dockerfile
