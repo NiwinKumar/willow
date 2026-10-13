@@ -161,7 +161,7 @@ class FakeFace(Face):
     def lip_band(self, shape, mm):
         return np.zeros(shape, bool)
 
-    def border_band(self, skin, origin=(0, 0), hairline_mm=None):
+    def border_band(self, skin, origin=(0, 0), hairline_mm=None, features=None):
         return np.zeros(skin.shape, bool)
 
     def feature_zones(self, shape):

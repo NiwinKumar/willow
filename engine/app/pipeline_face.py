@@ -21,7 +21,6 @@ from app.landmarks import (
     polygon_mask,
     refine_skin,
     skin_colour,
-    stubble,
 )
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
@@ -110,15 +109,23 @@ def _frame(path: str) -> dict:
     face_skin = refine_skin(lab[..., 0], box.crop(face_mask_full), zones, px_per_mm)
     if face.view != "front":  # hair, background and shine crowd a turned cheek
         face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
-        # sideburns and temple hair beside the ear: dense dark specks, like stubble
-        face_skin &= ~stubble(lab[..., 0], face_skin, px_per_mm)
+        # sideburns and temple hair beside the ear (beards: the lower-face stubble test in
+        # refine_skin). A dark-speck density test is not used here: dense acne marks on
+        # deep skin look the same and were cut.
         ear = face.ear_side(face_skin.shape, (box.x, box.y))
         face_skin &= ~edge_hair(lab, face_skin, cheek_skin, px_per_mm, ear)
     # both searches skip the band where hair, jaw shadow or background meet skin and the
     # brows and eye corners; dark spots also skip the glabella, the lip / nostril edges and
     # mouth corners (shading; it is not red, so blemishes there still count). Full face skin is still "nearby skin".
-    band = face.border_band(face_skin, (box.x, box.y))
+    # eyes, lids, lips and nostrils cut from the skin: inside the face, not its edge
+    face_full = box.crop(face_mask_full)
     outline = box.crop(polygon_mask(srgb8.shape[:2], face.outline()))
+    features = (outline & ~face_full) | zones["nostril_zone"]
+    # blemishes: band inside every outer edge, eye / lip cut-outs included (red lid and lip
+    # rims reach there). Dark spots: band inside the hair / background edge only, so a dark
+    # mark beside the nose or lips (a mole) is not cut off.
+    band = face.border_band(face_skin, (box.x, box.y))
+    spot_band = face.border_band(face_skin, (box.x, box.y), features=features)
     brows = box.crop(face.brow_guard(srgb8.shape[:2]))
     eye_corners = box.crop(face.eye_corner_guard(srgb8.shape[:2]))
     # a turned nose: shine and redness on its tip and wings are not blemishes
@@ -126,7 +133,6 @@ def _frame(path: str) -> dict:
     if face.view != "front":
         side_nose = box.crop(face.nose_mask(srgb8.shape[:2]))
     lip_edge = box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM))
-    edge = box.crop(face.edge_guard(srgb8.shape[:2])) | band
     # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
     # red crease looks like a spot
     guard = cv2.dilate(
@@ -140,10 +146,13 @@ def _frame(path: str) -> dict:
     )
     # dark spots over the whole face skin, away from shadow-prone areas and from spots
     # already counted as blemishes (a red-brown mark is one thing, not two)
-    search = face_skin & ~edge & ~box.crop(face.shadow_guard(srgb8.shape[:2]))
+    spot_edge = box.crop(face.edge_guard(srgb8.shape[:2])) | spot_band
+    search = face_skin & ~spot_edge & ~box.crop(face.shadow_guard(srgb8.shape[:2]))
     # just inside the hairline, skin darkens toward the hair and fine hairs remain: a dark
     # spot there must stand out more (a real mark near the hairline still counts)
-    strict = face.border_band(face_skin, (box.x, box.y), config.HAIRLINE_STRICT_MM)
+    strict = face.border_band(
+        face_skin, (box.x, box.y), config.HAIRLINE_STRICT_MM, features=features
+    )
     gap = config.BLEMISH_MERGE_MM * px_per_mm
     spots = [
         sp
