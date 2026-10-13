@@ -65,6 +65,7 @@ export type AdvisorReply = {
   products: Product[]
   follow_up_suggestions: string[]
   retrieval: string[]
+  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number }
   remaining_today: number
 }
 
@@ -79,6 +80,8 @@ export type RetailerInsights = {
   brands: { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }[]
   gaps: { goal: string; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
   conflicts: { pair: string; share: number; fix: string; resolves: string[] }[]
+  /** Every product with at least 10 people: outcome rate, people, median weeks to first real change. */
+  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null }>
 }
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
@@ -123,6 +126,14 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
 }
 
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
+
+/** Gemini's answer over the retailer aggregates (api retailer_ask.py); every number checked. */
+export type RetailerAnswer = {
+  answer: string
+  chart: { title: string; unit: 'percent' | 'count' | 'weeks'; bars: { label: string; value: number }[] } | null
+  follow_ups: string[]
+  checks: { model: string; numbers_checked: number; rejected_attempts: number } | null
+}
 
 /** Hosted sample photos for judge mode (api/app/demo.py). */
 export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number }
@@ -181,6 +192,7 @@ export const api = {
   putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
+  retailerAsk: (token: string, question: string) => request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question }) }),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),

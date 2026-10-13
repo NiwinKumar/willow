@@ -212,6 +212,7 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         kept = [uh for uh in members if (stopped[(uh, pid)] or 99) > 4]
         rows.append(
             {
+                "product_id": pid,
                 "product": p["name"],
                 "brand": p["brand"],
                 "concern": CONCERN_SHORT[p["concerns"][0]],
@@ -347,6 +348,10 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ],
         "needs": needs[:6],
         "products": rows[:8],
+        # Every product with enough people, for product cards and the advisor (labelled synthetic).
+        "product_outcomes": {
+            r["product_id"]: {"n": r["n"], "rate": r["rate"], "weeks": r["weeks"]} for r in rows
+        },
         "tone_bands": ["very light", "light", "intermediate", "tan", "brown", "dark"],
         "brands": brands[:8],
         "gaps": gaps,
