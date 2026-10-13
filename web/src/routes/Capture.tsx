@@ -1,14 +1,14 @@
-import { Camera, Check, ChevronRight, FolderOpen, Lock, Sun, Thermometer, Timer, Wind } from 'lucide-react'
+import { Camera, Check, ChevronRight, FileText, FolderOpen, Lock, PenLine, Sun, Thermometer, Timer, Wind } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { Button } from '../components/Button'
-import { Chip } from '../components/Chip'
 import { DemoBar } from '../components/DemoBar'
 import { UploadList } from '../components/UploadList'
 import { validateFiles, type Row } from '../lib/upload'
-import { useData } from '../data/useData'
+import { leaveDemo, useData } from '../data/useData'
 import type { CaptureMode, Site } from '../lib/api'
 import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
@@ -21,6 +21,8 @@ const RITUAL = [
   { icon: Timer, text: 'Clean skin, nothing applied, waited 15 minutes.', why: 'Water, products and rubbing all change redness and shine for a while.' },
   { icon: Wind, text: 'Hair back, glasses off, neutral face.', why: 'Hair and glasses cover regions; expressions move the landmarks the regions are built from.', faceOnly: true },
   { icon: Thermometer, text: 'Colour card next to the skin, flat, not in shadow.', why: 'The card is how each photo gets colour-corrected. Shadow or glare on it fails the quality check.', calibratedOnly: true },
+  { icon: PenLine, text: 'Four pen dots mark the corners of a 4 cm square on the forearm; all four in frame.', why: 'Willow finds the square from the dots, so every photo measures exactly the same patch of skin. A white marker works on deep skin tones.', forearmOnly: true },
+  { icon: FileText, text: 'A sheet of plain white paper beside the arm, in the same light.', why: 'The paper tells Willow the colour of your lamp, so a change in light is not mistaken for a change in skin.', forearmOnly: true },
 ]
 
 type Step = 'guide' | 'lightroom' | 'ring' | 'export' | 'upload'
@@ -33,7 +35,7 @@ export function Capture() {
   const reduce = useReducedMotion()
   const sample = params.get('sample') === '1'
   const initialMode: CaptureMode = params.get('mode') === 'quick' ? 'uncalibrated' : 'calibrated_raw'
-  const [site, setSite] = useState<Site>((params.get('site') as Site) ?? 'face_full')
+  const [site, setSite] = useState<Site>((params.get('site') as Site) ?? (data.mode === 'live' ? 'forearm_control' : 'face_full'))
   const [mode, setMode] = useState<CaptureMode>(initialMode)
   const [why, setWhy] = useState<number | null>(null)
   const [deviation, setDeviation] = useState(false)
@@ -110,7 +112,7 @@ export function Capture() {
 
           <h2 className="mt-8 text-[17px] font-semibold">The ritual</h2>
           <ul className="mt-3 divide-y divide-border border-y border-border">
-            {RITUAL.filter((r) => (!r.calibratedOnly || mode === 'calibrated_raw') && (!r.faceOnly || !site.startsWith('forearm'))).map((r, i) => (
+            {RITUAL.filter((r) => (!r.calibratedOnly || mode === 'calibrated_raw') && (!r.faceOnly || !site.startsWith('forearm')) && (!r.forearmOnly || site.startsWith('forearm'))).map((r, i) => (
               <li key={r.text}>
                 <button type="button" aria-expanded={why === i} onClick={() => setWhy(why === i ? null : i)} className="flex min-h-12 w-full items-center gap-3 py-2 text-left">
                   <r.icon size={22} aria-hidden className="shrink-0 text-willow-700" />
@@ -234,7 +236,7 @@ export function Capture() {
           {!user ? (
             <div className="mt-4 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px]">
               Sign in to upload. A guest account is enough.{' '}
-              <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => void continueAsGuest()}>
+              <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => continueAsGuest().catch(() => toast.error('Could not sign in. Check your connection and try again.'))}>
                 Continue as guest
               </button>
             </div>
@@ -303,7 +305,7 @@ export function Capture() {
   )
 }
 
-/** Judge path: hosted RAW sample sessions, one tap runs the pipeline (live engine from Thursday; until then the sample journey plays). */
+/** Sample run: plays the capture-to-report flow on the illustrative sample journey. Hosted RAW sample sessions through the live engine replace it once the team's consented captures are in demo/. */
 function Samples() {
   const navigate = useNavigate()
   const data = useData()
@@ -314,8 +316,8 @@ function Samples() {
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
       {data.mode === 'demo' ? <div className="-mx-5 mb-4 sm:-mx-8"><DemoBar /></div> : null}
-      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Try with sample photos</h1>
-      <p className="mt-2 text-[15px] text-text-2">These RAW sessions are already in Willow's bucket, so nothing to download. One tap runs the pipeline and lands on the real report.</p>
+      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">See a session run</h1>
+      <p className="mt-2 text-[15px] text-text-2">Plays the capture-to-report flow on Willow's illustrative sample journey. The numbers are examples, not a measurement.</p>
       <ul className="mt-5 space-y-3">
         {packs.map((p) => (
           <li key={p.id} className="flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-4">
@@ -323,17 +325,14 @@ function Samples() {
               <span className="block text-[15px] font-semibold">{p.title}</span>
               <span className="block text-[13px] text-text-2">{p.frames} RAW frames with colour card · {p.note}</span>
             </span>
-            <Button onClick={() => navigate(`/processing/sample?site=${p.id}&n=${p.frames}&sample=1`)}>Run</Button>
+            <Button onClick={() => navigate(`/processing/sample?site=${p.id}&n=${p.frames}&sample=1&demo=1`)}>Play</Button>
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-[12px] text-text-3">
-        <Chip tone="neutral">until Thursday</Chip> the measurement engine is a placeholder, so this plays the sample journey after the processing stages.
-      </p>
       <p className="mt-6 text-[13px] text-text-2">
-        Want to see the upload itself?{' '}
-        <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => navigate('/capture')}>
-          Upload your own RAW files
+        Want a real measurement?{' '}
+        <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => { leaveDemo(); navigate('/capture?site=forearm_control') }}>
+          Measure your own forearm
         </button>
       </p>
     </div>

@@ -34,7 +34,14 @@ class GeminiError(Exception):
 @lru_cache
 def client() -> genai.Client:
     s = get_settings()
-    return genai.Client(vertexai=True, project=s.project_id, location=s.vertex_location)
+    # 25 s per request: a slow Gemini call falls back to deterministic output instead of
+    # holding up an analysis or a chat reply.
+    return genai.Client(
+        vertexai=True,
+        project=s.project_id,
+        location=s.vertex_location,
+        http_options=types.HttpOptions(timeout=25_000),
+    )
 
 
 def generate_json[T: BaseModel](
@@ -46,6 +53,7 @@ def generate_json[T: BaseModel](
     temperature: float = 0.0,
     max_output_tokens: int = 4096,
     thinking: types.ThinkingLevel = types.ThinkingLevel.LOW,
+    attempts: int = 2,
 ) -> T:
     config = types.GenerateContentConfig(
         system_instruction=f"{SYSTEM_RULES}\n\n{instructions}",
@@ -57,7 +65,7 @@ def generate_json[T: BaseModel](
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     last_error: Exception | None = None
-    for attempt in (1, 2):
+    for attempt in range(1, attempts + 1):
         started = time.monotonic()
         try:
             res = client().models.generate_content(
@@ -65,7 +73,13 @@ def generate_json[T: BaseModel](
             )
         except Exception as exc:  # network, quota, safety block
             last_error = exc
-            log.warning("gemini %s attempt %d failed: %s", prompt_id, attempt, type(exc).__name__)
+            log.warning(
+                "gemini %s attempt %d failed: %s: %s",
+                prompt_id,
+                attempt,
+                type(exc).__name__,
+                str(exc)[:300],
+            )
             continue
         usage = res.usage_metadata
         log.info(

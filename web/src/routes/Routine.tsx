@@ -59,7 +59,30 @@ export function Routine() {
   const { user, getIdToken, continueAsGuest } = useAuth()
   const navigate = useNavigate()
   const [entries, setEntries] = useState<RoutineEntry[]>(live ? [] : DEMO_ROUTINE)
-  const [check] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
+  const [check, setCheck] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
+  const [checking, setChecking] = useState(false)
+  const routineKey = entries.map((e) => `${e.id}:${e.slots.join('')}:${e.ended_at ?? ''}`).join('|')
+
+  // Live: re-check compatibility whenever the routine changes (rules always, AI additions marked).
+  useEffect(() => {
+    if (!live || !user || !routineKey) return
+    let alive = true
+    const t = window.setTimeout(async () => {
+      if (alive) setChecking(true)
+      try {
+        const res = await api.routineCheck(await getIdToken())
+        if (alive) setCheck(res)
+      } catch {
+        if (alive) setCheck(null)
+      } finally {
+        if (alive) setChecking(false)
+      }
+    }, 300)
+    return () => {
+      alive = false
+      window.clearTimeout(t)
+    }
+  }, [live, user, routineKey, getIdToken])
   const [add, setAdd] = useState<'closed' | 'pick' | 'scan' | 'search' | 'confirm'>('closed')
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -158,7 +181,17 @@ export function Routine() {
   async function save(d: Draft) {
     const entry: NewRoutineEntry = d.product_id
       ? { product_id: d.product_id, slots, started_at: startedAt, source: d.source }
-      : { custom_name: d.name.trim(), brand: d.brand.trim(), category: d.category, key_actives: d.key_actives, inci: d.inci, slots, started_at: startedAt, source: d.source }
+      : {
+          // Clamp what a label scan read to what the api accepts.
+          custom_name: d.name.trim().slice(0, 120),
+          brand: d.brand.trim().slice(0, 80),
+          category: d.category.slice(0, 40),
+          key_actives: d.key_actives.slice(0, 20).map((a) => ({ name: a.name.slice(0, 80), pct: a.pct !== null && a.pct >= 0 && a.pct <= 100 ? a.pct : null })),
+          inci: d.inci.slice(0, 120),
+          slots,
+          started_at: startedAt,
+          source: d.source,
+        }
     if (!live) {
       setEntries((e) => [...e, { id: `r${Date.now()}`, product_id: d.product_id, custom_name: d.product_id ? '' : d.name, brand: d.brand, category: d.category, key_actives: d.key_actives, inci: d.inci, started_at: startedAt, ended_at: null, slots, concerns: d.concerns, source: d.source }])
       setAdd('closed')
@@ -223,7 +256,14 @@ export function Routine() {
         </div>
         <Button
           onClick={async () => {
-            if (live && !user) await continueAsGuest()
+            if (live && !user) {
+              try {
+                await continueAsGuest()
+              } catch {
+                toast.error('Could not sign in. Check your connection and try again.')
+                return
+              }
+            }
             setAdd('pick')
           }}
         >
@@ -236,10 +276,12 @@ export function Routine() {
 
       <section className="mt-8" aria-labelledby="compat">
         <h2 id="compat" className="text-[17px] font-semibold">Compatibility</h2>
-        {check ? (
-          <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.notes.length ? ` · ${check.notes[0]}` : ''}</p>
-        ) : entries.length >= 2 ? (
-          <p className="mt-1 text-[13px] text-text-2">The compatibility check is not connected yet. Your products are saved and will be checked as soon as it is.</p>
+        {checking && !check ? (
+          <p className="mt-1 text-[13px] text-text-2">Checking your routine…</p>
+        ) : check ? (
+          <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.conflicts.some((c) => c.source === 'model') ? ' and by AI (marked)' : ''}{check.notes.length ? ` · ${check.notes[0]}` : ''}</p>
+        ) : entries.length >= 1 && live ? (
+          <p className="mt-1 text-[13px] text-text-2">The check could not run just now. Your products are saved.</p>
         ) : (
           <p className="mt-1 text-[13px] text-text-2">Add two products and Willow checks them.</p>
         )}
@@ -258,7 +300,7 @@ export function Routine() {
                 <p className="mt-1 text-[15px] text-text-2">{c.issue}</p>
                 <p className="mt-1 text-[15px]"><span className="font-medium">Suggested change:</span> {c.suggestion}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button variant="secondary" className="!min-h-10" onClick={() => toast('Applied: alternate nights noted on both products.')}>Apply</Button>
+                  {live ? null : <Button variant="secondary" className="!min-h-10" onClick={() => toast('Demo: alternate nights noted on both products.')}>Apply</Button>}
                   <Button variant="quiet" className="!min-h-10" onClick={() => navigate(`/advisor${data.mode === 'demo' ? '?demo=1&' : '?'}q=${encodeURIComponent(`Why should I keep ${c.products.map((id) => name(byId(id)!)).join(' and ')} apart?`)}`)}>Tell me more</Button>
                   {c.source === 'model' ? <Button variant="quiet" className="!min-h-10" onClick={() => setDismissed((d) => [...d, c.products.join('+')])}>Dismiss</Button> : null}
                 </div>

@@ -97,8 +97,8 @@ def test_gemini_explanation_used_when_it_passes(monkeypatch):
         "items": [
             {
                 "metric_id": "redness",
-                "summary": f"Redness changed by {red['delta']:g}, "
-                "beyond the noise threshold of 0.86.",
+                "summary": f"Redness changed by {round(red['delta'], 1):g}, "
+                "beyond the noise threshold of 0.9.",
                 "quoted_numbers": [],
             }
         ],

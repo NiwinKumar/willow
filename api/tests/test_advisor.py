@@ -120,3 +120,30 @@ def test_routine_check_route_uses_saved_entries(client, fake):
     body = client.post("/v1/routine/check").json()
     assert body["conflicts"][0]["source"] == "rule"
     assert body["gaps"][0]["need"] == "Daily sunscreen in the morning"
+
+
+def test_routine_products_may_be_discussed(client, fake, monkeypatch):
+    _fake_model(
+        monkeypatch,
+        [],
+        {
+            "message": "Keep these two on separate nights.",
+            "product_ids": ["p1"],
+            "follow_up_suggestions": [],
+        },
+    )
+    fake.store.routine_set(
+        "u_test",
+        "r1",
+        {
+            "product_id": "p1",
+            "custom_name": "Sunscreen SPF 50",
+            "brand": "B",
+            "key_actives": [],
+            "slots": ["am"],
+        },
+    )
+    body = client.post(
+        "/v1/advisor/chat", json={"messages": [{"role": "user", "text": "Is this OK?"}]}
+    ).json()
+    assert body["product_ids"] == ["p1"]

@@ -34,7 +34,10 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   const rois = session?.result?.rois ?? []
   const activeRoiNames = metricId ? (METRIC_ROIS[metricId] ?? []) : []
   const shown = showBaseline && baseline ? baseline : session
-  const canFlicker = Boolean(baseline && session && baseline.id !== session.id)
+  // A live session without the engine's preview has no picture: never draw the demo
+  // illustration (its colour card and arm are not the person's), and nothing to flicker.
+  const blank = Boolean(session?.live && !session.preview)
+  const canFlicker = !blank && Boolean(baseline && session && baseline.id !== session.id && baseline.preview)
 
   const stopHold = useCallback(() => {
     if (holdTimer.current) window.clearTimeout(holdTimer.current)
@@ -89,10 +92,12 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
         <svg viewBox={`0 0 ${size.width} ${size.height}`} className="h-full w-full border border-surface" role="img" aria-label={`${metricLabel ? metricLabel + ' regions on ' : ''}aligned photo${showBaseline ? ', showing baseline' : ''}`}>
           {shown?.preview?.url ? (
             <image href={shown.preview.url} width={size.width} height={size.height} preserveAspectRatio="xMidYMid slice" />
+          ) : blank ? (
+            <rect width={size.width} height={size.height} fill="var(--color-surface-2)" />
           ) : (
             <Illustration site={site} session={shown} />
           )}
-          {rois.map((r) => {
+          {(blank ? [] : rois).map((r) => {
             const active = activeRoiNames.includes(r.name)
             const points = r.polygon.map((p) => p.join(',')).join(' ')
             return (
@@ -137,9 +142,11 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
         {canFlicker && !holding ? (
           <span className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-(--radius-chip) bg-surface/85 px-2 py-1 text-[12px] text-text-2">Hold to see your baseline</span>
         ) : null}
-        {!session?.preview && (
+        {blank ? (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px] text-text-3">{session?.measured === false ? 'No photo preview yet.' : 'No photo preview yet. The numbers below are measured from your photos.'}</span>
+        ) : !session?.preview ? (
           <span className="pointer-events-none absolute right-5 top-5 rounded-(--radius-chip) bg-surface/85 px-1.5 py-0.5 text-[11px] text-text-3">illustration</span>
-        )}
+        ) : null}
       </div>
     </div>
   )

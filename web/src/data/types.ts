@@ -113,6 +113,8 @@ export type Session = {
   /** Live sessions only: where the explanation came from, and why a failed session failed. */
   explanation_source?: 'template' | 'gemini' | null
   error?: { code: string; message: string } | null
+  /** True for sessions from the api (never for the illustrative demo journeys). */
+  live?: boolean
   /** Live: false when the engine cannot measure this site yet; the photos are kept. */
   measured?: boolean | null
   /** Live: the baseline this session is compared with (same site and capture mode). */

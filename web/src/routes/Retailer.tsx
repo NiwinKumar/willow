@@ -8,21 +8,15 @@ const TABS = ['Needs next', 'Product outcomes', 'Brand & category', 'Assortment 
 
 export function Retailer() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Product outcomes')
-  const [window_, setWindow] = useState<'4' | '8'>('8')
   return (
     <div className="pb-20">
       <div role="status" className="bg-warn/18 px-5 py-2 text-[13px] text-warn-text sm:px-8">
-        <strong className="font-semibold">Synthetic demo cohort + team data</strong> · {RETAILER.cohort.synthetic} simulated users and {RETAILER.cohort.real} real users · simulated outcomes follow Willow's measured noise model ·{' '}
+        <strong className="font-semibold">Synthetic data only</strong> · {RETAILER.cohort.synthetic} simulated users, no real customers · simulated outcomes follow Willow's measured noise model ·{' '}
         <button type="button" className="underline-offset-2 hover:underline" onClick={() => setTab('About this data')}>About this data</button>
       </div>
       <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3 pt-4">
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Willow Retailer</h1>
-          <div className="flex flex-wrap gap-2 text-[13px]">
-            <label className="flex items-center gap-1">Window <select value={window_} onChange={(e) => setWindow(e.target.value as '4' | '8')} className="rounded-(--radius-control) border border-border bg-surface px-2 py-1"><option value="4">4 weeks</option><option value="8">8 weeks</option></select></label>
-            <label className="flex items-center gap-1">Region <select className="rounded-(--radius-control) border border-border bg-surface px-2 py-1"><option>All</option><option>IN</option><option>US</option><option>UK</option><option>KR</option></select></label>
-            <label className="flex items-center gap-1">Tier <select className="rounded-(--radius-control) border border-border bg-surface px-2 py-1"><option>All</option><option>budget</option><option>mid</option><option>premium</option></select></label>
-          </div>
         </div>
         <nav className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0" aria-label="Retailer views">
           <ul className="flex gap-1 border-b border-border">
@@ -48,7 +42,7 @@ export function Retailer() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[12px] text-text-3">Blue: real change in the target metric by week {window_}. Hatched: no clear change. Grey: too early.</p>
+            <p className="mt-2 text-[12px] text-text-3">Blue: real change in the target metric by week 8. Hatched: no clear change. Grey: too early.</p>
           </Section>
         ) : null}
 
@@ -78,7 +72,7 @@ export function Retailer() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-[12px] text-text-3">Cell = share of users with a real change in the target metric by week {window_}, with n. Hatched cells have fewer than 10 users and are hidden.</p>
+            <p className="mt-2 text-[12px] text-text-3">Cell = share of users with a real change in the target metric by week 8, with n. Hatched cells have fewer than 10 users and are hidden.</p>
           </Section>
         ) : null}
 
@@ -97,7 +91,7 @@ export function Retailer() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[12px] text-text-3">Dot: outcome rate at week {window_}. Band: 95% Wilson interval. Continuation is the repeat-purchase analogue.</p>
+            <p className="mt-2 text-[12px] text-text-3">Dot: outcome rate at week 8. Band: 95% Wilson interval. Continuation is the repeat-purchase analogue.</p>
           </Section>
         ) : null}
 
@@ -140,7 +134,7 @@ export function Retailer() {
         {tab === 'About this data' ? (
           <div className="max-w-[36rem] space-y-3 pt-6 text-[15px] leading-relaxed text-text-2">
             <h2 className="text-[20px] font-bold text-text">About this data</h2>
-            <p>This view mixes a synthetic cohort with the team's real sessions. The synthetic cohort has {RETAILER.cohort.synthetic} simulated users across six regions and all six skin-tone bands, each with one to three goals and a routine of two to five catalog products, weekly sessions for {RETAILER.cohort.weeks} weeks and {Math.round(RETAILER.cohort.dropout * 100)}% dropout. The generator uses a fixed seed ({RETAILER.cohort.seed}).</p>
+            <p>This view shows a synthetic cohort only; no real customer data is in it yet. The synthetic cohort has {RETAILER.cohort.synthetic} simulated users across six regions and all six skin-tone bands, each with one to three goals and a routine of two to five catalog products, weekly sessions for {RETAILER.cohort.weeks} weeks and {Math.round(RETAILER.cohort.dropout * 100)}% dropout. The generator uses a fixed seed ({RETAILER.cohort.seed}).</p>
             <p>Each simulated weekly change is a product effect (only on the metrics mapped to the product's concerns; some products are set to about zero) plus noise drawn from Willow's measured noise bands. A simulated reading counts as real change only if it clears the band, the same rule the app uses.</p>
             <p>Suppression: any group under 10 users is hidden, in the data query and in the api, not only on the chart. Rates are never shown without n. Skin-tone bands are a slice, never a ranking.</p>
             <p>What this is not: evidence that any product works. It is a demonstration of what a multi-brand retailer would see once real, consented outcome data flows in.</p>

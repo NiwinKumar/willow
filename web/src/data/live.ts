@@ -30,6 +30,7 @@ export function toSession(v: SessionView): Session {
     hours_since_baseline: h !== null && h <= HOURS_LABEL_LIMIT && (h >= 1 || v.session.is_baseline) ? h : undefined,
     explanation_source: v.session.explanation_source,
     error: v.session.error,
+    live: true,
     measured: v.session.measured,
     baseline_ref: v.session.baseline,
   }
@@ -72,4 +73,21 @@ export function baselineFor(session: Session | null, sessions: Session[]): Sessi
 /** Live sessions the engine could not measure yet (the photos are kept, no numbers exist). */
 export function isUnmeasured(s: Session | null | undefined): boolean {
   return s?.measured === false
+}
+
+/** The control-arm session taken with a treated session: same capture mode, measured, nearest in time (within 3 h). */
+export function matchControl(treated: Session | null, controls: Session[]): Session | null {
+  if (!treated) return null
+  const t = new Date(treated.created_at).getTime()
+  let best: Session | null = null
+  let gap = 3 * 3_600_000
+  for (const c of controls) {
+    if (c.status !== 'done' || c.measured === false || !c.result || c.capture_mode !== treated.capture_mode) continue
+    const d = Math.abs(new Date(c.created_at).getTime() - t)
+    if (d <= gap) {
+      gap = d
+      best = c
+    }
+  }
+  return best
 }
