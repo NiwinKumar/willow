@@ -67,19 +67,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [demo, uid, load, apply])
 
+  // Demo mode prefers the seeded real journey (api /v1/demo/journey) and falls back to the illustration.
+  const [journey, setJourney] = useState<SessionView[] | null>(null)
+  useEffect(() => {
+    if (!demo || journey !== null) return
+    let alive = true
+    api
+      .demoJourney()
+      .then((r) => alive && setJourney(r.sessions.filter((v) => v.session.status === 'done')))
+      .catch(() => alive && setJourney([]))
+    return () => {
+      alive = false
+    }
+  }, [demo, journey])
+
   const upsert = useCallback((view: SessionView) => {
     setViews((vs) => [...vs.filter((v) => v.session.id !== view.session.id), view])
   }, [])
 
   const value = useMemo<DataState>(() => {
     if (demo) {
-      return { mode: 'demo', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
+      if (journey?.length) {
+        const real = groupBySite(journey)
+        return { mode: 'demo', demoSource: 'real', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
+      }
+      return { mode: 'demo', demoSource: 'illustrative', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
     }
     const status: DataStatus = !uid ? 'idle' : loaded.uid === uid ? loaded.status : 'loading'
     const mine = loaded.uid === uid ? views : []
     const bySite = groupBySite(mine)
     return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, goals: prefs.goals(), refresh, upsert }
-  }, [demo, uid, loaded, views, refresh, upsert])
+  }, [demo, journey, uid, loaded, views, refresh, upsert])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

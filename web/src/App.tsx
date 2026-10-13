@@ -7,6 +7,7 @@ import { DataProvider } from './data/store'
 import { Advisor } from './routes/Advisor'
 import { Capture } from './routes/Capture'
 import { Goals } from './routes/Goals'
+import { Judge } from './routes/Judge'
 import { Landing } from './routes/Landing'
 import { Processing } from './routes/Processing'
 import { QuickCapture } from './routes/QuickCapture'
@@ -32,6 +33,7 @@ export default function App() {
             <AppShell>
               <Routes>
                 <Route path="/" element={<Landing />} />
+                <Route path="/judge" element={<Judge />} />
                 <Route path="/start" element={<Start />} />
                 <Route path="/goals" element={<Goals />} />
                 <Route path="/capture" element={<Capture />} />
@@ -40,7 +42,7 @@ export default function App() {
                 <Route path="/retailer" element={<Retailer />} />
                 <Route path="/science" element={<Science />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/upload-test" element={<UploadTest />} />
+                {import.meta.env.DEV ? <Route path="/upload-test" element={<UploadTest />} /> : null}
                 <Route path="*" element={<div className="px-5 py-12 text-text-2">Not found.</div>} />
               </Routes>
             </AppShell>

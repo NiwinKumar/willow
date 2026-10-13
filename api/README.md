@@ -48,6 +48,8 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 - `app/gemini.py`: `generate_json(prompt_id, contents, Schema, instructions=...)`. System rules on every call, JSON against a pydantic schema, `thinking_level=LOW` (the lowest Gemini 3.8 Flash accepts), one retry, then `GeminiError` for the caller's fallback. Logs prompt id, latency and token counts only.
 - Catalog: `seed/products.json`, built from the sheet by `scripts/import_catalog.py` (see `docs/CATALOG_SPEC.md`).
 
+Judge mode data (sample photos, the seeded journey): `uv run python scripts/seed_demo.py --help`. Samples live in `gs://<bucket>/demo/samples/` with a manifest; the api re-reads it within 5 minutes.
+
 After the engine starts measuring a new site (face, close-ups): `uv run python scripts/remeasure.py [--site face_full] --apply` measures the photos saved before, oldest first, so the earliest becomes each person's baseline (dry run without `--apply`).
 
 End-to-end test against the real bucket, engine and Firestore: `scripts/e2e.py`, see `docs/LOCAL_DEV.md`. `/v1/dev/*` routes exist only with `AUTH_MODE=dev` and `DEV_UPLOADS=true`.

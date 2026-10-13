@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__, storage
+from app.routes.demo_routes import router as demo_router
 from app.routes.me_routes import router as me_router
 from app.routes.products_routes import router as products_router
 from app.routes.retailer_routes import router as retailer_router
@@ -26,6 +27,7 @@ app.include_router(sessions_router)
 app.include_router(me_router)
 app.include_router(products_router)
 app.include_router(retailer_router)
+app.include_router(demo_router)
 if storage.dev_uploads_enabled():
     from app.routes.dev_routes import router as dev_router
 
