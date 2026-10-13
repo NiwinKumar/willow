@@ -11,6 +11,7 @@ import { judge, type JudgeStop } from '../lib/judge'
 import { useAuth } from '../lib/useAuth'
 import { useSamples } from '../lib/useSamples'
 import { useJudge } from '../lib/useJudge'
+import { prefetchRoutes } from './lazy'
 
 const REPO = 'https://github.com/NiwinKumar/willow'
 
@@ -38,6 +39,7 @@ export function Judge() {
   useEffect(() => {
     judge.start()
     leaveDemo()
+    prefetchRoutes(['Processing', 'Report', 'Advisor', 'Routine', 'Retailer'])
   }, [])
   useEffect(() => {
     if (loading || user) return

@@ -1,15 +1,12 @@
-import {
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInAnonymously,
-  signInWithPopup,
-  signOut,
-  type User,
-} from 'firebase/auth'
+import type { User } from 'firebase/auth'
 import { createContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { DEV_UID } from './devAuth'
-import { firebaseAuth } from './firebase'
+
+// The Firebase SDK is the largest piece of the first page; it loads right after first paint
+// instead of blocking it. Every auth call awaits the same promise.
+let sdk: Promise<typeof import('./firebase')> | null = null
+const loadSdk = () => (sdk ??= import('./firebase'))
 
 export type AuthState = {
   user: User | null
@@ -33,10 +30,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (devUser) return
-    return onAuthStateChanged(firebaseAuth, (u) => {
-      setUser(u)
-      setLoading(false)
+    let unsubscribe: (() => void) | undefined
+    let alive = true
+    void loadSdk().then(({ firebaseAuth, onAuthStateChanged }) => {
+      if (!alive) return
+      unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
+        setUser(u)
+        setLoading(false)
+      })
     })
+    return () => {
+      alive = false
+      unsubscribe?.()
+    }
   }, [])
 
   const value = useMemo<AuthState>(
@@ -44,15 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       continueAsGuest: async () => {
-        await signInAnonymously(firebaseAuth)
+        const f = await loadSdk()
+        await f.signInAnonymously(f.firebaseAuth)
       },
       signInWithGoogle: async () => {
-        await signInWithPopup(firebaseAuth, new GoogleAuthProvider())
+        const f = await loadSdk()
+        await f.signInWithPopup(f.firebaseAuth, new f.GoogleAuthProvider())
       },
-      signOutUser: () => signOut(firebaseAuth),
+      signOutUser: async () => {
+        const f = await loadSdk()
+        await f.signOut(f.firebaseAuth)
+      },
       getIdToken: async () => {
         if (devUser) return 'dev'
-        const u = firebaseAuth.currentUser
+        const u = (await loadSdk()).firebaseAuth.currentUser
         if (!u) throw new Error('Not signed in')
         return u.getIdToken()
       },
