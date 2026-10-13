@@ -1,28 +1,18 @@
+import { Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
 import { AppShell } from './components/AppShell'
 import { BandBarDefs } from './components/BandBar'
 import { DataProvider } from './data/store'
-import { Advisor } from './routes/Advisor'
-import { Capture } from './routes/Capture'
-import { Goals } from './routes/Goals'
-import { Judge } from './routes/Judge'
 import { Landing } from './routes/Landing'
-import { Processing } from './routes/Processing'
-import { QuickCapture } from './routes/QuickCapture'
-import { Retailer } from './routes/Retailer'
-import { Routine } from './routes/Routine'
-import { Science } from './routes/Science'
-import { Settings } from './routes/Settings'
-import { Report } from './routes/Report'
-import { Start } from './routes/Start'
-import { UploadTest } from './routes/UploadTest'
+import { Advisor, Capture, Goals, Judge, Processing, QuickCapture, Report, Retailer, Routine, Science, Settings, Start, UploadTest } from './routes/lazy'
 
 export default function App() {
   return (
     <DataProvider>
       <BandBarDefs />
+      <Suspense fallback={<RouteLoading />}>
       <Routes>
         <Route path="/s/:site" element={<Report />} />
         <Route path="/processing/:sessionId" element={<Processing />} />
@@ -31,6 +21,7 @@ export default function App() {
           path="*"
           element={
             <AppShell>
+              <Suspense fallback={<RouteLoading />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/judge" element={<Judge />} />
@@ -45,11 +36,18 @@ export default function App() {
                 {import.meta.env.DEV ? <Route path="/upload-test" element={<UploadTest />} /> : null}
                 <Route path="*" element={<div className="px-5 py-12 text-text-2">Not found.</div>} />
               </Routes>
+              </Suspense>
             </AppShell>
           }
         />
       </Routes>
+      </Suspense>
       <Toaster position="bottom-center" toastOptions={{ style: { fontFamily: 'var(--font-sans)' } }} />
     </DataProvider>
   )
+}
+
+/** Shown for the moment a page's code is loading; quiet, so a fast load just looks instant. */
+function RouteLoading() {
+  return <div role="status" aria-label="Loading" className="min-h-[40dvh]" />
 }

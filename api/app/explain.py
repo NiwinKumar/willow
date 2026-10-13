@@ -109,6 +109,9 @@ Rules:
   if it started before this session.
 - Skin tone (tone_ita) is descriptive: never better or worse, never lighter or darker as a goal.
 - No disease names, no diagnosis, no "better/worse" skin.
+- is_baseline in the session data tells you which kind of session this is: true means the first reading
+  (say so); false means a later session compared with the baseline, so never call it "initial"
+  or "first". A delta of 0 or 0.0 means no measurable difference; never write "-0.0".
 - headline: one short sentence. items: one per metric, most important first. next_steps: up to 3
   short practical capture or routine tips. disclaimer: "Cosmetic appearance tracking, not a
   diagnosis.\""""

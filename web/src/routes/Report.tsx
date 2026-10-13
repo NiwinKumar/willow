@@ -1,6 +1,6 @@
 import { ArrowLeft, ChevronDown, Link2 } from 'lucide-react'
 import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -10,7 +10,6 @@ import { CoachMarks } from '../components/CoachMarks'
 import { ControlCompare } from '../components/ControlCompare'
 import { DemoBar } from '../components/DemoBar'
 import { JudgeBar } from '../components/JudgeBar'
-import { MetricDetail } from '../components/MetricDetail'
 import { MetricRow } from '../components/MetricRow'
 import { NumberValue } from '../components/NumberValue'
 import { Scrubber } from '../components/Scrubber'
@@ -27,6 +26,10 @@ import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
 import { useAuth } from '../lib/useAuth'
 import { useJudgeOn } from '../lib/useJudge'
+import { fresh } from './lazy'
+
+// The chart library is large and only needed when a metric is opened.
+const MetricDetail = lazy(() => fresh(() => import('../components/MetricDetail'))().then((m) => ({ default: m.MetricDetail })))
 
 const SNAPS = ['peek', 'half', 'full'] as const
 type Snap = (typeof SNAPS)[number]
@@ -315,7 +318,9 @@ export function Report() {
                     if (snap === 'peek') setSnap('full')
                   }}
                 >
-                  <MetricDetail metricId={m.id} sessions={sameMode} current={m} baseline={baseline} />
+                  <Suspense fallback={<div className="h-44" aria-hidden />}>
+                    <MetricDetail metricId={m.id} sessions={sameMode} current={m} baseline={baseline} />
+                  </Suspense>
                 </MetricRow>
               )
             })}
