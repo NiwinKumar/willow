@@ -41,7 +41,7 @@ def test_evenness_low_for_uniform_skin_higher_for_patchy():
 def test_evenness_ignores_camera_grain_but_sees_blotches():
     skin = np.ones((200, 200), bool)
     grainy = _skin_red(0.4, (200, 200)) * np.random.default_rng(9).normal(1, 0.05, (200, 200))
-    blotchy = _add_spots(_skin_red(0.4, (200, 200)), [(60, 60), (140, 140)], 30, 0.8)
+    blotchy = _add_spots(_skin_red(0.4, (200, 200)), [(60, 60), (140, 140)], 30, 0.8)  # evenness
     L = np.full((200, 200), 60.0)
     grain_score, _ = tone_evenness({"a": (L, grainy, skin), "b": (L, grainy, skin)}, PX_PER_MM)
     blotch_score, _ = tone_evenness({"a": (L, blotchy, skin), "b": (L, blotchy, skin)}, PX_PER_MM)
@@ -60,15 +60,21 @@ def test_no_spots_on_plain_skin():
 @pytest.mark.parametrize("base_red", [0.6, 0.35, 0.12, 0.05])  # light -> very deep skin
 def test_spots_found_relative_to_own_skin_at_every_tone(base_red):
     centres = [(60, 60), (200, 80), (120, 220)]
-    red = _add_spots(_skin_red(base_red), centres, radius_px=15, factor=0.85)  # 3 mm spots
+    red = _add_spots(_skin_red(base_red), centres, radius_px=15, factor=0.7)  # 3 mm visible spots
     pct, extras = pigment_spots({"cheek": (red, np.ones_like(red, bool))}, PX_PER_MM)
     assert extras["count"] == 3
     expected_pct = 100 * 3 * math.pi * 15**2 / red.size
     assert pct == pytest.approx(expected_pct, rel=0.35)
 
 
+def test_faint_blotches_below_visible_contrast_are_ignored():
+    red = _add_spots(_skin_red(0.4), [(150, 150)], radius_px=15, factor=0.88)  # 12% darker
+    _, extras = pigment_spots({"cheek": (red, np.ones_like(red, bool))}, PX_PER_MM)
+    assert extras["count"] == 0
+
+
 def test_specks_smaller_than_min_size_are_ignored():
-    red = _add_spots(_skin_red(0.4), [(150, 150)], radius_px=2, factor=0.6)  # 0.4 mm speck
+    red = _add_spots(_skin_red(0.4), [(150, 150)], radius_px=2, factor=0.5)  # 0.4 mm speck
     _, extras = pigment_spots({"cheek": (red, np.ones_like(red, bool))}, PX_PER_MM)
     assert extras["count"] == 0
 
