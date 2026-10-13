@@ -9,6 +9,22 @@ type Props = {
   className?: string
 }
 
+/** Ask image CDNs that support it for a copy near the tile size (2x for retina), not the 1600 px original. */
+function sized(url: string, px: number): string {
+  try {
+    const u = new URL(url)
+    if (u.pathname.includes('/cdn/shop/') || u.hostname === 'cdn.shopify.com') u.searchParams.set('width', String(px))
+    else if (u.pathname.includes('/dw/image/')) u.searchParams.set('sw', String(px))
+    else if (u.hostname === 'media.ulta.com') {
+      u.searchParams.set('w', String(px))
+      u.searchParams.set('h', String(px))
+    } else return url
+    return u.toString()
+  } catch {
+    return url
+  }
+}
+
 /**
  * The brand's own packshot on a quiet tile, or the category abbreviation when there is no image
  * or it fails to load. Decorative: the product name always sits next to it, so alt is empty.
@@ -26,7 +42,7 @@ export function ProductImage({ product, size = 48, className = '' }: Props) {
     >
       {show ? (
         <img
-          src={src}
+          src={sized(src, size * 2)}
           alt=""
           width={size}
           height={size}
