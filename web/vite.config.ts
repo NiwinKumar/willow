@@ -4,5 +4,6 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5173, host: true },
+  // The catalog lives in api/seed/products.json (one source for the api and the demo).
+  server: { port: 5173, host: true, fs: { allow: ['..'] } },
 })

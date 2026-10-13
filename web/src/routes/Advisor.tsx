@@ -4,8 +4,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Chip } from '../components/Chip'
+import { ProductImage } from '../components/ProductImage'
 import type { Product } from '../data/types'
 import { useData } from '../data/useData'
+import { fmtPrice, imageCredit } from '../lib/format'
 import { METRIC_META } from '../lib/metrics'
 import { CONCERN_LABEL } from '../mock/catalog'
 import { STARTERS, answer, productById, type Turn } from '../mock/advisor'
@@ -155,18 +157,30 @@ function withNumberChips(t: Turn, q: string) {
 
 function ProductCard({ p }: { p: Product }) {
   const [inci, setInci] = useState(false)
+  const credit = imageCredit(p)
+  const actives = p.key_actives.slice(0, 3)
+  const more = p.key_actives.length - actives.length
   return (
     <div className="rounded-(--radius-tile) border border-border bg-surface p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[15px] font-semibold">{p.brand} {p.name}</p>
-          <p className="text-[13px] text-text-2">For {p.concerns.map((c) => CONCERN_LABEL[c]).join(', ')} · {p.category} · {p.size}</p>
-          <div className="mt-1 flex flex-wrap gap-1">{p.key_actives.map((a) => <Chip key={a.name} tone="neutral">{a.name}{a.pct !== null ? ` ${a.pct}%` : ''}</Chip>)}</div>
+      <div className="flex items-start gap-3">
+        <ProductImage product={p} size={76} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] text-text-2">{p.brand}</p>
+          <p className="text-[15px] font-semibold leading-snug">{p.name}</p>
+          <p className="mt-1 text-[13px] text-text-2">
+            <span className="font-mono text-[15px] text-text">{fmtPrice(p.price)}</span> · {p.size}
+          </p>
         </div>
-        <div className="shrink-0 text-right">
-          <p className="font-mono text-[15px]">₹{p.price.amount}</p>
-          <p className="text-[11px] text-text-3">{p.last_verified.startsWith('sample') ? 'price unverified' : `as of ${p.last_verified}`}</p>
-        </div>
+      </div>
+      <p className="mt-2 text-[13px] text-text-2">For {p.concerns.map((c) => CONCERN_LABEL[c]).join(', ')}</p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {actives.map((a) => (
+          <Chip key={a.name} tone="neutral" className="max-w-full truncate">
+            {a.name}
+            {a.pct !== null ? ` ${a.pct}%` : ''}
+          </Chip>
+        ))}
+        {more > 0 ? <Chip tone="neutral">+{more} more</Chip> : null}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {p.stores.map((s) => (
@@ -177,6 +191,10 @@ function ProductCard({ p }: { p: Product }) {
         <button type="button" onClick={() => setInci((v) => !v)} aria-expanded={inci} className="min-h-9 px-2 text-[13px] text-text-2 underline-offset-2 hover:underline">Ingredients</button>
       </div>
       {inci ? <p className="mt-2 text-[12px] text-text-2">{p.inci.join(', ')}</p> : null}
+      <p className="mt-2 text-[11px] text-text-3">
+        Price as of {p.last_verified}
+        {credit ? ` · Image: ${credit}` : ''}
+      </p>
     </div>
   )
 }

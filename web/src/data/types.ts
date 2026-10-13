@@ -153,4 +153,8 @@ export type Product = {
   stores: { store: string; url: string; region: string }[]
   source_url: string
   last_verified: string
+  /** The brand's own packshot, linked where it is already published (never copied). */
+  image_url?: string | null
+  /** The page that image appears on, for the credit line. */
+  image_source?: string | null
 }
