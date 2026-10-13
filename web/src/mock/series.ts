@@ -22,7 +22,7 @@ function gauss(rng: () => number) {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
 }
 
-const BASE_DATE = new Date('2026-09-12T18:30:00Z')
+const BASE_DATE = new Date('2026-08-29T13:00:00Z')
 const iso = (d: Date) => d.toISOString()
 const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000)
 const addHours = (d: Date, n: number) => new Date(d.getTime() + n * 3_600_000)
@@ -128,7 +128,7 @@ function withBaseline(m: Metric, baselineValue: number, value: number, baselineM
   return { ...m, value: +value.toFixed(3), delta, verdict, direction: delta < 0 ? 'decrease' : delta > 0 ? 'increase' : 'none' }
 }
 
-/** Face: 5-frame baseline then six weekly check-ins; niacinamide started at week 2; dark spots clear the band by week 5. */
+/** Face: 5-frame baseline then six weekly check-ins; azelaic acid started at week 2; dark spots clear the band by week 6. */
 export function faceSeries(): SiteSeries {
   const rng = mulberry32(42)
   const fixtureMetrics = FIXTURE.metrics
@@ -151,7 +151,7 @@ export function faceSeries(): SiteSeries {
         nFrames: 3,
         rois: FACE_ROIS,
         quality: low ? { passed: true, card_detected: true, card_delta_e_mean: 5.4, sharpness: 310, clipped_pct: 1.9, pose: { yaw: 6.5, pitch: 1, roll: 0.3 }, reasons: ['card_delta_e_high'] } : undefined,
-        note: w === 2 ? 'Started niacinamide serum' : w === 4 ? 'Slept badly, different lamp position' : undefined,
+        note: w === 2 ? 'Started azelaic acid' : w === 4 ? 'Slept badly, different lamp position' : undefined,
         deviation: w === 4,
       }),
     )

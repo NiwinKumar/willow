@@ -274,7 +274,7 @@ function Samples() {
   const data = useData()
   const packs = [
     { id: 'forearm_treated', title: 'Forearm, treated, +24 h', frames: 3, note: 'self-tanner applied the evening before' },
-    { id: 'face_full', title: 'Face, week 6 check-in', frames: 3, note: 'niacinamide started at week 2' },
+    { id: 'face_full', title: 'Face, week 6 check-in', frames: 3, note: 'azelaic acid started at week 2' },
   ] as const
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
