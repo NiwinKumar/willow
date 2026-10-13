@@ -1,13 +1,17 @@
 import { Camera, RotateCcw, X } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
+import { FirstSessionGuide } from '../components/BaselineGuide'
 import { UploadList } from '../components/UploadList'
-import type { Site } from '../data/types'
+import { leaveDemo, useData } from '../data/useData'
+import { baselineState, photoSteps } from '../lib/baselineGuide'
+import type { CaptureMode, Site } from '../data/types'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { validateFiles, type Row } from '../lib/upload'
+import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 
 type Gates = { light: boolean; even: boolean; still: boolean }
@@ -24,8 +28,16 @@ export function QuickCapture() {
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const { user, continueAsGuest } = useAuth()
+  const data = useData()
   const site = (params.get('site') as Site) ?? 'face_full'
-  const n = Math.min(5, Math.max(1, Number(params.get('n') ?? '3')))
+  const firstSession = baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
+  // Fixed once the person's sessions are known (a deep link may arrive before they load), then kept
+  // for the whole capture even if the list refreshes while the camera is open.
+  const known = data.mode === 'demo' || data.status === 'ready' || data.status === 'error' || data.status === 'idle'
+  const [fixedN, setFixedN] = useState<number | null>(() => (params.get('n') ? Number(params.get('n')) : null))
+  if (fixedN === null && known) setFixedN(firstSession ? 5 : 3)
+  const n = Math.min(5, Math.max(1, fixedN ?? 5))
+  const steps = photoSteps(site, 'uncalibrated')
   const faceSite = site === 'face_full' || site === 'cheek_macro' || site === 'nose_macro'
   const [phase, setPhase] = useState<Phase>('ask')
   const [gates, setGates] = useState<Gates>({ light: false, even: false, still: false })
@@ -34,12 +46,17 @@ export function QuickCapture() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [manual, setManual] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
+  const [uploadMode, setUploadMode] = useState<CaptureMode>('uncalibrated')
+  const [uploadErrors, setUploadErrors] = useState<string[]>([])
   const video = useRef<HTMLVideoElement>(null)
   const stream = useRef<MediaStream | null>(null)
   const prev = useRef<Uint8ClampedArray | null>(null)
   const passSince = useRef<number | null>(null)
   const nearSince = useRef<number | null>(null)
   const firing = useRef(false)
+  const liveSince = useRef<number | null>(null)
+  // Each photo needs its own setup: after a shot, auto-capture waits until the camera has moved.
+  const movedSinceShot = useRef(true)
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop())
@@ -51,15 +68,20 @@ export function QuickCapture() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: faceSite ? 'user' : 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
       stream.current = s
-      if (video.current) {
-        video.current.srcObject = s
-        await video.current.play()
-      }
+      liveSince.current = performance.now()
+      // The <video> only exists once the live view renders; the effect below attaches the stream.
       setPhase('live')
     } catch {
       setPhase('denied')
     }
   }
+
+  useEffect(() => {
+    const v = video.current
+    if (phase !== 'live' || !v || !stream.current || v.srcObject === stream.current) return
+    v.srcObject = stream.current
+    v.play().catch(() => setPhase('denied'))
+  }, [phase])
 
   // Analysis loop on a 160 px frame, five times a second.
   useEffect(() => {
@@ -93,6 +115,7 @@ export function QuickCapture() {
       prev.current = new Uint8ClampedArray(d)
       const g: Gates = { light: mean > 0.32 && mean < 0.75 && clipped / N < 0.02, even: ratio > 0.8 && ratio < 1.25, still: motion < 6 }
       setGates(g)
+      if (!g.still) movedSinceShot.current = true
       if (!g.light) setHint(mean <= 0.32 ? 'Find brighter light' : 'Too bright. Turn away from the lamp')
       else if (!g.even) setHint('Face the window or lamp so both sides are lit evenly')
       else if (!g.still) setHint('Hold still')
@@ -101,10 +124,12 @@ export function QuickCapture() {
       const all = g.light && g.even && g.still
       if (g.light && g.even) nearSince.current ??= now
       else nearSince.current = null
-      if (nearSince.current && now - nearSince.current > 8000) setManual(true)
+      // The checks only help framing. Laptop cameras often never pass them, so the shutter is
+      // always available after a few seconds.
+      if ((nearSince.current && now - nearSince.current > 8000) || (liveSince.current && now - liveSince.current > 4000)) setManual(true)
       if (all) {
         passSince.current ??= now
-        if (now - passSince.current > 600 && countdown === null && !firing.current) setCountdown(1)
+        if (now - passSince.current > 600 && countdown === null && !firing.current && movedSinceShot.current) setCountdown(1)
       } else {
         passSince.current = null
         if (countdown !== null && !firing.current) setCountdown(null)
@@ -133,10 +158,11 @@ export function QuickCapture() {
     }
     setCountdown(null)
     passSince.current = null
+    movedSinceShot.current = false
     window.setTimeout(() => {
       firing.current = false
     }, 900)
-  }, [shots.length, n, stop])
+  }, [shots.length, n, stop, setShots, setPhase])
 
   useEffect(() => {
     if (countdown === null) return
@@ -152,13 +178,22 @@ export function QuickCapture() {
   ]
   const allPass = gates.light && gates.even && gates.still
 
+  if (data.mode === 'live' && !prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture/camera?${params.toString()}`)}`} replace />
+
+  if (fixedN === null)
+    return (
+      <p className="mx-auto max-w-[36rem] px-5 pt-6 text-[15px] text-text-3 sm:px-8" role="status">
+        Loading your sessions…
+      </p>
+    )
+
   if (phase === 'ask' || phase === 'denied')
     return (
       <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-6 sm:px-8">
-        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? 'Willow needs your camera for this selfie' : 'Camera is blocked'}</h1>
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? (faceSite ? 'Willow needs your camera for this selfie' : 'Willow needs your camera for this photo') : 'Camera is blocked'}</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-2">
           {phase === 'ask'
-            ? `Photos stay in your private space and are deleted after 30 days. ${n} photos, uncalibrated, so the result is a trend, not a measurement.`
+            ? `Photos stay in your private space and are deleted after 30 days. ${n} photos, uncalibrated, so the result is a trend, not a measurement.${firstSession ? '' : ` Between photos: ${steps.between.charAt(0).toLowerCase() + steps.between.slice(1)}`}`
             : 'Allow it in the browser: on iPhone, tap “aA” in the address bar, Website Settings, Camera, Allow. Or upload a photo instead.'}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -173,18 +208,50 @@ export function QuickCapture() {
             Upload a photo instead
             <input
               type="file"
-              accept=".jpg,.jpeg,image/jpeg,.heic,image/heic"
+              accept=".jpg,.jpeg,image/jpeg,.heic,image/heic,.dng,image/x-adobe-dng,image/dng"
               multiple
               className="sr-only"
               onChange={(e) => {
-                const v = validateFiles(Array.from(e.target.files ?? []), 'uncalibrated', n)
+                const files = Array.from(e.target.files ?? [])
+                e.target.value = ''
+                // A RAW .dng is better than a selfie: send it as a calibrated session instead.
+                const raw = files.filter((f) => /\.dng$/i.test(f.name))
+                if (raw.length && raw.length !== files.length) {
+                  setUploadErrors(['Choose either RAW .dng files or photos (.jpg / .heic), not both.'])
+                  return
+                }
+                const mode: CaptureMode = raw.length ? 'calibrated_raw' : 'uncalibrated'
+                const v = validateFiles(files, mode, n)
+                setUploadMode(mode)
+                setUploadErrors(v.errors)
                 setRows(v.rows)
                 if (v.rows.length) setPhase('upload')
               }}
             />
           </label>
         </div>
+        {!faceSite ? (
+          <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
+            <li>Four pen dots mark the corners of a 4 cm square; keep all four in the frame.</li>
+            <li>A sheet of plain white paper beside the arm, in the same light.</li>
+          </ul>
+        ) : null}
+        {phase === 'ask' && firstSession && data.mode === 'live' ? (
+          <div className="mt-5">
+            <FirstSessionGuide site={site} mode="uncalibrated" n={n} />
+          </div>
+        ) : null}
+        {uploadErrors.length ? (
+          <ul className="mt-3 space-y-1 text-[13px] text-danger">
+            {uploadErrors.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        ) : null}
         {!faceSite ? null : <p className="mt-6 text-[12px] text-text-3">Laptop camera? Expect lower quality; the checks are looser on desktop.</p>}
+        <Link to={`/capture?site=${site}&mode=quick`} className="mt-6 inline-flex min-h-11 items-center text-[15px] text-text-2 underline-offset-2 hover:text-text hover:underline">
+          Back to the photo guide
+        </Link>
       </div>
     )
 
@@ -215,6 +282,7 @@ export function QuickCapture() {
         <Button
           className="mt-6"
           onClick={() => {
+            setUploadMode('uncalibrated')
             setRows(shots.map((s) => ({ file: s.file, contentType: 'image/jpeg', progress: 0, state: 'ready' as const })))
             setPhase('upload')
           }}
@@ -237,7 +305,13 @@ export function QuickCapture() {
           </div>
         ) : (
           <div className="mt-5">
-            <UploadList site={site} mode="uncalibrated" rows={rows} onRows={setRows} onDone={(sid) => navigate(`/processing/${sid}?site=${site}&n=${rows.length}`)} />
+            {uploadMode === 'calibrated_raw' ? <p className="mb-3 text-[13px] text-text-2">RAW files: sent as a calibrated session.</p> : null}
+            <UploadList site={site} mode={uploadMode} rows={rows} onRows={setRows} onDone={(sid) => {
+              leaveDemo()
+              // "Something is different today" from the capture guide travels with the session.
+              const dev = params.get('dev') ? `&dev=1&note=${encodeURIComponent(params.get('note') ?? '')}` : ''
+              navigate(`/processing/${sid}?site=${site}&n=${rows.length}${dev}`)
+            }} />
           </div>
         )}
       </div>
@@ -280,7 +354,7 @@ export function QuickCapture() {
             <span key={i} className={`h-2 w-6 rounded-full ${i < shots.length ? 'bg-willow-500' : 'bg-white/50'}`} />
           ))}
         </div>
-        <span className="absolute bottom-4 right-4 rounded-(--radius-chip) bg-surface/85 px-1.5 py-0.5 text-[11px] text-text-2">Quick selfie · trend only</span>
+        <span className="absolute bottom-4 right-4 rounded-(--radius-chip) bg-surface/85 px-1.5 py-0.5 text-[11px] text-text-2">Phone photo · trend only</span>
       </div>
       <div className="flex items-center justify-center gap-6 bg-bg px-5 py-4 pb-[max(16px,env(safe-area-inset-bottom))]">
         <button
@@ -292,7 +366,7 @@ export function QuickCapture() {
         >
           <span className={`h-12 w-12 rounded-full ${allPass ? 'bg-willow-500' : 'bg-text'}`} />
         </button>
-        <span className="w-32 text-[13px] text-text-2">{shots.length > 0 ? 'Lower the phone, then raise it again.' : allPass ? 'Auto in 1 s' : manual ? 'Take it when ready' : 'Shutter enables when the ring is green'}</span>
+        <span className="w-44 text-[13px] leading-snug text-text-2">{shots.length > 0 ? steps.between : allPass ? 'Auto in 1 s' : manual ? 'Take it when ready' : 'Shutter enables when the ring is green'}</span>
       </div>
     </div>
   )

@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useData } from '../data/useData'
 import { Sheet } from './Sheet'
 
-const links = [
+const baseLinks = [
   { to: '/s/face_full', label: 'Results' },
   { to: '/capture', label: 'New session' },
   { to: '/routine', label: 'Routine' },
@@ -20,11 +20,14 @@ export function Nav() {
   const { pathname } = useLocation()
   const data = useData()
   const q = data.mode === 'demo' ? '?demo=1' : ''
+  // Live: Results opens a site the person actually has measured results for (forearm today).
+  const resultsTo = data.mode === 'demo' ? '/s/face_full' : `/s/${data.sites[0] ?? 'forearm_control'}`
+  const links = baseLinks.map((l) => (l.label === 'Results' ? { ...l, to: resultsTo } : l))
   return (
     <>
       <nav className="hidden items-center gap-4 text-[13px] text-text-2 md:flex" aria-label="Primary">
         {links.map((l) => (
-          <Link key={l.to} to={`${l.to}${q}`} className={`hover:text-text ${pathname.startsWith(l.to.split('?')[0]) ? 'font-semibold text-text' : ''}`}>
+          <Link key={l.to} to={`${l.to}${q}`} className={`hover:text-text ${pathname.startsWith(l.label === 'Results' ? '/s/' : l.to.split('?')[0]) ? 'font-semibold text-text' : ''}`}>
             {l.label}
           </Link>
         ))}

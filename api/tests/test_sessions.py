@@ -105,3 +105,19 @@ def test_session_objects_reports_size_and_md5(client, fake):
 def test_session_objects_404_for_other_user(client, fake):
     res = client.get("/v1/sessions/s_20261013_deadbeef/objects")
     assert res.status_code == 404
+
+
+def test_validation_errors_are_one_readable_sentence(client, fake):
+    res = client.post(
+        "/v1/sessions",
+        json={
+            "site": "face_full",
+            "capture_mode": "uncalibrated",
+            "n_frames": 1,
+            "content_types": ["image/x-adobe-dng"],
+        },
+    )
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    assert detail["code"] == "bad_request"
+    assert detail["message"] == "content type not allowed for uncalibrated: image/x-adobe-dng"

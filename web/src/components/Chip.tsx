@@ -28,7 +28,13 @@ export function Chip({ tone = 'neutral', children, className = '', title }: { to
 
 const verdictTone: Record<Verdict, Tone> = { real_change: 'signal', within_noise: 'noise', no_baseline: 'willow', low_quality: 'warn' }
 
-export function VerdictChip({ verdict, className = '' }: { verdict: Verdict; className?: string }) {
+export function VerdictChip({ verdict, noBand = false, className = '' }: { verdict: Verdict; noBand?: boolean; className?: string }) {
+  if (noBand && verdict === 'no_baseline')
+    return (
+      <Chip tone="noise" className={className} title="Your baseline has one photo, so there is no noise band to compare against yet.">
+        No noise band yet
+      </Chip>
+    )
   return (
     <Chip tone={verdictTone[verdict]} className={className}>
       {verdict === 'real_change' ? <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-signal-500" /> : null}

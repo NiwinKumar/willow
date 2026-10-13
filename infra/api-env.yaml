@@ -1,7 +1,7 @@
 # Env vars for willow-api (no secrets here). Deploy: see infra/README.md
 PROJECT_ID: "willow-511508"
 BUCKET: "willow-511508-captures"
-ENGINE_MODE: "fixture"
+ENGINE_MODE: "http"
 ENGINE_URL: "https://willow-engine-hrlt7lqdwa-uc.a.run.app"
 VERTEX_LOCATION: "global"
 GEMINI_MODEL: "gemini-3.8-flash"

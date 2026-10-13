@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 
-import { api, putSigned, type CaptureMode, type ObjectStatus, type Site } from '../lib/api'
+import { ApiError, api, putSigned, type CaptureMode, type ObjectStatus, type Site, type UploadTarget } from '../lib/api'
 import { formatBytes, type Row } from '../lib/upload'
 import { useAuth } from '../lib/useAuth'
 
@@ -22,10 +21,13 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
   const { getIdToken } = useAuth()
   const [busy, setBusy] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [fatal, setFatal] = useState<string | null>(null)
   const started = useRef(false)
   const wake = useRef<WakeLockSentinel | null>(null)
-
-  const update = (i: number, patch: Partial<Row>) => onRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
+  // One session per upload: retries reuse it (fresh signed URLs), never create a second one.
+  const session = useRef<{ id: string; targets: UploadTarget[]; issuedAt: number } | null>(null)
+  const latest = useRef(rows)
+  latest.current = rows
 
   useEffect(() => {
     if (!autoStart || started.current || rows.length === 0) return
@@ -54,18 +56,28 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
   }
 
   async function run() {
+    if (busy) return
     setBusy(true)
+    setFatal(null)
     await requestWake()
-    let current = rows
+    let current = latest.current.map((r) => (r.state === 'done' ? r : { ...r, state: 'ready' as const, error: undefined, progress: 0 }))
+    onRows(current)
     const set = (i: number, patch: Partial<Row>) => {
       current = current.map((r, j) => (j === i ? { ...r, ...patch } : r))
       onRows(current)
     }
     try {
       const token = await getIdToken()
-      const session = await api.createSession(token, { site, capture_mode: mode, n_frames: rows.length, content_types: rows.map((r) => r.contentType) })
-      setSessionId(session.session_id)
-      const queue = rows.map((_, i) => i)
+      if (!session.current) {
+        const created = await api.createSession(token, { site, capture_mode: mode, n_frames: current.length, content_types: current.map((r) => r.contentType) })
+        session.current = { id: created.session_id, targets: created.upload_urls, issuedAt: Date.now() }
+        setSessionId(created.session_id)
+      } else if (Date.now() - session.current.issuedAt > 10 * 60_000) {
+        const fresh = await api.reissueUploadUrls(token, session.current.id)
+        session.current = { ...session.current, targets: fresh.upload_urls, issuedAt: Date.now() }
+      }
+      const { id, targets } = session.current
+      const queue = current.map((r, i) => (r.state === 'done' ? -1 : i)).filter((i) => i >= 0)
       const worker = async () => {
         for (let i = queue.shift(); i !== undefined; i = queue.shift()) {
           const idx = i
@@ -73,25 +85,24 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
           while (attempt < 3) {
             set(idx, { state: 'uploading', error: undefined })
             try {
-              await putSigned(session.upload_urls[idx], current[idx].file, (f) => set(idx, { progress: f }))
+              await putSigned(targets[idx], current[idx].file, (f) => set(idx, { progress: f }))
               set(idx, { state: 'done', progress: 1 })
               break
-            } catch (e) {
+            } catch {
               attempt += 1
               if (attempt >= 3) set(idx, { state: 'failed', error: 'Network dropped. Tap retry.' })
               else await new Promise((r) => setTimeout(r, [1000, 3000, 9000][attempt - 1]))
-              void e
             }
           }
         }
       }
       await Promise.all([worker(), worker()])
       if (current.every((r) => r.state === 'done')) {
-        const result = await api.sessionObjects(token, session.session_id)
-        onDone(session.session_id, result.objects)
+        const result = await api.sessionObjects(token, id)
+        onDone(id, result.objects)
       }
     } catch (e) {
-      toast.error(String(e))
+      setFatal(e instanceof ApiError ? e.message : 'Could not reach Willow. Check your connection.')
     } finally {
       setBusy(false)
       wake.current?.release().catch(() => undefined)
@@ -123,14 +134,22 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
             {r.error ? (
               <div className="mt-1 flex items-center justify-between text-[13px] text-danger">
                 <span>{r.error}</span>
-                <button type="button" className="min-h-9 px-2 font-medium underline-offset-2 hover:underline" onClick={() => { update(i, { state: 'ready', error: undefined, progress: 0 }); started.current = false }}>
-                  Retry this file
+                <button type="button" disabled={busy} className="min-h-11 px-2 font-medium underline-offset-2 hover:underline disabled:opacity-50" onClick={() => void run()}>
+                  Retry
                 </button>
               </div>
             ) : null}
           </li>
         ))}
       </ul>
+      {fatal ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px]">
+          <span className="text-danger">Upload stopped: {fatal}</span>
+          <button type="button" disabled={busy} onClick={() => void run()} className="min-h-11 shrink-0 px-2 font-medium underline-offset-2 hover:underline disabled:opacity-50">
+            Try again
+          </button>
+        </div>
+      ) : null}
       {sessionId ? <p className="mt-2 font-mono text-[12px] text-text-3">session {sessionId}</p> : null}
     </div>
   )

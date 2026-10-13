@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     upload_url_ttl_seconds: int = 900
     # "firebase": verify Firebase ID tokens. "dev": trust the X-Dev-Uid header (local only).
     auth_mode: Literal["firebase", "dev"] = "firebase"
+    # Local end-to-end runs only (needs auth_mode=dev): upload links point at this api, which
+    # writes to the real bucket with your ADC, so no signing permission is needed on a laptop.
+    dev_uploads: bool = False
+    dev_public_url: str = "http://localhost:8080"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

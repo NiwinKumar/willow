@@ -1,8 +1,16 @@
 import type { Session } from '../data/types'
 import { METRIC_META, fmtSigned, fmtValue } from '../lib/metrics'
-import { CATALOG } from './catalog'
 
-export type Turn = { role: 'user' | 'willow'; text: string; retrieval?: string[]; product_ids?: string[]; follow_ups?: string[]; numbers?: { token: string; metric: string }[] }
+export type Turn = {
+  role: 'user' | 'willow'
+  text: string
+  retrieval?: string[]
+  product_ids?: string[]
+  follow_ups?: string[]
+  numbers?: { token: string; metric: string }[]
+  /** Live answers: what the validator checked (api advisor.py). */
+  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number }
+}
 
 /** Canned advisor turns for demo mode. Every quoted number is read from the session data, never typed in. */
 export function answer(q: string, sessions: Session[]): Turn {
@@ -24,9 +32,9 @@ export function answer(q: string, sessions: Session[]): Turn {
   if (lower.includes('dark spots') || lower.includes('under')) {
     return {
       role: 'willow',
-      text: `For dark spots under ₹1,500, three options from the catalog target pigmentation and fit your routine: you already use azelaic acid, kojic acid is a budget addition, and daily sunscreen is the one your routine is missing. Dark spots are currently ${spots ? fmtSigned(spots.delta, spots) : '–'} versus your baseline, so adding one thing at a time will keep the timeline readable.`,
+      text: `For dark spots under ₹1,500, three options from the catalog target pigmentation and fit your routine: you already use azelaic acid, alpha arbutin is a budget addition, and daily sunscreen is the one your routine is missing. Dark spots are currently ${spots ? fmtSigned(spots.delta, spots) : '–'} versus your baseline, so adding one thing at a time will keep the timeline readable.`,
       retrieval: ['Checked your results (latest session)', 'Searched catalog: dark spots, under ₹1,500 (3 results)'],
-      product_ids: ['the-derma-co-2-kojic-acid', 'la-roche-posay-anthelios-uvmune-400', 'beauty-of-joseon-relief-sun'],
+      product_ids: ['minimalist-alpha-arbutin-2-face-serum', 'la-roche-posay-anthelios-uvmune-400-invisible-fluid-spf50', 'the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50'],
       numbers: spots ? [{ token: fmtSigned(spots.delta, spots), metric: 'pigment_spots' }] : [],
       follow_ups: ['Can I use azelaic acid with retinol?', 'Which sunscreen for oily skin?'],
     }
@@ -64,5 +72,5 @@ export function answer(q: string, sessions: Session[]): Turn {
 }
 
 export const STARTERS = ['Is my azelaic acid doing anything?', 'What should I add for dark spots under ₹1,500?', 'Can I use retinol and glycolic acid together?', 'When should I take my next photos?']
-export const productById = (id: string) => CATALOG.find((p) => p.product_id === id)
+export { productById } from './catalog'
 export { METRIC_META }

@@ -110,6 +110,15 @@ export type Session = {
   deviation?: boolean
   /** Hours since the baseline session; used for the scrubber labels on short series. */
   hours_since_baseline?: number
+  /** Live sessions only: where the explanation came from, and why a failed session failed. */
+  explanation_source?: 'template' | 'gemini' | null
+  error?: { code: string; message: string } | null
+  /** True for sessions from the api (never for the illustrative demo journeys). */
+  live?: boolean
+  /** Live: false when the engine cannot measure this site yet; the photos are kept. */
+  measured?: boolean | null
+  /** Live: the baseline this session is compared with (same site and capture mode). */
+  baseline_ref?: { session_id: string; frames: number | null; has_noise_band: boolean } | null
 }
 
 export type SiteSeries = { site: Site; sessions: Session[] }
@@ -150,4 +159,8 @@ export type Product = {
   stores: { store: string; url: string; region: string }[]
   source_url: string
   last_verified: string
+  /** The brand's own packshot, linked where it is already published (never copied). */
+  image_url?: string | null
+  /** The page that image appears on, for the credit line. */
+  image_source?: string | null
 }

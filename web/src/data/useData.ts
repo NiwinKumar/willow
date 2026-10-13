@@ -8,12 +8,16 @@ export function useData(): DataState {
   return ctx
 }
 
+/** The DataProvider listens for this, so switching mode re-renders without a navigation. */
+export const DEMO_EVENT = 'willow-demo'
+
 export function enterDemo() {
   try {
     sessionStorage.setItem('willow.demo', '1')
   } catch {
     /* private mode */
   }
+  window.dispatchEvent(new Event(DEMO_EVENT))
 }
 export function leaveDemo() {
   try {
@@ -21,4 +25,5 @@ export function leaveDemo() {
   } catch {
     /* private mode */
   }
+  window.dispatchEvent(new Event(DEMO_EVENT))
 }

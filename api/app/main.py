@@ -1,9 +1,16 @@
 """Willow product API (Cloud Run service `willow-api`). Contract: docs/CONTRACT.md section 3."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 
-from app import __version__
+from app import __version__, storage
+from app.routes.demo_routes import router as demo_router
+from app.routes.me_routes import router as me_router
+from app.routes.products_routes import router as products_router
+from app.routes.retailer_routes import router as retailer_router
 from app.routes.sessions_routes import router as sessions_router
 from app.settings import get_settings
 
@@ -14,10 +21,53 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Dev-Uid"],
+    # Browsers re-ask the preflight once per URL; cache it (Chrome caps this at 2 hours).
+    max_age=7200,
 )
+# Session lists carry region polygons and the insights are ~15 KB: compress anything sizeable.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Public, identical for everyone: let browsers reuse them briefly.
+PUBLIC_CACHE = {
+    "/v1/retailer/insights": "public, max-age=300",
+    "/v1/demo/samples": "public, max-age=300",
+    "/v1/demo/journey": "public, max-age=120",
+    "/v1/demo/status": "public, max-age=30",
+}
+
+
+@app.middleware("http")
+async def public_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    rule = PUBLIC_CACHE.get(request.url.path)
+    if rule and request.method == "GET" and response.status_code == 200:
+        response.headers["Cache-Control"] = rule
+    return response
+
+
 app.include_router(sessions_router)
+app.include_router(me_router)
+app.include_router(products_router)
+app.include_router(retailer_router)
+app.include_router(demo_router)
+if storage.dev_uploads_enabled():
+    from app.routes.dev_routes import router as dev_router
+
+    app.include_router(dev_router)
+
+
+@app.exception_handler(RequestValidationError)
+def _readable_422(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """One plain sentence instead of pydantic's error list (the web shows it to people)."""
+    first = exc.errors()[0] if exc.errors() else {}
+    message = str(first.get("msg", "Invalid request")).removeprefix("Value error, ")
+    field = ".".join(str(p) for p in first.get("loc", ()) if p != "body")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": {"code": "bad_request", "message": message, "field": field or None}},
+    )
 
 
 # GET /healthz is answered by Google's frontend with a 404 on *.run.app (seen Oct 13 on both

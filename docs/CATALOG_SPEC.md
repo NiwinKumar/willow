@@ -46,7 +46,16 @@ Facts only: names, ingredients (INCI), concerns, prices, store links. No marketi
   "last_verified": "2026-10-14"
 }
 ```
-Rules: copy INCI from the official page or pack; record the price you saw with currency and date; store URLs must be real product pages; no product images (show a neutral category icon) to avoid copyright issues.
+Rules: copy INCI from the official page or pack; record the price you saw with currency and date; store URLs must be real product pages.
+
+Product images (changed Oct 13, see DECISIONS): `image_url` is the brand's own official product image, **linked from where the brand or a major retailer already publishes it, never downloaded, copied into the repo or re-hosted in our bucket**. `image_source` is the page it appears on, and the UI credits it ("Image: theordinary.com"). Packshots only: no lifestyle, model, before/after or claims images. If an image fails to load, the UI falls back to the neutral category icon. Brands or retailers can ask for removal, and an empty `image_url` is always valid.
 
 ## Collection workflow
 Google Sheet with the columns above -> export CSV -> `api/scripts/import_catalog.py` -> `api/seed/products.json` -> Firestore `products/` (seed script, idempotent). Keep the sheet as the source of truth until Friday.
+
+Commands (from `api/`): `uv run python scripts/import_catalog.py from-csv catalog.csv` (validates enums, regions, https links, duplicate ids, then writes `seed/products.json`), `to-csv catalog.csv` (to start or refresh the sheet), `seed` (mirrors `products.json` into Firestore `products/`). Sheet columns: list fields separated by ` | `, `key_actives` as `name:pct` (pct may be empty), and four store column triples `store_N_name`, `store_N_url`, `store_N_region`.
+
+The api serves search, match and product facts from the bundled `seed/products.json` (fast, no Firestore read per request); Firestore `products/` is the copy for the BigQuery export.
+
+## Status (Oct 13)
+48 SKUs in `api/seed/products.json` (18 global, 16 Indian, 14 Korean brands), every concern and category covered, with the clash-check actives the demo needs (retinoids, AHA/BHA, benzoyl peroxide, L-ascorbic acid, niacinamide, azelaic acid, alpha arbutin, sunscreens). `api/seed/catalog.csv` is the same data in sheet columns, to import into the Google Sheet. Every product has a verified packshot (`image_url`, 47 from the brand's own site, Clinique's from Ulta). `api/seed/VERIFY.md` lists, per product, what came from search results only and any formula or naming caveat; check those before Friday.
