@@ -48,7 +48,12 @@ export function sitesWithResults(series: Partial<Record<Site, SiteSeries>>): Sit
   return SITE_ORDER.filter((s) => series[s]?.sessions.some((x) => x.status === 'done'))
 }
 
-/** True when the fixture engine produced this result (it says so in its version and warnings). */
+/**
+ * True when the numbers are a sample, not a measurement: the api's fixture engine ("-fixture") or
+ * the engine's placeholder for sites it does not analyse yet ("-placeholder", warnings say so).
+ */
 export function isSampleEngine(s: Session | null | undefined): boolean {
-  return Boolean(s?.result?.engine_version.endsWith('-fixture'))
+  const r = s?.result
+  if (!r) return false
+  return /-(fixture|placeholder)$/.test(r.engine_version) || (r.warnings ?? []).some((w) => w.startsWith('placeholder:'))
 }
