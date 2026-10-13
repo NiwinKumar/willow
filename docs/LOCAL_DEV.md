@@ -23,7 +23,7 @@ Env: `BUCKET` (optional for local), `LOG_LEVEL`.
 ## api (Niwin)
 ```bash
 cd api && uv sync && uv run pytest
-ENGINE_MODE=fixture uv run uvicorn app.main:app --reload --port 8080
+AUTH_MODE=dev ENGINE_MODE=fixture uv run uvicorn app.main:app --reload --port 8080   # health: GET /v1/health
 ```
 Env vars:
 | Var | Example | Notes |
@@ -31,7 +31,7 @@ Env vars:
 | PROJECT_ID | willow-511508 | |
 | BUCKET | willow-511508-captures | |
 | ENGINE_MODE | fixture / http | fixture returns `fixtures/analysis_result.sample.json` |
-| ENGINE_URL | https://willow-engine-xxxx.run.app | private; api adds an ID token |
+| ENGINE_URL | https://willow-engine-hrlt7lqdwa-uc.a.run.app | private; api adds an ID token |
 | GEMINI_MODEL | gemini-3.8-flash | latest GA Flash (GA Sep 2, 2026) |
 | VERTEX_LOCATION | global | Gemini 3.x GA models are served only from the global endpoint; everything else stays in us-central1 |
 | BQ_DATASET | willow_insights | |

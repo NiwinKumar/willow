@@ -20,8 +20,10 @@ app.add_middleware(
 app.include_router(sessions_router)
 
 
-@app.get("/healthz")
-def healthz() -> dict[str, str]:
+# GET /healthz is answered by Google's frontend with a 404 on *.run.app (seen Oct 13 on both
+# services), so the health route lives under /v1. It is the only unauthenticated route.
+@app.get("/v1/health")
+def health() -> dict[str, str]:
     return {
         "status": "ok",
         "service": "willow-api",
