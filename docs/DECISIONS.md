@@ -2,7 +2,7 @@
 
 | Date | Decision | Supersedes |
 |---|---|---|
-| Oct 13 | Design direction "Field notebook, calibrated" (`docs/DESIGN.md`): warm low-chroma paper, Fraunces + Atkinson Hyperlegible, signal blue-teal as the only accent, rows not cards, photos on a neutral grey stage, no dark mode in MVP | UX_SPEC "visual direction" paragraph |
+| Oct 13 | Design direction **"Lens"** (`docs/DESIGN.md` v2): the aligned photo is the canvas, metrics are layers on it, one scrubber replaces the Timeline and Compare screens, hold-to-flicker replaces the slider, the landing is a live Lens on seeded data; web-native (URL state, installable, offline demo, command palette). Visual base kept from v1: warm low-chroma paper, ink, sage, one signal accent, neutral grey stage, Atkinson Hyperlegible (no serif in the app shell), no dark mode | "Field notebook" v1 structure (kept as the degraded fallback), UX_SPEC screens 6-7 as separate screens |
 | Oct 13 | Judges run "Try with sample photos" on hosted frames in `demo/` (server-side sample sessions), never a download-and-upload path | DEMO_PLAN "download a sample pack" |
 | Oct 13 | Gemini model `gemini-3.8-flash` (latest GA Flash) via the Vertex AI **global** endpoint; all other resources stay in `us-central1` | "Gemini in us-central1" (3.x GA models are global-only; 2.5 Flash retires Oct 20) |
 | Oct 13 | Web talks only to the api (Firebase SDK used for Auth only); Firestore client rules are deny-all, the api uses the Admin SDK | Browser reads of demo data via Firestore rules |
