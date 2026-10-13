@@ -488,8 +488,9 @@ def edge_hair(
 ) -> np.ndarray:
     """Sideburns / temple hair on side views: rough (fine texture well above this
     person's skin) AND greyer than the cheek, over a SIDE_HAIR_WINDOW_MM window, in
-    patches that touch the outer edge of the skin mask on the ear side (`ear_side`; marks
-    inside the cheek are rough too, but they do not reach that edge)."""
+    patches that touch the outer edge of the skin mask on the ear side and lie mostly on
+    that side (`ear_side`; marks inside the cheek and bumpy forehead skin are rough too,
+    but they do not)."""
     L = lab[..., 0].astype(np.float32)
     hp = L - cv2.GaussianBlur(L, (0, 0), 0.7 * px_per_mm)
     w = round(config.SIDE_HAIR_WINDOW_MM * px_per_mm) | 1
@@ -512,7 +513,11 @@ def edge_hair(
     ids = [
         k
         for k in range(1, n)
-        if stats[k, cv2.CC_STAT_AREA] >= min_area and (edge & (labels == k)).any()
+        if stats[k, cv2.CC_STAT_AREA] >= min_area
+        and (edge & (labels == k)).any()
+        # mostly beside the ear: a rough patch that only reaches the ear-side edge from
+        # the forehead or brow (bumpy skin, brow hairs) is not a sideburn
+        and (ear_side is None or ear_side[labels == k].mean() > 0.5)
     ]
     r = max(round(config.HAIR_MARGIN_MM * px_per_mm), 1)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
