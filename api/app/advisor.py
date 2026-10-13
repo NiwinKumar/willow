@@ -33,6 +33,9 @@ measurements, check their routine and find products from Willow's facts-only cat
   in tool results; never estimate, compute or invent numbers, scores, skin tone or age.
 - Only recommend products returned by search_catalog or compare_products, by product_id. The
   catalog has facts (ingredients, price, stores), not efficacy; never claim a product works.
+  measured_outcomes in tool results are cohort outcome rates; write a rate as a whole percent
+  (0.61 -> 61%), quote it only with its n and, when
+  synthetic_cohort is true, say they come from a synthetic demo cohort.
 - verdict real_change = changed beyond photo noise; within_noise = no clear change yet;
   no_baseline = first reading or no noise band yet; a metric marked indicative is a trend.
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
@@ -143,6 +146,23 @@ def context(store: Store, uid: str) -> dict[str, Any]:
     }
 
 
+def _outcomes(ids: list[str]) -> dict[str, Any]:
+    """Cohort outcomes for these products (retailer aggregates; groups under 10 never appear)."""
+    try:
+        from app import retailer
+
+        data = retailer.insights()
+    except Exception:
+        return {"note": "outcome data unavailable right now"}
+    found = {i: data["product_outcomes"][i] for i in ids if i in data.get("product_outcomes", {})}
+    return {
+        "synthetic_cohort": data["cohort"]["real"] == 0,
+        "definition": "rate = share of people with this goal still improved beyond their own "
+        "photo noise at week 8; n = people; weeks = median weeks to first real change",
+        "by_product": found,
+    }
+
+
 def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[str, Any]:
     if name == "search_catalog":
         found = catalog.search(
@@ -154,12 +174,15 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
             exclude_ingredients=args.get("exclude_ingredients"),
             limit=6,
         )
-        return {"products": [_compact(p) for p in found]}
+        return {
+            "products": [_compact(p) for p in found],
+            "measured_outcomes": _outcomes([p["product_id"] for p in found]),
+        }
     if name == "compare_products":
         found = [catalog.by_id(i) for i in (args.get("product_ids") or [])[:4]]
         return {
             "products": [_compact(p) for p in found if p],
-            "measured_outcomes": "none yet: Willow has no measured outcomes for these products",
+            "measured_outcomes": _outcomes([p["product_id"] for p in found if p]),
         }
     if name == "check_routine":
         entries = [{"id": eid, **e} for eid, e in store.routine_list(uid)]
@@ -238,7 +261,9 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
     )
     # Products it may show: anything a tool returned, plus the person's own routine products.
     product_ids |= {r["product_id"] for r in ctx["routine"] if r.get("product_id")}
-    allowed = numbers.collect(ctx) | numbers.collect(tool_outputs)
+    # Outcome rates may be written as percents; measurements may not be rescaled.
+    rates = [t["result"].get("measured_outcomes") for t in tool_outputs]
+    allowed = numbers.collect(ctx) | numbers.collect(tool_outputs) | numbers.percents(rates)
     for m in messages:
         if m["role"] == "user":
             allowed |= numbers.in_text(m["text"])
@@ -266,6 +291,13 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
                 "products": [catalog.by_id(i) for i in reply.product_ids if catalog.by_id(i)],
                 "follow_up_suggestions": reply.follow_up_suggestions,
                 "retrieval": retrieval or ["Checked your results and routine"],
+                # What the validator checked, shown under the answer.
+                "checks": {
+                    "model": get_settings().gemini_model,
+                    "tool_calls": len(tool_outputs),
+                    "numbers_checked": len(set(numbers.NUMBER.findall(reply.message))),
+                    "products_from_tools": len(reply.product_ids),
+                },
             }
         log.warning("advisor reply rejected (ids %s)", sorted(bad_ids))
     return {

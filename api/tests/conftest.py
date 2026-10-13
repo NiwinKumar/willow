@@ -41,6 +41,17 @@ def no_real_gemini(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(gemini, "generate_json", offline)
 
 
+@pytest.fixture(autouse=True)
+def no_real_bigquery(monkeypatch: pytest.MonkeyPatch):
+    """Tests never query BigQuery; a test that needs insights replaces retailer.insights."""
+    from app import retailer
+
+    def offline():
+        raise RuntimeError("offline in tests")
+
+    monkeypatch.setattr(retailer, "fetch", offline)
+
+
 @pytest.fixture
 def fake(monkeypatch: pytest.MonkeyPatch):
     cloud = FakeCloud()

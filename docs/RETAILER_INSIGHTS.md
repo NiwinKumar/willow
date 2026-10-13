@@ -23,6 +23,9 @@ Loaded by batch jobs (`api/scripts/export_bq.py`), not streaming (works in sandb
 - Per-metric weekly change = product effect (only for metrics mapped to the product's concerns; effect size drawn per product from a small positive range, some products ~0) + noise drawn from **our measured MDC/SD**; record verdict by comparing |delta| to MDC.
 - Document the generator's assumptions on the dashboard's "About this data" panel.
 
+## Ask this data (Oct 13)
+The retailer view has an "Ask this data" box: Gemini answers from the aggregates (never rows), with an optional bar chart; numbers and chart labels are validated against the aggregates (GEMINI_SPEC section 6). `product_outcomes` (every product with n >= 10) also feeds the shopper-facing product cards and the advisor, labelled synthetic while the cohort is synthetic: outcomes, not purchases, flow back to shoppers.
+
 ## Looker Studio
 One report, 5 pages matching the questions above; connect to BigQuery views; embed in the web `/retailer` page and link it in the deck. In-app charts come from `GET /v1/retailer/insights` for speed.
 

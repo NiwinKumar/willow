@@ -61,6 +61,7 @@ def test_reply_with_tool_products_is_returned(client, fake, monkeypatch):
     body = res.json()
     assert body["product_ids"] == ["p1"] and body["products"][0]["name"] == "Sunscreen SPF 50"
     assert body["retrieval"][0].startswith("Searched the catalog")
+    assert body["checks"]["tool_calls"] == 1 and body["checks"]["products_from_tools"] == 1
     assert body["remaining_today"] == 19
 
 
@@ -147,3 +148,21 @@ def test_routine_products_may_be_discussed(client, fake, monkeypatch):
         "/v1/advisor/chat", json={"messages": [{"role": "user", "text": "Is this OK?"}]}
     ).json()
     assert body["product_ids"] == ["p1"]
+
+
+def test_product_tools_carry_cohort_outcomes_labelled_synthetic(monkeypatch):
+    from app import retailer
+    from app.store import MemoryStore
+
+    pid = "minimalist-retinol-0-3-face-serum"
+    monkeypatch.setattr(
+        retailer,
+        "insights",
+        lambda: {
+            "cohort": {"real": 0},
+            "product_outcomes": {pid: {"n": 40, "rate": 0.55, "weeks": 6}},
+        },
+    )
+    out = advisor.run_tool("compare_products", {"product_ids": [pid]}, MemoryStore(), "u")
+    assert out["measured_outcomes"]["synthetic_cohort"] is True
+    assert out["measured_outcomes"]["by_product"] == {pid: {"n": 40, "rate": 0.55, "weeks": 6}}
