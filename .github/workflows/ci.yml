@@ -22,7 +22,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with: { version: "0.12.15" }
       - run: uv sync
-      - run: uv run pytest -q
+      # The engine package is imported as `app` from engine/; its pyproject does not set pythonpath (Harshini's folder).
+      - run: PYTHONPATH=. uv run pytest -q
   web:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
