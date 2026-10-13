@@ -1,3 +1,4 @@
+import { deleteUser } from 'firebase/auth'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -5,18 +6,43 @@ import { toast } from 'sonner'
 import { Button } from '../components/Button'
 import { Sheet } from '../components/Sheet'
 import { useData } from '../data/useData'
+import { api } from '../lib/api'
 import { fmtDate } from '../lib/format'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 
 export function Settings() {
-  const { user, signOutUser } = useAuth()
+  const { user, signOutUser, getIdToken } = useAuth()
   const data = useData()
   const navigate = useNavigate()
   const consent = prefs.consent()
   const [confirm, setConfirm] = useState(false)
   const [optIn, setOptIn] = useState(consent?.aggregate_opt_in ?? false)
   const [deleteDate] = useState(() => new Date(Date.now() + 30 * 86_400_000).toISOString())
+  const [deleting, setDeleting] = useState(false)
+
+  async function deleteEverything() {
+    setDeleting(true)
+    try {
+      if (data.mode === 'live' && user) {
+        await api.deleteMe(await getIdToken())
+        try {
+          await deleteUser(user)
+        } catch {
+          // Google accounts may need a recent sign-in to be removed; the data is gone either way.
+          await signOutUser()
+        }
+      }
+      prefs.clearAll()
+      setConfirm(false)
+      toast('Deleted: photos, results and your account.')
+      navigate('/')
+    } catch {
+      toast.error('Could not delete right now. Nothing was removed; try again.')
+    } finally {
+      setDeleting(false)
+    }
+  }
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-20 pt-4 sm:px-8">
       <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Settings</h1>
@@ -68,10 +94,10 @@ export function Settings() {
       <Sheet open={confirm} onOpenChange={setConfirm} title="Delete everything?">
         <p className="text-[15px] text-text-2">This removes photos, results and your account. There is no undo.</p>
         <div className="mt-4 flex gap-2">
-          <Button className="!bg-danger" onClick={() => { prefs.clearAll(); setConfirm(false); toast('Deleted: photos, results and this device’s settings.'); navigate('/') }}>Delete</Button>
+          <Button className="!bg-danger" disabled={deleting} onClick={() => void deleteEverything()}>{deleting ? 'Deleting…' : 'Delete'}</Button>
           <Button variant="secondary" onClick={() => setConfirm(false)}>Keep my data</Button>
         </div>
-        {data.mode === 'live' ? <p className="mt-3 text-[12px] text-text-3">Account deletion on the server connects with the api in M5; on this device everything is cleared now.</p> : null}
+        {data.mode === 'demo' ? <p className="mt-3 text-[12px] text-text-3">Demo: nothing is stored on the server, so this clears this device only.</p> : null}
       </Sheet>
     </div>
   )

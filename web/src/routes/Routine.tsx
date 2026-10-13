@@ -1,5 +1,5 @@
 import { AlertTriangle, Camera, Check, CircleAlert, Copy, Info, Octagon, Plus, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -8,11 +8,40 @@ import { Chip } from '../components/Chip'
 import { Sheet } from '../components/Sheet'
 import type { Product, RoutineCheck, RoutineEntry } from '../data/types'
 import { useData } from '../data/useData'
+import { api, type NewRoutineEntry } from '../lib/api'
+import { fmtPrice } from '../lib/format'
+import { toJpegBase64 } from '../lib/image'
 import { outcomeFor } from '../lib/outcome'
+import { useAuth } from '../lib/useAuth'
 import { CATALOG, CONCERN_LABEL } from '../mock/catalog'
 import { DEMO_CHECK, DEMO_ROUTINE } from '../mock/routine'
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
+/** What the confirm step edits: a catalog product, or what the label scan read. */
+type Draft = {
+  product_id: string | null
+  brand: string
+  name: string
+  category: string
+  key_actives: { name: string; pct: number | null }[]
+  inci: string[]
+  concerns: string[]
+  source: 'catalog' | 'label_scan'
+  matched: boolean
+}
+
+const fromProduct = (p: Product, source: Draft['source'] = 'catalog'): Draft => ({
+  product_id: p.product_id,
+  brand: p.brand,
+  name: p.name,
+  category: p.category,
+  key_actives: p.key_actives,
+  inci: p.inci,
+  concerns: p.concerns,
+  source,
+  matched: true,
+})
+
 const SEVERITY = {
   avoid_same_routine: { label: 'Keep these apart', Icon: Octagon, cls: 'text-warn-text' },
   caution: { label: 'Use with care', Icon: AlertTriangle, cls: 'text-warn-text' },
@@ -21,23 +50,121 @@ const SEVERITY = {
 
 export function Routine() {
   const data = useData()
+  const live = data.mode === 'live'
+  const { user, getIdToken, continueAsGuest } = useAuth()
   const navigate = useNavigate()
-  const [entries, setEntries] = useState<RoutineEntry[]>(data.mode === 'demo' ? DEMO_ROUTINE : [])
-  const [check] = useState<RoutineCheck | null>(data.mode === 'demo' ? DEMO_CHECK : null)
+  const [entries, setEntries] = useState<RoutineEntry[]>(live ? [] : DEMO_ROUTINE)
+  const [check] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
   const [add, setAdd] = useState<'closed' | 'pick' | 'scan' | 'search' | 'confirm'>('closed')
   const [query, setQuery] = useState('')
-  const [draft, setDraft] = useState<Product | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const [reading, setReading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [liveResults, setLiveResults] = useState<Product[]>([])
+  const searchSeq = useRef(0)
+
+  // Live: the saved routine.
+  useEffect(() => {
+    if (!live || !user) return
+    let alive = true
+    void (async () => {
+      try {
+        const res = await api.routine(await getIdToken())
+        if (alive) setEntries(res.entries)
+      } catch {
+        if (alive) toast.error('Could not load your routine. Pull to refresh or try again.')
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [live, user, getIdToken])
+
+  // Live: catalog search, latest query wins.
+  useEffect(() => {
+    if (!live || !user || add !== 'search') return
+    const seq = ++searchSeq.current
+    const t = window.setTimeout(async () => {
+      try {
+        const res = await api.catalogSearch(await getIdToken(), { q: query.trim() || undefined, limit: 30 })
+        if (seq === searchSeq.current) setLiveResults(res.products)
+      } catch {
+        if (seq === searchSeq.current) setLiveResults([])
+      }
+    }, 200)
+    return () => clearTimeout(t)
+  }, [live, user, add, query, getIdToken])
   const [slots, setSlots] = useState<('am' | 'pm')[]>(['pm'])
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 10))
   const [dismissed, setDismissed] = useState<string[]>([])
   const sessions = data.series('face_full')?.sessions ?? []
   const byId = (id: string) => entries.find((e) => e.id === id)
-  const name = (e: RoutineEntry) => e.product_id ? (CATALOG.find((p) => p.product_id === e.product_id)?.name ?? e.custom_name) : e.custom_name
+  const name = (e: RoutineEntry) => (e.product_id ? (CATALOG.find((p) => p.product_id === e.product_id)?.name ?? e.custom_name) : e.custom_name)
 
   const openConflicts = (check?.conflicts ?? []).filter((c) => !dismissed.includes(c.products.join('+')))
   const worst = openConflicts.some((c) => c.severity === 'avoid_same_routine') ? 'avoid' : openConflicts.some((c) => c.severity === 'caution') ? 'caution' : (check?.gaps.length ?? 0) > 0 ? 'gap' : 'ok'
   const status = entries.length === 0 ? 'Add products to check compatibility' : worst === 'ok' ? 'Looks compatible' : `${openConflicts.length + (check?.gaps.length ?? 0)} ${openConflicts.length + (check?.gaps.length ?? 0) === 1 ? 'thing' : 'things'} to look at`
-  const results = useMemo(() => (query.trim().length < 2 ? CATALOG : CATALOG.filter((p) => `${p.brand} ${p.name}`.toLowerCase().includes(query.toLowerCase()))), [query])
+  const demoResults = useMemo(() => (query.trim().length < 2 ? CATALOG : CATALOG.filter((p) => `${p.brand} ${p.name}`.toLowerCase().includes(query.toLowerCase()))), [query])
+  const results = live ? liveResults : demoResults
+
+  async function readLabel(file: File) {
+    if (!live) {
+      setDraft(fromProduct(CATALOG[7], 'label_scan'))
+      setAdd('confirm')
+      toast('Demo: label reading is simulated with a catalog product.')
+      return
+    }
+    setReading(true)
+    try {
+      const token = await getIdToken()
+      const res = await api.labelScan(token, [await toJpegBase64(file)])
+      if (res.match) {
+        const product = await api.catalogProduct(token, res.match.product_id)
+        setDraft(fromProduct(product, 'label_scan'))
+      } else {
+        setDraft({
+          product_id: null,
+          brand: res.scan.brand ?? '',
+          name: res.scan.product_name ?? '',
+          category: res.scan.category,
+          key_actives: res.scan.key_actives,
+          inci: res.scan.inci,
+          concerns: [],
+          source: 'label_scan',
+          matched: false,
+        })
+      }
+      setAdd('confirm')
+      if (res.scan.confidence === 'low') toast('Parts of the label were hard to read. Check the details.')
+    } catch {
+      toast.error('Could not read the label. Try a sharper photo with the ingredient list filling the frame.')
+    } finally {
+      setReading(false)
+    }
+  }
+
+  async function save(d: Draft) {
+    const entry: NewRoutineEntry = d.product_id
+      ? { product_id: d.product_id, slots, started_at: startedAt, source: d.source }
+      : { custom_name: d.name.trim(), brand: d.brand.trim(), category: d.category, key_actives: d.key_actives, inci: d.inci, slots, started_at: startedAt, source: d.source }
+    if (!live) {
+      setEntries((e) => [...e, { id: `r${Date.now()}`, product_id: d.product_id, custom_name: d.product_id ? '' : d.name, brand: d.brand, category: d.category, key_actives: d.key_actives, inci: d.inci, started_at: startedAt, ended_at: null, slots, concerns: d.concerns, source: d.source }])
+      setAdd('closed')
+      toast('Added to your routine.')
+      return
+    }
+    setSaving(true)
+    try {
+      const saved = await api.addRoutine(await getIdToken(), entry)
+      setEntries((e) => [...e, saved])
+      setAdd('closed')
+      toast('Added to your routine.')
+    } catch {
+      toast.error('Could not add it. Nothing was saved; try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const section = (slot: 'am' | 'pm') => {
     const items = entries.filter((e) => e.slots.includes(slot) && !e.ended_at).sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category))
@@ -82,7 +209,12 @@ export function Routine() {
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Your routine</h1>
           <p className={`mt-1 text-[15px] ${worst === 'ok' || entries.length === 0 ? 'text-text-2' : 'text-warn-text'}`}>{status}</p>
         </div>
-        <Button onClick={() => setAdd('pick')}>
+        <Button
+          onClick={async () => {
+            if (live && !user) await continueAsGuest()
+            setAdd('pick')
+          }}
+        >
           <Plus size={18} aria-hidden /> Add product
         </Button>
       </div>
@@ -92,7 +224,13 @@ export function Routine() {
 
       <section className="mt-8" aria-labelledby="compat">
         <h2 id="compat" className="text-[17px] font-semibold">Compatibility</h2>
-        {check ? <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.notes.length ? ` · ${check.notes[0]}` : ''}</p> : <p className="mt-1 text-[13px] text-text-2">Add two products and Willow checks them.</p>}
+        {check ? (
+          <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.notes.length ? ` · ${check.notes[0]}` : ''}</p>
+        ) : entries.length >= 2 ? (
+          <p className="mt-1 text-[13px] text-text-2">The compatibility check is not connected yet. Your products are saved and will be checked as soon as it is.</p>
+        ) : (
+          <p className="mt-1 text-[13px] text-text-2">Add two products and Willow checks them.</p>
+        )}
         <ul className="mt-3 space-y-3">
           {openConflicts.map((c) => {
             const s = SEVERITY[c.severity]
@@ -148,10 +286,21 @@ export function Routine() {
         {add === 'scan' ? (
           <div>
             <p className="text-[15px] text-text-2">Fit the whole ingredient list inside the frame. Label photos are used only to read the ingredients and are not kept.</p>
-            <label className="mt-4 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-(--radius-tile) border border-dashed border-border bg-surface-2 text-[15px] text-text-2">
+            <label aria-busy={reading} className="mt-4 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-(--radius-tile) border border-dashed border-border bg-surface-2 text-[15px] text-text-2">
               <Camera size={24} aria-hidden className="mb-2" />
-              Take or choose a photo
-              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={() => { setDraft(CATALOG[7]); setAdd('confirm'); toast(data.mode === 'demo' ? 'Demo: label reading is simulated until Gemini is connected.' : 'Reading the label…') }} />
+              {reading ? 'Reading the label…' : 'Take or choose a photo'}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                disabled={reading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) void readLabel(file)
+                }}
+              />
             </label>
           </div>
         ) : null}
@@ -161,12 +310,13 @@ export function Routine() {
             <ul className="mt-3 max-h-[50dvh] divide-y divide-border overflow-y-auto">
               {results.map((p) => (
                 <li key={p.product_id}>
-                  <button type="button" onClick={() => { setDraft(p); setAdd('confirm') }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
+                  <button type="button" onClick={() => { setDraft(fromProduct(p)); setAdd('confirm') }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
                     <span><span className="block text-[15px] font-medium">{p.brand} {p.name}</span><span className="block text-[12px] text-text-2">For {p.concerns.map((c) => CONCERN_LABEL[c]).join(', ')}</span></span>
-                    <span className="font-mono text-[13px] text-text-2">₹{p.price.amount}</span>
+                    <span className="font-mono text-[13px] text-text-2">{fmtPrice(p.price)}</span>
                   </button>
                 </li>
               ))}
+              {live && results.length === 0 ? <li className="py-3 text-[13px] text-text-3">{query.trim() ? 'Nothing in the catalog matches. Scan the label instead.' : 'Loading the catalog…'}</li> : null}
             </ul>
           </div>
         ) : null}
@@ -174,14 +324,18 @@ export function Routine() {
           <div>
             <p className="text-[13px] text-text-2">Check the name and actives. You can edit anything that was misread.</p>
             <div className="mt-3 space-y-2">
-              <input defaultValue={draft.brand} aria-label="Brand" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" />
-              <input defaultValue={draft.name} aria-label="Product name" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" />
+              <input value={draft.brand} readOnly={draft.matched} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} aria-label="Brand" placeholder="Brand" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px] read-only:bg-surface-2" />
+              <input value={draft.name} readOnly={draft.matched} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Product name" placeholder="Product name" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px] read-only:bg-surface-2" />
               <div className="flex flex-wrap gap-1">
                 <Chip tone="neutral">{draft.category}</Chip>
                 {draft.key_actives.map((a) => <Chip key={a.name} tone="willow">{a.name}{a.pct !== null ? ` ${a.pct}%` : ''}</Chip>)}
               </div>
               <details className="text-[13px] text-text-2"><summary className="cursor-pointer py-1">Ingredients ({draft.inci.length})</summary><p className="pt-1">{draft.inci.join(', ')}</p></details>
-              <p className="text-[13px] text-text-2"><Check size={14} aria-hidden className="mr-1 inline" /> Found in catalog: {draft.brand} {draft.name}</p>
+              {draft.matched ? (
+                <p className="text-[13px] text-text-2"><Check size={14} aria-hidden className="mr-1 inline" /> Found in the catalog, so ingredients and store links come from there.</p>
+              ) : (
+                <p className="text-[13px] text-text-2">Not in the catalog yet. It is saved with the ingredients read from the label.</p>
+              )}
             </div>
             <h3 className="mt-4 text-[15px] font-semibold">When do you use it?</h3>
             <div className="mt-2 flex gap-2" role="group" aria-label="Time of day">
@@ -191,11 +345,9 @@ export function Routine() {
             </div>
             <label className="mt-3 block text-[13px] font-medium">Started on<input type="date" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} className="mt-1 block w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" /></label>
             <p className="mt-1 text-[12px] text-text-3">The start date is what links this product to your measured outcome.</p>
-            <Button className="mt-4" disabled={slots.length === 0} onClick={() => {
-              setEntries((e) => [...e, { id: `r${Date.now()}`, product_id: draft.product_id, custom_name: '', brand: draft.brand, category: draft.category, key_actives: draft.key_actives, inci: draft.inci, started_at: startedAt, ended_at: null, slots, concerns: draft.concerns, source: 'catalog' }])
-              setAdd('closed')
-              toast('Added to your routine. Compatibility rechecked.')
-            }}>Add to routine</Button>
+            <Button className="mt-4" disabled={slots.length === 0 || saving || !draft.name.trim()} onClick={() => void save(draft)}>
+              {saving ? 'Adding…' : 'Add to routine'}
+            </Button>
           </div>
         ) : null}
       </Sheet>

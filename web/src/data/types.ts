@@ -110,6 +110,9 @@ export type Session = {
   deviation?: boolean
   /** Hours since the baseline session; used for the scrubber labels on short series. */
   hours_since_baseline?: number
+  /** Live sessions only: where the explanation came from, and why a failed session failed. */
+  explanation_source?: 'template' | 'gemini' | null
+  error?: { code: string; message: string } | null
 }
 
 export type SiteSeries = { site: Site; sessions: Session[] }
