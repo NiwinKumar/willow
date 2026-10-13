@@ -32,3 +32,13 @@ export function fmtPrice(price: { amount: number; currency: string }): string {
     return `${price.amount} ${price.currency}`
   }
 }
+
+/** "theordinary.com" for the credit line under a product image. */
+export function imageCredit(p: { image_url?: string | null; image_source?: string | null }): string | null {
+  if (!p.image_url || !p.image_source) return null
+  try {
+    return new URL(p.image_source).hostname.replace(/^www\./, '')
+  } catch {
+    return null
+  }
+}

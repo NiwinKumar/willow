@@ -5,15 +5,16 @@ import { toast } from 'sonner'
 
 import { Button } from '../components/Button'
 import { Chip } from '../components/Chip'
+import { ProductImage } from '../components/ProductImage'
 import { Sheet } from '../components/Sheet'
 import type { Product, RoutineCheck, RoutineEntry } from '../data/types'
 import { useData } from '../data/useData'
 import { api, type NewRoutineEntry } from '../lib/api'
-import { fmtPrice } from '../lib/format'
+import { fmtPrice, imageCredit } from '../lib/format'
 import { toJpegBase64 } from '../lib/image'
 import { outcomeFor } from '../lib/outcome'
 import { useAuth } from '../lib/useAuth'
-import { CATALOG, CONCERN_LABEL } from '../mock/catalog'
+import { CATALOG, CONCERN_LABEL, productById } from '../mock/catalog'
 import { DEMO_CHECK, DEMO_ROUTINE } from '../mock/routine'
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
@@ -28,6 +29,8 @@ type Draft = {
   concerns: string[]
   source: 'catalog' | 'label_scan'
   matched: boolean
+  image_url: string | null
+  image_source: string | null
 }
 
 const fromProduct = (p: Product, source: Draft['source'] = 'catalog'): Draft => ({
@@ -40,6 +43,8 @@ const fromProduct = (p: Product, source: Draft['source'] = 'catalog'): Draft => 
   concerns: p.concerns,
   source,
   matched: true,
+  image_url: p.image_url ?? null,
+  image_source: p.image_source ?? null,
 })
 
 const SEVERITY = {
@@ -109,7 +114,7 @@ export function Routine() {
 
   async function readLabel(file: File) {
     if (!live) {
-      setDraft(fromProduct(CATALOG[7], 'label_scan'))
+      setDraft(fromProduct(productById('la-roche-posay-cicaplast-baume-b5-plus') ?? CATALOG[0], 'label_scan'))
       setAdd('confirm')
       toast('Demo: label reading is simulated with a catalog product.')
       return
@@ -132,6 +137,8 @@ export function Routine() {
           concerns: [],
           source: 'label_scan',
           matched: false,
+          image_url: null,
+          image_source: null,
         })
       }
       setAdd('confirm')
@@ -178,12 +185,12 @@ export function Routine() {
             const flagged = openConflicts.some((c) => c.products.includes(e.id))
             return (
               <li key={`${slot}-${e.id}`} className="flex items-start gap-3 py-3">
-                <span aria-hidden className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-(--radius-control) bg-surface-2 text-[11px] font-medium text-text-2">{e.category.slice(0, 3)}</span>
+                <ProductImage product={{ image_url: e.product_id ? productById(e.product_id)?.image_url : null, category: e.category }} size={48} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-medium">{e.brand} {name(e)}</span>
                     {flagged ? <span aria-label="part of a compatibility note" className="h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
-                    {e.slots.length === 2 ? <Chip tone="neutral">AM + PM</Chip> : null}
+                    {e.slots.length === 2 ? <Chip tone="neutral" className="shrink-0 whitespace-nowrap">AM + PM</Chip> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {e.key_actives.slice(0, 3).map((a) => (
@@ -311,7 +318,8 @@ export function Routine() {
               {results.map((p) => (
                 <li key={p.product_id}>
                   <button type="button" onClick={() => { setDraft(fromProduct(p)); setAdd('confirm') }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
-                    <span><span className="block text-[15px] font-medium">{p.brand} {p.name}</span><span className="block text-[12px] text-text-2">For {p.concerns.map((c) => CONCERN_LABEL[c]).join(', ')}</span></span>
+                    <ProductImage product={p} size={44} />
+                    <span className="min-w-0 flex-1"><span className="block text-[15px] font-medium">{p.brand} {p.name}</span><span className="block text-[12px] text-text-2">For {p.concerns.map((c) => CONCERN_LABEL[c]).join(', ')}</span></span>
                     <span className="font-mono text-[13px] text-text-2">{fmtPrice(p.price)}</span>
                   </button>
                 </li>
@@ -323,6 +331,12 @@ export function Routine() {
         {add === 'confirm' && draft ? (
           <div>
             <p className="text-[13px] text-text-2">Check the name and actives. You can edit anything that was misread.</p>
+            {draft.image_url ? (
+              <figure className="mt-3 flex items-end gap-3">
+                <ProductImage product={draft} size={96} />
+                {imageCredit(draft) ? <figcaption className="text-[11px] text-text-3">Image: {imageCredit(draft)}</figcaption> : null}
+              </figure>
+            ) : null}
             <div className="mt-3 space-y-2">
               <input value={draft.brand} readOnly={draft.matched} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} aria-label="Brand" placeholder="Brand" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px] read-only:bg-surface-2" />
               <input value={draft.name} readOnly={draft.matched} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Product name" placeholder="Product name" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px] read-only:bg-surface-2" />
