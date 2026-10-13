@@ -19,9 +19,9 @@ SKIN_MIN_WARMTH = 0.12  # (R - B) / R: skin is warm at every tone, paper is ~0
 DOT_AREA_PX = (3, 400)  # dot size range in the small copy
 MAX_CANDIDATES = 40
 SQUARE_SIDE_FRAC = (0.03, 0.20)  # dot spacing as a fraction of photo width (~2-6 cm squares)
-PAIR_GAP_SIDES = 4.0
+PAIR_GAP_SIDES = 4.0  # two squares must be within 4 side-lengths of each other
 PAPER_BAND_BOXES = 1.5  # paper within 1.5 box-heights above/below the skin box
-PAPER_MIN_PX = 2000  # in the small copy; fewer -> use the whole sheet  # two squares must be within 4 side-lengths of each other
+PAPER_MIN_PX = 2000  # in the small copy; fewer -> use the whole sheet
 ROI_FRACTION = 0.30  # half-size of the measured square as a fraction of the dot spacing
 
 
@@ -126,20 +126,12 @@ def find_dot_square(srgb8: np.ndarray, max_score: float = 0.25) -> tuple[Box, np
     return find_dot_squares(srgb8, 1, max_score)[0]
 
 
-def paper_pixels(
-    linear: np.ndarray,
-    srgb8: np.ndarray,
-    near: Box | None = None,
-    require_near: bool = False,
-    max_gap: float | None = None,
-) -> np.ndarray:
-    """Linear RGB of the white paper: a bright, colourless region, edges trimmed.
+def paper_pixels(linear: np.ndarray, srgb8: np.ndarray, near: Box | None = None) -> np.ndarray:
+    """Linear RGB of the white paper (forearm captures): a bright, colourless region.
 
     With `near`, the region with the most paper level with that box is used, and only its
-    part at that height (lamp light falls off across the table, so paper beside the skin
-    sees the same light). `require_near` (faces): if there is no paper level with the box,
-    and within `max_gap` px of it sideways, raise instead of falling back to the biggest
-    white thing in the photo, which may be a wall or a shirt.
+    part at that height: lamp light falls off across the table, so paper beside the skin
+    sees the same light. Falls back to the whole sheet if too little is level with it.
     """
     small = srgb8[::SCALE, ::SCALE].astype(np.int16)
     bright = small.min(axis=-1) > 150
@@ -150,27 +142,14 @@ def paper_pixels(
     regions = measure.regionprops(labels)
     if near is None:
         best = max(regions, key=lambda r: r.area)
-        mask = morphology.erosion(labels == best.label, morphology.disk(6))
-        ys, xs = np.nonzero(mask)
-        return linear[::SCALE, ::SCALE][ys, xs]
-
-    cy = (near.y + near.h / 2) / SCALE
-    half = PAPER_BAND_BOXES * near.h / SCALE
-    x0, x1 = near.x / SCALE, (near.x + near.w) / SCALE
-    gap = (max_gap if max_gap is not None else np.inf) / SCALE
-
-    def in_band(region) -> np.ndarray:
-        ys, xs = region.coords[:, 0], region.coords[:, 1]
-        sideways = np.maximum(x0 - xs, xs - x1)  # <= 0 inside the box's columns
-        return (np.abs(ys - cy) <= half) & (sideways <= gap)
-
-    best = max(regions, key=lambda r: in_band(r).sum())
+    else:
+        cy = (near.y + near.h / 2) / SCALE
+        half = PAPER_BAND_BOXES * near.h / SCALE
+        best = max(regions, key=lambda r: (np.abs(r.coords[:, 0] - cy) <= half).sum())
     mask = morphology.erosion(labels == best.label, morphology.disk(6))
     ys, xs = np.nonzero(mask)
-    sideways = np.maximum(x0 - xs, xs - x1)
-    band = (np.abs(ys - cy) <= half) & (sideways <= gap)
-    if band.sum() >= PAPER_MIN_PX:
-        ys, xs = ys[band], xs[band]
-    elif require_near:
-        raise ValueError("no white paper beside the face")
+    if near is not None:
+        band = np.abs(ys - cy) <= half
+        if band.sum() >= PAPER_MIN_PX:
+            ys, xs = ys[band], xs[band]
     return linear[::SCALE, ::SCALE][ys, xs]
