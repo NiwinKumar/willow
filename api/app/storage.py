@@ -95,3 +95,18 @@ def delete_prefix(prefix: str) -> int:
     for blob in blobs:
         blob.delete()
     return len(blobs)
+
+
+def copy_object(source_name: str, dest_name: str) -> None:
+    """Server-side copy inside the captures bucket (sample photos into a person's session)."""
+    bucket = gcp.storage_client().bucket(get_settings().bucket)
+    bucket.copy_blob(bucket.blob(source_name), bucket, dest_name)
+
+
+def read_text(object_name: str) -> str | None:
+    blob = gcp.storage_client().bucket(get_settings().bucket).get_blob(object_name)
+    return blob.download_as_text() if blob is not None else None
+
+
+def read_bytes(object_name: str) -> bytes:
+    return gcp.storage_client().bucket(get_settings().bucket).blob(object_name).download_as_bytes()

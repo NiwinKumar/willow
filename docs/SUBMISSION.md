@@ -4,7 +4,8 @@
 - [ ] Live link works on a fresh phone and laptop (judge mode, no login needed for the demo journey)
 - [ ] Public GitHub repo (history checked: no images, no secrets), README with architecture + setup + attribution
 - [ ] Deck (PDF) on the prescribed template
-- [ ] Demo video on YouTube/Vimeo/Drive (public/unlisted link); length rule to confirm with organizers
+- [ ] Demo video on YouTube/Vimeo/Drive (public/unlisted link). Length: organizer emails (Oct 12) say 3 to 4 minutes, the public FAQ says under 3; confirm in the dashboard's submission section
+- [ ] Live link to submit: https://willow-511508.web.app/judge (guided tour, guest account, no sign-in)
 - [ ] Brief description (below) pasted into the form
 - [ ] Category: Retail & Commerce: Intelligent Customer and Business Experiences
 - [ ] Services stay up until judging ends (Nov 6); budget alerts on
@@ -17,7 +18,7 @@
 ## Deck outline (10-12 slides)
 1. Title + one line  2. Problem (stats)  3. Insight: outcomes, not purchases  4. Product walkthrough (screens)  5. How measurement works (card, RAW, MDC)  6. Proof: DHA split arm + repeatability (Harshini)  7. Gemini: five jobs, never measures  8. Retailer value (dashboard)  9. Architecture (Firebase, Firestore, Cloud Run x2, Vertex AI Gemini, BigQuery, Looker)  10. Inclusivity + privacy + fairness numbers  11. Business model + roadmap  12. Team + links
 
-## Video script (<= 2:50 until confirmed)
+## Video script (about 3:00 until the length rule is confirmed)
 0:00 hook "Did your serum actually work?" | 0:15 capture (RAW, card, cone) | 0:40 proof (split arm, noise band, numbers) | 1:25 Gemini (explanation, label scan, routine clash, advisor with store links) | 1:55 retailer dashboard | 2:20 architecture | 2:40 close.
 
 ## Social Choice plan

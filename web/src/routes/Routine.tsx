@@ -12,6 +12,7 @@ import { useData } from '../data/useData'
 import { api, type NewRoutineEntry } from '../lib/api'
 import { fmtPrice, imageCredit } from '../lib/format'
 import { toJpegBase64 } from '../lib/image'
+import { sampleLabelFile } from '../lib/sampleLabel'
 import { outcomeFor } from '../lib/outcome'
 import { useAuth } from '../lib/useAuth'
 import { CATALOG, CONCERN_LABEL, productById } from '../mock/catalog'
@@ -131,6 +132,8 @@ export function Routine() {
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 10))
   const [dismissed, setDismissed] = useState<string[]>([])
   const sessions = data.series('face_full')?.sessions ?? []
+  // Until any face photo is measured, one note says so instead of a "Not measured yet" chip on every product.
+  const faceMeasured = sessions.some((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed)
   const byId = (id: string) => entries.find((e) => e.id === id)
   const name = (e: RoutineEntry) => (e.product_id ? (CATALOG.find((p) => p.product_id === e.product_id)?.name ?? e.custom_name) : e.custom_name)
 
@@ -235,9 +238,11 @@ export function Routine() {
                       <Chip key={a.name} tone="neutral">{a.name}{a.pct !== null ? ` ${a.pct}%` : ''}</Chip>
                     ))}
                   </div>
-                  <button type="button" title={o.detail} onClick={() => (o.kind === 'real' ? navigate(`/s/face_full${data.mode === 'demo' ? '?demo=1' : '?'}&m=${o.metric}&layer=1`) : toast(o.detail))} className="mt-2 inline-flex">
-                    <Chip tone={o.kind === 'real' ? 'signal' : o.kind === 'none' ? 'noise' : 'neutral'}>{o.text}</Chip>
-                  </button>
+                  {faceMeasured || o.text !== 'Not measured yet' ? (
+                    <button type="button" title={o.detail} onClick={() => (o.kind === 'real' ? navigate(`/s/face_full?${data.mode === 'demo' ? 'demo=1&' : ''}m=${o.metric}&layer=1`) : toast(o.detail))} className="mt-2 inline-flex">
+                      <Chip tone={o.kind === 'real' ? 'signal' : o.kind === 'none' ? 'noise' : 'neutral'}>{o.text}</Chip>
+                    </button>
+                  ) : null}
                 </div>
               </li>
             )
@@ -253,6 +258,7 @@ export function Routine() {
         <div>
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Your routine</h1>
           <p className={`mt-1 text-[15px] ${worst === 'ok' || entries.length === 0 ? 'text-text-2' : 'text-warn-text'}`}>{status}</p>
+          {entries.length > 0 && !faceMeasured && data.mode === 'live' ? <p className="mt-1 text-[13px] text-text-3">Whether each product changed your skin shows here once your face photos are measured.</p> : null}
         </div>
         <Button
           onClick={async () => {
@@ -356,6 +362,16 @@ export function Routine() {
                 }}
               />
             </label>
+            {live ? (
+              <button
+                type="button"
+                disabled={reading}
+                onClick={() => void sampleLabelFile().then(readLabel)}
+                className="mt-3 min-h-11 text-[13px] font-medium text-text underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                No product to hand? Try a sample label
+              </button>
+            ) : null}
           </div>
         ) : null}
         {add === 'search' ? (

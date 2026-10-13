@@ -40,3 +40,8 @@ export const prefs = {
     }
   },
 }
+
+/** Where to go after onboarding: only an in-app path. */
+export function nextPath(raw: string | null, fallback: string): string {
+  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : fallback
+}

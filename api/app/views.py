@@ -37,13 +37,30 @@ def sign_all(names: list[str]) -> dict[str, str]:
         return dict(zip(unique, pool.map(storage.signed_get_url, unique), strict=True))
 
 
+def photo_name(uid: str, sid: str, doc: dict[str, Any], existing: set[str]) -> str | None:
+    """The image shown on the stage: the engine's preview.jpg, else the person's own first JPEG
+    (a quick selfie is already viewable; a RAW frame is not)."""
+    if preview_name(uid, sid) in existing:
+        return preview_name(uid, sid)
+    types, uris = doc.get("content_types") or [], doc.get("frame_uris") or []
+    if types and uris and types[0] == "image/jpeg":
+        return storage.name_from_uri(uris[0])
+    return None
+
+
+def _first_frame(doc: dict[str, Any]) -> str | None:
+    uris = doc.get("frame_uris") or []
+    return storage.name_from_uri(uris[0]) if uris else None
+
+
 def wanted_urls(
     uid: str, sid: str, doc: dict[str, Any], existing: set[str], with_overlays: bool
 ) -> list[str]:
     result = measured_result(doc)
     names = []
-    if result and preview_name(uid, sid) in existing:
-        names.append(preview_name(uid, sid))
+    photo = photo_name(uid, sid, doc, existing) if result else None
+    if photo:
+        names.append(photo)
     if result and with_overlays:
         for overlay in result.get("overlays", []):
             name = storage.name_from_uri(overlay["uri"])
@@ -64,10 +81,13 @@ def session_view(
     measured = result is not None
     analyzed = doc["status"] == "done"
     preview = None
-    if result and preview_name(uid, sid) in signed:
+    photo = next(
+        (n for n in (preview_name(uid, sid), _first_frame(doc)) if n and n in signed), None
+    )
+    if result and photo:
         size = result.get("image_size") or {}
         preview = {
-            "url": signed[preview_name(uid, sid)],
+            "url": signed[photo],
             "width": size.get("width"),
             "height": size.get("height"),
         }
@@ -114,6 +134,8 @@ def session_view(
             "preview": preview,
             "overlay_urls": overlay_urls,
             "hours_since_baseline": hours,
+            # Judge mode: which hosted sample these photos were copied from (else None).
+            "sample_id": doc.get("sample_id"),
         },
         "result": result,
         "labels": doc.get("labels") or {},

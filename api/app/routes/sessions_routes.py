@@ -174,7 +174,10 @@ def list_sessions(
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
     """Every session of a person (optionally one site), oldest first: the scrubber's ticks."""
-    uid = user.uid
+    return {"sessions": list_views(store, user.uid, site)}
+
+
+def list_views(store: Store, uid: str, site: str | None = None) -> list[dict[str, Any]]:
     rows = [(sid, d) for sid, d in store.sessions_list(uid) if site is None or d["site"] == site]
     rows.sort(key=lambda r: r[1].get("created_at") or datetime.min.replace(tzinfo=UTC))
     existing = (
@@ -195,7 +198,7 @@ def list_sessions(
         if k not in baseline_by_key:
             baseline_by_key[k] = baselines.get(store, uid, d["site"], d["capture_mode"])
         out.append(views.session_view(uid, sid, d, baseline=baseline_by_key[k], signed=signed))
-    return {"sessions": out}
+    return out
 
 
 @router.get("/{session_id}")

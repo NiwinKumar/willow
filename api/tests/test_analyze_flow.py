@@ -315,3 +315,14 @@ def test_saved_sessions_are_measured_again_oldest_first(client, fake, monkeypatc
     later = fake.store.session_get("u_test", second["session_id"])
     assert later["measured"] is True and later["compared_with"]["session_id"] == first["session_id"]
     assert analysis.remeasure(fake.store, "b", "u_test", apply=True) == []
+
+
+def test_quick_selfie_shows_its_own_photo_and_raw_waits_for_a_preview(client, fake):
+    quick = _create(client, mode="uncalibrated", n=1)
+    _upload_all(fake, quick)
+    view = client.post(f"/v1/sessions/{quick['session_id']}/analyze").json()
+    assert view["session"]["preview"]["url"].endswith(f"{quick['session_id']}/frame_1.jpg")
+    raw = _create(client, n=1)
+    _upload_all(fake, raw)
+    view = client.post(f"/v1/sessions/{raw['session_id']}/analyze").json()
+    assert view["session"]["preview"] is None

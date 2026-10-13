@@ -118,6 +118,24 @@ def _http_analyze(request: dict[str, Any]) -> dict[str, Any]:
     return res.json()
 
 
+def health() -> dict[str, Any]:
+    """The engine's /v1/health, for the status panel. Fixture mode answers locally."""
+    if get_settings().engine_mode == "fixture":
+        return {"status": "ok", "engine_version": "fixture"}
+    url = get_settings().engine_url
+    if not url:
+        raise EngineError("engine_unconfigured", "ENGINE_URL is not set", status=500)
+    headers = {}
+    if not url.startswith(("http://localhost", "http://127.0.0.1")):
+        headers["Authorization"] = f"Bearer {_id_token(url)}"
+    try:
+        res = httpx.get(f"{url.rstrip('/')}/v1/health", headers=headers, timeout=20.0)
+        res.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise EngineError("engine_unreachable", str(exc)) from exc
+    return res.json()
+
+
 def _id_token(audience: str) -> str:
     from google.auth.transport.requests import Request
     from google.oauth2 import id_token
