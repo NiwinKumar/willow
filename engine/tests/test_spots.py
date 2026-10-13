@@ -179,3 +179,17 @@ def test_shiny_skin_is_not_cut_as_facial_hair():
     shine[60:300, 60:300] += 25  # a glossy patch...
     shine[60:300:3, 60:300] -= 12  # ...with dark pore gaps between highlights
     assert not facial_hair(shine, np.ones_like(l_star, bool), PX_PER_MM)[180, 180]
+
+
+def test_dark_grey_braids_at_the_hairline_are_cut():
+    from app.landmarks import remove_hair
+
+    rng = np.random.default_rng(6)
+    L = 42 + rng.normal(0, 0.8, (360, 360))  # deep skin
+    chroma = np.full((360, 360), 30.0)
+    L[:60], chroma[:60] = 19.0, 4.0  # braids along the top edge: 23 L* darker, nearly grey
+    mask = np.zeros((360, 360), bool)
+    mask[5:355, 5:355] = True  # the face mask sits inside the crop
+    assert remove_hair(L, mask, PX_PER_MM)[30, 180]  # L* alone misses them
+    keep = remove_hair(L, mask, PX_PER_MM, chroma)
+    assert not keep[30, 180] and keep[200, 180]
