@@ -39,3 +39,20 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Why: on both deployed services, `GET /healthz` is answered by Google's frontend with an HTML 404 before the request reaches the container; every other path works. Verified with and without identity tokens.
 - Change: none to the schemas. The api exposes its health at `/v1/health`. For the engine, the api never calls `/healthz`; if you want a reachable health route, add `GET /v1/health` with the same body and keep `/healthz` for local use.
 - Approved by: [ ] Harshini [x] Niwin
+
+## 2026-10-13: api-only additions to `SessionView.session` (note, no engine impact)
+- What: `SessionView.session` carries `preview` (signed GET URL of `{output_prefix}preview.jpg` when the engine wrote one, else null), `overlay_urls` (signed), `hours_since_baseline`, `note`, `deviation`, `error`, `explanation_source` (`template` | `gemini`). New api routes: `PATCH /v1/sessions/{id}`, `POST /v1/sessions/{id}/upload-urls`, `GET /v1/sessions?site=`, `DELETE /v1/me` (all listed in DESIGN.md section 8 as api work with no contract change).
+- Impact on the engine: none. The api reads `preview.jpg` only if it exists, so it works with or without proposal 1b.
+- Approved by: n/a (api and web are both Niwin's)
+
+## 2026-10-13: Baseline rule and placeholder handling in the api (note for Harshini, no schema change)
+- Baseline (CONTRACT.md section 3 says "auto: first passing 5-frame calibrated session"): now the first *measured* session with passing quality, per site **and** capture mode, any frame count. Firestore: `baselines/{site}` for calibrated (as in section 4), `baselines/{site}__uncalibrated` for quick selfies. Niwin asked for this after testing: one-photo sessions never became a baseline, so nothing was ever compared. With a one-photo baseline the engine already does the right thing (delta, verdict stays `no_baseline` because `mdc95` is null) and the web says "No noise band yet".
+- Placeholders: results with `engine_version` ending `-placeholder` (or a `placeholder:` warning) are stored with `measured: false` and never returned as numbers or used as a baseline.
+- Asks for the engine (Harshini):
+  1. The face/macro placeholder returns the fixture unchanged, including `frames_used: 5` and baked-in deltas and `real_change` verdicts even when no baseline was sent. The api now ignores it, but returning `metrics: []`, `frames_used` = frames received and `quality.passed: false` with a warning would be safer for any other caller.
+  2. A RAW photo with no colour card and no white paper still gets `confidence: "measured"` and `quality.passed: true` (seen on Oct 13 with a plain iPhone DNG; warnings say colours were not corrected). Suggest `indicative`, or a quality reason, when no colour reference is found.
+- Follow-up (same day, api/web only): the first session of a site asks for 5 photos (repositioned, same pose) so most baselines get a noise band; the baseline never switches automatically; when the engine starts measuring face/macro, `api/scripts/remeasure.py --apply` re-runs saved sessions oldest first so each person's earliest one becomes the baseline. Nothing changes in the engine.
+- More asks for the engine (Oct 14, from testing the live judge flow; the web now works around them):
+  3. With one photo and no white paper, warnings say both "colours corrected with the white paper only" and "no white reference found in some photos": please emit one or the other per session.
+  4. On a forearm photo with no pen dots, the square detector locked onto arm hair and measured that patch without a warning (ITA came out -55 on the DNG vs +71 on the JPEG of the same frame). Please require four dots in a plausible 4 cm geometry, or fail with "pen-dot square not found".
+- Approved by: [ ] Harshini [x] Niwin

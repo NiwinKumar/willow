@@ -50,5 +50,18 @@ cd web && npm install && npm run dev
 - web: Vitest for utilities; one Playwright smoke test (landing -> demo journey -> report) if time.
 - Before each merge: `ruff check`, `pytest` / `npm run lint && npm run build`.
 
+## End-to-end test (real pipeline, from a laptop)
+Runs everything except Firebase sign-in for real: uploads land in the bucket, the deployed engine measures them, Firestore stores them. The test person is deleted before and after.
+
+1. api in end-to-end mode (in `.claude/launch.json` as `api-e2e`):
+   `cd api && AUTH_MODE=dev DEV_UPLOADS=true ENGINE_MODE=http ENGINE_URL=https://willow-engine-hrlt7lqdwa-uc.a.run.app ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174 uv run uvicorn app.main:app --port 8080`
+   - `AUTH_MODE=dev` trusts the `X-Dev-Uid` header (never set on Cloud Run).
+   - `DEV_UPLOADS=true` points upload links at the api itself (`/v1/dev/upload`), which writes to the real bucket with your ADC, so no Token Creator grant is needed.
+   - The engine call uses `gcloud auth print-identity-token` when ADC cannot mint an ID token.
+2. Script: `cd api && uv run python scripts/e2e.py --dng <forearm.dng> --jpeg <forearm.jpg> [--label <label.jpg>]`. 19 checks: real engine measures RAW and quick photos, first session becomes the baseline, one-photo baseline has no noise band, quick selfies get their own baseline, face sessions are saved but never show numbers, timeline, catalog images, manual baseline, delete my data.
+3. Website: `web-e2e` in `.claude/launch.json` (`VITE_AUTH_MODE=dev VITE_DEV_UID=e2e_browser VITE_API_URL=http://localhost:8080 npx vite --port 5174`). The web skips Firebase sign-in and sends `X-Dev-Uid`. Keep test photos outside `web/` (for example `data/e2e/`, gitignored) and load them in the dev server through Vite's `/@fs/<absolute path>` URL, then feed them to file inputs from the browser console with a `DataTransfer`. Never put photos in `web/public/`: it is deployed as-is (on Oct 14 a test forearm photo was briefly public this way), and `npm run build` now refuses to build if it finds one.
+
+Test photos stay out of git (`*.dng`/`*.jpg` are ignored); keep them in a scratch folder.
+
 ## Deploy
 See `infra/README.md`. Engine image builds from the repo root via `infra/cloudbuild.engine.yaml`.

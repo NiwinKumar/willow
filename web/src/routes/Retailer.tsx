@@ -1,29 +1,69 @@
-import { Download } from 'lucide-react'
-import { useState } from 'react'
+import { Download, ExternalLink } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
+import { AskData } from '../components/AskData'
 import { Chip } from '../components/Chip'
-import { RETAILER, TONE_BANDS, type Cell } from '../mock/retailer'
+import { api, type RetailerInsights } from '../lib/api'
 
-const TABS = ['Needs next', 'Product outcomes', 'Brand & category', 'Assortment gaps', 'Routine conflicts', 'About this data'] as const
+type Cell = RetailerInsights['products'][number]['cells'][number]
+
+/** The same suppressed aggregates as a shareable Data Studio report (api/scripts/publish_looker.py). */
+const DATA_STUDIO = 'https://datastudio.google.com/reporting/5147af6b-c268-470a-a420-2277dfcfe7df'
+
+const TABS = ['Needs next', 'Product outcomes', 'Brands', 'Assortment gaps', 'Routine conflicts', 'About this data'] as const
 
 export function Retailer() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Product outcomes')
-  const [window_, setWindow] = useState<'4' | '8'>('8')
+  const [d, setD] = useState<RetailerInsights | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    api
+      .retailerInsights()
+      .then((r) => alive && setD(r))
+      .catch(() => alive && setFailed(true))
+    return () => {
+      alive = false
+    }
+  }, [attempt])
+
+  if (!d)
+    return (
+      <div className="mx-auto max-w-[36rem] px-5 py-12" role="status">
+        {failed ? (
+          <>
+            <p className="text-[15px] text-text-2">The insights could not be loaded.</p>
+            <button type="button" className="mt-3 font-medium underline-offset-2 hover:underline" onClick={() => { setFailed(false); setAttempt((a) => a + 1) }}>Try again</button>
+          </>
+        ) : (
+          <p className="text-[15px] text-text-2">Querying BigQuery…</p>
+        )}
+      </div>
+    )
+
+  const best = [...d.products].sort((a, b) => b.rate - a.rate)[0]
+  const evidence = d.product_outcomes ? Object.keys(d.product_outcomes).length : d.products.length
+  const zeroTiers = d.gaps.flatMap((g) => (['budget', 'mid', 'premium'] as const).filter((t) => g[t].options === 0).map((t) => `${g.goal}, ${t}`))
+  const thinTiers = d.gaps.flatMap((g) => (['budget', 'mid', 'premium'] as const).filter((t) => g[t].options === 1).map((t) => `${g.goal}, ${t}`))
+  const spf = d.conflicts.find((c) => c.pair.startsWith('No morning sunscreen'))
+  const topClash = d.conflicts.find((c) => !c.pair.startsWith('No morning sunscreen'))
+  const routines = d.tiles[0].n
   return (
     <div className="pb-20">
       <div role="status" className="bg-warn/18 px-5 py-2 text-[13px] text-warn-text sm:px-8">
-        <strong className="font-semibold">Synthetic demo cohort + team data</strong> · {RETAILER.cohort.synthetic} simulated users and {RETAILER.cohort.real} real users · simulated outcomes follow Willow's measured noise model ·{' '}
+        <strong className="font-semibold">Synthetic data only</strong> · {d.cohort.synthetic} simulated users{d.cohort.real ? `, ${d.cohort.real} real` : ', no real customers'} · simulated outcomes follow Willow's measured noise model ·{' '}
         <button type="button" className="underline-offset-2 hover:underline" onClick={() => setTab('About this data')}>About this data</button>
       </div>
       <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3 pt-4">
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Willow Retailer</h1>
-          <div className="flex flex-wrap gap-2 text-[13px]">
-            <label className="flex items-center gap-1">Window <select value={window_} onChange={(e) => setWindow(e.target.value as '4' | '8')} className="rounded-(--radius-control) border border-border bg-surface px-2 py-1"><option value="4">4 weeks</option><option value="8">8 weeks</option></select></label>
-            <label className="flex items-center gap-1">Region <select className="rounded-(--radius-control) border border-border bg-surface px-2 py-1"><option>All</option><option>IN</option><option>US</option><option>UK</option><option>KR</option></select></label>
-            <label className="flex items-center gap-1">Tier <select className="rounded-(--radius-control) border border-border bg-surface px-2 py-1"><option>All</option><option>budget</option><option>mid</option><option>premium</option></select></label>
-          </div>
+          <a href={DATA_STUDIO} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-border bg-surface px-3 text-[13px] font-medium hover:bg-surface-2">
+            Open the Data Studio report <ExternalLink size={14} aria-hidden />
+          </a>
         </div>
+        <AskData />
         <nav className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0" aria-label="Retailer views">
           <ul className="flex gap-1 border-b border-border">
             {TABS.map((t) => (
@@ -35,9 +75,9 @@ export function Retailer() {
         </nav>
 
         {tab === 'Needs next' ? (
-          <Section q="What do customers need next?" tiles={RETAILER.tiles}>
+          <Section q="What do customers need next?" tiles={d.tiles} csv={d.needs}>
             <ul className="space-y-3">
-              {RETAILER.needs.map((r) => (
+              {d.needs.map((r) => (
                 <li key={r.goal}>
                   <div className="flex justify-between text-[13px]"><span className="font-medium">{r.goal}</span><span className="font-mono text-text-2">n={r.n}</span></div>
                   <div className="mt-1 flex h-6 w-full overflow-hidden rounded-(--radius-chip)" role="img" aria-label={`${r.goal}: ${r.real}% real change, ${r.none}% no clear change, ${r.early}% too early`}>
@@ -48,44 +88,44 @@ export function Retailer() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[12px] text-text-3">Blue: real change in the target metric by week {window_}. Hatched: no clear change. Grey: too early.</p>
+            <p className="mt-2 text-[12px] text-text-3">Blue: real change in the target metric by week 8. Hatched: no clear change. Grey: too early.</p>
           </Section>
         ) : null}
 
         {tab === 'Product outcomes' ? (
-          <Section q="Which products actually help which profiles?" tiles={[{ label: 'Products with evidence', value: '5', n: 5, sub: 'n ≥ 10 in at least one band' }, { label: 'Best outcome rate', value: '61%', n: 24, sub: 'Azelaic acid, very light band' }, { label: 'Median weeks to change', value: '5', n: 264, sub: 'across products' }]}>
+          <Section q="Which products actually help which profiles?" csv={d.products.map(({ cells, ...p }) => ({ ...p, ...Object.fromEntries(cells.map((c, i) => [d.tone_bands[i], c.suppressed ? '' : c.value])) }))} tiles={[{ label: 'Products with evidence', value: String(evidence), n: evidence, sub: `n ≥ 10 users each; top ${d.products.length} shown` }, { label: 'Best outcome rate', value: best ? `${Math.round(best.rate * 100)}%` : '–', n: best?.n ?? 0, sub: best ? `${best.brand} ${best.product}` : '' }, { label: 'Median weeks to change', value: d.tiles[3].value, n: d.tiles[3].n, sub: 'held to week 8' }, { label: 'Users at week 8', value: String(routines), n: routines, sub: `${Math.round(d.cohort.dropout * 100)}% dropped out` }]}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] border-collapse text-[13px]">
                 <thead>
                   <tr className="text-left text-text-2">
                     <th className="py-2 pr-3 font-medium">Product</th>
                     <th className="py-2 pr-3 font-medium">Concern</th>
-                    {TONE_BANDS.map((b) => <th key={b} className="py-2 pr-2 font-medium">{b}</th>)}
+                    {d.tone_bands.map((b) => <th key={b} className="py-2 pr-2 font-medium">{b}</th>)}
                     <th className="py-2 pr-2 font-medium">Lift vs non-users</th>
                     <th className="py-2 font-medium">Weeks · continuation</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {RETAILER.products.map((p) => (
+                  {d.products.map((p) => (
                     <tr key={p.product} className="border-t border-border">
                       <td className="py-2 pr-3"><span className="font-medium">{p.product}</span><span className="block text-text-3">{p.brand}</span></td>
                       <td className="py-2 pr-3 text-text-2">{p.concern}</td>
                       {p.cells.map((c, i) => <td key={i} className="py-1 pr-2"><HeatCell c={c} /></td>)}
-                      <td className="py-2 pr-2 font-mono">+{Math.round(p.lift * 100)} pts</td>
-                      <td className="py-2 font-mono">{p.weeks} · {Math.round(p.cont * 100)}%</td>
+                      <td className="py-2 pr-2 font-mono">{p.lift === null ? '–' : `${p.lift >= 0 ? '+' : ''}${Math.round(p.lift * 100)} pts`}</td>
+                      <td className="py-2 font-mono">{p.weeks ?? '–'} · {Math.round(p.cont * 100)}%</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-[12px] text-text-3">Cell = share of users with a real change in the target metric by week {window_}, with n. Hatched cells have fewer than 10 users and are hidden.</p>
+            <p className="mt-2 text-[12px] text-text-3">Cell = share of users with a real change in the target metric by week 8, with n. Hatched cells have fewer than 10 users and are hidden.</p>
           </Section>
         ) : null}
 
-        {tab === 'Brand & category' ? (
-          <Section q="How are our brands and categories performing on measured outcomes?" tiles={[{ label: 'Brands with evidence', value: '5', n: 5, sub: 'n ≥ 10' }, { label: 'Top category', value: 'Treatment', n: 173, sub: '55% outcome rate' }, { label: 'Continuation 4 wks', value: '71%', n: 441, sub: 'still using at week 4' }]}>
+        {tab === 'Brands' ? (
+          <Section q="How are our brands performing on measured outcomes?" csv={d.brands} tiles={[{ label: 'Brands with evidence', value: String(d.brands.length), n: d.brands.length, sub: 'n ≥ 10' }, { label: 'Highest outcome rate', value: d.brands[0] ? `${Math.round(d.brands[0].rate * 100)}%` : '–', n: d.brands[0]?.n ?? 0, sub: d.brands[0]?.brand ?? '' }, { label: 'Lowest outcome rate', value: d.brands.at(-1) ? `${Math.round(d.brands.at(-1)!.rate * 100)}%` : '–', n: d.brands.at(-1)?.n ?? 0, sub: d.brands.at(-1)?.brand ?? '' }, { label: 'Best continuation', value: d.brands.length ? `${Math.round(Math.max(...d.brands.map((b) => b.cont)) * 100)}%` : '–', n: d.brands.length, sub: 'still using after week 4' }]}>
             <ul className="space-y-3">
-              {RETAILER.brands.map((b) => (
+              {d.brands.map((b) => (
                 <li key={b.brand} className="grid grid-cols-[120px_1fr_60px] items-center gap-3 text-[13px]">
                   <span className="font-medium">{b.brand}</span>
                   <div className="relative h-6" role="img" aria-label={`${b.brand}: outcome rate ${Math.round(b.rate * 100)}%, interval ${Math.round(b.lo * 100)} to ${Math.round(b.hi * 100)}, n=${b.n}`}>
@@ -97,16 +137,16 @@ export function Retailer() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[12px] text-text-3">Dot: outcome rate at week {window_}. Band: 95% Wilson interval. Continuation is the repeat-purchase analogue.</p>
+            <p className="mt-2 text-[12px] text-text-3">Dot: outcome rate at week 8. Band: 95% Wilson interval. Continuation is the repeat-purchase analogue.</p>
           </Section>
         ) : null}
 
         {tab === 'Assortment gaps' ? (
-          <Section q="Where are the assortment gaps?" tiles={[{ label: 'Goal × tier combos with no option', value: '1', n: 9, sub: 'dark spots, premium' }, { label: 'Combos below median outcome', value: '3', n: 9, sub: 'texture & pores in every tier' }, { label: 'Largest gap', value: 'Dark spots, premium', n: 189, sub: '44% of users want it' }]}>
+          <Section q="Where are the assortment gaps?" csv={d.gaps.map((g) => ({ goal: g.goal, budget_options: g.budget.options, budget_rate: g.budget.rate, mid_options: g.mid.options, mid_rate: g.mid.rate, premium_options: g.premium.options, premium_rate: g.premium.rate, action: g.action }))} tiles={[{ label: 'Goal × tier with no option', value: String(zeroTiers.length), n: d.gaps.length * 3, sub: zeroTiers[0] ?? 'none' }, { label: 'Goal × tier with one option', value: String(thinTiers.length), n: d.gaps.length * 3, sub: thinTiers[0] ?? 'none' }, { label: 'Goals tracked', value: String(d.gaps.length), n: d.gaps.length, sub: 'with a measured metric' }, { label: 'Catalog products', value: String(d.gaps.reduce((a, g) => Math.max(a, g.budget.options + g.mid.options + g.premium.options), 0)), n: d.gaps.length, sub: 'most options for one goal' }]}>
             <table className="w-full border-collapse text-[13px]">
               <thead><tr className="text-left text-text-2"><th className="py-2 pr-3 font-medium">Goal</th><th className="py-2 pr-3 font-medium">Budget</th><th className="py-2 pr-3 font-medium">Mid</th><th className="py-2 pr-3 font-medium">Premium</th><th className="py-2 font-medium">Suggested action</th></tr></thead>
               <tbody>
-                {RETAILER.gaps.map((g) => (
+                {d.gaps.map((g) => (
                   <tr key={g.goal} className="border-t border-border">
                     <td className="py-2 pr-3 font-medium">{g.goal}</td>
                     {[g.budget, g.mid, g.premium].map((t, i) => (
@@ -124,9 +164,9 @@ export function Retailer() {
         ) : null}
 
         {tab === 'Routine conflicts' ? (
-          <Section q="How common are routine conflicts, and what resolves them?" tiles={[{ label: 'Routines with a caution', value: '18%', n: 427, sub: 'retinoid + acid same night' }, { label: 'Missing SPF', value: '27%', n: 427, sub: 'with a retinoid or acid' }, { label: 'Most common pair', value: 'Retinoid + BHA', n: 77, sub: 'alternate nights resolves it' }]}>
+          <Section q="How common are routine conflicts, and what resolves them?" csv={d.conflicts.map((c) => ({ ...c, resolves: c.resolves.join('; ') }))} tiles={[{ label: 'Missing morning SPF', value: spf ? `${Math.round(spf.share * 100)}%` : '–', n: routines, sub: 'with a retinoid or acid' }, { label: 'Most common clash', value: topClash ? `${Math.round(topClash.share * 100)}%` : '–', n: routines, sub: topClash?.pair ?? 'none' }, { label: 'Clash types seen', value: String(d.conflicts.length), n: routines, sub: 'n ≥ 10 each' }, { label: 'Routines checked', value: String(d.cohort.synthetic + d.cohort.real), n: d.cohort.synthetic + d.cohort.real, sub: 'rule table, same as the app' }]}>
             <ul className="space-y-3">
-              {RETAILER.conflicts.map((c) => (
+              {d.conflicts.map((c) => (
                 <li key={c.pair} className="rounded-(--radius-tile) border border-border bg-surface p-3">
                   <div className="flex items-center justify-between gap-3 text-[13px]"><span className="font-medium">{c.pair}</span><span className="font-mono text-text-2">{Math.round(c.share * 100)}% of routines</span></div>
                   <div className="mt-2 h-2 w-full overflow-hidden rounded bg-surface-2"><span className="block h-full bg-warn" style={{ width: `${c.share * 100}%` }} /></div>
@@ -140,8 +180,9 @@ export function Retailer() {
         {tab === 'About this data' ? (
           <div className="max-w-[36rem] space-y-3 pt-6 text-[15px] leading-relaxed text-text-2">
             <h2 className="text-[20px] font-bold text-text">About this data</h2>
-            <p>This view mixes a synthetic cohort with the team's real sessions. The synthetic cohort has {RETAILER.cohort.synthetic} simulated users across six regions and all six skin-tone bands, each with one to three goals and a routine of two to five catalog products, weekly sessions for {RETAILER.cohort.weeks} weeks and {Math.round(RETAILER.cohort.dropout * 100)}% dropout. The generator uses a fixed seed ({RETAILER.cohort.seed}).</p>
-            <p>Each simulated weekly change is a product effect (only on the metrics mapped to the product's concerns; some products are set to about zero) plus noise drawn from Willow's measured noise bands. A simulated reading counts as real change only if it clears the band, the same rule the app uses.</p>
+            <p>Every number here is computed live from BigQuery (dataset willow_insights) over a synthetic cohort: {d.cohort.synthetic} simulated people{d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ', no real customers yet'}. Each has one to three goals, a routine of two to five real catalog products (about 60% also use a sunscreen) and weekly face readings for {d.cohort.weeks} weeks; {Math.round(d.cohort.dropout * 100)}% dropped out early. Fixed seed ({d.cohort.seed}), so the numbers are reproducible.</p>
+            <p>Simulated change: each product drifts the metrics its concerns map to towards the desired direction, growing to full size by week 6, between 0.2 and 1.1 times that metric's noise band; about 3 in 10 products have no effect. Every reading adds noise at the spread Willow measures, and a reading counts as a real change only if it clears the noise band, the same rule the app uses. Skin tone and region have no effect in the simulation.</p>
+            <p>Outcome: still improved beyond the noise band at the week-8 reading. A single lucky reading earlier does not count. Lift compares product users with people who share the goal but do not use the product. Routine conflicts come from the same rule table as the app's compatibility check.</p>
             <p>Suppression: any group under 10 users is hidden, in the data query and in the api, not only on the chart. Rates are never shown without n. Skin-tone bands are a slice, never a ranking.</p>
             <p>What this is not: evidence that any product works. It is a demonstration of what a multi-brand retailer would see once real, consented outcome data flows in.</p>
           </div>
@@ -151,7 +192,23 @@ export function Retailer() {
   )
 }
 
-function Section({ q, tiles, children }: { q: string; tiles: { label: string; value: string; n: number; sub: string }[]; children: React.ReactNode }) {
+function downloadCsv(name: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return
+  const cols = [...Object.keys(rows[0]), 'is_synthetic']
+  const esc = (v: unknown) => {
+    const t = v === null || v === undefined ? '' : String(v)
+    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
+  }
+  const body = [cols.join(','), ...rows.map((r) => cols.map((c) => esc(c === 'is_synthetic' ? true : r[c])).join(','))].join('\n')
+  const url = URL.createObjectURL(new Blob([body], { type: 'text/csv' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `willow-${name.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function Section({ q, tiles, csv, children }: { q: string; tiles: { label: string; value: string; n: number; sub: string }[]; csv: Record<string, unknown>[]; children: React.ReactNode }) {
   return (
     <section className="pt-6">
       <h2 className="text-[20px] font-bold tracking-[-0.02em]">{q}</h2>
@@ -166,7 +223,7 @@ function Section({ q, tiles, children }: { q: string; tiles: { label: string; va
       </dl>
       <div className="mt-5 rounded-(--radius-tile) border border-border bg-surface p-4">{children}</div>
       <div className="mt-2 flex justify-end">
-        <button type="button" className="inline-flex min-h-9 items-center gap-1 text-[13px] text-text-2 hover:text-text" onClick={() => alert('CSV export connects to the api in M4; rows will carry a synthetic flag.')}>
+        <button type="button" className="inline-flex min-h-11 items-center gap-1 text-[13px] text-text-2 hover:text-text" onClick={() => downloadCsv(q, csv)}>
           <Download size={14} aria-hidden /> CSV
         </button>
       </div>

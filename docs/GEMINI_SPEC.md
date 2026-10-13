@@ -2,7 +2,7 @@
 
 ## Setup
 - SDK: `google-genai` (Python) with `vertexai=True`, `project=$PROJECT_ID`, `location="global"`. Gemini 3.x GA models are served only from the global endpoint (verified Oct 13: regional `us-central1` returns model-not-found; `gemini-2.5-flash` is regional but retires on Vertex around Oct 20, during judging). Every other GCP resource stays in `us-central1`.
-- Model: env `GEMINI_MODEL` = `gemini-3.8-flash` (GA since Sep 2, 2026). It is a thinking model: set `thinking_config` to the lowest level/budget for labelling, extraction and routine checks, and always give a generous `max_output_tokens` (thinking tokens otherwise truncate the JSON). Optional `GEMINI_MODEL_PRO` for the weekly summary only.
+- Model: env `GEMINI_MODEL` = `gemini-3.8-flash` (GA since Sep 2, 2026). It is a thinking model: set `thinking_config` to the lowest level/budget for labelling, extraction and routine checks, and always give a generous `max_output_tokens` (thinking tokens otherwise truncate the JSON). Verified Oct 13 with `google-genai==2.25.0`: the lowest accepted level is `thinking_level=LOW` (`MINIMAL` returns 400 "Thinking level is unsupported"); a short JSON extraction takes 1-3 s warm, a label photo about 6 s. Implementation: `api/app/gemini.py` (`generate_json`). Optional `GEMINI_MODEL_PRO` for the weekly summary only.
 - Always `response_mime_type="application/json"` + `response_schema` (pydantic). Temperature 0 for labelling/extraction, 0.3 for explanations/chat. Set `max_output_tokens`.
 - Never send more than needed: crops, not full faces, for labelling; metrics JSON, not images, for explanations.
 - Log prompt id, latency, token counts (no images, no PII) to Cloud Logging.
@@ -29,6 +29,7 @@
 - Input: product photo(s) (front and/or back).
 - Output: `{brand, product_name, category: enum(CATALOG_SPEC), inci: string[], key_actives: [{name, pct: number|null}], claims_on_pack: string[], confidence}`.
 - Then match against catalog (brand + name fuzzy match); if matched, link `product_id`; else store as custom routine entry.
+- api: `POST /v1/label-scan` with `{images: [{mime_type, data_base64}]}` (1-2 images, the web downsizes to a JPEG first) returns `{scan, match}` and saves nothing; the web shows a confirm/edit step, then `POST /v1/routine`. Trailing punctuation from printed lists is stripped; active names are lower-cased.
 
 ## 4. Routine compatibility check
 - Input: routine entries (AM/PM, INCI, key actives), user goals, current verdicts.
@@ -55,5 +56,17 @@ Tools (implemented in api, results are the only source of product facts):
 - `check_routine(proposed_change?: object)` -> runs feature 4
 Response schema: `{message: string, product_ids: string[], follow_up_suggestions: string[]}`. UI renders product cards with all store links. Max 5 tool calls per turn.
 
+## 6. Ask the retailer data (added Oct 13)
+- Input: the same aggregates as `GET /v1/retailer/insights` (groups under 10 already suppressed, no rows) plus the question. Output schema `Answer {answer, chart?: {title, unit: percent|count|weeks, bars[2..8]: {label, value}}, follow_ups[]}`.
+- Validators: every number in the answer must be in the aggregates (a fraction may be written as a whole percent); every bar label must be a product, brand, goal, tile or routine issue in the aggregates; every bar value must be a number from them; banned words. One retry, then a fixed "could not answer" message. `POST /v1/retailer/ask` (sign-in, guest is fine; 20 a day).
+- Advisor tools `search_catalog` and `compare_products` now return `measured_outcomes` from the cohort (`product_outcomes`, labelled `synthetic_cohort`); the advisor may quote a rate as a whole percent with its n. Each advisor answer returns `checks {model, tool_calls, numbers_checked, products_from_tools}` and the web shows the steps and checks under the answer.
+
+## Status (Oct 13)
+- Explanation: live (`api/app/explain.py`). Gemini gets the metrics rounded the way the app shows them; the validator rejects unknown numbers, disease or "lighter/fairer" wording, change language for anything but `real_change`, and unknown metric ids; at most two Gemini calls, then the template. `explanation_source` says which one the person sees.
+- Routine check: live (`api/app/routine_check.py`). The rule table runs as code (`source: "rule"`), so it is deterministic; Gemini may add `source: "model"` findings, kept only if they name known products, add no numbers, never flag niacinamide + vitamin C and do not repeat a rule finding.
+- Advisor: live (`api/app/advisor.py`). Latest measurements and routine go in as context; tools are `search_catalog`, `compare_products`, `check_routine` (get_my_metrics / get_my_routine are folded into the context to save a round trip). Reply numbers must come from the context, tool results or the person's own words; product ids from tool results or their routine. 20 questions per person per day (`users/{uid}/usage/{date}`).
+- Candidate labelling: waits for engine crops (face pipeline).
+- Every call has a 25 s timeout; failures log the error and fall back.
+
 ## Cost and quota guardrails
-Flash for everything interactive; cache explanations per session; label once per candidate; cap advisor to 20 turns per user per day; budget alerts are already set.
+Flash for everything interactive; cache explanations per session; label once per candidate; budget alerts are already set. Daily caps per person and across everyone (`api/app/limits.py`, Oct 13): advisor 20 / 3000, retailer questions 20 / 1500, label scans 30 / 1500, analyses 60 / 2000, judge sample runs 12 / 600. Guest accounts are free to create, so the global cap is what bounds cost; over it the api answers 429 "busy".

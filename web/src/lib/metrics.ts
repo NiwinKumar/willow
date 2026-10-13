@@ -45,6 +45,12 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   low_quality: 'Photo quality too low to compare',
 }
 
+/**
+ * Sites the deployed engine measures today. Other sites are saved and marked "not measured yet"
+ * (the api never shows the engine's placeholder numbers). Update when the engine adds a site.
+ */
+export const MEASURED_SITES: Site[] = ['forearm_treated', 'forearm_control']
+
 export const SITE_LABEL: Record<Site, string> = {
   face_full: 'Face',
   cheek_macro: 'Cheek close-up',

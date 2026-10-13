@@ -59,7 +59,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      {cluster.length ? (
+      {cluster.length && mdc !== null ? (
         <p className="text-[12px] text-text-3">
           Your noise band (MDC95 from {baseline?.n_frames ?? 5} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
         </p>
@@ -74,9 +74,13 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
           <dd className="text-text-2">
             {b !== null && mdc !== null
               ? `Your ${baseline?.n_frames ?? 5} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
-              : current.confidence === 'indicative'
-                ? 'This metric is indicative: a directional estimate without a noise band. It never gets a Real change verdict; watch it as a trend.'
-                : 'This is your first reading. Future photos are compared to it; the noise band comes from the spread of your reference photos.'}
+              : current.verdict === 'low_quality'
+                ? 'This photo did not pass the quality check, so it is not compared. Retake it in the same light and position.'
+                : b !== null && mdc === null
+                  ? 'Your baseline has one photo, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
+                  : current.confidence === 'indicative'
+                    ? 'This metric is indicative: a directional estimate, so watch it as a trend.'
+                    : 'This is your first reading. Future photos are compared to it; the noise band comes from the spread of your reference photos.'}
           </dd>
         </div>
         <div>
@@ -119,7 +123,7 @@ const WHAT: Record<Metric['id'], string> = {
   glow: 'A composite of lightness versus your baseline, chroma and fine-scale smoothness. Change only, indicative.',
 }
 const OTHER: Record<Metric['id'], string> = {
-  tone_ita: 'A different lamp or colour card position, sun exposure, a tan, and time of day.',
+  tone_ita: 'A different lamp, a moved paper or colour card, sun exposure, a tan, and time of day.',
   pigment_spots: 'Hair across the cheek, shadows, makeup residue, and a card that is in shadow or glare.',
   tone_evenness: 'Lighting gradients across the face, hair, and a slight head turn.',
   redness: 'Exercise, heat, a hot shower, cleansing minutes before the photo, and emotion.',

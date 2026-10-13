@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { BandBar } from '../components/BandBar'
@@ -7,15 +7,16 @@ import { Button } from '../components/Button'
 import { Chip } from '../components/Chip'
 import { Scrubber } from '../components/Scrubber'
 import { Stage } from '../components/Stage'
-import { enterDemo } from '../data/useData'
+import { enterDemo, leaveDemo } from '../data/useData'
 import { useAuth } from '../lib/useAuth'
 import { fmtSigned, fmtValue } from '../lib/metrics'
 import { DEMO_SERIES } from '../mock/series'
+import { prefetchRoutes } from './lazy'
 
 const entries = [
-  { title: 'Explore a real journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1' },
-  { title: 'Try with sample photos', sub: 'Run the live pipeline on our RAW samples.', eta: '~30 s', to: '/capture?demo=1&sample=1' },
-  { title: 'Try your own selfie', sub: 'Phone or laptop camera. Uncalibrated, trend only.', eta: '~1 min', to: '/capture?mode=quick' },
+  { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', demo: true },
+  { title: 'Run the pipeline on sample photos', sub: 'Real RAW photos, measured live in a guest account of your own.', eta: '~40 s', to: '/capture?sample=1', demo: false },
+  { title: 'Measure your own forearm', sub: 'Phone camera or a RAW photo. Your own baseline, really measured.', eta: '~2 min', to: '/capture?site=forearm_control&mode=quick', demo: false },
 ]
 
 export function Landing() {
@@ -25,6 +26,7 @@ export function Landing() {
   const control = DEMO_SERIES.forearm_control
   const [i, setI] = useState(3)
   const [touched, setTouched] = useState(false)
+  useEffect(() => prefetchRoutes(['Judge', 'Report', 'Capture', 'QuickCapture']), [])
   const session = series.sessions[i]
   const baseline = series.sessions[0]
   const tone = session.result!.metrics.find((m) => m.id === 'tone_ita')!
@@ -33,8 +35,10 @@ export function Landing() {
   const ctrlBase = control.sessions[0].result!.metrics.find((m) => m.id === 'tone_ita')!
   const reach = useMemo(() => Math.max(...series.sessions.map((s) => Math.abs(s.result!.metrics[0].delta ?? 0))), [series])
 
-  const go = (to: string) => {
-    enterDemo()
+  const go = (to: string, demo: boolean) => {
+    // Your own photos always run live; only the sample entries switch the app to demo mode.
+    if (demo) enterDemo()
+    else leaveDemo()
     navigate(to)
   }
 
@@ -46,7 +50,7 @@ export function Landing() {
         {/* The live Lens: drag before you read. On phones it sits right under the headline. */}
         <div className="rounded-(--radius-tile) border border-border bg-surface p-3 sm:p-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">
           <div className="flex items-center justify-between gap-2 px-1 pb-2">
-            <span className="text-[13px] font-semibold">Self-tanner on the left square, nothing on the right</span>
+            <span className="text-[13px] font-semibold">Self-tanner on one square, nothing on the other</span>
             <Chip tone="neutral">sample</Chip>
           </div>
           <div className="h-[260px] sm:h-[320px]">
@@ -80,12 +84,19 @@ export function Landing() {
           <p className="text-[17px] leading-relaxed text-text-2">
             Willow measures your skin from standardized photos and tells you whether a change is real or just the camera. Every number comes from calibrated computer vision; the AI only explains.
           </p>
-          <div className="mt-6 flex flex-col gap-3">
+          <Link to="/judge" className="mt-6 flex min-h-11 items-center justify-between gap-3 rounded-(--radius-control) bg-text px-4 py-3 text-surface transition-opacity hover:opacity-90">
+            <span>
+              <span className="block text-[15px] font-semibold">Judging Willow? Take the guided tour</span>
+              <span className="block text-[13px] opacity-80">Five stops, every one live. No sign-in.</span>
+            </span>
+            <span className="shrink-0 whitespace-nowrap font-mono text-[13px] opacity-80">~4 min</span>
+          </Link>
+          <div className="mt-3 flex flex-col gap-3">
             {entries.map((e) => (
-              <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to)}>
+              <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to, e.demo)}>
                 <span className="flex w-full items-center justify-between">
                   <span className="font-semibold">{e.title}</span>
-                  <span className="font-mono text-[13px] text-text-3">{e.eta}</span>
+                  <span className="shrink-0 whitespace-nowrap font-mono text-[13px] text-text-3">{e.eta}</span>
                 </span>
                 <span className="text-[13px] font-normal text-text-2">{e.sub}</span>
               </Button>
@@ -99,10 +110,10 @@ export function Landing() {
             ) : (
               <>
                 <span>No sign-in needed to try it.</span>
-                <Button variant="quiet" className="!min-h-9 !px-2" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
+                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
                   Continue as guest
                 </Button>
-                <Button variant="quiet" className="!min-h-9 !px-2" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
+                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
                   Sign in with Google to keep your results
                 </Button>
               </>

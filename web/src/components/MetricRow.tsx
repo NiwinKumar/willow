@@ -18,11 +18,13 @@ type Props = {
   onSelect: () => void
   onToggle: () => void
   stamp?: boolean
+  /** The baseline has no noise band (one photo): show the change without a verdict. */
+  noBand?: boolean
   children?: React.ReactNode
 }
 
 /** One metric, same anatomy every time: label + confidence, value + delta, band bar, verdict + wording. */
-export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, selected, expanded, onSelect, onToggle, stamp = false, children }: Props) {
+export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, selected, expanded, onSelect, onToggle, stamp = false, noBand = false, children }: Props) {
   const reduce = useReducedMotion()
   const meta = METRIC_META[m.id]
   const unit = UNIT_LABEL[m.unit]
@@ -31,7 +33,8 @@ export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, select
   return (
     <li className={`relative border-b border-border transition-colors duration-150 ${selected ? 'bg-surface' : ''}`}>
       <div className="flex items-start gap-3 px-5 py-3 sm:px-6">
-        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left" aria-pressed={selected} aria-label={`${meta.label}: select to show its regions on the photo`}>
+        {/* No aria-label: the value, change and verdict inside are what a screen reader should hear. */}
+        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left" aria-pressed={selected} title="Select to show its regions on the photo">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-[15px] font-semibold">{meta.label}</span>
             <ConfidenceChip confidence={m.confidence} />
@@ -55,7 +58,7 @@ export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, select
               transition={{ ...SPRING_STAMP, opacity: { duration: DUR.fast } }}
               className="inline-flex"
             >
-              <VerdictChip verdict={m.verdict} />
+              <VerdictChip verdict={m.verdict} noBand={noBand} />
             </motion.span>
             {dirText ? <span className="text-[13px] text-text-2">{dirText}</span> : null}
             {m.verdict === 'no_baseline' && m.id === 'tone_ita' && meta.note ? <span className="text-[13px] text-text-3">{meta.note}</span> : null}

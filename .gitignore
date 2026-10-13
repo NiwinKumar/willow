@@ -45,3 +45,6 @@ engine/models/*.task
 .DS_Store
 .idea/
 .vscode/
+
+# Local end-to-end test photos (never commit images)
+web/public/__e2e/
