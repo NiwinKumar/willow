@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
 
-from app import storage
+from app import engine, storage
 from app.store import iso
 
 
@@ -37,10 +37,21 @@ def sign_all(names: list[str]) -> dict[str, str]:
         return dict(zip(unique, pool.map(storage.signed_get_url, unique), strict=True))
 
 
+def measured_result(doc: dict[str, Any]) -> dict[str, Any] | None:
+    """The stored result if it is a measurement; None for placeholders (old docs included)."""
+    if not doc.get("result_json"):
+        return None
+    result = json.loads(doc["result_json"])
+    measured = doc.get("measured")
+    if measured is None:  # sessions analysed before the measured flag existed
+        measured = not engine.is_placeholder(result)
+    return result if measured else None
+
+
 def wanted_urls(
     uid: str, sid: str, doc: dict[str, Any], existing: set[str], with_overlays: bool
 ) -> list[str]:
-    result = json.loads(doc["result_json"]) if doc.get("result_json") else None
+    result = measured_result(doc)
     names = []
     if result and preview_name(uid, sid) in existing:
         names.append(preview_name(uid, sid))
@@ -60,7 +71,9 @@ def session_view(
     baseline: dict[str, Any] | None,
     signed: dict[str, str],
 ) -> dict[str, Any]:
-    result = json.loads(doc["result_json"]) if doc.get("result_json") else None
+    result = measured_result(doc)
+    measured = result is not None
+    analyzed = doc["status"] == "done"
     preview = None
     if result and preview_name(uid, sid) in signed:
         size = result.get("image_size") or {}
@@ -85,7 +98,18 @@ def session_view(
             "n_frames": doc["n_frames"],
             "created_at": iso(doc.get("created_at")),
             "status": doc["status"],
-            "is_baseline": bool(doc.get("is_baseline")),
+            "is_baseline": bool(doc.get("is_baseline")) and measured,
+            # done but not measured: the engine cannot analyse this site yet; photos are kept.
+            "measured": measured if analyzed else None,
+            "baseline": (
+                {
+                    "session_id": baseline["session_id"],
+                    "frames": baseline.get("frames"),
+                    "has_noise_band": baseline.get("has_noise_band", True),
+                }
+                if baseline
+                else None
+            ),
             "note": doc.get("note"),
             "deviation": bool(doc.get("deviation")),
             "error": doc.get("error"),
@@ -96,5 +120,5 @@ def session_view(
         },
         "result": result,
         "labels": doc.get("labels") or {},
-        "explanation": doc.get("explanation"),
+        "explanation": doc.get("explanation") if measured else None,
     }

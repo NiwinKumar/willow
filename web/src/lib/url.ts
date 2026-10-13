@@ -4,7 +4,9 @@ import { useSearchParams } from 'react-router-dom'
 /** Report view state lives in the URL: ?t=<session index>&m=<metric id>&layer=1 */
 export function useViewState() {
   const [params, setParams] = useSearchParams()
-  const t = Number(params.get('t') ?? '')
+  // No ?t= means the latest session (Number('') would be 0, the baseline).
+  const rawT = params.get('t')
+  const t = rawT === null || rawT === '' ? Number.NaN : Number(rawT)
   const m = params.get('m') ?? null
   const layer = params.get('layer') === '1'
   const demo = params.get('demo') === '1'

@@ -10,7 +10,7 @@ import { UploadList } from '../components/UploadList'
 import { validateFiles, type Row } from '../lib/upload'
 import { useData } from '../data/useData'
 import type { CaptureMode, Site } from '../lib/api'
-import { SITE_LABEL } from '../lib/metrics'
+import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
@@ -19,7 +19,7 @@ const SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treate
 const RITUAL = [
   { icon: Sun, text: 'Same lamp, same spot, curtains closed.', why: 'Lighting is the biggest source of photo-to-photo change. Keeping it fixed is what makes the noise band small.' },
   { icon: Timer, text: 'Clean skin, nothing applied, waited 15 minutes.', why: 'Water, products and rubbing all change redness and shine for a while.' },
-  { icon: Wind, text: 'Hair back, glasses off, neutral face.', why: 'Hair and glasses cover regions; expressions move the landmarks the regions are built from.' },
+  { icon: Wind, text: 'Hair back, glasses off, neutral face.', why: 'Hair and glasses cover regions; expressions move the landmarks the regions are built from.', faceOnly: true },
   { icon: Thermometer, text: 'Colour card next to the skin, flat, not in shadow.', why: 'The card is how each photo gets colour-corrected. Shadow or glare on it fails the quality check.', calibratedOnly: true },
 ]
 
@@ -42,8 +42,11 @@ export function Capture() {
   const [shots, setShots] = useState(0)
   const [rows, setRows] = useState<Row[]>([])
   const [errors, setErrors] = useState<string[]>([])
-  const baselineNeeded = !data.series(site)?.sessions.some((s) => s.is_baseline)
+  const [uploadFew, setUploadFew] = useState(false)
+  // One baseline per site and capture mode: quick selfies are never compared with RAW photos.
+  const baselineNeeded = !data.series(site)?.sessions.some((s) => s.is_baseline && s.capture_mode === mode)
   const expected = baselineNeeded ? 5 : 3
+  const ready = rows.length > 0 && (rows.length >= expected || uploadFew)
 
   if (sample) return <Samples />
 
@@ -84,6 +87,11 @@ export function Capture() {
               </li>
             ))}
           </ul>
+          {data.mode === 'live' && !MEASURED_SITES.includes(site) ? (
+            <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
+              {SITE_LABEL[site]} is not measured yet: photos are saved and can be measured when it is ready. Forearm photos are measured today.
+            </p>
+          ) : null}
           <p className="mt-2 text-[13px] text-text-2">{baselineNeeded ? `No baseline yet for ${SITE_LABEL[site]}: this session takes 5 photos.` : `Check-in: 3 photos, compared to your baseline.`}</p>
 
           <div className="mt-6 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode">
@@ -102,7 +110,7 @@ export function Capture() {
 
           <h2 className="mt-8 text-[17px] font-semibold">The ritual</h2>
           <ul className="mt-3 divide-y divide-border border-y border-border">
-            {RITUAL.filter((r) => !r.calibratedOnly || mode === 'calibrated_raw').map((r, i) => (
+            {RITUAL.filter((r) => (!r.calibratedOnly || mode === 'calibrated_raw') && (!r.faceOnly || !site.startsWith('forearm'))).map((r, i) => (
               <li key={r.text}>
                 <button type="button" aria-expanded={why === i} onClick={() => setWhy(why === i ? null : i)} className="flex min-h-12 w-full items-center gap-3 py-2 text-left">
                   <r.icon size={22} aria-hidden className="shrink-0 text-willow-700" />
@@ -184,7 +192,11 @@ export function Capture() {
             <Button variant="quiet" onClick={() => setShots((s) => Math.max(0, s - 1))} disabled={shots === 0}>
               Undo
             </Button>
-            {shots >= expected ? <Button variant="secondary" onClick={() => setStep('export')}>All {expected} taken</Button> : null}
+            {shots >= expected ? (
+              <Button variant="secondary" onClick={() => setStep('export')}>All {expected} taken</Button>
+            ) : (
+              <Button variant="quiet" onClick={() => setStep('export')}>I already have my photos</Button>
+            )}
           </div>
         </>
       ) : null}
@@ -227,21 +239,45 @@ export function Capture() {
               </button>
             </div>
           ) : null}
-          {rows.length === 0 ? (
+          {!ready ? (
             <label className="mt-5 block">
-              <span className="sr-only">Choose files</span>
+              <span className="sr-only">{rows.length ? 'Choose more files' : 'Choose files'}</span>
               <input
                 type="file"
                 multiple
                 accept={mode === 'calibrated_raw' ? '.dng,image/x-adobe-dng,image/dng' : '.jpg,.jpeg,image/jpeg,.heic,image/heic'}
                 onChange={(e) => {
-                  const v = validateFiles(Array.from(e.target.files ?? []), mode, expected)
+                  const picked = Array.from(e.target.files ?? [])
+                  e.target.value = ''
+                  const v = validateFiles([...rows.map((r) => r.file), ...picked], mode, expected)
                   setErrors(v.errors)
                   setRows(v.rows)
                 }}
                 className="block w-full text-[15px] file:mr-3 file:min-h-11 file:rounded-(--radius-control) file:border file:border-border file:bg-surface file:px-4 file:text-[15px] file:font-medium"
               />
             </label>
+          ) : null}
+          {rows.length > 0 && !ready ? (
+            <div className="mt-4 rounded-(--radius-tile) border border-border bg-surface p-4">
+              <p className="text-[15px] font-medium">
+                {rows.length} of {expected} chosen
+              </p>
+              <ul className="mt-1 text-[13px] text-text-2">
+                {rows.map((r) => (
+                  <li key={`${r.file.name}-${r.file.size}`} className="truncate font-mono">
+                    {r.file.name}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[13px] text-text-2">
+                {baselineNeeded
+                  ? `A baseline with ${expected} photos lets Willow measure your normal photo-to-photo variation. With ${rows.length === 1 ? 'one photo' : 'fewer'}, changes are shown but cannot be called real yet.`
+                  : `Check-ins work best with ${expected} photos; fewer makes the reading noisier.`}
+              </p>
+              <Button variant="secondary" className="mt-3" onClick={() => setUploadFew(true)}>
+                Upload {rows.length} {rows.length === 1 ? 'photo' : 'photos'} now
+              </Button>
+            </div>
           ) : null}
           {errors.length ? (
             <ul className="mt-3 space-y-1 text-[13px] text-danger">
@@ -250,7 +286,7 @@ export function Capture() {
               ))}
             </ul>
           ) : null}
-          {rows.length > 0 && user ? (
+          {ready && user ? (
             <div className="mt-5">
               <UploadList
                 site={site}
@@ -261,7 +297,6 @@ export function Capture() {
               />
             </div>
           ) : null}
-          {rows.length > 0 && rows.length < expected ? <p className="mt-3 text-[13px] text-warn-text">{expected - rows.length} more to go. Choose the rest and they will be added.</p> : null}
         </>
       ) : null}
     </div>

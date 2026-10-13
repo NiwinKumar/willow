@@ -10,7 +10,8 @@ import { toSession } from '../data/live'
 import type { Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { ApiError, api, type SessionView } from '../lib/api'
-import { QUALITY_COPY } from '../lib/metrics'
+import { plural } from '../lib/format'
+import { QUALITY_COPY, SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { useAuth } from '../lib/useAuth'
 import { DEMO_SERIES } from '../mock/series'
@@ -20,20 +21,50 @@ const LABELS = ['Checking photo quality', 'Correcting colours', 'Measuring', 'Ex
 /** What each stage turned out to be, written from the real result. */
 function outcomes(view: SessionView): string[] {
   const r = view.result
-  if (!r) return LABELS
+  const n = view.session.n_frames
+  if (view.session.measured === false || !r) {
+    return [`${n} ${n === 1 ? 'photo' : 'photos'} received and saved`, `${SITE_LABEL[view.session.site]} is not measured yet`, 'Nothing measured, so no numbers', 'Nothing to explain']
+  }
   const q = r.quality
-  const quality = q.passed ? `${r.frames_used} of ${view.session.n_frames} frames passed` : (q.reasons.map((x) => QUALITY_COPY[x]?.text).filter(Boolean)[0] ?? 'Photo quality too low to compare')
+  const quality = q.passed ? `${r.frames_used} of ${n} ${n === 1 ? 'photo' : 'photos'} passed the quality check` : (q.reasons.map((x) => QUALITY_COPY[x]?.text).filter(Boolean)[0] ?? 'Photo quality too low to compare')
+  const warnings = r.warnings ?? []
+  const paper = warnings.some((w) => w.includes('white paper')) && !warnings.some((w) => w.includes('no white reference'))
   const colour =
     r.capture_mode === 'uncalibrated'
       ? 'No colour card: results are a trend'
       : q.card_detected
         ? `Colour card found${q.card_delta_e_mean != null ? `, ΔE ${q.card_delta_e_mean}` : ''}`
-        : 'Colour card not found'
-  const first = r.metrics.every((m) => m.verdict === 'no_baseline')
+        : paper
+          ? 'Colours corrected with the white paper'
+          : 'No colour reference found: colours not corrected'
   const count = `${r.metrics.length} ${r.metrics.length === 1 ? 'metric' : 'metrics'}`
-  const measured = first ? `${count}, your first reading` : `${count} against your baseline`
+  const measured = view.session.is_baseline
+    ? `${count} measured. This is your baseline`
+    : view.session.baseline?.has_noise_band === false
+      ? `${count} compared with your baseline (no noise band yet)`
+      : `${count} compared with your baseline`
   const explained = view.session.explanation_source === 'gemini' ? 'Numbers verified, nothing invented' : 'Written from your numbers'
   return [quality, colour, measured, explained]
+}
+
+/**
+ * Analyze a session exactly once, whatever page reloads happen: a finished session is shown as it
+ * is, a session another tab (or a refresh) is analysing is waited for, anything else is analysed.
+ */
+async function analyzeOnce(token: string, sessionId: string): Promise<SessionView> {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+  let current = await api.getSession(token, sessionId)
+  for (let i = 0; current.session.status === 'processing' && i < 60; i++) {
+    await wait(3000)
+    current = await api.getSession(token, sessionId)
+  }
+  if (current.session.status === 'done') return current
+  try {
+    return await api.analyze(token, sessionId)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409 && e.code === 'conflict') return analyzeOnce(token, sessionId)
+    throw e
+  }
 }
 
 const ERROR_COPY: Record<string, string> = {
@@ -65,6 +96,7 @@ export function Processing() {
   const [view, setView] = useState<SessionView | null>(null)
   const [error, setError] = useState<{ code: string | null; message: string } | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
   const ran = useRef(-1)
 
   // Demo and samples: the scripted run.
@@ -82,41 +114,50 @@ export function Processing() {
     }
   }, [scripted, navigate, step, demoSeries, site, demoLast])
 
-  // Live: one analyze call per attempt; the first two stages tick while it runs.
+  // Live: one analyze call per attempt; the first two stages tick while it runs. The call is
+  // guarded by `ran` and is never cancelled by an effect cleanup (React runs effects twice in
+  // development, which used to drop the result); only unmounting stops state updates.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   useEffect(() => {
     if (scripted || ran.current === attempt) return
     ran.current = attempt
-    let alive = true
-    const ticks = [window.setTimeout(() => alive && setDone((d) => Math.max(d, 1)), step), window.setTimeout(() => alive && setDone((d) => Math.max(d, 2)), step * 2)]
+    const later = (ms: number, f: () => void) => window.setTimeout(() => mounted.current && f(), ms)
+    // No stage is ticked before the engine answers: progress shown is real or not shown at all.
+    const started = Date.now()
+    const clock = window.setInterval(() => mounted.current && setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    const ticks = [clock]
     void (async () => {
       try {
         const token = await getIdToken()
         const dev = params.get('dev') === '1'
         const note = params.get('note')
         if (dev || note) await api.patchSession(token, sessionId, { deviation: dev, note: note || null })
-        const v = await api.analyze(token, sessionId)
-        if (!alive) return
+        const v = await analyzeOnce(token, sessionId)
+        if (!mounted.current) return
+        ticks.forEach(clearInterval)
         setView(v)
         data.upsert(v)
-        ticks.forEach(clearTimeout)
-        for (let i = 0; i <= LABELS.length; i++) window.setTimeout(() => alive && setDone((d) => Math.max(d, i)), (reduce ? 120 : 380) * i)
+        for (let i = 0; i <= LABELS.length; i++) later((reduce ? 120 : 380) * i, () => setDone((d) => Math.max(d, i)))
       } catch (e) {
-        if (!alive) return
-        ticks.forEach(clearTimeout)
+        if (!mounted.current) return
+        ticks.forEach(clearInterval)
         const code = e instanceof ApiError ? e.code : null
-        setError({ code, message: (code && ERROR_COPY[code]) || 'Something went wrong while measuring. Your photos are safe; try again.' })
+        setError({ code, message: (code && ERROR_COPY[code]) || (e instanceof ApiError && e.message) || 'Something went wrong while measuring. Your photos are safe; try again.' })
       }
     })()
-    return () => {
-      alive = false
-      ticks.forEach(clearTimeout)
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scripted, attempt, sessionId])
 
-  // Live: once every stage shows its result, open the report on this session.
+  // Live: once every stage shows its result, open the report on this session (unless nothing
+  // was measured; then this page says what happened and offers what works today).
   useEffect(() => {
-    if (scripted || !view || done < LABELS.length) return
+    if (scripted || !view || done < LABELS.length || view.session.measured === false) return
     const t = window.setTimeout(() => {
       const series = data.series(site)
       const index = series ? series.sessions.filter((s) => s.status === 'done').findIndex((s) => s.id === view.session.id) : -1
@@ -128,19 +169,25 @@ export function Processing() {
   const results = view ? outcomes(view) : null
   const stageSession: Session | null = view ? toSession(view) : (demoSeries?.sessions[demoLast] ?? null)
   const failed = Boolean(view?.result && !view.result.quality.passed)
+  const unmeasured = view?.session.measured === false
 
   return (
     <div className="flex min-h-dvh flex-col">
       {data.mode === 'demo' ? <DemoBar /> : null}
       <div className="h-[40dvh]">
-        <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={`${view?.session.n_frames ?? n} frames`} />
+        <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'frame', 'frames')} />
       </div>
       <div className="mx-auto w-full max-w-[36rem] px-5 py-6 sm:px-8">
-        <h1 className="text-[22px] font-bold tracking-[-0.02em]">{error ? 'Measuring stopped' : done < LABELS.length ? 'Measuring…' : failed ? 'Done, with a photo problem' : 'Done'}</h1>
+        <h1 className="text-[22px] font-bold tracking-[-0.02em]">{error ? 'Measuring stopped' : done < LABELS.length ? 'Measuring…' : unmeasured ? 'Saved, not measured yet' : failed ? 'Done, with a photo problem' : 'Done'}</h1>
+        {!scripted && !view && !error ? (
+          <p className="mt-1 font-mono text-[13px] text-text-2" aria-live="off">
+            {elapsed} s · usually 10 to 30 s, longer for the first photo of the day
+          </p>
+        ) : null}
         <ol className="mt-4 space-y-3" aria-live="polite">
           {LABELS.map((label, i) => {
-            const state = i < done ? 'done' : error ? 'stopped' : i === done ? 'active' : 'pending'
-            const text = state === 'done' ? (results?.[i] ?? (scripted ? scriptedResult(i, n) : label)) : label
+            const state = unmeasured && i > 0 && i < done ? 'skipped' : i < done ? 'done' : error ? 'stopped' : i === done ? 'active' : 'pending'
+            const text = state === 'done' || state === 'skipped' ? (results?.[i] ?? (scripted ? scriptedResult(i, n) : label)) : label
             return (
               <li key={label} className="flex items-center gap-3">
                 <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${state === 'done' ? 'border-willow-500 bg-willow-100 text-willow-700' : state === 'active' ? 'border-text' : 'border-border'}`} aria-hidden>
@@ -150,6 +197,8 @@ export function Processing() {
                     </motion.span>
                   ) : state === 'active' ? (
                     <motion.span className="h-2 w-2 rounded-full bg-text" animate={reduce ? {} : { opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.2 }} />
+                  ) : state === 'skipped' ? (
+                    <span className="h-px w-2.5 bg-text-3" />
                   ) : state === 'stopped' && i === done ? (
                     <X size={14} className="text-text-3" />
                   ) : null}
@@ -159,6 +208,17 @@ export function Processing() {
             )
           })}
         </ol>
+        {unmeasured && done >= LABELS.length ? (
+          <div className="mt-6 space-y-3">
+            <p className="text-[15px] text-text-2">
+              Willow measures forearm photos today. {SITE_LABEL[view!.session.site]} measurement is still being built, so this session has no numbers. Your photos are kept and can be measured when it is ready.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => navigate('/capture?site=forearm_control')}>Photograph a forearm</Button>
+              <Button variant="secondary" onClick={() => navigate('/')}>Done</Button>
+            </div>
+          </div>
+        ) : null}
         {error ? (
           <div className="mt-6 space-y-3">
             <p className="text-[15px] text-text-2">{error.message}</p>

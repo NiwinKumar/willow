@@ -1,6 +1,7 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
 import type { AnalysisResult, Explanation, Product, RoutineEntry } from '../data/types'
+import { DEV_UID } from './devAuth'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
 
@@ -28,6 +29,10 @@ export type SessionView = {
     created_at: string
     status: 'uploading' | 'processing' | 'done' | 'failed'
     is_baseline: boolean
+    /** null until analysed; false when the engine cannot measure this site yet (photos kept). */
+    measured: boolean | null
+    /** The baseline this session is compared with (same site and capture mode). */
+    baseline: { session_id: string; frames: number | null; has_noise_band: boolean } | null
     note: string | null
     deviation: boolean
     error: { code: string; message: string } | null
@@ -67,7 +72,12 @@ export class ApiError extends Error {
 async function request<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}),
+      ...(init?.headers ?? {}),
+    },
   })
   if (!res.ok) {
     const text = await res.text()
