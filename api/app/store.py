@@ -28,6 +28,7 @@ class Store(Protocol):
     def routine_get(self, uid: str, entry_id: str) -> Doc | None: ...
     def routine_set(self, uid: str, entry_id: str, doc: Doc) -> None: ...
     def routine_delete(self, uid: str, entry_id: str) -> None: ...
+    def usage_incr(self, uid: str, day: str, key: str) -> int: ...
     def delete_user(self, uid: str) -> None: ...
 
 
@@ -70,6 +71,13 @@ class FirestoreStore:
     def routine_delete(self, uid: str, entry_id: str) -> None:
         self._db().document(f"users/{uid}/routine/{entry_id}").delete()
 
+    def usage_incr(self, uid: str, day: str, key: str) -> int:
+        from google.cloud import firestore
+
+        ref = self._db().document(f"users/{uid}/usage/{day}")
+        ref.set({key: firestore.Increment(1)}, merge=True)
+        return int((ref.get().to_dict() or {}).get(key, 0))
+
     def delete_user(self, uid: str) -> None:
         db = self._db()
         db.recursive_delete(db.document(f"users/{uid}"))
@@ -80,6 +88,7 @@ class MemoryStore:
         self.sessions: dict[tuple[str, str], Doc] = {}
         self.baselines: dict[tuple[str, str], Doc] = {}
         self.routine: dict[tuple[str, str], Doc] = {}
+        self.usage: dict[tuple[str, str, str], int] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -114,8 +123,13 @@ class MemoryStore:
     def routine_delete(self, uid: str, entry_id: str) -> None:
         self.routine.pop((uid, entry_id), None)
 
+    def usage_incr(self, uid: str, day: str, key: str) -> int:
+        k = (uid, day, key)
+        self.usage[k] = self.usage.get(k, 0) + 1
+        return self.usage[k]
+
     def delete_user(self, uid: str) -> None:
-        for table in (self.sessions, self.baselines, self.routine):
+        for table in (self.sessions, self.baselines, self.routine, self.usage):
             for key in [k for k in table if k[0] == uid]:
                 del table[key]
 

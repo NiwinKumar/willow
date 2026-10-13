@@ -30,6 +30,17 @@ class FakeCloud:
         )
 
 
+@pytest.fixture(autouse=True)
+def no_real_gemini(monkeypatch: pytest.MonkeyPatch):
+    """Tests never call Vertex; a test that needs Gemini replaces generate_json itself."""
+    from app import gemini
+
+    def offline(*args, **kwargs):
+        raise gemini.GeminiError("offline in tests")
+
+    monkeypatch.setattr(gemini, "generate_json", offline)
+
+
 @pytest.fixture
 def fake(monkeypatch: pytest.MonkeyPatch):
     cloud = FakeCloud()

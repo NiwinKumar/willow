@@ -1,4 +1,3 @@
-import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -7,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from app import baselines, storage
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
+from app.results import measured_result
 from app.store import Store, get_store, iso
 
 router = APIRouter(prefix="/v1", tags=["timeline", "baselines", "me"])
@@ -22,15 +22,12 @@ def timeline(
     rows = [
         (sid, d)
         for sid, d in store.sessions_list(user.uid)
-        if d["site"] == site
-        and d.get("status") == "done"
-        and d.get("result_json")
-        and d.get("measured", True)
+        if d["site"] == site and d.get("status") == "done" and measured_result(d) is not None
     ]
     rows.sort(key=lambda r: r[1].get("created_at") or datetime.min.replace(tzinfo=UTC))
     series: dict[str, list[dict[str, Any]]] = {}
     for sid, d in rows:
-        for m in json.loads(d["result_json"])["metrics"]:
+        for m in measured_result(d)["metrics"]:
             series.setdefault(m["id"], []).append(
                 {
                     "session_id": sid,
@@ -68,9 +65,10 @@ def set_baseline(
         raise HTTPException(404, {"code": "not_found", "message": "session not found for site"})
     if doc.get("status") != "done" or not doc.get("result_json"):
         raise HTTPException(409, {"code": "conflict", "message": "session not analyzed yet"})
-    if not doc.get("measured", True):
+    result = measured_result(doc)
+    if result is None:
         raise HTTPException(409, {"code": "conflict", "message": "this session is not measured"})
-    if not json.loads(doc["result_json"])["quality"]["passed"]:
+    if not result["quality"]["passed"]:
         raise HTTPException(409, {"code": "conflict", "message": "photo quality too low"})
     saved = baselines.set_baseline(store, user.uid, body.session_id, doc)
     return {

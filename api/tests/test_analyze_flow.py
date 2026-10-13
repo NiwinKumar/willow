@@ -233,3 +233,55 @@ def test_delete_me_removes_photos_results_and_documents(client, fake):
     assert fake.deleted_prefixes == ["uploads/u_test/", "results/u_test/"]
     assert fake.store.sessions_list("u_test") == []
     assert fake.store.baseline_get("u_test", "forearm_treated") is None
+
+
+def test_sessions_keep_the_baseline_they_were_compared_with(client, fake):
+    first = _create(client, n=1)
+    _upload_all(fake, first)
+    client.post(f"/v1/sessions/{first['session_id']}/analyze")
+    second = _create(client, n=5)
+    _upload_all(fake, second)
+    client.post(f"/v1/sessions/{second['session_id']}/analyze")
+    third = _create(client, n=1)
+    _upload_all(fake, third)
+    client.post(f"/v1/sessions/{third['session_id']}/analyze")
+
+    client.post("/v1/baselines/forearm_treated", json={"session_id": second["session_id"]})
+    view = client.get(f"/v1/sessions/{third['session_id']}").json()
+    # Still labelled with the baseline its numbers were computed against.
+    assert view["session"]["baseline"]["session_id"] == first["session_id"]
+    assert view["session"]["baseline"]["has_noise_band"] is False
+
+
+def test_legacy_baselines_from_placeholders_are_ignored(client, fake):
+    import json as _json
+
+    created = _create(client, n=1)
+    result = engine.fixture_result(
+        {
+            "schema_version": "1.0",
+            "session_id": created["session_id"],
+            "user_id": "u_test",
+            "site": "forearm_treated",
+            "capture_mode": "calibrated_raw",
+            "frames": [{"uri": "gs://b/x"}],
+        }
+    )
+    result["engine_version"] = "0.2.0-placeholder"
+    fake.store.session_update(
+        "u_test", created["session_id"], {"status": "done", "result_json": _json.dumps(result)}
+    )
+    fake.store.baseline_set(
+        "u_test",
+        "forearm_treated",
+        {
+            "session_id": created["session_id"],
+            "metrics": {"redness": {"mean": 13.4, "mdc95": 0.86, "n_frames": 5}},
+        },
+    )
+    fresh = _create(client, n=1)
+    _upload_all(fake, fresh)
+    view = client.post(f"/v1/sessions/{fresh['session_id']}/analyze").json()
+    # The fake baseline is not used: this real session becomes the baseline instead.
+    assert view["session"]["is_baseline"] is True
+    assert {m["verdict"] for m in view["result"]["metrics"]} == {"no_baseline"}
