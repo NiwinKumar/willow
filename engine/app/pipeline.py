@@ -13,7 +13,7 @@ from app.color import linear_srgb_to_lab, white_balance
 from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
 from app.markers import find_dot_squares, paper_pixels
 from app.metrics.redness import redness
-from app.metrics.tone import tone_ita
+from app.metrics.tone import ita_band, tone_ita
 from app.quality import FrameQuality, check_frame
 from app.roi import Box, skin_mask
 
@@ -23,6 +23,15 @@ METRIC_INFO = {  # id -> (group, label, unit)
     "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
     "redness": ("redness", "Redness", "a_star"),
 }
+
+
+def _mean_extras(per_frame: list[dict]) -> dict:
+    """Average numeric extras over the good frames (text extras are recomputed by the caller)."""
+    out = {}
+    for key, first in per_frame[0].items():
+        if isinstance(first, (int, float)):
+            out[key] = round(sum(e[key] for e in per_frame) / len(per_frame), 2)
+    return out
 
 
 def capture_mode_for(files: list[str]) -> str:
@@ -115,7 +124,9 @@ def analyze_forearm(
         base = (baseline or {}).get(metric_id)
         if passed_values:
             summary = summarize([v[metric_id] for v in passed_values], base)
-            extras = passed_extras[0][metric_id]  # extras of the first good frame
+            extras = _mean_extras([e[metric_id] for e in passed_extras])
+            if metric_id == "tone_ita":  # band must describe the reported (mean) value
+                extras["ita_band"] = ita_band(summary["value"])
         else:
             summary = {
                 "value": None,

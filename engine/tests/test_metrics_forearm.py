@@ -142,3 +142,17 @@ def test_paper_found_automatically(tmp_path):
     linear, srgb8 = _load(str(tmp_path / "p.jpg"))
     px = paper_pixels(linear, srgb8)
     assert len(px) > 300 and px.mean() > 0.7  # paper is the bright patch, not skin/background
+
+
+def test_ita_band_matches_mean_value(tmp_path):
+    from app.metrics.tone import ita_band
+
+    rng = np.random.default_rng(5)
+    files = []
+    for i in range(3):
+        _fake_photo(tmp_path / f"g{i}.jpg", rng)
+        files.append(str(tmp_path / f"g{i}.jpg"))
+    skin, paper = Box(70, 70, 160, 160), Box(290, 70, 80, 160)
+    ita = analyze_forearm(files, "forearm_control", [skin] * 3, [paper] * 3)["metrics"][0]
+    assert ita["extras"]["ita_band"] == ita_band(ita["value"])
+    assert set(ita["extras"]) == {"l_star", "b_star", "ita_band"}
