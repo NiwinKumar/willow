@@ -44,3 +44,10 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - What: `SessionView.session` carries `preview` (signed GET URL of `{output_prefix}preview.jpg` when the engine wrote one, else null), `overlay_urls` (signed), `hours_since_baseline`, `note`, `deviation`, `error`, `explanation_source` (`template` | `gemini`). New api routes: `PATCH /v1/sessions/{id}`, `POST /v1/sessions/{id}/upload-urls`, `GET /v1/sessions?site=`, `DELETE /v1/me` (all listed in DESIGN.md section 8 as api work with no contract change).
 - Impact on the engine: none. The api reads `preview.jpg` only if it exists, so it works with or without proposal 1b.
 - Approved by: n/a (api and web are both Niwin's)
+
+## 2026-10-13: Forehead and chin close-ups (proposed by Harshini)
+- Why: pores, blackheads, texture and small blemishes also show on the forehead and chin (T-zone and chin are common acne areas), and a full-face photo is too coarse for them (~14 px/mm on an iPhone selfie vs ~40-60 px/mm in macro). The contract only has close-ups for cheek and nose.
+- Change: add sites `forehead_macro` and `chin_macro` to the `site` enum in `schemas/analyze_request.schema.json` and `schemas/analysis_result.schema.json`; bump `schema_version` to `1.1`. Metrics on the new sites: `pores`, `texture`, `blemishes` (blackheads in `extras`, as on `nose_macro`). Capture as for `cheek_macro`: same spot each time, fixed distance with the paper cone.
+- Impact on engine: same macro pipeline as `cheek_macro` / `nose_macro`, only the site name differs; no new maths. Lands with the M3 macro work.
+- Impact on api / web: two more sites in the capture guide and site picker, baselines and timeline per site, site lists in Firestore and BigQuery.
+- Approved by: [x] Harshini [ ] Niwin
