@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Chip } from '../components/Chip'
+import { CoachMarks } from '../components/CoachMarks'
 import { ControlCompare } from '../components/ControlCompare'
 import { DemoBar } from '../components/DemoBar'
 import { MetricDetail } from '../components/MetricDetail'
@@ -38,6 +39,7 @@ export function Report() {
   const [expanded, setExpanded] = useState<MetricId | null>(null)
   const [snap, setSnap] = useState<Snap>('half')
   const [siteSheet, setSiteSheet] = useState(false)
+  const [keys, setKeys] = useState(false)
 
   const metrics = session?.result?.metrics ?? []
   const baselineMetric = useCallback((id: MetricId) => baseline?.result?.metrics.find((m) => m.id === id) ?? null, [baseline])
@@ -62,6 +64,7 @@ export function Report() {
       if (e.key === 'ArrowLeft') view.set({ t: Math.max(0, index - 1) })
       else if (e.key === 'ArrowRight') view.set({ t: Math.min(sessions.length - 1, index + 1) })
       else if (e.key.toLowerCase() === 'l') view.set({ layer: !view.layer })
+      else if (e.key === '?') setKeys(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -229,7 +232,7 @@ export function Report() {
   )
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-bg">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-bg">
       {data.mode === 'demo' ? <DemoBar /> : null}
       {topBar}
       {/* Desktop: stage + scrubber left, panel right */}
@@ -248,6 +251,17 @@ export function Report() {
         </SnapSheet>
         {scrubber}
       </div>
+      <CoachMarks id="lens" />
+      <Sheet open={keys} onOpenChange={setKeys} title="Keyboard">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[15px]">
+          {[['← →', 'Move through sessions'], ['Home / End', 'Baseline / latest'], ['L', 'Toggle the layer on the photo'], ['Hold B', 'Flicker to the baseline'], ['?', 'This list']].map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="font-mono text-[13px] text-text-2">{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </Sheet>
       <Sheet open={siteSheet} onOpenChange={setSiteSheet} title="Choose a site">
         <ul className="divide-y divide-border">
           {data.sites.map((s) => (
