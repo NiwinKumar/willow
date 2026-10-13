@@ -18,6 +18,7 @@ import { Stage } from '../components/Stage'
 import { baselineFor, isSampleEngine, isUnmeasured, matchControl } from '../data/live'
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
+import { missingBaselines } from '../lib/baselineGuide'
 import { fmtDate, plural } from '../lib/format'
 import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
 import { ApiError, api } from '../lib/api'
@@ -41,12 +42,14 @@ export function Report() {
   const baseline = useMemo(() => baselineFor(session, sessions), [session, sessions])
   const { getIdToken, loading: authLoading, user, continueAsGuest, signInWithGoogle } = useAuth()
   const [settingBaseline, setSettingBaseline] = useState(false)
+  const [confirmBaseline, setConfirmBaseline] = useState(false)
   const unmeasured = isUnmeasured(session)
   const qualityFailed = Boolean(session?.result && !session.result.quality.passed)
   const nothingMeasured = Boolean(session?.result && session.result.metrics.every((m) => m.value === null))
   const controlSessions = useMemo(() => data.series('forearm_control')?.sessions ?? [], [data])
   // Demo journeys are aligned by index; live pairs the nearest control photo in time.
   const controlSession = data.mode === 'demo' ? (controlSessions[index] ?? null) : matchControl(session, controlSessions)
+  const missing = session?.is_baseline ? missingBaselines(data.series, session.capture_mode).filter((m) => m !== site) : []
   const noBand = Boolean(session && !session.is_baseline && session.baseline_ref && !session.baseline_ref.has_noise_band)
 
   const makeBaseline = async () => {
@@ -55,6 +58,7 @@ export function Report() {
     try {
       await api.setBaseline(await getIdToken(), session.site, session.id)
       await data.refresh()
+      setConfirmBaseline(false)
       toast('This session is now your baseline. Later sessions are compared with it.')
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not change the baseline. Try again.')
@@ -188,6 +192,20 @@ export function Report() {
                 One photo, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
               </p>
             ) : null}
+            {data.mode === 'live' && missing.length ? (
+              <p className="mt-2 text-[13px] text-text-2">
+                Still without a baseline:{' '}
+                {missing.map((m, i) => (
+                  <span key={m}>
+                    {i ? ', ' : ''}
+                    <Link to={`/capture?site=${m}${session.capture_mode === 'uncalibrated' ? '&mode=quick' : ''}`} className="font-medium text-willow-700 underline-offset-2 hover:underline">
+                      {SITE_LABEL[m]}
+                    </Link>
+                  </span>
+                ))}
+                .
+              </p>
+            ) : null}
           </>
         ) : (
           <>
@@ -210,10 +228,26 @@ export function Report() {
                 {session && session.n_frames >= 2 ? 'This session has several photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
               </p>
             ) : null}
-            {data.mode === 'live' && session && !session.is_baseline && session.result?.quality.passed && session.n_frames > (session.baseline_ref?.frames ?? 0) ? (
-              <Button variant="secondary" className="mt-3 !min-h-10" disabled={settingBaseline} onClick={() => void makeBaseline()}>
-                {settingBaseline ? 'Saving…' : 'Make this my baseline'}
-              </Button>
+            {data.mode === 'live' && session && !session.is_baseline && session.measured !== false && session.result?.quality.passed ? (
+              confirmBaseline ? (
+                <div className="mt-3 rounded-(--radius-tile) border border-border bg-surface p-3">
+                  <p className="text-[13px] text-text-2">
+                    Choose this only if it was taken before you started a product, for example when your first session had poor light. Later sessions are compared with this one; earlier comparisons stay as they are.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button className="!min-h-10" disabled={settingBaseline} onClick={() => void makeBaseline()}>
+                      {settingBaseline ? 'Saving…' : 'Make this my baseline'}
+                    </Button>
+                    <Button variant="quiet" className="!min-h-10" disabled={settingBaseline} onClick={() => setConfirmBaseline(false)}>
+                      Keep the current one
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => setConfirmBaseline(true)}>
+                  Make this my baseline
+                </Button>
+              )
             ) : null}
           </>
         )}

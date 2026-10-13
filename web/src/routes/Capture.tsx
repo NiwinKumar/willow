@@ -6,10 +6,12 @@ import { toast } from 'sonner'
 
 import { Button } from '../components/Button'
 import { DemoBar } from '../components/DemoBar'
+import { BaselineChecklist, FirstSessionGuide } from '../components/BaselineGuide'
 import { UploadList } from '../components/UploadList'
 import { validateFiles, type Row } from '../lib/upload'
 import { leaveDemo, useData } from '../data/useData'
 import type { CaptureMode, Site } from '../lib/api'
+import { DONT_VARY, baselineState, photoSteps } from '../lib/baselineGuide'
 import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { prefs } from '../lib/prefs'
@@ -46,7 +48,9 @@ export function Capture() {
   const [errors, setErrors] = useState<string[]>([])
   const [uploadFew, setUploadFew] = useState(false)
   // One baseline per site and capture mode: quick selfies are never compared with RAW photos.
-  const baselineNeeded = !data.series(site)?.sessions.some((s) => s.is_baseline && s.capture_mode === mode)
+  // Photos saved before a site is measured count: the first of them becomes the baseline later.
+  const baselineNeeded = baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
+  const steps = photoSteps(site, mode)
   const expected = baselineNeeded ? 5 : 3
   const ready = rows.length > 0 && (rows.length >= expected || uploadFew)
 
@@ -94,7 +98,7 @@ export function Capture() {
               {SITE_LABEL[site]} is not measured yet: photos are saved and can be measured when it is ready. Forearm photos are measured today.
             </p>
           ) : null}
-          <p className="mt-2 text-[13px] text-text-2">{baselineNeeded ? `No baseline yet for ${SITE_LABEL[site]}: this session takes 5 photos.` : `Check-in: 3 photos, compared to your baseline.`}</p>
+          {!baselineNeeded ? <p className="mt-2 text-[13px] text-text-2">Check-in: 3 photos, compared with your baseline.</p> : null}
 
           <div className="mt-6 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode">
             {(
@@ -109,6 +113,17 @@ export function Capture() {
               </button>
             ))}
           </div>
+
+          {baselineNeeded ? (
+            <div className="mt-6">
+              <FirstSessionGuide site={site} mode={mode} />
+            </div>
+          ) : null}
+          {data.mode === 'live' ? (
+            <div className="mt-8">
+              <BaselineChecklist mode={mode} current={site} onPick={setSite} />
+            </div>
+          ) : null}
 
           <h2 className="mt-8 text-[17px] font-semibold">The ritual</h2>
           <ul className="mt-3 divide-y divide-border border-y border-border">
@@ -130,7 +145,7 @@ export function Capture() {
             ) : null}
             <li className="flex min-h-12 items-center gap-3 py-2">
               <Check size={22} aria-hidden className="shrink-0 text-willow-700" />
-              <span className="text-[15px]">{baselineNeeded ? 'Baseline: 5 photos. Move the phone away and back between each.' : 'Check-in: 3 photos. Reposition between each.'}</span>
+              <span className="text-[15px]">{baselineNeeded ? '5 photos for your baseline.' : '3 photos.'} Between each: {steps.between.charAt(0).toLowerCase() + steps.between.slice(1)}</span>
             </li>
           </ul>
 
@@ -185,7 +200,8 @@ export function Capture() {
       {step === 'ring' ? (
         <>
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Take your {expected} photos</h1>
-          <p className="mt-2 text-[15px] text-text-2">Tap after each shot in Lightroom. Between shots: {site.includes('macro') ? 'lift the cone off and put it back on the same spot.' : 'move the phone away, then back to about 35 to 40 cm.'}</p>
+          <p className="mt-2 text-[15px] text-text-2">Tap after each shot in Lightroom. Between shots: {steps.between.charAt(0).toLowerCase() + steps.between.slice(1)}</p>
+          {baselineNeeded ? <p className="mt-2 text-[13px] text-text-2">{DONT_VARY}</p> : null}
           <div className="mt-8">{ring}</div>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button onClick={() => setShots((s) => Math.min(expected, s + 1))} disabled={shots >= expected}>
