@@ -8,6 +8,10 @@ dependencies = [
   "uvicorn[standard]",
   "pydantic>=2",
   "jsonschema",
+  "numpy>=2.4.6",
+  "rawpy>=0.27.1",
+  "pillow>=12.3.0",
+  "pillow-heif==1.8.0",
 ]
 # Claude Code adds and pins: numpy, rawpy, opencv-contrib-python-headless,
 # scikit-image, colour-science, colour-checker-detection, mediapipe,
@@ -18,3 +22,6 @@ dev = ["pytest", "ruff", "httpx"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
