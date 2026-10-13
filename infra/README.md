@@ -4,9 +4,9 @@
 - Deploy commands (fill in once services exist):
 
 ```bash
-# engine (from repo root; image needs schemas/ and fixtures/)
-gcloud builds submit --config infra/cloudbuild.engine.yaml .
-gcloud run deploy willow-engine --image us-central1-docker.pkg.dev/$PROJECT_ID/willow/engine:latest --region us-central1 \
+# engine (from repo root; image needs schemas/ and fixtures/); tag with the commit
+gcloud builds submit --config infra/cloudbuild.engine.yaml --substitutions=_TAG=$(git rev-parse --short HEAD) .
+gcloud run deploy willow-engine --image us-central1-docker.pkg.dev/$PROJECT_ID/willow/engine:<tag> --region us-central1 \
   --service-account sa-engine@$PROJECT_ID.iam.gserviceaccount.com \
   --no-allow-unauthenticated --cpu 2 --memory 4Gi --concurrency 1 \
   --min-instances 0 --max-instances 3 --timeout 120
@@ -26,7 +26,7 @@ Deployed Oct 13 (M1):
 | Service | URL | Notes |
 |---|---|---|
 | willow-api | https://willow-api-hrlt7lqdwa-uc.a.run.app | public; health at `/v1/health`; every other route needs a Firebase ID token |
-| willow-engine | https://willow-engine-hrlt7lqdwa-uc.a.run.app | private; `sa-api` has `roles/run.invoker` (granted Oct 13); placeholder image returns the fixture |
+| willow-engine | https://willow-engine-hrlt7lqdwa-uc.a.run.app | private; `sa-api` has `roles/run.invoker` (granted Oct 13); real pipeline since Oct 13 (`engine:26f53f7`): forearm sites measured, face and macro sites return the fixture marked `-placeholder`; health at `/v1/health` |
 | web | https://willow-511508.web.app | Firebase Hosting |
 
 Gotcha: `GET /healthz` on any `*.run.app` host is answered by Google's frontend with a 404 before it reaches the container (seen on both services). Use another path for health checks; the api uses `/v1/health`.
