@@ -10,6 +10,7 @@ gcloud auth application-default login
 gcloud config set project <PROJECT_ID>
 ```
 No key files. Cloud Run uses service accounts `sa-engine` and `sa-api`.
+Signed upload URLs are signed with IAM signBlob as `sa-api`. Locally the api impersonates `sa-api` (set `SIGNING_SERVICE_ACCOUNT=sa-api@willow-511508.iam.gserviceaccount.com`; your user needs `roles/iam.serviceAccountTokenCreator` on it, which project Owner already has).
 
 ## engine (Harshini)
 ```bash
@@ -27,14 +28,14 @@ ENGINE_MODE=fixture uv run uvicorn app.main:app --reload --port 8080
 Env vars:
 | Var | Example | Notes |
 |---|---|---|
-| PROJECT_ID | willow-2026 | |
-| BUCKET | willow-2026-captures | |
+| PROJECT_ID | willow-511508 | |
+| BUCKET | willow-511508-captures | |
 | ENGINE_MODE | fixture / http | fixture returns `fixtures/analysis_result.sample.json` |
 | ENGINE_URL | https://willow-engine-xxxx.run.app | private; api adds an ID token |
-| GEMINI_MODEL | (pin exact Flash model ID) | |
-| VERTEX_LOCATION | us-central1 | |
+| GEMINI_MODEL | gemini-3.8-flash | latest GA Flash (GA Sep 2, 2026) |
+| VERTEX_LOCATION | global | Gemini 3.x GA models are served only from the global endpoint; everything else stays in us-central1 |
 | BQ_DATASET | willow_insights | |
-| ALLOWED_ORIGINS | http://localhost:5173,https://<project>.web.app | CORS |
+| ALLOWED_ORIGINS | http://localhost:5173,https://willow-511508.web.app,https://willow-511508.firebaseapp.com | CORS |
 | DEMO_USER_ID | demo_willow | read-only seeded account |
 
 ## web (Niwin)

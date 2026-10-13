@@ -1,29 +1,11 @@
 rules_version = '2';
+// Willow: the web app never talks to Firestore directly. All reads and writes go through
+// the api (Cloud Run, Admin SDK, which bypasses these rules). Deny every client request.
+// If a screen ever needs direct client reads, open the narrowest rule here and note it in docs/DECISIONS.md.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-
-    // User data: owner only. The api (Admin SDK) bypasses these rules.
-    match /users/{uid} {
-      allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid);
-      allow delete: if isOwner(uid);
-      match /{sub=**} {
-        allow read: if isOwner(uid);
-        allow write: if isOwner(uid) && !(uid.matches('demo_.*'));
-      }
-    }
-
-    // Seeded demo journey: readable by any signed-in user (anonymous judges included), never writable.
-    match /users/{uid}/{sub=**} {
-      allow read: if signedIn() && uid.matches('demo_.*');
-    }
-
-    // Catalog: read-only for signed-in users; written by the api seed script (Admin SDK).
-    match /products/{id} {
-      allow read: if signedIn();
-      allow write: if false;
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
