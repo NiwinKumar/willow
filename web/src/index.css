@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* Willow tokens: docs/DESIGN.md section 4. */
+@theme {
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono Variable", ui-monospace, monospace;
+
+  --color-bg: oklch(0.975 0.006 85);
+  --color-surface: oklch(0.992 0.003 85);
+  --color-surface-2: oklch(0.955 0.008 85);
+  --color-border: oklch(0.9 0.01 85);
+  --color-stage: oklch(0.62 0 0);
+
+  --color-text: oklch(0.24 0.018 130);
+  --color-text-2: oklch(0.46 0.02 130);
+  --color-text-3: oklch(0.58 0.015 100);
+
+  --color-willow-100: oklch(0.94 0.03 145);
+  --color-willow-500: oklch(0.58 0.085 145);
+  --color-willow-700: oklch(0.42 0.08 145);
+
+  --color-signal-100: oklch(0.94 0.03 220);
+  --color-signal-500: oklch(0.62 0.12 220);
+  --color-signal-600: oklch(0.5 0.105 222);
+  --color-signal-700: oklch(0.42 0.095 224);
+
+  --color-noise-band: oklch(0.93 0.006 85);
+  --color-noise-500: oklch(0.66 0.01 85);
+  --color-noise-700: oklch(0.52 0.012 85);
+
+  --color-warn: oklch(0.76 0.14 80);
+  --color-warn-text: oklch(0.52 0.13 70);
+  --color-danger: oklch(0.55 0.17 28);
+  --color-info: oklch(0.52 0.07 235);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --radius-chip: 4px;
+  --radius-control: 8px;
+  --radius-tile: 12px;
+  --radius-sheet: 20px;
+}
+
+@layer base {
+  html { color-scheme: light; }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-variant-numeric: tabular-nums;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  input, select, textarea, button { font: inherit; }
+  :focus-visible { outline: 2px solid var(--color-signal-500); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}

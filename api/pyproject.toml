@@ -1,0 +1,31 @@
+[project]
+name = "willow-api"
+version = "0.1.0"
+description = "Willow product API: sessions, uploads, engine calls, Gemini, catalog, retailer insights"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.142.1",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.13.5",
+  "pydantic-settings==2.15.0",
+  "firebase-admin==7.7.0",
+  "google-auth==2.59.0",
+  "google-cloud-storage==3.15.1",
+  "google-cloud-firestore==2.33.0",
+  "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "ruff==0.16.9"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]  # FastAPI Depends() in defaults is the documented pattern
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
