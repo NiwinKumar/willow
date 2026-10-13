@@ -2,7 +2,7 @@
 
 ## Setup
 - SDK: `google-genai` (Python) with `vertexai=True`, `project=$PROJECT_ID`, `location="global"`. Gemini 3.x GA models are served only from the global endpoint (verified Oct 13: regional `us-central1` returns model-not-found; `gemini-2.5-flash` is regional but retires on Vertex around Oct 20, during judging). Every other GCP resource stays in `us-central1`.
-- Model: env `GEMINI_MODEL` = `gemini-3.8-flash` (GA since Sep 2, 2026). It is a thinking model: set `thinking_config` to the lowest level/budget for labelling, extraction and routine checks, and always give a generous `max_output_tokens` (thinking tokens otherwise truncate the JSON). Optional `GEMINI_MODEL_PRO` for the weekly summary only.
+- Model: env `GEMINI_MODEL` = `gemini-3.8-flash` (GA since Sep 2, 2026). It is a thinking model: set `thinking_config` to the lowest level/budget for labelling, extraction and routine checks, and always give a generous `max_output_tokens` (thinking tokens otherwise truncate the JSON). Verified Oct 14 with `google-genai==2.25.0`: the lowest accepted level is `thinking_level=LOW` (`MINIMAL` returns 400 "Thinking level is unsupported"); a short JSON extraction takes 1-3 s warm, a label photo about 6 s. Implementation: `api/app/gemini.py` (`generate_json`). Optional `GEMINI_MODEL_PRO` for the weekly summary only.
 - Always `response_mime_type="application/json"` + `response_schema` (pydantic). Temperature 0 for labelling/extraction, 0.3 for explanations/chat. Set `max_output_tokens`.
 - Never send more than needed: crops, not full faces, for labelling; metrics JSON, not images, for explanations.
 - Log prompt id, latency, token counts (no images, no PII) to Cloud Logging.
@@ -29,6 +29,7 @@
 - Input: product photo(s) (front and/or back).
 - Output: `{brand, product_name, category: enum(CATALOG_SPEC), inci: string[], key_actives: [{name, pct: number|null}], claims_on_pack: string[], confidence}`.
 - Then match against catalog (brand + name fuzzy match); if matched, link `product_id`; else store as custom routine entry.
+- api: `POST /v1/label-scan` with `{images: [{mime_type, data_base64}]}` (1-2 images, the web downsizes to a JPEG first) returns `{scan, match}` and saves nothing; the web shows a confirm/edit step, then `POST /v1/routine`. Trailing punctuation from printed lists is stripped; active names are lower-cased.
 
 ## 4. Routine compatibility check
 - Input: routine entries (AM/PM, INCI, key actives), user goals, current verdicts.
