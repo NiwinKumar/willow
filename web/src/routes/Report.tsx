@@ -15,12 +15,14 @@ import { NumberValue } from '../components/NumberValue'
 import { Scrubber } from '../components/Scrubber'
 import { Sheet } from '../components/Sheet'
 import { Stage } from '../components/Stage'
-import { isSampleEngine } from '../data/live'
+import { baselineFor, isSampleEngine, isUnmeasured } from '../data/live'
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { fmtDate, plural } from '../lib/format'
 import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
+import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
+import { useAuth } from '../lib/useAuth'
 
 const SNAPS = ['peek', 'half', 'full'] as const
 type Snap = (typeof SNAPS)[number]
@@ -36,7 +38,25 @@ export function Report() {
   const view = useViewState()
   const index = Math.min(sessions.length - 1, Math.max(0, view.t ?? sessions.length - 1))
   const session: Session | null = sessions[index] ?? null
-  const baseline = useMemo(() => sessions.find((s) => s.is_baseline) ?? null, [sessions])
+  const baseline = useMemo(() => baselineFor(session, sessions), [session, sessions])
+  const { getIdToken } = useAuth()
+  const [settingBaseline, setSettingBaseline] = useState(false)
+  const unmeasured = isUnmeasured(session)
+  const noBand = Boolean(session && !session.is_baseline && session.baseline_ref && !session.baseline_ref.has_noise_band)
+
+  const makeBaseline = async () => {
+    if (!session) return
+    setSettingBaseline(true)
+    try {
+      await api.setBaseline(await getIdToken(), session.site, session.id)
+      await data.refresh()
+      toast('This session is now your baseline. Later sessions are compared with it.')
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not change the baseline. Try again.')
+    } finally {
+      setSettingBaseline(false)
+    }
+  }
   const metricId = (view.m as MetricId | null) ?? null
   const [expanded, setExpanded] = useState<MetricId | null>(null)
   const [snap, setSnap] = useState<Snap>('half')
@@ -112,28 +132,72 @@ export function Report() {
   const sheetBody = (
     <>
       <header className="px-5 pb-3 pt-1 sm:px-6">
-        {session?.is_baseline ? (
+        {unmeasured && session ? (
+          <>
+            <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Saved, not measured yet</h1>
+            <p className="mt-2 text-[15px] text-text-2">
+              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')}. Willow measures forearm photos today; {SITE_LABEL[session.site].toLowerCase()} measurement is still being built. Your photos are kept and can be measured when it is ready.
+            </p>
+            <Link to="/capture?site=forearm_control" className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+              Photograph a forearm
+            </Link>
+          </>
+        ) : session?.is_baseline ? (
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Your baseline</h1>
             <p className="mt-1 text-[13px] text-text-2">
-              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · every later session is compared to this
+              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · {session.capture_mode === 'uncalibrated' ? 'quick selfie' : 'calibrated'} · later {session.capture_mode === 'uncalibrated' ? 'quick selfies are' : 'calibrated sessions are'} compared to this
             </p>
+            {session.n_frames < 2 ? (
+              <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
+                One photo, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
+              </p>
+            ) : null}
           </>
         ) : (
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">
-              <NumberValue value={realCount} decimals={0} size="lg" className="text-[28px] align-baseline" /> real {realCount === 1 ? 'change' : 'changes'} since your baseline
+              {noBand ? (
+                'Compared with your baseline'
+              ) : (
+                <>
+                  <NumberValue value={realCount} decimals={0} size="lg" className="text-[28px] align-baseline" /> real {realCount === 1 ? 'change' : 'changes'} since your baseline
+                </>
+              )}
             </h1>
             <p className="mt-1 text-[13px] text-text-2">
               Baseline {baseline ? fmtDate(baseline.created_at) : '–'} · {baseline ? plural(baseline.n_frames, 'photo', 'photos') : ''} · {session ? plural(session.n_frames, 'photo', 'photos') : ''} this session
               {session?.deviation ? <Chip tone="warn" className="ml-2">something was different</Chip> : null}
             </p>
+            {noBand ? (
+              <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
+                Your baseline has one photo, so changes are shown but none can be called real yet.{' '}
+                {session && session.n_frames >= 2 ? 'This session has several photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
+              </p>
+            ) : null}
+            {data.mode === 'live' && session && !session.is_baseline && session.result?.quality.passed && session.n_frames > (session.baseline_ref?.frames ?? 0) ? (
+              <Button variant="secondary" className="mt-3 !min-h-10" disabled={settingBaseline} onClick={() => void makeBaseline()}>
+                {settingBaseline ? 'Saving…' : 'Make this my baseline'}
+              </Button>
+            ) : null}
           </>
         )}
       </header>
-      {isSampleEngine(session) ? (
+      {!unmeasured && isSampleEngine(session) ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold">Sample numbers.</span> Your photos are saved. Until the measurement engine is connected, these readings come from a fixed sample, not from your skin.
+        </div>
+      ) : null}
+      {data.mode === 'live' && session?.result?.warnings?.filter((w) => !w.startsWith('placeholder:')).length ? (
+        <div className="mx-5 mb-3 rounded-(--radius-tile) border border-border p-3 text-[13px] sm:mx-6">
+          <p className="font-semibold">Notes from the measurement</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-text-2">
+            {session.result.warnings
+              .filter((w) => !w.startsWith('placeholder:'))
+              .map((w) => (
+                <li key={w}>{w.charAt(0).toUpperCase() + w.slice(1)}</li>
+              ))}
+          </ul>
         </div>
       ) : null}
       {session?.result && !session.result.quality.passed ? (
@@ -171,6 +235,7 @@ export function Report() {
                   selected={metricId === m.id}
                   expanded={expanded === m.id}
                   stamp
+                  noBand={noBand && m.verdict === 'no_baseline' && m.delta !== null}
                   onSelect={() => view.set({ m: metricId === m.id ? null : m.id, layer: metricId !== m.id })}
                   onToggle={() => {
                     setExpanded(expanded === m.id ? null : m.id)
@@ -206,7 +271,7 @@ export function Report() {
               </ul>
             </>
           ) : null}
-          <p className="mt-3 text-[12px] text-text-3">{session.explanation.disclaimer}</p>
+          {session.explanation.disclaimer.startsWith('Cosmetic appearance tracking, not a diagnosis') ? null : <p className="mt-3 text-[12px] text-text-3">{session.explanation.disclaimer}</p>}
         </section>
       ) : null}
       <p className="px-5 pb-6 text-[12px] text-text-3 sm:px-6">Cosmetic appearance tracking, not a diagnosis. Photos delete 30 days after capture; measurements stay in your account until you delete them.</p>

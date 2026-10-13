@@ -29,7 +29,9 @@ def signing_credentials():
 
 @lru_cache
 def storage_client() -> storage.Client:
-    return storage.Client(project=get_settings().project_id, credentials=signing_credentials())
+    # Plain ADC for reads and writes; signing passes signing_credentials() explicitly, so local
+    # dev works without the Token Creator grant except when a signed URL is actually needed.
+    return storage.Client(project=get_settings().project_id)
 
 
 @lru_cache
