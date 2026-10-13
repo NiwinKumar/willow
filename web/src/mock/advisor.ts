@@ -1,0 +1,68 @@
+import type { Session } from '../data/types'
+import { METRIC_META, fmtSigned, fmtValue } from '../lib/metrics'
+import { CATALOG } from './catalog'
+
+export type Turn = { role: 'user' | 'willow'; text: string; retrieval?: string[]; product_ids?: string[]; follow_ups?: string[]; numbers?: { token: string; metric: string }[] }
+
+/** Canned advisor turns for demo mode. Every quoted number is read from the session data, never typed in. */
+export function answer(q: string, sessions: Session[]): Turn {
+  const latest = sessions[sessions.length - 1]
+  const spots = latest?.result?.metrics.find((m) => m.id === 'pigment_spots')
+  const red = latest?.result?.metrics.find((m) => m.id === 'redness')
+  const lower = q.toLowerCase()
+  if (lower.includes('azelaic') || lower.includes('doing anything')) {
+    const d = spots ? fmtSigned(spots.delta, spots) : '–'
+    const band = spots?.mdc95 !== null && spots ? fmtValue(spots.mdc95, spots) : '–'
+    return {
+      role: 'willow',
+      text: `Since you started azelaic acid at week 2, dark spots moved ${d} against a noise threshold of ${band}, which counts as a real change. Redness moved ${red ? fmtSigned(red.delta, red) : '–'}, inside its band, so no clear change there yet. The change may be linked to the azelaic acid; the niacinamide you were already using could also contribute, so I would keep both as they are for two more weeks before changing anything.`,
+      retrieval: ['Checked your results (latest session)', 'Checked your routine (5 products)'],
+      numbers: [{ token: d, metric: 'pigment_spots' }, { token: band, metric: 'pigment_spots' }, ...(red ? [{ token: fmtSigned(red.delta, red), metric: 'redness' }] : [])],
+      follow_ups: ['Should I keep using it?', 'What else helps dark spots?', 'When should I take my next photos?'],
+    }
+  }
+  if (lower.includes('dark spots') || lower.includes('under')) {
+    return {
+      role: 'willow',
+      text: `For dark spots under ₹1,500, three options from the catalog target pigmentation and fit your routine: you already use azelaic acid, kojic acid is a budget addition, and daily sunscreen is the one your routine is missing. Dark spots are currently ${spots ? fmtSigned(spots.delta, spots) : '–'} versus your baseline, so adding one thing at a time will keep the timeline readable.`,
+      retrieval: ['Checked your results (latest session)', 'Searched catalog: dark spots, under ₹1,500 (3 results)'],
+      product_ids: ['the-derma-co-2-kojic-acid', 'la-roche-posay-anthelios-uvmune-400', 'beauty-of-joseon-relief-sun'],
+      numbers: spots ? [{ token: fmtSigned(spots.delta, spots), metric: 'pigment_spots' }] : [],
+      follow_ups: ['Can I use azelaic acid with retinol?', 'Which sunscreen for oily skin?'],
+    }
+  }
+  if (lower.includes('retinol') && (lower.includes('glycolic') || lower.includes('bha') || lower.includes('apart') || lower.includes('together') || lower.includes('exfoliant'))) {
+    return {
+      role: 'willow',
+      text: 'Retinol and an exfoliating acid used on the same night can irritate: both increase cell turnover, so the skin barrier gets hit twice. Alternating nights keeps both and avoids the overlap. If you notice more redness in your readings after a night with both, that is the signal to space them further apart.',
+      retrieval: ['Checked your routine (rule: retinoid + AHA/BHA, caution)'],
+      follow_ups: ['Apply alternate nights', 'Is my redness changing?'],
+    }
+  }
+  if (lower.includes('next photos') || lower.includes('when')) {
+    return {
+      role: 'willow',
+      text: 'Weekly is enough. Daily scans mostly measure your lighting. Your baseline was taken in the evening after washing; keep to that. Most pigment effects take 8 to 12 weeks to clear photo noise, so the next meaningful check-in for dark spots is in about two weeks.',
+      retrieval: ['Checked your sessions (7 of them, weekly)'],
+      follow_ups: ['Is my azelaic acid doing anything?', 'What should I add for dark spots under ₹1,500?'],
+    }
+  }
+  if (lower.includes('mole') || lower.includes('rash') || lower.includes('pain') || lower.includes('bleed')) {
+    return {
+      role: 'willow',
+      text: 'This sounds medical. Willow only tracks cosmetic appearance and cannot assess moles or skin conditions. For a changing mole, a rash or pain, please see a dermatologist.',
+      retrieval: ['No lookups needed'],
+      follow_ups: ['Back to my results'],
+    }
+  }
+  return {
+    role: 'willow',
+    text: `I can explain your measurements, check your routine and find products from a facts-only catalog. Your latest session shows ${latest?.result?.metrics.filter((m) => m.verdict === 'real_change').length ?? 0} real change${(latest?.result?.metrics.filter((m) => m.verdict === 'real_change').length ?? 0) === 1 ? '' : 's'} since your baseline. Ask about a metric, a product, or what to do next.`,
+    retrieval: ['Checked your results (latest session)'],
+    follow_ups: ['Is my azelaic acid doing anything?', 'What should I add for dark spots under ₹1,500?', 'Can I use retinol and glycolic acid together?', 'When should I take my next photos?'],
+  }
+}
+
+export const STARTERS = ['Is my azelaic acid doing anything?', 'What should I add for dark spots under ₹1,500?', 'Can I use retinol and glycolic acid together?', 'When should I take my next photos?']
+export const productById = (id: string) => CATALOG.find((p) => p.product_id === id)
+export { METRIC_META }
