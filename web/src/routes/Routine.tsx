@@ -66,6 +66,8 @@ export function Routine() {
   const [reading, setReading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [liveResults, setLiveResults] = useState<Product[]>([])
+  const [searchState, setSearchState] = useState<'loading' | 'done' | 'error'>('loading')
+  const [searchRetry, setSearchRetry] = useState(0)
   const searchSeq = useRef(0)
 
   // Live: the saved routine.
@@ -92,13 +94,16 @@ export function Routine() {
     const t = window.setTimeout(async () => {
       try {
         const res = await api.catalogSearch(await getIdToken(), { q: query.trim() || undefined, limit: 30 })
-        if (seq === searchSeq.current) setLiveResults(res.products)
+        if (seq === searchSeq.current) {
+          setLiveResults(res.products)
+          setSearchState('done')
+        }
       } catch {
-        if (seq === searchSeq.current) setLiveResults([])
+        if (seq === searchSeq.current) setSearchState('error')
       }
     }, 200)
     return () => clearTimeout(t)
-  }, [live, user, add, query, getIdToken])
+  }, [live, user, add, query, getIdToken, searchRetry])
   const [slots, setSlots] = useState<('am' | 'pm')[]>(['pm'])
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 10))
   const [dismissed, setDismissed] = useState<string[]>([])
@@ -324,7 +329,14 @@ export function Routine() {
                   </button>
                 </li>
               ))}
-              {live && results.length === 0 ? <li className="py-3 text-[13px] text-text-3">{query.trim() ? 'Nothing in the catalog matches. Scan the label instead.' : 'Loading the catalog…'}</li> : null}
+              {live && searchState === 'error' ? (
+                <li className="flex items-center justify-between gap-3 py-3 text-[13px] text-text-2">
+                  Could not load the catalog. Check your connection.
+                  <Button variant="secondary" className="!min-h-10" onClick={() => setSearchRetry((n) => n + 1)}>Try again</Button>
+                </li>
+              ) : live && results.length === 0 ? (
+                <li className="py-3 text-[13px] text-text-3">{searchState === 'loading' ? 'Loading the catalog…' : query.trim() ? 'Nothing in the catalog matches. Scan the label instead.' : 'The catalog is empty right now.'}</li>
+              ) : null}
             </ul>
           </div>
         ) : null}
