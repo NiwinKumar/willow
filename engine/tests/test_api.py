@@ -43,7 +43,7 @@ def _arm_jpgs(tmp_path, n=3):
     return paths
 
 
-@pytest.mark.parametrize("path", ["/healthz", "/health"])
+@pytest.mark.parametrize("path", ["/healthz", "/health", "/v1/health"])
 def test_healthz(path):
     body = client.get(path).json()
     assert body["status"] == "ok" and body["engine_version"]

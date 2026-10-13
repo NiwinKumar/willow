@@ -43,7 +43,8 @@ def _unexpected(_: Request, exc: Exception) -> JSONResponse:
 
 
 @app.get("/healthz")
-@app.get("/health")  # Cloud Run's front end swallows /healthz on *.run.app; same response
+@app.get("/health")
+@app.get("/v1/health")  # Cloud Run front end swallows /healthz on *.run.app; same response
 def healthz() -> dict:
     return {"status": "ok", "engine_version": __version__}
 
