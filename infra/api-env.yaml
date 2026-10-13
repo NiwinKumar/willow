@@ -1,0 +1,11 @@
+# Env vars for willow-api (no secrets here). Deploy: see infra/README.md
+PROJECT_ID: "willow-511508"
+BUCKET: "willow-511508-captures"
+ENGINE_MODE: "fixture"
+ENGINE_URL: "https://willow-engine-hrlt7lqdwa-uc.a.run.app"
+VERTEX_LOCATION: "global"
+GEMINI_MODEL: "gemini-3.8-flash"
+BQ_DATASET: "willow_insights"
+DEMO_USER_ID: "demo_willow"
+SIGNING_SERVICE_ACCOUNT: "sa-api@willow-511508.iam.gserviceaccount.com"
+ALLOWED_ORIGINS: "http://localhost:5173,https://willow-511508.web.app,https://willow-511508.firebaseapp.com"
