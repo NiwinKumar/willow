@@ -40,4 +40,4 @@ Verdict badge text: `real_change` -> "Real change" + friendly text; `within_nois
 Empty (no sessions yet), first reading (no baseline), processing, partial quality failure, total quality failure (retake tips), engine timeout (retry), offline, demo read-only notices, deleted data.
 
 ## Visual direction
-Soft natural palette (willow green, warm neutrals), plenty of whitespace, rounded cards, one accent color for "real change", grey for "within noise". Icons, no stock photos of faces.
+See `docs/DESIGN.md` (Oct 13) for the full direction, tokens, flows, components and motion; it supersedes this paragraph. In short: warm low-chroma paper, ink-green text, sage brand green, one signal accent used only for "real change", grey hatched band for "within noise", rows with hairline rules rather than cards, photos on a neutral grey stage, icons only where they carry meaning, no stock photos of faces.

@@ -2,6 +2,8 @@
 
 | Date | Decision | Supersedes |
 |---|---|---|
+| Oct 13 | Design direction "Field notebook, calibrated" (`docs/DESIGN.md`): warm low-chroma paper, Fraunces + Atkinson Hyperlegible, signal blue-teal as the only accent, rows not cards, photos on a neutral grey stage, no dark mode in MVP | UX_SPEC "visual direction" paragraph |
+| Oct 13 | Judges run "Try with sample photos" on hosted frames in `demo/` (server-side sample sessions), never a download-and-upload path | DEMO_PLAN "download a sample pack" |
 | Oct 13 | Gemini model `gemini-3.8-flash` (latest GA Flash) via the Vertex AI **global** endpoint; all other resources stay in `us-central1` | "Gemini in us-central1" (3.x GA models are global-only; 2.5 Flash retires Oct 20) |
 | Oct 13 | Web talks only to the api (Firebase SDK used for Auth only); Firestore client rules are deny-all, the api uses the Admin SDK | Browser reads of demo data via Firestore rules |
 | Oct 13 | Budget ₹2,000/month, alerts 5/25/100% excluding credits; CODEOWNERS removed (ruleset: PR required, 0 approvals) | "$20 budget, $1/$5/$20 alerts", CODEOWNERS review |

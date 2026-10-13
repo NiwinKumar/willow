@@ -15,6 +15,12 @@ Template:
 - Impact: engine writes one extra JPEG per request (cheap); api turns the gs:// URI into a signed GET URL in `SessionView`; web draws overlays on it. Schema: one new optional object; `schema_version` 1.1.
 - Approved by: [ ] Harshini [x] Niwin
 
+### 1b. Same need, zero schema change (fallback if 1 is not agreed in time)
+- Change: by convention the engine also writes `{output_prefix}preview.jpg`: an sRGB JPEG of the aligned reference frame at exactly `image_size` (or at an integer downscale; the api reads the JPEG's own dimensions and scales `rois`, `candidates[].bbox` and overlay PNGs by `preview_width / image_size.width`). No new field; `schema_version` stays 1.0. The CLI writes the same file into `--out`.
+- Engine effort: about 15 lines (convert the aligned reference frame to sRGB, `cv2.imwrite`, upload). Needed for the Report overlay toggle, the before/after slider and the timeline compare; without it browsers have nothing to draw on because they cannot render DNG.
+- api behaviour: if the file is missing, the Report shows metrics without the photo stage and says "Preview not available for this session".
+- Approved by: [ ] Harshini [x] Niwin
+
 ## 2026-10-13: Forearm square localization for API requests (proposed by Niwin)
 - Why: the CLI takes `--roi x,y,w,h`, but `AnalyzeRequest` has no way to say where the taped forearm square is. For the hackathon the DHA series will be run through the CLI and seeded into the demo account, so this is not blocking M3. It matters only if a judge or user uploads forearm photos through the app.
 - Change (minimal): add optional `options.roi: [x, y, w, h]` (pixel coords of the first frame). If absent for a forearm site, the engine either detects the tape corners or returns `quality.passed=false` with a new reason `roi_not_found`.
