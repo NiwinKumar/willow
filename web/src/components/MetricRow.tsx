@@ -52,7 +52,7 @@ export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, select
               key={`${m.id}-${m.verdict}`}
               initial={stamp && m.verdict === 'real_change' && !reduce ? { scale: 1.12, rotate: -2, opacity: 0 } : false}
               animate={{ scale: 1, rotate: 0, opacity: 1 }}
-              transition={SPRING_STAMP}
+              transition={{ ...SPRING_STAMP, opacity: { duration: DUR.fast } }}
               className="inline-flex"
             >
               <VerdictChip verdict={m.verdict} />
