@@ -34,3 +34,8 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Why: the color checker may arrive after the DHA baseline. `capture_mode` only has `calibrated_raw` and `uncalibrated`. The UI needs to say "partially calibrated" honestly without a schema change.
 - Change (no schema change): engine adds the exact warning string `semi_calibrated: white-balance-only correction (grey card)` to `warnings[]` and sets `quality.card_detected=false`, `card_delta_e_mean=null`. The api stores a `calibration: "semi"` flag on the session and the web shows a "Grey-card calibrated" chip next to "Measured".
 - Approved by: [ ] Harshini [x] Niwin
+
+## 2026-10-13: /healthz is unreachable on Cloud Run URLs (observation, proposed by Niwin)
+- Why: on both deployed services, `GET /healthz` is answered by Google's frontend with an HTML 404 before the request reaches the container; every other path works. Verified with and without identity tokens.
+- Change: none to the schemas. The api exposes its health at `/v1/health`. For the engine, the api never calls `/healthz`; if you want a reachable health route, add `GET /v1/health` with the same body and keep `/healthz` for local use.
+- Approved by: [ ] Harshini [x] Niwin
