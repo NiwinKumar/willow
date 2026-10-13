@@ -1,70 +1,119 @@
-import { toast } from 'sonner'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { BandBar } from '../components/BandBar'
 import { Button } from '../components/Button'
+import { Chip } from '../components/Chip'
+import { Scrubber } from '../components/Scrubber'
+import { Stage } from '../components/Stage'
+import { enterDemo } from '../data/useData'
 import { useAuth } from '../lib/useAuth'
+import { fmtSigned, fmtValue } from '../lib/metrics'
+import { DEMO_SERIES } from '../mock/series'
 
 const entries = [
-  { title: 'Explore a real journey', sub: 'A 5-day self-tanner split-arm test. Read-only.', eta: '~1 min' },
-  { title: 'Try with sample photos', sub: 'Run the live pipeline on our RAW samples.', eta: '~30 s' },
-  { title: 'Try your own selfie', sub: 'Phone or laptop camera. Uncalibrated, trend only.', eta: '~1 min' },
+  { title: 'Explore a real journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1' },
+  { title: 'Try with sample photos', sub: 'Run the live pipeline on our RAW samples.', eta: '~30 s', to: '/capture?demo=1&sample=1' },
+  { title: 'Try your own selfie', sub: 'Phone or laptop camera. Uncalibrated, trend only.', eta: '~1 min', to: '/capture?mode=quick' },
 ]
 
 export function Landing() {
   const { user, loading, continueAsGuest, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const series = DEMO_SERIES.forearm_treated
+  const control = DEMO_SERIES.forearm_control
+  const [i, setI] = useState(3)
+  const [touched, setTouched] = useState(false)
+  const session = series.sessions[i]
+  const baseline = series.sessions[0]
+  const tone = session.result!.metrics.find((m) => m.id === 'tone_ita')!
+  const toneBase = baseline.result!.metrics.find((m) => m.id === 'tone_ita')!
+  const ctrl = control.sessions[i].result!.metrics.find((m) => m.id === 'tone_ita')!
+  const ctrlBase = control.sessions[0].result!.metrics.find((m) => m.id === 'tone_ita')!
+  const reach = useMemo(() => Math.max(...series.sessions.map((s) => Math.abs(s.result!.metrics[0].delta ?? 0))), [series])
+
+  const go = (to: string) => {
+    enterDemo()
+    navigate(to)
+  }
 
   return (
-    <div className="max-w-[36rem]">
-      <h1 className="text-[clamp(36px,8vw,56px)] font-bold leading-[1.0] tracking-[-0.03em]">
-        Did your serum actually work?
-      </h1>
-      <p className="mt-6 text-[17px] leading-relaxed text-text-2">
-        Willow measures your skin from standardized photos and tells you whether a change is real or just the
-        camera. Every number comes from calibrated computer vision; the AI only explains.
+    <div className="mx-auto w-full max-w-[1120px] px-5 pb-16 sm:px-8">
+      <section className="grid gap-6 pt-6 lg:grid-cols-[1.05fr_1fr] lg:gap-x-12 lg:gap-y-0 lg:pt-12">
+        <h1 className="max-w-[36rem] text-[clamp(36px,8vw,56px)] font-bold leading-[1.0] tracking-[-0.03em] lg:col-start-1">Did your serum actually work?</h1>
+
+        {/* The live Lens: drag before you read. On phones it sits right under the headline. */}
+        <div className="rounded-(--radius-tile) border border-border bg-surface p-3 sm:p-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">
+          <div className="flex items-center justify-between gap-2 px-1 pb-2">
+            <span className="text-[13px] font-semibold">Self-tanner on the left square, nothing on the right</span>
+            <Chip tone="neutral">sample</Chip>
+          </div>
+          <div className="h-[260px] sm:h-[320px]">
+            <Stage site="forearm_treated" session={session} baseline={baseline} metricId="tone_ita" layer={false} compact caption={session.hours_since_baseline ? `+${session.hours_since_baseline} h` : 'Baseline'} className="h-full" />
+          </div>
+          <div className="mt-3 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 px-1 text-[13px]">
+            <span className="text-text-2">Treated</span>
+            <BandBar value={tone.value} baseline={toneBase.value} mdc95={toneBase.mdc95} verdict={tone.verdict} reach={reach} label="Treated square skin tone" />
+            <span className={`font-mono ${tone.verdict === 'real_change' ? 'text-signal-700' : 'text-text-2'}`}>{tone.delta === null ? '–' : fmtSigned(tone.delta, tone)}°</span>
+            <span className="text-text-2">Untreated</span>
+            <BandBar value={ctrl.value} baseline={ctrlBase.value} mdc95={ctrlBase.mdc95} verdict={ctrl.verdict} reach={reach} label="Untreated square skin tone" />
+            <span className="font-mono text-text-2">{ctrl.delta === null ? '–' : fmtSigned(ctrl.delta, ctrl)}°</span>
+          </div>
+          <div className="mt-2">
+            <Scrubber
+              compact
+              sessions={series.sessions}
+              index={i}
+              onChange={(n) => {
+                setI(n)
+                setTouched(true)
+              }}
+            />
+          </div>
+          <p className="px-1 pt-1 text-[12px] text-text-3">
+            {touched ? `Noise band ±${fmtValue(toneBase.mdc95, tone)}° from five reference photos. ${tone.verdict === 'real_change' ? 'The treated square cleared it; the untreated one did not.' : 'Neither square has cleared it yet.'}` : 'Drag the handle to move through four days.'}
+          </p>
+        </div>
+
+        <div className="max-w-[36rem] lg:col-start-1">
+          <p className="text-[17px] leading-relaxed text-text-2">
+            Willow measures your skin from standardized photos and tells you whether a change is real or just the camera. Every number comes from calibrated computer vision; the AI only explains.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            {entries.map((e) => (
+              <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to)}>
+                <span className="flex w-full items-center justify-between">
+                  <span className="font-semibold">{e.title}</span>
+                  <span className="font-mono text-[13px] text-text-3">{e.eta}</span>
+                </span>
+                <span className="text-[13px] font-normal text-text-2">{e.sub}</span>
+              </Button>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-2">
+            {loading ? (
+              <span>Checking sign-in…</span>
+            ) : user ? (
+              <span>Signed in{user.isAnonymous ? ' as a guest' : user.email ? ` as ${user.email}` : ''}.</span>
+            ) : (
+              <>
+                <span>No sign-in needed to try it.</span>
+                <Button variant="quiet" className="!min-h-9 !px-2" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
+                  Continue as guest
+                </Button>
+                <Button variant="quiet" className="!min-h-9 !px-2" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
+                  Sign in with Google to keep your results
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <p className="mt-12 text-[12px] text-text-3">
+        Cosmetic appearance tracking, not a medical device or diagnosis. Built on Firebase, Firestore, Cloud Run and Gemini on Vertex AI.
       </p>
-
-      <div className="mt-10 flex flex-col gap-3">
-        {entries.map((e) => (
-          <Button
-            key={e.title}
-            variant="secondary"
-            className="flex-col items-start !py-3 text-left"
-            onClick={() => toast('Coming Wednesday. The upload test is live already.')}
-          >
-            <span className="flex w-full items-center justify-between">
-              <span className="font-semibold">{e.title}</span>
-              <span className="font-mono text-[13px] text-text-3">{e.eta}</span>
-            </span>
-            <span className="text-[13px] font-normal text-text-2">{e.sub}</span>
-          </Button>
-        ))}
-      </div>
-
-      <div className="mt-10 flex flex-wrap items-center gap-3 text-[13px] text-text-2">
-        {loading ? (
-          <span>Checking sign-in…</span>
-        ) : user ? (
-          <>
-            <span>
-              Signed in{user.isAnonymous ? ' as a guest' : user.email ? ` as ${user.email}` : ''}.
-            </span>
-            <Button variant="quiet" onClick={() => navigate('/upload-test')}>
-              Go to the upload test
-            </Button>
-          </>
-        ) : (
-          <>
-            <span>No sign-in needed to try it.</span>
-            <Button variant="quiet" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
-              Continue as guest
-            </Button>
-            <Button variant="quiet" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
-              Sign in with Google to keep your results
-            </Button>
-          </>
-        )}
-      </div>
     </div>
   )
 }

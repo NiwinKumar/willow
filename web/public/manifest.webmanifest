@@ -1,0 +1,10 @@
+{
+  "name": "Willow",
+  "short_name": "Willow",
+  "description": "Did your serum actually work? Calibrated skin measurements from standardized photos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9f6f2",
+  "theme_color": "#f9f6f2",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

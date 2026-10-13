@@ -55,3 +55,12 @@
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
 }
+
+@layer components {
+  .chip-hatch {
+    background-image: repeating-linear-gradient(45deg, transparent 0 4px, oklch(0.66 0.01 85 / 0.14) 4px 5px);
+  }
+  .stage-grid {
+    background-color: var(--color-stage);
+  }
+}
