@@ -15,7 +15,7 @@ Expected: published data (mostly lighter skin, contact spectrophotometer) shows 
 ## Judge flow (deployed link)
 Landing with three buttons:
 1. **Explore a real journey** (seeded read-only demo account: DHA arm test timeline + team face/macro sessions).
-2. **Try with sample photos** (download a sample pack, upload, watch the live pipeline).
+2. **Try with sample photos** (one tap runs the live pipeline on hosted RAW sample sessions in `demo/`; a small download pack stays as a secondary link to show the upload UI).
 3. **Try your own selfie** (browser camera, "Uncalibrated: trend only" badge).
 Plus: routine check (label scan + compatibility), advisor chat with multi-store links, retailer dashboard (banner: "Synthetic demo cohort").
 
