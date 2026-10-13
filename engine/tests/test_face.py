@@ -51,32 +51,58 @@ def test_evenness_ignores_camera_grain_but_sees_blotches():
 # ---- pigment_spots ---------------------------------------------------------------------
 
 
+def _lab(L, a=12.0, b=18.0, seed=0, shape=(300, 300)):
+    rng = np.random.default_rng(seed)
+    lab = np.empty((*shape, 3))
+    for i, v in enumerate((L, a, b)):
+        lab[..., i] = v + rng.normal(0, 0.6, shape)
+    return lab
+
+
+def _dot(lab, cx, cy, r, d_l, chroma_scale=1.0):
+    yy, xx = np.ogrid[: lab.shape[0], : lab.shape[1]]
+    disk = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
+    lab[disk, 0] += d_l
+    lab[disk, 1:] *= chroma_scale
+    return lab
+
+
+def _spots(lab):
+    skin = np.ones(lab.shape[:2], bool)
+    return find_spots(lab, skin, skin, PX_PER_MM)
+
+
 def test_no_spots_on_plain_skin():
-    skin = np.ones((300, 300), bool)
-    mask, contrasts = find_spots(_skin_red(0.4), skin, PX_PER_MM)
-    assert not mask.any() and contrasts == []
+    assert _spots(_lab(60)) == []
 
 
-@pytest.mark.parametrize("base_red", [0.6, 0.35, 0.12, 0.05])  # light -> very deep skin
-def test_spots_found_relative_to_own_skin_at_every_tone(base_red):
-    centres = [(60, 60), (200, 80), (120, 220)]
-    red = _add_spots(_skin_red(base_red), centres, radius_px=15, factor=0.7)  # 3 mm visible spots
-    pct, extras = pigment_spots({"cheek": (red, np.ones_like(red, bool))}, PX_PER_MM)
-    assert extras["count"] == 3
-    expected_pct = 100 * 3 * math.pi * 15**2 / red.size
-    assert pct == pytest.approx(expected_pct, rel=0.35)
+@pytest.mark.parametrize("L", [80.0, 65.0, 45.0, 28.0])  # very light -> very deep skin
+def test_brown_spots_found_at_every_tone(L):
+    lab = _lab(L)
+    for cx, cy in [(60, 60), (230, 80), (150, 230)]:
+        _dot(lab, cx, cy, r=15, d_l=-6.0, chroma_scale=1.1)  # 3 mm, darker, a bit browner
+    spots = _spots(lab)
+    assert len(spots) == 3
+    pct, extras = pigment_spots(spots, lab.shape[0] * lab.shape[1])
+    assert extras["count"] == 3 and extras["mean_contrast"] > 3 and 0 < pct < 15
 
 
-def test_faint_blotches_below_visible_contrast_are_ignored():
-    red = _add_spots(_skin_red(0.4), [(150, 150)], radius_px=15, factor=0.88)  # 12% darker
-    _, extras = pigment_spots({"cheek": (red, np.ones_like(red, bool))}, PX_PER_MM)
-    assert extras["count"] == 0
+def test_shadow_that_loses_colour_is_not_a_spot():
+    lab = _dot(_lab(60), 150, 150, r=15, d_l=-8.0, chroma_scale=0.7)  # darker AND greyer
+    assert _spots(lab) == []
 
 
 def test_specks_smaller_than_min_size_are_ignored():
-    red = _add_spots(_skin_red(0.4), [(150, 150)], radius_px=2, factor=0.5)  # 0.4 mm speck
-    _, extras = pigment_spots({"cheek": (red, np.ones_like(red, bool))}, PX_PER_MM)
-    assert extras["count"] == 0
+    lab = _dot(_lab(60), 150, 150, r=2, d_l=-15.0)  # 0.4 mm speck
+    assert _spots(lab) == []
+
+
+def test_spots_must_be_inside_search_area():
+    lab = _dot(_lab(60), 60, 60, r=15, d_l=-6.0, chroma_scale=1.1)
+    skin = np.ones(lab.shape[:2], bool)
+    search = skin.copy()
+    search[:150, :150] = False  # e.g. a shadow guard beside the nose
+    assert find_spots(lab, skin, search, PX_PER_MM) == []
 
 
 # ---- landmarks / pose ------------------------------------------------------------------
@@ -118,6 +144,9 @@ class FakeFace(Face):
 
     def _disk(self, mm):
         return np.ones((3, 3), np.uint8)
+
+    def shadow_guard(self, shape):
+        return np.zeros(shape, bool)
 
     def feature_zones(self, shape):
         none = np.zeros(shape, bool)
