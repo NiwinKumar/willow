@@ -36,3 +36,19 @@ def test_decode_photo_jpeg_applies_exif_rotation(tmp_path):
     assert linear.shape == (40, 20, 3) and info.size == (20, 40)
     assert linear.dtype == np.float32 and 0.0 <= linear.min() <= linear.max() <= 1.0
     assert info.format == "JPEG"
+
+
+def test_linear_srgb_roundtrip():
+    from app.decode import linear_to_srgb8
+
+    values = np.arange(256, dtype=np.uint8)
+    assert np.array_equal(linear_to_srgb8(srgb_to_linear(values)), values)
+
+
+def test_capture_mode_from_file_types():
+    from app.pipeline import capture_mode_for
+
+    assert capture_mode_for(["a.DNG", "b.dng"]) == "calibrated_raw"
+    assert capture_mode_for(["a.heic", "b.jpg"]) == "uncalibrated"
+    with pytest.raises(ValueError):
+        capture_mode_for(["a.dng", "b.jpg"])

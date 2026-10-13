@@ -1,4 +1,6 @@
-"""Command line: python -m app.cli analyze --site forearm_treated --roi x,y,w,h photo.heic ...
+"""Command line: python -m app.cli analyze --site forearm_treated --roi x,y,w,h photo.dng ...
+
+Mode is picked from the files: .dng -> calibrated_raw, .heic/.jpg -> uncalibrated.
 
 --roi / --white can be given once (same box for every photo) or once per photo, in order.
 """
@@ -30,7 +32,6 @@ def main(argv: list[str] | None = None) -> None:
     a = sub.add_parser("analyze", help="analyze 1-5 photos of one forearm square")
     a.add_argument("files", nargs="+")
     a.add_argument("--site", required=True, choices=["forearm_treated", "forearm_control"])
-    a.add_argument("--mode", default="uncalibrated", choices=["uncalibrated"])
     a.add_argument("--roi", action="append", required=True, help="skin square x,y,w,h")
     a.add_argument("--white", action="append", help="white paper x,y,w,h (optional)")
     a.add_argument("--baseline", help="baseline.json: {metric_id: {mean, mdc95}}")
