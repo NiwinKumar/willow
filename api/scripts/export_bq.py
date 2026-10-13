@@ -9,6 +9,7 @@ Writes (WRITE_TRUNCATE, batch loads, no streaming):
   there are none until the consent screen writes to the api, so the view says "synthetic only".
 """
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from google.cloud import bigquery  # noqa: E402
 
 from app import catalog, cohort  # noqa: E402
+from app.results import measured_result  # noqa: E402
 from app.settings import get_settings  # noqa: E402
 
 S = bigquery.SchemaField
@@ -85,10 +87,79 @@ def product_rows() -> list[dict]:
     ]
 
 
+def real_rows(store) -> dict[str, list[dict]]:
+    """Measured sessions and routines of people who opted in, under a one-way hash."""
+    out: dict[str, list[dict]] = {"sessions_flat": [], "routine_flat": [], "routine_conflicts": []}
+    for uid, doc in store.users_list():
+        if not ((doc or {}).get("consent") or {}).get("aggregate_insights_opt_in"):
+            continue
+        uh = "real_" + hashlib.sha256(f"willow-real-{uid}".encode()).hexdigest()[:12]
+        for _, d in store.sessions_list(uid):
+            result = measured_result(d)
+            base = d.get("compared_with") or {}
+            if d.get("status") != "done" or result is None or not result["quality"]["passed"]:
+                continue
+            created, base_at = d.get("created_at"), base.get("session_created_at")
+            weeks = ((created - base_at).days // 7) if created and base_at else 0
+            tone = next(
+                (
+                    m.get("extras", {}).get("ita_band")
+                    for m in result["metrics"]
+                    if m["id"] == "tone_ita"
+                ),
+                None,
+            )
+            for m in result["metrics"]:
+                if m["value"] is None:
+                    continue
+                up = m["id"] in cohort.UP_IS_GOOD
+                out["sessions_flat"].append(
+                    {
+                        "user_hash": uh,
+                        "is_synthetic": False,
+                        "region": "unknown",
+                        "tone_band": tone or "unknown",
+                        "goals": [],
+                        "site": d["site"],
+                        "session_ts": created.isoformat() if created else None,
+                        "weeks_since_baseline": weeks,
+                        "metric_id": m["id"],
+                        "delta": m.get("delta"),
+                        "mdc95": m.get("mdc95"),
+                        "verdict": m["verdict"],
+                        "improved": m["verdict"] == "real_change"
+                        and ((m.get("delta") or 0) > 0) == up,
+                    }
+                )
+        for _, e in store.routine_list(uid):
+            p = catalog.by_id(e.get("product_id") or "")
+            if p:
+                out["routine_flat"].append(
+                    {
+                        "user_hash": uh,
+                        "is_synthetic": False,
+                        "product_id": p["product_id"],
+                        "brand": p["brand"],
+                        "category": p["category"],
+                        "concerns": p["concerns"],
+                        "tier": cohort.tier(p["price"]),
+                        "started_week": 0,
+                        "stopped_week": None,
+                    }
+                )
+    return out
+
+
 def main() -> int:
+    from app.store import FirestoreStore
+
     s = get_settings()
     client = bigquery.Client(project=s.project_id, location="us-central1")
     tables = {"products": product_rows(), **cohort.generate()}
+    real = real_rows(FirestoreStore())
+    for name, rows in real.items():
+        tables[name] = tables[name] + rows
+    print(f"real people who opted in: {len({r['user_hash'] for r in real['sessions_flat']})}")
     for name, rows in tables.items():
         job = client.load_table_from_json(
             rows,

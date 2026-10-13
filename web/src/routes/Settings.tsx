@@ -8,7 +8,8 @@ import { Sheet } from '../components/Sheet'
 import { useData } from '../data/useData'
 import { api } from '../lib/api'
 import { fmtDate } from '../lib/format'
-import { prefs } from '../lib/prefs'
+import { syncConsent } from '../lib/consent'
+import { CONSENT_VERSION, prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 
 export function Settings() {
@@ -78,7 +79,16 @@ export function Settings() {
             <span className="block text-[15px] font-semibold">Help improve recommendations</span>
             <span className="block text-[13px] text-text-2">Anonymized numbers only, never photos, never your name. Groups under 10 people are never shown.</span>
           </span>
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-[var(--color-text)]" checked={optIn} onChange={(e) => { setOptIn(e.target.checked); if (consent) prefs.setConsent({ ...consent, aggregate_opt_in: e.target.checked }); toast(e.target.checked ? 'Sharing on' : 'Sharing off') }} />
+          <input type="checkbox" className="mt-1 h-5 w-5 accent-[var(--color-text)]" checked={optIn} onChange={(e) => {
+            const on = e.target.checked
+            setOptIn(on)
+            prefs.setConsent({ ...(consent ?? { version: CONSENT_VERSION, accepted_at: new Date().toISOString() }), aggregate_opt_in: on })
+            if (data.mode === 'live' && user) {
+              syncConsent(user.uid, getIdToken)
+                .then(() => toast(on ? 'Sharing on, saved to your account' : 'Sharing off, saved to your account'))
+                .catch(() => toast.error('Saved on this device; your account will update when you are back online.'))
+            } else toast(on ? 'Sharing on' : 'Sharing off')
+          }} />
         </label>
       </section>
 

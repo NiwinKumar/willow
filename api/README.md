@@ -24,6 +24,9 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | POST | `/v1/sessions/{id}/analyze` | Checks frames are uploaded, calls the engine with the stored baseline, saves the result and a template explanation, sets the auto baseline |
 | GET | `/v1/timeline?site=` | Per-metric series |
 | POST | `/v1/baselines/{site}` | `{session_id}`: pick the baseline by hand |
+| GET | `/v1/me` | The person's stored consent |
+| PUT | `/v1/me/consent` | `{version, aggregate_insights_opt_in}` -> `users/{uid}.consent` (the web syncs it once signed in) |
+| GET | `/v1/retailer/insights` | Public aggregates from BigQuery (synthetic cohort + opted-in people), groups under 10 suppressed |
 | DELETE | `/v1/me` | Delete the person's photos, results, sessions, baselines and routine |
 | GET | `/v1/catalog/search?q=&concern=&category=&max_price=&currency=` | Catalog search (facts only) |
 | GET | `/v1/catalog/{product_id}` | One product |

@@ -21,6 +21,9 @@ function write(key: string, value: unknown) {
 export const prefs = {
   consent: () => read<Consent>('willow.consent'),
   setConsent: (c: Consent) => write('willow.consent', c),
+  /** Which consent (uid:version:opt-in) was last saved to the server, so it syncs once. */
+  consentSynced: () => read<string>('willow.consentSynced'),
+  setConsentSynced: (k: string) => write('willow.consentSynced', k),
   goals: () => read<string[]>('willow.goals') ?? [],
   setGoals: (g: string[]) => write('willow.goals', g),
   photoTime: () => read<string>('willow.photoTime'),
