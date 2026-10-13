@@ -52,6 +52,16 @@ def no_real_bigquery(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(retailer, "fetch", offline)
 
 
+@pytest.fixture(autouse=True)
+def no_real_crops(monkeypatch: pytest.MonkeyPatch):
+    """Tests never read crops from the bucket; a test that needs them replaces read_bytes."""
+
+    def offline(name: str) -> bytes:
+        raise FileNotFoundError(name)
+
+    monkeypatch.setattr(storage, "read_bytes", offline)
+
+
 @pytest.fixture
 def fake(monkeypatch: pytest.MonkeyPatch):
     cloud = FakeCloud()
