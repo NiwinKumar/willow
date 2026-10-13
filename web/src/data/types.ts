@@ -110,6 +110,9 @@ export type Session = {
   deviation?: boolean
   /** Hours since the baseline session; used for the scrubber labels on short series. */
   hours_since_baseline?: number
+  /** Live sessions only: where the explanation came from, and why a failed session failed. */
+  explanation_source?: 'template' | 'gemini' | null
+  error?: { code: string; message: string } | null
 }
 
 export type SiteSeries = { site: Site; sessions: Session[] }
@@ -150,4 +153,8 @@ export type Product = {
   stores: { store: string; url: string; region: string }[]
   source_url: string
   last_verified: string
+  /** The brand's own packshot, linked where it is already published (never copied). */
+  image_url?: string | null
+  /** The page that image appears on, for the credit line. */
+  image_source?: string | null
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { Button } from '../components/Button'
 import { Chip } from '../components/Chip'
 import { CoachMarks } from '../components/CoachMarks'
 import { ControlCompare } from '../components/ControlCompare'
@@ -14,6 +15,7 @@ import { NumberValue } from '../components/NumberValue'
 import { Scrubber } from '../components/Scrubber'
 import { Sheet } from '../components/Sheet'
 import { Stage } from '../components/Stage'
+import { isSampleEngine } from '../data/live'
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { fmtDate, plural } from '../lib/format'
@@ -70,6 +72,26 @@ export function Report() {
     return () => window.removeEventListener('keydown', onKey)
   }, [index, sessions.length, view])
 
+  if (data.mode === 'live' && (data.status === 'loading' || data.status === 'idle') && sessions.length === 0) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center" role="status" aria-live="polite">
+        <p className="text-[15px] text-text-2">{data.status === 'idle' ? 'Signing in…' : 'Loading your sessions…'}</p>
+      </div>
+    )
+  }
+
+  if (data.mode === 'live' && data.status === 'error' && sessions.length === 0) {
+    return (
+      <div className="mx-auto max-w-[36rem] px-5 py-12">
+        <h1 className="text-[28px] font-bold tracking-[-0.02em]">Could not load your sessions</h1>
+        <p className="mt-3 text-[15px] text-text-2">Check your connection, then try again. Nothing was lost.</p>
+        <Button className="mt-6" onClick={() => void data.refresh()}>
+          Try again
+        </Button>
+      </div>
+    )
+  }
+
   if (!series || sessions.length === 0) {
     return (
       <div className="flex min-h-dvh flex-col">
@@ -77,7 +99,7 @@ export function Report() {
         <div className="mx-auto max-w-[36rem] px-5 py-12">
           <h1 className="text-[28px] font-bold tracking-[-0.02em]">No sessions yet for {SITE_LABEL[site]}</h1>
           <p className="mt-3 text-[15px] text-text-2">Take a baseline of five photos to start. Every later session is compared to it.</p>
-          <Link to="/capture" className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+          <Link to={`/capture?site=${site}`} className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
             Start a baseline
           </Link>
         </div>
@@ -109,6 +131,11 @@ export function Report() {
           </>
         )}
       </header>
+      {isSampleEngine(session) ? (
+        <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
+          <span className="font-semibold">Sample numbers.</span> Your photos are saved. Until the measurement engine is connected, these readings come from a fixed sample, not from your skin.
+        </div>
+      ) : null}
       {session?.result && !session.result.quality.passed ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold text-warn-text">Photo quality differed from your reference.</span>{' '}
@@ -161,7 +188,7 @@ export function Report() {
         <section className="mx-5 my-5 rounded-(--radius-tile) bg-surface p-4 sm:mx-6">
           <div className="flex items-center justify-between">
             <h2 className="text-[17px] font-semibold">Why this matters</h2>
-            {data.mode === 'demo' ? <Chip tone="neutral">sample explanation</Chip> : <Chip tone="neutral">AI-written, numbers verified</Chip>}
+            {data.mode === 'demo' ? <Chip tone="neutral">sample explanation</Chip> : session.explanation_source === 'gemini' ? <Chip tone="neutral">AI-written, numbers verified</Chip> : <Chip tone="neutral">written from your numbers</Chip>}
           </div>
           <p className="mt-2 text-[15px] font-medium">{session.explanation.headline}</p>
           <ul className="mt-2 space-y-2 text-[15px] leading-relaxed text-text-2">
