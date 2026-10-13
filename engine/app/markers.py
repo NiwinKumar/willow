@@ -126,12 +126,20 @@ def find_dot_square(srgb8: np.ndarray, max_score: float = 0.25) -> tuple[Box, np
     return find_dot_squares(srgb8, 1, max_score)[0]
 
 
-def paper_pixels(linear: np.ndarray, srgb8: np.ndarray, near: Box | None = None) -> np.ndarray:
-    """Linear RGB of the white paper: the largest bright, colourless region, edges trimmed.
+def paper_pixels(
+    linear: np.ndarray,
+    srgb8: np.ndarray,
+    near: Box | None = None,
+    require_near: bool = False,
+    max_gap: float | None = None,
+) -> np.ndarray:
+    """Linear RGB of the white paper: a bright, colourless region, edges trimmed.
 
-    With `near`, only paper in a band at the same height as that box is used, because lamp
-    light falls off across the table and paper next to the skin sees the same light as it.
-    Falls back to the whole sheet if the band has too little paper.
+    With `near`, the region with the most paper level with that box is used, and only its
+    part at that height (lamp light falls off across the table, so paper beside the skin
+    sees the same light). `require_near` (faces): if there is no paper level with the box,
+    and within `max_gap` px of it sideways, raise instead of falling back to the biggest
+    white thing in the photo, which may be a wall or a shirt.
     """
     small = srgb8[::SCALE, ::SCALE].astype(np.int16)
     bright = small.min(axis=-1) > 150
@@ -139,12 +147,30 @@ def paper_pixels(linear: np.ndarray, srgb8: np.ndarray, near: Box | None = None)
     labels = measure.label(morphology.opening(bright & neutral, morphology.disk(3)))
     if labels.max() == 0:
         raise ValueError("could not find the white paper")
-    largest = max(measure.regionprops(labels), key=lambda r: r.area)
-    mask = morphology.erosion(labels == largest.label, morphology.disk(6))
+    regions = measure.regionprops(labels)
+    if near is None:
+        best = max(regions, key=lambda r: r.area)
+        mask = morphology.erosion(labels == best.label, morphology.disk(6))
+        ys, xs = np.nonzero(mask)
+        return linear[::SCALE, ::SCALE][ys, xs]
+
+    cy = (near.y + near.h / 2) / SCALE
+    half = PAPER_BAND_BOXES * near.h / SCALE
+    x0, x1 = near.x / SCALE, (near.x + near.w) / SCALE
+    gap = (max_gap if max_gap is not None else np.inf) / SCALE
+
+    def in_band(region) -> np.ndarray:
+        ys, xs = region.coords[:, 0], region.coords[:, 1]
+        sideways = np.maximum(x0 - xs, xs - x1)  # <= 0 inside the box's columns
+        return (np.abs(ys - cy) <= half) & (sideways <= gap)
+
+    best = max(regions, key=lambda r: in_band(r).sum())
+    mask = morphology.erosion(labels == best.label, morphology.disk(6))
     ys, xs = np.nonzero(mask)
-    if near is not None:
-        cy = (near.y + near.h / 2) / SCALE
-        band = np.abs(ys - cy) <= PAPER_BAND_BOXES * near.h / SCALE
-        if band.sum() >= PAPER_MIN_PX:
-            ys, xs = ys[band], xs[band]
+    sideways = np.maximum(x0 - xs, xs - x1)
+    band = (np.abs(ys - cy) <= half) & (sideways <= gap)
+    if band.sum() >= PAPER_MIN_PX:
+        ys, xs = ys[band], xs[band]
+    elif require_near:
+        raise ValueError("no white paper beside the face")
     return linear[::SCALE, ::SCALE][ys, xs]

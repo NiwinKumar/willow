@@ -17,7 +17,9 @@ def find_spots(
     # shading across the face (curvature, overhead light) is not mistaken for a spot
     sigma_bg = config.SPOT_BACKGROUND_MM * px_per_mm
     weight = ndimage.gaussian_filter(skin.astype(np.float64), sigma_bg)
-    background = ndimage.gaussian_filter(np.where(skin, mi, 0.0), sigma_bg) / np.maximum(weight, 1e-6)
+    background = ndimage.gaussian_filter(np.where(skin, mi, 0.0), sigma_bg) / np.maximum(
+        weight, 1e-6
+    )
     contrast = mi - background
     mad = np.median(np.abs(contrast[skin])) * 1.4826  # robust SD of this person's skin
     # MI is a log scale, so a fixed MI difference is the same *ratio* of light at every tone

@@ -109,6 +109,17 @@ SQUARES = {  # name -> (x, y) top-left of a 120 px ROI square in a 1000x1000 pho
 
 
 class FakeFace(Face):
+    """Stand-in for MediaPipe output: square ROIs, the face = a big central rectangle."""
+
+    def skin_mask(self, shape):
+        m = np.zeros(shape, bool)
+        m[120:900, 200:820] = True
+        return m
+
+    def feature_zones(self, shape):
+        none = np.zeros(shape, bool)
+        return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
+
     def roi_polygons(self):
         return {
             n: np.array([[x, y], [x + 120, y], [x + 120, y + 120], [x, y + 120]], float)
@@ -165,3 +176,23 @@ def test_face_not_found(tmp_path, fake_landmarks):
     r = analyze_face([str(tmp_path / "dark.jpg")])
     assert r["quality"]["per_frame"][0]["reasons"] == ["face_not_found"]
     assert "too_few_frames" in r["quality"]["reasons"] and r["rois"] == []
+
+
+def test_refine_skin_keeps_a_mark_but_cuts_hair_and_brow():
+    from app.landmarks import refine_skin
+
+    rng = np.random.default_rng(4)
+    L = 60 + rng.normal(0, 0.5, (400, 400))
+    mask = np.zeros((400, 400), bool)
+    mask[50:350, 50:350] = True
+    L[50:70, 50:350] = 25  # hair along the top edge of the face
+    yy, xx = np.ogrid[:400, :400]
+    L[(yy - 200) ** 2 + (xx - 200) ** 2 <= 6**2] = 50  # a small darker mark, 10 L* down
+    brow = np.zeros_like(mask)
+    brow[120:135, 100:180] = True
+    L[brow] = 35
+    zones = {"brow_core": brow, "brow_zone": brow, "nostril_zone": np.zeros_like(mask)}
+    skin = refine_skin(L, mask, zones, px_per_mm=PX_PER_MM)
+    assert skin[200, 200]  # the mark stays: it is skin, not hair
+    assert not skin[55, 200] and not skin[127, 140]  # hair and brow are cut
+    assert skin[250, 250]  # plain skin stays
