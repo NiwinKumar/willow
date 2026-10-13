@@ -1,8 +1,11 @@
 # willow-engine on Cloud Run. Build from the REPO ROOT so schemas/ and fixtures/ are included:
 #   gcloud builds submit --config infra/cloudbuild.engine.yaml .
 # Dependencies come from engine/uv.lock. rawpy and pillow-heif ship manylinux wheels with
-# LibRaw and libheif inside, so no system packages are needed.
+# LibRaw and libheif inside; MediaPipe needs only the GL libraries installed below.
 FROM python:3.12-slim
+# MediaPipe's face landmarker links the GLES / EGL libraries even when it runs on CPU.
+RUN apt-get update && apt-get install -y --no-install-recommends libgles2 libegl1 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/srv/.venv
 WORKDIR /srv/engine
