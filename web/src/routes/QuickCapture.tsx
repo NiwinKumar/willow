@@ -1,16 +1,17 @@
 import { Camera, RotateCcw, X } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { FirstSessionGuide } from '../components/BaselineGuide'
 import { UploadList } from '../components/UploadList'
-import { useData } from '../data/useData'
+import { leaveDemo, useData } from '../data/useData'
 import { baselineState, photoSteps } from '../lib/baselineGuide'
 import type { CaptureMode, Site } from '../data/types'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { validateFiles, type Row } from '../lib/upload'
+import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 
 type Gates = { light: boolean; even: boolean; still: boolean }
@@ -173,6 +174,8 @@ export function QuickCapture() {
   ]
   const allPass = gates.light && gates.even && gates.still
 
+  if (data.mode === 'live' && !prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture/camera?${params.toString()}`)}`} replace />
+
   if (phase === 'ask' || phase === 'denied')
     return (
       <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-6 sm:px-8">
@@ -289,7 +292,10 @@ export function QuickCapture() {
         ) : (
           <div className="mt-5">
             {uploadMode === 'calibrated_raw' ? <p className="mb-3 text-[13px] text-text-2">RAW files: sent as a calibrated session.</p> : null}
-            <UploadList site={site} mode={uploadMode} rows={rows} onRows={setRows} onDone={(sid) => navigate(`/processing/${sid}?site=${site}&n=${rows.length}`)} />
+            <UploadList site={site} mode={uploadMode} rows={rows} onRows={setRows} onDone={(sid) => {
+              leaveDemo()
+              navigate(`/processing/${sid}?site=${site}&n=${rows.length}`)
+            }} />
           </div>
         )}
       </div>

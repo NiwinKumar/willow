@@ -9,6 +9,7 @@ import { Chip } from '../components/Chip'
 import { CoachMarks } from '../components/CoachMarks'
 import { ControlCompare } from '../components/ControlCompare'
 import { DemoBar } from '../components/DemoBar'
+import { JudgeBar } from '../components/JudgeBar'
 import { MetricDetail } from '../components/MetricDetail'
 import { MetricRow } from '../components/MetricRow'
 import { NumberValue } from '../components/NumberValue'
@@ -24,6 +25,7 @@ import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } fro
 import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
 import { useAuth } from '../lib/useAuth'
+import { useJudgeOn } from '../lib/useJudge'
 
 const SNAPS = ['peek', 'half', 'full'] as const
 type Snap = (typeof SNAPS)[number]
@@ -32,6 +34,7 @@ export function Report() {
   const { site: siteParam } = useParams()
   const site = (siteParam ?? 'face_full') as Site
   const data = useData()
+  const judging = useJudgeOn()
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const series = data.series(site)
@@ -47,8 +50,8 @@ export function Report() {
   const qualityFailed = Boolean(session?.result && !session.result.quality.passed)
   const nothingMeasured = Boolean(session?.result && session.result.metrics.every((m) => m.value === null))
   const controlSessions = useMemo(() => data.series('forearm_control')?.sessions ?? [], [data])
-  // Demo journeys are aligned by index; live pairs the nearest control photo in time.
-  const controlSession = data.mode === 'demo' ? (controlSessions[index] ?? null) : matchControl(session, controlSessions)
+  // The illustrative journey is aligned by index; real sessions pair the nearest control photo in time.
+  const controlSession = session?.live ? matchControl(session, controlSessions) : (controlSessions[index] ?? null)
   const missing = session?.is_baseline ? missingBaselines(data.series, session.capture_mode).filter((m) => m !== site) : []
   const noBand = Boolean(session && !session.is_baseline && session.baseline_ref && !session.baseline_ref.has_noise_band)
 
@@ -139,7 +142,7 @@ export function Report() {
   if (!series || sessions.length === 0) {
     return (
       <div className="flex min-h-dvh flex-col">
-        {data.mode === 'demo' ? <DemoBar /> : null}
+        {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
         <div className="mx-auto max-w-[36rem] px-5 py-12">
           <h1 className="text-[28px] font-bold tracking-[-0.02em]">No sessions yet for {SITE_LABEL[site]}</h1>
           <p className="mt-3 text-[15px] text-text-2">Take a baseline of five photos to start. Every later session is compared to it.</p>
@@ -394,7 +397,7 @@ export function Report() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-bg">
-      {data.mode === 'demo' ? <DemoBar /> : null}
+      {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
       {topBar}
       {/* Desktop: stage + scrubber left, panel right */}
       <div className="hidden min-h-0 flex-1 lg:grid lg:grid-cols-[58%_42%]">

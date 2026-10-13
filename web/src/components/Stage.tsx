@@ -82,14 +82,15 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   return (
     <div className={`relative select-none overflow-hidden bg-stage ${compact ? 'rounded-(--radius-tile)' : ''} ${className}`} style={{ touchAction: 'pan-y' }}>
       <div
-        className={`relative mx-auto ${compact ? 'h-full' : 'h-full'} aspect-[3/4] max-h-full p-3`}
+        // The svg letterboxes the photo in its own shape (phone RAW frames are often landscape).
+        className="relative mx-auto h-full w-full p-3"
         onPointerDown={startHold}
         onPointerUp={stopHold}
         onPointerCancel={stopHold}
         onPointerLeave={stopHold}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <svg viewBox={`0 0 ${size.width} ${size.height}`} className="h-full w-full border border-surface" role="img" aria-label={`${metricLabel ? metricLabel + ' regions on ' : ''}aligned photo${showBaseline ? ', showing baseline' : ''}`}>
+        <svg viewBox={`0 0 ${size.width} ${size.height}`} className="h-full w-full" role="img" aria-label={`${metricLabel ? metricLabel + ' regions on ' : ''}aligned photo${showBaseline ? ', showing baseline' : ''}`}>
           {shown?.preview?.url ? (
             <image href={shown.preview.url} width={size.width} height={size.height} preserveAspectRatio="xMidYMid slice" />
           ) : blank ? (
@@ -133,6 +134,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
               </g>
             )
           })}
+          <rect width={size.width} height={size.height} fill="none" stroke="var(--color-surface)" strokeWidth={2} vectorEffect="non-scaling-stroke" pointerEvents="none" />
         </svg>
         <div className="pointer-events-none absolute left-5 top-5 flex gap-2">
           {caption ? <span className="rounded-(--radius-chip) bg-surface/90 px-1.5 py-0.5 font-mono text-[12px] text-text">{caption}</span> : null}

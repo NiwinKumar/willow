@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { GOALS } from '../lib/metrics'
-import { prefs } from '../lib/prefs'
+import { nextPath, prefs } from '../lib/prefs'
 
 const times = [
   { id: 'evening', label: 'Evening', hint: 'Most people do this after washing their face in the evening.' },
@@ -15,6 +15,7 @@ export function Goals() {
   const [picked, setPicked] = useState<string[]>(prefs.goals())
   const [time, setTime] = useState<string>(prefs.photoTime() ?? 'evening')
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 3 ? p : [...p, id]))
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
@@ -64,7 +65,7 @@ export function Goals() {
           } catch {
             /* ignore */
           }
-          navigate('/capture')
+          navigate(nextPath(params.get('next'), '/capture'))
         }}
       >
         Start my baseline

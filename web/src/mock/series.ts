@@ -40,10 +40,10 @@ export const FOREARM_ROIS: Roi[] = [{ name: 'square', polygon: [[1000, 1300], [2
 
 /** Which ROI each metric lights up on the stage (layers). */
 export const METRIC_ROIS: Partial<Record<Metric['id'], string[]>> = {
-  tone_ita: ['left_cheek', 'right_cheek', 'square'],
+  tone_ita: ['left_cheek', 'right_cheek', 'square', 'forearm_square'],
   pigment_spots: ['left_cheek', 'right_cheek', 'forehead'],
   tone_evenness: ['forehead', 'left_cheek', 'right_cheek', 'nose', 'chin'],
-  redness: ['left_cheek', 'right_cheek', 'nose', 'square'],
+  redness: ['left_cheek', 'right_cheek', 'nose', 'square', 'forearm_square'],
   blemishes: ['forehead', 'left_cheek', 'right_cheek', 'chin'],
   lines: ['forehead'],
   dark_circles: ['left_under_eye', 'right_under_eye'],

@@ -101,6 +101,11 @@ def routine_add(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
+    entry_id, doc = add_routine_entry(store, user.uid, body)
+    return _entry_view(entry_id, doc)
+
+
+def add_routine_entry(store: Store, uid: str, body: RoutineEntryIn) -> tuple[str, dict[str, Any]]:
     doc = body.model_dump(mode="json")
     if body.product_id:
         product = catalog.by_id(body.product_id)
@@ -121,8 +126,8 @@ def routine_add(
     doc["ended_at"] = None
     doc["created_at"] = datetime.now(UTC)
     entry_id = f"r_{secrets.token_hex(4)}"
-    store.routine_set(user.uid, entry_id, doc)
-    return _entry_view(entry_id, doc)
+    store.routine_set(uid, entry_id, doc)
+    return entry_id, doc
 
 
 @router.patch("/routine/{entry_id}")

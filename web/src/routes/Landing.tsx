@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { BandBar } from '../components/BandBar'
@@ -14,7 +14,7 @@ import { DEMO_SERIES } from '../mock/series'
 
 const entries = [
   { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', demo: true },
-  { title: 'See a session run', sub: 'The capture-to-report flow on sample data.', eta: '~30 s', to: '/capture?demo=1&sample=1', demo: true },
+  { title: 'Run the pipeline on sample photos', sub: 'Real RAW photos, measured live in a guest account of your own.', eta: '~40 s', to: '/capture?sample=1', demo: false },
   { title: 'Measure your own forearm', sub: 'Phone camera or a RAW photo. Your own baseline, really measured.', eta: '~2 min', to: '/capture?site=forearm_control&mode=quick', demo: false },
 ]
 
@@ -82,7 +82,14 @@ export function Landing() {
           <p className="text-[17px] leading-relaxed text-text-2">
             Willow measures your skin from standardized photos and tells you whether a change is real or just the camera. Every number comes from calibrated computer vision; the AI only explains.
           </p>
-          <div className="mt-6 flex flex-col gap-3">
+          <Link to="/judge" className="mt-6 flex min-h-11 items-center justify-between gap-3 rounded-(--radius-control) bg-text px-4 py-3 text-surface transition-opacity hover:opacity-90">
+            <span>
+              <span className="block text-[15px] font-semibold">Judging Willow? Take the guided tour</span>
+              <span className="block text-[13px] opacity-80">Five stops, every one live. No sign-in.</span>
+            </span>
+            <span className="font-mono text-[13px] opacity-80">~4 min</span>
+          </Link>
+          <div className="mt-3 flex flex-col gap-3">
             {entries.map((e) => (
               <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to, e.demo)}>
                 <span className="flex w-full items-center justify-between">

@@ -1,21 +1,22 @@
 import { Camera, Check, ChevronRight, FileText, FolderOpen, Lock, PenLine, Sun, Thermometer, Timer, Wind } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '../components/Button'
-import { DemoBar } from '../components/DemoBar'
 import { BaselineChecklist, FirstSessionGuide } from '../components/BaselineGuide'
+import { SampleRuns } from '../components/SampleRuns'
 import { UploadList } from '../components/UploadList'
 import { validateFiles, type Row } from '../lib/upload'
-import { leaveDemo, useData } from '../data/useData'
+import { enterDemo, leaveDemo, useData } from '../data/useData'
 import type { CaptureMode, Site } from '../lib/api'
 import { DONT_VARY, baselineState, photoSteps } from '../lib/baselineGuide'
 import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
+import { useSamples } from '../lib/useSamples'
 
 const SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
 const RITUAL = [
@@ -55,6 +56,8 @@ export function Capture() {
   const ready = rows.length > 0 && (rows.length >= expected || uploadFew)
 
   if (sample) return <Samples />
+  // Consent comes before the first photo (UX_SPEC screen 2), then goals, then back here.
+  if (data.mode === 'live' && !prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture?${params.toString()}`)}`} replace />
 
   const ring = (
     <div className="relative mx-auto h-44 w-44" role="img" aria-label={`${shots} of ${expected} photos taken`}>
@@ -79,7 +82,6 @@ export function Capture() {
 
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
-      {data.mode === 'demo' ? <div className="-mx-5 mb-4 sm:-mx-8"><DemoBar /></div> : null}
 
       {step === 'guide' ? (
         <>
@@ -311,7 +313,10 @@ export function Capture() {
                 mode={mode}
                 rows={rows}
                 onRows={setRows}
-                onDone={(sid) => navigate(`/processing/${sid}?site=${site}&n=${rows.length}${deviation ? `&dev=1&note=${encodeURIComponent(note)}` : ''}`)}
+                onDone={(sid) => {
+                  leaveDemo()
+                  navigate(`/processing/${sid}?site=${site}&n=${rows.length}${deviation ? `&dev=1&note=${encodeURIComponent(note)}` : ''}`)
+                }}
               />
             </div>
           ) : null}
@@ -321,34 +326,47 @@ export function Capture() {
   )
 }
 
-/** Sample run: plays the capture-to-report flow on the illustrative sample journey. Hosted RAW sample sessions through the live engine replace it once the team's consented captures are in demo/. */
+/** Sample photos: hosted consented captures run through the real pipeline in your own account; the scripted replay stays as a fallback. */
 function Samples() {
   const navigate = useNavigate()
-  const data = useData()
+  const samples = useSamples()
+  const live = samples.state === 'ready' && samples.samples.length > 0
   const packs = [
     { id: 'forearm_treated', title: 'Forearm, treated, +24 h', frames: 3, note: 'self-tanner applied the evening before' },
     { id: 'face_full', title: 'Face, week 6 check-in', frames: 3, note: 'azelaic acid started at week 2' },
   ] as const
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
-      {data.mode === 'demo' ? <div className="-mx-5 mb-4 sm:-mx-8"><DemoBar /></div> : null}
-      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">See a session run</h1>
-      <p className="mt-2 text-[15px] text-text-2">Plays the capture-to-report flow on Willow's illustrative sample journey. The numbers are examples, not a measurement.</p>
-      <ul className="mt-5 space-y-3">
-        {packs.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-4">
-            <span>
-              <span className="block text-[15px] font-semibold">{p.title}</span>
-              <span className="block text-[13px] text-text-2">{p.frames} RAW frames with colour card · {p.note}</span>
-            </span>
-            <Button onClick={() => navigate(`/processing/sample?site=${p.id}&n=${p.frames}&sample=1&demo=1`)}>Play</Button>
-          </li>
-        ))}
-      </ul>
+      <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{live ? 'Run the pipeline on sample photos' : 'See a session run'}</h1>
+      {samples.state === 'loading' ? (
+        <p className="mt-2 text-[15px] text-text-3">Loading the sample photos…</p>
+      ) : live ? (
+        <>
+          <p className="mt-2 text-[15px] text-text-2">The photos are copied into a guest account of your own and measured for real: the engine on Cloud Run, then a Gemini explanation with every number checked. Run a second one to see it compared with the first.</p>
+          <div className="mt-5">
+            <SampleRuns samples={samples.samples} />
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 text-[15px] text-text-2">Plays the capture-to-report flow on Willow's illustrative sample journey. The numbers are examples, not a measurement.</p>
+          <ul className="mt-5 space-y-3">
+            {packs.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-4">
+                <span>
+                  <span className="block text-[15px] font-semibold">{p.title}</span>
+                  <span className="block text-[13px] text-text-2">{p.frames} RAW frames with colour card · {p.note}</span>
+                </span>
+                <Button onClick={() => { enterDemo(); navigate(`/processing/sample?site=${p.id}&n=${p.frames}&sample=1&demo=1`) }}>Play</Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <p className="mt-6 text-[13px] text-text-2">
-        Want a real measurement?{' '}
-        <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => { leaveDemo(); navigate('/capture?site=forearm_control') }}>
-          Measure your own forearm
+        Want to measure yourself?{' '}
+        <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => { leaveDemo(); navigate('/capture?site=forearm_control&mode=quick') }}>
+          Photograph your own forearm
         </button>
       </p>
     </div>
