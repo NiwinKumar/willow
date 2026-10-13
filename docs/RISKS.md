@@ -14,5 +14,6 @@
 | Scope creep | Tiers A/B/C, cut order in `SPLIT.md`, feature freeze Sat 12:00 |
 | Face photos in a public repo | `.gitignore` blocks images; data only in GCS; check history before making the repo public |
 | Medical-claim perception | cosmetic wording, disclaimer on every report, no disease names |
-| Costs | budget alerts $1/$5/$20, max instances 3, lifecycle deletes |
+| Costs | ₹2,000/month budget with alerts at 5/25/100% (credits excluded), max instances 3, lifecycle deletes, Flash model, cached Gemini outputs |
+| Gemini quota on a new trial project (global endpoint RPM) too low for several judges at once | Check and request a quota increase on `gemini-3.8-flash` early (Wed); cache explanations; cap analyses per user per day |
 | Merge conflicts | strict folder ownership, contract changes only by agreement |

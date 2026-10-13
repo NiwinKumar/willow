@@ -4,7 +4,8 @@
 set -euo pipefail
 
 # ---- fill these in ----
-PROJECT_ID="${PROJECT_ID:-willow-2026}"        # must be globally unique
+PROJECT_ID="${PROJECT_ID:-willow-511508}"      # must be globally unique
+BUDGET_AMOUNT="${BUDGET_AMOUNT:-2000INR}"      # monthly budget, e.g. 2000INR or 20USD
 BILLING_ACCOUNT="${BILLING_ACCOUNT:-XXXXXX-XXXXXX-XXXXXX}"  # gcloud billing accounts list
 REGION="us-central1"
 HARSHINI_EMAIL="${HARSHINI_EMAIL:-harshini@example.com}"
@@ -17,11 +18,14 @@ gcloud projects create "$PROJECT_ID" --name="Willow" || true
 gcloud config set project "$PROJECT_ID"
 gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING_ACCOUNT"
 
-echo ">> Budget: \$20 with alerts at \$1 (5%), \$5 (25%), \$20 (100%)"
+echo ">> Budget: ${BUDGET_AMOUNT}/month with alerts at 5%, 25%, 100% of actual spend (credits excluded)"
+gcloud services enable billingbudgets.googleapis.com || true
 gcloud billing budgets create --billing-account="$BILLING_ACCOUNT" \
-  --display-name="willow-budget" --amount=20USD \
+  --display-name="willow-budget" --budget-amount="$BUDGET_AMOUNT" \
   --filter-projects="projects/${PROJECT_ID}" \
-  --threshold-rule=percent=0.05 --threshold-rule=percent=0.25 --threshold-rule=percent=1.0 || true
+  --filter-credit-types-treatment=exclude-all-credits \
+  --threshold-rule=percent=0.05 --threshold-rule=percent=0.25 --threshold-rule=percent=1.0 \
+  || echo "   (budget step skipped or already exists; create it in the console if needed)"
 
 echo ">> APIs"
 gcloud services enable \
@@ -69,12 +73,12 @@ gcloud iam service-accounts add-iam-policy-binding "$API_SA" \
 echo ">> Teammate access"
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="user:${HARSHINI_EMAIL}" --role="roles/editor" --condition=None
 
-echo ">> Firebase"
-firebase projects:addfirebase "$PROJECT_ID" || true
-echo "Manual steps in the Firebase console:"
-echo "  1. Upgrade to Blaze (uses the same billing account)."
+echo ">> Firebase (manual: the CLI cannot add Firebase until the terms are accepted in the console)"
+echo "  1. Open https://console.firebase.google.com and 'Add project' -> choose existing project ${PROJECT_ID}."
+echo "     Accept the Firebase terms. The project is already on Blaze via the linked billing account; do NOT click Upgrade."
 echo "  2. Authentication > Sign-in method: enable Google and Anonymous."
 echo "  3. Add a Web app; copy the config into web/.env.local (not committed)."
+echo "  4. Then: firebase use ${PROJECT_ID} && firebase deploy --only firestore:rules"
 
 echo ">> After the engine is deployed (Thu), allow api to invoke it:"
 echo "  gcloud run services add-iam-policy-binding willow-engine --region=$REGION --member=serviceAccount:${API_SA} --role=roles/run.invoker"

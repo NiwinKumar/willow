@@ -2,6 +2,9 @@
 
 | Date | Decision | Supersedes |
 |---|---|---|
+| Oct 13 | Gemini model `gemini-3.8-flash` (latest GA Flash) via the Vertex AI **global** endpoint; all other resources stay in `us-central1` | "Gemini in us-central1" (3.x GA models are global-only; 2.5 Flash retires Oct 20) |
+| Oct 13 | Web talks only to the api (Firebase SDK used for Auth only); Firestore client rules are deny-all, the api uses the Admin SDK | Browser reads of demo data via Firestore rules |
+| Oct 13 | Budget ₹2,000/month, alerts 5/25/100% excluding credits; CODEOWNERS removed (ruleset: PR required, 0 approvals) | "$20 budget, $1/$5/$20 alerts", CODEOWNERS review |
 | Oct 13 | Name: **Willow** (working; final check by Thu) | "SkinProof", earlier name lists |
 | Oct 13 | Team of 2: Harshini = engine (pixels), Niwin = product (everything else) | 4-role plan in the original lock sheet |
 | Oct 13 | Business customer = **multi-brand retailers**; brands as secondary integration | Brand-store integration |

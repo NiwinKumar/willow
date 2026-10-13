@@ -13,6 +13,9 @@ data/*
 !data/README.md
 !data/.gitkeep
 
+# Logs (firebase-debug.log, npm-debug.log, ...)
+*.log
+
 # Secrets
 .env
 .env.*
