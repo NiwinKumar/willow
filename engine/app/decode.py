@@ -114,3 +114,28 @@ def decode_photo(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
     """JPEG/HEIC -> linear sRGB float32 0..1 (docs/METRICS.md pipeline step 1, uncalibrated)."""
     rgb8, info = load_photo_srgb8(path)
     return srgb_to_linear(rgb8), info
+
+
+def decode_dng_srgb(path: str | Path) -> np.ndarray:
+    """DNG -> linear sRGB float32 0..1, for DNGs shot without a colour card.
+
+    With no card to fit our own colour matrix, we use the camera's own matrix and as-shot
+    white balance stored in the DNG (fixed if WB is locked), then the white paper fixes
+    what is left. Still no phone beautifying, no HDR, no smoothing.
+    """
+    with rawpy.imread(str(path)) as raw:
+        rgb = raw.postprocess(
+            gamma=(1, 1),
+            no_auto_bright=True,
+            use_camera_wb=True,
+            output_color=rawpy.ColorSpace.sRGB,
+            output_bps=16,
+        )
+    return rgb.astype(np.float32) / 65535.0
+
+
+def linear_to_srgb8(linear: np.ndarray) -> np.ndarray:
+    """Inverse of srgb_to_linear: linear 0..1 -> 8-bit sRGB (for previews and sharpness)."""
+    c = np.clip(linear, 0.0, 1.0)
+    encoded = np.where(c <= 0.0031308, c * 12.92, 1.055 * c ** (1 / 2.4) - 0.055)
+    return np.round(encoded * 255).astype(np.uint8)

@@ -10,7 +10,7 @@ from jsonschema import validate
 from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
-from app.decode import load_photo_srgb8, srgb_to_linear
+from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
 from app.metrics.redness import redness
 from app.metrics.tone import tone_ita
 from app.quality import FrameQuality, check_frame
@@ -24,11 +24,27 @@ METRIC_INFO = {  # id -> (group, label, unit)
 }
 
 
+def capture_mode_for(files: list[str]) -> str:
+    """All DNG -> calibrated_raw; all normal photos -> uncalibrated. No mixing in one session."""
+    is_dng = {Path(f).suffix.lower() == ".dng" for f in files}
+    if len(is_dng) > 1:
+        raise ValueError("mix of DNG and normal photos in one session")
+    return "calibrated_raw" if is_dng.pop() else "uncalibrated"
+
+
+def _load(path: str) -> tuple[np.ndarray, np.ndarray]:
+    """-> (linear sRGB float 0..1, 8-bit sRGB) for DNG or normal photos."""
+    if Path(path).suffix.lower() == ".dng":
+        linear = decode_dng_srgb(path)
+        return linear, linear_to_srgb8(linear)
+    srgb8, _ = load_photo_srgb8(path)
+    return srgb_to_linear(srgb8), srgb8
+
+
 def _frame_metrics(
     path: str, roi: Box, white: Box | None
 ) -> tuple[dict, dict, FrameQuality, tuple]:
-    srgb8, _ = load_photo_srgb8(path)
-    linear = srgb_to_linear(srgb8)
+    linear, srgb8 = _load(path)
     if white is not None:
         linear = white_balance(linear, white.crop(linear))
     skin_lin = roi.crop(linear)
@@ -51,10 +67,16 @@ def analyze_forearm(
     user_id: str = "local",
     baseline: dict | None = None,
 ) -> dict:
-    """Uncalibrated (normal phone photo) analysis of one taped forearm square."""
+    """Analyze one taped forearm square from normal photos (uncalibrated) or DNGs.
+
+    DNGs have no colour card (team decision Oct 13): reported as calibrated_raw with
+    card_detected=false and a warning; normal photos are uncalibrated and 'indicative'.
+    """
     if site not in FOREARM_SITES:
         raise ValueError(f"M1 supports {sorted(FOREARM_SITES)} only, got {site!r}")
     t0 = time.perf_counter()
+    mode = capture_mode_for(files)
+    confidence = "measured" if mode == "calibrated_raw" else "indicative"
     per_frame, passed_values, passed_extras, shape = [], [], [], None
     for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
         values, extras, q, frame_shape = _frame_metrics(path, roi, white)
@@ -86,7 +108,7 @@ def analyze_forearm(
                 "group": group,
                 "label": label,
                 "unit": unit,
-                "confidence": "indicative",
+                "confidence": confidence,
                 **summary,
                 "extras": extras,
             }
@@ -96,7 +118,10 @@ def analyze_forearm(
     reasons = sorted({r for f in per_frame for r in f["reasons"]})
     if not passed_values:
         reasons.append("too_few_frames")
-    warnings = ["uncalibrated photo: results are a trend only, not a measurement"]
+    if mode == "uncalibrated":
+        warnings = ["uncalibrated photo: results are a trend only, not a measurement"]
+    else:
+        warnings = ["no colour card: colours corrected with the white paper only"]
     if any(w is None for w in whites):
         warnings.append("no white reference in frame: lamp colour not corrected")
 
@@ -106,7 +131,7 @@ def analyze_forearm(
         "session_id": session_id,
         "user_id": user_id,
         "site": site,
-        "capture_mode": "uncalibrated",
+        "capture_mode": mode,
         "frames_used": len(passed_values),
         "quality": {
             "passed": bool(passed_values),
