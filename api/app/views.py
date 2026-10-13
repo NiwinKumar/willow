@@ -2,7 +2,8 @@
 
 `session` also carries what the Lens needs and the engine does not produce: a signed preview URL
 (the engine's `{output_prefix}preview.jpg`, when present), signed overlay URLs, the hours since
-the baseline for the scrubber, and the person's note and deviation flag.
+the baseline for the scrubber, the person's note and deviation flag, and whether the
+explanation came from Gemini or the template (`explanation_source`).
 """
 
 import json
@@ -88,6 +89,7 @@ def session_view(
             "note": doc.get("note"),
             "deviation": bool(doc.get("deviation")),
             "error": doc.get("error"),
+            "explanation_source": doc.get("explanation_source"),
             "preview": preview,
             "overlay_urls": overlay_urls,
             "hours_since_baseline": hours,

@@ -37,6 +37,7 @@ def test_first_calibrated_five_frame_session_becomes_the_baseline(client, fake):
     assert view["result"]["session_id"] == sid
     assert {m["verdict"] for m in view["result"]["metrics"]} == {"no_baseline"}
     assert view["explanation"]["headline"] == "Your first reading"
+    assert view["session"]["explanation_source"] == "template"
     baseline = fake.store.baseline_get("u_test", "forearm_treated")
     assert baseline["session_id"] == sid
     assert set(baseline["metrics"]) == {"tone_ita", "redness"}
