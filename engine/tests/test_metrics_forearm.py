@@ -103,19 +103,34 @@ def test_white_paper_cancels_lamp_tint(tmp_path):
     assert abs(ita("warm.jpg", None) - plain) > 5  # uncorrected: lamp shifts the tone a lot
 
 
+def _arm_with_dots(squares, decoy=None):
+    """Plain skin image with pen-dot squares; optional dark 'table' squares off the skin."""
+    img = np.full((1200, 1000, 3), (190, 140, 110), np.uint8)
+    rng = np.random.default_rng(2)
+    img = np.clip(img + rng.normal(0, 4, img.shape), 0, 255).astype(np.uint8)
+    img[:, 850:] = (235, 235, 235)  # paper strip on the right
+    yy, xx = np.ogrid[:1200, :1000]
+    for x0, y0, side in squares + ([decoy] if decoy else []):
+        for cx, cy in [(x0, y0), (x0 + side, y0), (x0, y0 + side), (x0 + side, y0 + side)]:
+            img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 12**2] = (40, 35, 35)
+    img[100:140, 100:800] = (60, 40, 30)  # a dark stripe (e.g. table edge) must be ignored
+    return img
+
+
 def test_find_dot_square_on_synthetic_arm():
     from app.markers import find_dot_square
 
-    img = np.full((1200, 1000, 3), (190, 140, 110), np.uint8)  # plain skin
-    rng = np.random.default_rng(2)
-    img = np.clip(img + rng.normal(0, 4, img.shape), 0, 255).astype(np.uint8)
-    for cx, cy in [(400, 500), (600, 500), (400, 700), (600, 700)]:  # 4 pen dots, 200 px apart
-        yy, xx = np.ogrid[:1200, :1000]
-        img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 14**2] = (40, 35, 35)
-    img[100:140, 100:900] = (60, 40, 30)  # a dark stripe (e.g. table edge) must be ignored
-    box, _ = find_dot_square(img)
-    assert abs(box.x + box.w / 2 - 500) < 8 and abs(box.y + box.h / 2 - 600) < 8
-    assert 100 < box.w < 141  # inside the dots: 0.6 x spacing = 120 px
+    box, _ = find_dot_square(_arm_with_dots([(400, 500, 150)]))
+    assert abs(box.x + box.w / 2 - 475) < 8 and abs(box.y + box.h / 2 - 575) < 8
+    assert 80 < box.w < 100  # inside the dots: 0.6 x spacing = 90 px
+
+
+def test_find_two_dot_squares_top_to_bottom():
+    from app.markers import find_dot_squares
+
+    img = _arm_with_dots([(400, 750, 150), (400, 300, 150)], decoy=(870, 300, 100))
+    (top, _), (bottom, _) = find_dot_squares(img, 2)
+    assert abs(top.y + top.h / 2 - 375) < 8 and abs(bottom.y + bottom.h / 2 - 825) < 8
 
 
 def test_paper_found_automatically(tmp_path):
