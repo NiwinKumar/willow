@@ -8,7 +8,7 @@ Rule of thumb: **Harshini owns everything that touches pixels. Niwin owns everyt
 - **Primary customer for the business side: multi-brand retailers** (Nykaa, Sephora, Myntra, Olive Young, etc.); individual brands can integrate too. Retailer dashboard answers: what does this customer need next, which products in our assortment actually help customers like this, how are our brands/categories performing on measured outcomes, where are the assortment gaps.
 - **Routine compatibility check** (Gemini over ingredient lists): clashes, duplicated actives, likely cancel-outs.
 - **Multi-store links** on every recommended product; the user picks where to buy.
-- Catalog holds facts (ingredients, concerns, price, store links). Efficacy evidence comes only from what SkinProof measures (team data + clearly labeled synthetic cohort). No scraping reviews as "efficacy".
+- Catalog holds facts (ingredients, concerns, price, store links). Efficacy evidence comes only from what Willow measures (team data + clearly labeled synthetic cohort). No scraping reviews as "efficacy".
 - Global positioning, all skin tones.
 
 ## Responsibilities

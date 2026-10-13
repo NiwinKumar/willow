@@ -1,0 +1,16 @@
+# Glossary
+- **DNG / RAW:** unprocessed sensor data from the phone. We use it to avoid the phone's beautifying and HDR processing.
+- **Color card / ColorChecker:** 24 printed patches with known colors; lets us correct each photo's colors.
+- **CCM (color correction matrix):** 3x3 matrix mapping camera RGB to true color, fitted on the card.
+- **ΔE2000:** perceptual color difference. After correction, card patch error should be small (< 6 here).
+- **CIELAB (L\*, a\*, b\*):** color space. L\* = lightness, a\* = red-green (redness), b\* = yellow-blue.
+- **ITA° (Individual Typology Angle):** skin-tone angle from L\* and b\*. Descriptive, never a score.
+- **Monk scale:** 10-point skin-tone scale (Google). We give an estimate only.
+- **Erythema index / melanin index:** RGB-based proxies for redness and pigment.
+- **ROI:** region of interest (e.g., left cheek polygon from face landmarks).
+- **MDC95 (minimum detectable change):** 1.96 x sqrt(2) x within-session SD. Changes smaller than this are "within noise".
+- **Baseline:** first good 5-frame calibrated session per site; later sessions compare to it.
+- **Measured vs indicative:** measured metrics have demonstrated repeatability; indicative ones are shown as trends only.
+- **Candidate:** a region the engine found (blemish/spot) that Gemini labels.
+- **DHA:** dihydroxyacetone, the self-tanner active; reacts with the skin surface and darkens it within hours. Our demo's controlled, product-driven change.
+- **Site:** body area photographed: face_full, cheek_macro, nose_macro, forearm_treated, forearm_control.

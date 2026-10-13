@@ -27,4 +27,4 @@ Goal: the same light, distance, angle and camera settings every time, so changes
 `timestamp, person, site, mode (calibrated_raw/semi_calibrated/uncalibrated), n_frames, iso, shutter, wb_k, lens, notes (e.g. "DHA +4h")`
 
 ## Consent note (everyone photographed signs/agrees in writing, keep in Drive)
-"I agree that my skin photos are used by the SkinProof hackathon team to build and demonstrate the app, stored in a private Google Cloud bucket, never committed to a public repository, and deleted after the hackathon unless I agree otherwise. I can withdraw at any time."
+"I agree that my skin photos are used by the Willow hackathon team to build and demonstrate the app, stored in a private Google Cloud bucket, never committed to a public repository, and deleted after the hackathon unless I agree otherwise. I can withdraw at any time."

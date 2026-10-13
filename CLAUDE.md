@@ -1,6 +1,27 @@
 # CLAUDE.md (repo-wide rules for Claude Code)
 
-Project: SkinProof, a hackathon entry (Google Cloud AI Builder Cup 2026, Retail & Commerce). Deadline: Oct 18, 2026. Two developers. Speed and a working end-to-end demo matter more than perfection.
+Project: Willow, a hackathon entry (Google Cloud AI Builder Cup 2026, Retail & Commerce). Deadline: Oct 18, 2026. Two developers. Speed and a working end-to-end demo matter more than perfection.
+
+## Knowledge base (read before doing anything)
+The `docs/` folder is the complete, authoritative knowledge base for this project. It contains every product decision, the interface contract, formulas, UX, Gemini behavior, data model, infra, testing, risks and submission plan. Do not invent requirements; if something is genuinely not covered, ask the human instead of guessing.
+
+| Doc | What it holds |
+|---|---|
+| `docs/PRODUCT.md` | What Willow is, users, problem evidence, MVP features, non-goals, rubric mapping, business model |
+| `docs/DECISIONS.md` | Decision log (latest wins; superseded choices listed) |
+| `docs/SPLIT.md` | Ownership, prerequisites, milestones M1-M5, day-by-day tasks, cut order |
+| `docs/CONTRACT.md` + `schemas/` + `fixtures/` | Engine <-> api <-> web interface, Firestore model, BigQuery, naming |
+| `docs/METRICS.md` | Pipeline steps, the 11 parameters, formulas, tiers, validation |
+| `docs/CAPTURE_PROTOCOL.md` | How photos are taken, settings, consent |
+| `docs/UX_SPEC.md` | Screens, states, copy rules, per-metric wording |
+| `docs/GEMINI_SPEC.md` | Every Gemini feature: inputs, output schemas, validators, rule table, tools |
+| `docs/CATALOG_SPEC.md` | Product catalog fields, enums, concern->metric mapping |
+| `docs/RETAILER_INSIGHTS.md` | Retailer questions, BigQuery tables, synthetic cohort spec, Looker |
+| `docs/LOCAL_DEV.md` | Ports, env vars, local runs, testing strategy |
+| `docs/RISKS.md` | Known pitfalls and mitigations |
+| `docs/DEMO_PLAN.md`, `docs/SUBMISSION.md` | Demo test, judge flow, video, deck, description |
+| `docs/GLOSSARY.md` | Terms (ITA, MDC, CCM, DNG...) |
+| `infra/` | `setup.sh`, Firestore rules, Cloud Build config, deploy commands |
 
 ## Source of truth
 - `docs/CONTRACT.md` and `schemas/*.json` define the engine <-> api interface. Do NOT change them unless the human explicitly says the change is agreed by both owners. If you think a change is needed, write it in `docs/CONTRACT_CHANGES.md` as a proposal and stop.

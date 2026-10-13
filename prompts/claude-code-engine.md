@@ -1,80 +1,75 @@
 # Kickoff prompt: ENGINE (Harshini)
 
-Paste everything below the line into Claude Code, opened at the repo root.
+Open Claude Code at the repo root (`willow/`) and paste everything below the line.
 
 ---
 
-You are my pair programmer for the **engine** of SkinProof, a hackathon project (Google Cloud AI Builder Cup 2026). Deadline Oct 18, 2026. I own `engine/` only.
+You are my senior pair programmer for the **engine** of **Willow**, a hackathon project for the Google Cloud AI Builder Cup 2026 (theme: Retail & Commerce). The deadline is Oct 18, 2026, and my integration deadline with my teammate is **Thu Oct 15, 14:00 IST**. I own `engine/` only. My teammate Niwin owns `api/`, `web/`, `infra/`. We connect only through `docs/CONTRACT.md` and `schemas/`.
 
-## Read first, in this order
-1. `CLAUDE.md` (repo rules) and `engine/CLAUDE.md`
-2. `docs/CONTRACT.md` and `schemas/*.json` (the interface I must return; do NOT change it)
-3. `docs/METRICS.md` (formulas, priorities A/B/C)
-4. `docs/CAPTURE_PROTOCOL.md`, `docs/SPLIT.md` (my tasks and milestones)
-Then summarize back to me in 10 bullets what you will build and in what order, and wait for my "go".
+## The knowledge base has everything
+The `docs/` folder (indexed in `CLAUDE.md`) is the complete, authoritative specification: product, decisions, contract, metric formulas, capture protocol, risks, demo plan. Treat it as the source of truth. Do not invent requirements, metrics, thresholds or fields that aren't there. If something is ambiguous or missing, stop and ask me with a concrete proposal instead of guessing. If the docs contradict each other, `docs/DECISIONS.md` wins, then `docs/CONTRACT.md`.
+
+## Read first (in order), then report back
+1. `CLAUDE.md`, `engine/CLAUDE.md`
+2. `docs/PRODUCT.md`, `docs/DECISIONS.md`
+3. `docs/CONTRACT.md`, `schemas/analyze_request.schema.json`, `schemas/analysis_result.schema.json`, `fixtures/analysis_result.sample.json`
+4. `docs/METRICS.md`, `docs/CAPTURE_PROTOCOL.md`
+5. `docs/SPLIT.md` (my tasks, milestones M1-M5, cut order), `docs/RISKS.md`, `docs/LOCAL_DEV.md`, `docs/GLOSSARY.md`
+Then give me: (a) a 10-bullet summary of what the engine must do, (b) the build plan mapped to milestones M1-M3, (c) any questions or contradictions you found. Wait for my "go" before writing code.
 
 ## What the engine is
-A stateless Python service + CLI. Input: 1-5 photos of one skin site (iPhone DNG with a 24-patch color card, or uncalibrated JPEG/HEIC). Output: an `AnalysisResult` JSON (schema-valid) with quality gates, 11 cosmetic metrics, per-metric within-session SD and MDC95, verdicts against an optional baseline, blemish/spot candidate crops, overlays. No database, no Gemini, no model training. Classical CV only.
+A **stateless** Python service + CLI. Input: 1-5 photos of one skin site in one session (iPhone DNG with a 24-patch color card = `calibrated_raw`, or browser JPEG/HEIC = `uncalibrated`). Output: an `AnalysisResult` JSON that validates against the schema: quality gates, the metrics valid for that site, per-metric within-session SD and MDC95, verdicts vs an optional baseline, blemish/spot candidate crops, overlay PNGs, ROIs, timings, warnings. No database, no Gemini, no network calls except Google Cloud Storage. **No model training. Classical, deterministic computer vision only.**
 
-## Tech
-- Python 3.12 (fall back to 3.11 only if a dependency has no 3.12 wheel), `uv`, FastAPI, uvicorn, pydantic v2, numpy, `rawpy`, `opencv-contrib-python-headless`, `scikit-image`, `colour-science`, `colour-checker-detection`, `mediapipe` (Face Landmarker task, model file downloaded at build into `engine/models/`, git-ignored), `pillow`, `pillow-heif`, `google-cloud-storage`, `jsonschema`, `pytest`, `ruff`.
-- Pin versions in `uv.lock`. Prefer releases at least two weeks old.
+## Tech (verify current stable versions before pinning; prefer releases at least two weeks old)
+Python 3.12 (3.11 only if a dependency lacks wheels), `uv`, FastAPI, uvicorn, pydantic v2, numpy, `rawpy`, `opencv-contrib-python-headless`, `scikit-image`, `colour-science`, `colour-checker-detection`, `mediapipe` (Face Landmarker task; download `face_landmarker.task` at build time into `engine/models/`, git-ignored), `pillow`, `pillow-heif`, `google-cloud-storage`, `jsonschema`, `pytest`, `ruff`.
 
-## Package layout to create
+## Package layout
 ```
 engine/
-  pyproject.toml, Dockerfile, README.md
+  pyproject.toml, uv.lock, Dockerfile, README.md
   app/
-    main.py          FastAPI: GET /healthz, POST /v1/analyze
-    cli.py           `python -m app.cli analyze --site ... --mode ... <files> --out <dir>`
-    config.py        thresholds (quality gates, k for MAD thresholds, ROI definitions)
-    models.py        pydantic models mirroring schemas/ (AnalyzeRequest, AnalysisResult, Metric, ...)
-    io.py            load frames from local path or gs://, write crops/overlays to output_prefix or local dir
-    decode.py        DNG -> linear camera RGB (rawpy); JPEG/HEIC -> linear sRGB
-    calibrate.py     card detection, CCM fit, ΔE2000 residual, apply CCM, -> Lab
-    landmarks.py     MediaPipe Face Landmarker, ROI polygons, exclusion masks, pose (yaw/pitch/roll)
-    quality.py       sharpness, clipping, pose, card gates -> reasons
-    align.py         similarity transform across frames
-    metrics/
-      tone.py        tone_ita, tone_evenness
-      redness.py     redness (+ erythema index)
-      pigment.py     pigment_spots
-      pores.py       pores (macro)
-      texture.py     texture (macro)
-      eye.py         dark_circles
-      blemish.py     blemishes + candidates (+ blackheads on nose_macro)
-      lines.py       lines            (tier C)
-      oil_glow.py    shine, glow      (tier C)
-    aggregate.py     per-frame -> mean, SD, MDC95, delta, verdict, direction
-    pipeline.py      orchestrates everything for one request
+    main.py        FastAPI: GET /healthz, POST /v1/analyze (replace the current placeholder)
+    cli.py         python -m app.cli analyze --site S --mode M <files...> --out DIR [--roi x,y,w,h] [--baseline baseline.json]
+    config.py      all thresholds and constants (quality gates, k for MAD thresholds, ROI landmark index lists, macro mm-per-pixel)
+    models.py      pydantic models mirroring schemas/ exactly
+    io.py          read frames from local paths or gs://; write crops/overlays to output_prefix or a local dir
+    decode.py      DNG -> linear camera RGB (rawpy linear settings in docs/METRICS.md); JPEG/HEIC -> linear sRGB
+    calibrate.py   ColorChecker detection, CCM fit, ΔE2000 residual, apply CCM, convert to CIELAB (D65)
+    landmarks.py   MediaPipe Face Landmarker (478 pts), ROI polygons, exclusion masks, head pose
+    skinmask.py    skin mask inside ROIs (drop specular, shadow, hair)
+    quality.py     sharpness, clipping, pose, card gates -> reason codes from the schema
+    align.py       similarity transform of frames to the first frame
+    metrics/       tone.py (tone_ita, tone_evenness), redness.py, pigment.py, pores.py, texture.py,
+                   eye.py (dark_circles), blemish.py (blemishes + candidates + blackheads), lines.py, oil_glow.py
+    aggregate.py   per-frame values -> mean, SD, MDC95, delta, verdict, direction (+ texture auto-downgrade)
+    pipeline.py    orchestrates one request end to end
+  scripts/
+    validation_report.py   MDC table per metric/site + DHA treated-vs-control time series (CSV + PNG chart)
   tests/
-    test_contract.py   fixture + generated outputs validate against schemas/analysis_result.schema.json
-    test_calibrate.py  synthetic card image -> CCM recovers known matrix; ΔE small
-    test_metrics_*.py  synthetic Lab arrays with known answers per metric
-    test_aggregate.py  MDC and verdict logic
+    test_contract.py, test_calibrate.py (synthetic card recovers a known matrix), test_metrics_*.py (synthetic Lab arrays with known answers), test_aggregate.py (MDC/verdict), test_api.py
 ```
 
-## Build order (stop and show me results after each step)
-1. **Day-1 smoke test:** a script that opens one of my DNGs from `data/` with rawpy using linear settings (see `docs/METRICS.md`), prints shape, black/white levels, and saves a quick-look PNG to `data/out/`. If rawpy fails on the file, tell me exactly what to change in the capture app.
-2. **Calibration:** detect the ColorChecker; fit CCM to "ColorChecker24 - After November 2014" reference (colour-science, D65 linear sRGB); report mean ΔE2000 per frame; save an annotated PNG of detected patches. Unit test with a synthetic card.
-3. **Forearm metrics (M1):** for `forearm_*` sites the ROI is the taped square (start with a manual rectangle via CLI args `--roi x,y,w,h`; later auto-detect the tape corners). Compute `tone_ita` (+ L*, b*) and `redness`. CLI prints a table and writes JSON.
-4. **Contract + API (M2):** pydantic models, `/v1/analyze`, `jsonschema` validation of every response in tests, gs:// IO, multi-frame aggregation, MDC95 and verdicts, quality gates.
-5. **Face pipeline (M2):** landmarks, ROIs, masks, pose, alignment; `tone_ita`, `redness`, `tone_evenness`, `pigment_spots` for `face_full`.
-6. **Macro (M3):** `pores`, `texture` for `cheek_macro` (scale from cone; make it a config value I measure), `nose_macro` blackheads.
-7. **B tier (M3/M4):** `dark_circles`, `blemishes` + candidate crops (64-128 px + 3x context) written to `output_prefix/crops/`.
-8. **Overlays:** PNG overlays for redness, pigment_spots, pores, blemishes.
-9. **C tier only if I say so:** lines, shine, glow.
-10. **Dockerfile** for Cloud Run (python:3.12-slim, download the MediaPipe .task at build, non-root user, `uvicorn app.main:app --host 0.0.0.0 --port $PORT`). Keep the image as small as possible.
+## Build order (stop after each step: show results, run ruff + pytest, propose a commit message)
+1. **Smoke test (today, first):** open one of my DNGs from `data/` with rawpy linear settings; print shape, black/white levels, camera WB; save a quick-look PNG to `data/out/`. If rawpy fails, tell me exactly what to change in the capture app.
+2. **Calibration:** detect the ColorChecker (fall back to manual 4-corner input via CLI flag if detection fails); fit CCM to "ColorChecker24 - After November 2014" (colour-science, D65 linear sRGB); report mean ΔE2000; save an annotated PNG. Also support white-balance-only correction from a grey card (`semi_calibrated`, adds a warning). Unit test with a synthetic card.
+3. **Forearm metrics = M1 (tonight):** ROI from `--roi` (later: detect tape corners or place relative to the card). `tone_ita` (+ L\*, b\*, band, Monk estimate) and `redness` (+ erythema index). CLI prints a table and writes schema-valid JSON.
+4. **Contract + API = M2:** pydantic models, `/v1/analyze`, gs:// IO, multi-frame aggregation, MDC95, verdicts vs baseline, quality gates and reason codes, jsonschema validation of every response in tests, structured logging of timings.
+5. **Face pipeline = M2:** landmarks, ROIs, exclusion masks, skin mask, pose, alignment; `tone_ita`, `redness`, `tone_evenness`, `pigment_spots` for `face_full`.
+6. **Macro = M3:** `pores` and `texture` for `cheek_macro` (mm-per-pixel from config, which I will measure with the cone); blackheads on `nose_macro`.
+7. **B tier:** `dark_circles`; `blemishes` with candidate crops (64-128 px + 3x context) written to `output_prefix/crops/`.
+8. **Overlays:** PNGs for redness, pigment_spots, pores, blemishes in `output_prefix/overlays/`.
+9. **Dockerfile + deploy with Niwin (Thu by 12:00):** python:3.12-slim, model download at build, non-root, `uvicorn` on `$PORT`, built from the repo root via `infra/cloudbuild.engine.yaml` (the image needs `schemas/` and `fixtures/`). Keep it small; target < 20 s per 5-frame request on 2 vCPU / 4 GiB.
+10. **Validation report** for the science slide (MDC table, DHA curves, tan-line control).
+11. **C tier only when I say so:** `lines`, `shine`, `glow`.
 
-## Rules
-- Every number comes from deterministic code. Same input -> same output.
-- Thresholds are relative to the person's own skin (median + k*MAD), never absolute L* cut-offs. Never encode "lighter is better".
-- In `uncalibrated` mode force every metric's `confidence` to `indicative` and add a warning.
-- Quality failures return 200 with `quality.passed=false`, not an exception.
-- Never commit images. Read test photos from `data/` (git-ignored) or GCS.
-- Don't edit `schemas/` or `docs/CONTRACT.md`. If something in the contract is impossible, write a proposal in `docs/CONTRACT_CHANGES.md` and tell me.
-- Keep each function small and tested; I'm learning as we go, so explain non-obvious CV choices in 1-2 lines of comments.
-- After each step: run `ruff` and `pytest`, show me the output, and suggest the commit message.
+## Non-negotiable rules
+- Same input -> same output. No randomness without a fixed seed.
+- Thresholds are relative to the person's own skin (median + k x MAD), never absolute L\* cut-offs. Never encode or imply "lighter is better". Tone is descriptive.
+- `uncalibrated` mode: every metric `confidence = "indicative"` + a warning.
+- Quality failures return HTTP 200 with `quality.passed = false` and reasons; only malformed requests/unreadable files are errors (codes in the contract).
+- Never commit images or RAW files. Real photos only from `data/` (git-ignored) or GCS.
+- Never edit `schemas/` or `docs/CONTRACT.md`. If the contract can't be met, write a proposal in `docs/CONTRACT_CHANGES.md` and tell me so I can agree it with Niwin.
+- I'm learning CV as we go: keep functions small, add 1-2 line comments explaining non-obvious choices, and explain results in plain language when you show them.
 
-## Done (for the hackathon)
-`/v1/analyze` deployed on Cloud Run, handling `face_full`, `cheek_macro`, `forearm_*` in < 20 s for 5 frames, schema-valid, with A and B tier metrics, MDC from my 5-frame baseline captures, and a `scripts/validation_report.py` that prints the MDC table and the DHA treated-vs-control time series for the science slide.
+## Definition of done (hackathon)
+`/v1/analyze` deployed on Cloud Run, handling `face_full`, `cheek_macro`, `nose_macro`, `forearm_treated`, `forearm_control`; schema-valid; A and B tier metrics; MDC from my 5-frame baselines; < 20 s per request; validation report produced; tests green.

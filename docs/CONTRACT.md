@@ -38,7 +38,7 @@ demo/...    (seeded judge data, consented team captures only)
 
 ## 2. Engine API (Harshini implements, api calls)
 
-Service: Cloud Run `skinproof-engine`, private (requires IAM invoker; the api's service account has `roles/run.invoker`).
+Service: Cloud Run `willow-engine`, private (requires IAM invoker; the api's service account has `roles/run.invoker`).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -174,7 +174,7 @@ HTTP 4xx/5xx with `{"error": {"code": "...", "message": "..."}}`. Codes: `bad_re
 
 ## 3. Product API (Niwin implements, web calls)
 
-Service: Cloud Run `skinproof-api`, public, every route except `/healthz` requires `Authorization: Bearer <Firebase ID token>`.
+Service: Cloud Run `willow-api`, public, every route except `/healthz` requires `Authorization: Bearer <Firebase ID token>`.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -225,7 +225,7 @@ products/{product_id}
 Security rules: users read/write only their own `users/{uid}/**`; `products` read-only for signed-in users; demo users read-only.
 
 ## 5. BigQuery (Niwin owns)
-Dataset `skinproof_insights` (us-central1). Tables: `sessions_flat` (one row per session x metric, pseudonymous user hash, region, skin-tone band, goal), `routine_flat`, `products`. Loaded by a batch script from Firestore + the synthetic cohort generator (`is_synthetic = true` on every synthetic row; shown on every chart).
+Dataset `willow_insights` (us-central1). Tables: `sessions_flat` (one row per session x metric, pseudonymous user hash, region, skin-tone band, goal), `routine_flat`, `products`. Loaded by a batch script from Firestore + the synthetic cohort generator (`is_synthetic = true` on every synthetic row; shown on every chart).
 
 ## 6. Shared naming
 - Session IDs: `s_{yyyymmdd}_{8 random}`.
