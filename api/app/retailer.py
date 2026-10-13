@@ -350,7 +350,16 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         "products": rows[:8],
         # Every product with enough people, for product cards and the advisor (labelled synthetic).
         "product_outcomes": {
-            r["product_id"]: {"n": r["n"], "rate": r["rate"], "weeks": r["weeks"]} for r in rows
+            r["product_id"]: {
+                "n": r["n"],
+                "rate": r["rate"],
+                "weeks": r["weeks"],
+                "product": r["product"],
+                "brand": r["brand"],
+                "concern": r["concern"],
+                "cont": r["cont"],
+            }
+            for r in rows
         },
         "tone_bands": ["very light", "light", "intermediate", "tan", "brown", "dark"],
         "brands": brands[:8],
