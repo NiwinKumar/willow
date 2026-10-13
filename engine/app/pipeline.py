@@ -1,0 +1,131 @@
+"""One analysis request end to end (forearm sites, M1)."""
+
+import json
+import time
+from pathlib import Path
+
+import numpy as np
+from jsonschema import validate
+
+from app import config
+from app.aggregate import summarize
+from app.color import linear_srgb_to_lab, white_balance
+from app.decode import load_photo_srgb8, srgb_to_linear
+from app.metrics.redness import redness
+from app.metrics.tone import tone_ita
+from app.quality import FrameQuality, check_frame
+from app.roi import Box, skin_mask
+
+SCHEMA = Path(__file__).resolve().parents[2] / "schemas" / "analysis_result.schema.json"
+FOREARM_SITES = {"forearm_treated", "forearm_control"}
+METRIC_INFO = {  # id -> (group, label, unit)
+    "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
+    "redness": ("redness", "Redness", "a_star"),
+}
+
+
+def _frame_metrics(
+    path: str, roi: Box, white: Box | None
+) -> tuple[dict, dict, FrameQuality, tuple]:
+    srgb8, _ = load_photo_srgb8(path)
+    linear = srgb_to_linear(srgb8)
+    if white is not None:
+        linear = white_balance(linear, white.crop(linear))
+    skin_lin = roi.crop(linear)
+    quality = check_frame(skin_lin, roi.crop(srgb8))
+    lab = linear_srgb_to_lab(skin_lin)
+    mask = skin_mask(lab)
+    ita, ita_extras = tone_ita(lab, mask)
+    a_star, red_extras = redness(lab, skin_lin, mask)
+    values = {"tone_ita": ita, "redness": a_star}
+    extras = {"tone_ita": ita_extras, "redness": red_extras}
+    return values, extras, quality, srgb8.shape
+
+
+def analyze_forearm(
+    files: list[str],
+    site: str,
+    rois: list[Box],
+    whites: list[Box | None],
+    session_id: str = "s_local",
+    user_id: str = "local",
+    baseline: dict | None = None,
+) -> dict:
+    """Uncalibrated (normal phone photo) analysis of one taped forearm square."""
+    if site not in FOREARM_SITES:
+        raise ValueError(f"M1 supports {sorted(FOREARM_SITES)} only, got {site!r}")
+    t0 = time.perf_counter()
+    per_frame, passed_values, passed_extras, shape = [], [], [], None
+    for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
+        values, extras, q, frame_shape = _frame_metrics(path, roi, white)
+        shape = shape or frame_shape
+        per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons, "_q": q})
+        if q.passed:
+            passed_values.append(values)
+            passed_extras.append(extras)
+
+    metrics = []
+    for metric_id, (group, label, unit) in METRIC_INFO.items():
+        base = (baseline or {}).get(metric_id)
+        if passed_values:
+            summary = summarize([v[metric_id] for v in passed_values], base)
+            extras = passed_extras[0][metric_id]  # extras of the first good frame
+        else:
+            summary = {
+                "value": None,
+                "within_session_sd": None,
+                "mdc95": None,
+                "delta": None,
+                "verdict": "low_quality",
+                "direction": "none",
+            }
+            extras = {}
+        metrics.append(
+            {
+                "id": metric_id,
+                "group": group,
+                "label": label,
+                "unit": unit,
+                "confidence": "indicative",
+                **summary,
+                "extras": extras,
+            }
+        )
+
+    qs = [f.pop("_q") for f in per_frame]
+    reasons = sorted({r for f in per_frame for r in f["reasons"]})
+    if not passed_values:
+        reasons.append("too_few_frames")
+    warnings = ["uncalibrated photo: results are a trend only, not a measurement"]
+    if any(w is None for w in whites):
+        warnings.append("no white reference in frame: lamp colour not corrected")
+
+    result = {
+        "schema_version": "1.0",
+        "engine_version": config.ENGINE_VERSION,
+        "session_id": session_id,
+        "user_id": user_id,
+        "site": site,
+        "capture_mode": "uncalibrated",
+        "frames_used": len(passed_values),
+        "quality": {
+            "passed": bool(passed_values),
+            "card_detected": False,
+            "card_delta_e_mean": None,
+            "sharpness": round(float(np.mean([q.sharpness for q in qs])), 1),
+            "clipped_pct": round(float(np.mean([q.clipped_pct for q in qs])), 2),
+            "pose": None,
+            "per_frame": per_frame,
+            "reasons": reasons,
+        },
+        "metrics": metrics,
+        "candidates": [],
+        "overlays": [],
+        "rois": [{"name": "forearm_square", "polygon": rois[0].polygon()}]
+        + ([{"name": "white_reference", "polygon": whites[0].polygon()}] if whites[0] else []),
+        "image_size": {"width": int(shape[1]), "height": int(shape[0])},
+        "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
+        "warnings": warnings,
+    }
+    validate(result, json.loads(SCHEMA.read_text()))
+    return result

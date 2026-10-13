@@ -14,7 +14,9 @@ def _load(name: str) -> dict:
 
 
 def test_fixture_is_schema_valid():
-    validate(_load("fixtures/analysis_result.sample.json"), _load("schemas/analysis_result.schema.json"))
+    validate(
+        _load("fixtures/analysis_result.sample.json"), _load("schemas/analysis_result.schema.json")
+    )
 
 
 def test_placeholder_analyze_roundtrip():
