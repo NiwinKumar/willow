@@ -37,6 +37,8 @@ MDC_Z = 1.96  # 95% two-sided
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
 FACE_ROI_SHRINK = 0.85  # pull ROI hulls 15% toward their centre to stay off edges
+FOREHEAD_BAND = (0.25, 0.70)  # fraction of the way from hairline to brows: top, bottom
+FOREHEAD_WIDTH = 0.70  # keep the central 70% of the forehead width (temples carry hair)
 MAX_ABS_YAW = 8.0
 MAX_ABS_PITCH = 8.0
 MAX_ABS_ROLL = 6.0
@@ -44,7 +46,11 @@ EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-m
 
 # pigment_spots (docs/METRICS.md A4): tone-relative threshold on the melanin proxy
 SPOT_K_MAD = 3.0  # spot = melanin proxy above ROI median + k * MAD of this person's skin
-SPOT_MIN_CONTRAST_MI = 2.0  # and at least ~4.5% less red light than the skin around it
+# and at least ~21% less red light than the skin around it (MI 10 = 100*log10(1/0.79)).
+# Measured Oct 13 on 6 real face DNGs (dim room, ~7 px/mm): camera-grain blotches reach
+# MI 4.7-7.9, so anything below 10 cannot be told apart from noise at phone distance.
+SPOT_MIN_CONTRAST_MI = 10.0
 SPOT_MIN_DIAMETER_MM = 1.0
+SPOT_BACKGROUND_MM = 3.0  # local skin background radius (Gaussian sigma) for spot contrast
 SPOT_MAX_DIAMETER_MM = 10.0
 EVENNESS_SMOOTH_MM = 1.0  # smooth before the within-ROI SD: blotches, not camera grain

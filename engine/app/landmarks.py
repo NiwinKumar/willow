@@ -19,7 +19,6 @@ MODEL = Path(__file__).resolve().parents[1] / "models" / "face_landmarker.task"
 
 # Mirrored pairs on the canonical mesh (e.g. 50 <-> 280 are the two cheekbones).
 ROI_POINTS = {
-    "forehead": [109, 10, 338, 108, 151, 337, 69, 299],
     "right_cheek": [50, 101, 118, 117, 123, 187, 205, 36],
     "left_cheek": [280, 330, 347, 346, 352, 411, 425, 266],
     "nose": [197, 195, 5, 4, 45, 275, 51, 281],
@@ -28,6 +27,10 @@ ROI_POINTS = {
     "left_under_eye": [339, 254, 253, 252, 256, 349, 348, 347, 346, 340],
 }
 CHEEKS = ("right_cheek", "left_cheek")
+# Forehead is a band between the hairline row and the brow row of the mesh, touching
+# neither: hair and eyebrow strands were being read as dark spots.
+FOREHEAD_HAIRLINE = [109, 10, 338]
+FOREHEAD_BROWS = [105, 9, 334]  # upper edge of the right brow, glabella, left brow
 EYE_OUTER = (33, 263)  # outer eye corners, for face scale (inter-ocular distance)
 
 
@@ -48,7 +51,14 @@ class Face:
         return float(np.hypot(*(a - b)))
 
     def roi_polygons(self) -> dict[str, np.ndarray]:
-        out = {}
+        hair = self.points[FOREHEAD_HAIRLINE]
+        brow = self.points[FOREHEAD_BROWS]
+        top = hair + (brow - hair) * config.FOREHEAD_BAND[0]
+        bottom = hair + (brow - hair) * config.FOREHEAD_BAND[1]
+        band = np.vstack([top, bottom[::-1]])
+        centre = band.mean(axis=0)  # keep the middle of the width, away from side hair
+        band[:, 0] = centre[0] + (band[:, 0] - centre[0]) * config.FOREHEAD_WIDTH
+        out = {"forehead": band}
         for name, idx in ROI_POINTS.items():
             pts = self.points[idx].astype(np.float32)
             hull = cv2.convexHull(pts).reshape(-1, 2)

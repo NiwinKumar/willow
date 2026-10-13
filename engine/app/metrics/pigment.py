@@ -13,7 +13,12 @@ def find_spots(
 ) -> tuple[np.ndarray, list[float]]:
     """Spot mask and per-spot mean contrast (MI units) inside one ROI's bounding box."""
     mi = ndimage.gaussian_filter(melanin_index(linear_red), sigma=max(px_per_mm * 0.3, 1.0))
-    contrast = mi - np.median(mi[skin])  # tone-relative: subtract this ROI's own median
+    # local, tone-relative background: average of THIS person's skin within ~3 mm, so gentle
+    # shading across the face (curvature, overhead light) is not mistaken for a spot
+    sigma_bg = config.SPOT_BACKGROUND_MM * px_per_mm
+    weight = ndimage.gaussian_filter(skin.astype(np.float64), sigma_bg)
+    background = ndimage.gaussian_filter(np.where(skin, mi, 0.0), sigma_bg) / np.maximum(weight, 1e-6)
+    contrast = mi - background
     mad = np.median(np.abs(contrast[skin])) * 1.4826  # robust SD of this person's skin
     # MI is a log scale, so a fixed MI difference is the same *ratio* of light at every tone
     threshold = max(config.SPOT_K_MAD * mad, config.SPOT_MIN_CONTRAST_MI)
