@@ -9,7 +9,8 @@ from skimage.filters import gaussian
 from app.roi import Box
 
 SCALE = 4  # work on a 4x smaller copy: dots are still ~5-15 px across, and it is 16x faster
-DOT_MIN_CONTRAST = 15.0  # dot must be this many grey levels darker than skin around it
+DOT_MIN_CONTRAST = 15.0  # dot must differ from the skin around it by this many grey levels
+SKIN_MIN_WARMTH = 0.12  # (R - B) / R: skin is warm at every tone, paper is ~0
 DOT_AREA_PX = (3, 400)  # dot size range in the small copy
 MAX_CANDIDATES = 40
 SQUARE_SIDE_FRAC = (0.03, 0.20)  # dot spacing as a fraction of photo width (~2-6 cm squares)
@@ -24,22 +25,23 @@ def _small_grey(srgb8: np.ndarray) -> np.ndarray:
 
 
 def _skin_like(rgb: np.ndarray) -> bool:
-    """Rough 'is this skin?' test on the blurred colour around a dot: skin is redder than it
-    is green, greener than blue, and not white paper. Works across tones because it uses
-    channel order, not brightness."""
-    r, g, b = rgb
-    return bool(r > g > b and r - b > 25 and min(r, g, b) < 170)
+    """Rough 'is this skin?' test on the blurred colour around a dot: R > G >= B with some
+    warmth relative to its own brightness. Uses proportions, not brightness, so it works the
+    same from very light to very dark skin; neutral white paper fails it."""
+    r, g, b = (float(v) for v in rgb)
+    return bool(r > g >= b and (r - b) / max(r, 1.0) >= SKIN_MIN_WARMTH)
 
 
 def dot_candidates(srgb8: np.ndarray) -> list[tuple[float, float, float]]:
-    """Small dark round blobs on skin: (x, y, contrast) in full-res pixels, darkest first."""
+    """Small round blobs on skin that stand out from it: (x, y, contrast), strongest first."""
     small = srgb8[::SCALE, ::SCALE].astype(np.float32)
     grey = small.mean(axis=-1)
-    darker = gaussian(grey, sigma=8, preserve_range=True) - grey  # >0 where darker than nearby
+    # dots may be darker (pen) or lighter (white marker on deep skin) than the skin around them
+    contrast = np.abs(gaussian(grey, sigma=8, preserve_range=True) - grey)
     around = gaussian(small, sigma=8, channel_axis=-1, preserve_range=True)
-    labels = measure.label(darker > DOT_MIN_CONTRAST)
+    labels = measure.label(contrast > DOT_MIN_CONTRAST)
     out = []
-    for r in measure.regionprops(labels, intensity_image=darker):
+    for r in measure.regionprops(labels, intensity_image=contrast):
         if not DOT_AREA_PX[0] <= r.area <= DOT_AREA_PX[1] or r.eccentricity > 0.9:
             continue
         y, x = r.centroid
