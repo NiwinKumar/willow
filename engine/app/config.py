@@ -42,7 +42,7 @@ MDC_Z = 1.96  # 95% two-sided
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
 FACE_ROI_SHRINK = 0.85  # pull ROI hulls 15% toward their centre to stay off edges
 FACE_OVAL_SHRINK = 0.97  # pull the face outline in 3% so the jaw edge / background stay out
-EYE_MARGIN_MM = 2.5  # lashes and the pink lower-lid rim
+EYE_MARGIN_MM = 3.5  # lashes and the pink lower-lid rim (2.5 mm still caught the rim, Oct 13)
 LIP_MARGIN_MM = 0.8  # lip edge
 BROW_ZONE_MM = 3.0  # search this far around the brow outline for stray brow hairs
 BROW_DELTA_L = 8.0  # a brow hair is this much darker than the skin around it
@@ -64,16 +64,20 @@ MAX_ABS_PITCH = 8.0
 MAX_ABS_ROLL = 6.0
 EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-mm scale
 
-# pigment_spots (docs/METRICS.md A4): tone-relative threshold on the melanin proxy
-SPOT_K_MAD = 3.0  # spot = melanin proxy above ROI median + k * MAD of this person's skin
-# and at least ~21% less red light than the skin around it (MI 10 = 100*log10(1/0.79)).
-# Measured Oct 13 on 6 real face DNGs (dim room, ~7 px/mm): camera-grain blotches reach
-# MI 4.7-7.9, so anything below 10 cannot be told apart from noise at phone distance.
-SPOT_MIN_CONTRAST_MI = 10.0
-SPOT_MIN_DIAMETER_MM = 1.0
-SPOT_BACKGROUND_MM = 3.0  # local skin background radius (Gaussian sigma) for spot contrast
+# pigment_spots (docs/METRICS.md A4): round dots darker than nearby skin that keep their
+# colour. Tuned Oct 13 on 2 normal iPhone photos with no brown marks: texture peaked at
+# 2.9, shadows by the eyes/nose/lips scored 4-7 but lost colour (chroma -1.7 to -9.7).
+SPOT_MIN_SCORE = 3.5
+SPOT_MIN_CHROMA_CHANGE = -1.0  # shadows go greyer as they darken; pigment does not
+SPOT_DIAMETER_MM = (1.0, 5.0)
+SPOT_BACKGROUND_MM = 3.0  # "nearby skin" (Gaussian sigma)
+SPOT_EDGE_MM = 2.0  # stay this far from eyes, brows, lips, nostrils, hairline
+SHADOW_GUARD_MM = 2.0  # margin around nose sides / under-nose / under-eye guard zones
 SPOT_MAX_DIAMETER_MM = 10.0
 EVENNESS_SMOOTH_MM = 1.0  # smooth before the within-ROI SD: blotches, not camera grain
+
+# Spot/blemish searches run at this scale (1 mm spots are still 6 px across); faster.
+DETECT_PX_PER_MM = 6.0
 
 # blemishes (docs/METRICS.md B2). Tuned Oct 13 on 2 normal iPhone face photos: the 3 real
 # spots (2 pimples, 1 red mark) scored 3.8-5.5 in both; skin texture/noise stayed <= 3.4.

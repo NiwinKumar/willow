@@ -4,6 +4,7 @@ picked up. Indicative only: Gemini labels each crop (pimple, mark, mole...) late
 
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 from scipy import ndimage
 from skimage.feature import blob_log
@@ -23,17 +24,40 @@ class Blemish:
 
 
 def _local_mean(values: np.ndarray, skin: np.ndarray, sigma: float) -> np.ndarray:
-    weight = ndimage.gaussian_filter(skin.astype(np.float64), sigma)
-    total = ndimage.gaussian_filter(np.where(skin, values, 0.0), sigma)
+    """Average of `values` over skin pixels nearby (Gaussian, sigma in px)."""
+    weight = cv2.GaussianBlur(skin.astype(np.float32), (0, 0), sigma)
+    total = cv2.GaussianBlur(np.where(skin, values, 0).astype(np.float32), (0, 0), sigma)
     return total / np.maximum(weight, 1e-6)
 
 
+def working_scale(
+    lab: np.ndarray, masks: list[np.ndarray], px_per_mm: float
+) -> tuple[np.ndarray, list[np.ndarray], float, float]:
+    """Shrink to DETECT_PX_PER_MM: 1-5 mm spots need no more detail, and the blob search
+    costs grow with pixel count. Returns (lab, masks, px_per_mm, factor to full size)."""
+    scale = min(config.DETECT_PX_PER_MM / px_per_mm, 1.0)
+    if scale == 1.0:
+        return lab, masks, px_per_mm, 1.0
+    h, w = lab.shape[:2]
+    size = (max(round(w * scale), 1), max(round(h * scale), 1))
+    small = cv2.resize(lab.astype(np.float32), size, interpolation=cv2.INTER_AREA)
+    small_masks = [
+        cv2.resize(m.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST).astype(bool)
+        for m in masks
+    ]
+    return small, small_masks, px_per_mm * scale, 1.0 / scale
+
+
 def find_blemishes(lab: np.ndarray, skin: np.ndarray, px_per_mm: float) -> list[Blemish]:
-    """Blemishes inside `skin` (bool mask over the `lab` crop), strongest first."""
+    """Blemishes inside `skin` (bool mask over the `lab` crop), strongest first.
+    Coordinates and areas are in the input's pixels."""
+    lab, (skin,), px_per_mm, back = working_scale(lab, [skin], px_per_mm)
     sigma_bg = config.BLEMISH_BACKGROUND_MM * px_per_mm
     a_bg = _local_mean(lab[..., 1], skin, sigma_bg)
     l_bg = _local_mean(lab[..., 0], skin, sigma_bg)
-    redder = ndimage.gaussian_filter(np.where(skin, lab[..., 1] - a_bg, 0.0), 0.15 * px_per_mm)
+    redder = cv2.GaussianBlur(
+        np.where(skin, lab[..., 1] - a_bg, 0).astype(np.float32), (0, 0), max(0.15 * px_per_mm, 0.5)
+    )
     spread = np.median(np.abs(redder[skin])) * 1.4826  # robust SD of this person's skin
     z = np.clip(redder / max(spread, 1e-6), 0, None)
 
@@ -62,16 +86,17 @@ def find_blemishes(lab: np.ndarray, skin: np.ndarray, px_per_mm: float) -> list[
             continue
         found.append(
             Blemish(
-                x=float(x),
-                y=float(y),
-                radius=float(r),
+                x=x * back,
+                y=y * back,
+                radius=r * back,
                 score=score,
                 a_star_contrast=float((lab[..., 1] - a_bg)[disk].mean()),
                 l_star_contrast=float((lab[..., 0] - l_bg)[disk].mean()),
-                area_px=int(disk.sum()),
+                area_px=round(disk.sum() * back * back),
             )
         )
-    return _merge(sorted(found, key=lambda b: -b.score), config.BLEMISH_MERGE_MM * px_per_mm)
+    gap = config.BLEMISH_MERGE_MM * px_per_mm * back  # in input pixels
+    return _merge(sorted(found, key=lambda b: -b.score), gap)
 
 
 def _merge(blemishes: list[Blemish], min_gap_px: float) -> list[Blemish]:

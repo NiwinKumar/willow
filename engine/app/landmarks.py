@@ -84,6 +84,33 @@ LEFT_BROW = [300, 293, 334, 296, 336, 285, 295, 282, 283, 276]
 RIGHT_LID = [33, 246, 161, 160, 159, 158, 157, 173, 133, 55, 65, 52, 53, 46]
 LEFT_LID = [263, 466, 388, 387, 386, 385, 384, 398, 362, 285, 295, 282, 283, 276]
 LIPS = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
+# Where the face's own shape casts shadows: nose sidewalls (bridge to wings) and the
+# groove under the nose. Under-eye hollows use the under-eye ROIs. Dark spots skip these.
+NOSE_SIDES = [
+    193,
+    417,
+    122,
+    351,
+    196,
+    419,
+    3,
+    248,
+    236,
+    456,
+    198,
+    420,
+    131,
+    360,
+    49,
+    279,
+    48,
+    278,
+    219,
+    439,
+    64,
+    294,
+]
+SUBNASAL = [2, 164, 0, 37, 267, 97, 326, 167, 393]
 NOSE_BASE = [64, 98, 97, 2, 326, 327, 294, 129, 358, 240, 460]  # area where nostrils can be
 
 
@@ -156,6 +183,19 @@ class Face:
             mask &= ~self._shape(shape, lid, config.FEATURE_EDGE_MM)
         mask &= ~self._shape(shape, LIPS, config.LIP_MARGIN_MM)
         return mask
+
+    def shadow_guard(self, shape: tuple[int, int]) -> np.ndarray:
+        """Areas where the face's shape casts shadows (nose sides, under the nose,
+        under-eye hollows), grown by SHADOW_GUARD_MM. Dark-spot search skips them."""
+        guard = np.zeros(shape, bool)
+        for idx in (NOSE_SIDES, SUBNASAL):
+            hull = cv2.convexHull(self.points[idx].astype(np.float32)).reshape(-1, 2)
+            guard |= polygon_mask(shape, hull)
+        polys = self.roi_polygons()
+        for name in ("right_under_eye", "left_under_eye"):
+            guard |= polygon_mask(shape, polys[name])
+        grown = cv2.dilate(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
+        return grown.astype(bool)
 
     def feature_zones(self, shape: tuple[int, int]) -> dict[str, np.ndarray]:
         """Where brows and nostrils can be; refine_skin removes only their dark pixels."""

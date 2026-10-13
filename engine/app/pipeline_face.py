@@ -15,7 +15,7 @@ from app.io import save_jpeg
 from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, refine_skin
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
-from app.metrics.pigment import pigment_spots
+from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
 from app.metrics.tone import ita_band, ita_degrees
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
@@ -32,9 +32,6 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
 ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
-# Dark spots stay on these flatter ROIs until the round-dot detector lands: over the whole
-# face the current detector mistakes shadows beside the nose and eye sockets for spots.
-SPOT_ROIS = ("forehead", "right_cheek", "left_cheek")
 
 
 def _bbox(polygons: list[np.ndarray], shape: tuple[int, int]) -> Box:
@@ -87,8 +84,8 @@ def _frame(path: str) -> dict:
     evenness, _ = tone_evenness(
         {n: (lab[..., 0], lin[..., 0], skin[n]) for n in EVENNESS_ROIS}, px_per_mm
     )
-    # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair); used by
-    # blemishes next. Dark spots still use the flatter ROIs (see SPOT_ROIS).
+    # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair) for blemishes
+    # and dark spots
     zones = {k: box.crop(v) for k, v in face.feature_zones(srgb8.shape[:2]).items()}
     face_skin = refine_skin(lab[..., 0], box.crop(face_mask_full), zones, px_per_mm)
     # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
@@ -97,9 +94,16 @@ def _frame(path: str) -> dict:
         zones["nostril_zone"].astype(np.uint8), face._disk(config.NOSTRIL_GUARD_MM)
     ).astype(bool)
     blemishes = find_blemishes(lab, face_skin & ~guard, px_per_mm)
-    spots_pct, spot_extras = pigment_spots(
-        {n: (lin[..., 0], skin[n]) for n in SPOT_ROIS}, px_per_mm
-    )
+    # dark spots over the whole face skin, away from shadow-prone areas and from spots
+    # already counted as blemishes (a red-brown mark is one thing, not two)
+    search = face_skin & ~box.crop(face.shadow_guard(srgb8.shape[:2]))
+    gap = config.BLEMISH_MERGE_MM * px_per_mm
+    spots = [
+        sp
+        for sp in find_spots(lab, face_skin, search, px_per_mm)
+        if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
+    ]
+    spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
         "tone_ita": ita_degrees(l_star, b_star),
@@ -124,18 +128,20 @@ def _frame(path: str) -> dict:
         "shape": srgb8.shape,
         "face_skin": (box, face_skin),
         "blemishes": blemishes,
+        "spots": spots,
         "box": box,
         "srgb8": srgb8,
     }
 
 
 def _candidates(frame: dict, output_prefix: str | None, limit: int) -> list[dict]:
-    """Contract candidates (docs/CONTRACT.md 2.6) for the strongest blemishes of one photo:
+    """Contract candidates (docs/CONTRACT.md 2.6), blemishes then dark spots of one photo:
     bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label."""
     box, srgb8 = frame["box"], frame["srgb8"]
     h, w = srgb8.shape[:2]
+    found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
     out = []
-    for i, b in enumerate(frame["blemishes"][:limit], start=1):
+    for i, (kind, b) in enumerate(found[:limit], start=1):
         cid = f"c_{i:03d}"
         cx, cy = box.x + b.x, box.y + b.y
         side = 2 * b.radius * 1.5
@@ -157,11 +163,15 @@ def _candidates(frame: dict, output_prefix: str | None, limit: int) -> list[dict
         out.append(
             {
                 "id": cid,
-                "kind": "blemish",
+                "kind": kind,
                 "bbox": bbox,
                 **crops,
                 "features": {
-                    "a_star_contrast": round(b.a_star_contrast, 2),
+                    **(
+                        {"a_star_contrast": round(b.a_star_contrast, 2)}
+                        if kind == "blemish"
+                        else {"chroma_change": round(b.chroma_change, 2)}
+                    ),
                     "l_star_contrast": round(b.l_star_contrast, 2),
                     "area_px": float(b.area_px),
                     "score": round(b.score, 2),
