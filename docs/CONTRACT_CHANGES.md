@@ -41,6 +41,6 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Approved by: [ ] Harshini [x] Niwin
 
 ## 2026-10-14: api-only additions to `SessionView.session` (note, no engine impact)
-- What: `SessionView.session` carries `preview` (signed GET URL of `{output_prefix}preview.jpg` when the engine wrote one, else null), `overlay_urls` (signed), `hours_since_baseline`, `note`, `deviation`, `error`. New api routes: `PATCH /v1/sessions/{id}`, `POST /v1/sessions/{id}/upload-urls`, `GET /v1/sessions?site=`, `DELETE /v1/me` (all listed in DESIGN.md section 8 as api work with no contract change).
+- What: `SessionView.session` carries `preview` (signed GET URL of `{output_prefix}preview.jpg` when the engine wrote one, else null), `overlay_urls` (signed), `hours_since_baseline`, `note`, `deviation`, `error`, `explanation_source` (`template` | `gemini`). New api routes: `PATCH /v1/sessions/{id}`, `POST /v1/sessions/{id}/upload-urls`, `GET /v1/sessions?site=`, `DELETE /v1/me` (all listed in DESIGN.md section 8 as api work with no contract change).
 - Impact on the engine: none. The api reads `preview.jpg` only if it exists, so it works with or without proposal 1b.
 - Approved by: n/a (api and web are both Niwin's)
