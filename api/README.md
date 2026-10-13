@@ -26,7 +26,7 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | POST | `/v1/baselines/{site}` | `{session_id}`: pick the baseline by hand |
 | DELETE | `/v1/me` | Delete the person's photos, results, sessions and baselines |
 
-`SessionView.session` also carries `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation` and `error`.
+`SessionView.session` also carries `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
 
 ## Engine modes
 - `ENGINE_MODE=fixture`: answers from `app/contract/analysis_result.sample.json`, filtered to the site's metrics, varied a little per session, with the baseline verdict rules applied. `engine_version` ends in `-fixture` and `warnings[]` says the numbers are a sample.

@@ -183,6 +183,7 @@ def analyze_session(
             "status": "done",
             "result_json": json.dumps(result),
             "explanation": explain.template(result),
+            "explanation_source": "template",
             "labels": {},
             "analyzed_at": datetime.now(UTC),
         },
