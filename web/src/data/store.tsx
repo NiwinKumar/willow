@@ -1,0 +1,39 @@
+/**
+ * Data seam. Demo mode serves the illustrative sample journeys; live mode will read the api
+ * (sessions list per site) once those routes exist (M2). Screens never know which one they got.
+ */
+import { createContext, useMemo, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
+
+import { DEMO_SERIES, DEMO_SITES } from '../mock/series'
+import type { Site, SiteSeries } from './types'
+
+export type DataMode = 'demo' | 'live'
+
+export type DataState = {
+  mode: DataMode
+  sites: Site[]
+  series: (site: Site) => SiteSeries | null
+  goals: string[]
+}
+
+export const DataContext = createContext<DataState | null>(null)
+
+export function DataProvider({ children }: { children: ReactNode }) {
+  const [params] = useSearchParams()
+  const demo = params.get('demo') === '1' || sessionStorage.getItem('willow.demo') === '1'
+  const value = useMemo<DataState>(() => {
+    if (demo) {
+      let goals: string[] = []
+      try {
+        goals = JSON.parse(sessionStorage.getItem('willow.goals') ?? '[]') as string[]
+      } catch {
+        goals = []
+      }
+      return { mode: 'demo', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals: goals.length ? goals : ['even_tone', 'calmer'] }
+    }
+    return { mode: 'live', sites: [], series: () => null, goals: [] }
+  }, [demo])
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+}
+
