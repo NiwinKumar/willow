@@ -445,11 +445,12 @@ def skin_colour(lab: np.ndarray, mask: np.ndarray, ref: np.ndarray, px_per_mm: f
     l_all, l_cheek = float(np.median(L[mask])), float(np.median(L[ref]))
     c_ref = float(np.median(chroma[ref]))
     h_ref = float(np.median(hue[ref]))
-    d_hue = np.abs((hue - h_ref + 180) % 360 - 180)
+    d_hue = (hue - h_ref + 180) % 360 - 180  # negative = redder than the cheek
     keep = (
         mask
         & (chroma >= config.SIDE_MIN_CHROMA_FRAC * c_ref)
         & (d_hue <= config.SIDE_MAX_HUE_DEG)
+        & (d_hue >= -config.SIDE_MAX_RED_SHIFT_DEG)  # inflamed skin is much redder: keep it
         & (L <= max(l_all, l_cheek) + config.SIDE_MAX_BRIGHTER_L)
         & (L >= min(l_all, l_cheek) - config.SIDE_MAX_DARKER_L)
     )
