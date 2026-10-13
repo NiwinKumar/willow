@@ -285,3 +285,33 @@ def test_legacy_baselines_from_placeholders_are_ignored(client, fake):
     # The fake baseline is not used: this real session becomes the baseline instead.
     assert view["session"]["is_baseline"] is True
     assert {m["verdict"] for m in view["result"]["metrics"]} == {"no_baseline"}
+
+
+def test_saved_sessions_are_measured_again_oldest_first(client, fake, monkeypatch):
+    """Face photos saved before face measurement existed: the earliest becomes the baseline."""
+    from app import analysis
+
+    real_analyze = engine.analyze
+
+    def placeholder(request):
+        result = engine.fixture_result(request)
+        result["engine_version"] = "0.2.0-placeholder"
+        return result
+
+    monkeypatch.setattr(engine, "analyze", placeholder)
+    first = _create(client, site="face_full", n=5)
+    second = _create(client, site="face_full", n=3)
+    for created in (first, second):
+        _upload_all(fake, created)
+        client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert fake.store.baseline_get("u_test", "face_full") is None
+
+    monkeypatch.setattr(engine, "analyze", real_analyze)
+    dry = analysis.remeasure(fake.store, "b", "u_test")
+    assert len(dry) == 2 and all(line.endswith("would measure") for line in dry)
+    lines = analysis.remeasure(fake.store, "b", "u_test", apply=True)
+    assert lines[0].endswith("measured, now the baseline")
+    assert fake.store.baseline_get("u_test", "face_full")["session_id"] == first["session_id"]
+    later = fake.store.session_get("u_test", second["session_id"])
+    assert later["measured"] is True and later["compared_with"]["session_id"] == first["session_id"]
+    assert analysis.remeasure(fake.store, "b", "u_test", apply=True) == []
