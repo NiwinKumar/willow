@@ -1,4 +1,6 @@
-/** Thin client for willow-api (docs/CONTRACT.md section 3). Every call sends the Firebase ID token. */
+/** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
+
+import type { AnalysisResult, Explanation, Product, RoutineEntry } from '../data/types'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
 
@@ -16,11 +18,49 @@ export type ObjectStatus = {
   content_type: string | null
 }
 
+/** SessionView as the api returns it: {session, result, labels, explanation}. */
+export type SessionView = {
+  session: {
+    id: string
+    site: Site
+    capture_mode: CaptureMode
+    n_frames: number
+    created_at: string
+    status: 'uploading' | 'processing' | 'done' | 'failed'
+    is_baseline: boolean
+    note: string | null
+    deviation: boolean
+    error: { code: string; message: string } | null
+    explanation_source: 'template' | 'gemini' | null
+    preview: { url: string; width: number | null; height: number | null } | null
+    overlay_urls: Record<string, string>
+    hours_since_baseline: number | null
+  }
+  result: AnalysisResult | null
+  labels: Record<string, string>
+  explanation: Explanation | null
+}
+
+export type LabelScan = {
+  brand: string | null
+  product_name: string | null
+  category: string
+  inci: string[]
+  key_actives: { name: string; pct: number | null }[]
+  claims_on_pack: string[]
+  confidence: 'low' | 'medium' | 'high'
+}
+export type LabelScanResponse = { scan: LabelScan; match: { product_id: string; brand: string; name: string; score: number } | null }
+
+export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
+
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  code: string | null
+  constructor(status: number, message: string, code: string | null = null) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -29,16 +69,55 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
     ...init,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   })
-  if (!res.ok) throw new ApiError(res.status, await res.text())
+  if (!res.ok) {
+    const text = await res.text()
+    let code: string | null = null
+    let message = text
+    try {
+      const detail = (JSON.parse(text) as { detail?: { code?: string; message?: string } }).detail
+      if (detail && typeof detail === 'object') {
+        code = detail.code ?? null
+        message = detail.message ?? text
+      }
+    } catch {
+      /* not JSON */
+    }
+    throw new ApiError(res.status, message, code)
+  }
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
+const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
+
 export const api = {
-  healthz: () => fetch(`${API_URL}/healthz`).then((r) => r.json() as Promise<Record<string, string>>),
+  health: () => fetch(`${API_URL}/v1/health`).then((r) => r.json() as Promise<Record<string, string>>),
   createSession: (token: string, body: { site: Site; capture_mode: CaptureMode; n_frames: number; content_types: string[] }) =>
-    request<CreateSessionResponse>(token, '/v1/sessions', { method: 'POST', body: JSON.stringify(body) }),
+    request<CreateSessionResponse>(token, '/v1/sessions', { method: 'POST', ...json(body) }),
+  reissueUploadUrls: (token: string, sessionId: string) => request<CreateSessionResponse>(token, `/v1/sessions/${sessionId}/upload-urls`, { method: 'POST' }),
   sessionObjects: (token: string, sessionId: string) =>
     request<{ session_id: string; objects: ObjectStatus[] }>(token, `/v1/sessions/${sessionId}/objects`),
+  listSessions: (token: string, site?: Site) =>
+    request<{ sessions: SessionView[] }>(token, `/v1/sessions${site ? `?site=${site}` : ''}`),
+  getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
+  patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
+    request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
+  analyze: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}/analyze`, { method: 'POST' }),
+  setBaseline: (token: string, site: Site, sessionId: string) =>
+    request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
+  deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
+  catalogSearch: (token: string, params: { q?: string; concern?: string; category?: string; max_price?: number; currency?: string; limit?: number }) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+    return request<{ products: Product[] }>(token, `/v1/catalog/search?${qs}`)
+  },
+  catalogProduct: (token: string, productId: string) => request<Product>(token, `/v1/catalog/${productId}`),
+  labelScan: (token: string, images: { mime_type: string; data_base64: string }[]) =>
+    request<LabelScanResponse>(token, '/v1/label-scan', { method: 'POST', ...json({ images }) }),
+  routine: (token: string) => request<{ entries: RoutineEntry[] }>(token, '/v1/routine'),
+  addRoutine: (token: string, entry: NewRoutineEntry) => request<RoutineEntry>(token, '/v1/routine', { method: 'POST', ...json(entry) }),
+  patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
+    request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
+  deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */

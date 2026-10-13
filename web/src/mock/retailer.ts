@@ -20,10 +20,10 @@ export const RETAILER = {
   ],
   products: [
     { product: 'Azelaic Acid Suspension 10%', brand: 'The Ordinary', concern: 'dark spots', cells: [cell(0.61, 24), cell(0.58, 31), cell(0.55, 29), cell(0.52, 22), cell(0.47, 14), cell(0, 6)], lift: 0.21, weeks: 5, cont: 0.78 },
-    { product: '2% Kojic Acid Face Serum', brand: 'The Derma Co', concern: 'dark spots', cells: [cell(0.44, 12), cell(0.41, 19), cell(0.39, 21), cell(0.4, 18), cell(0, 9), cell(0, 4)], lift: 0.08, weeks: 7, cont: 0.64 },
+    { product: 'Alpha Arbutin 2% Face Serum', brand: 'Minimalist', concern: 'dark spots', cells: [cell(0.44, 12), cell(0.41, 19), cell(0.39, 21), cell(0.4, 18), cell(0, 9), cell(0, 4)], lift: 0.08, weeks: 7, cont: 0.64 },
     { product: 'Niacinamide 10% + Zinc 1%', brand: 'The Ordinary', concern: 'blemishes', cells: [cell(0.48, 21), cell(0.5, 27), cell(0.46, 25), cell(0.44, 19), cell(0.42, 12), cell(0, 7)], lift: 0.14, weeks: 4, cont: 0.81 },
     { product: '2% Salicylic Acid Serum', brand: 'Minimalist', concern: 'blemishes', cells: [cell(0.52, 16), cell(0.49, 22), cell(0.45, 20), cell(0.47, 15), cell(0, 8), cell(0, 3)], lift: 0.12, weeks: 4, cont: 0.7 },
-    { product: 'Retinol + Ceramide Serum', brand: 'Dot & Key', concern: 'texture', cells: [cell(0.33, 14), cell(0.3, 18), cell(0.29, 16), cell(0, 9), cell(0, 5), cell(0, 2)], lift: 0.05, weeks: 8, cont: 0.58 },
+    { product: 'Retinol 0.3% Face Serum', brand: 'Minimalist', concern: 'texture', cells: [cell(0.33, 14), cell(0.3, 18), cell(0.29, 16), cell(0, 9), cell(0, 5), cell(0, 2)], lift: 0.05, weeks: 8, cont: 0.58 },
   ],
   brands: [
     { brand: 'The Ordinary', rate: 0.55, n: 173, lo: 0.48, hi: 0.62, cont: 0.79 },
@@ -39,7 +39,7 @@ export const RETAILER = {
   ],
   conflicts: [
     { pair: 'Retinoid + AHA/BHA, same night', share: 0.18, fix: 'Alternate nights', resolves: ['La Roche-Posay Anthelios SPF50+'] },
-    { pair: 'No sunscreen with a retinoid or acid', share: 0.27, fix: 'Add daily SPF', resolves: ['La Roche-Posay Anthelios SPF50+', 'Beauty of Joseon Relief Sun'] },
+    { pair: 'No sunscreen with a retinoid or acid', share: 0.27, fix: 'Add daily SPF', resolves: ['La Roche-Posay Anthelios UVMune 400 SPF50+', 'The Derma Co 1% Hyaluronic Sunscreen SPF 50'] },
     { pair: 'Two exfoliants daily', share: 0.07, fix: 'Reduce frequency', resolves: [] },
   ],
 }
