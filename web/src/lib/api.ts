@@ -66,6 +66,19 @@ export type AdvisorReply = {
   remaining_today: number
 }
 
+type RetailerCell = { value: number | null; n: number; suppressed: boolean }
+type TierStat = { options: number; rate: number | null }
+export type RetailerInsights = {
+  cohort: { synthetic: number; real: number; weeks: number; dropout: number; seed: number }
+  tiles: { label: string; value: string; n: number; sub: string }[]
+  needs: { goal: string; n: number; real: number; none: number; early: number }[]
+  products: { product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
+  tone_bands: string[]
+  brands: { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }[]
+  gaps: { goal: string; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
+  conflicts: { pair: string; share: number; fix: string; resolves: string[] }[]
+}
+
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
 
 export class ApiError extends Error {
@@ -110,6 +123,12 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
 
 export const api = {
+  /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
+  retailerInsights: async () => {
+    const res = await fetch(`${API_URL}/v1/retailer/insights`)
+    if (!res.ok) throw new ApiError(res.status, 'insights unavailable')
+    return (await res.json()) as RetailerInsights
+  },
   health: () => fetch(`${API_URL}/v1/health`).then((r) => r.json() as Promise<Record<string, string>>),
   createSession: (token: string, body: { site: Site; capture_mode: CaptureMode; n_frames: number; content_types: string[] }) =>
     request<CreateSessionResponse>(token, '/v1/sessions', { method: 'POST', ...json(body) }),
