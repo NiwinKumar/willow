@@ -51,4 +51,5 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Asks for the engine (Harshini):
   1. The face/macro placeholder returns the fixture unchanged, including `frames_used: 5` and baked-in deltas and `real_change` verdicts even when no baseline was sent. The api now ignores it, but returning `metrics: []`, `frames_used` = frames received and `quality.passed: false` with a warning would be safer for any other caller.
   2. A RAW photo with no colour card and no white paper still gets `confidence: "measured"` and `quality.passed: true` (seen on Oct 13 with a plain iPhone DNG; warnings say colours were not corrected). Suggest `indicative`, or a quality reason, when no colour reference is found.
+- Follow-up (same day, api/web only): the first session of a site asks for 5 photos (repositioned, same pose) so most baselines get a noise band; the baseline never switches automatically; when the engine starts measuring face/macro, `api/scripts/remeasure.py --apply` re-runs saved sessions oldest first so each person's earliest one becomes the baseline. Nothing changes in the engine.
 - Approved by: [ ] Harshini [x] Niwin
