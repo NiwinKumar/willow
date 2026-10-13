@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -11,6 +11,7 @@ import { enterDemo, leaveDemo } from '../data/useData'
 import { useAuth } from '../lib/useAuth'
 import { fmtSigned, fmtValue } from '../lib/metrics'
 import { DEMO_SERIES } from '../mock/series'
+import { prefetchRoutes } from './lazy'
 
 const entries = [
   { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', demo: true },
@@ -25,6 +26,7 @@ export function Landing() {
   const control = DEMO_SERIES.forearm_control
   const [i, setI] = useState(3)
   const [touched, setTouched] = useState(false)
+  useEffect(() => prefetchRoutes(['Judge', 'Report', 'Capture', 'QuickCapture']), [])
   const session = series.sessions[i]
   const baseline = series.sessions[0]
   const tone = session.result!.metrics.find((m) => m.id === 'tone_ita')!

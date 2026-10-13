@@ -3,6 +3,7 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__, storage
@@ -22,7 +23,30 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Dev-Uid"],
+    # Browsers re-ask the preflight once per URL; cache it (Chrome caps this at 2 hours).
+    max_age=7200,
 )
+# Session lists carry region polygons and the insights are ~15 KB: compress anything sizeable.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Public, identical for everyone: let browsers reuse them briefly.
+PUBLIC_CACHE = {
+    "/v1/retailer/insights": "public, max-age=300",
+    "/v1/demo/samples": "public, max-age=300",
+    "/v1/demo/journey": "public, max-age=120",
+    "/v1/demo/status": "public, max-age=30",
+}
+
+
+@app.middleware("http")
+async def public_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    rule = PUBLIC_CACHE.get(request.url.path)
+    if rule and request.method == "GET" and response.status_code == 200:
+        response.headers["Cache-Control"] = rule
+    return response
+
+
 app.include_router(sessions_router)
 app.include_router(me_router)
 app.include_router(products_router)
