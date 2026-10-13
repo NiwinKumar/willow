@@ -122,7 +122,28 @@ def _id_token(audience: str) -> str:
     from google.auth.transport.requests import Request
     from google.oauth2 import id_token
 
-    return id_token.fetch_id_token(Request(), audience)
+    try:
+        return id_token.fetch_id_token(Request(), audience)
+    except Exception:
+        # A laptop's user ADC cannot mint ID tokens; local end-to-end runs use gcloud's.
+        if get_settings().auth_mode != "dev":
+            raise
+        import subprocess
+
+        out = subprocess.run(
+            ["gcloud", "auth", "print-identity-token"], capture_output=True, text=True, check=True
+        )
+        return out.stdout.strip()
+
+
+def is_placeholder(result: dict[str, Any]) -> bool:
+    """The engine answers sites it cannot analyse yet with the contract fixture, marked so.
+
+    Those numbers are not measurements of anyone's skin, so the api never shows them.
+    """
+    return result["engine_version"].endswith("-placeholder") or any(
+        w.startswith("placeholder:") for w in result.get("warnings", [])
+    )
 
 
 def _unit_noise(session_id: str, metric_id: str) -> float:
@@ -194,9 +215,14 @@ def _apply_baseline(metric: dict[str, Any], stored: dict[str, Any] | None) -> No
         return
     delta = round(metric["value"] - stored["mean"], 2)
     mdc = stored.get("mdc95")
-    real = mdc is not None and abs(delta) > mdc
+    # Like the engine (engine/app/aggregate.py): without a baseline noise band there is a delta
+    # but no verdict, so the verdict stays no_baseline.
+    if mdc is None:
+        verdict = "no_baseline"
+    else:
+        verdict = "real_change" if abs(delta) > mdc else "within_noise"
     metric.update(
         delta=delta,
-        verdict="real_change" if real else "within_noise",
+        verdict=verdict,
         direction="increase" if delta > 0 else "decrease" if delta < 0 else "none",
     )

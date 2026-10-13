@@ -2,7 +2,7 @@ import { motion, useMotionValue, useReducedMotion, animate } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Session } from '../data/types'
-import { fmtDate, fmtHours } from '../lib/format'
+import { sessionLabel } from '../lib/format'
 
 type Props = {
   sessions: Session[]
@@ -95,7 +95,7 @@ export function Scrubber({ sessions, index, onChange, outsideCount, compact = fa
     }
   }
   const current = sessions[index]
-  const labelFor = (s: Session) => (s.hours_since_baseline !== undefined ? fmtHours(s.hours_since_baseline) : s.is_baseline ? 'Baseline' : fmtDate(s.created_at))
+  const labelFor = (s: Session) => sessionLabel(s, sessions)
   const outside = current && outsideCount ? outsideCount(current) : 0
 
   return (
@@ -144,12 +144,12 @@ export function Scrubber({ sessions, index, onChange, outsideCount, compact = fa
         </motion.div>
       </div>
       <div className="flex items-baseline justify-between font-mono text-[12px] text-text-3">
-        <span>{sessions[0] ? labelFor(sessions[0]) : ''}</span>
+        <span>{sessions[0] && n > 1 && index > 0 ? labelFor(sessions[0]) : ''}</span>
         <span className="text-text" aria-live="polite">
           {current ? labelFor(current) : ''}
           {current?.note ? <span className="ml-2 font-sans text-text-2">· {current.note}</span> : null}
         </span>
-        <span>{sessions[n - 1] && n > 1 ? labelFor(sessions[n - 1]) : ''}</span>
+        <span>{sessions[n - 1] && n > 1 && index < n - 1 ? labelFor(sessions[n - 1]) : ''}</span>
       </div>
     </div>
   )

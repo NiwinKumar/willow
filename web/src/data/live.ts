@@ -26,9 +26,12 @@ export function toSession(v: SessionView): Session {
       : null,
     note: v.session.note ?? undefined,
     deviation: v.session.deviation,
-    hours_since_baseline: h !== null && h <= HOURS_LABEL_LIMIT ? h : undefined,
+    // Under an hour reads as "+0 h"; those ticks are labelled by time of day instead.
+    hours_since_baseline: h !== null && h <= HOURS_LABEL_LIMIT && (h >= 1 || v.session.is_baseline) ? h : undefined,
     explanation_source: v.session.explanation_source,
     error: v.session.error,
+    measured: v.session.measured,
+    baseline_ref: v.session.baseline,
   }
 }
 
@@ -56,4 +59,17 @@ export function isSampleEngine(s: Session | null | undefined): boolean {
   const r = s?.result
   if (!r) return false
   return /-(fixture|placeholder)$/.test(r.engine_version) || (r.warnings ?? []).some((w) => w.startsWith('placeholder:'))
+}
+
+/** The baseline a session is compared with: its own baseline_ref (live), else the series' baseline. */
+export function baselineFor(session: Session | null, sessions: Session[]): Session | null {
+  if (!session) return null
+  const id = session.baseline_ref?.session_id
+  if (id) return sessions.find((s) => s.id === id) ?? null
+  return sessions.find((s) => s.is_baseline && s.capture_mode === session.capture_mode) ?? sessions.find((s) => s.is_baseline) ?? null
+}
+
+/** Live sessions the engine could not measure yet (the photos are kept, no numbers exist). */
+export function isUnmeasured(s: Session | null | undefined): boolean {
+  return s?.measured === false
 }

@@ -56,12 +56,87 @@ def test_later_sessions_are_compared_to_the_baseline(client, fake):
     assert all(m["delta"] is not None for m in view["result"]["metrics"])
 
 
-def test_uncalibrated_sessions_never_become_the_auto_baseline(client, fake):
-    created = _create(client, mode="uncalibrated")
+def test_quick_selfies_get_their_own_baseline(client, fake):
+    raw = _create(client)
+    _upload_all(fake, raw)
+    client.post(f"/v1/sessions/{raw['session_id']}/analyze")
+
+    quick = _create(client, mode="uncalibrated")
+    _upload_all(fake, quick)
+    view = client.post(f"/v1/sessions/{quick['session_id']}/analyze").json()
+    # Never compared with the calibrated baseline: it becomes the quick-selfie baseline.
+    assert view["session"]["is_baseline"] is True
+    assert {m["verdict"] for m in view["result"]["metrics"]} == {"no_baseline"}
+    assert fake.store.baseline_get("u_test", "forearm_treated")["session_id"] == raw["session_id"]
+    quick_base = fake.store.baseline_get("u_test", "forearm_treated__uncalibrated")
+    assert quick_base["session_id"] == quick["session_id"]
+
+
+def test_first_single_photo_session_is_the_baseline_without_a_noise_band(client, fake):
+    first = _create(client, n=1)
+    _upload_all(fake, first)
+    view = client.post(f"/v1/sessions/{first['session_id']}/analyze").json()
+    assert view["session"]["is_baseline"] is True
+    assert view["session"]["baseline"]["has_noise_band"] is False
+
+    later = _create(client, n=1)
+    _upload_all(fake, later)
+    view = client.post(f"/v1/sessions/{later['session_id']}/analyze").json()
+    assert view["session"]["baseline"] == {
+        "session_id": first["session_id"],
+        "frames": 1,
+        "has_noise_band": False,
+    }
+    # Deltas are reported, but nothing can be called a real change without a noise band.
+    assert all(m["delta"] is not None for m in view["result"]["metrics"])
+    assert "real_change" not in {m["verdict"] for m in view["result"]["metrics"]}
+
+
+def test_placeholder_results_are_never_shown_or_used_as_a_baseline(client, fake, monkeypatch):
+    def placeholder(request):
+        result = engine.fixture_result(request)
+        result["engine_version"] = "0.2.0-placeholder"
+        result["warnings"] = ["placeholder: face_full not analysed yet, fixture data"]
+        return result
+
+    monkeypatch.setattr(engine, "analyze", placeholder)
+    created = _create(client, site="face_full", n=1)
     _upload_all(fake, created)
     view = client.post(f"/v1/sessions/{created['session_id']}/analyze").json()
+    assert view["session"]["status"] == "done"
+    assert view["session"]["measured"] is False
+    assert view["result"] is None and view["explanation"] is None
     assert view["session"]["is_baseline"] is False
-    assert fake.store.baseline_get("u_test", "forearm_treated") is None
+    assert fake.store.baseline_get("u_test", "face_full") is None
+    listed = client.get("/v1/sessions", params={"site": "face_full"}).json()["sessions"]
+    assert listed[0]["result"] is None and listed[0]["session"]["measured"] is False
+    refused = client.post("/v1/baselines/face_full", json={"session_id": created["session_id"]})
+    assert refused.status_code == 409
+
+
+def test_sessions_analysed_before_the_measured_flag_hide_placeholders(client, fake):
+    created = _create(client, site="face_full", n=1)
+    result = engine.fixture_result(
+        {
+            "schema_version": "1.0",
+            "session_id": created["session_id"],
+            "user_id": "u_test",
+            "site": "face_full",
+            "capture_mode": "calibrated_raw",
+            "frames": [{"uri": "gs://b/x"}],
+        }
+    )
+    result["engine_version"] = "0.2.0-placeholder"
+    import json
+
+    fake.store.session_update(
+        "u_test",
+        created["session_id"],
+        {"status": "done", "result_json": json.dumps(result), "is_baseline": True},
+    )
+    view = client.get(f"/v1/sessions/{created['session_id']}").json()
+    assert view["result"] is None
+    assert view["session"]["measured"] is False and view["session"]["is_baseline"] is False
 
 
 def test_engine_failure_marks_the_session_failed(client, fake, monkeypatch):
@@ -129,7 +204,8 @@ def test_timeline_and_manual_baseline(client, fake):
     assert fake.store.session_get("u_test", sids[0])["is_baseline"] is True
 
     tl = client.get("/v1/timeline", params={"site": "forearm_treated"}).json()
-    assert tl["baseline_session_id"] == sids[0]
+    assert tl["baseline_session_ids"]["uncalibrated"] == sids[0]
+    assert tl["baseline_session_id"] is None  # no calibrated baseline yet
     assert [p["session_id"] for p in tl["metrics"]["redness"]] == sids
 
     wrong_site = client.post("/v1/baselines/face_full", json={"session_id": sids[0]})

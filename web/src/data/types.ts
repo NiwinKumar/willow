@@ -113,6 +113,10 @@ export type Session = {
   /** Live sessions only: where the explanation came from, and why a failed session failed. */
   explanation_source?: 'template' | 'gemini' | null
   error?: { code: string; message: string } | null
+  /** Live: false when the engine cannot measure this site yet; the photos are kept. */
+  measured?: boolean | null
+  /** Live: the baseline this session is compared with (same site and capture mode). */
+  baseline_ref?: { session_id: string; frames: number | null; has_noise_band: boolean } | null
 }
 
 export type SiteSeries = { site: Site; sessions: Session[] }
