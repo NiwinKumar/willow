@@ -35,7 +35,7 @@ Capture (standardized) -> Measure (CV, calibrated) -> Compare to your own noise 
 4. Timeline/compare: metric series with noise band, before/after slider, treated vs control.
 5. Routine: Gemini label scan of product photos, routine list, Gemini compatibility check (clashes, duplicates, gaps).
 6. Advisor chat: Gemini with function calling over the catalog + the user's metrics; every product with multi-store links.
-7. Retailer dashboard: BigQuery + Looker Studio + in-app view (synthetic cohort clearly labeled).
+7. Retailer dashboard: BigQuery + in-app view with a Gemini "ask this data" assistant (synthetic cohort clearly labeled). Looker Studio dropped Oct 13 (cut list item 5): one link for judges, and the in-app view answers questions.
 8. Judge mode: seeded real journey, sample photos, try-your-own selfie.
 
 ## Non-goals (say no if asked)
@@ -53,7 +53,7 @@ Diagnosis or disease names; skin age; hydration measurement; UV spots/porphyrins
 - Brands: aggregate efficacy evidence reports (consented, anonymized).
 
 ## Why we win (rubric mapping)
-- **Tech & Gen AI (40%):** real calibrated imaging pipeline + Gemini doing five distinct jobs (region labelling, grounded explanations with number validation, label OCR, routine compatibility reasoning, function-calling advisor). Cloud Run x2, Firestore, Firebase Hosting/Auth, Vertex AI, BigQuery, Looker.
+- **Tech & Gen AI (40%):** real calibrated imaging pipeline + Gemini doing six distinct jobs (region labelling, grounded explanations with number validation, label OCR, routine compatibility reasoning, function-calling advisor, retailer questions over aggregates with validated charts). Cloud Run x2, Firestore, Firebase Hosting/Auth, Vertex AI, BigQuery.
 - **Impact (25%):** ends guesswork for shoppers; gives retailers outcome data nobody else has.
 - **Innovation (25%):** personal noise-floor change detection on consumer phones; "CV measures, Gemini explains" so numbers are never invented.
 - **UX (10%):** guided capture with live quality checks, calm inclusive copy, signal-vs-noise visuals.
