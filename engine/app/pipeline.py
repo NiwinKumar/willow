@@ -11,6 +11,7 @@ from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
 from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
+from app.markers import find_dot_square, paper_pixels
 from app.metrics.redness import redness
 from app.metrics.tone import tone_ita
 from app.quality import FrameQuality, check_frame
@@ -42,11 +43,20 @@ def _load(path: str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _frame_metrics(
-    path: str, roi: Box, white: Box | None
-) -> tuple[dict, dict, FrameQuality, tuple]:
+    path: str, roi: Box | None, white: Box | None, auto_white: bool = True
+) -> tuple[dict, dict, FrameQuality, tuple, Box, bool]:
+    """Metrics for one photo. roi=None -> find the 4 pen dots; white=None -> find the paper."""
     linear, srgb8 = _load(path)
-    if white is not None:
-        linear = white_balance(linear, white.crop(linear))
+    if roi is None:
+        roi, _ = find_dot_square(srgb8)
+    white_px = white.crop(linear) if white is not None else None
+    if white_px is None and auto_white:
+        try:
+            white_px = paper_pixels(linear, srgb8)
+        except ValueError:
+            white_px = None  # reported as a warning below
+    if white_px is not None:
+        linear = white_balance(linear, white_px)
     skin_lin = roi.crop(linear)
     quality = check_frame(skin_lin, roi.crop(srgb8))
     lab = linear_srgb_to_lab(skin_lin)
@@ -55,14 +65,15 @@ def _frame_metrics(
     a_star, red_extras = redness(lab, skin_lin, mask)
     values = {"tone_ita": ita, "redness": a_star}
     extras = {"tone_ita": ita_extras, "redness": red_extras}
-    return values, extras, quality, srgb8.shape
+    return values, extras, quality, srgb8.shape, roi, white_px is not None
 
 
 def analyze_forearm(
     files: list[str],
     site: str,
-    rois: list[Box],
+    rois: list[Box | None],
     whites: list[Box | None],
+    auto_white: bool = True,
     session_id: str = "s_local",
     user_id: str = "local",
     baseline: dict | None = None,
@@ -78,9 +89,14 @@ def analyze_forearm(
     mode = capture_mode_for(files)
     confidence = "measured" if mode == "calibrated_raw" else "indicative"
     per_frame, passed_values, passed_extras, shape = [], [], [], None
+    used_rois, white_ok = [], []
     for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
-        values, extras, q, frame_shape = _frame_metrics(path, roi, white)
+        values, extras, q, frame_shape, used_roi, balanced = _frame_metrics(
+            path, roi, white, auto_white
+        )
         shape = shape or frame_shape
+        used_rois.append(used_roi)
+        white_ok.append(balanced)
         per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons, "_q": q})
         if q.passed:
             passed_values.append(values)
@@ -122,8 +138,8 @@ def analyze_forearm(
         warnings = ["uncalibrated photo: results are a trend only, not a measurement"]
     else:
         warnings = ["no colour card: colours corrected with the white paper only"]
-    if any(w is None for w in whites):
-        warnings.append("no white reference in frame: lamp colour not corrected")
+    if not all(white_ok):
+        warnings.append("no white reference found in some photos: lamp colour not corrected")
 
     result = {
         "schema_version": "1.0",
@@ -146,8 +162,7 @@ def analyze_forearm(
         "metrics": metrics,
         "candidates": [],
         "overlays": [],
-        "rois": [{"name": "forearm_square", "polygon": rois[0].polygon()}]
-        + ([{"name": "white_reference", "polygon": whites[0].polygon()}] if whites[0] else []),
+        "rois": [{"name": "forearm_square", "polygon": used_rois[0].polygon()}],
         "image_size": {"width": int(shape[1]), "height": int(shape[0])},
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
