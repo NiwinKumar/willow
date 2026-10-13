@@ -174,6 +174,16 @@ def main() -> int:
     if body.get("message"):
         print("      advisor:", body["message"][:300])
 
+    ins = httpx.get(f"{args.api}/v1/retailer/insights", timeout=60)
+    body = ins.json() if ins.status_code == 200 else {}
+    check(
+        "retailer insights from BigQuery, small groups suppressed",
+        ins.status_code == 200
+        and body["cohort"]["synthetic"] > 0
+        and all(p["n"] >= 10 for p in body["products"]),
+        f"{len(body.get('products', []))} products, {len(body.get('brands', []))} brands",
+    )
+
     # 7. Pick a different baseline by hand.
     res = c.post("/v1/baselines/forearm_control", json={"session_id": v2["session"]["id"]})
     check(
