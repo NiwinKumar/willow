@@ -74,3 +74,14 @@ SPOT_MIN_DIAMETER_MM = 1.0
 SPOT_BACKGROUND_MM = 3.0  # local skin background radius (Gaussian sigma) for spot contrast
 SPOT_MAX_DIAMETER_MM = 10.0
 EVENNESS_SMOOTH_MM = 1.0  # smooth before the within-ROI SD: blotches, not camera grain
+
+# blemishes (docs/METRICS.md B2). Tuned Oct 13 on 2 normal iPhone face photos: the 3 real
+# spots (2 pimples, 1 red mark) scored 3.8-5.5 in both; skin texture/noise stayed <= 3.4.
+BLEMISH_MIN_SCORE = 3.5  # redness above nearby skin, in units of this person's skin spread
+BLEMISH_DIAMETER_MM = (1.0, 5.0)
+BLEMISH_BACKGROUND_MM = 3.0  # "nearby skin" (Gaussian sigma)
+BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
+BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
+NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
+CROP_SIZE_PX = (64, 128)  # candidate crop side, clamped to this range
+CROP_CONTEXT = 3  # context crop is 3x the candidate crop

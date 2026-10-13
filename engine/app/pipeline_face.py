@@ -3,6 +3,7 @@
 import json
 import time
 
+import cv2
 import numpy as np
 from jsonschema import validate
 
@@ -10,7 +11,9 @@ from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
+from app.io import save_jpeg
 from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, refine_skin
+from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.pigment import pigment_spots
 from app.metrics.redness import erythema_index
@@ -24,7 +27,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "pigment_spots": ("tone_pigment", "Dark spots", "pct_area"),
     "tone_evenness": ("tone_pigment", "Tone evenness", "index"),
     "redness": ("redness", "Redness", "a_star"),
+    "blemishes": ("clarity", "Blemishes", "count"),
 }
+ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 # Dark spots stay on these flatter ROIs until the round-dot detector lands: over the whole
@@ -86,6 +91,12 @@ def _frame(path: str) -> dict:
     # blemishes next. Dark spots still use the flatter ROIs (see SPOT_ROIS).
     zones = {k: box.crop(v) for k, v in face.feature_zones(srgb8.shape[:2]).items()}
     face_skin = refine_skin(lab[..., 0], box.crop(face_mask_full), zones, px_per_mm)
+    # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
+    # red crease looks like a spot
+    guard = cv2.dilate(
+        zones["nostril_zone"].astype(np.uint8), face._disk(config.NOSTRIL_GUARD_MM)
+    ).astype(bool)
+    blemishes = find_blemishes(lab, face_skin & ~guard, px_per_mm)
     spots_pct, spot_extras = pigment_spots(
         {n: (lin[..., 0], skin[n]) for n in SPOT_ROIS}, px_per_mm
     )
@@ -95,12 +106,14 @@ def _frame(path: str) -> dict:
         "pigment_spots": spots_pct,
         "tone_evenness": evenness,
         "redness": float(np.mean(lab[..., 1][red_skin])),
+        "blemishes": float(len(blemishes)),
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
         "pigment_spots": spot_extras,
         "tone_evenness": {},
         "redness": {"erythema_index": erythema_index(lin, red_skin)},
+        "blemishes": {},
     }
     return {
         "values": values,
@@ -110,7 +123,52 @@ def _frame(path: str) -> dict:
         "polygons": polys,
         "shape": srgb8.shape,
         "face_skin": (box, face_skin),
+        "blemishes": blemishes,
+        "box": box,
+        "srgb8": srgb8,
     }
+
+
+def _candidates(frame: dict, output_prefix: str | None, limit: int) -> list[dict]:
+    """Contract candidates (docs/CONTRACT.md 2.6) for the strongest blemishes of one photo:
+    bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label."""
+    box, srgb8 = frame["box"], frame["srgb8"]
+    h, w = srgb8.shape[:2]
+    out = []
+    for i, b in enumerate(frame["blemishes"][:limit], start=1):
+        cid = f"c_{i:03d}"
+        cx, cy = box.x + b.x, box.y + b.y
+        side = 2 * b.radius * 1.5
+        bbox = [round(cx - side / 2, 1), round(cy - side / 2, 1), round(side, 1), round(side, 1)]
+        crop_side = int(np.clip(side * 2, *config.CROP_SIZE_PX))
+        crops = {}
+        for key, size in (
+            ("crop_uri", crop_side),
+            ("context_crop_uri", crop_side * config.CROP_CONTEXT),
+        ):
+            x0, y0 = int(max(cx - size / 2, 0)), int(max(cy - size / 2, 0))
+            patch = np.ascontiguousarray(srgb8[y0 : min(y0 + size, h), x0 : min(x0 + size, w)])
+            suffix = "" if key == "crop_uri" else "_ctx"
+            crops[key] = (
+                save_jpeg(patch, f"{output_prefix.rstrip('/')}/crops/{cid}{suffix}.jpg")
+                if output_prefix
+                else None
+            )
+        out.append(
+            {
+                "id": cid,
+                "kind": "blemish",
+                "bbox": bbox,
+                **crops,
+                "features": {
+                    "a_star_contrast": round(b.a_star_contrast, 2),
+                    "l_star_contrast": round(b.l_star_contrast, 2),
+                    "area_px": float(b.area_px),
+                    "score": round(b.score, 2),
+                },
+            }
+        )
+    return out
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -124,8 +182,14 @@ def analyze_face(
     session_id: str = "s_local",
     user_id: str = "local",
     baseline: dict | None = None,
+    output_prefix: str | None = None,
+    max_candidates: int = 40,
 ) -> dict:
-    """Analyze 1-5 front-on face photos of one session (site face_full)."""
+    """Analyze 1-5 front-on face photos of one session (site face_full).
+
+    Blemish candidates (with crops when output_prefix is given) come from the first photo
+    that passed the quality checks.
+    """
     t0 = time.perf_counter()
     try:
         mode = capture_mode_for(files)
@@ -171,7 +235,7 @@ def analyze_face(
                 "group": group,
                 "label": label,
                 "unit": unit,
-                "confidence": confidence,
+                "confidence": "indicative" if metric_id in ALWAYS_INDICATIVE else confidence,
                 **summary,
                 "extras": extras,
             }
@@ -185,7 +249,10 @@ def analyze_face(
     else:
         warnings.insert(0, "no colour card: colours as captured by the camera")
 
-    ref = frames[0] if frames else None
+    ref = good[0] if good else (frames[0] if frames else None)
+    candidates = _candidates(good[0], output_prefix, max_candidates) if good else []
+    for f in frames:
+        f.pop("srgb8", None)  # free the full-size photos
     qs = [f["quality"] for f in frames]
     result = {
         "schema_version": "1.0",
@@ -213,7 +280,7 @@ def analyze_face(
             "reasons": reasons,
         },
         "metrics": metrics,
-        "candidates": [],
+        "candidates": candidates,
         "overlays": [],
         # ROIs of the first photo; cross-frame alignment comes with overlays
         "rois": (

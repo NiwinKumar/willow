@@ -116,6 +116,9 @@ class FakeFace(Face):
         m[120:900, 200:820] = True
         return m
 
+    def _disk(self, mm):
+        return np.ones((3, 3), np.uint8)
+
     def feature_zones(self, shape):
         none = np.zeros(shape, bool)
         return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
@@ -157,7 +160,8 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
     r = analyze_face(files)  # schema-validated inside
     assert r["site"] == "face_full" and r["frames_used"] == 3
     m = {x["id"]: x for x in r["metrics"]}
-    assert set(m) == {"tone_ita", "pigment_spots", "tone_evenness", "redness"}
+    assert set(m) == {"tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes"}
+    assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
     assert m["tone_evenness"]["value"] < 2.0  # every ROI is the same colour
     assert {p["name"] for p in r["rois"]} == set(SQUARES)
@@ -196,3 +200,19 @@ def test_refine_skin_keeps_a_mark_but_cuts_hair_and_brow():
     assert skin[200, 200]  # the mark stays: it is skin, not hair
     assert not skin[55, 200] and not skin[127, 140]  # hair and brow are cut
     assert skin[250, 250]  # plain skin stays
+
+
+def test_blemish_candidates_with_crops(tmp_path, fake_landmarks):
+    path = tmp_path / "face.jpg"
+    rng = np.random.default_rng(0)
+    img = np.full((1000, 1000, 3), (198, 148, 115), np.float64) + rng.normal(0, 3, (1000, 1000, 1))
+    yy, xx = np.ogrid[:1000, :1000]
+    img[(xx - 500) ** 2 + (yy - 600) ** 2 <= 9**2] = (215, 120, 105)  # a red bump on the cheek
+    Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(path, quality=95)
+    r = analyze_face([str(path)], output_prefix=str(tmp_path / "out"))
+    blem = next(m for m in r["metrics"] if m["id"] == "blemishes")
+    assert blem["value"] == 1 and len(r["candidates"]) == 1
+    c = r["candidates"][0]
+    assert c["kind"] == "blemish" and abs(c["bbox"][0] + c["bbox"][2] / 2 - 500) < 6
+    assert Image.open(c["crop_uri"]).size[0] >= 64
+    assert Image.open(c["context_crop_uri"]).size[0] == 3 * Image.open(c["crop_uri"]).size[0]

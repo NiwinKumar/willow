@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> None:
     n = len(args.files)
     baseline = json.loads(Path(args.baseline).read_text()) if args.baseline else None
     if args.site == "face_full":
-        result = analyze_face(args.files, baseline=baseline)
+        result = analyze_face(args.files, baseline=baseline, output_prefix=args.out)
     else:
         result = analyze_forearm(
             args.files,
@@ -80,6 +80,11 @@ def main(argv: list[str] | None = None) -> None:
         print(
             f"{m['id']:<10}{_fmt(m['value']):>9}{_fmt(m['within_session_sd']):>8}"
             f"{_fmt(m['mdc95']):>8}  {m['extras']}"
+        )
+    for c in result["candidates"]:
+        print(
+            f"  {c['kind']} {c['id']} at {c['bbox'][:2]} score {c['features']['score']}"
+            + (f" -> {c['crop_uri']}" if c.get("crop_uri") else "")
         )
     for w in result["warnings"]:
         print(f"note: {w}")

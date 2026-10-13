@@ -91,7 +91,14 @@ async def analyze(http_request: Request) -> dict:
             fetch_ms = (time.perf_counter() - t_fetch) * 1000
             ids = {"session_id": request["session_id"], "user_id": request["user_id"]}
             if request["site"] == "face_full":
-                result = analyze_face(paths, baseline=request.get("baseline"), **ids)
+                opts = request.get("options") or {}
+                result = analyze_face(
+                    paths,
+                    baseline=request.get("baseline"),
+                    output_prefix=request.get("output_prefix"),
+                    max_candidates=opts.get("max_candidates", 40),
+                    **ids,
+                )
             else:
                 result = analyze_forearm(
                     paths,
