@@ -9,10 +9,20 @@ from jsonschema import validate
 
 from app import config
 from app.aggregate import summarize
+from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
 from app.io import save_jpeg
-from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, refine_skin
+from app.landmarks import (
+    Face,
+    FaceNotFound,
+    detect_face,
+    edge_hair,
+    polygon_mask,
+    refine_skin,
+    skin_colour,
+    stubble,
+)
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.pigment import find_spots, pigment_spots
@@ -44,11 +54,18 @@ def _bbox(polygons: list[np.ndarray], shape: tuple[int, int]) -> Box:
 
 
 def _pose_ok(face: Face) -> bool:
-    return (
-        abs(face.yaw) <= config.MAX_ABS_YAW
-        and abs(face.pitch) <= config.MAX_ABS_PITCH
-        and abs(face.roll) <= config.MAX_ABS_ROLL
+    if face.view == "front":
+        return abs(face.pitch) <= config.MAX_ABS_PITCH and abs(face.roll) <= config.MAX_ABS_ROLL
+    return (  # side / three-quarter view: the visible half is analysed
+        abs(face.yaw) <= config.SIDE_MAX_YAW
+        and abs(face.pitch) <= config.SIDE_MAX_PITCH
+        and abs(face.roll) <= config.SIDE_MAX_ROLL
     )
+
+
+def _rois(face: Face, names: tuple[str, ...]) -> tuple[str, ...]:
+    """The ROIs of `names` this view shows (side views: the cheek facing the camera)."""
+    return names if face.view == "front" else face.cheeks
 
 
 def _frame(path: str) -> dict:
@@ -60,12 +77,15 @@ def _frame(path: str) -> dict:
     ys, xs = np.nonzero(face_mask_full)
     face_outline = np.array([[xs.min(), ys.min()], [xs.max() + 1, ys.max() + 1]], float)
     box = _bbox([*polys.values(), face_outline], srgb8.shape[:2])  # face area only
-    cheek_box = _bbox([polys[c] for c in CHEEKS], srgb8.shape[:2])
+    cheek_box = _bbox([polys[c] for c in face.cheeks], srgb8.shape[:2])
 
     masks = {n: box.crop(polygon_mask(srgb8.shape[:2], p)) for n, p in polys.items()}
     # sharpness/exposure on the cheek area (2-D patch the Laplacian needs)
+    cheek_mask = cheek_box.crop(
+        np.logical_or.reduce([polygon_mask(srgb8.shape[:2], polys[c]) for c in face.cheeks])
+    )
     quality: FrameQuality = check_frame(
-        cheek_box.crop(linear), cheek_box.crop(srgb8), px_per_mm=face.px_per_mm
+        cheek_box.crop(linear), cheek_box.crop(srgb8), px_per_mm=face.px_per_mm, skin=cheek_mask
     )
     if not _pose_ok(face):
         quality.reasons.append("pose_out_of_range")
@@ -75,32 +95,59 @@ def _frame(path: str) -> dict:
     lab = linear_srgb_to_lab(lin)
 
     skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
-    cheek_skin = skin["right_cheek"] | skin["left_cheek"]
+    cheek_skin = np.logical_or.reduce([skin[c] for c in face.cheeks])
     l_star = float(np.median(lab[..., 0][cheek_skin]))
     b_star = float(np.median(lab[..., 2][cheek_skin]))
-    red_skin = np.logical_or.reduce([skin[n] for n in REDNESS_ROIS])
-    px_per_mm = face.eye_distance_px / config.EYE_DISTANCE_MM
+    red_skin = np.logical_or.reduce([skin[n] for n in _rois(face, REDNESS_ROIS)])
+    px_per_mm = face.px_per_mm
 
     evenness, _ = tone_evenness(
-        {n: (lab[..., 0], lin[..., 0], skin[n]) for n in EVENNESS_ROIS}, px_per_mm
+        {n: (lab[..., 0], lin[..., 0], skin[n]) for n in _rois(face, EVENNESS_ROIS)}, px_per_mm
     )
     # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair) for blemishes
     # and dark spots
     zones = {k: box.crop(v) for k, v in face.feature_zones(srgb8.shape[:2]).items()}
     face_skin = refine_skin(lab[..., 0], box.crop(face_mask_full), zones, px_per_mm)
+    if face.view != "front":  # hair, background and shine crowd a turned cheek
+        face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
+        # sideburns and temple hair beside the ear: dense dark specks, like stubble
+        face_skin &= ~stubble(lab[..., 0], face_skin, px_per_mm)
+        ear = face.ear_side(face_skin.shape, (box.x, box.y))
+        face_skin &= ~edge_hair(lab, face_skin, cheek_skin, px_per_mm, ear)
+    # both searches skip the band where hair, jaw shadow or background meet skin and the
+    # brows and eye corners; dark spots also skip the glabella, the lip / nostril edges and
+    # mouth corners (shading; it is not red, so blemishes there still count). Full face skin is still "nearby skin".
+    band = face.border_band(face_skin, (box.x, box.y))
+    outline = box.crop(polygon_mask(srgb8.shape[:2], face.outline()))
+    brows = box.crop(face.brow_guard(srgb8.shape[:2]))
+    eye_corners = box.crop(face.eye_corner_guard(srgb8.shape[:2]))
+    # a turned nose: shine and redness on its tip and wings are not blemishes
+    side_nose = np.zeros_like(face_skin)
+    if face.view != "front":
+        side_nose = box.crop(face.nose_mask(srgb8.shape[:2]))
+    lip_edge = box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM))
+    edge = box.crop(face.edge_guard(srgb8.shape[:2])) | band
     # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
     # red crease looks like a spot
     guard = cv2.dilate(
         zones["nostril_zone"].astype(np.uint8), face._disk(config.NOSTRIL_GUARD_MM)
     ).astype(bool)
-    blemishes = find_blemishes(lab, face_skin & ~guard, px_per_mm)
+    blemishes = find_blemishes(
+        lab,
+        face_skin,
+        px_per_mm,
+        search=face_skin & ~guard & ~band & ~brows & ~eye_corners & ~lip_edge & ~side_nose,
+    )
     # dark spots over the whole face skin, away from shadow-prone areas and from spots
     # already counted as blemishes (a red-brown mark is one thing, not two)
-    search = face_skin & ~box.crop(face.shadow_guard(srgb8.shape[:2]))
+    search = face_skin & ~edge & ~box.crop(face.shadow_guard(srgb8.shape[:2]))
+    # just inside the hairline, skin darkens toward the hair and fine hairs remain: a dark
+    # spot there must stand out more (a real mark near the hairline still counts)
+    strict = face.border_band(face_skin, (box.x, box.y), config.HAIRLINE_STRICT_MM)
     gap = config.BLEMISH_MERGE_MM * px_per_mm
     spots = [
         sp
-        for sp in find_spots(lab, face_skin, search, px_per_mm)
+        for sp in find_spots(lab, face_skin, search, px_per_mm, strict=strict, outline=outline)
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
     ]
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
@@ -124,6 +171,7 @@ def _frame(path: str) -> dict:
         "extras": extras,
         "quality": quality,
         "face": face,
+        "view": face.view,
         "polygons": polys,
         "shape": srgb8.shape,
         "face_skin": (box, face_skin),
@@ -134,7 +182,51 @@ def _frame(path: str) -> dict:
     }
 
 
-def _candidates(frame: dict, output_prefix: str | None, limit: int) -> list[dict]:
+def _marks(frame: dict) -> np.ndarray:
+    """(N, 2) photo-pixel centres of a frame's blemishes then dark spots."""
+    box = frame["box"]
+    pts = [(box.x + m.x, box.y + m.y) for m in (*frame["blemishes"], *frame["spots"])]
+    return np.array(pts, float).reshape(-1, 2)
+
+
+def _align(ref: dict, others: list[dict]) -> tuple[list[np.ndarray], list[str]]:
+    """Map each other photo of the session onto the reference photo (docs/METRICS.md step 7):
+    a shift / rotation / scale fitted on rigid landmarks. Returns, per other photo, its
+    marks in reference-photo pixels (empty when the photos could not be lined up), and
+    warnings for photos whose landmarks still differ by more than ALIGN_WARN_MM."""
+    mapped, warnings = [], []
+    ref_pts, mm = ref["face"].points, ref["face"].px_per_mm
+    for f in others:
+        try:
+            m = similarity(f["face"].points, ref_pts)
+        except ValueError:
+            mapped.append(np.empty((0, 2)))
+            warnings.append(f"photo {f['index'] + 1} could not be lined up with photo 1")
+            continue
+        if residual_px(f["face"].points, ref_pts, m) > config.ALIGN_WARN_MM * mm:
+            warnings.append(
+                f"photo {f['index'] + 1} lines up poorly with photo 1 (face moved or changed "
+                "expression): spot matching across photos is less reliable"
+            )
+        mapped.append(transform(m, _marks(f)))
+    return mapped, warnings
+
+
+def _seen_in(ref: dict, mapped: list[np.ndarray]) -> list[float]:
+    """For each mark of the reference photo, the share of the session's photos (itself
+    included) with a blemish or spot within ALIGN_MATCH_MM of it. A real mark is in every
+    photo; grain, glints and stray hairs usually are in one."""
+    gap = config.ALIGN_MATCH_MM * ref["face"].px_per_mm
+    out = []
+    for p in _marks(ref):
+        hits = 1 + sum(bool(len(o)) and float(np.min(np.hypot(*(o - p).T))) <= gap for o in mapped)
+        out.append(round(hits / (1 + len(mapped)), 2))
+    return out
+
+
+def _candidates(
+    frame: dict, output_prefix: str | None, limit: int, seen: list[float] | None = None
+) -> list[dict]:
     """Contract candidates (docs/CONTRACT.md 2.6), blemishes then dark spots of one photo:
     bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label."""
     box, srgb8 = frame["box"], frame["srgb8"]
@@ -175,6 +267,7 @@ def _candidates(frame: dict, output_prefix: str | None, limit: int) -> list[dict
                     "l_star_contrast": round(b.l_star_contrast, 2),
                     "area_px": float(b.area_px),
                     "score": round(b.score, 2),
+                    **({"seen_in_fraction": seen[i - 1]} if seen else {}),
                 },
             }
         )
@@ -214,10 +307,14 @@ def analyze_face(
         except FaceNotFound:
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
+        f["index"] = i
         frames.append(f)
         q = f["quality"]
         per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons})
-    good = [f for f in frames if f["quality"].passed]
+    passed = [f for f in frames if f["quality"].passed]
+    # one view per summary: front photos if any passed, else the side views (each measures
+    # different skin, so they are not averaged together)
+    good = [f for f in passed if f["view"] == "front"] or passed
 
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
@@ -259,8 +356,22 @@ def analyze_face(
     else:
         warnings.insert(0, "no colour card: colours as captured by the camera")
 
+    sides = sorted({f["view"] for f in good if f["view"] != "front"})
+    if sides:
+        warnings.append(
+            "side view: measured on the visible side of the face only ("
+            + " and ".join(f"{v} cheek" for v in sides)
+            + "); tone, redness and evenness come from that cheek"
+        )
+    if len(good) < len(passed):
+        warnings.append("side views were left out: front-view photos in the same session")
     ref = good[0] if good else (frames[0] if frames else None)
-    candidates = _candidates(good[0], output_prefix, max_candidates) if good else []
+    candidates = []
+    if good:
+        mapped, align_warnings = _align(good[0], good[1:])
+        warnings.extend(align_warnings)
+        seen = _seen_in(good[0], mapped) if len(good) > 1 else None
+        candidates = _candidates(good[0], output_prefix, max_candidates, seen)
     for f in frames:
         f.pop("srgb8", None)  # free the full-size photos
     qs = [f["quality"] for f in frames]
