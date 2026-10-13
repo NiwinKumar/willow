@@ -239,6 +239,9 @@ def test_blemish_candidates_with_crops(tmp_path, fake_landmarks):
     img[(xx - 500) ** 2 + (yy - 600) ** 2 <= 9**2] = (215, 120, 105)  # a red bump on the cheek
     Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(path, quality=95)
     r = analyze_face([str(path)], output_prefix=str(tmp_path / "out"))
+    import json
+
+    json.dumps(r)  # the API and CLI must be able to serialise every result
     blem = next(m for m in r["metrics"] if m["id"] == "blemishes")
     assert blem["value"] == 1 and len(r["candidates"]) == 1
     c = r["candidates"][0]

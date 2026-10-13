@@ -75,9 +75,9 @@ def find_spots(
             continue
         found.append(
             Spot(
-                x=x * back,
-                y=y * back,
-                radius=r * back,
+                x=float(x * back),  # plain floats: numpy float32 is not JSON-serialisable
+                y=float(y * back),
+                radius=float(r * back),
                 score=score,
                 l_star_contrast=float((lab[..., 0] - l_bg)[disk].mean()),
                 chroma_change=dc,
