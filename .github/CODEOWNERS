@@ -1,0 +1,7 @@
+# Replace the placeholders with real GitHub usernames.
+/engine/      @HARSHINI_GITHUB
+/api/         @NIWIN_GITHUB
+/web/         @NIWIN_GITHUB
+/infra/       @NIWIN_GITHUB
+/schemas/     @HARSHINI_GITHUB @NIWIN_GITHUB
+/docs/CONTRACT.md @HARSHINI_GITHUB @NIWIN_GITHUB
