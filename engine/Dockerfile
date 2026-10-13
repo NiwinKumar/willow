@@ -11,6 +11,13 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY schemas/ /srv/schemas/
 COPY fixtures/ /srv/fixtures/
 COPY engine/app/ /srv/engine/app/
+# MediaPipe face model for face_full (git-ignored in the repo): Google's published file,
+# checked against the hash of the copy the engine was tuned with.
+RUN python -c "import hashlib, urllib.request, pathlib; \
+p = pathlib.Path('/srv/engine/models/face_landmarker.task'); p.parent.mkdir(parents=True); \
+urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', p); \
+h = hashlib.sha256(p.read_bytes()).hexdigest(); \
+assert h == '64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff', h"
 RUN useradd -m appuser && chown -R appuser /srv
 USER appuser
 ENV PATH="/srv/.venv/bin:$PATH"
