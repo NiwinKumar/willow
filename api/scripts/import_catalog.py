@@ -5,7 +5,8 @@
     uv run python scripts/import_catalog.py seed                   # products.json -> Firestore
 
 Sheet columns: list fields are separated by " | "; key_actives are "name:pct" (pct may be empty);
-stores take four column triples store_N_name, store_N_url, store_N_region.
+stores take four column triples store_N_name, store_N_url, store_N_region. image_url is the
+brand's own product image, linked (never copied); image_source is the page it is shown on.
 """
 
 import csv
@@ -34,6 +35,8 @@ COLUMNS = [
     "region",
     "source_url",
     "last_verified",
+    "image_url",
+    "image_source",
 ] + [f"store_{i}_{f}" for i in range(1, STORE_SLOTS + 1) for f in ("name", "url", "region")]
 
 
@@ -54,6 +57,10 @@ def validate(p: dict) -> list[str]:
     ]
     if not p["source_url"].startswith("https://"):
         problems.append("source_url")
+    if p.get("image_url") and not p["image_url"].startswith("https://"):
+        problems.append("image_url")
+    if p.get("image_url") and not (p.get("image_source") or "").startswith("https://"):
+        problems.append("image_source (the page the image is shown on)")
     return problems
 
 
@@ -83,6 +90,8 @@ def from_row(row: dict[str, str]) -> dict:
         "size": row["size"].strip(),
         "region": _split(row["region"]),
         "stores": stores,
+        "image_url": (row.get("image_url") or "").strip() or None,
+        "image_source": (row.get("image_source") or "").strip() or None,
         "source_url": row["source_url"].strip(),
         "last_verified": row["last_verified"].strip(),
     }
@@ -107,6 +116,8 @@ def to_row(p: dict) -> dict[str, str]:
         "region": SEP.join(p["region"]),
         "source_url": p["source_url"],
         "last_verified": p["last_verified"],
+        "image_url": p.get("image_url") or "",
+        "image_source": p.get("image_source") or "",
     }
     for i in range(1, STORE_SLOTS + 1):
         s = p["stores"][i - 1] if i <= len(p["stores"]) else {"store": "", "url": "", "region": ""}
