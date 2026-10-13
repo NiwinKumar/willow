@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from app import catalog, gemini, label_scan
+from app import advisor, catalog, gemini, label_scan, routine_check
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store, iso
 
@@ -150,3 +150,43 @@ def routine_delete(
     """Remove an entry added by mistake. To stop using a product, PATCH ended_at instead."""
     store.routine_delete(user.uid, entry_id)
     return Response(status_code=204)
+
+
+@router.post("/routine/check")
+def routine_check_route(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """Rule table first (always), then Gemini additions marked source=model."""
+    entries = [{"id": eid, **e} for eid, e in store.routine_list(user.uid)]
+    return routine_check.check(entries)
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "willow"]
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1, max_length=20)
+
+
+@router.post("/advisor/chat")
+def advisor_chat(
+    body: ChatRequest,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    if body.messages[-1].role != "user":
+        raise HTTPException(422, {"code": "bad_request", "message": "last message must be yours"})
+    used = store.usage_incr(user.uid, datetime.now(UTC).date().isoformat(), "advisor")
+    if used > advisor.DAILY_LIMIT:
+        raise HTTPException(
+            429, {"code": "daily_limit", "message": "That is 20 questions for today."}
+        )
+    try:
+        reply = advisor.chat([m.model_dump() for m in body.messages], store, user.uid)
+    except Exception as exc:  # Vertex unavailable, quota, safety block
+        raise HTTPException(
+            502, {"code": "advisor_unavailable", "message": "The advisor is unavailable right now."}
+        ) from exc
+    return {**reply, "remaining_today": max(0, advisor.DAILY_LIMIT - used)}

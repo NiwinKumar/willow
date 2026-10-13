@@ -133,7 +133,48 @@ def main() -> int:
         f"{len(cat)} found",
     )
 
-    # 6. Pick a different baseline by hand.
+    # 6. Gemini: explanation on a measured session, routine check, advisor.
+    check(
+        "explanation present on a measured session",
+        bool(v2.get("explanation"))
+        and v2["session"]["explanation_source"] in ("gemini", "template"),
+        str(v2["session"].get("explanation_source")),
+    )
+    for pid in (
+        "minimalist-retinol-0-3-face-serum",
+        "paulas-choice-skin-perfecting-2-bha-liquid-exfoliant",
+    ):
+        c.post("/v1/routine", json={"product_id": pid, "slots": ["pm"], "source": "catalog"})
+    t0 = time.monotonic()
+    rc = c.post("/v1/routine/check").json()
+    rule = [x for x in rc.get("conflicts", []) if x["source"] == "rule"]
+    check(
+        "routine check flags retinoid + BHA and the missing sunscreen",
+        len(rule) >= 1 and any("sunscreen" in g["need"].lower() for g in rc.get("gaps", [])),
+        f"{len(rc.get('conflicts', []))} conflicts, {round(time.monotonic() - t0, 1)} s",
+    )
+    t0 = time.monotonic()
+    adv = c.post(
+        "/v1/advisor/chat",
+        json={
+            "messages": [
+                {"role": "user", "text": "Which sunscreen under 1000 INR would suit my routine?"}
+            ]
+        },
+    )
+    body = adv.json() if adv.status_code == 200 else {}
+    check(
+        "advisor answers from the catalog",
+        adv.status_code == 200
+        and bool(body.get("message"))
+        and all(p.get("image_url") for p in body.get("products", [])),
+        f"{round(time.monotonic() - t0, 1)} s, {len(body.get('products', []))} products, "
+        f"{body.get('retrieval')}",
+    )
+    if body.get("message"):
+        print("      advisor:", body["message"][:300])
+
+    # 7. Pick a different baseline by hand.
     res = c.post("/v1/baselines/forearm_control", json={"session_id": v2["session"]["id"]})
     check(
         "make this my baseline",

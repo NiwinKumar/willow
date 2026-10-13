@@ -38,11 +38,24 @@ CONCERNS = (
 )
 
 
+def _tidy(p: dict[str, Any]) -> dict[str, Any]:
+    """Whole numbers as integers (prices and percentages read 445, not 445.0)."""
+
+    def whole(x: Any) -> Any:
+        return int(x) if isinstance(x, float) and x.is_integer() else x
+
+    return {
+        **p,
+        "price": {**p["price"], "amount": whole(p["price"]["amount"])},
+        "key_actives": [{**a, "pct": whole(a["pct"])} for a in p["key_actives"]],
+    }
+
+
 @lru_cache
 def products() -> tuple[dict[str, Any], ...]:
     if not CATALOG_PATH.exists():
         return ()
-    return tuple(json.loads(CATALOG_PATH.read_text()))
+    return tuple(_tidy(p) for p in json.loads(CATALOG_PATH.read_text()))
 
 
 def by_id(product_id: str) -> dict[str, Any] | None:
