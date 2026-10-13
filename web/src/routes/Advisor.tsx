@@ -55,6 +55,20 @@ export function Advisor() {
   const last = turns[turns.length - 1]
   const chips = last?.role === 'willow' && last.follow_ups?.length ? last.follow_ups : STARTERS
 
+  // The canned answers describe the sample journey; never show them to a real person.
+  if (data.mode === 'live')
+    return (
+      <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-6 sm:px-8">
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">The advisor is not connected yet</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-text-2">
+          It will answer from your own measurements, your routine and the product catalog, and quote only numbers Willow measured. Until then, try it on the sample journey.
+        </p>
+        <Link to="/advisor?demo=1" className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+          Try it on the sample journey
+        </Link>
+      </div>
+    )
+
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-56px)] w-full max-w-[1120px] flex-col px-5 sm:px-8 lg:grid lg:grid-cols-[minmax(0,680px)_1fr] lg:gap-8">
       <div className="flex min-h-0 flex-1 flex-col">

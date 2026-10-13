@@ -31,7 +31,7 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | GET/POST | `/v1/routine` | List / add entries (catalog facts win for a `product_id`) |
 | PATCH/DELETE | `/v1/routine/{id}` | Stop (`ended_at`) or move AM/PM / remove a mistaken entry |
 
-`SessionView.session` also carries `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
+`SessionView.session` also carries `measured` (false when the engine returned a placeholder; `result` is then null), `baseline` (`{session_id, frames, has_noise_band}` of the baseline this session is compared with, same site and capture mode), `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
 
 ## Engine modes
 - `ENGINE_MODE=fixture`: answers from `app/contract/analysis_result.sample.json`, filtered to the site's metrics, varied a little per session, with the baseline verdict rules applied. `engine_version` ends in `-fixture` and `warnings[]` says the numbers are a sample.
@@ -42,5 +42,7 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 ## Gemini and the catalog
 - `app/gemini.py`: `generate_json(prompt_id, contents, Schema, instructions=...)`. System rules on every call, JSON against a pydantic schema, `thinking_level=LOW` (the lowest Gemini 3.8 Flash accepts), one retry, then `GeminiError` for the caller's fallback. Logs prompt id, latency and token counts only.
 - Catalog: `seed/products.json`, built from the sheet by `scripts/import_catalog.py` (see `docs/CATALOG_SPEC.md`).
+
+End-to-end test against the real bucket, engine and Firestore: `scripts/e2e.py`, see `docs/LOCAL_DEV.md`. `/v1/dev/*` routes exist only with `AUTH_MODE=dev` and `DEV_UPLOADS=true`.
 
 Deploy: see `infra/README.md`.

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { api, putSigned, type CaptureMode, type ObjectStatus, type Site } from '../lib/api'
+import { ApiError, api, putSigned, type CaptureMode, type ObjectStatus, type Site } from '../lib/api'
 import { formatBytes, type Row } from '../lib/upload'
 import { useAuth } from '../lib/useAuth'
 
@@ -91,7 +91,7 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
         onDone(session.session_id, result.objects)
       }
     } catch (e) {
-      toast.error(String(e))
+      toast.error(e instanceof ApiError ? `Upload could not start: ${e.message}` : 'Upload could not start. Check your connection and try again.')
     } finally {
       setBusy(false)
       wake.current?.release().catch(() => undefined)

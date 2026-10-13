@@ -44,3 +44,11 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - What: `SessionView.session` carries `preview` (signed GET URL of `{output_prefix}preview.jpg` when the engine wrote one, else null), `overlay_urls` (signed), `hours_since_baseline`, `note`, `deviation`, `error`, `explanation_source` (`template` | `gemini`). New api routes: `PATCH /v1/sessions/{id}`, `POST /v1/sessions/{id}/upload-urls`, `GET /v1/sessions?site=`, `DELETE /v1/me` (all listed in DESIGN.md section 8 as api work with no contract change).
 - Impact on the engine: none. The api reads `preview.jpg` only if it exists, so it works with or without proposal 1b.
 - Approved by: n/a (api and web are both Niwin's)
+
+## 2026-10-13: Baseline rule and placeholder handling in the api (note for Harshini, no schema change)
+- Baseline (CONTRACT.md section 3 says "auto: first passing 5-frame calibrated session"): now the first *measured* session with passing quality, per site **and** capture mode, any frame count. Firestore: `baselines/{site}` for calibrated (as in section 4), `baselines/{site}__uncalibrated` for quick selfies. Niwin asked for this after testing: one-photo sessions never became a baseline, so nothing was ever compared. With a one-photo baseline the engine already does the right thing (delta, verdict stays `no_baseline` because `mdc95` is null) and the web says "No noise band yet".
+- Placeholders: results with `engine_version` ending `-placeholder` (or a `placeholder:` warning) are stored with `measured: false` and never returned as numbers or used as a baseline.
+- Asks for the engine (Harshini):
+  1. The face/macro placeholder returns the fixture unchanged, including `frames_used: 5` and baked-in deltas and `real_change` verdicts even when no baseline was sent. The api now ignores it, but returning `metrics: []`, `frames_used` = frames received and `quality.passed: false` with a warning would be safer for any other caller.
+  2. A RAW photo with no colour card and no white paper still gets `confidence: "measured"` and `quality.passed: true` (seen on Oct 13 with a plain iPhone DNG; warnings say colours were not corrected). Suggest `indicative`, or a quality reason, when no colour reference is found.
+- Approved by: [ ] Harshini [x] Niwin

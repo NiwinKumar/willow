@@ -148,10 +148,10 @@ def analyze_session(
     store.session_update(
         uid, session_id, {"status": "processing", "processing_started_at": now, "error": None}
     )
-    current = store.baseline_get(uid, doc["site"])
+    current = baselines.get(store, uid, doc["site"], doc["capture_mode"])
     baseline_map = None
     if current and current["session_id"] != session_id:
-        baseline_map = baselines.for_request(store, uid, doc["site"])
+        baseline_map = baselines.for_request(current)
     request = {
         "schema_version": "1.0",
         "session_id": session_id,
@@ -176,21 +176,24 @@ def analyze_session(
         )
         raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}) from exc
 
+    measured = not engine.is_placeholder(result)
     store.session_update(
         uid,
         session_id,
         {
             "status": "done",
+            "measured": measured,
+            # Placeholder numbers are kept for debugging only; views never return them.
             "result_json": json.dumps(result),
-            "explanation": explain.template(result),
-            "explanation_source": "template",
+            "explanation": explain.template(result) if measured else None,
+            "explanation_source": "template" if measured else None,
             "labels": {},
             "analyzed_at": datetime.now(UTC),
         },
     )
     doc = _load(store, uid, session_id)
-    if current is None and baselines.qualifies(doc, result):
-        baselines.set_baseline(store, uid, doc["site"], session_id, doc)
+    if measured and current is None and baselines.qualifies(result):
+        baselines.set_baseline(store, uid, session_id, doc)
         doc = _load(store, uid, session_id)
     return _detail_view(store, uid, session_id, doc)
 
@@ -203,7 +206,11 @@ def _detail_view(store: Store, uid: str, session_id: str, doc: dict) -> dict[str
     )
     signed = views.sign_all(views.wanted_urls(uid, session_id, doc, existing, with_overlays=True))
     return views.session_view(
-        uid, session_id, doc, baseline=store.baseline_get(uid, doc["site"]), signed=signed
+        uid,
+        session_id,
+        doc,
+        baseline=baselines.get(store, uid, doc["site"], doc["capture_mode"]),
+        signed=signed,
     )
 
 
@@ -228,14 +235,13 @@ def list_sessions(
         for name in views.wanted_urls(uid, sid, d, existing, with_overlays=False)
     ]
     signed = views.sign_all(wanted)
-    baseline_by_site: dict[str, dict | None] = {}
+    baseline_by_key: dict[str, dict | None] = {}
     out = []
     for sid, d in rows:
-        if d["site"] not in baseline_by_site:
-            baseline_by_site[d["site"]] = store.baseline_get(uid, d["site"])
-        out.append(
-            views.session_view(uid, sid, d, baseline=baseline_by_site[d["site"]], signed=signed)
-        )
+        k = baselines.key(d["site"], d["capture_mode"])
+        if k not in baseline_by_key:
+            baseline_by_key[k] = baselines.get(store, uid, d["site"], d["capture_mode"])
+        out.append(views.session_view(uid, sid, d, baseline=baseline_by_key[k], signed=signed))
     return {"sessions": out}
 
 

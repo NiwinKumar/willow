@@ -1,6 +1,34 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "web", "run", "dev"], "port": 5173 }
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "web-e2e",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd web && VITE_AUTH_MODE=dev VITE_DEV_UID=e2e_browser VITE_API_URL=http://localhost:8080 npx vite --port 5174 --strictPort"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "api-e2e",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd api && AUTH_MODE=dev DEV_UPLOADS=true ENGINE_MODE=http ENGINE_URL=https://willow-engine-hrlt7lqdwa-uc.a.run.app ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174 uv run uvicorn app.main:app --port 8080"
+      ],
+      "port": 8080
+    }
   ]
 }

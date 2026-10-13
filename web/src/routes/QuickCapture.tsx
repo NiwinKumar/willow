@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
 import { UploadList } from '../components/UploadList'
-import type { Site } from '../data/types'
+import type { CaptureMode, Site } from '../data/types'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { validateFiles, type Row } from '../lib/upload'
 import { useAuth } from '../lib/useAuth'
@@ -34,12 +34,15 @@ export function QuickCapture() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [manual, setManual] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
+  const [uploadMode, setUploadMode] = useState<CaptureMode>('uncalibrated')
+  const [uploadErrors, setUploadErrors] = useState<string[]>([])
   const video = useRef<HTMLVideoElement>(null)
   const stream = useRef<MediaStream | null>(null)
   const prev = useRef<Uint8ClampedArray | null>(null)
   const passSince = useRef<number | null>(null)
   const nearSince = useRef<number | null>(null)
   const firing = useRef(false)
+  const liveSince = useRef<number | null>(null)
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop())
@@ -51,15 +54,20 @@ export function QuickCapture() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: faceSite ? 'user' : 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
       stream.current = s
-      if (video.current) {
-        video.current.srcObject = s
-        await video.current.play()
-      }
+      liveSince.current = performance.now()
+      // The <video> only exists once the live view renders; the effect below attaches the stream.
       setPhase('live')
     } catch {
       setPhase('denied')
     }
   }
+
+  useEffect(() => {
+    const v = video.current
+    if (phase !== 'live' || !v || !stream.current || v.srcObject === stream.current) return
+    v.srcObject = stream.current
+    v.play().catch(() => setPhase('denied'))
+  }, [phase])
 
   // Analysis loop on a 160 px frame, five times a second.
   useEffect(() => {
@@ -101,7 +109,9 @@ export function QuickCapture() {
       const all = g.light && g.even && g.still
       if (g.light && g.even) nearSince.current ??= now
       else nearSince.current = null
-      if (nearSince.current && now - nearSince.current > 8000) setManual(true)
+      // The checks only help framing. Laptop cameras often never pass them, so the shutter is
+      // always available after a few seconds.
+      if ((nearSince.current && now - nearSince.current > 8000) || (liveSince.current && now - liveSince.current > 4000)) setManual(true)
       if (all) {
         passSince.current ??= now
         if (now - passSince.current > 600 && countdown === null && !firing.current) setCountdown(1)
@@ -173,17 +183,35 @@ export function QuickCapture() {
             Upload a photo instead
             <input
               type="file"
-              accept=".jpg,.jpeg,image/jpeg,.heic,image/heic"
+              accept=".jpg,.jpeg,image/jpeg,.heic,image/heic,.dng,image/x-adobe-dng,image/dng"
               multiple
               className="sr-only"
               onChange={(e) => {
-                const v = validateFiles(Array.from(e.target.files ?? []), 'uncalibrated', n)
+                const files = Array.from(e.target.files ?? [])
+                e.target.value = ''
+                // A RAW .dng is better than a selfie: send it as a calibrated session instead.
+                const raw = files.filter((f) => /\.dng$/i.test(f.name))
+                if (raw.length && raw.length !== files.length) {
+                  setUploadErrors(['Choose either RAW .dng files or photos (.jpg / .heic), not both.'])
+                  return
+                }
+                const mode: CaptureMode = raw.length ? 'calibrated_raw' : 'uncalibrated'
+                const v = validateFiles(files, mode, n)
+                setUploadMode(mode)
+                setUploadErrors(v.errors)
                 setRows(v.rows)
                 if (v.rows.length) setPhase('upload')
               }}
             />
           </label>
         </div>
+        {uploadErrors.length ? (
+          <ul className="mt-3 space-y-1 text-[13px] text-danger">
+            {uploadErrors.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        ) : null}
         {!faceSite ? null : <p className="mt-6 text-[12px] text-text-3">Laptop camera? Expect lower quality; the checks are looser on desktop.</p>}
       </div>
     )
@@ -215,6 +243,7 @@ export function QuickCapture() {
         <Button
           className="mt-6"
           onClick={() => {
+            setUploadMode('uncalibrated')
             setRows(shots.map((s) => ({ file: s.file, contentType: 'image/jpeg', progress: 0, state: 'ready' as const })))
             setPhase('upload')
           }}
@@ -237,7 +266,8 @@ export function QuickCapture() {
           </div>
         ) : (
           <div className="mt-5">
-            <UploadList site={site} mode="uncalibrated" rows={rows} onRows={setRows} onDone={(sid) => navigate(`/processing/${sid}?site=${site}&n=${rows.length}`)} />
+            {uploadMode === 'calibrated_raw' ? <p className="mb-3 text-[13px] text-text-2">RAW files: sent as a calibrated session.</p> : null}
+            <UploadList site={site} mode={uploadMode} rows={rows} onRows={setRows} onDone={(sid) => navigate(`/processing/${sid}?site=${site}&n=${rows.length}`)} />
           </div>
         )}
       </div>
