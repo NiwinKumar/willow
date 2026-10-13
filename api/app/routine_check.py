@@ -195,8 +195,19 @@ INSTRUCTIONS = """You review a skincare routine for cosmetic compatibility.
 The rule-based findings below are already final; do not repeat or contradict them.
 Add only other well-known cosmetic interactions you are confident about (for example two
 strong actives that destabilise each other), or say nothing. Never flag niacinamide with
-vitamin C. Refer to products only by the ids given. No percentages or other numbers unless
-they appear in the input. Calm, plain, cosmetic language; no medical claims."""
+vitamin C. In "products" lists use the ids given; in any sentence name products by brand and
+name, never by id. No percentages or other numbers unless they appear in the input. Calm,
+plain, cosmetic language; no medical claims."""
+
+ENTRY_ID = re.compile(r"\br_[A-Za-z0-9_]+\b")
+
+
+def _readable(text: str, names: dict[str, str]) -> str | None:
+    """Swap any entry id Gemini wrote into the product's name; None if an unknown id is left."""
+    for entry_id, name in names.items():
+        text = re.sub(rf"\b{re.escape(entry_id)}\b", name, text)
+    return None if ENTRY_ID.search(text) else text
+
 
 MYTH = re.compile(r"niacinamide", re.I)
 
@@ -237,13 +248,20 @@ def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
     except gemini.GeminiError:
         return result
     ids = {e["id"] for e in active}
+    names = {e["id"]: _name(e) for e in active}
     allowed = numbers.in_text(listing)
     for add in extra.conflicts:
-        if _valid(add, ids, allowed, result["conflicts"]):
-            result["conflicts"].append({**add.model_dump(), "source": "model"})
-    for note in extra.notes:
-        if numbers.only_known(note, allowed) and not (
-            MYTH.search(note) and re.search(r"vitamin c|ascorbic", note, re.I)
+        issue, suggestion = _readable(add.issue, names), _readable(add.suggestion, names)
+        if issue and suggestion and _valid(add, ids, allowed, result["conflicts"]):
+            result["conflicts"].append(
+                {**add.model_dump(), "issue": issue, "suggestion": suggestion, "source": "model"}
+            )
+    for raw in extra.notes:
+        note = _readable(raw, names)
+        if (
+            note
+            and numbers.only_known(note, allowed)
+            and not (MYTH.search(note) and re.search(r"vitamin c|ascorbic", note, re.I))
         ):
             result["notes"].append(note)
     return result

@@ -133,3 +133,22 @@ def test_number_validator():
     assert numbers.only_known("Redness moved -0.8 against a band of 0.86 over 21 days", allowed)
     assert not numbers.only_known("Redness improved 12%", allowed)
     assert numbers.only_known("SPF 50", numbers.in_text("Sunscreen SPF 50"))
+
+
+def test_gemini_sentences_name_products_never_ids(monkeypatch):
+    def fake(prompt_id, contents, schema, **kw):
+        return schema(
+            notes=[
+                "Applying sunscreen like r_57cc2366 is meant for daytime.",
+                "Ask about r_unknown before use.",
+            ]
+        )
+
+    monkeypatch.setattr(gemini, "generate_json", fake)
+    entries = [
+        e("r_57cc2366", "Sun Gel SPF 50", category="sunscreen"),
+        e("r_2", "Retinol 0.3%", ["retinol"]),
+    ]
+    notes = routine_check.check(entries)["notes"]
+    assert "Applying sunscreen like B Sun Gel SPF 50 is meant for daytime." in notes
+    assert not any("r_" in n for n in notes)
