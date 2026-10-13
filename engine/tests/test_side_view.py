@@ -79,3 +79,17 @@ def test_skin_colour_keeps_a_dark_mole_at_the_mask_edge():
     ref = np.zeros_like(mask)
     ref[60:200, 60:200] = True
     assert skin_colour(lab, mask, ref, PX_PER_MM)[120, 6]
+
+
+def test_edge_hair_keeps_bumpy_forehead_that_only_touches_the_ear_side():
+    rng = np.random.default_rng(3)
+    lab = _skin()
+    patch = (40.0 + rng.normal(0, 6, (60, 230)), 8.0, 11.0)  # rough, greyer strip
+    for i, v in enumerate(patch):
+        lab[20:80, 0:230, i] = v  # runs across the top, only its end is on the ear side
+    skin = np.ones((240, 240), bool)
+    ref = np.zeros_like(skin)
+    ref[120:220, 80:200] = True
+    ear = np.zeros_like(skin)
+    ear[:, :40] = True
+    assert not edge_hair(lab, skin, ref, PX_PER_MM, ear)[50, 150]
