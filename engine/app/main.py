@@ -3,6 +3,7 @@
 Returns the contract fixture so the api and web can integrate from day 1.
 Replace `analyze` with the real pipeline (see prompts/claude-code-engine.md).
 """
+
 import json
 from pathlib import Path
 
