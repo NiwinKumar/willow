@@ -205,6 +205,13 @@ export function QuickCapture() {
             />
           </label>
         </div>
+        {!faceSite ? (
+          <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
+            <li>Four pen dots mark the corners of a 4 cm square; keep all four in the frame.</li>
+            <li>A sheet of plain white paper beside the arm, in the same light.</li>
+            <li>Hold the phone about 30 cm away, straight above the square.</li>
+          </ul>
+        ) : null}
         {uploadErrors.length ? (
           <ul className="mt-3 space-y-1 text-[13px] text-danger">
             {uploadErrors.map((m) => (

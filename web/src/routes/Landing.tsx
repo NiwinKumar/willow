@@ -7,15 +7,15 @@ import { Button } from '../components/Button'
 import { Chip } from '../components/Chip'
 import { Scrubber } from '../components/Scrubber'
 import { Stage } from '../components/Stage'
-import { enterDemo } from '../data/useData'
+import { enterDemo, leaveDemo } from '../data/useData'
 import { useAuth } from '../lib/useAuth'
 import { fmtSigned, fmtValue } from '../lib/metrics'
 import { DEMO_SERIES } from '../mock/series'
 
 const entries = [
-  { title: 'Explore a real journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1' },
-  { title: 'Try with sample photos', sub: 'Run the live pipeline on our RAW samples.', eta: '~30 s', to: '/capture?demo=1&sample=1' },
-  { title: 'Try your own selfie', sub: 'Phone or laptop camera. Uncalibrated, trend only.', eta: '~1 min', to: '/capture?mode=quick' },
+  { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', demo: true },
+  { title: 'See a session run', sub: 'The capture-to-report flow on sample data.', eta: '~30 s', to: '/capture?demo=1&sample=1', demo: true },
+  { title: 'Measure your own forearm', sub: 'Phone camera or a RAW photo. Your own baseline, really measured.', eta: '~2 min', to: '/capture?site=forearm_control&mode=quick', demo: false },
 ]
 
 export function Landing() {
@@ -33,8 +33,10 @@ export function Landing() {
   const ctrlBase = control.sessions[0].result!.metrics.find((m) => m.id === 'tone_ita')!
   const reach = useMemo(() => Math.max(...series.sessions.map((s) => Math.abs(s.result!.metrics[0].delta ?? 0))), [series])
 
-  const go = (to: string) => {
-    enterDemo()
+  const go = (to: string, demo: boolean) => {
+    // Your own photos always run live; only the sample entries switch the app to demo mode.
+    if (demo) enterDemo()
+    else leaveDemo()
     navigate(to)
   }
 
@@ -82,7 +84,7 @@ export function Landing() {
           </p>
           <div className="mt-6 flex flex-col gap-3">
             {entries.map((e) => (
-              <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to)}>
+              <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to, e.demo)}>
                 <span className="flex w-full items-center justify-between">
                   <span className="font-semibold">{e.title}</span>
                   <span className="font-mono text-[13px] text-text-3">{e.eta}</span>

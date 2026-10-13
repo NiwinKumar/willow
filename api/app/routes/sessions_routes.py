@@ -177,6 +177,11 @@ def analyze_session(
         raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}) from exc
 
     measured = not engine.is_placeholder(result)
+    explanation, source = (None, None)
+    if measured:
+        explanation, source = explain.generate(
+            result, _explain_context(store, uid, doc, current, session_id)
+        )
     store.session_update(
         uid,
         session_id,
@@ -185,8 +190,9 @@ def analyze_session(
             "measured": measured,
             # Placeholder numbers are kept for debugging only; views never return them.
             "result_json": json.dumps(result),
-            "explanation": explain.template(result) if measured else None,
-            "explanation_source": "template" if measured else None,
+            "explanation": explanation,
+            "explanation_source": source,
+            "compared_with": baselines.compared_with(current) if baseline_map else None,
             "labels": {},
             "analyzed_at": datetime.now(UTC),
         },
@@ -196,6 +202,31 @@ def analyze_session(
         baselines.set_baseline(store, uid, session_id, doc)
         doc = _load(store, uid, session_id)
     return _detail_view(store, uid, session_id, doc)
+
+
+def _explain_context(
+    store: Store, uid: str, doc: dict, baseline: dict | None, session_id: str
+) -> dict[str, Any]:
+    """What the explanation may refer to besides the metrics (all numbers here are quotable)."""
+    is_baseline = baseline is None or baseline["session_id"] == session_id
+    days = None
+    created, base_created = doc.get("created_at"), (baseline or {}).get("session_created_at")
+    if not is_baseline and isinstance(created, datetime) and isinstance(base_created, datetime):
+        days = (created - base_created).days
+    routine = [
+        {
+            "product": f"{e.get('brand', '')} {e.get('custom_name', '')}".strip(),
+            "started_at": e.get("started_at"),
+            "ended_at": e.get("ended_at"),
+        }
+        for _, e in store.routine_list(uid)
+    ]
+    return {
+        "is_baseline": is_baseline,
+        "baseline_has_noise_band": None if is_baseline else baseline.get("has_noise_band", True),
+        "days_since_baseline": days,
+        "routine": routine[:12],
+    }
 
 
 def _detail_view(store: Store, uid: str, session_id: str, doc: dict) -> dict[str, Any]:
