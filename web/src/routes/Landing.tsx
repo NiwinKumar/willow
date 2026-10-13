@@ -87,14 +87,14 @@ export function Landing() {
               <span className="block text-[15px] font-semibold">Judging Willow? Take the guided tour</span>
               <span className="block text-[13px] opacity-80">Five stops, every one live. No sign-in.</span>
             </span>
-            <span className="font-mono text-[13px] opacity-80">~4 min</span>
+            <span className="shrink-0 whitespace-nowrap font-mono text-[13px] opacity-80">~4 min</span>
           </Link>
           <div className="mt-3 flex flex-col gap-3">
             {entries.map((e) => (
               <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to, e.demo)}>
                 <span className="flex w-full items-center justify-between">
                   <span className="font-semibold">{e.title}</span>
-                  <span className="font-mono text-[13px] text-text-3">{e.eta}</span>
+                  <span className="shrink-0 whitespace-nowrap font-mono text-[13px] text-text-3">{e.eta}</span>
                 </span>
                 <span className="text-[13px] font-normal text-text-2">{e.sub}</span>
               </Button>

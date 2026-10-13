@@ -8,6 +8,7 @@ copies the frames server-side into the person's own session; from there it is an
 """
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -18,10 +19,11 @@ from app.models import CONTENT_TYPES, CaptureMode, Site
 from app.settings import get_settings
 from app.store import Store
 
+log = logging.getLogger("willow.demo")
+
 SAMPLES_PREFIX = "demo/samples/"
 MANIFEST = f"{SAMPLES_PREFIX}manifest.json"
 CACHE_SECONDS = 300
-DAILY_SAMPLE_RUNS = 12
 
 EXT_CONTENT_TYPE = {"dng": "image/x-adobe-dng", "jpg": "image/jpeg", "jpeg": "image/jpeg"}
 
@@ -137,11 +139,8 @@ def status() -> dict[str, Any]:
                 "latency_ms": round((time.monotonic() - started) * 1000),
             }
         except Exception as exc:  # cold start timeout, IAM, network
-            out["engine"] = {
-                "status": "unreachable",
-                "mode": settings.engine_mode,
-                "error": str(exc)[:120],
-            }
+            log.warning("status: engine check failed: %s", exc)
+            out["engine"] = {"status": "unreachable", "mode": settings.engine_mode}
         try:
             from app import retailer
 
@@ -154,7 +153,8 @@ def status() -> dict[str, Any]:
                 "synthetic": c["synthetic"],
             }
         except Exception as exc:
-            out["bigquery"] = {"status": "unavailable", "error": str(exc)[:120]}
+            log.warning("status: bigquery check failed: %s", exc)
+            out["bigquery"] = {"status": "unavailable"}
         out["checked_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         return out
 

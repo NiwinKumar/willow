@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from app import advisor, catalog, gemini, label_scan, routine_check
+from app import advisor, catalog, gemini, label_scan, limits, routine_check
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store, iso
 
@@ -48,9 +48,12 @@ def catalog_product(product_id: str, user: AuthUser = Depends(current_user)) -> 
 
 @router.post("/label-scan", response_model=label_scan.LabelScanResponse)
 def post_label_scan(
-    body: label_scan.LabelScanRequest, user: AuthUser = Depends(current_user)
+    body: label_scan.LabelScanRequest,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
 ) -> label_scan.LabelScanResponse:
     """Read a product label. Nothing is saved: the person confirms, then POSTs /v1/routine."""
+    limits.take(store, user.uid, "label_scan")
     try:
         return label_scan.scan(body.images)
     except gemini.GeminiError as exc:
@@ -105,7 +108,9 @@ def routine_add(
     return _entry_view(entry_id, doc)
 
 
-def add_routine_entry(store: Store, uid: str, body: RoutineEntryIn) -> tuple[str, dict[str, Any]]:
+def add_routine_entry(
+    store: Store, uid: str, body: RoutineEntryIn, entry_id: str | None = None
+) -> tuple[str, dict[str, Any]]:
     doc = body.model_dump(mode="json")
     if body.product_id:
         product = catalog.by_id(body.product_id)
@@ -125,7 +130,7 @@ def add_routine_entry(store: Store, uid: str, body: RoutineEntryIn) -> tuple[str
     doc["started_at"] = doc["started_at"] or datetime.now(UTC).date().isoformat()
     doc["ended_at"] = None
     doc["created_at"] = datetime.now(UTC)
-    entry_id = f"r_{secrets.token_hex(4)}"
+    entry_id = entry_id or f"r_{secrets.token_hex(4)}"
     store.routine_set(uid, entry_id, doc)
     return entry_id, doc
 
@@ -183,11 +188,7 @@ def advisor_chat(
 ) -> dict[str, Any]:
     if body.messages[-1].role != "user":
         raise HTTPException(422, {"code": "bad_request", "message": "last message must be yours"})
-    used = store.usage_incr(user.uid, datetime.now(UTC).date().isoformat(), "advisor")
-    if used > advisor.DAILY_LIMIT:
-        raise HTTPException(
-            429, {"code": "daily_limit", "message": "That is 20 questions for today."}
-        )
+    used = limits.take(store, user.uid, "advisor")
     try:
         reply = advisor.chat([m.model_dump() for m in body.messages], store, user.uid)
     except Exception as exc:  # Vertex unavailable, quota, safety block

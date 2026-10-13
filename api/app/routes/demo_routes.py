@@ -2,12 +2,11 @@
 journey and live status. Sample runs and the routine need a sign-in (a guest is enough) so every
 judge works in an account of their own; the journey and status are public."""
 
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app import demo
+from app import demo, limits
 from app.auth import AuthUser, current_user
 from app.routes.products_routes import RoutineEntryIn, add_routine_entry
 from app.routes.sessions_routes import list_views
@@ -37,11 +36,7 @@ def start_sample(
     s = demo.sample(sample_id)
     if s is None:
         raise HTTPException(404, {"code": "not_found", "message": "sample not found"})
-    used = store.usage_incr(user.uid, datetime.now(UTC).date().isoformat(), "sample_runs")
-    if used > demo.DAILY_SAMPLE_RUNS:
-        raise HTTPException(
-            429, {"code": "daily_limit", "message": "That is enough sample runs for today."}
-        )
+    limits.take(store, user.uid, "sample_runs")
     session_id = demo.create_sample_session(store, user.uid, s)
     return {"session_id": session_id, "site": s.site, "n_frames": len(s.frames)}
 
@@ -50,13 +45,16 @@ def start_sample(
 def judge_setup(
     user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
-    """Give a judge's fresh account a small routine so the routine check and the advisor have
-    something real to work with. Does nothing if the person already has a routine."""
+    """Give a judge's fresh guest account a small routine so the routine check and the advisor
+    have something real to work with. Guest accounts only, and only when the routine is empty;
+    fixed entry ids, so two tabs at once cannot add it twice."""
+    if not user.is_anonymous and get_settings().auth_mode != "dev":
+        return {"routine_added": 0}
     added = 0
     if not store.routine_list(user.uid):
-        for product, slots in demo.judge_routine_entries():
+        for i, (product, slots) in enumerate(demo.judge_routine_entries(), start=1):
             body = RoutineEntryIn(product_id=product["product_id"], slots=slots, source="catalog")
-            add_routine_entry(store, user.uid, body)
+            add_routine_entry(store, user.uid, body, entry_id=f"r_judge{i}")
             added += 1
     store.user_merge(user.uid, {"judge": True})
     return {"routine_added": added}

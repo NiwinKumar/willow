@@ -54,11 +54,14 @@ def only_known(text: str, allowed: set[str]) -> bool:
 
 
 def percents(obj: Any) -> set[str]:
-    """Fractions in the aggregates written as whole (or one-decimal) percents."""
+    """Shares in the aggregates written as whole (or one-decimal) percents.
+
+    Only 0..1: the validator compares magnitudes, so a negative difference such as a lift of
+    -0.08 must not let "8 points above" through."""
     out: set[str] = set()
     if isinstance(obj, bool) or obj is None:
         return out
-    if isinstance(obj, float) and -1 <= obj <= 1:
+    if isinstance(obj, float) and 0 <= obj <= 1:
         out |= collect(round(obj * 100)) | collect(round(obj * 100, 1))
     elif isinstance(obj, dict):
         for v in obj.values():
