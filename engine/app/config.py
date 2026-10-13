@@ -3,7 +3,10 @@
 ENGINE_VERSION = "0.1.0"
 
 # Quality gates (docs/CONTRACT.md 2.3)
-SHARPNESS_MIN = 100.0  # variance of Laplacian on the skin ROI (0-255 grey scale)
+# Variance of Laplacian on the skin ROI (0-255 grey). Contract default was 100, but smooth
+# forearm skin in sharp 12 MP iPhone DNGs scores 38-54 and a 1 px blur drops it to ~4
+# (measured Oct 13 on 6 photos), so 15 separates sharp from blurry.
+SHARPNESS_MIN = 15.0
 CLIPPED_PCT_MAX = 2.0  # % of skin-ROI pixels at pure white
 DARK_PCT_MAX = 2.0  # % of skin-ROI pixels at pure black
 CLIP_LEVEL = 0.999  # linear value counted as clipped
