@@ -265,6 +265,22 @@ def _local_mean(values: np.ndarray, mask: np.ndarray, sigma: float) -> np.ndarra
     return total / np.maximum(weight, 1e-6)
 
 
+def facial_hair(l_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """Moustache, beard and stubble: many hair-thin pixels much darker than the skin
+    right next to them (within ~1 mm). Hair is stripy; a shadow is smooth, and a dark spot
+    is one small patch, so neither reaches the density."""
+    fine = cv2.GaussianBlur(
+        l_star.astype(np.float32), (0, 0), config.FACIAL_HAIR_FINE_MM * px_per_mm
+    )
+    strands = skin & (l_star < fine - config.FACIAL_HAIR_DELTA_L)
+    window = round(config.FACIAL_HAIR_WINDOW_MM * px_per_mm) | 1
+    density = cv2.blur(strands.astype(np.float32), (window, window))
+    beard = (density > config.FACIAL_HAIR_DENSITY).astype(np.uint8)
+    r = max(round(config.HAIR_MARGIN_MM * px_per_mm), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    return cv2.dilate(beard, kernel).astype(bool)
+
+
 def refine_skin(
     l_star: np.ndarray, mask: np.ndarray, zones: dict[str, np.ndarray], px_per_mm: float
 ) -> np.ndarray:
@@ -288,6 +304,7 @@ def refine_skin(
     nostril = cv2.morphologyEx(nostril.astype(np.uint8), cv2.MORPH_CLOSE, disk(1.0))
     cut = cv2.dilate((brow | nostril.astype(bool)).astype(np.uint8), disk(config.FEATURE_EDGE_MM))
     skin = remove_hair(l_star, mask & ~cut.astype(bool), px_per_mm)
+    skin &= ~facial_hair(l_star, skin, px_per_mm)
 
     # smooth: fill pin-holes, shave ragged spurs, keep the one face region
     smooth = cv2.morphologyEx(skin.astype(np.uint8), cv2.MORPH_CLOSE, disk(0.7))

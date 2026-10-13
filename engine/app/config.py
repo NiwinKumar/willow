@@ -56,7 +56,13 @@ HAIR_DELTA_L_GLOBAL = 25.0  # or this much darker than the face median (big hair
 HAIR_MARGIN_MM = 1.0
 HAIR_BACKGROUND_MM = 4.0  # "nearby skin" for hair darkness (Gaussian sigma)
 HAIR_MAX_WIDTH_MM = 1.0  # ...and no thicker than this (an under-eye shadow is long but wide)
-HAIR_MIN_LENGTH_MM = 3.0  # thin dark shapes longer than this are hair strands, not marks  # also drop skin within 1 mm of detected hair (fine strands)
+HAIR_MIN_LENGTH_MM = 3.0
+# Facial hair: share of "strand" pixels (much darker than the skin within ~1 mm) in a
+# 4 mm window. Hair is stripy; shadows are smooth and spots are single small patches.
+FACIAL_HAIR_FINE_MM = 0.5
+FACIAL_HAIR_DELTA_L = 6.0
+FACIAL_HAIR_WINDOW_MM = 4.0
+FACIAL_HAIR_DENSITY = 0.12  # thin dark shapes longer than this are hair strands, not marks  # also drop skin within 1 mm of detected hair (fine strands)
 FOREHEAD_BAND = (0.25, 0.70)  # fraction of the way from hairline to brows: top, bottom
 FOREHEAD_WIDTH = 0.70  # keep the central 70% of the forehead width (temples carry hair)
 MAX_ABS_YAW = 8.0

@@ -86,9 +86,9 @@ def find_blemishes(lab: np.ndarray, skin: np.ndarray, px_per_mm: float) -> list[
             continue
         found.append(
             Blemish(
-                x=x * back,
-                y=y * back,
-                radius=r * back,
+                x=float(x * back),  # plain floats: numpy float32 is not JSON-serialisable
+                y=float(y * back),
+                radius=float(r * back),
                 score=score,
                 a_star_contrast=float((lab[..., 1] - a_bg)[disk].mean()),
                 l_star_contrast=float((lab[..., 0] - l_bg)[disk].mean()),
