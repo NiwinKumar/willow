@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Button } from '../components/Button'
+import { FirstSessionGuide } from '../components/BaselineGuide'
 import { UploadList } from '../components/UploadList'
+import { useData } from '../data/useData'
+import { baselineState, photoSteps } from '../lib/baselineGuide'
 import type { CaptureMode, Site } from '../data/types'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { validateFiles, type Row } from '../lib/upload'
@@ -24,8 +27,12 @@ export function QuickCapture() {
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const { user, continueAsGuest } = useAuth()
+  const data = useData()
   const site = (params.get('site') as Site) ?? 'face_full'
-  const n = Math.min(5, Math.max(1, Number(params.get('n') ?? '3')))
+  const firstSession = baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
+  // Fixed for the whole session, even if the session list refreshes while the camera is open.
+  const [n] = useState(() => Math.min(5, Math.max(1, Number(params.get('n') ?? (firstSession ? '5' : '3')))))
+  const steps = photoSteps(site, 'uncalibrated')
   const faceSite = site === 'face_full' || site === 'cheek_macro' || site === 'nose_macro'
   const [phase, setPhase] = useState<Phase>('ask')
   const [gates, setGates] = useState<Gates>({ light: false, even: false, still: false })
@@ -43,6 +50,8 @@ export function QuickCapture() {
   const nearSince = useRef<number | null>(null)
   const firing = useRef(false)
   const liveSince = useRef<number | null>(null)
+  // Each photo needs its own setup: after a shot, auto-capture waits until the camera has moved.
+  const movedSinceShot = useRef(true)
 
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop())
@@ -101,6 +110,7 @@ export function QuickCapture() {
       prev.current = new Uint8ClampedArray(d)
       const g: Gates = { light: mean > 0.32 && mean < 0.75 && clipped / N < 0.02, even: ratio > 0.8 && ratio < 1.25, still: motion < 6 }
       setGates(g)
+      if (!g.still) movedSinceShot.current = true
       if (!g.light) setHint(mean <= 0.32 ? 'Find brighter light' : 'Too bright. Turn away from the lamp')
       else if (!g.even) setHint('Face the window or lamp so both sides are lit evenly')
       else if (!g.still) setHint('Hold still')
@@ -114,7 +124,7 @@ export function QuickCapture() {
       if ((nearSince.current && now - nearSince.current > 8000) || (liveSince.current && now - liveSince.current > 4000)) setManual(true)
       if (all) {
         passSince.current ??= now
-        if (now - passSince.current > 600 && countdown === null && !firing.current) setCountdown(1)
+        if (now - passSince.current > 600 && countdown === null && !firing.current && movedSinceShot.current) setCountdown(1)
       } else {
         passSince.current = null
         if (countdown !== null && !firing.current) setCountdown(null)
@@ -143,10 +153,11 @@ export function QuickCapture() {
     }
     setCountdown(null)
     passSince.current = null
+    movedSinceShot.current = false
     window.setTimeout(() => {
       firing.current = false
     }, 900)
-  }, [shots.length, n, stop])
+  }, [shots.length, n, stop, setShots, setPhase])
 
   useEffect(() => {
     if (countdown === null) return
@@ -168,7 +179,7 @@ export function QuickCapture() {
         <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? 'Willow needs your camera for this selfie' : 'Camera is blocked'}</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-2">
           {phase === 'ask'
-            ? `Photos stay in your private space and are deleted after 30 days. ${n} photos, uncalibrated, so the result is a trend, not a measurement.`
+            ? `Photos stay in your private space and are deleted after 30 days. ${n} photos, uncalibrated, so the result is a trend, not a measurement.${firstSession ? '' : ` Between photos: ${steps.between.charAt(0).toLowerCase() + steps.between.slice(1)}`}`
             : 'Allow it in the browser: on iPhone, tap “aA” in the address bar, Website Settings, Camera, Allow. Or upload a photo instead.'}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -209,8 +220,12 @@ export function QuickCapture() {
           <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
             <li>Four pen dots mark the corners of a 4 cm square; keep all four in the frame.</li>
             <li>A sheet of plain white paper beside the arm, in the same light.</li>
-            <li>Hold the phone about 30 cm away, straight above the square.</li>
           </ul>
+        ) : null}
+        {phase === 'ask' && firstSession && data.mode === 'live' ? (
+          <div className="mt-5">
+            <FirstSessionGuide site={site} mode="uncalibrated" n={n} />
+          </div>
         ) : null}
         {uploadErrors.length ? (
           <ul className="mt-3 space-y-1 text-[13px] text-danger">
@@ -329,7 +344,7 @@ export function QuickCapture() {
         >
           <span className={`h-12 w-12 rounded-full ${allPass ? 'bg-willow-500' : 'bg-text'}`} />
         </button>
-        <span className="w-32 text-[13px] text-text-2">{shots.length > 0 ? 'Lower the phone, then raise it again.' : allPass ? 'Auto in 1 s' : manual ? 'Take it when ready' : 'Shutter enables when the ring is green'}</span>
+        <span className="w-44 text-[13px] leading-snug text-text-2">{shots.length > 0 ? steps.between : allPass ? 'Auto in 1 s' : manual ? 'Take it when ready' : 'Shutter enables when the ring is green'}</span>
       </div>
     </div>
   )
