@@ -299,16 +299,22 @@ class Face:
         return guard | self._shape(shape, LEFT_BROW, config.BROW_GUARD_MM)
 
     def border_band(
-        self, skin: np.ndarray, origin: tuple[int, int] = (0, 0), hairline_mm: float | None = None
+        self,
+        skin: np.ndarray,
+        origin: tuple[int, int] = (0, 0),
+        hairline_mm: float | None = None,
+        features: np.ndarray | None = None,
     ) -> np.ndarray:
         """Band inside the OUTER edge of a skin mask (whose top-left pixel is `origin` in
         the photo): `hairline_mm` (default HAIRLINE_GUARD_MM) above the eyes, where baby
         hairs too fine for the colour trim remain, and JAW_GUARD_MM below (jaw shadow, neck,
         background). Measured from where the skin really ends, not from the outline lifted
-        into the hair."""
+        into the hair. `features` (eyes, lips, nostrils cut from the skin) count as inside the
+        face, so a cut-out that reaches the outline is not mistaken for the face edge."""
         if hairline_mm is None:
             hairline_mm = config.HAIRLINE_GUARD_MM
-        outer = binary_fill_holes(skin).astype(np.uint8)
+        filled = skin if features is None else skin | features
+        outer = binary_fill_holes(filled).astype(np.uint8)
         inside = cv2.distanceTransform(outer, cv2.DIST_L2, 5) / self.px_per_mm  # mm
         up = self.points[10] - self.points[152]
         up = up / np.linalg.norm(up)
@@ -316,7 +322,7 @@ class Face:
         yy, xx = np.mgrid[: skin.shape[0], : skin.shape[1]].astype(np.float32)
         above_eyes = (xx - cx) * up[0] + (yy - cy) * up[1] > 0
         band_mm = np.where(above_eyes, hairline_mm, config.JAW_GUARD_MM)
-        return outer.astype(bool) & (inside < band_mm)
+        return outer.astype(bool) & (inside < band_mm) & skin
 
     def feature_zones(self, shape: tuple[int, int]) -> dict[str, np.ndarray]:
         """Where brows and nostrils can be; refine_skin removes only their dark pixels."""
@@ -433,7 +439,10 @@ def skin_colour(lab: np.ndarray, mask: np.ndarray, ref: np.ndarray, px_per_mm: f
     L, a, b = lab[..., 0], lab[..., 1], lab[..., 2]
     chroma = np.hypot(a, b)
     hue = np.degrees(np.arctan2(b, a))
-    l_ref = float(np.median(L[ref]))
+    # darkness limit from all of this skin, not the cheek patch alone: on a shiny photo
+    # the cheek patch sits on the highlight and shaded skin (under the mouth) read as hair.
+    # The shine limit keeps the brighter of the two, so lit skin is not cut as shine.
+    l_all, l_cheek = float(np.median(L[mask])), float(np.median(L[ref]))
     c_ref = float(np.median(chroma[ref]))
     h_ref = float(np.median(hue[ref]))
     d_hue = np.abs((hue - h_ref + 180) % 360 - 180)
@@ -441,12 +450,12 @@ def skin_colour(lab: np.ndarray, mask: np.ndarray, ref: np.ndarray, px_per_mm: f
         mask
         & (chroma >= config.SIDE_MIN_CHROMA_FRAC * c_ref)
         & (d_hue <= config.SIDE_MAX_HUE_DEG)
-        & (L <= l_ref + config.SIDE_MAX_BRIGHTER_L)
-        & (L >= l_ref - config.SIDE_MAX_DARKER_L)
+        & (L <= max(l_all, l_cheek) + config.SIDE_MAX_BRIGHTER_L)
+        & (L >= min(l_all, l_cheek) - config.SIDE_MAX_DARKER_L)
     )
     # small round dark blobs are marks or moles, not hair (hair is thin or large), even
     # where they touch the mask edge
-    dark = mask & ~keep & (L < l_ref)
+    dark = mask & ~keep & (L < min(l_all, l_cheek))
     n, labels, stats, _ = cv2.connectedComponentsWithStats(dark.astype(np.uint8), connectivity=8)
     max_area = config.SIDE_FILL_HOLES_MM2 * px_per_mm**2
     for k in range(1, n):
