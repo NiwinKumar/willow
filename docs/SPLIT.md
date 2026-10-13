@@ -35,7 +35,7 @@ Rule of thumb: **Harshini owns everything that touches pixels. Niwin owns everyt
 - [ ] Consent note agreed by anyone photographed
 
 ### Niwin (before starting Claude Code)
-- [ ] GCP project created, $300 trial billing attached, budget alerts $1/$5/$20
+- [x] GCP project `willow-511508` created, free-trial billing attached (credit valid to Jan 12, 2027), budget ₹2,000/month with alerts at 5/25/100% excluding credits
 - [ ] Firebase project on the same GCP project, Blaze plan
 - [ ] APIs enabled (see `infra/setup.sh`)
 - [ ] Harshini added as Editor (or Cloud Run Developer + Storage Admin + Artifact Registry Writer)
