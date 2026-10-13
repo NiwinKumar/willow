@@ -129,6 +129,12 @@ export function Routine() {
     return () => clearTimeout(t)
   }, [live, user, add, query, getIdToken, searchRetry])
   const [slots, setSlots] = useState<('am' | 'pm')[]>(['pm'])
+  // A new product starts in the slot it belongs to: sunscreen in the morning, cleansers and
+  // moisturizers both, treatments at night. The person can change it before saving.
+  const pickDraft = (d: Draft) => {
+    setDraft(d)
+    setSlots(d.category === 'sunscreen' ? ['am'] : d.category === 'cleanser' || d.category === 'moisturizer' ? ['am', 'pm'] : ['pm'])
+  }
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 10))
   const [dismissed, setDismissed] = useState<string[]>([])
   const sessions = data.series('face_full')?.sessions ?? []
@@ -145,7 +151,7 @@ export function Routine() {
 
   async function readLabel(file: File) {
     if (!live) {
-      setDraft(fromProduct(productById('la-roche-posay-cicaplast-baume-b5-plus') ?? CATALOG[0], 'label_scan'))
+      pickDraft(fromProduct(productById('la-roche-posay-cicaplast-baume-b5-plus') ?? CATALOG[0], 'label_scan'))
       setAdd('confirm')
       toast('Demo: label reading is simulated with a catalog product.')
       return
@@ -156,9 +162,9 @@ export function Routine() {
       const res = await api.labelScan(token, [await toJpegBase64(file)])
       if (res.match) {
         const product = await api.catalogProduct(token, res.match.product_id)
-        setDraft(fromProduct(product, 'label_scan'))
+        pickDraft(fromProduct(product, 'label_scan'))
       } else {
-        setDraft({
+        pickDraft({
           product_id: null,
           brand: res.scan.brand ?? '',
           name: res.scan.product_name ?? '',
@@ -316,7 +322,7 @@ export function Routine() {
           {(check?.duplicates ?? []).map((d) => (
             <li key={d.active} className="rounded-(--radius-tile) border border-border bg-surface p-4">
               <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-text-2"><Copy size={18} aria-hidden /> Same active twice</span>
-              <p className="mt-2 text-[15px] text-text-2">{d.active} appears in {d.products.length} products. {d.note}</p>
+              <p className="mt-2 text-[15px] text-text-2">{d.active.charAt(0).toUpperCase() + d.active.slice(1)} appears in {d.products.length} products. {d.note}</p>
             </li>
           ))}
           {(check?.gaps ?? []).map((g) => (
@@ -380,7 +386,7 @@ export function Routine() {
             <ul className="mt-3 max-h-[50dvh] divide-y divide-border overflow-y-auto">
               {results.map((p) => (
                 <li key={p.product_id}>
-                  <button type="button" onClick={() => { setDraft(fromProduct(p)); setAdd('confirm') }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
+                  <button type="button" onClick={() => { pickDraft(fromProduct(p)); setAdd('confirm') }} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left">
                     <ProductImage product={p} size={44} />
                     <span className="min-w-0 flex-1"><span className="block text-[15px] font-medium">{p.brand} {p.name}</span><span className="block text-[12px] text-text-2">For {p.concerns.map((c) => CONCERN_LABEL[c]).join(', ')}</span></span>
                     <span className="font-mono text-[13px] text-text-2">{fmtPrice(p.price)}</span>
