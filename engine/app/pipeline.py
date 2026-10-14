@@ -29,9 +29,14 @@ METRIC_INFO = {  # id -> (group, label, unit)
 def _mean_extras(per_frame: list[dict]) -> dict:
     """Average numeric extras over the good frames (text extras are recomputed by the caller)."""
     out = {}
-    for key, first in per_frame[0].items():
-        if isinstance(first, (int, float)):
-            out[key] = round(sum(e[key] for e in per_frame) / len(per_frame), 2)
+    keys = dict.fromkeys(k for e in per_frame for k in e)  # every key, first-seen order
+    for key in keys:
+        vals = [e.get(key) for e in per_frame]
+        nums = [v for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        if nums:  # photos without a value for this key (None) are left out of the mean
+            out[key] = round(sum(nums) / len(nums), 2)
+        elif any(isinstance(v, list) for v in vals):  # e.g. regions skipped: union
+            out[key] = sorted({x for v in vals if isinstance(v, list) for x in v})
     return out
 
 
