@@ -49,7 +49,7 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
  * Sites the deployed engine measures today. Other sites are saved and marked "not measured yet"
  * (the api never shows the engine's placeholder numbers). Update when the engine adds a site.
  */
-export const MEASURED_SITES: Site[] = ['forearm_treated', 'forearm_control']
+export const MEASURED_SITES: Site[] = ['face_full', 'forearm_treated', 'forearm_control']
 
 export const SITE_LABEL: Record<Site, string> = {
   face_full: 'Face',
