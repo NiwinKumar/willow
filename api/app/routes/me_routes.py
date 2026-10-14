@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from app import baselines, storage
+from app import baselines, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
@@ -52,6 +52,70 @@ def timeline(
         },
         "metrics": series,
     }
+
+
+@router.get("/spots")
+def spots(
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Spot diary (face): each mark followed across sessions, oldest first. Sessions are the
+    diary's columns; each track lists its sightings with a signed crop. docs/METRICS.md."""
+    rows = [
+        (sid, d)
+        for sid, d in store.sessions_list(user.uid)
+        if d["site"] == "face_full" and d.get("status") == "done"
+    ]
+    rows.sort(key=lambda r: r[1].get("created_at") or datetime.min.replace(tzinfo=UTC))
+    used, docs, not_mapped = [], {}, 0
+    for sid, d in rows:
+        result = measured_result(d)
+        if not tracks.usable(result):
+            # passed but measured before the face map existed: re-measuring fills it in
+            if result and result.get("quality", {}).get("passed") and tracks.is_front(result):
+                not_mapped += 1
+            continue
+        docs[sid] = d
+        used.append(
+            {
+                "id": sid,
+                "created_at": d["created_at"],
+                "marks": tracks.observations(result, d.get("labels") or {}),
+            }
+        )
+    diary = tracks.follow(used)
+    existing = storage.list_names(views.results_prefix(user.uid)) if used else set()
+    photos = {s["id"]: views.photo_name(user.uid, s["id"], docs[s["id"]], existing) for s in used}
+    crops = [
+        name
+        for t in diary["tracks"]
+        for o in t["observations"]
+        for k in ("crop_uri", "context_crop_uri")
+        if (name := storage.name_from_uri(o.get(k) or "")) and name in existing
+    ]
+    signed = views.sign_all([p for p in photos.values() if p] + crops)
+
+    def url(uri: str | None) -> str | None:
+        name = storage.name_from_uri(uri or "")
+        return signed.get(name) if name else None
+
+    for t in diary["tracks"]:
+        for o in t["observations"]:
+            o["crop_url"] = url(o.pop("crop_uri"))
+            o["context_crop_url"] = url(o.pop("context_crop_uri"))
+    t0 = used[0]["created_at"] if used else None
+    diary["sessions"] = [
+        {
+            "id": s["id"],
+            "created_at": iso(s["created_at"]),
+            "day": tracks.days(s["created_at"], t0),
+            "photo_url": signed.get(photos[s["id"]] or ""),
+            "marks": len(s["marks"]),
+        }
+        for s in used
+    ]
+    diary["sessions_not_mapped"] = not_mapped
+    return diary
 
 
 @router.post("/baselines/{site}")
