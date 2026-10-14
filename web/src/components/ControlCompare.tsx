@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import type { Session } from '../data/types'
 import { UNIT_LABEL, fmtSigned, fmtValue } from '../lib/metrics'
 import { BandBar } from './BandBar'
@@ -9,7 +11,21 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
   const c = control?.result?.metrics.find((m) => m.id === metricId)
   const tb = treatedBaseline?.result?.metrics.find((m) => m.id === metricId)
   const cb = controlBaseline?.result?.metrics.find((m) => m.id === metricId)
-  if (!t || !c || !tb || !cb || t.delta === null || c.delta === null) return null
+  if (!t || !tb || t.delta === null) return null
+  if (!c || !cb || c.delta === null)
+    // Without an untreated photo taken around the same time the product cannot be told apart
+    // from light or time of day: say how to get the comparison.
+    return (
+      <div className="rounded-(--radius-tile) border border-border bg-surface p-4 text-[15px]">
+        <span className="font-semibold">Treated vs control</span>
+        <p className="mt-1 text-text-2">
+          {controlBaseline ? 'Photograph the untreated square within 3 hours of this one' : 'Set a baseline for the untreated square'} to see whether this change is the product or the light.
+        </p>
+        <Link to="/capture?site=forearm_control" className="mt-2 inline-flex min-h-11 items-center font-medium text-willow-700 underline-offset-2 hover:underline">
+          Photograph the untreated square
+        </Link>
+      </div>
+    )
   const noBand = tb.mdc95 === null || cb.mdc95 === null
   const dd = t.delta - c.delta
   // The difference of two readings carries both arms' photo noise (independent errors add in quadrature).
@@ -52,7 +68,7 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
     <div className="rounded-(--radius-tile) border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[15px] font-semibold">Treated vs control</span>
-        {kind === 'no_band' ? <VerdictChip verdict="no_baseline" noBand /> : kind === 'not_attributable' ? <Chip tone="warn">not attributable</Chip> : <VerdictChip verdict={kind === 'treated' || kind === 'both_more' ? 'real_change' : 'within_noise'} />}
+        {kind === 'no_band' ? <VerdictChip verdict="no_baseline" noBand /> : kind === 'not_attributable' ? <Chip tone="warn">not attributable</Chip> : kind === 'treated_small_gap' ? <Chip tone="neutral">not separable yet</Chip> : <VerdictChip verdict={kind === 'treated' || kind === 'both_more' ? 'real_change' : 'within_noise'} />}
       </div>
       <p className="mt-1 text-[17px] font-semibold leading-tight">{headline}</p>
       <p className="mt-2 text-[15px] leading-relaxed text-text-2">{body}</p>

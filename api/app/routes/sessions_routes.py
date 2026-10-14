@@ -163,6 +163,9 @@ def analyze_session(
         # Anything else (token minting, Firestore, a malformed engine answer): never leave the
         # session "processing" for minutes; mark it failed so "Try again" works at once.
         log.exception("analysis crashed for %s/%s", uid, session_id)
+        current = store.session_get(uid, session_id) or {}
+        if current.get("status") == "done":  # finished before the error: show the result
+            return _detail_view(store, uid, session_id, current)
         limits.refund(store, uid, "analyze")
         try:
             store.session_update(
