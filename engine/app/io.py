@@ -3,6 +3,9 @@
 import os
 from pathlib import Path
 
+import numpy as np
+
+from app import config
 from app.errors import EngineError
 
 SUPPORTED = {".dng", ".jpg", ".jpeg", ".heic", ".heif"}
@@ -53,6 +56,22 @@ def fetch_frames(uris: list[str], workdir: Path) -> list[str]:
             raise EngineError("internal", f"{uri}: {kind}: {exc}") from exc
         paths.append(str(dest))
     return paths
+
+
+def save_preview(srgb8: np.ndarray, output_prefix: str) -> str:
+    """{output_prefix}/preview.jpg: the reference photo that rois, candidate bboxes and
+    image_size describe (CONTRACT_CHANGES proposal 1b). Browsers cannot show DNG or (outside
+    Safari) HEIC. Shrunk by a whole factor when the long edge is over PREVIEW_MAX_SIDE."""
+    import math
+
+    import cv2
+
+    h, w = srgb8.shape[:2]
+    k = math.ceil(max(h, w) / config.PREVIEW_MAX_SIDE)
+    if k > 1:
+        srgb8 = cv2.resize(srgb8, (round(w / k), round(h / k)), interpolation=cv2.INTER_AREA)
+    dest = f"{output_prefix.rstrip('/')}/preview.jpg"
+    return save_jpeg(np.ascontiguousarray(srgb8), dest, quality=config.PREVIEW_QUALITY)
 
 
 def save_jpeg(srgb8, dest: str, quality: int = 90) -> str:
