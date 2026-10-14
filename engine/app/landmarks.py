@@ -6,7 +6,7 @@ stays on skin when the landmarks are a few pixels off.
 """
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -135,8 +135,6 @@ class Face:
     yaw: float
     pitch: float
     roll: float
-    # MediaPipe expression scores 0-1 (e.g. mouthSmileLeft, eyeSquintRight); empty if unknown
-    expression: dict[str, float] = field(default_factory=dict)
 
     @property
     def eye_distance_px(self) -> float:
@@ -262,34 +260,6 @@ class Face:
         grown = cv2.dilate(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
         return grown.astype(bool)
 
-    def line_polygons(self) -> dict[str, np.ndarray]:
-        """Where expression lines form, as polygons: crow's feet (beside each outer eye
-        corner, along the eye's axis) and nasolabial folds (from the nose wing towards the
-        mouth corner, on the cheek side). Sizes in mm from LINES_* in config."""
-        mm = self.px_per_mm
-        out = {}
-        for side, inner, outer in (("right", 133, 33), ("left", 362, 263)):
-            axis = self.points[outer] - self.points[inner]
-            axis = axis / np.linalg.norm(axis)
-            normal = np.array([-axis[1], axis[0]])
-            start = self.points[outer] + axis * config.LINES_CROW_GAP_MM * mm
-            end = start + axis * config.LINES_CROW_LENGTH_MM * mm
-            half = normal * config.LINES_CROW_HALF_HEIGHT_MM * mm
-            out[f"{side}_crows_feet"] = np.array(
-                [start - half, end - half, end + half, start + half]
-            )
-        for side, wing, mouth in (("right", 98, 61), ("left", 327, 291)):
-            a, b = self.points[wing], self.points[mouth]
-            along = (b - a) / np.linalg.norm(b - a)
-            out_dir = np.array([-along[1], along[0]])
-            if (a - self.points[2]) @ out_dir < 0:  # point away from the face midline
-                out_dir = -out_dir
-            near, far = config.LINES_FOLD_OFFSET_MM * mm, config.LINES_FOLD_WIDTH_MM * mm
-            out[f"{side}_nasolabial"] = np.array(
-                [a + out_dir * near, a + out_dir * far, b + out_dir * far, b + out_dir * near]
-            )
-        return out
-
     def t_zone_mask(self, shape: tuple[int, int]) -> np.ndarray:
         """Forehead (above the upper brow line), the whole nose and the chin ROI."""
         up = self.points[10] - self.points[152]
@@ -410,7 +380,6 @@ def _landmarker():
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
         num_faces=1,
         output_facial_transformation_matrixes=True,
-        output_face_blendshapes=True,  # expression scores, for the lines metric's gate
     )
     return mp.tasks.vision.FaceLandmarker.create_from_options(options)
 
@@ -429,12 +398,7 @@ def detect_face(srgb8: np.ndarray) -> Face:
     lm = result.face_landmarks[0]
     points = np.array([[p.x * w, p.y * h] for p in lm], dtype=np.float64)  # back to full res
     yaw, pitch, roll = _euler_degrees(result.facial_transformation_matrixes[0])
-    expression = (
-        {c.category_name: float(c.score) for c in result.face_blendshapes[0]}
-        if result.face_blendshapes
-        else {}
-    )
-    return Face(points=points, yaw=yaw, pitch=pitch, roll=roll, expression=expression)
+    return Face(points=points, yaw=yaw, pitch=pitch, roll=roll)
 
 
 def polygon_mask(shape: tuple[int, int], polygon: np.ndarray) -> np.ndarray:
