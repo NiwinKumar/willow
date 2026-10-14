@@ -90,7 +90,9 @@ FACE_HEIGHT_MM = 74.9
 # background and shine (bright, grey) drop out; marks keep enough colour to stay.
 SIDE_MIN_CHROMA_FRAC = 0.5
 SIDE_MAX_HUE_DEG = 25.0
-SIDE_MAX_RED_SHIFT_DEG = 50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+SIDE_MAX_RED_SHIFT_DEG = (
+    50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+)
 SIDE_MAX_BRIGHTER_L = 15.0
 SIDE_MAX_DARKER_L = 30.0
 SIDE_FILL_HOLES_MM2 = 80.0
@@ -173,6 +175,7 @@ BLEMISH_MIN_A_CONTRAST = 1.0  # ...and at least this much a* above nearby skin (
 BLEMISH_MIN_RED_RATIO = 0.35
 BLEMISH_DIAMETER_MM = (1.0, 5.0)
 BLEMISH_BACKGROUND_MM = 3.0  # "nearby skin" (Gaussian sigma)
+BLEMISH_HAIR_GAP_MM2 = 2.0  # holes this small in the skin mask are hair gaps, not an edge
 BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)

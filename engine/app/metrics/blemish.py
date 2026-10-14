@@ -85,7 +85,9 @@ def find_blemishes(
         overlap=0.3,
     )
     edge = round(config.BLEMISH_EDGE_MM * px_per_mm)
-    inner = ndimage.binary_erosion(skin, iterations=max(edge, 1)) & search  # not on the edge
+    # not on the mask edge; gaps left by single hairs (beard, stubble) are not an edge
+    solid = skin | _small_holes(skin, config.BLEMISH_HAIR_GAP_MM2 * px_per_mm**2)
+    inner = ndimage.binary_erosion(solid, iterations=max(edge, 1)) & search
     yy, xx = np.ogrid[: skin.shape[0], : skin.shape[1]]
     found = []
     for y, x, s in blobs:
@@ -117,6 +119,16 @@ def find_blemishes(
         )
     gap = config.BLEMISH_MERGE_MM * px_per_mm * back  # in input pixels
     return _merge(sorted(found, key=lambda b: -b.score), gap)
+
+
+def _small_holes(mask: np.ndarray, max_area_px: float) -> np.ndarray:
+    """Holes in `mask` smaller than max_area_px (hair gaps; eyes and lips are far larger)."""
+    holes = ndimage.binary_fill_holes(mask) & ~mask
+    labels, n = ndimage.label(holes)
+    if n == 0:
+        return holes
+    sizes = ndimage.sum(holes, labels, index=np.arange(1, n + 1))
+    return np.isin(labels, 1 + np.nonzero(sizes < max_area_px)[0])
 
 
 def robust_spread(values: np.ndarray) -> float:
