@@ -129,7 +129,11 @@ def _frame(path: str) -> dict:
     # blemishes are found by redness and hair is not red, so they also search the skin
     # between beard hairs (lower face cut as stubble): a pimple in a beard still counts.
     # Dark spots do not (hair is dark).
-    beard_skin = _beard_skin(lab[..., 0], face_full & zones["lower_face"] & ~face_skin, px_per_mm)
+    beard_skin = _beard_skin(
+        lab[..., 0],
+        face_full & zones.get("lower_face", np.zeros_like(face_skin)) & ~face_skin,
+        px_per_mm,
+    )
     blem_skin = face_skin | beard_skin
     band = face.border_band(blem_skin, (box.x, box.y))
     spot_band = face.border_band(face_skin, (box.x, box.y), features=features)
