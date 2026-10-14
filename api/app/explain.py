@@ -41,7 +41,7 @@ def item(metric: dict[str, Any]) -> dict[str, Any]:
     if verdict == "no_baseline" and delta is not None:
         quoted = [_signed(delta)]
         summary = (
-            f"{label}: change {quoted[0]}{trend}. Your baseline has one photo, so there is no "
+            f"{label}: change {quoted[0]}{trend}. Your baseline has too few photos, so there is no "
             "noise band yet and this cannot be called a real change."
         )
     elif verdict == "no_baseline":
@@ -132,6 +132,8 @@ Rules:
   shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
   this is the first reading. low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
+- With frames_used of 2 or more, blemishes and dark spots count only marks seen in at least two
+  of the photos (one photo's grain or a stray hair does not count); say so if the count is low.
 - Never attribute causation with certainty; at most "may be linked to" a routine product, and only
   if it started before this session.
 - Skin tone (tone_ita) is descriptive: never better or worse, never lighter or darker as a goal.
@@ -139,6 +141,7 @@ Rules:
 - is_baseline in the session data tells you which kind of session this is: true means the first
   reading (say so); false means a later session compared with the baseline, so never call it
   "initial" or "first". A delta of 0 or 0.0 means no measurable difference; never write "-0.0".
+- British spelling (colour, centre), as in the rest of the app.
 - headline: one short sentence. items: one per metric, most important first. next_steps: up to 3
   short practical capture or routine tips. disclaimer: "Cosmetic appearance tracking, not a
   diagnosis.\""""
@@ -174,9 +177,25 @@ def decimals(metric: dict[str, Any]) -> int:
     precision than its noise band supports. Counts are whole numbers."""
     if metric.get("unit") == "count":
         return 0
-    band = metric.get("mdc95")
+    # the band the screen formats with (this session's own), even when the band quoted is the
+    # baseline's (see with_bands)
+    band = metric.get("display_mdc95", metric.get("mdc95"))
     band = 1.0 if band is None else band
     return 0 if band >= 5 else 1 if band >= 0.5 else 2
+
+
+def with_bands(result: dict[str, Any], bands: dict[str, float | None] | None) -> dict[str, Any]:
+    """The result with each compared metric's mdc95 set to the band its verdict used: the
+    baseline's. A session's own mdc95 is its spread for later comparisons; quoting it as "the
+    noise threshold" contradicted the verdict (and is null for a one-photo session)."""
+    if not bands:
+        return result
+    metrics = []
+    for m in result["metrics"]:
+        if m.get("delta") is not None and m["id"] in bands:
+            m = {**m, "display_mdc95": m.get("mdc95"), "mdc95": bands[m["id"]]}
+        metrics.append(m)
+    return {**result, "metrics": metrics}
 
 
 def _shown(x: float | None, places: int) -> float | int | None:
@@ -210,7 +229,8 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
                 "verdict": m["verdict"],
                 "direction": m["direction"],
                 "confidence": m["confidence"],
-                "unit": UNIT_DISPLAY.get(m["unit"], "").strip() or m["unit"],
+                # Unit as the app writes it; none for counts and indexes (never "index").
+                "unit": UNIT_DISPLAY.get(m["unit"], m["unit"]).strip(),
                 **shown_numbers(m),
             }
             for m in result["metrics"]
@@ -241,6 +261,8 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
 
 def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """(explanation, source): Gemini when it passes the validator, else the template."""
+    context = dict(context)
+    result = with_bands(result, context.pop("bands", None))
     if not result["metrics"] or not result["quality"]["passed"]:
         # Nothing was measured: the fixed text says why and how to retake (Gemini would be told
         # this is a first reading, which a session that failed quality never is).
@@ -256,7 +278,8 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
                 instructions=INSTRUCTIONS,
                 temperature=0.3,
                 max_output_tokens=4096,
-                attempts=1,
+                attempts=2,  # a pause and one more try on a rate limit or a slow answer
+                timeout_ms=35_000,
             )
         except gemini.GeminiError:
             break

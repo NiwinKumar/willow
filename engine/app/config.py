@@ -11,8 +11,13 @@ ENGINE_VERSION = __version__  # single source of truth: app/__init__.py
 SHARPNESS_MIN = 15.0
 # Faces: sharpness at a fixed 4 px per mm of face. Measured Oct 13: sharp DNG and HEIC face
 # photos score 71-100, the same photos blurred by 0.3 mm score 1-2.
-SHARPNESS_PX_PER_MM = 4.0
-FACE_SHARPNESS_MIN = 15.0
+SHARPNESS_PX_PER_MM = 4.0  # larger faces are shrunk to this; smaller ones are measured as they are
+# A face fails when it is blurred by more than about 0.25 mm: a 1 mm spot (the smallest
+# counted) still keeps 86% of its contrast. The same blur in mm scores higher on a
+# low-resolution face, so the threshold depends on px per mm. Oct 14: median score of 3
+# sharp face photos resampled to each scale and blurred by 0.25 mm. (The old fixed 15 at
+# 4 px/mm meant about 0.18 mm, and failed usable webcam selfies at 3.2 px/mm.)
+FACE_SHARPNESS_AT = ((2.0, 41.0), (2.5, 19.0), (2.8, 12.7), (3.2, 7.8), (3.5, 5.7), (4.0, 3.6))
 CLIPPED_PCT_MAX = 2.0  # % of skin-ROI pixels at pure white
 DARK_PCT_MAX = 2.0  # % of skin-ROI pixels at pure black
 CLIP_LEVEL = 0.999  # linear value counted as clipped
@@ -25,6 +30,7 @@ SKIN_HIGH_PCT = 99.0
 # White reference (paper) must be bright but not clipped to be usable for white balance
 WHITE_REF_MIN_LINEAR = 0.15
 WHITE_REF_TARGET = 0.85  # paper is mapped to this linear value (office paper reflects ~85%)
+WHITE_REF_MAX_CLIPPED = 0.05  # share of paper pixels at the clip level; more -> unusable
 
 # ITA bands in degrees (docs/METRICS.md A1). Descriptive only, never a score.
 ITA_BANDS = [
@@ -37,6 +43,22 @@ ITA_BANDS = [
 ]
 
 MDC_Z = 1.96  # 95% two-sided
+MIN_FRAMES_FOR_BAND = 3  # fewer passed photos: SD reported, no noise band (no verdicts)
+# Floor on the photo-to-photo SD per metric (same units as the metric). A session whose photos
+# all gave the same value is not noise-free: counts move by whole marks and webcams by a few
+# tenths of a* between frames. Without a floor its band is 0 and any later change is "real".
+MIN_SD = {
+    "tone_ita": 0.5,  # degrees
+    "redness": 0.2,  # a*
+    "tone_evenness": 0.1,
+    "pigment_spots": 0.05,  # % of skin area
+    "blemishes": 0.5,  # marks
+    "dark_circles": 0.3,  # delta L*
+    "shine": 0.02,  # % of T-zone (Oct 14: SD 0.017-0.023 on two sessions)
+    "glow": 1.0,  # index (Oct 14: SD 1.8-2.7, mostly lighting)
+}
+ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
+UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
@@ -102,7 +124,8 @@ SIDE_FILL_HOLES_MM2 = 80.0
 SIDE_HAIR_WINDOW_MM = 4.0
 SIDE_HAIR_TEXTURE = 1.4
 SIDE_HAIR_CHROMA = 0.9  # fill smaller holes (a 10 mm mark that lost colour stays skin)
-MAX_ABS_PITCH = 8.0
+MAX_ABS_PITCH = 15.0  # laptop / webcam selfies sit at 8-12° (camera above the screen); ROIs stay on
+# the same skin up to 15° (canonical-mesh test in tests/test_pose.py), same as SIDE_MAX_PITCH
 MAX_ABS_ROLL = 6.0
 EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-mm scale
 
@@ -116,6 +139,8 @@ EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-m
 # on IMG_2537 -6; false hits were mostly broad 5-9 mm shading at 2-4 L*, so marks wider
 # than SPOT_LARGE_MM need proportionally more (8 mm -> 6 L*).
 SPOT_MIN_DL = 3.0
+SPOT_TUNE_L = 60.0  # skin L* the L*-step thresholds were tuned on (Oct 13 photos)
+SPOT_TONE_MIN_SCALE = 0.4  # deepest skin: thresholds go no lower than 40%
 SPOT_LARGE_MM = 4.0
 # ...and stand out from camera grain: score (darkness / fine skin texture) at least this.
 # Not the main test: texture depends on the camera (sharp HEIC 0.9 L*, soft JPEG 0.5).
@@ -175,12 +200,33 @@ BLEMISH_MIN_A_CONTRAST = 1.0  # ...and at least this much a* above nearby skin (
 BLEMISH_MIN_RED_RATIO = 0.35
 BLEMISH_DIAMETER_MM = (1.0, 5.0)
 BLEMISH_BACKGROUND_MM = 3.0  # "nearby skin" (Gaussian sigma)
+BLEMISH_HAIR_GAP_MM2 = 2.0  # holes this small in the skin mask are hair gaps, not an edge
 BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
 BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red lip edge)
-CROP_SIZE_PX = (64, 128)  # candidate crop side, clamped to this range
+# Candidate crops for Gemini, sized on the face: the tight crop is 4x the mark's diameter
+# and at least 6 mm (pixel sizes covered 20 mm at 3.2 px/mm and half the face in the
+# context crop); the context crop is 3x that. Small crops are upscaled to 128 px.
+CROP_SPOT_FACTOR = 4.0
+CROP_MIN_MM = 6.0
+CROP_MIN_OUT_PX = 128
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
+
+# preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
+PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
+PREVIEW_QUALITY = 85
+UPLOAD_WORKERS = 8  # parallel GCS transfers (frames in, crops out)
+
+# Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
+# test photos: at 0.2 confidence the only detections were a real hand and two specks a
+# few px across; specks are dropped by the size rule. A hand on the chin is cut from the
+# face skin; if it covers more than HAND_OCCLUSION_FRAC of the face skin the photo gets
+# occlusion_suspected (contract reason code).
+HAND_MIN_CONFIDENCE = 0.2
+HAND_MIN_SPAN_EYES = 0.8  # a detected hand spans at least this x the outer-eye distance
+HAND_MARGIN_MM = 10.0  # palm and finger edges beyond the landmarks
+HAND_OCCLUSION_FRAC = 0.10
 
 # shine (docs/METRICS.md C2): highlight = SHINE_DELTA_L brighter than the skin within
 # a SHINE_WINDOW_MM local median AND below SHINE_CHROMA_FRAC of its chroma (or clipped). Oct 14 on 10

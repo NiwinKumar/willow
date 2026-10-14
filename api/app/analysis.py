@@ -5,12 +5,19 @@ sessions again once their site is measured, so photos taken early still become t
 """
 
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
-from app import baselines, engine, explain, labeller, views
+from app import baselines, engine, explain, labeller, storage, views
 from app.store import Store
+
+log = logging.getLogger("willow.analysis")
+
+
+class SessionGone(Exception):
+    """The session was deleted while it was being measured."""
 
 
 def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any]) -> dict:
@@ -44,14 +51,18 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     try:
         result = engine.analyze(request)
     except engine.EngineError as exc:
+        log.warning("engine failed for %s/%s: %s %s", uid, session_id, exc.code, exc.message)
         store.session_update(
             uid,
             session_id,
-            {"status": "failed", "error": {"code": exc.code, "message": exc.message}},
+            {"status": "failed", "error": {"code": exc.code, "message": exc.public_message}},
         )
         raise
 
     measured = not engine.is_placeholder(result)
+    if measured and baseline_map:
+        baselines.guard_engine_version(result, current)
+        baselines.guard_counts(result, current)
     explanation, source, details = (None, None, {})
     if measured:
         # The explanation and the spot labels are independent Gemini calls: run them together.
@@ -61,6 +72,10 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
             labelled = pool.submit(labeller.label_candidates, result)
             explanation, source = explained.result()
             details = labelled.result()
+    if store.session_get(uid, session_id) is None:
+        # "Delete my data" ran while the engine worked: remove what it wrote since, keep nothing.
+        storage.delete_prefix(views.results_prefix(uid, session_id))
+        raise SessionGone(session_id)
     store.session_update(
         uid,
         session_id,
@@ -79,8 +94,24 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         },
     )
     doc = store.session_get(uid, session_id) or doc
+    if measured and current is not None and current["session_id"] == session_id:
+        # Measured again (a fix or a new engine): the baseline keeps up with its own session,
+        # and stops being one if it no longer passes (a square found in hair, for example).
+        if baselines.qualifies(result):
+            baselines.set_baseline(store, uid, session_id, doc)
+        else:
+            store.baseline_delete(uid, baselines.key(doc["site"], doc["capture_mode"]))
+            store.session_update(uid, session_id, {"is_baseline": False})
+            current = None
+        doc = store.session_get(uid, session_id) or doc
+        return doc
     if measured and current is None and baselines.qualifies(result):
-        baselines.set_baseline(store, uid, session_id, doc)
+        try:
+            baselines.set_baseline(store, uid, session_id, doc)
+        except Exception:
+            # The measurement is saved and shown; only the baseline pointer failed. The next
+            # session becomes the baseline instead, never "failed" for a finished session.
+            log.exception("could not set the baseline for %s/%s", uid, session_id)
         doc = store.session_get(uid, session_id) or doc
     return doc
 
@@ -104,6 +135,10 @@ def explain_context(
     ]
     return {
         "is_baseline": is_baseline,
+        # the band each verdict was judged against (explain.with_bands; not sent to Gemini)
+        "bands": None
+        if is_baseline
+        else {k: m.get("mdc95") for k, m in (baseline.get("metrics") or {}).items()},
         "baseline_has_noise_band": None if is_baseline else baseline.get("has_noise_band", True),
         "days_since_baseline": days,
         "routine": routine[:12],

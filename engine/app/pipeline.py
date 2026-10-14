@@ -12,6 +12,7 @@ from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
 from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
 from app.errors import EngineError
+from app.io import save_preview
 from app.markers import SpotNotFound, find_dot_squares, paper_pixels
 from app.metrics.redness import redness
 from app.metrics.tone import ita_band, tone_ita
@@ -80,7 +81,10 @@ def _frame_metrics(
     # very light skin to 1.0, which is not the camera's fault and must not fail the photo
     quality = check_frame(roi.crop(linear), roi.crop(srgb8))
     if white_px is not None:
-        linear = white_balance(linear, white_px)
+        try:
+            linear = white_balance(linear, white_px)
+        except ValueError:  # paper too dark or blown out: no reference, not a crash
+            white_px = None
     skin_lin = roi.crop(linear)
     lab = linear_srgb_to_lab(skin_lin)
     mask = skin_mask(lab)
@@ -101,6 +105,7 @@ def analyze_forearm(
     session_id: str = "s_local",
     user_id: str = "local",
     baseline: dict | None = None,
+    output_prefix: str | None = None,
 ) -> dict:
     """Analyze one taped forearm square from normal photos (uncalibrated) or DNGs.
 
@@ -115,7 +120,7 @@ def analyze_forearm(
     except ValueError as exc:
         raise EngineError("bad_request", str(exc)) from exc
     confidence = "measured" if mode == "calibrated_raw" else "indicative"
-    per_frame, passed_values, passed_extras, shape = [], [], [], None
+    per_frame, passed_values, passed_extras, shape, ref_path = [], [], [], None, None
     used_rois, white_ok, qs, warnings = [], [], [], []
     for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
         try:
@@ -128,7 +133,8 @@ def analyze_forearm(
             per_frame.append({"index": i, "passed": False, "reasons": []})
             warnings.append(f"photo {i + 1}: pen-dot square not found")
             continue
-        shape = shape or frame_shape
+        if shape is None:
+            shape, ref_path = frame_shape, path  # first photo whose square was found
         used_rois.append(used_roi)
         white_ok.append(balanced)
         qs.append(q)
@@ -137,11 +143,17 @@ def analyze_forearm(
             passed_values.append(values)
             passed_extras.append(extras)
 
+    # "Measured" needs a colour reference in every photo: without the paper, neither the lamp's
+    # colour nor its brightness is corrected, so tone and redness are a trend, even from a DNG.
+    if mode == "calibrated_raw" and not (white_ok and all(white_ok)):
+        confidence = "indicative"
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
         if passed_values:
-            summary = summarize([v[metric_id] for v in passed_values], base)
+            summary = summarize(
+                [v[metric_id] for v in passed_values], base, config.MIN_SD.get(metric_id, 0.0)
+            )
             extras = _mean_extras([e[metric_id] for e in passed_extras])
             if metric_id == "tone_ita":  # band must describe the reported (mean) value
                 extras["ita_band"] = ita_band(summary["value"])
@@ -172,10 +184,18 @@ def analyze_forearm(
         reasons.append("too_few_frames")
     if mode == "uncalibrated":
         warnings.insert(0, "uncalibrated photo: results are a trend only, not a measurement")
-    else:
+    elif any(white_ok):
         warnings.insert(0, "no colour card: colours corrected with the white paper only")
-    if not all(white_ok):
-        warnings.append("no white reference found in some photos: lamp colour not corrected")
+    # (the web reads "no white reference found" and " in some photos")
+    if white_ok and not any(white_ok):
+        warnings.append(
+            "no white reference found: lamp colour and brightness not corrected, so tone and "
+            "redness are a trend"
+        )
+    elif not all(white_ok):
+        warnings.append(
+            "no white reference found in some photos: lamp colour and brightness not corrected"
+        )
 
     result = {
         "schema_version": "1.0",
@@ -204,6 +224,13 @@ def analyze_forearm(
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
     }
+    if output_prefix and (ref_path or files):
+        # the photo the forearm_square ROI describes; with no square found, the first photo,
+        # so the person sees what was sent next to "pen dots not found"
+        try:
+            save_preview(_load(ref_path or files[0])[1], output_prefix)
+        except EngineError:
+            pass  # an unreadable file is already reported per photo
     if shape is not None:
         result["image_size"] = {"width": int(shape[1]), "height": int(shape[0])}
     validate(result, json.loads(SCHEMA.read_text()))

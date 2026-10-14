@@ -27,6 +27,13 @@ def laplacian_variance(grey: np.ndarray) -> float:
     return float(lap.var())
 
 
+def face_sharpness_min(px_per_mm: float) -> float:
+    """Sharpness score a face needs at this scale (see FACE_SHARPNESS_AT): the score of a
+    sharp face blurred by about 0.25 mm, interpolated on a log scale; clamped at the ends."""
+    ppm, score = zip(*config.FACE_SHARPNESS_AT)
+    return float(np.exp(np.interp(px_per_mm, ppm, np.log(score))))
+
+
 def check_frame(
     linear_roi: np.ndarray,
     srgb8_roi: np.ndarray,
@@ -44,7 +51,7 @@ def check_frame(
     if px_per_mm:
         scale = min(config.SHARPNESS_PX_PER_MM / px_per_mm, 1.0)
         grey = cv2.resize(grey, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-        threshold = config.FACE_SHARPNESS_MIN
+        threshold = face_sharpness_min(px_per_mm * scale)
     q = FrameQuality(
         sharpness=laplacian_variance(grey),
         clipped_pct=float(np.mean(exposure >= config.CLIP_LEVEL) * 100),

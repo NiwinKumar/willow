@@ -34,6 +34,8 @@ export function FirstSessionGuide({ site, mode, n = 5 }: { site: Site; mode: Cap
 export function BaselineChecklist({ mode, current, onPick }: { mode: CaptureMode; current?: Site; onPick?: (site: Site) => void }) {
   const data = useData()
   const quick = mode === 'uncalibrated'
+  // Until the sessions have loaded, never claim "No baseline yet".
+  const loading = data.mode === 'live' && data.status === 'loading'
   return (
     <section aria-labelledby="baselines">
       <h2 id="baselines" className="text-[17px] font-semibold">Your baselines{quick ? ' (phone photos)' : ''}</h2>
@@ -41,6 +43,16 @@ export function BaselineChecklist({ mode, current, onPick }: { mode: CaptureMode
       <ul className="mt-3 divide-y divide-border border-y border-border">
         {BASELINE_SITES.map((site) => {
           const st = baselineState(data.series(site)?.sessions ?? [], mode)
+          if (loading)
+            return (
+              <li key={site} className="flex min-h-12 items-center gap-3 py-2">
+                <Circle size={20} aria-hidden className="shrink-0 text-border" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium">{SITE_LABEL[site]}</span>
+                  <span className="block text-[13px] text-text-3">Checking…</span>
+                </span>
+              </li>
+            )
           return (
             <li key={site} className="flex min-h-12 items-center gap-3 py-2">
               {st.state === 'set' ? (

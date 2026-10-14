@@ -7,6 +7,8 @@ their baseline and later ones are compared with it. Dry run by default.
     uv run python scripts/remeasure.py [--site face_full] [--session s_...] [--apply]
 
 `--session` runs those sessions again even if they are already measured (after a fix).
+`--all` runs every measured session again, oldest first (after an engine version change: the
+baseline is measured first, so later sessions are compared with the new numbers).
 """
 
 import sys
@@ -25,7 +27,16 @@ def main() -> int:
     only = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--session"} or None
     store = FirestoreStore()
     bucket = get_settings().bucket
+    every = "--all" in sys.argv
     for user in gcp.firestore_client().collection("users").list_documents():
+        if every:
+            only = {
+                sid
+                for sid, d in store.sessions_list(user.id)
+                if d.get("status") == "done" and d.get("measured")
+            } or None
+            if only is None:
+                continue
         for line in analysis.remeasure(store, bucket, user.id, sites, apply, only):
             print(line)
     print("applied" if apply else "dry run (pass --apply to write)")

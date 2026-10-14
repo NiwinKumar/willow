@@ -104,7 +104,9 @@ def search(
                 continue
             scored.append((-hits, p["price"]["amount"], p))
         else:
-            scored.append((0, p["price"]["amount"], p))
+            # Browsing (no query): by brand then name; raw prices in different currencies
+            # do not compare (sorting by them hid most INR products behind USD ones).
+            scored.append((0, f"{p['brand']} {p['name']}".lower(), p))
     scored.sort(key=lambda s: (s[0], s[1]))
     return [p for _, _, p in scored[:limit]]
 

@@ -36,8 +36,10 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
   const sd = base?.within_session_sd ?? 0
   const cluster = baseline && b !== null ? [-1.2, -0.5, 0.1, 0.6, 1.1].map((k) => b + k * sd) : []
   const vals = points.map((p) => p.v).filter((v): v is number => v !== null)
-  const lo = Math.min(...vals, ...(mdc !== null && b !== null ? [b - mdc * 1.6] : []))
-  const hi = Math.max(...vals, ...(mdc !== null && b !== null ? [b + mdc * 1.6] : []))
+  const span = [...vals, ...(mdc !== null && b !== null ? [b - mdc * 1.6, b + mdc * 1.6] : [])]
+  // No values and no band (every photo failed): a flat 0..1 axis instead of ±Infinity.
+  const lo = span.length ? Math.min(...span) : 0
+  const hi = span.length ? Math.max(...span) : 1
   const padY = (hi - lo || 1) * 0.15
 
   return (
@@ -45,7 +47,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
       <div className="h-44 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={points} margin={{ top: 12, right: 12, bottom: 0, left: -18 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-text-3)', fontFamily: 'var(--font-mono)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} interval={0} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-text-3)', fontFamily: 'var(--font-mono)' }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} interval="preserveStartEnd" minTickGap={8} />
             <YAxis domain={[lo - padY, hi + padY]} tick={{ fontSize: 11, fill: 'var(--color-text-3)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v.toFixed(dec)} width={44} />
             {b !== null && mdc !== null ? (
               <>
@@ -74,12 +76,12 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
         <div>
           <dt className="font-semibold">How we decide real change</dt>
           <dd className="text-text-2">
-            {b !== null && mdc !== null
-              ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
-              : current.verdict === 'low_quality'
-                ? 'This photo did not pass the quality check, so it is not compared. Retake it in the same light and position.'
+            {current.verdict === 'low_quality'
+              ? 'This photo did not pass the quality check, so it is not compared. Retake it in the same light and position.'
+              : b !== null && mdc !== null
+                ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
                 : b !== null && mdc === null
-                  ? 'Your baseline has one photo, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
+                  ? 'Your baseline has fewer than 3 usable photos, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
                   : current.confidence === 'indicative'
                     ? 'This metric is indicative: a directional estimate, so watch it as a trend.'
                     : 'This is your first reading. Future photos are compared to it; the noise band comes from the spread of your reference photos.'}
@@ -112,11 +114,11 @@ function Dot(props: { cx?: number; cy?: number; payload?: Point }) {
 }
 
 const WHAT: Record<Metric['id'], string> = {
-  tone_ita: 'The Individual Typology Angle computed from L* and b* of your cheek (or forearm square) after colour calibration. A description of tone, never a score, and no direction is better.',
-  pigment_spots: 'The share of skin area where the melanin proxy sits well above your own skin median, after colour calibration. Reported with the count and mean contrast.',
+  tone_ita: 'The Individual Typology Angle computed from L* and b* of your cheek (or forearm square), colour-corrected when the photo has a white reference. A description of tone, never a score, and no direction is better.',
+  pigment_spots: 'The share of skin area where the melanin proxy sits well above your own skin median. With several photos, only spots seen in at least two of them count. Reported with the count and mean contrast.',
   tone_evenness: 'How much lightness varies across your face regions and within them. Lower means more even.',
-  redness: 'Mean a* (red-green) over the cheek and nose regions, relative to your own skin, after colour calibration. Harder to read on deep skin tones; then shown as indicative.',
-  blemishes: 'Candidate blemishes the engine found by local redness and shading. Gemini labels each one; the count is indicative.',
+  redness: 'Mean a* (red-green) over the cheek and nose regions, relative to your own skin, colour-corrected when the photo has a white reference. Harder to read on deep skin tones; then shown as indicative.',
+  blemishes: 'Candidate blemishes the engine found by local redness and shading, averaged over your photos. With several photos, only blemishes seen in at least two of them count. Gemini labels each one; the count is indicative.',
   pores: 'Dark blobs between 0.05 and 0.3 mm on the close-up, as density per cm² and mean diameter.',
   texture: 'Fine-scale roughness energy on the close-up, normalised by lightness. Downgraded to indicative if its noise band is too wide.',
   lines: 'Ridge density in the forehead, crow’s feet and nasolabial regions. Very lighting dependent, so indicative.',

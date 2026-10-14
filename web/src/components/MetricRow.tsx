@@ -93,7 +93,9 @@ export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, select
 }
 
 function bandLabel(m: Metric, baseline: number | null, mdc: number | null): string {
-  if (baseline === null || mdc === null) return `${METRIC_META[m.id].label}: first reading`
-  const where = m.verdict === 'real_change' ? 'outside' : m.verdict === 'low_quality' ? 'not comparable to' : 'inside'
+  if (m.verdict === 'low_quality') return `${METRIC_META[m.id].label}: photo quality too low to compare`
+  if (baseline === null) return `${METRIC_META[m.id].label}: first reading`
+  if (mdc === null) return `${METRIC_META[m.id].label}: ${fmtSigned(m.delta, m)} from baseline, no noise band yet`
+  const where = m.verdict === 'real_change' ? 'outside' : 'inside'
   return `${METRIC_META[m.id].label}: ${where} your noise band, ${fmtSigned(m.delta, m)} from baseline, band plus or minus ${mdc.toFixed(decimalsFor(m))}`
 }

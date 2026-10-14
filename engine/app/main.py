@@ -8,8 +8,10 @@ import json
 import logging
 import tempfile
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anyio
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from jsonschema import ValidationError, validate
@@ -28,7 +30,23 @@ RESULT_SCHEMA = json.loads((SCHEMAS / "analysis_result.schema.json").read_text()
 MODE_FOR_EXT = {".dng": "calibrated_raw"}  # anything else is a normal photo -> uncalibrated
 
 log = logging.getLogger("willow.engine")
-app = FastAPI(title="Willow engine", version=__version__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Load both face models before the first request, not during it (a judge's first selfie
+    # otherwise waited for them).
+    try:
+        from app.landmarks import _hand_landmarker, _landmarker
+
+        await anyio.to_thread.run_sync(_landmarker)
+        await anyio.to_thread.run_sync(_hand_landmarker)
+    except Exception:  # a missing model is reported by the request that needs it
+        log.exception("face models did not load at startup")
+    yield
+
+
+app = FastAPI(title="Willow engine", version=__version__, lifespan=lifespan)
 
 
 @app.exception_handler(EngineError)
@@ -80,6 +98,28 @@ async def analyze(http_request: Request) -> dict:
     except ValueError as exc:  # body is not JSON
         raise EngineError("bad_request", f"invalid JSON: {exc}") from exc
 
+    # The measurement is CPU work: run it in a worker thread so the event loop keeps answering
+    # (health checks, a second request) while a photo is being measured.
+    result = await anyio.to_thread.run_sync(_run, request)
+    result["timings_ms"]["request"] = round((time.perf_counter() - t0) * 1000, 1)
+    validate(result, RESULT_SCHEMA)  # never send a response that breaks the contract
+    log.info(
+        json.dumps(
+            {
+                "event": "analyze",
+                "session_id": request["session_id"],
+                "site": request["site"],
+                "frames": len(request["frames"]),
+                "frames_used": result["frames_used"],
+                "passed": result["quality"]["passed"],
+                "timings_ms": result["timings_ms"],
+            }
+        )
+    )
+    return result
+
+
+def _run(request: dict) -> dict:
     if request["site"] not in FOREARM_SITES | {"face_full"}:
         result = _placeholder(request)
     else:
@@ -106,23 +146,8 @@ async def analyze(http_request: Request) -> dict:
                     [None] * n,  # forearm square found from the pen dots
                     [None] * n,  # white paper found automatically
                     baseline=request.get("baseline"),
+                    output_prefix=request.get("output_prefix"),
                     **ids,
                 )
         result["timings_ms"]["fetch"] = round(fetch_ms, 1)
-
-    result["timings_ms"]["request"] = round((time.perf_counter() - t0) * 1000, 1)
-    validate(result, RESULT_SCHEMA)  # never send a response that breaks the contract
-    log.info(
-        json.dumps(
-            {
-                "event": "analyze",
-                "session_id": request["session_id"],
-                "site": request["site"],
-                "frames": len(request["frames"]),
-                "frames_used": result["frames_used"],
-                "passed": result["quality"]["passed"],
-                "timings_ms": result["timings_ms"],
-            }
-        )
-    )
     return result

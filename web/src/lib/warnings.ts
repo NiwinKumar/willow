@@ -10,12 +10,25 @@ const PEN_DOTS_TEXT =
  * and "corrected with the white paper" dropped when another note says no white reference was found.
  */
 export function readableWarnings(r: AnalysisResult | null | undefined): string[] {
-  const raw = (r?.warnings ?? []).filter((w) => !w.startsWith('placeholder:'))
+  const raw = (r?.warnings ?? [])
+    .filter((w) => !w.startsWith('placeholder:'))
+    // The engine's wording, in the app's: a phone photo is a trend.
+    .map((w) => (/^uncalibrated photo: results are a trend only/i.test(w) ? 'Phone photos: results are a trend, not a measurement' : w))
   const noWhite = raw.some((w) => /no white reference found/i.test(w))
   const dots = raw.filter((w) => PEN_DOTS.test(w)).map((w) => w.match(/photo (\d+)/i)?.[1]).filter(Boolean)
   const out = raw.filter((w) => !PEN_DOTS.test(w) && !(noWhite && /white paper only/i.test(w)))
   if (dots.length) out.push(`Pen dots not found in photo ${dots.join(', ')}; ${dots.length === 1 ? 'that photo was' : 'those photos were'} not measured`)
-  return [...new Set(out)].map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+  // "photo 3 lines up poorly with photo 1 (...)" once per photo: one sentence for all of them.
+  const poor = out.map((w) => /^photo (\d+) (?:lines up poorly|could not be lined up) with photo (\d+)/i.exec(w)).filter((m): m is RegExpExecArray => Boolean(m))
+  if (poor.length) {
+    const nums = poor.map((m) => m[1])
+    const list = nums.length === 1 ? `Photo ${nums[0]}` : `Photos ${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}`
+    out.splice(0, out.length, ...out.filter((w) => !/^photo \d+ (?:lines up poorly|could not be lined up) with photo/i.test(w)))
+    out.push(`${list} did not line up well with photo ${poor[0][2]} (the face moved or the expression changed), so matching spots across photos is less certain`)
+  }
+  // The engine says "in some photos" even for a one-photo session.
+  const one = (r?.quality.per_frame?.length ?? 0) === 1
+  return [...new Set(out)].map((w) => (one ? w.replace(/ in some photos/i, '') : w)).map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 }
 
 /** Why a session could not be measured, in plain words; missing pen dots explain "too few frames". */

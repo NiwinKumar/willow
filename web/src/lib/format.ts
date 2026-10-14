@@ -1,5 +1,17 @@
+/** A date-only string ("2026-10-13") is a calendar day, not UTC midnight: parse it as local. */
+export function parseDate(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso)
+}
+
+/** Today as a local calendar day, YYYY-MM-DD (for date inputs). */
+export function todayLocal(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function fmtDate(iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }): string {
-  return new Date(iso).toLocaleDateString(undefined, opts)
+  return parseDate(iso).toLocaleDateString(undefined, opts)
 }
 
 export function fmtDateTime(iso: string): string {

@@ -8,7 +8,7 @@ import { nextPath, prefs } from '../lib/prefs'
 const times = [
   { id: 'evening', label: 'Evening', hint: 'Most people do this after washing their face in the evening.' },
   { id: 'morning', label: 'Morning', hint: 'Before any product, after washing.' },
-  { id: 'skip', label: 'Skip', hint: 'No reminder copy.' },
+  { id: 'skip', label: 'Skip', hint: 'No reminder.' },
 ]
 
 export function Goals() {
