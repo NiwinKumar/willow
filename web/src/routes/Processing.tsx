@@ -49,7 +49,9 @@ function outcomes(view: SessionView): string[] {
     : view.session.baseline?.has_noise_band === false
       ? `${count} compared with your baseline (no noise band yet)`
       : `${count} compared with your baseline`
-  const explained = usable === 0 ? 'Nothing to explain' : view.session.explanation_source === 'gemini' ? 'Explained by AI, every number checked' : 'Written from your numbers'
+  const named = Object.keys(view.session.label_details ?? {}).length
+  const spots = named ? `; ${named} ${named === 1 ? 'spot' : 'spots'} named by AI` : ''
+  const explained = usable === 0 ? 'Nothing to explain' : (view.session.explanation_source === 'gemini' ? 'Explained by AI, every number checked' : 'Written from your numbers') + spots
   return [quality, colour, measured, explained]
 }
 

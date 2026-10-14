@@ -121,6 +121,13 @@ export function Judge() {
                     .
                   </p>
                 )}
+                <p className="mt-2 text-[13px] text-text-2">
+                  Or measure your own face:{' '}
+                  <Link to="/capture?site=face_full&mode=quick" className="font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('run')}>
+                    take a quick selfie
+                  </Link>
+                  . The engine finds your face, measures tone, dark spots, evenness, redness and blemishes, and Gemini names the spots it found.
+                </p>
                 {lastRun ? (
                   <p className="mt-2 text-[13px]">
                     <Link to={`/s/${lastRun.site}`} className="font-medium text-willow-700 underline-offset-2 hover:underline">
@@ -163,6 +170,10 @@ export function Judge() {
           </ol>
           <p className="mt-6 text-[13px] text-text-2">
             Or look around on your own:{' '}
+            <Link to="/capture?site=face_full&mode=quick" className="font-medium text-text underline-offset-2 hover:underline">
+              take a selfie
+            </Link>
+            ,{' '}
             <Link to="/capture?site=forearm_control&mode=quick" className="font-medium text-text underline-offset-2 hover:underline">
               photograph your own forearm
             </Link>{' '}

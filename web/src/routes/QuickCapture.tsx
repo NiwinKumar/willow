@@ -121,7 +121,7 @@ export function QuickCapture() {
       if (!g.light) setHint(mean <= 0.32 ? 'Find brighter light' : 'Too bright. Turn away from the lamp')
       else if (!g.even) setHint('Face the window or lamp so both sides are lit evenly')
       else if (!g.still) setHint('Hold still')
-      else setHint(faceSite ? 'Fit your face in the oval' : 'Fit the square in the frame')
+      else setHint(faceSite ? 'Fill the oval with your face, eyes on the lens' : 'Fit the square in the frame')
       const now = performance.now()
       const all = g.light && g.even && g.still
       if (g.light && g.even) nearSince.current ??= now
@@ -237,7 +237,13 @@ export function QuickCapture() {
             <li>Four pen dots mark the corners of a 4 cm square; keep all four in the frame.</li>
             <li>A sheet of plain white paper beside the arm, in the same light.</li>
           </ul>
-        ) : null}
+        ) : (
+          <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
+            <li>Hair back, glasses off, hands away from your face.</li>
+            <li>Camera at eye level, looking into the lens rather than at the screen. Come close enough that your face fills the oval.</li>
+            <li>Face a window or lamp so both cheeks are lit.</li>
+          </ul>
+        )}
         {phase === 'ask' && firstSession && data.mode === 'live' ? (
           <div className="mt-5">
             <FirstSessionGuide site={site} mode="uncalibrated" n={n} />

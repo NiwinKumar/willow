@@ -14,7 +14,7 @@ Built for the **Google Cloud AI Builder Cup 2026** (Hack2skill), theme **Retail 
 People spend weeks on a serum and still cannot tell whether it worked: phone photos change with light, angle and the camera's own processing, so "looks better" is mostly noise. Retailers only see purchases and returns, never outcomes, so recommendations reward marketing rather than results.
 
 ## What Willow does
-1. **Measure.** Standardized photos (a RAW DNG with a white reference or colour card, or a quick browser selfie marked "trend only") go to a Python computer-vision engine that corrects colour and measures cosmetic parameters (today: skin tone ITA° and redness a* on a marked forearm square; face metrics are in progress).
+1. **Measure.** Standardized photos (a RAW DNG with a white reference or colour card, or a quick browser selfie marked "trend only") go to a Python computer-vision engine that corrects colour and measures cosmetic parameters: on the face, skin tone (ITA°), dark spots, tone evenness, redness and blemishes; on a marked forearm square, skin tone and redness. Cheek and nose close-ups (pores, texture) are next.
 2. **Prove.** The first session of each place is the person's **baseline**. Its five photos, each set up from scratch, give a personal **noise band** (minimum detectable change at 95%). A later reading is called a *real change* only when it leaves that band. A treated-versus-untreated forearm test separates a product's effect from light and time of day.
 3. **Explain and advise.** Gemini explains results in plain words, reads ingredient labels, checks routines for clashing actives and recommends products from a facts-only catalog with links to several stores. **Gemini never produces a measurement**, and every number it writes is checked against the data.
 4. **Learn.** Anonymized outcomes (opt-in) flow to BigQuery. Retailers see which products produced measured change for which goals, skin-tone bands and price tiers, and can ask questions in plain words. The demo cohort is synthetic and labelled everywhere.
@@ -52,7 +52,7 @@ flowchart LR
 | Check a routine | Routine | A rule table in code is final; Gemini may only add findings, marked AI-suggested, never remove one |
 | Shopping advisor | Advisor | Function calling with three tools (`search_catalog`, `compare_products`, `check_routine`); products only from tool results; every number checked; the steps and checks are shown under each answer |
 | Answer a retailer's question | Retailer, "Ask this data" | Sees aggregates only (groups under 10 hidden); answer, chart labels and chart values must exist in the data |
-| Label spots the engine finds | Report, "Spots on this photo" (switches on with the engine's face crops) | Asked twice in different orders; a name is kept only if both agree confidently; marked AI-suggested; moles carry the dermatologist note |
+| Label spots the engine finds | Report, "Spots on this photo" (face sessions) | Asked twice in different orders; a name is kept only if both agree confidently; marked AI-suggested; moles carry the dermatologist note |
 
 Shared rules: cosmetic language only, no disease names, never ranks skin tone ("lighter is better" is banned wording), daily caps per person and across everyone.
 
@@ -87,7 +87,7 @@ Tests: `cd api && uv run pytest` and `cd web && npm run lint`.
 - No images, RAW files, keys or `.env` files are committed. Services use service accounts and Application Default Credentials.
 
 ## Status and limits
-Measured today: forearm skin tone and redness, calibrated (RAW + white reference) and quick selfie (trend only). Face and close-up photos are stored and will be measured when the engine's face pipeline lands; `api/scripts/remeasure.py` then measures the saved photos so the first one becomes the baseline. Willow cannot assess moles or skin conditions; for a changing mole, see a dermatologist.
+Measured today: the face (front or side view: skin tone, dark spots, evenness, redness, blemishes, with spots matched across the session's photos) and the forearm square (tone, redness), as calibrated RAW or quick selfie (trend only). Cheek and nose close-ups are stored and measured once the engine supports them (`api/scripts/remeasure.py`). Face colours are as the camera captured them: colour-card correction for faces is next. Willow cannot assess moles or skin conditions; for a changing mole, see a dermatologist.
 
 ## Attribution
 Engine: NumPy, rawpy / LibRaw, colour-science, scikit-image, Pillow, pillow-heif, FastAPI. api: FastAPI, Pydantic, google-genai, Firebase Admin, Google Cloud client libraries, httpx, jsonschema. Web: React, React Router, Vite, Tailwind CSS, Firebase JS SDK, Motion, Lucide, Sonner, Vaul, Recharts, NumberFlow, Atkinson Hyperlegible (Braille Institute). Product images are linked from brand or retailer pages with a credit, never re-hosted.

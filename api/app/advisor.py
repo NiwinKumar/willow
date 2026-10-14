@@ -16,8 +16,7 @@ from typing import Any
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from app import catalog, gemini, numbers, routine_check
-from app.explain import BANNED
+from app import catalog, explain, gemini, numbers, routine_check
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
@@ -110,20 +109,14 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "date": iso(doc.get("created_at")),
             "is_baseline": bool(doc.get("is_baseline")),
             "photos": doc.get("n_frames"),
+            "photos_used": result["frames_used"],
             "quality_passed": result["quality"]["passed"],
+            # Rounded as the app shows them (explain.UNIT_DISPLAY), so the advisor never quotes
+            # 2.5 blemishes for a screen that says 3.
             "metrics": [
                 {
-                    k: m.get(k)
-                    for k in (
-                        "id",
-                        "label",
-                        "value",
-                        "unit",
-                        "delta",
-                        "mdc95",
-                        "verdict",
-                        "confidence",
-                    )
+                    **{k: m.get(k) for k in ("id", "label", "unit", "verdict", "confidence")},
+                    **{k: explain._shown(m.get(k), m["unit"]) for k in ("value", "delta", "mdc95")},
                 }
                 for m in result["metrics"]
             ],
@@ -284,7 +277,7 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
         bad_ids = set(reply.product_ids) - product_ids
         if (
             numbers.only_known(reply.message, allowed)
-            and not BANNED.search(reply.message)
+            and not explain.BANNED.search(reply.message)
             and not bad_ids
         ):
             return {
