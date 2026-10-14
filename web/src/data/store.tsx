@@ -44,7 +44,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const demo = params.get('demo') === '1' || stored
   const { user, getIdToken } = useAuth()
   const uid = user?.uid ?? null
-  const [views, setViews] = useState<SessionView[]>([])
+  // Sessions are kept with the uid they belong to, so a failed first load for the next person on
+  // this device can never show the previous person's sessions.
+  const [owned, setOwned] = useState<{ uid: string | null; views: SessionView[] }>({ uid: null, views: [] })
   const [loaded, setLoaded] = useState<{ uid: string | null; status: DataStatus }>({ uid: null, status: 'idle' })
 
   const load = useCallback(async (forUid: string) => {
@@ -57,7 +59,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [getIdToken])
 
   const apply = useCallback((r: Awaited<ReturnType<typeof load>>) => {
-    if (r.sessions) setViews(r.sessions)
+    if (r.sessions) setOwned({ uid: r.uid, views: r.sessions })
     setLoaded({ uid: r.uid, status: r.status })
   }, [])
 
@@ -97,9 +99,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [demo, journey])
 
-  const upsert = useCallback((view: SessionView) => {
-    setViews((vs) => [...vs.filter((v) => v.session.id !== view.session.id), view])
-  }, [])
+  const upsert = useCallback(
+    (view: SessionView) => {
+      setOwned((o) => (o.uid === uid ? { uid, views: [...o.views.filter((v) => v.session.id !== view.session.id), view] } : { uid, views: [view] }))
+    },
+    [uid],
+  )
 
   const value = useMemo<DataState>(() => {
     if (demo) {
@@ -110,10 +115,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return { mode: 'demo', demoSource: 'illustrative', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
     }
     const status: DataStatus = !uid ? 'idle' : loaded.uid === uid ? loaded.status : 'loading'
-    const mine = loaded.uid === uid ? views : []
+    const mine = owned.uid === uid ? owned.views : []
     const bySite = groupBySite(mine)
     return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, goals: prefs.goals(), refresh, upsert }
-  }, [demo, journey, uid, loaded, views, refresh, upsert])
+  }, [demo, journey, uid, loaded, owned, refresh, upsert])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

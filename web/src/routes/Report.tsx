@@ -26,6 +26,7 @@ import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } fro
 import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
 import { useAuth } from '../lib/useAuth'
+import { authErrorText } from '../lib/authErrors'
 import { useJudgeOn } from '../lib/useJudge'
 import { fresh } from './lazy'
 
@@ -124,7 +125,7 @@ export function Report() {
         <p className="mt-3 text-[15px] text-text-2">Your sessions belong to your account. A guest account keeps them on this device; Google keeps them across devices.</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button onClick={() => continueAsGuest().catch(() => toast.error('Could not sign in. Check your connection and try again.'))}>Continue as guest</Button>
-          <Button variant="secondary" onClick={() => signInWithGoogle().catch(() => toast.error('Google sign-in did not finish. Try again.'))}>Sign in with Google</Button>
+          <Button variant="secondary" onClick={() => signInWithGoogle().catch((e) => { const t = authErrorText(e); if (t) toast.error(t) })}>Sign in with Google</Button>
         </div>
       </div>
     )

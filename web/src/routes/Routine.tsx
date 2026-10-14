@@ -60,19 +60,22 @@ export function Routine() {
   const { user, getIdToken, continueAsGuest } = useAuth()
   const navigate = useNavigate()
   const [entries, setEntries] = useState<RoutineEntry[]>(live ? [] : DEMO_ROUTINE)
-  const [check, setCheck] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
+  const [rawCheck, setCheck] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
+  // An empty routine has nothing to check: never show findings about products that are gone.
+  const check = entries.length ? rawCheck : null
   const [checking, setChecking] = useState(false)
-  // Removing a product deletes the entry (one added by mistake or no longer used); the check reruns.
+  // Removing a product deletes the entry (one added by mistake or no longer used). The list changes
+  // only once the api confirms, so the compatibility check that follows never reads the old routine.
   const removeEntry = async (e: RoutineEntry) => {
-    const before = entries
-    setEntries((xs) => xs.filter((x) => x.id !== e.id))
-    if (!live) return
-    try {
-      await api.deleteRoutine(await getIdToken(), e.id)
-    } catch {
-      setEntries(before)
-      toast.error('Could not remove it. Try again.')
+    if (live) {
+      try {
+        await api.deleteRoutine(await getIdToken(), e.id)
+      } catch {
+        toast.error('Could not remove it. Try again.')
+        return
+      }
     }
+    setEntries((xs) => xs.filter((x) => x.id !== e.id))
   }
   const routineKey = entries.map((e) => `${e.id}:${e.slots.join('')}:${e.ended_at ?? ''}`).join('|')
 
@@ -328,7 +331,7 @@ export function Routine() {
                 <p className="mt-1 text-[15px]"><span className="font-medium">Suggested change:</span> {c.suggestion}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {live ? null : <Button variant="secondary" className="!min-h-10" onClick={() => toast('Demo: alternate nights noted on both products.')}>Apply</Button>}
-                  <Button variant="quiet" className="!min-h-10" onClick={() => navigate(`/advisor${data.mode === 'demo' ? '?demo=1&' : '?'}q=${encodeURIComponent(`Why should I keep ${c.products.map((id) => name(byId(id)!)).join(' and ')} apart?`)}`)}>Tell me more</Button>
+                  <Button variant="quiet" className="!min-h-10" onClick={() => navigate(`/advisor${data.mode === 'demo' ? '?demo=1&' : '?'}q=${encodeURIComponent(`Why should I keep ${c.products.map((id) => byId(id)).filter((x): x is RoutineEntry => Boolean(x)).map((x) => name(x)).join(' and ')} apart?`)}`)}>Tell me more</Button>
                   {c.source === 'model' ? <Button variant="quiet" className="!min-h-10" onClick={() => setDismissed((d) => [...d, c.products.join('+')])}>Dismiss</Button> : null}
                 </div>
               </li>

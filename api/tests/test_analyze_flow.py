@@ -326,3 +326,48 @@ def test_quick_selfie_shows_its_own_photo_and_raw_waits_for_a_preview(client, fa
     _upload_all(fake, raw)
     view = client.post(f"/v1/sessions/{raw['session_id']}/analyze").json()
     assert view["session"]["preview"] is None
+
+
+def test_a_second_analyze_while_one_runs_is_refused_and_not_counted(client, fake):
+    from datetime import UTC, datetime
+
+    created = _create(client)
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    fake.store.session_update(
+        "u_test", sid, {"status": "processing", "processing_started_at": datetime.now(UTC)}
+    )
+    res = client.post(f"/v1/sessions/{sid}/analyze")
+    assert res.status_code == 409 and res.json()["detail"]["code"] == "conflict"
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage.get(("u_test", day, "analyze")) == 0
+
+
+def test_engine_failure_gives_the_analysis_back(client, fake, monkeypatch):
+    from datetime import UTC, datetime
+
+    def down(request):
+        raise engine.EngineError("engine_timeout", "slow", 504)
+
+    monkeypatch.setattr(engine, "analyze", down)
+    created = _create(client)
+    _upload_all(fake, created)
+    assert client.post(f"/v1/sessions/{created['session_id']}/analyze").status_code == 504
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage.get(("u_test", day, "analyze")) == 0
+
+
+def test_a_session_made_baseline_shows_no_deltas_against_the_old_one(client, fake):
+    first = _create(client)
+    _upload_all(fake, first)
+    client.post(f"/v1/sessions/{first['session_id']}/analyze")
+    second = _create(client)
+    _upload_all(fake, second)
+    sid = second["session_id"]
+    before = client.post(f"/v1/sessions/{sid}/analyze").json()
+    assert any(m["delta"] is not None for m in before["result"]["metrics"])
+    assert client.post("/v1/baselines/forearm_treated", json={"session_id": sid}).status_code == 200
+    after = client.get(f"/v1/sessions/{sid}").json()
+    assert after["session"]["is_baseline"] is True
+    assert all(m["delta"] is None for m in after["result"]["metrics"])
+    assert after["session"]["baseline"]["session_id"] == sid
