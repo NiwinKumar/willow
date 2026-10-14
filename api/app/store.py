@@ -25,6 +25,7 @@ class Store(Protocol):
     def session_claim(self, uid: str, sid: str, stale: timedelta) -> bool: ...
     def baseline_get(self, uid: str, site: str) -> Doc | None: ...
     def baseline_set(self, uid: str, site: str, doc: Doc) -> None: ...
+    def baseline_delete(self, uid: str, site: str) -> None: ...
     def routine_list(self, uid: str) -> list[tuple[str, Doc]]: ...
     def routine_get(self, uid: str, entry_id: str) -> Doc | None: ...
     def routine_set(self, uid: str, entry_id: str, doc: Doc) -> None: ...
@@ -89,6 +90,9 @@ class FirestoreStore:
 
     def baseline_set(self, uid: str, site: str, doc: Doc) -> None:
         self._db().document(f"users/{uid}/baselines/{site}").set(doc)
+
+    def baseline_delete(self, uid: str, site: str) -> None:
+        self._db().document(f"users/{uid}/baselines/{site}").delete()
 
     def routine_list(self, uid: str) -> list[tuple[str, Doc]]:
         return [(s.id, s.to_dict()) for s in self._db().collection(f"users/{uid}/routine").stream()]
@@ -159,6 +163,9 @@ class MemoryStore:
 
     def baseline_set(self, uid: str, site: str, doc: Doc) -> None:
         self.baselines[(uid, site)] = copy.deepcopy(doc)
+
+    def baseline_delete(self, uid: str, site: str) -> None:
+        self.baselines.pop((uid, site), None)
 
     def routine_list(self, uid: str) -> list[tuple[str, Doc]]:
         return [(eid, copy.deepcopy(d)) for (u, eid), d in self.routine.items() if u == uid]

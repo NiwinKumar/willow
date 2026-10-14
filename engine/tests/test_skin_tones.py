@@ -71,4 +71,5 @@ def test_pipeline_reads_ita_at_every_tone(tmp_path, tone):
     expected = _expected_ita(skin)
     assert ita["value"] == pytest.approx(expected, abs=1.5)  # JPEG + texture tolerance
     assert ita["extras"]["ita_band"] == ita_band(expected)
-    assert ita["within_session_sd"] < 0.5  # identical skin -> tiny spread at every tone
+    # identical skin -> the spread is at its floor (config.MIN_SD) at every tone
+    assert ita["within_session_sd"] <= 0.5

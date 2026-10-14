@@ -272,9 +272,9 @@ export function Report() {
               {fmtDate(session.created_at)} · {photosUsed(session)} · {session.capture_mode === 'uncalibrated' ? 'phone camera' : 'RAW'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'RAW photos are'} compared to this
             </p>
             {leftOutPhotos(session.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session.result)}</p> : null}
-            {(session.result?.frames_used ?? session.n_frames) < 2 ? (
+            {(session.result?.frames_used ?? session.n_frames) < 3 ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-                {session.n_frames > 1 ? 'Only one photo passed' : 'One photo'}, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
+                {(session.result?.frames_used ?? session.n_frames) === 1 ? (session.n_frames > 1 ? 'Only one photo passed' : 'One photo') : 'Only two photos passed'}, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
               </p>
             ) : null}
             {data.mode === 'live' && missing.length ? (
@@ -312,8 +312,8 @@ export function Report() {
             {leftOutPhotos(session?.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session?.result)}</p> : null}
             {noBand ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-                Your baseline has one usable photo, so changes are shown but none can be called real yet.{' '}
-                {session && (session.result?.frames_used ?? 0) >= 2 ? 'This session has several usable photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
+                Your baseline has fewer than 3 usable photos, so changes are shown but none can be called real yet.{' '}
+                {session && (session.result?.frames_used ?? 0) >= 3 ? 'This session has several usable photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
               </p>
             ) : null}
             {baselineButton}

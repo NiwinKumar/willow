@@ -1,6 +1,8 @@
 """Fetch input frames (gs:// or, for local dev/tests, file paths) into a temp folder."""
 
 import os
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -25,28 +27,40 @@ def _check_format(name: str) -> None:
         raise EngineError("unsupported_format", f"{name}: expected one of {sorted(SUPPORTED)}")
 
 
+@lru_cache(maxsize=1)
+def gcs_client():
+    """One storage client per process (thread-safe). Building one per crop cost a credential
+    lookup each time, for up to 80 crops per face session."""
+    from google.cloud import storage  # imported lazily: tests run without GCP
+
+    return storage.Client()  # Application Default Credentials / Cloud Run SA
+
+
+def save_jpegs(jobs: list[tuple[np.ndarray, str]]) -> list[str]:
+    """Write many JPEGs at once (GCS uploads are network-bound): same results as save_jpeg."""
+    if len(jobs) <= 1:
+        return [save_jpeg(img, dest) for img, dest in jobs]
+    with ThreadPoolExecutor(max_workers=config.UPLOAD_WORKERS) as pool:
+        return list(pool.map(lambda j: save_jpeg(*j), jobs))
+
+
 def fetch_frames(uris: list[str], workdir: Path) -> list[str]:
-    """Download every frame to workdir; returns local paths in the same order."""
+    """Download every frame to workdir (in parallel); returns local paths in the same order."""
     for uri in uris:
         _check_format(uri)
-    paths = []
-    client = None
-    for i, uri in enumerate(uris):
+
+    def one(item: tuple[int, str]) -> str:
+        i, uri = item
         if not uri.startswith("gs://"):
             if os.environ.get(LOCAL_ENV) != "1":
                 raise EngineError("bad_request", f"frames must be gs:// URIs, got {uri}")
             if not Path(uri).is_file():
                 raise EngineError("frame_unreadable", f"no such file: {uri}")
-            paths.append(uri)
-            continue
-        if client is None:
-            from google.cloud import storage  # imported lazily: tests run without GCP
-
-            client = storage.Client()  # Application Default Credentials / Cloud Run SA
+            return uri
         bucket, name = parse_gs_uri(uri)
         dest = workdir / f"frame_{i}{Path(name).suffix.lower()}"
         try:
-            client.bucket(bucket).blob(name).download_to_filename(str(dest))
+            gcs_client().bucket(bucket).blob(name).download_to_filename(str(dest))
         except Exception as exc:  # map GCS failures to contract error codes
             kind = type(exc).__name__
             if kind in {"Forbidden", "Unauthorized"}:
@@ -54,8 +68,13 @@ def fetch_frames(uris: list[str], workdir: Path) -> list[str]:
             if kind == "NotFound":
                 raise EngineError("frame_unreadable", f"{uri}: not found") from exc
             raise EngineError("internal", f"{uri}: {kind}: {exc}") from exc
-        paths.append(str(dest))
-    return paths
+        return str(dest)
+
+    items = list(enumerate(uris))
+    if len(items) <= 1:
+        return [one(it) for it in items]
+    with ThreadPoolExecutor(max_workers=min(len(items), config.UPLOAD_WORKERS)) as pool:
+        return list(pool.map(one, items))
 
 
 def save_preview(srgb8: np.ndarray, output_prefix: str) -> str:
@@ -83,11 +102,9 @@ def save_jpeg(srgb8, dest: str, quality: int = 90) -> str:
     buf = io.BytesIO()
     Image.fromarray(srgb8).save(buf, format="JPEG", quality=quality)
     if dest.startswith("gs://"):
-        from google.cloud import storage
-
         bucket, name = parse_gs_uri(dest)
         try:
-            blob = storage.Client().bucket(bucket).blob(name)
+            blob = gcs_client().bucket(bucket).blob(name)
             blob.upload_from_string(buf.getvalue(), content_type="image/jpeg")
         except Exception as exc:
             code = (

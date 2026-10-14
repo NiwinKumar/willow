@@ -81,7 +81,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
               : b !== null && mdc !== null
                 ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
                 : b !== null && mdc === null
-                  ? 'Your baseline has one photo, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
+                  ? 'Your baseline has fewer than 3 usable photos, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
                   : current.confidence === 'indicative'
                     ? 'This metric is indicative: a directional estimate, so watch it as a trend.'
                     : 'This is your first reading. Future photos are compared to it; the noise band comes from the spread of your reference photos.'}

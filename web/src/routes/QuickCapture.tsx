@@ -48,6 +48,7 @@ export function QuickCapture() {
   const [shots, setShots] = useState<{ url: string; file: File }[]>([])
   const [countdown, setCountdown] = useState<number | null>(null)
   const [manual, setManual] = useState(false)
+  const [settledNow, setSettledNow] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
   const [uploadMode, setUploadMode] = useState<CaptureMode>('uncalibrated')
   const [uploadErrors, setUploadErrors] = useState<string[]>([])
@@ -78,6 +79,13 @@ export function QuickCapture() {
         setPhase('denied')
       })
       liveSince.current = performance.now()
+      // Once exposure and white balance have settled, hold them for every photo of the session
+      const track = s.getVideoTracks()[0]
+      setSettledNow(false)
+      window.setTimeout(() => {
+        setSettledNow(true)
+        if (track) void holdCamera(track)
+      }, SETTLE_MS)
       // The <video> only exists once the live view renders; the effect below attaches the stream.
       setPhase('live')
     } catch {
@@ -131,6 +139,7 @@ export function QuickCapture() {
       if (!g.light) setHint(mean <= 0.32 ? 'Find brighter light' : 'Too bright. Turn away from the lamp')
       else if (!g.even) setHint('Face the window or lamp so both sides are lit evenly')
       else if (!g.still) setHint('Hold still')
+      else if (liveSince.current !== null && performance.now() - liveSince.current <= SETTLE_MS) setHint('One moment: the camera is adjusting to the light')
       else setHint(faceSite ? 'Fill the oval with your face, eyes on the lens' : 'Fit the square in the frame')
       const now = performance.now()
       const all = g.light && g.even && g.still
@@ -141,7 +150,9 @@ export function QuickCapture() {
       if ((nearSince.current && now - nearSince.current > 8000) || (liveSince.current && now - liveSince.current > 4000)) setManual(true)
       if (all) {
         passSince.current ??= now
-        if (now - passSince.current > 600 && countdown === null && !firing.current && movedSinceShot.current) setCountdown(1)
+        // never before the camera has settled (and its settings are held, see holdCamera)
+        const settled = liveSince.current !== null && now - liveSince.current > SETTLE_MS
+        if (settled && now - passSince.current > 600 && countdown === null && !firing.current && movedSinceShot.current) setCountdown(1)
       } else {
         passSince.current = null
         if (countdown !== null && !firing.current) setCountdown(null)
@@ -378,7 +389,7 @@ export function QuickCapture() {
         <button
           type="button"
           onClick={() => void capture()}
-          disabled={!allPass && !manual}
+          disabled={(!allPass && !manual) || !settledNow}
           aria-label="Take photo"
           className="inline-flex h-16 w-16 items-center justify-center rounded-full border-4 border-text bg-surface transition-transform active:scale-95 disabled:opacity-40"
         >
@@ -388,4 +399,37 @@ export function QuickCapture() {
       </div>
     </div>
   )
+}
+
+/**
+ * A webcam keeps adjusting exposure and white balance: on Oct 14 the first two of five
+ * selfies came out yellower and redder than the rest, which tripled the noise band for
+ * redness. Wait for the camera to settle, then fix its current settings where the browser and
+ * camera allow it (read the settled values and apply them as manual ones, so nothing jumps).
+ */
+const SETTLE_MS = 2500
+
+type CameraCaps = { exposureMode?: string[]; whiteBalanceMode?: string[] }
+type CameraSettings = { exposureTime?: number; colorTemperature?: number; iso?: number }
+
+async function holdCamera(track: MediaStreamTrack): Promise<void> {
+  if (track.readyState !== 'live' || typeof track.getCapabilities !== 'function') return
+  const caps = track.getCapabilities() as CameraCaps
+  const now = track.getSettings() as CameraSettings
+  const hold: Record<string, string | number> = {}
+  if (caps.whiteBalanceMode?.includes('manual') && now.colorTemperature) {
+    hold.whiteBalanceMode = 'manual'
+    hold.colorTemperature = now.colorTemperature
+  }
+  if (caps.exposureMode?.includes('manual') && now.exposureTime) {
+    hold.exposureMode = 'manual'
+    hold.exposureTime = now.exposureTime
+    if (now.iso) hold.iso = now.iso
+  }
+  if (!Object.keys(hold).length) return
+  try {
+    await track.applyConstraints({ advanced: [hold as MediaTrackConstraintSet] })
+  } catch {
+    // not supported on this camera: the 2.5 s settle is still in place
+  }
 }

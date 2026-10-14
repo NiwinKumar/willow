@@ -11,25 +11,35 @@ All metrics are computed by classical CV in `engine/`. No model training. Gemini
 6. **Skin mask.** Inside ROIs, drop specular pixels (L* > ROI p99) and deep shadows (L* < ROI p1), and hair (dark thin structures via morphological black-hat).
 7. **Alignment across frames/sessions.** Similarity transform from landmarks to the first frame (face). Forearm: tape-corner markers or card-relative coordinates.
 8. **Aggregation.** Each metric computed per frame, then mean and SD across frames that passed gates.
-9. **MDC.** `mdc95 = 1.96 * sqrt(2) * within_session_sd`. Verdict vs baseline per `docs/CONTRACT.md` 2.4.
+9. **MDC.** `mdc95 = max(1.96 * sqrt(2) * sd, t(0.975, n-1) * sd * sqrt(1 + 1/n))` with `sd = max(within_session_sd, MIN_SD[metric])` (`engine/app/config.py`). The second term is the 95% prediction interval for one new photo: an SD from 2-3 photos is itself uncertain, and with z = 1.96 alone a 2-photo baseline called noise a real change about 1 time in 4 (simulated, Oct 14). The floor stops identical values (a count that did not move) from giving a band of 0. A band needs at least 3 passed photos (`MIN_FRAMES_FOR_BAND`): from 2 the spread is so uncertain that bands came out at hundreds of degrees; with fewer the SD is reported but there is no band and no verdict. Verdict vs baseline per `docs/CONTRACT.md` 2.4; the api does not compare across engine minor versions, nor blemish/dark-spot counts between a 1-photo and a 2+-photo session.
 
 ## The 11 parameters (build order = priority)
 
 | P | id | Formula / method | Site | Confidence |
 |---|---|---|---|---|
-| A1 | `tone_ita` | ITA = atan2(L* - 50, b*) * 180/pi, median over cheek ROIs (forearm: square ROI). Extras: L*, b*, ITA band (very light >55, light 41-55, intermediate 28-41, tan 10-28, brown -30-10, dark <-30), Monk estimate (rough mapping, label "estimate"). | face, cheek_macro, forearm | measured, descriptive only |
-| A2 | `redness` | Mean a* over cheek+nose ROIs (forearm: square). Extra: erythema index EI = 100*(log10(1/G) - log10(1/R)) on linear corrected RGB. | face, cheek_macro, forearm | measured |
+| A1 | `tone_ita` | ITA = atan2(L* - 50, b*) * 180/pi from L* and b* taken as each cheek's own median, then the mean of the cheeks (pooling a lit and a shaded cheek swung ITA by 6 degrees between photos; per cheek 1.9). Forearm: square ROI, white-paper corrected; "measured" only when every photo had the paper, else indicative. Extras: L*, b*, ITA band (very light >55, light 41-55, intermediate 28-41, tan 10-28, brown -30-10, dark <-30), Monk estimate (rough mapping, label "estimate"). | face, cheek_macro, forearm | measured, descriptive only |
+| A2 | `redness` | Face: mean of the per-ROI median a* over cheeks and nose, each region weighted equally (forearm: median a* over the square). Extra: erythema index EI = 100*(log10(1/G) - log10(1/R)) on linear corrected RGB. | face, cheek_macro, forearm | measured |
 | A3 | `tone_evenness` | SD of per-ROI median L* across 6-8 ROIs + mean within-ROI SD of a melanin proxy (MI = 100*log10(1/R_lin) style, or L*/b* contrast). Lower = more even. | face | measured |
 | A4 | `pigment_spots` | Melanin-proxy map; subtract ROI median (tone-relative); local contrast; `skimage.feature.blob_log` or adaptive threshold; report area % of skin mask, count, mean contrast. Threshold k * MAD of the person's own skin, never an absolute L*. With 2+ passed photos, only spots that another photo of the session also shows (within 3 mm after aligning the photos on face landmarks) count toward the value; every spot stays a candidate with `features.seen_in_fraction`. | face, cheek_macro | measured |
 | A5 | `pores` | Macro only. High-pass luminance (DoG), `blob_log` dark blobs 0.05-0.3 mm (scale from cone/known card size), density per cm2, mean diameter. | cheek_macro, nose_macro | measured |
 | A6 | `texture` | Macro only. Energy of Laplacian / Gabor bank on L* within skin mask, normalized by mean L*. Auto-downgrade to indicative if mdc95 > 25% of value. | cheek_macro | measured* |
-| B1 | `dark_circles` | Under-eye ROI minus cheek ROI: ΔL* (value), Δa*, Δmelanin proxy (extras). Relative to own cheek, works across tones. | face | measured |
+| B1 | `dark_circles` | Built Oct 14. Per visible side: median L* of under-eye skin (ROI ∩ hair-free face skin) minus the same side's cheek; mean of the sides. Extra: Δa*. Skipped when under 20 mm² of under-eye skin is visible. Relative to own cheek, so it works across tones and cancels exposure (session SD 0.8 L* on laptop selfies). | face | indicative (faces have no colour reference) |
 | B2 | `blemishes` | Candidate blobs: local a* elevation (redness above ROI median + k*MAD) combined with shading contrast; size filter; output count + `candidates[]` crops (64-128 px + 3x context crop) for Gemini labelling. With 2+ passed photos the count uses only blemishes another photo also shows (same rule as `pigment_spots`). Nose macro also reports `blackheads` (small dark blobs). | face, cheek_macro, nose_macro | indicative |
 | C1 | `lines` | Frangi / Hessian ridge filter on L* in forehead, crow's feet and nasolabial ROIs + Gabor orientation prior; line pixel density. Gate on neutral expression. | face | indicative |
 | C2 | `shine` | Specular fraction in T-zone vs U-zone: pixels with high V and low S in HSV (or dichromatic separation). Capture at a fixed time after washing. | face | indicative |
 | C3 | `glow` | Composite of mean L* (vs own baseline), chroma, and inverse of fine-scale luminance variance. Change only. | face | indicative |
 
 Tiers: **A = must** (M2/M3), **B = should** (M3/M4), **C = only if time** (M4). Cut C first.
+
+## Face regions and fairness (Oct 14)
+- Region statistics use the region's hair-free skin (beard, stubble, brows and hair removed by the face-skin refinement) when at least half of the region is left.
+- Dark-spot L* thresholds scale with the person's own skin lightness, `(L*skin + 16) / (60 + 16)`, never above 1: a mark that reflects 25% less light is a 4.5 L* step at L* 30 and a 7.5 step at L* 70, so fixed steps missed it on deep skin.
+- The sharpest passed front photo is the reference (spots, crops, regions, preview). A hand over a cheek or the nose fails the photo (`occlusion_suspected`); over the chin or forehead it is cut out.
+- Side-view sessions are not compared with a front-on baseline.
+
+## Forearm (Oct 14)
+- DNG BaselineExposure is applied when decoding (phone DNGs decoded about 2x too dark otherwise).
+- Pen dots must clearly beat the skin's other spots (every spot but the 8 strongest) and no spot of similar strength may sit inside the square; white paper must be colourless in linear light, brighter than the skin, sheet-sized and level with the skin. Without paper the reading is a trend.
 
 ## Not shown (by design)
 Hydration (RGB can't measure water), firmness/sagging, skin age, UV spots, porphyrins, eye bags (optional Gemini label only).
