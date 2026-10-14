@@ -188,6 +188,10 @@ BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red li
 CROP_SIZE_PX = (64, 128)  # candidate crop side, clamped to this range
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
 
+# preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
+PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
+PREVIEW_QUALITY = 85
+
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
 ALIGN_WARN_MM = 3.0  # warn if a photo's rigid landmarks still differ by more than this
