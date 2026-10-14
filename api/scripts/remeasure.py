@@ -6,6 +6,11 @@ their baseline and later ones are compared with it. Dry run by default.
 
     uv run python scripts/remeasure.py [--site face_full] [--session s_...] [--apply]
 
+It writes to the real Firestore, so it must call the real engine: export the variables in
+infra/api-env.yaml (ENGINE_MODE=http, ENGINE_URL, BUCKET, ...) and AUTH_MODE=dev (so the engine
+call can use your gcloud identity token). With the default ENGINE_MODE=fixture it refuses to
+apply: the contract fixture's sample numbers would be saved as measurements.
+
 `--session` runs those sessions again even if they are already measured (after a fix).
 `--all` runs every measured session again, oldest first (after an engine version change: the
 baseline is measured first, so later sessions are compared with the new numbers).
@@ -23,6 +28,9 @@ from app.store import FirestoreStore  # noqa: E402
 
 def main() -> int:
     apply = "--apply" in sys.argv
+    if apply and get_settings().engine_mode != "http":
+        print("refusing to apply: ENGINE_MODE is not http (export infra/api-env.yaml first)")
+        return 2
     sites = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--site"} or None
     only = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--session"} or None
     store = FirestoreStore()

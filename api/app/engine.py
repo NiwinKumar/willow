@@ -135,7 +135,12 @@ def _http_analyze(request: dict[str, Any]) -> dict[str, Any]:
     return res.json()
 
 
-def health() -> dict[str, Any]:
+# A cold engine takes about 35 s to answer (Cloud Run starts the container, then the models
+# load): the status check waits that long, so a sleeping engine reads as "waking", not down.
+HEALTH_TIMEOUT_S = 45.0
+
+
+def health(timeout: float = HEALTH_TIMEOUT_S) -> dict[str, Any]:
     """The engine's /v1/health, for the status panel. Fixture mode answers locally."""
     if get_settings().engine_mode == "fixture":
         return {"status": "ok", "engine_version": "fixture"}
@@ -146,8 +151,10 @@ def health() -> dict[str, Any]:
     if not url.startswith(("http://localhost", "http://127.0.0.1")):
         headers["Authorization"] = f"Bearer {_id_token(url)}"
     try:
-        res = httpx.get(f"{url.rstrip('/')}/v1/health", headers=headers, timeout=20.0)
+        res = httpx.get(f"{url.rstrip('/')}/v1/health", headers=headers, timeout=timeout)
         res.raise_for_status()
+    except httpx.TimeoutException as exc:
+        raise EngineError("engine_waking", str(exc)) from exc
     except httpx.HTTPError as exc:
         raise EngineError("engine_unreachable", str(exc)) from exc
     return res.json()
