@@ -102,3 +102,14 @@ def test_skin_colour_keeps_inflamed_red_skin():
     ref = np.zeros_like(mask)
     ref[20:120, 40:200] = True
     assert skin_colour(lab, mask, ref, PX_PER_MM)[185, 120]
+
+
+def test_skin_colour_keeps_normal_skin_when_the_cheek_patch_is_inflamed():
+    lab = _skin(L=78.0, a=7.0, b=12.0)  # normal skin, chroma about 14
+    lab[80:160, 80:160] = (74.0, 24.0, 14.0)  # the cheek patch is inflamed acne, chroma 28
+    mask = np.ones((240, 240), bool)
+    ref = np.zeros_like(mask)
+    ref[90:150, 90:150] = True
+    keep = skin_colour(lab, mask, ref, PX_PER_MM)
+    assert keep[20, 20] and keep[200, 200]  # normal skin around it stays
+    assert keep[120, 120]

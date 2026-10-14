@@ -443,14 +443,21 @@ def skin_colour(lab: np.ndarray, mask: np.ndarray, ref: np.ndarray, px_per_mm: f
     # the cheek patch sits on the highlight and shaded skin (under the mouth) read as hair.
     # The shine limit keeps the brighter of the two, so lit skin is not cut as shine.
     l_all, l_cheek = float(np.median(L[mask])), float(np.median(L[ref]))
-    c_ref = float(np.median(chroma[ref]))
-    h_ref = float(np.median(hue[ref]))
-    d_hue = (hue - h_ref + 180) % 360 - 180  # negative = redder than the cheek
+    # colour like the cheek patch OR like all of this skin: on acne skin the cheek patch
+    # can be the inflamed area (normal skin around it then looks "not skin"), and on a
+    # shiny face all-skin colour is pulled by shine; skin either reference accepts stays
+    colour = np.zeros_like(mask)
+    for region in (ref, mask):
+        c_ref = float(np.median(chroma[region]))
+        d_hue = (hue - float(np.median(hue[region])) + 180) % 360 - 180  # negative = redder
+        colour |= (
+            (chroma >= config.SIDE_MIN_CHROMA_FRAC * c_ref)
+            & (d_hue <= config.SIDE_MAX_HUE_DEG)
+            & (d_hue >= -config.SIDE_MAX_RED_SHIFT_DEG)  # inflamed skin is redder: keep it
+        )
     keep = (
         mask
-        & (chroma >= config.SIDE_MIN_CHROMA_FRAC * c_ref)
-        & (d_hue <= config.SIDE_MAX_HUE_DEG)
-        & (d_hue >= -config.SIDE_MAX_RED_SHIFT_DEG)  # inflamed skin is much redder: keep it
+        & colour
         & (L <= max(l_all, l_cheek) + config.SIDE_MAX_BRIGHTER_L)
         & (L >= min(l_all, l_cheek) - config.SIDE_MAX_DARKER_L)
     )
@@ -495,6 +502,7 @@ def edge_hair(
     ref: np.ndarray,
     px_per_mm: float,
     ear_side: np.ndarray | None = None,
+    face: np.ndarray | None = None,
 ) -> np.ndarray:
     """Sideburns / temple hair on side views: rough (fine texture well above this
     person's skin) AND greyer than the cheek, over a SIDE_HAIR_WINDOW_MM window, in
@@ -510,7 +518,9 @@ def edge_hair(
     grey = chroma < config.SIDE_HAIR_CHROMA * float(np.median(chroma[ref]))
     hair = (skin & rough & grey).astype(np.uint8)
     hair = cv2.morphologyEx(hair, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-    outer = binary_fill_holes(skin).astype(np.uint8)
+    # the face's own edge (`face`: skin before the colour cut), not the edge of an area cut
+    # for being washed out, which can run through the middle of the cheek
+    outer = binary_fill_holes(skin if face is None else face).astype(np.uint8)
     # (borderValue 0: a mask that runs to the crop border has an edge there too)
     inner = cv2.erode(
         outer, np.ones((5, 5), np.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0

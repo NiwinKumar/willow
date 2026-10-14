@@ -110,12 +110,13 @@ def _frame(path: str) -> dict:
         lab[..., 0], box.crop(face_mask_full), zones, px_per_mm, np.hypot(lab[..., 1], lab[..., 2])
     )
     if face.view != "front":  # hair, background and shine crowd a turned cheek
+        face_edge = face_skin.copy()  # where the face really ends, before the colour cut
         face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
         # sideburns and temple hair beside the ear (beards: the lower-face stubble test in
         # refine_skin). A dark-speck density test is not used here: dense acne marks on
         # deep skin look the same and were cut.
         ear = face.ear_side(face_skin.shape, (box.x, box.y))
-        face_skin &= ~edge_hair(lab, face_skin, cheek_skin, px_per_mm, ear)
+        face_skin &= ~edge_hair(lab, face_skin, cheek_skin, px_per_mm, ear, face_edge)
     # both searches skip the band where hair, jaw shadow or background meet skin and the
     # brows and eye corners; dark spots also skip the glabella, the lip / nostril edges and
     # mouth corners (shading; it is not red, so blemishes there still count). Full face skin is still "nearby skin".
