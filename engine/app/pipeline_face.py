@@ -1,6 +1,7 @@
 """face_full analysis (M2): landmarks -> ROIs + face skin mask -> Lab -> A-tier face metrics."""
 
 import json
+import logging
 import time
 
 import cv2
@@ -33,12 +34,15 @@ from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
 from app.quality import FrameQuality, check_frame
 from app.roi import Box
 
+log = logging.getLogger("willow.face")
+
 METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
     "pigment_spots": ("tone_pigment", "Dark spots", "pct_area"),
     "tone_evenness": ("tone_pigment", "Tone evenness", "index"),
     "redness": ("redness", "Redness", "a_star"),
     "blemishes": ("clarity", "Blemishes", "count"),
+    "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
 }
 ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
@@ -75,6 +79,8 @@ def _frame(path: str) -> dict:
     face = detect_face(srgb8)
     polys = face.roi_polygons()
     face_mask_full = face.skin_mask(srgb8.shape[:2])
+    if not face_mask_full.any():  # face at the very edge of the photo: nothing to measure
+        raise FaceNotFound("no face skin inside the photo")
     ys, xs = np.nonzero(face_mask_full)
     face_outline = np.array([[xs.min(), ys.min()], [xs.max() + 1, ys.max() + 1]], float)
     box = _bbox([*polys.values(), face_outline], srgb8.shape[:2])  # face area only
@@ -83,11 +89,17 @@ def _frame(path: str) -> dict:
     # a hand resting on the face (chin, cheek) is skin but not face: cut it everywhere
     hands = detect_hands(srgb8, config.HAND_MIN_SPAN_EYES * face.eye_distance_px)
     hand = box.crop(hand_mask(srgb8.shape[:2], hands, config.HAND_MARGIN_MM * face.px_per_mm))
-    masks = {}
+    masks, covered = {}, False
     for n, p in polys.items():
         m = box.crop(polygon_mask(srgb8.shape[:2], p))
-        # keep an ROI that is mostly covered as it is (the photo fails as occluded anyway)
-        masks[n] = m & ~hand if (m & ~hand).sum() >= 0.5 * m.sum() else m
+        if (m & ~hand).sum() >= 0.5 * m.sum():
+            masks[n] = m & ~hand
+        elif n in face.cheeks or n == "nose":
+            # tone and redness come from here: a hand over it fails the photo (below)
+            masks[n], covered = m, True
+        else:
+            # chin or forehead under a hand resting on the face: measure what is left of it
+            masks[n] = m & ~hand if (m & ~hand).any() else m
     # sharpness/exposure on the cheek area (2-D patch the Laplacian needs)
     cheek_mask = cheek_box.crop(
         np.logical_or.reduce([polygon_mask(srgb8.shape[:2], polys[c]) for c in face.cheeks])
@@ -98,7 +110,9 @@ def _frame(path: str) -> dict:
     if not _pose_ok(face):
         quality.reasons.append("pose_out_of_range")
     face_area = box.crop(face_mask_full)
-    if (face_area & hand).sum() > config.HAND_OCCLUSION_FRAC * max(face_area.sum(), 1):
+    # a hand over a measured region (a fingertip on the cheek feeds tone and redness) or over
+    # a large part of the face fails the photo
+    if covered or (face_area & hand).sum() > config.HAND_OCCLUSION_FRAC * max(face_area.sum(), 1):
         quality.reasons.append("occlusion_suspected")
 
     # colours as the phone captured them: users do not hold a white reference
@@ -107,14 +121,7 @@ def _frame(path: str) -> dict:
 
     skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
     cheek_skin = np.logical_or.reduce([skin[c] for c in face.cheeks])
-    l_star = float(np.median(lab[..., 0][cheek_skin]))
-    b_star = float(np.median(lab[..., 2][cheek_skin]))
-    red_skin = np.logical_or.reduce([skin[n] for n in _rois(face, REDNESS_ROIS)])
     px_per_mm = face.px_per_mm
-
-    evenness, _ = tone_evenness(
-        {n: (lab[..., 0], lin[..., 0], skin[n]) for n in _rois(face, EVENNESS_ROIS)}, px_per_mm
-    )
     # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair) for blemishes
     # and dark spots
     zones = {k: box.crop(v) for k, v in face.feature_zones(srgb8.shape[:2]).items()}
@@ -129,6 +136,42 @@ def _frame(path: str) -> dict:
         ear = face.ear_side(face_skin.shape, (box.x, box.y))
         face_skin &= ~edge_hair(lab, face_skin, cheek_skin, px_per_mm, ear)
     face_skin &= ~hand
+
+    # Region skin without beard, stubble, brows or hair (face_skin), when enough is left;
+    # a region that is mostly hair keeps its outline (its median is still skin-weighted).
+    roi_skin = {}
+    for n, m in skin.items():
+        refined = m & face_skin
+        roi_skin[n] = refined if refined.sum() >= config.ROI_MIN_SKIN_FRAC * max(m.sum(), 1) else m
+
+    def med(channel: int, n: str) -> float:
+        return float(np.median(lab[..., channel][roi_skin[n]]))
+
+    # Tone: each cheek's own median, then their mean. Pooling both cheeks put the median in
+    # the gap between a lit and a shaded cheek and swung ITA by 6 degrees between photos
+    # (Oct 14); per cheek it was 1.9.
+    l_star = float(np.mean([med(0, c) for c in face.cheeks]))
+    b_star = float(np.mean([med(2, c) for c in face.cheeks]))
+    # Redness: each region weighs the same (the nose is small and redder; pixel pooling let
+    # its share of the pixels move the value)
+    red_rois = _rois(face, REDNESS_ROIS)
+    redness_a = float(np.mean([med(1, n) for n in red_rois]))
+    red_skin = np.logical_or.reduce([roi_skin[n] for n in red_rois])
+    evenness, _ = tone_evenness(
+        {n: (lab[..., 0], lin[..., 0], roi_skin[n]) for n in _rois(face, EVENNESS_ROIS)}, px_per_mm
+    )
+    # Dark circles: under-eye skin minus the same side's cheek, in L* (docs/METRICS.md B1);
+    # relative to the person's own cheek, so it works at every tone and cancels exposure.
+    circles = [
+        (
+            med(0, f"{side}_under_eye") - med(0, f"{side}_cheek"),
+            med(1, f"{side}_under_eye") - med(1, f"{side}_cheek"),
+        )
+        for side in ("right", "left")
+        if f"{side}_under_eye" in roi_skin
+        and f"{side}_cheek" in roi_skin
+        and roi_skin[f"{side}_under_eye"].sum() >= config.UNDER_EYE_MIN_MM2 * px_per_mm**2
+    ]
     # both searches skip the band where hair, jaw shadow or background meet skin and the
     # brows and eye corners; dark spots also skip the glabella, the lip / nostril edges and
     # mouth corners (shading; it is not red, so blemishes there still count). Full face skin is still "nearby skin".
@@ -189,8 +232,9 @@ def _frame(path: str) -> dict:
         "tone_ita": ita_degrees(l_star, b_star),
         "pigment_spots": spots_pct,
         "tone_evenness": evenness,
-        "redness": float(np.mean(lab[..., 1][red_skin])),
+        "redness": redness_a,
         "blemishes": float(len(blemishes)),
+        "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -198,6 +242,9 @@ def _frame(path: str) -> dict:
         "tone_evenness": {},
         "redness": {"erythema_index": erythema_index(lin, red_skin)},
         "blemishes": {},
+        "dark_circles": {"delta_a_star": float(np.mean([c[1] for c in circles]))}
+        if circles
+        else {},
     }
     return {
         "values": values,
@@ -246,7 +293,7 @@ def _align(ref: dict, others: list[dict]) -> tuple[list[np.ndarray], list[str]]:
         try:
             m = similarity(f["face"].points, ref_pts)
         except ValueError:
-            mapped.append(np.empty((0, 2)))
+            mapped.append(None)  # not lined up: no evidence about any mark either way
             warnings.append(
                 f"photo {f['index'] + 1} could not be lined up with photo {ref['index'] + 1}"
             )
@@ -265,10 +312,13 @@ def _seen_in(ref: dict, mapped: list[np.ndarray]) -> list[float]:
     included) with a blemish or spot within ALIGN_MATCH_MM of it. A real mark is in every
     photo; grain, glints and stray hairs usually are in one."""
     gap = config.ALIGN_MATCH_MM * ref["face"].px_per_mm
+    lined_up = [o for o in mapped if o is not None]  # photos that could not be lined up say nothing
     out = []
     for p in _marks(ref):
-        hits = 1 + sum(bool(len(o)) and float(np.min(np.hypot(*(o - p).T))) <= gap for o in mapped)
-        out.append(round(hits / (1 + len(mapped)), 2))
+        hits = 1 + sum(
+            bool(len(o)) and float(np.min(np.hypot(*(o - p).T))) <= gap for o in lined_up
+        )
+        out.append(round(hits / (1 + len(lined_up)), 2))
     return out
 
 
@@ -291,7 +341,10 @@ def _count_confirmed(good: list[dict]) -> None:
     for i, f in enumerate(good):
         if mapped[i] is None:
             continue
-        others = [o for j, o in enumerate(mapped) if j != i and o is not None and len(o)]
+        partners = [o for j, o in enumerate(mapped) if j != i and o is not None]
+        if not partners:  # its only partner could not be lined up: keep its own counts
+            continue
+        others = [o for o in partners if len(o)]
         seen = [any(float(np.min(np.hypot(*(o - p).T))) <= gap for o in others) for p in mapped[i]]
         n_b = len(f["blemishes"])
         f["values"]["blemishes"] = float(sum(seen[:n_b]))
@@ -401,6 +454,11 @@ def analyze_face(
         except FaceNotFound:
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
+        except (IndexError, ValueError) as exc:  # an empty region at the photo edge, etc.
+            log.warning("face photo %d could not be measured: %s", i + 1, exc)
+            per_frame.append({"index": i, "passed": False, "reasons": []})
+            warnings.append(f"photo {i + 1} could not be measured")
+            continue
         f["index"] = i
         frames.append(f)
         q = f["quality"]
@@ -409,16 +467,19 @@ def analyze_face(
     # one view per summary: front photos if any passed, else the side views (each measures
     # different skin, so they are not averaged together)
     good = [f for f in passed if f["view"] == "front"] or passed
+    # the sharpest photo is the reference: spots, crops, regions and the preview come from it
+    good.sort(key=lambda f: -f["quality"].sharpness)
     _count_confirmed(good)
 
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
-        if good:
+        have = [f for f in good if f["values"][metric_id] is not None]
+        if have:
             summary = summarize(
-                [f["values"][metric_id] for f in good], base, config.MIN_SD.get(metric_id, 0.0)
+                [f["values"][metric_id] for f in have], base, config.MIN_SD.get(metric_id, 0.0)
             )
-            extras = _mean_extras([f["extras"][metric_id] for f in good])
+            extras = _mean_extras([f["extras"][metric_id] for f in have])
             if metric_id == "tone_ita":
                 extras["ita_band"] = ita_band(summary["value"])
             if metric_id == "pigment_spots":
@@ -454,6 +515,12 @@ def analyze_face(
         warnings.insert(0, "no colour card: colours as captured by the camera")
 
     sides = sorted({f["view"] for f in good if f["view"] != "front"})
+    if sides and baseline:
+        # one cheek against a front-on baseline is a different measurement, not a change
+        for m in metrics:
+            if m["delta"] is not None:
+                m.update(delta=None, verdict="no_baseline", direction="none")
+        warnings.append("side view: not compared with your baseline, which is front-on")
     if sides:
         warnings.append(
             "side view: measured on the visible side of the face only ("

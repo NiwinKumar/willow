@@ -52,7 +52,10 @@ MIN_SD = {
     "tone_evenness": 0.1,
     "pigment_spots": 0.05,  # % of skin area
     "blemishes": 0.5,  # marks
+    "dark_circles": 0.3,  # delta L*
 }
+ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
+UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
@@ -133,6 +136,8 @@ EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-m
 # on IMG_2537 -6; false hits were mostly broad 5-9 mm shading at 2-4 L*, so marks wider
 # than SPOT_LARGE_MM need proportionally more (8 mm -> 6 L*).
 SPOT_MIN_DL = 3.0
+SPOT_TUNE_L = 60.0  # skin L* the L*-step thresholds were tuned on (Oct 13 photos)
+SPOT_TONE_MIN_SCALE = 0.4  # deepest skin: thresholds go no lower than 40%
 SPOT_LARGE_MM = 4.0
 # ...and stand out from camera grain: score (darkness / fine skin texture) at least this.
 # Not the main test: texture depends on the camera (sharp HEIC 0.9 L*, soft JPEG 0.5).

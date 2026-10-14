@@ -25,6 +25,12 @@ class Spot:
     area_px: int
 
 
+def tone_scale(l_skin: float) -> float:
+    """Factor for L*-step thresholds at this skin lightness: (L* + 16) / (L*_tune + 16), at
+    most 1 (the thresholds were tuned on mid-tone skin and are kept there and above)."""
+    return min(1.0, max(config.SPOT_TONE_MIN_SCALE, (l_skin + 16) / (config.SPOT_TUNE_L + 16)))
+
+
 def strand_map(l_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
     """Hair-thin pixels much darker than the skin within ~0.5 mm (full resolution: strands
     are 1-2 px wide and vanish when the photo is shrunk)."""
@@ -139,6 +145,10 @@ def find_spots(
     )
     edge = max(round(config.SPOT_EDGE_MM * px_per_mm), 1)
     inner = ndimage.binary_erosion(search, iterations=edge)  # away from eyes, brows, lips
+    # Fair at every tone: a mark that reflects the same share less light is a smaller L* step
+    # on deep skin (dL* ~ (L* + 16) / 3 * dlnY), so the L* thresholds shrink with this
+    # person's own skin lightness below the tone they were tuned on (never grow above it).
+    tone = tone_scale(float(np.median(l_star[skin])) if skin.any() else config.SPOT_TUNE_L)
     yy, xx = np.ogrid[: skin.shape[0], : skin.shape[1]]
     min_area = np.pi * (config.SPOT_MIN_CORE_MM / 2 * px_per_mm) ** 2
     holes = outline & ~skin  # eyes, lips, nostrils, brows, hair
@@ -152,7 +162,7 @@ def find_spots(
         score = float(z[disk].mean())
         dc = float((chroma - c_bg)[disk].mean())
         dl = float((l_bg - lab[..., 0])[disk].mean())  # L* darker than nearby skin
-        min_dl = config.SPOT_MIN_DL * max(1.0, 2 * r / px_per_mm / config.SPOT_LARGE_MM)
+        min_dl = tone * config.SPOT_MIN_DL * max(1.0, 2 * r / px_per_mm / config.SPOT_LARGE_MM)
         min_score = config.SPOT_STRICT_SCORE if strict[y, x] else config.SPOT_MIN_SCORE
         # (no colour test: on deep skin post-acne marks go grey-violet just like shading;
         # shadows are kept out by the guard zones and the round test below)
@@ -169,9 +179,9 @@ def find_spots(
         # crossing the skin is as dark as the centre on at least one side.
         ring_dl = _ring_contrast(lab[..., 0], skin, x, y, r, px_per_mm, holes)
         diam_mm = 2 * r / px_per_mm
-        min_ring = max(config.SPOT_MIN_RING_DL, config.SPOT_LARGE_RING_PER_MM * diam_mm)
+        min_ring = tone * max(config.SPOT_MIN_RING_DL, config.SPOT_LARGE_RING_PER_MM * diam_mm)
         if diam_mm <= config.SPOT_LARGE_MM:
-            min_ring = config.SPOT_MIN_RING_DL
+            min_ring = tone * config.SPOT_MIN_RING_DL
         if ring_dl < min_ring:
             continue
         # hair around it (baby hairs at the hairline, brow strands): not a mark
