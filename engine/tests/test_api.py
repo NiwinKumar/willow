@@ -86,8 +86,8 @@ def test_photo_without_dots_fails_quality_not_request(tmp_path, local_files):
     assert any("pen-dot square not found" in w for w in body["warnings"])
 
 
-def test_face_site_is_marked_placeholder():
-    res = client.post("/v1/analyze", json=_request("face_full", ["gs://b/u/s/frame_1.jpg"]))
+def test_macro_site_is_marked_placeholder():
+    res = client.post("/v1/analyze", json=_request("cheek_macro", ["gs://b/u/s/frame_1.jpg"]))
     assert res.status_code == 200
     assert res.json()["warnings"][0].startswith("placeholder")
 
