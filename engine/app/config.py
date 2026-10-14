@@ -232,8 +232,13 @@ PORE_MIN_SCORE = 3.0
 BLACKHEAD_MIN_DL = 12.0
 BLACKHEAD_MAX_CHROMA_RATIO = 0.7
 BLACKHEAD_MIN_DIAMETER_MM = 0.1
-# texture (docs/METRICS.md A6): Laplacian energy at this fine scale
-TEXTURE_SIGMA_MM = 0.1
+# texture (docs/METRICS.md A6): Laplacian energy at this scale: bumps and enlarged pores.
+# Oct 15, two selfies of the same skin at 16 and 18 px/mm: at 0.1 mm the values differed
+# 33-54% (it measured the camera's sharpness), at 0.4 mm 2-8%. 0.4 mm is 4 px at 10 px/mm,
+# so ordinary close selfies get texture; the pore count still needs MACRO_MIN_PX_PER_MM
+TEXTURE_SIGMA_MM = 0.4
+TEXTURE_MIN_PX_PER_MM = 10.0
+TEXTURE_EDGE_MM = 1.5  # left out along a region's edge (creases, outline shading)
 # Laplacian variance at the working scale. Oct 14 synthetic close-ups: sharp skin 8-18 (smooth
 # or deep skin is lower), blurred by 0.05 mm or more under 1 (pore counts break at 0.2 mm).
 # From synthetic photos only: check on real macro shots.
