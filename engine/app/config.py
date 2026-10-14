@@ -90,7 +90,9 @@ FACE_HEIGHT_MM = 74.9
 # background and shine (bright, grey) drop out; marks keep enough colour to stay.
 SIDE_MIN_CHROMA_FRAC = 0.5
 SIDE_MAX_HUE_DEG = 25.0
-SIDE_MAX_RED_SHIFT_DEG = 50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+SIDE_MAX_RED_SHIFT_DEG = (
+    50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+)
 SIDE_MAX_BRIGHTER_L = 15.0
 SIDE_MAX_DARKER_L = 30.0
 SIDE_FILL_HOLES_MM2 = 80.0
@@ -100,7 +102,8 @@ SIDE_FILL_HOLES_MM2 = 80.0
 SIDE_HAIR_WINDOW_MM = 4.0
 SIDE_HAIR_TEXTURE = 1.4
 SIDE_HAIR_CHROMA = 0.9  # fill smaller holes (a 10 mm mark that lost colour stays skin)
-MAX_ABS_PITCH = 8.0
+MAX_ABS_PITCH = 15.0  # laptop / webcam selfies sit at 8-12° (camera above the screen); ROIs stay on
+# the same skin up to 15° (canonical-mesh test in tests/test_pose.py), same as SIDE_MAX_PITCH
 MAX_ABS_ROLL = 6.0
 EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-mm scale
 
