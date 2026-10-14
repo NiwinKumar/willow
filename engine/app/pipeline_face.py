@@ -235,6 +235,34 @@ def _seen_in(ref: dict, mapped: list[np.ndarray]) -> list[float]:
     return out
 
 
+def _count_confirmed(good: list[dict]) -> None:
+    """With 2+ photos, blemishes and pigment_spots count only marks that another photo of
+    the session also shows (within ALIGN_MATCH_MM after lining the photos up): one photo's
+    grain, glint or stray hair should not move the number. Every mark stays a candidate.
+    A photo that cannot be lined up keeps all its marks (no evidence either way)."""
+    if len(good) < 2:
+        return
+    ref = good[0]
+    mapped: list[np.ndarray | None] = []
+    for f in good:
+        try:
+            m = np.eye(2, 3) if f is ref else similarity(f["face"].points, ref["face"].points)
+            mapped.append(transform(m, _marks(f)))
+        except ValueError:
+            mapped.append(None)
+    gap = config.ALIGN_MATCH_MM * ref["face"].px_per_mm
+    for i, f in enumerate(good):
+        if mapped[i] is None:
+            continue
+        others = [o for j, o in enumerate(mapped) if j != i and o is not None and len(o)]
+        seen = [any(float(np.min(np.hypot(*(o - p).T))) <= gap for o in others) for p in mapped[i]]
+        n_b = len(f["blemishes"])
+        f["values"]["blemishes"] = float(sum(seen[:n_b]))
+        spots = [s for s, ok in zip(f["spots"], seen[n_b:], strict=True) if ok]
+        pct, extras = pigment_spots(spots, int(f["face_skin"][1].sum()))
+        f["values"]["pigment_spots"], f["extras"]["pigment_spots"] = pct, extras
+
+
 def _candidates(
     frame: dict, output_prefix: str | None, limit: int, seen: list[float] | None = None
 ) -> list[dict]:
@@ -326,6 +354,7 @@ def analyze_face(
     # one view per summary: front photos if any passed, else the side views (each measures
     # different skin, so they are not averaged together)
     good = [f for f in passed if f["view"] == "front"] or passed
+    _count_confirmed(good)
 
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
