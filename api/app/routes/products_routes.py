@@ -192,6 +192,7 @@ def advisor_chat(
     try:
         reply = advisor.chat([m.model_dump() for m in body.messages], store, user.uid)
     except Exception as exc:  # Vertex unavailable, quota, safety block
+        limits.refund(store, user.uid, "advisor")
         raise HTTPException(
             502, {"code": "advisor_unavailable", "message": "The advisor is unavailable right now."}
         ) from exc

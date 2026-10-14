@@ -76,7 +76,25 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
         const fresh = await api.reissueUploadUrls(token, session.current.id)
         session.current = { ...session.current, targets: fresh.upload_urls, issuedAt: Date.now() }
       }
-      const { id, targets } = session.current
+      const { id } = session.current
+      // Signed upload links last 15 minutes: on a slow connection, renew them before any file
+      // starts after the 10-minute mark (one renewal shared by both workers).
+      let renewing: Promise<void> | null = null
+      const targetsNow = async () => {
+        const s = session.current!
+        if (Date.now() - s.issuedAt > 10 * 60_000) {
+          renewing ??= api
+            .reissueUploadUrls(await getIdToken(), s.id)
+            .then((fresh) => {
+              session.current = { ...s, targets: fresh.upload_urls, issuedAt: Date.now() }
+            })
+            .finally(() => {
+              renewing = null // a failed renewal is retried by the next attempt
+            })
+          await renewing
+        }
+        return session.current!.targets
+      }
       const queue = current.map((r, i) => (r.state === 'done' ? -1 : i)).filter((i) => i >= 0)
       const worker = async () => {
         for (let i = queue.shift(); i !== undefined; i = queue.shift()) {
@@ -85,7 +103,7 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
           while (attempt < 3) {
             set(idx, { state: 'uploading', error: undefined })
             try {
-              await putSigned(targets[idx], current[idx].file, (f) => set(idx, { progress: f }))
+              await putSigned((await targetsNow())[idx], current[idx].file, (f) => set(idx, { progress: f }))
               set(idx, { state: 'done', progress: 1 })
               break
             } catch {

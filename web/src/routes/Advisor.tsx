@@ -52,7 +52,7 @@ export function Advisor() {
     void (async () => {
       try {
         if (!user) await continueAsGuest()
-        const reply = await api.advisorChat(await getIdToken(), history.slice(-20).map((t) => ({ role: t.role, text: t.text })))
+        const reply = await api.advisorChat(await getIdToken(), history.slice(-20).map((t) => ({ role: t.role, text: t.text.slice(0, 1000) })))
         setLeft(reply.remaining_today)
         setTurns((t) => [...t, { role: 'willow', text: reply.message, retrieval: reply.retrieval, product_ids: reply.product_ids, follow_ups: reply.follow_up_suggestions, checks: reply.checks }])
       } catch (e) {
@@ -146,7 +146,7 @@ export function Advisor() {
             }}
             className="flex items-center gap-2"
           >
-            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask Willow" aria-label="Ask Willow" className="min-h-11 flex-1 rounded-(--radius-control) border border-border bg-surface px-3 text-[16px]" />
+            <input value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Ask Willow" aria-label="Ask Willow" className="min-h-11 flex-1 rounded-(--radius-control) border border-border bg-surface px-3 text-[16px]" />
             <button type="submit" aria-label="Send" disabled={!input.trim() || thinking} className="inline-flex h-11 w-11 items-center justify-center rounded-(--radius-control) bg-text text-surface disabled:opacity-40">
               <ArrowUp size={18} aria-hidden />
             </button>

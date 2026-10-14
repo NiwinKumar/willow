@@ -128,10 +128,6 @@ def analyze_session(
 ) -> dict[str, Any]:
     uid = user.uid
     doc = _load(store, uid, session_id)
-    started = doc.get("processing_started_at")
-    now = datetime.now(UTC)
-    if doc["status"] == "processing" and started and now - started < STALE_PROCESSING:
-        raise HTTPException(409, {"code": "conflict", "message": "analysis already running"})
 
     missing = []
     for i, uri in enumerate(doc["frame_uris"], start=1):
@@ -144,10 +140,15 @@ def analyze_session(
             {"code": "frames_missing", "message": f"frames not uploaded yet: {missing}"},
         )
     limits.take(store, uid, "analyze")
+    # Atomic: of two tabs (or a reload) only one runs the engine; the other waits and reads.
+    if not store.session_claim(uid, session_id, STALE_PROCESSING):
+        limits.refund(store, uid, "analyze")
+        raise HTTPException(409, {"code": "conflict", "message": "analysis already running"})
 
     try:
         doc = analysis.run(store, settings.bucket, uid, session_id, doc)
     except engine.EngineError as exc:
+        limits.refund(store, uid, "analyze")  # our failure: it does not use up a daily analysis
         raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}) from exc
     return _detail_view(store, uid, session_id, doc)
 

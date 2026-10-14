@@ -8,6 +8,7 @@ import { Chip } from '../components/Chip'
 import { Scrubber } from '../components/Scrubber'
 import { Stage } from '../components/Stage'
 import { enterDemo, leaveDemo } from '../data/useData'
+import { authErrorText } from '../lib/authErrors'
 import { useAuth } from '../lib/useAuth'
 import { fmtSigned, fmtValue } from '../lib/metrics'
 import { DEMO_SERIES } from '../mock/series'
@@ -110,10 +111,10 @@ export function Landing() {
             ) : (
               <>
                 <span>No sign-in needed to try it.</span>
-                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => continueAsGuest().catch((e) => toast.error(String(e)))}>
+                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => continueAsGuest().catch((e) => { const t = authErrorText(e); if (t) toast.error(t) })}>
                   Continue as guest
                 </Button>
-                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => signInWithGoogle().catch((e) => toast.error(String(e)))}>
+                <Button variant="quiet" className="!min-h-11 !px-2" onClick={() => signInWithGoogle().catch((e) => { const t = authErrorText(e); if (t) toast.error(t) })}>
                   Sign in with Google to keep your results
                 </Button>
               </>

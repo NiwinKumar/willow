@@ -53,8 +53,8 @@ def object_info(object_name: str) -> ObjectInfo:
     return ObjectInfo(object_uri(object_name), True, blob.size, blob.md5_hash, blob.content_type)
 
 
-_GET_TTL_SECONDS = 3600
-_REUSE_MARGIN_SECONDS = 600
+_GET_TTL_SECONDS = 6 * 3600  # long enough for a judge to leave a tab open
+_REUSE_MARGIN_SECONDS = 2 * 3600  # a reused link still has 2 h; caches add minutes
 _signed_get_cache: dict[str, tuple[str, float]] = {}
 
 
@@ -85,15 +85,25 @@ def signed_get_url(object_name: str) -> str:
 
 
 def list_names(prefix: str) -> set[str]:
+    """The displayable results under a prefix: previews and overlays only. Spot crops (dozens per
+    session once the face pipeline writes them) are never listed on a page load."""
     client = gcp.storage_client()
-    return {b.name for b in client.list_blobs(get_settings().bucket, prefix=prefix)}
+    bucket = get_settings().bucket
+    return {
+        b.name
+        for glob in ("**/preview.jpg", "**/overlays/*")
+        for b in client.list_blobs(bucket, prefix=prefix, match_glob=glob)
+    }
 
 
 def delete_prefix(prefix: str) -> int:
+    """Delete every object under a prefix, 100 per batched request."""
     client = gcp.storage_client()
     blobs = list(client.list_blobs(get_settings().bucket, prefix=prefix))
-    for blob in blobs:
-        blob.delete()
+    for i in range(0, len(blobs), 100):
+        with client.batch(raise_exception=False):
+            for blob in blobs[i : i + 100]:
+                blob.delete()
     return len(blobs)
 
 

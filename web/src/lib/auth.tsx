@@ -51,11 +51,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       continueAsGuest: async () => {
         const f = await loadSdk()
+        // A page that asks before the saved sign-in is restored must not replace it with a new guest.
+        await f.firebaseAuth.authStateReady()
+        if (f.firebaseAuth.currentUser) return
         await f.signInAnonymously(f.firebaseAuth)
       },
       signInWithGoogle: async () => {
         const f = await loadSdk()
-        await f.signInWithPopup(f.firebaseAuth, new f.GoogleAuthProvider())
+        await f.firebaseAuth.authStateReady()
+        const current = f.firebaseAuth.currentUser
+        const provider = new f.GoogleAuthProvider()
+        if (current?.isAnonymous) {
+          // Keep the guest's sessions: attach Google to the same account. If that Google account
+          // already has its own Willow data, switch to it instead.
+          try {
+            await f.linkWithPopup(current, provider)
+            return
+          } catch (e) {
+            if ((e as { code?: string }).code !== 'auth/credential-already-in-use') throw e
+          }
+        }
+        await f.signInWithPopup(f.firebaseAuth, provider)
       },
       signOutUser: async () => {
         const f = await loadSdk()
@@ -63,7 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       getIdToken: async () => {
         if (devUser) return 'dev'
-        const u = (await loadSdk()).firebaseAuth.currentUser
+        const auth = (await loadSdk()).firebaseAuth
+        await auth.authStateReady()
+        const u = auth.currentUser
         if (!u) throw new Error('Not signed in')
         return u.getIdToken()
       },
@@ -73,4 +91,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-
