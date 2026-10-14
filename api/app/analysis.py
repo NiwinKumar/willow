@@ -94,6 +94,17 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         },
     )
     doc = store.session_get(uid, session_id) or doc
+    if measured and current is not None and current["session_id"] == session_id:
+        # Measured again (a fix or a new engine): the baseline keeps up with its own session,
+        # and stops being one if it no longer passes (a square found in hair, for example).
+        if baselines.qualifies(result):
+            baselines.set_baseline(store, uid, session_id, doc)
+        else:
+            store.baseline_delete(uid, baselines.key(doc["site"], doc["capture_mode"]))
+            store.session_update(uid, session_id, {"is_baseline": False})
+            current = None
+        doc = store.session_get(uid, session_id) or doc
+        return doc
     if measured and current is None and baselines.qualifies(result):
         try:
             baselines.set_baseline(store, uid, session_id, doc)
