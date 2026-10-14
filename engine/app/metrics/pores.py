@@ -75,7 +75,9 @@ def find_pores(
         threshold=config.PORE_MIN_SCORE / 10 * 0.5,
         overlap=0.3,
     )
-    inner = cv2.erode(skin.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=2) > 0
+    # away from the skin's edge: a nostril rim, lid or hairline edge is a row of dark dots
+    edge = max(round(config.PORE_EDGE_MM * px), 2)
+    inner = cv2.erode(skin.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=edge) > 0
     yy, xx = np.ogrid[: L.shape[0], : L.shape[1]]
     out = []
     for y, x, s in blobs:

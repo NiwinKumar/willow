@@ -37,7 +37,15 @@ def main(argv: list[str] | None = None) -> None:
     a.add_argument(
         "--site",
         required=True,
-        choices=["forearm_treated", "forearm_control", "face_full", "cheek_macro", "nose_macro"],
+        choices=[
+            "forearm_treated",
+            "forearm_control",
+            "face_full",
+            "cheek_macro",
+            "nose_macro",
+            "forehead_macro",  # not in the contract yet
+            "chin_macro",  # not in the contract yet
+        ],
     )
     a.add_argument("--roi", action="append", help="skin square x,y,w,h (default: find 4 pen dots)")
     a.add_argument(
@@ -60,7 +68,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit("give 1-5 photos")
     n = len(args.files)
     baseline = json.loads(Path(args.baseline).read_text()) if args.baseline else None
-    if args.site in ("cheek_macro", "nose_macro"):
+    if args.site.endswith("_macro"):
         from app.pipeline_macro import analyze_macro
 
         result = analyze_macro(args.files, args.site, baseline=baseline, output_prefix=args.out)
