@@ -250,6 +250,7 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
         "blemishes",
         "shine",
         "lines",
+        "glow",
     }
     assert m["shine"]["value"] < 2.0 and m["shine"]["confidence"] == "indicative"
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"

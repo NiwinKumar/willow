@@ -210,6 +210,13 @@ LINES_MIN_MM2 = 40.0  # region skin needed to measure it
 LINES_MAX_EXPRESSION = 0.6  # skip a region when its creasing expression scores above this
 LINES_MAX_BROW_RAISE = 0.8  # forehead: browInnerUp; neutral faces scored 0.18-0.78 (Oct 14)
 
+# glow (docs/METRICS.md C3), change only: median L* + median chroma - GLOW_TEXTURE_WEIGHT x
+# fine-scale L* SD (texture below GLOW_TEXTURE_MM) on the visible cheeks, shine left out.
+# Provisional weights: a 1 L* texture drop counts like a 5 L* brightness rise.
+GLOW_TEXTURE_MM = 0.5
+GLOW_TEXTURE_WEIGHT = 5.0
+GLOW_MIN_MM2 = 100.0
+
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
 ALIGN_WARN_MM = 3.0  # warn if a photo's rigid landmarks still differ by more than this

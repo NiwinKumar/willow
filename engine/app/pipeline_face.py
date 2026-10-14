@@ -24,6 +24,7 @@ from app.landmarks import (
 )
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
+from app.metrics.glow import glow
 from app.metrics.lines import lines
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
@@ -41,8 +42,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "blemishes": ("clarity", "Blemishes", "count"),
     "shine": ("oil_glow", "Shine", "pct_area"),
     "lines": ("lines", "Lines", "index"),
+    "glow": ("oil_glow", "Glow", "index"),
 }
-ALWAYS_INDICATIVE = {"blemishes", "shine", "lines"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "lines", "glow"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -181,6 +183,7 @@ def _frame(path: str) -> dict:
     line_masks = {
         n: box.crop(polygon_mask(srgb8.shape[:2], q)) & face_skin for n, q in line_regions.items()
     }
+    glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
     lines_idx, lines_extras = lines(
         lab, line_masks, [*blemishes, *spots], px_per_mm, face.expression
     )
@@ -194,6 +197,7 @@ def _frame(path: str) -> dict:
         "blemishes": float(len(blemishes)),
         "shine": shine_pct,
         "lines": lines_idx,
+        "glow": glow_idx,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -203,6 +207,7 @@ def _frame(path: str) -> dict:
         "blemishes": {},
         "shine": shine_extras,
         "lines": lines_extras,
+        "glow": glow_extras,
     }
     return {
         "values": values,
