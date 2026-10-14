@@ -228,10 +228,6 @@ MACRO_EDGE_FRAC = 0.03  # ignore this share of each photo edge (vignetting, cone
 PORE_DIAMETER_MM = (0.05, 0.3)
 PORE_BACKGROUND_MM = 0.5
 PORE_MIN_SCORE = 3.0
-# blackheads (nose close-up): pores this much darker (L*) and greyer than the skin around
-BLACKHEAD_MIN_DL = 12.0
-BLACKHEAD_MAX_CHROMA_RATIO = 0.7
-BLACKHEAD_MIN_DIAMETER_MM = 0.1
 # texture (docs/METRICS.md A6): Laplacian energy at this scale: bumps and enlarged pores.
 # Oct 15, two selfies of the same skin at 16 and 18 px/mm: at 0.1 mm the values differed
 # 33-54% (it measured the camera's sharpness), at 0.4 mm 2-8%. 0.4 mm is 4 px at 10 px/mm,

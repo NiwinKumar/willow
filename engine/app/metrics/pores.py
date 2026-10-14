@@ -1,9 +1,7 @@
-"""pores (docs/METRICS.md A5) and blackheads (B2, nose close-up): small round dark blobs
+"""pores (docs/METRICS.md A5): small round dark blobs
 0.05-0.3 mm across in a close-up, found with a Laplacian-of-Gaussian blob search on the
 darkness below this person's own skin nearby. Thresholds are relative to the person's skin
-texture, never an absolute L*. Value = pores per cm2 of skin; extras mean diameter (mm).
-A blackhead is a pore that is much darker AND greyer than the skin around it (an open
-comedone's oxidised plug), at least BLACKHEAD_MIN_DIAMETER_MM across."""
+texture, never an absolute L*. Value = pores per cm2 of skin; extras mean diameter (mm)."""
 
 from dataclasses import dataclass
 
@@ -21,7 +19,6 @@ class Pore:
     y: float
     diameter_mm: float
     dark_l: float  # L* darker than the skin nearby
-    chroma_ratio: float  # chroma / chroma of the skin nearby (1 = same colour)
 
 
 def _to_work(img: np.ndarray, px_per_mm: float, interp=cv2.INTER_AREA):
@@ -59,10 +56,8 @@ def find_pores(
     lab, px, back = _to_work(lab.astype(np.float32), px_per_mm)
     skin = cv2.resize(skin.astype(np.uint8), lab.shape[1::-1], interpolation=cv2.INTER_NEAREST) > 0
     L = lab[..., 0]
-    chroma = np.hypot(lab[..., 1], lab[..., 2])
     sigma_bg = config.PORE_BACKGROUND_MM * px
     l_bg = _local_mean(L, skin, sigma_bg)
-    c_bg = _local_mean(chroma, skin, sigma_bg)
     darker = np.where(skin, l_bg - L, 0).astype(np.float32)
     spread = robust_spread(darker[skin])
     z = np.clip(darker / spread, 0, None)
@@ -94,7 +89,6 @@ def find_pores(
                 y=float(y * back),
                 diameter_mm=float(2 * r / px),
                 dark_l=float(darker[disk].mean()),
-                chroma_ratio=float(chroma[disk].mean() / max(c_bg[y, x], 1e-6)),
             )
         )
     for m in marks or []:
@@ -109,12 +103,3 @@ def pores_per_cm2(pores: list[Pore], skin_px: int, px_per_mm: float) -> tuple[fl
         return None, {}
     mean_d = float(np.mean([p.diameter_mm for p in pores])) if pores else 0.0
     return len(pores) / area_cm2, {"mean_diameter_mm": round(mean_d, 3), "count": len(pores)}
-
-
-def blackheads(pores: list[Pore]) -> int:
-    return sum(
-        p.dark_l >= config.BLACKHEAD_MIN_DL
-        and p.chroma_ratio <= config.BLACKHEAD_MAX_CHROMA_RATIO
-        and p.diameter_mm >= config.BLACKHEAD_MIN_DIAMETER_MM
-        for p in pores
-    )
