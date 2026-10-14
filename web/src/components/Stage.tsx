@@ -129,7 +129,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
             ) : (
               <Illustration site={site} session={shown} />
             )}
-            {(blank ? [] : rois).map((r) => {
+            {(blank || !photoReady ? [] : rois).map((r) => {
               const active = activeRoiNames.includes(r.name)
               const points = r.polygon.map((p) => p.join(',')).join(' ')
               return (
@@ -169,7 +169,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
             })}
             {/* Spots the engine found, labelled by Gemini (AI-suggested): small rings, the label on hover.
                 By default everything but hair and artefacts; picking a name in the spots list shows just those. */}
-            {!blank && shown === session
+            {!blank && photoReady && shown === session
               ? (session?.result?.candidates ?? [])
                   .filter((c) => {
                     const d = session?.label_details?.[c.id]
