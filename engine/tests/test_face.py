@@ -168,6 +168,15 @@ class FakeFace(Face):
         none = np.zeros(shape, bool)
         return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
 
+    def line_polygons(self):
+        sq = lambda x, y: np.array([[x, y], [x + 60, y], [x + 60, y + 60], [x, y + 60]], float)
+        return {
+            "right_crows_feet": sq(210, 300),
+            "left_crows_feet": sq(760, 300),
+            "right_nasolabial": sq(360, 620),
+            "left_nasolabial": sq(600, 620),
+        }
+
     def t_zone_mask(self, shape):
         m = np.zeros(shape, bool)
         for n in ("forehead", "nose", "chin"):
@@ -233,7 +242,15 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
     r = analyze_face(files)  # schema-validated inside
     assert r["site"] == "face_full" and r["frames_used"] == 3
     m = {x["id"]: x for x in r["metrics"]}
-    assert set(m) == {"tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes", "shine"}
+    assert set(m) == {
+        "tone_ita",
+        "pigment_spots",
+        "tone_evenness",
+        "redness",
+        "blemishes",
+        "shine",
+        "lines",
+    }
     assert m["shine"]["value"] < 2.0 and m["shine"]["confidence"] == "indicative"
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots

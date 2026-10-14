@@ -190,6 +190,26 @@ SHINE_DELTA_L = 8.0
 SHINE_CHROMA_FRAC = 0.8
 SHINE_MIN_MM2 = 200.0  # T-zone skin needed for a value
 
+# lines (docs/METRICS.md C1): regions where expression lines form, in mm on the face
+LINES_CROW_GAP_MM = 2.0  # crow's feet start this far past the outer eye corner
+LINES_CROW_LENGTH_MM = 15.0
+LINES_CROW_HALF_HEIGHT_MM = 8.0
+LINES_FOLD_OFFSET_MM = 1.0  # nasolabial band: from this far beside the wing-mouth line
+LINES_FOLD_WIDTH_MM = 9.0  # ...to this far, on the cheek side
+# Line = Sato ridge (dark) response above LINES_MIN_RIDGE at widths LINES_SIGMAS_MM, kept if
+# at least LINES_MIN_LENGTH_MM long, LINES_MIN_ELONGATION x longer than wide and at most
+# LINES_MAX_WIDTH_MM wide. Oct 14 on 9 young faces: without the shape rules acne and bumps
+# filled whole foreheads (up to 50%); with them young faces read 0-6% (a few real folds).
+LINES_SIGMAS_MM = (0.3, 0.5, 0.8)
+LINES_MIN_RIDGE = 1.0
+LINES_MIN_LENGTH_MM = 4.0
+LINES_MIN_ELONGATION = 4.0
+LINES_MAX_WIDTH_MM = 1.0
+LINES_EDGE_MM = 1.0  # trim this off each region's skin (hair and outline edges are ridges)
+LINES_MIN_MM2 = 40.0  # region skin needed to measure it
+LINES_MAX_EXPRESSION = 0.6  # skip a region when its creasing expression scores above this
+LINES_MAX_BROW_RAISE = 0.8  # forehead: browInnerUp; neutral faces scored 0.18-0.78 (Oct 14)
+
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
 ALIGN_WARN_MM = 3.0  # warn if a photo's rigid landmarks still differ by more than this
