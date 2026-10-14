@@ -12,6 +12,7 @@ from PIL import Image, ImageCms, ImageOps
 pillow_heif.register_heif_opener()  # lets Pillow open iPhone .heic files
 
 EXIF_IFD, TAG_MODEL, TAG_EXPOSURE, TAG_ISO = 0x8769, 0x0110, 0x829A, 0x8827
+TAG_LENS_MODEL = 0xA434
 
 
 @dataclass
@@ -71,6 +72,7 @@ class PhotoInfo:
     camera: str | None
     iso: int | None
     exposure_s: float | None
+    lens: str | None = None  # e.g. "iPhone 17 Pro Max front camera 2.715mm f/1.9"
 
 
 def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
@@ -106,6 +108,7 @@ def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
         camera=exif.get(TAG_MODEL),
         iso=int(iso[0] if isinstance(iso, tuple) else iso) if iso else None,
         exposure_s=float(exposure) if exposure else None,
+        lens=sub.get(TAG_LENS_MODEL),
     )
     return rgb8, info
 
