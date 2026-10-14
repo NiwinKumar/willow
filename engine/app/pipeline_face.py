@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from jsonschema import validate
 
-from app import config
+from app import config, facemap
 from app.aggregate import summarize
 from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
@@ -392,8 +392,11 @@ def _candidates(
     box, srgb8 = frame["box"], frame["srgb8"]
     px_per_mm = frame["face"].px_per_mm
     found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
+    found = found[:limit]
+    # where each mark sits on the canonical face, so the api can follow it across sessions
+    places = facemap.locate(frame["face"].points, [(box.x + b.x, box.y + b.y) for _, b in found])
     out, uploads = [], []
-    for i, (kind, b) in enumerate(found[:limit], start=1):
+    for i, (kind, b) in enumerate(found, start=1):
         cid = f"c_{i:03d}"
         cx, cy = box.x + b.x, box.y + b.y
         side = 2 * b.radius * 1.5
@@ -427,11 +430,24 @@ def _candidates(
                     "area_px": float(b.area_px),
                     "score": round(b.score, 2),
                     **({"seen_in_fraction": seen[i - 1]} if seen else {}),
+                    **_place_features(places[i - 1], b.radius),
                 },
             }
         )
     save_jpegs(uploads)  # all crops in parallel (network-bound)
     return out
+
+
+def _place_features(place: dict | None, radius_px: float) -> dict:
+    """Face-map features of one mark (numbers only, as the contract's features are)."""
+    if place is None:
+        return {}
+    return {
+        "face_x_mm": place["face_x_mm"],
+        "face_y_mm": place["face_y_mm"],
+        "zone": float(facemap.ZONES.index(place["zone"]) + 1),
+        "diameter_mm": round(2 * radius_px * place["mm_per_px"], 1),
+    }
 
 
 def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.ndarray:
