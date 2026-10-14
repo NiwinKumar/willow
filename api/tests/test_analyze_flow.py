@@ -479,3 +479,25 @@ def test_data_deleted_mid_measurement_leaves_nothing(client, fake, monkeypatch):
     monkeypatch.setattr(engine, "analyze", delete_while_running)
     assert client.post(f"/v1/sessions/{sid}/analyze").status_code == 404
     assert not [n for n in fake.blobs if n.startswith(f"results/u_test/{sid}/")]
+
+
+def test_counts_are_not_compared_across_one_photo_and_several():
+    from app import baselines
+
+    result = {
+        "site": "face_full",
+        "frames_used": 3,
+        "warnings": [],
+        "metrics": [
+            {"id": "blemishes", "delta": -4.0, "verdict": "real_change", "direction": "decrease"},
+            {"id": "redness", "delta": 0.5, "verdict": "within_noise", "direction": "increase"},
+        ],
+    }
+    baselines.guard_counts(result, {"frames": 1})
+    blem, red = result["metrics"]
+    assert blem["delta"] is None and blem["verdict"] == "no_baseline"
+    assert red["delta"] == 0.5  # other metrics are compared as usual
+    assert result["warnings"] == [baselines.COUNTS_NOT_COMPARED]
+    same = {"site": "face_full", "frames_used": 3, "metrics": [{"id": "blemishes", "delta": -1}]}
+    baselines.guard_counts(same, {"frames": 5})
+    assert same["metrics"][0]["delta"] == -1

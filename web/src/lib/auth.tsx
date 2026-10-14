@@ -27,6 +27,8 @@ const devUser = DEV_UID ? ({ uid: DEV_UID, isAnonymous: true, email: null } as u
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(devUser)
   const [loading, setLoading] = useState(!devUser)
+  // Linking Google to a guest keeps the same User object (only isAnonymous flips): re-render.
+  const [linked, setLinked] = useState(0)
 
   useEffect(() => {
     if (devUser) return
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // already has its own Willow data, switch to it instead.
           try {
             await f.linkWithPopup(current, provider)
+            setLinked((n) => n + 1)
             return
           } catch (e) {
             if ((e as { code?: string }).code !== 'auth/credential-already-in-use') throw e
@@ -86,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return u.getIdToken()
       },
     }),
-    [user, loading],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- linked forces a new value after linking
+    [user, loading, linked],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -35,7 +35,7 @@ export function BaselineChecklist({ mode, current, onPick }: { mode: CaptureMode
   const data = useData()
   const quick = mode === 'uncalibrated'
   // Until the sessions have loaded, never claim "No baseline yet".
-  const loading = data.mode === 'live' && data.status !== 'ready'
+  const loading = data.mode === 'live' && data.status === 'loading'
   return (
     <section aria-labelledby="baselines">
       <h2 id="baselines" className="text-[17px] font-semibold">Your baselines{quick ? ' (phone photos)' : ''}</h2>

@@ -4,6 +4,7 @@
  */
 import { FIXTURE } from '../data/fixture'
 import type { AnalysisResult, Explanation, Metric, Roi, Session, Site, SiteSeries } from '../data/types'
+import { fmtHours } from '../lib/format'
 import { METRIC_META, fmtSigned, fmtValue } from '../lib/metrics'
 
 function mulberry32(seed: number) {
@@ -112,7 +113,7 @@ function session(
     is_baseline: Boolean(opts.baseline),
     result,
     labels: site === 'face_full' ? { c_001: 'post_blemish_mark', c_002: 'freckle' } : {},
-    explanation: explain(metrics, opts.hours !== undefined ? (opts.hours === 0 ? null : `+${opts.hours} h`) : null),
+    explanation: explain(metrics, opts.hours !== undefined ? (opts.hours === 0 ? null : fmtHours(opts.hours)) : null),
     preview: null,
     note: opts.note,
     deviation: opts.deviation,
@@ -124,14 +125,19 @@ function withBaseline(m: Metric, baselineValue: number, value: number, baselineM
   const delta = +(value - baselineValue).toFixed(3)
   let verdict: Metric['verdict'] = 'within_noise'
   if (lowQuality) verdict = 'low_quality'
-  else if (m.confidence === 'measured' && baselineMdc !== null && Math.abs(delta) > baselineMdc) verdict = 'real_change'
+  // As the engine does (aggregate.py): any metric with a noise band can clear it; indicative
+  // only says the colours were not corrected.
+  else if (baselineMdc === null) verdict = 'no_baseline' // a change with no noise band has no verdict
+  else if (Math.abs(delta) > baselineMdc) verdict = 'real_change'
   return { ...m, value: +value.toFixed(3), delta, verdict, direction: delta < 0 ? 'decrease' : delta > 0 ? 'increase' : 'none' }
 }
 
 /** Face: 5-frame baseline then six weekly check-ins; azelaic acid started at week 2; dark spots clear the band by week 6. */
 export function faceSeries(): SiteSeries {
   const rng = mulberry32(42)
-  const fixtureMetrics = FIXTURE.metrics
+  // Faces have no colour reference: every face metric is a trend (engine, Oct 14).
+  // The contract sample has no band for blemishes; a 5-photo baseline would have one.
+  const fixtureMetrics = FIXTURE.metrics.map((m) => ({ ...m, confidence: 'indicative' as const, mdc95: m.mdc95 ?? (m.unit === 'count' ? 2 : null) }))
   const baseVals = Object.fromEntries(fixtureMetrics.map((m) => [m.id, (m.value ?? 0) - (m.delta ?? 0)])) as Record<string, number>
   const sessions: Session[] = []
   const baselineMetrics: Metric[] = fixtureMetrics.map((m) => ({ ...m, value: +baseVals[m.id].toFixed(3), delta: null, verdict: 'no_baseline', direction: 'none' }))

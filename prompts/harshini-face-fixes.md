@@ -49,3 +49,14 @@ Counts per photo were 7, 10, 8, 17 and 16 on the same face seconds apart, so the
 - `docs/METRICS.md`: describe the face metrics as built (ROIs, side views, seen-in-photos matching), and mark cheek and nose close-ups as not built yet.
 
 When each item is merged, tell Niwin. The api re-runs saved sessions with `uv run python scripts/remeasure.py --site face_full --session <id> --apply`.
+
+---
+
+## Round 2 (after #32 to #39 were merged and deployed, Oct 14)
+
+Re-measured Niwin's 5-photo laptop session on the deployed engine: 5 of 5 photos used, the hand cut without failing any photo, 10 spots instead of 20, a preview written. Thank you. Two things are left:
+
+1. **`_count_confirmed` drops a photo's count to 0 when the other photo cannot be lined up** (`pipeline_face.py`, the `others` list). With two photos where `similarity()` fails for one, `others` is empty for the photo that did line up, so all its marks count as unconfirmed and its blemish and dark-spot values become 0 while the other photo keeps its full count. The docstring says a photo that cannot be lined up "keeps all its marks". Skip the confirmation for a frame when no other frame could be mapped. Test: two photos, the second with landmarks that `similarity()` rejects; both keep their counts.
+2. **The moustache and upper-lip edge still give 3 of 10 candidates** (blemish kind) on that session. A thin dark band of hair just above a red lip edge looks like a red bump. The lip-edge guard (`BLEMISH_LIP_GUARD_MM`) could extend upwards over the philtrum when the lower-face stubble test finds hair there, or the blemish test could require some skin all round the candidate.
+
+The api now does not compare blemish and dark-spot counts between a 1-photo session and a 2+-photo session (one counts every mark, the other only confirmed ones), and says so in the notes. Nothing for you to change there; it is only so you know why a verdict can be missing.

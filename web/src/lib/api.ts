@@ -212,11 +212,26 @@ export function putSigned(target: UploadTarget, file: File, onProgress: (fractio
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', target.url)
     for (const [k, v] of Object.entries(target.headers)) xhr.setRequestHeader(k, v)
+    // A stalled connection (or a phone that backgrounded the tab) must end in a Retry, never an
+    // upload that spins forever: no progress for 60 s aborts it.
+    let watchdog = 0
+    const stall = () => {
+      window.clearTimeout(watchdog)
+      watchdog = window.setTimeout(() => xhr.abort(), 60_000)
+    }
+    const done = (f: () => void) => () => {
+      window.clearTimeout(watchdog)
+      f()
+    }
     xhr.upload.onprogress = (e) => {
+      stall()
       if (e.lengthComputable) onProgress(e.loaded / e.total)
     }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`PUT failed: HTTP ${xhr.status}`)))
-    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.onload = done(() => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`PUT failed: HTTP ${xhr.status}`))))
+    xhr.onerror = done(() => reject(new Error('Network error during upload')))
+    xhr.onabort = done(() => reject(new Error('Upload stalled')))
+    xhr.ontimeout = done(() => reject(new Error('Upload timed out')))
+    stall()
     xhr.send(file)
   })
 }

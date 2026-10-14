@@ -8,12 +8,13 @@ import { Sheet } from '../components/Sheet'
 import { useData } from '../data/useData'
 import { api } from '../lib/api'
 import { fmtDate } from '../lib/format'
+import { authErrorText } from '../lib/authErrors'
 import { syncConsent } from '../lib/consent'
 import { CONSENT_VERSION, prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 
 export function Settings() {
-  const { user, signOutUser, getIdToken } = useAuth()
+  const { user, signOutUser, getIdToken, signInWithGoogle } = useAuth()
   const data = useData()
   const navigate = useNavigate()
   const consent = prefs.consent()
@@ -24,28 +25,31 @@ export function Settings() {
 
   async function deleteEverything() {
     setDeleting(true)
+    let serverDone = false
     try {
-      if (data.mode === 'live' && !user) {
+      if (!user) {
         prefs.clearAll()
         setConfirm(false)
         toast('Not signed in, so there was nothing stored on the server. This device is cleared.')
         return
       }
-      if (data.mode === 'live' && user) {
-        await api.deleteMe(await getIdToken())
-        try {
-          await deleteUser(user)
-        } catch {
-          // Google accounts may need a recent sign-in to be removed; the data is gone either way.
-          await signOutUser()
-        }
+      // Signed in, the server copy goes too, even while looking at the demo.
+      await api.deleteMe(await getIdToken())
+      serverDone = true
+      let accountGone = true
+      try {
+        await deleteUser(user)
+      } catch {
+        // Google may ask for a recent sign-in before removing the sign-in itself; the data is gone.
+        accountGone = false
+        await signOutUser()
       }
       prefs.clearAll()
       setConfirm(false)
-      toast(data.mode === 'demo' ? 'Cleared everything stored on this device.' : 'Deleted: photos, results and your account.')
+      toast(accountGone ? 'Deleted: photos, results and your account.' : 'Deleted your photos and results, and signed you out. Your Google sign-in itself is managed by Google.')
       navigate('/')
     } catch {
-      toast.error('Could not delete right now. Nothing was removed; try again.')
+      toast.error(serverDone ? 'Your data was deleted, but signing out did not finish. Close the tab to finish.' : 'Deletion did not finish. Try again; anything not yet removed is removed then.')
     } finally {
       setDeleting(false)
     }
@@ -77,9 +81,9 @@ export function Settings() {
         <label className="flex cursor-pointer items-start justify-between gap-3">
           <span>
             <span className="block text-[15px] font-semibold">Help improve recommendations</span>
-            <span className="block text-[13px] text-text-2">Anonymized numbers only, never photos, never your name. Groups under 10 people are never shown.</span>
+            <span className="block text-[13px] text-text-2">Anonymized numbers only, never photos, never your name. Groups under 10 people are never shown.{consent ? '' : ' Available once you have accepted the terms before your first photo.'}</span>
           </span>
-          <input type="checkbox" className="mt-1 h-5 w-5 accent-[var(--color-text)]" checked={optIn} onChange={(e) => {
+          <input type="checkbox" className="mt-1 h-5 w-5 accent-[var(--color-text)]" checked={optIn} disabled={!consent} onChange={(e) => {
             const on = e.target.checked
             setOptIn(on)
             prefs.setConsent({ ...(consent ?? { version: CONSENT_VERSION, accepted_at: new Date().toISOString() }), aggregate_opt_in: on })
@@ -95,15 +99,35 @@ export function Settings() {
       <section className="mt-4 rounded-(--radius-tile) border border-border bg-surface p-4">
         <h2 className="text-[17px] font-semibold">Capture settings</h2>
         <p className="mt-1 text-[13px] text-text-2">RAW camera setup (Lightroom): {prefs.lightroomDone() ? 'done on this device' : 'not done yet'}. If you change the setup, take a new baseline so later photos stay comparable.</p>
-        <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => { prefs.setLightroomDone(false); toast('The setup steps will show on your next RAW capture.') }}>Show the setup steps again</Button>
+        <Button variant="secondary" className="mt-3 !min-h-11" onClick={() => { prefs.setLightroomDone(false); toast('The setup steps will show on your next RAW capture.') }}>Show the setup steps again</Button>
       </section>
+
+      {user?.isAnonymous ? (
+        <section className="mt-4 rounded-(--radius-tile) border border-border bg-surface p-4">
+          <h2 className="text-[17px] font-semibold">Keep your results</h2>
+          <p className="mt-1 text-[13px] text-text-2">You are using a guest account on this device. Sign in with Google to keep your sessions and routine, and to open them on another device.</p>
+          <Button
+            className="mt-3 !min-h-11"
+            onClick={() =>
+              signInWithGoogle()
+                .then(() => toast('Signed in with Google. Your sessions and routine are kept with it.'))
+                .catch((e) => {
+                  const t = authErrorText(e)
+                  if (t) toast.error(t)
+                })
+            }
+          >
+            Keep them with Google
+          </Button>
+        </section>
+      ) : null}
 
       <section className="mt-4 rounded-(--radius-tile) border border-danger/40 bg-surface p-4">
         <h2 className="text-[17px] font-semibold">Delete my data</h2>
         <p className="mt-1 text-[13px] text-text-2">Removes photos, results and your account. Minutes, not days. There is no undo.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="secondary" className="!min-h-10 !text-danger" onClick={() => setConfirm(true)}>Delete my data</Button>
-          {user ? <Button variant="quiet" className="!min-h-10" onClick={() => (user.isAnonymous ? setConfirmSignOut(true) : void signOutUser())}>Sign out</Button> : null}
+          <Button variant="secondary" className="!min-h-11 !text-danger" onClick={() => setConfirm(true)}>Delete my data</Button>
+          {user ? <Button variant="quiet" className="!min-h-11" onClick={() => (user.isAnonymous ? setConfirmSignOut(true) : void signOutUser())}>Sign out</Button> : null}
         </div>
       </section>
 

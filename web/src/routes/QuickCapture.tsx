@@ -32,7 +32,8 @@ export function QuickCapture() {
   const { user, continueAsGuest } = useAuth()
   const data = useData()
   const site = (params.get('site') as Site) ?? 'face_full'
-  const firstSession = (data.mode !== 'live' || data.status === 'ready') && baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
+  // Signed out ('idle') or a failed load count as no sessions: only an in-flight load waits.
+  const firstSession = data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
   // Fixed once the person's sessions are known (a deep link may arrive before they load), then kept
   // for the whole capture even if the list refreshes while the camera is open.
   const known = data.mode === 'demo' || data.status === 'ready' || data.status === 'error' || data.status === 'idle'
@@ -67,9 +68,15 @@ export function QuickCapture() {
   useEffect(() => stop, [stop])
 
   async function start() {
+    stop() // a retry never leaves the previous stream (and the camera light) running
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: faceSite ? 'user' : 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
       stream.current = s
+      // The tab went to the background or another app took the camera: say so, not a black frame.
+      s.getVideoTracks()[0]?.addEventListener('ended', () => {
+        stop()
+        setPhase('denied')
+      })
       liveSince.current = performance.now()
       // The <video> only exists once the live view renders; the effect below attaches the stream.
       setPhase('live')
@@ -82,8 +89,11 @@ export function QuickCapture() {
     const v = video.current
     if (phase !== 'live' || !v || !stream.current || v.srcObject === stream.current) return
     v.srcObject = stream.current
-    v.play().catch(() => setPhase('denied'))
-  }, [phase])
+    v.play().catch(() => {
+      stop()
+      setPhase('denied')
+    })
+  }, [phase, stop])
 
   // Analysis loop on a 160 px frame, five times a second.
   useEffect(() => {

@@ -100,3 +100,30 @@ def set_baseline(store: Store, uid: str, session_id: str, session_doc: dict) -> 
         store.session_update(uid, old, {"is_baseline": False})
     store.session_update(uid, session_id, {"is_baseline": True})
     return doc
+
+
+# Face counts (engine, Oct 14): with 2+ usable photos only marks seen in at least two photos are
+# counted; a single photo counts every mark. A count from one kind of session against the other
+# would show a change made by the photo count, not the skin.
+CONFIRMED_COUNTS = ("blemishes", "pigment_spots")
+COUNTS_NOT_COMPARED = (
+    "blemish and dark-spot counts are not compared with your baseline this time: one of the two "
+    "sessions had a single usable photo, and counts are confirmed across photos only when there "
+    "are two or more"
+)
+
+
+def guard_counts(result: dict[str, Any], baseline: dict[str, Any] | None) -> None:
+    """Drop the comparison of confirmed counts when only one side had 2+ usable photos."""
+    if not baseline or result.get("site") != "face_full":
+        return
+    base_frames, frames = baseline.get("frames") or 0, result.get("frames_used") or 0
+    if not base_frames or not frames or (base_frames >= 2) == (frames >= 2):
+        return
+    touched = False
+    for m in result.get("metrics", []):
+        if m["id"] in CONFIRMED_COUNTS and m.get("delta") is not None:
+            m.update(delta=None, verdict="no_baseline", direction="none")
+            touched = True
+    if touched:
+        result.setdefault("warnings", []).append(COUNTS_NOT_COMPARED)

@@ -37,7 +37,9 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   const shown = showBaseline && baseline ? baseline : session
   // Geometry follows the photo on screen: while flickering, the baseline photo has its own size,
   // regions and face position (selfies are never pixel-aligned).
-  const size = shown?.result?.image_size ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
+  // No image_size (older results): the preview's own size, never a made-up portrait frame.
+  const previewSize = shown?.preview?.width && shown.preview.height ? { width: shown.preview.width, height: shown.preview.height } : null
+  const size = shown?.result?.image_size ?? previewSize ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
   const rois = shown?.result?.rois ?? session?.result?.rois ?? []
   // A live session without the engine's preview has no picture: never draw the demo
   // illustration (its colour card and arm are not the person's), and nothing to flicker.
