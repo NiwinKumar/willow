@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import type { MetricId, Session, Site } from '../data/types'
+import type { AnalysisResult, MetricId, Session, Site } from '../data/types'
 import { METRIC_META } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { METRIC_ROIS } from '../mock/series'
@@ -33,19 +33,22 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   const [showBaseline, setShowBaseline] = useState(false)
   const holdTimer = useRef<number | null>(null)
   const flickerTimer = useRef<number | null>(null)
-  const size = session?.result?.image_size ?? { width: 3024, height: 4032 }
-  const rois = session?.result?.rois ?? []
   const activeRoiNames = metricId ? (METRIC_ROIS[metricId] ?? []) : []
   const shown = showBaseline && baseline ? baseline : session
+  // Geometry follows the photo on screen: while flickering, the baseline photo has its own size,
+  // regions and face position (selfies are never pixel-aligned).
+  const size = shown?.result?.image_size ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
+  const rois = shown?.result?.rois ?? session?.result?.rois ?? []
   // A live session without the engine's preview has no picture: never draw the demo
   // illustration (its colour card and arm are not the person's), and nothing to flicker.
   const blank = Boolean(session?.live && !session.preview)
   const canFlicker = !blank && Boolean(baseline && session && baseline.id !== session.id && baseline.preview)
   // A face fills only part of a laptop or arm's-length selfie: frame the face (its regions plus
   // room for hair and jaw) so its skin and spot rings are visible. Other sites show the whole photo.
-  const result = session?.result
+  const result = shown?.result ?? session?.result
   const clipId = useId()
-  const vb = useMemo(() => faceFrame(site, blank ? [] : (result?.rois ?? []), result?.image_size ?? { width: 3024, height: 4032 }), [site, blank, result])
+  const framed = Boolean(shown?.preview) // a real photo; the demo illustration keeps its full view
+  const vb = useMemo(() => faceFrame(site, framed ? result : null), [site, framed, result])
 
   const stopHold = useCallback(() => {
     if (holdTimer.current) window.clearTimeout(holdTimer.current)
@@ -198,11 +201,15 @@ function seenText(fraction: number | undefined, frames: number | undefined): str
   return ` (seen in ${Math.round(fraction * frames)} of ${frames} photos)`
 }
 
-/** The part of the photo to show: for a face, a square around its regions; else the whole photo. */
-function faceFrame(site: Site, rois: { polygon: [number, number][] }[], size: { width: number; height: number }) {
+/**
+ * The part of the photo to show: for a face, a square around its regions and spots (a side view's
+ * regions cover one cheek, its spots can be anywhere on the face); else the whole photo.
+ */
+function faceFrame(site: Site, result: AnalysisResult | null | undefined) {
+  const size = result?.image_size ?? { width: 3024, height: 4032 }
   const all = { x: 0, y: 0, w: size.width, h: size.height }
-  if (site !== 'face_full' || !rois.length) return all
-  const pts = rois.flatMap((r) => r.polygon)
+  if (site !== 'face_full' || !result?.rois?.length) return all
+  const pts = [...result.rois.flatMap((r) => r.polygon), ...(result.candidates ?? []).map((c) => [c.bbox[0] + c.bbox[2] / 2, c.bbox[1] + c.bbox[3] / 2])]
   const xs = pts.map((p) => p[0])
   const ys = pts.map((p) => p[1])
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
