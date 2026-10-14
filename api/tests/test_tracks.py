@@ -175,3 +175,23 @@ def test_spots_route_builds_the_diary(fake, client, monkeypatch):
 def test_spots_route_with_no_sessions(fake, client):
     body = client.get("/v1/spots").json()
     assert body["tracks"] == [] and body["sessions"] == [] and not body["enough_data"]
+
+
+def test_contrast_jitter_is_not_fading_but_two_low_sightings_are():
+    marks = [3.0, 2.0, 3.1]  # one low photo between two normal ones
+    s = [_session(i, [_mark(30.0, -5.0, contrast=c)]) for i, c in enumerate(marks)]
+    assert tracks.follow(s)["tracks"][0]["status"] == "still_there"
+    s = [_session(i, [_mark(30.0, -5.0, contrast=c)]) for i, c in enumerate([3.0, 3.2, 2.0, 1.9])]
+    assert tracks.follow(s)["tracks"][0]["status"] == "fading"
+
+
+def test_a_flicker_that_ended_does_not_make_a_mark_come_back():
+    s = [
+        _session(0, [_mark(30.0, -5.0)]),  # seen once, one photo: unconfirmed
+        _session(1, []),
+        _session(2, []),
+        _session(3, [_mark(30.5, -5.0)]),
+        _session(4, [_mark(30.5, -5.0)]),
+    ]
+    [t] = tracks.follow(s)["tracks"]
+    assert not t["came_back"]

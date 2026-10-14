@@ -246,15 +246,19 @@ def _summary(i: int, t: dict[str, Any], sessions: list[dict[str, Any]]) -> dict[
 
 
 def _fading(obs: list[dict[str, Any]]) -> bool:
-    """A raised or red mark that now reads as a flat mark, or one whose contrast dropped to
-    FADING_CONTRAST of its peak (compared within one kind of mark)."""
+    """A raised or red mark that now reads as a flat mark, or one whose contrast stayed at or
+    below FADING_CONTRAST of its earlier peak for two sightings (within one kind of mark)."""
     now = obs[-1]
     if now["stage"] in ("mark", "dark_spot") and any(
         o["stage"] in ("bump", "red_spot", "clogged_pore") for o in obs[:-1]
     ):
         return True
+    # contrast jitters between photos: the last two sightings must both sit well below the
+    # peak before it
     same = [o["contrast"] for o in obs if o["kind"] == now["kind"]]
-    return len(same) >= 2 and max(same) > 0 and now["contrast"] <= FADING_CONTRAST * max(same)
+    if len(same) < 3 or max(same[:-2]) <= 0:
+        return False
+    return all(c <= FADING_CONTRAST * max(same[:-2]) for c in same[-2:])
 
 
 def _link_came_back(tracks: list[dict[str, Any]]) -> None:
@@ -266,6 +270,7 @@ def _link_came_back(tracks: list[dict[str, Any]]) -> None:
         for e in tracks:
             if (
                 e["status"] == "gone"
+                and e["confirmed"]  # a one-off sighting that ended is flicker, not a mark
                 and order[e["id"]] < order[t["id"]]
                 and _dist((e["x_mm"], e["y_mm"]), (t["x_mm"], t["y_mm"])) <= TRACK_CAME_BACK_MM
                 and t["first_seen_index"] > e["last_seen_index"]
