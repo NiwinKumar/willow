@@ -57,3 +57,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
   3. With one photo and no white paper, warnings say both "colours corrected with the white paper only" and "no white reference found in some photos": please emit one or the other per session.
   4. On a forearm photo with no pen dots, the square detector locked onto arm hair and measured that patch without a warning (ITA came out -55 on the DNG vs +71 on the JPEG of the same frame). Please require four dots in a plausible 4 cm geometry, or fail with "pen-dot square not found".
 - Approved by: [ ] Harshini [x] Niwin
+
+## 2026-10-14: Face-map features on face candidates (note, no schema change; engine 0.3.1)
+- What: face candidates' `features` gain `face_x_mm`, `face_y_mm`, `zone` (1-based code into `engine/app/config.py FACE_ZONES`) and `diameter_mm` (docs/METRICS.md "Face map"). `features` already allows any numeric keys, so the schema is unchanged; old results simply lack them.
+- Why: the api follows each mark across sessions (spot diary: new, still there, fading, gone; new marks per zone). Matching needs a position that does not depend on head pose; photo pixels do.
+- Impact: engine adds `app/facemap.py` and three lines in `_candidates`; the api reads the keys when present and re-runs old sessions with `scripts/remeasure.py --all --apply` to fill them.
+- Approved by: [ ] Harshini [x] Niwin

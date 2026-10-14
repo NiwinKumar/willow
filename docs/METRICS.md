@@ -37,6 +37,11 @@ Tiers: **A = must** (M2/M3), **B = should** (M3/M4), **C = only if time** (M4). 
 - The sharpest passed front photo is the reference (spots, crops, regions, preview). A hand over a cheek or the nose fails the photo (`occlusion_suspected`); over the chin or forehead it is cut out.
 - Side-view sessions are not compared with a front-on baseline.
 
+## Face map: following a mark across sessions (Oct 14)
+- Every face candidate carries where it sits on MediaPipe's canonical face (`engine/app/facemap.py`): the mark's barycentric weights in the face-mesh triangle around it, applied to the same triangle of the canonical mesh (read from the face model file). Pose, tilt and camera distance drop out; on 5 laptop selfies of one session the same mark landed a median 0.7-2.4 mm apart with no alignment.
+- Features (numbers only, as the contract's `features` are): `face_x_mm` (negative = the subject's right), `face_y_mm` (up), `zone` (1-based index into `config.FACE_ZONES`: forehead, nose, right_cheek, left_cheek, around_mouth, chin, right_jaw, left_jaw), `diameter_mm` (on the skin surface, from the triangle's own scale). Marks more than 5 mm off the mesh have none of these.
+- Canonical millimetres are an average adult face, not the person's: they say "same place as last time", not how big the face is. The engine stays per session; the api matches marks across sessions (`api/app/tracks.py`).
+
 ## Forearm (Oct 14)
 - DNG BaselineExposure is applied when decoding (phone DNGs decoded about 2x too dark otherwise).
 - Pen dots must clearly beat the skin's other spots (every spot but the 8 strongest) and no spot of similar strength may sit inside the square; white paper must be colourless in linear light, brighter than the skin, sheet-sized and level with the skin. Without paper the reading is a trend.
