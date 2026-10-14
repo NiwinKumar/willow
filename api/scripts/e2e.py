@@ -5,13 +5,15 @@ ENGINE_MODE=http, see docs/LOCAL_DEV.md). Everything else is real: uploads land 
 the deployed engine measures them, Firestore stores them. The test person is deleted at the
 start and at the end, so runs never pile up.
 
-    uv run python scripts/e2e.py --dng path/to/forearm.dng --jpeg path/to/forearm.jpg
+    uv run python scripts/e2e.py --dng path/to/forearm.dng --jpeg path/to/forearm.jpg \
+        [--face selfie1.jpg selfie2.jpg ...]
 """
 
 import argparse
 import sys
 import time
 from pathlib import Path
+from urllib.parse import unquote
 
 import httpx
 
@@ -31,6 +33,7 @@ def main() -> int:
     ap.add_argument("--dng", type=Path, required=True)
     ap.add_argument("--jpeg", type=Path, required=True)
     ap.add_argument("--label", type=Path, help="optional product label photo (calls Gemini)")
+    ap.add_argument("--face", type=Path, nargs="*", default=[], help="optional face selfies (JPEG)")
     args = ap.parse_args()
 
     c = httpx.Client(base_url=args.api, headers={"X-Dev-Uid": args.uid}, timeout=180)
@@ -108,18 +111,61 @@ def main() -> int:
     )
     check("quick selfie has its own baseline", v3["session"]["is_baseline"] is True)
 
-    # 4. A face session: the engine cannot measure faces yet, so no numbers are shown.
+    # 4. A forearm photo sent as a face: measured, no face found, never a baseline.
     v4 = session("face_full", "calibrated_raw", [args.dng])
+    r4 = v4.get("result") or {}
     check(
-        "face session is saved but not measured",
-        v4["session"].get("measured") is False
-        and v4.get("result") is None
+        "a photo without a face is measured as 'no face found'",
+        v4["session"].get("measured") is True
+        and r4.get("quality", {}).get("passed") is False
+        and "face_not_found" in r4.get("quality", {}).get("reasons", [])
         and v4["session"]["is_baseline"] is False,
+        str(r4.get("quality", {}).get("reasons")),
     )
+    n_sessions = 4
+
+    # 4b. Real face selfies: five face metrics, spots with crops, Gemini names, the right photo.
+    if args.face:
+        v5 = session("face_full", "uncalibrated", args.face)
+        r5 = v5.get("result") or {}
+        n_sessions += 1
+        ids5 = {m["id"] for m in r5.get("metrics", []) if m.get("value") is not None}
+        check(
+            "face selfies are measured",
+            v5["session"].get("measured") is True and r5.get("frames_used", 0) >= 1,
+            f"{r5.get('frames_used')} of {len(args.face)} used, {v5['_seconds']} s",
+        )
+        want = {"tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes"}
+        check("five face metrics", want <= ids5, str(sorted(ids5)))
+        check("face selfie is its own baseline", v5["session"]["is_baseline"] is True)
+        cands = r5.get("candidates") or []
+        check(
+            "spots come with crops",
+            bool(cands) and all(x.get("crop_uri") and x.get("context_crop_uri") for x in cands),
+            f"{len(cands)} spots",
+        )
+        details = v5["session"].get("label_details") or {}
+        check(
+            "Gemini named spots (both looks agree, or 'uncertain')",
+            bool(details) and set(details) <= {x["id"] for x in cands},
+            f"{len(details)} named",
+        )
+        ref = next(
+            (f["index"] for f in r5["quality"]["per_frame"] if f["passed"]),
+            0,
+        )
+        # unquoted: in DEV_UPLOADS mode the photo link carries the object name as a query value
+        preview = unquote((v5["session"].get("preview") or {}).get("url", ""))
+        check(
+            "the photo shown is the one the spots were found on",
+            f"/frame_{ref + 1}.jpg" in preview or "/preview.jpg" in preview,
+            f"photo {ref + 1}",
+        )
+        check("face explanation by Gemini", v5["session"].get("explanation_source") == "gemini")
 
     # 5. Reads the web uses.
     listed = c.get("/v1/sessions").json()["sessions"]
-    check("sessions list has all four", len(listed) == 4, str(len(listed)))
+    check("sessions list has all of them", len(listed) == n_sessions, str(len(listed)))
     tl = c.get("/v1/timeline", params={"site": "forearm_control"}).json()
     check(
         "timeline has two RAW and one quick reading",

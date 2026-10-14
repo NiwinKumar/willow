@@ -116,5 +116,5 @@ export const QUALITY_COPY: Record<string, { text: string; action: string }> = {
   pose_out_of_range: { text: 'Face a little turned. Look straight at the phone.', action: 'Retake one frame' },
   face_not_found: { text: 'No face found. Full face, hair back, phone at arm’s length.', action: 'Retake one frame' },
   occlusion_suspected: { text: 'Something is covering the skin (hair, glasses, hand).', action: 'Retake one frame' },
-  too_few_frames: { text: 'Only a few usable photos. Baselines need 5 so we can measure your normal photo-to-photo variation.', action: 'Add frames' },
+  too_few_frames: { text: 'No photo passed the quality check, so nothing could be measured.', action: 'Retake the session' },
 }

@@ -111,18 +111,25 @@ def explain_context(
 
 
 def remeasure(
-    store: Store, bucket: str, uid: str, sites: set[str] | None = None, apply: bool = False
+    store: Store,
+    bucket: str,
+    uid: str,
+    sites: set[str] | None = None,
+    apply: bool = False,
+    sessions: set[str] | None = None,
 ) -> list[str]:
     """Measure again, oldest first, the sessions saved while their site was not measured yet.
 
     Oldest first, so the earliest saved session becomes the baseline (the person's "before")
-    and later ones are compared with it. Returns one line per session; writes only with apply.
+    and later ones are compared with it. `sessions` names sessions to run again even if already
+    measured (after an engine or explanation fix). Returns one line per session; writes only
+    with apply.
     """
     rows = [
         (sid, d)
         for sid, d in store.sessions_list(uid)
         if d.get("status") == "done"
-        and d.get("measured") is False
+        and (sid in sessions if sessions else d.get("measured") is False)
         and (sites is None or d["site"] in sites)
     ]
     rows.sort(key=lambda r: (r[1].get("created_at") or datetime.min.replace(tzinfo=UTC), r[0]))

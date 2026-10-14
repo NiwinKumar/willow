@@ -37,20 +37,39 @@ def sign_all(names: list[str]) -> dict[str, str]:
         return dict(zip(unique, pool.map(storage.signed_get_url, unique), strict=True))
 
 
+def reference_index(result: dict[str, Any] | None) -> int:
+    """Which uploaded photo the engine's rois, candidates and image_size belong to.
+
+    Face (engine pipeline_face.py): the first photo that passed the quality checks, since spots
+    are found on it; with none passed, the first photo with a face. Forearm (pipeline.py): the
+    first photo whose pen-dot square was found, passed or not (a photo without the square has
+    no reasons). A session whose first photos were blurry has its rings on a later photo.
+    """
+    frames = ((result or {}).get("quality") or {}).get("per_frame") or []
+    if (result or {}).get("site") == "face_full":
+        tests = [
+            lambda f: f.get("passed"),
+            lambda f: "face_not_found" not in (f.get("reasons") or []),
+        ]
+    else:
+        tests = [lambda f: f.get("passed") or f.get("reasons")]
+    for test in tests:
+        for frame in frames:
+            if test(frame):
+                return int(frame.get("index", 0))
+    return 0
+
+
 def photo_name(uid: str, sid: str, doc: dict[str, Any], existing: set[str]) -> str | None:
-    """The image shown on the stage: the engine's preview.jpg, else the person's own first JPEG
-    (a quick selfie is already viewable; a RAW frame is not)."""
+    """The image shown on the stage: the engine's preview.jpg, else the person's own JPEG of the
+    reference photo (a quick selfie is already viewable; a RAW frame is not)."""
     if preview_name(uid, sid) in existing:
         return preview_name(uid, sid)
     types, uris = doc.get("content_types") or [], doc.get("frame_uris") or []
-    if types and uris and types[0] == "image/jpeg":
-        return storage.name_from_uri(uris[0])
+    i = reference_index(measured_result(doc))
+    if i < min(len(types), len(uris)) and types[i] == "image/jpeg":
+        return storage.name_from_uri(uris[i])
     return None
-
-
-def _first_frame(doc: dict[str, Any]) -> str | None:
-    uris = doc.get("frame_uris") or []
-    return storage.name_from_uri(uris[0]) if uris else None
 
 
 def wanted_urls(
@@ -93,9 +112,8 @@ def session_view(
             ],
         }
     preview = None
-    photo = next(
-        (n for n in (preview_name(uid, sid), _first_frame(doc)) if n and n in signed), None
-    )
+    photo = photo_name(uid, sid, doc, set(signed))
+    photo = photo if photo in signed else None
     if result and photo:
         size = result.get("image_size") or {}
         preview = {

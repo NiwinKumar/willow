@@ -49,7 +49,9 @@ function outcomes(view: SessionView): string[] {
     : view.session.baseline?.has_noise_band === false
       ? `${count} compared with your baseline (no noise band yet)`
       : `${count} compared with your baseline`
-  const explained = usable === 0 ? 'Nothing to explain' : view.session.explanation_source === 'gemini' ? 'Explained by AI, every number checked' : 'Written from your numbers'
+  const named = Object.keys(view.session.label_details ?? {}).length
+  const spots = named ? `; ${named} ${named === 1 ? 'spot' : 'spots'} named by AI` : ''
+  const explained = usable === 0 ? 'Nothing to explain' : (view.session.explanation_source === 'gemini' ? 'Explained by AI, every number checked' : 'Written from your numbers') + spots
   return [quality, colour, measured, explained]
 }
 
@@ -236,7 +238,7 @@ export function Processing() {
               Willow measures face and forearm photos today. {SITE_LABEL[view!.session.site]} measurement is still being built, so this session has no numbers. Your photos are kept and can be measured when it is ready.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button onClick={() => navigate('/capture?site=forearm_control')}>Photograph a forearm</Button>
+              <Button onClick={() => navigate('/capture?site=face_full&mode=quick')}>Take a face photo</Button>
               <Button variant="secondary" onClick={() => navigate('/')}>Done</Button>
             </div>
           </div>

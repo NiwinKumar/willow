@@ -60,12 +60,21 @@ def item(metric: dict[str, Any]) -> dict[str, Any]:
     return {"metric_id": metric["id"], "summary": summary, "quoted_numbers": quoted}
 
 
+RETAKE = {
+    "face_full": "Retake facing a window or lamp, hair back, hands away from your face, looking "
+    "straight into the camera.",
+    "forearm_treated": "Retake with all four pen dots in view and white paper beside the arm.",
+    "forearm_control": "Retake with all four pen dots in view and white paper beside the arm.",
+}
+RETAKE_DEFAULT = "Retake in the same light, holding the phone steady."
+
+
 def template(result: dict[str, Any]) -> dict[str, Any]:
     metrics = result["metrics"]
     real = [m for m in metrics if m["verdict"] == "real_change"]
     if not result["quality"]["passed"]:
-        headline = "These photos could not be compared"
-        steps = ["Retake in the same light with the card in view."]
+        headline = "These photos could not be measured"
+        steps = [RETAKE.get(result.get("site", ""), RETAKE_DEFAULT)]
     elif metrics and all(m["verdict"] == "no_baseline" for m in metrics):
         if any(m.get("delta") is not None for m in metrics):
             headline = "Compared with your baseline (no noise band yet)"
@@ -148,27 +157,42 @@ class _Explanation(BaseModel):
     disclaimer: str = Field(max_length=120)
 
 
-# How the app displays each unit (web/src/lib/metrics.ts): Gemini quotes these, not raw floats.
+# How the app displays each unit (web/src/lib/metrics.ts UNIT_LABEL): Gemini quotes these.
 UNIT_DISPLAY = {
-    "deg": ("°", 1),
-    "a_star": (" a*", 1),
-    "pct_area": ("% of area", 1),
-    "index": ("", 2),
-    "count": ("", 0),
-    "per_cm2": (" per cm²", 0),
-    "delta_l_star": (" ΔL*", 1),
+    "deg": "°",
+    "a_star": " a*",
+    "pct_area": "% of area",
+    "index": "",
+    "count": "",
+    "per_cm2": " per cm²",
+    "delta_l_star": " ΔL*",
 }
 
 
-def _shown(x: float | None, unit: str) -> float | None:
+def decimals(metric: dict[str, Any]) -> int:
+    """Decimals the app shows a metric with (web/src/lib/metrics.ts decimalsFor): never more
+    precision than its noise band supports. Counts are whole numbers."""
+    if metric.get("unit") == "count":
+        return 0
+    band = metric.get("mdc95")
+    band = 1.0 if band is None else band
+    return 0 if band >= 5 else 1 if band >= 0.5 else 2
+
+
+def _shown(x: float | None, places: int) -> float | int | None:
     if x is None:
         return None
-    # Round half away from zero, like the web's Intl formatting: 2.5 blemishes shows as 3 on
-    # screen, so Gemini must see 3 too (Python's round() would give 2). A delta that rounds to
-    # zero is written as 0, never -0.
-    places = UNIT_DISPLAY.get(unit, ("", 2))[1]
+    # Round half away from zero, like the web's toFixed for these values: 2.5 blemishes shows as
+    # 3 on screen, so Gemini must see 3 too (Python's round() would give 2). A delta that rounds
+    # to zero is written as 0, never -0.
     q = Decimal(str(x)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
     return (int(q) if places == 0 else float(q)) + 0
+
+
+def shown_numbers(metric: dict[str, Any]) -> dict[str, Any]:
+    """value, delta and mdc95 exactly as the app shows them."""
+    places = decimals(metric)
+    return {k: _shown(metric.get(k), places) for k in ("value", "delta", "mdc95")}
 
 
 def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -186,10 +210,8 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
                 "verdict": m["verdict"],
                 "direction": m["direction"],
                 "confidence": m["confidence"],
-                "unit": UNIT_DISPLAY.get(m["unit"], ("", 2))[0].strip() or m["unit"],
-                "value": _shown(m["value"], m["unit"]),
-                "delta": _shown(m.get("delta"), m["unit"]),
-                "mdc95": _shown(m.get("mdc95"), m["unit"]),
+                "unit": UNIT_DISPLAY.get(m["unit"], "").strip() or m["unit"],
+                **shown_numbers(m),
             }
             for m in result["metrics"]
         ],
@@ -219,7 +241,9 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
 
 def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """(explanation, source): Gemini when it passes the validator, else the template."""
-    if not result["metrics"]:
+    if not result["metrics"] or not result["quality"]["passed"]:
+        # Nothing was measured: the fixed text says why and how to retake (Gemini would be told
+        # this is a first reading, which a session that failed quality never is).
         return template(result), "template"
     data = gemini_input(result, context)
     prompt = f"Session data (JSON):\n{json.dumps(data)}"
