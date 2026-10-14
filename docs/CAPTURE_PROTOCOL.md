@@ -6,11 +6,11 @@ Goal: the same light, distance, angle and camera settings every time, so changes
 - iPhone 17 Pro Max with **Lightroom Mobile** (free) camera in **Professional** mode, file format **DNG**. (Halide Process Zero is fine if already owned.)
 - 24-patch color card (ColorChecker Classic / Mini / Passport). Until it arrives: white + 18% grey card (mark sessions `semi_calibrated` in the capture log).
 - Light: one fixed lamp (or the same window at the same time of day), curtains closed, no overhead mixed lighting.
-- Macro: built-in iPhone macro (move close until it switches to ultra-wide macro) + a paper/3D-printed cone (~2 cm) so distance is fixed. A small LED inside the cone if flash is unavailable in Pro mode.
+- Close-ups (as built Oct 15): the phone about a hand's width from the face (10-15 cm), the cheek or nose in the middle, one eye still in the photo. The iris sets the scale, so no cone is needed and pores and texture are "measured". A true macro shot (iPhone macro or a cone) with no eye in view still works but its scale is assumed until `engine/scripts/macro_scale.py` is run on a ruler photo, so pores and texture are indicative.
 - Skin-safe tape to mark forearm squares (4 x 4 cm).
 
 ## Camera settings (lock and write them down on day 1; never change after)
-- Lens: 1x for face and forearm (about 35-40 cm away), macro for cheek/nose.
+- Lens: 1x for everything: face and forearm about 35-40 cm away, close-ups a hand's width away with one eye in view.
 - ISO: lowest that gives a sharp shot (50-200). Shutter: 1/60-1/125. White balance: fixed Kelvin (e.g., 5000 K). Focus: manual, set once per site.
 - No HDR, no Portrait mode, no filters, no beauty settings.
 

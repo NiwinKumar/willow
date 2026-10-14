@@ -22,8 +22,8 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   const measured = sessions.filter((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed)
   if (measured.length === 0)
     return { kind: 'unmeasured', text: 'Not measured yet', detail: 'No face photo has been measured yet. Take a face session to see whether this product changed anything.' }
-  // Face photos measure tone, dark spots, evenness, redness and blemishes today; pores, lines and
-  // the rest need close-ups the engine does not measure yet. Never call those "no change".
+  // Only metrics some measured session actually has a value for: pores and texture come from
+  // close-ups, lines are not measured yet. Never call an unmeasured target "no change".
   const measurable = new Set(measured.flatMap((s) => (s.result?.metrics ?? []).filter((m) => m.value !== null).map((m) => m.id)))
   const checked = targets.filter((t) => measurable.has(t))
   if (checked.length === 0) {

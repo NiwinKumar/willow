@@ -156,7 +156,7 @@ export function Capture() {
             {site === 'cheek_macro' || site === 'nose_macro' ? (
               <li className="flex min-h-12 items-center gap-3 py-2">
                 <Camera size={22} aria-hidden className="shrink-0 text-willow-700" />
-                <span className="text-[15px]">Cone touching the cheek for close-ups.</span>
+                <span className="text-[15px]">A hand’s width away, one eye still in the photo.</span>
               </li>
             ) : null}
             <li className="flex min-h-12 items-center gap-3 py-2">
@@ -193,7 +193,7 @@ export function Capture() {
               ['Open the camera in Lightroom Mobile.', 'Camera, then tap “Auto” left of the shutter and choose “Professional”.'],
               ['File format DNG.', 'In the capture settings, pick DNG. This is the RAW file Willow needs.'],
               ['Set and lock.', 'ISO 50 to 200, shutter 1/60 to 1/125, white balance a fixed Kelvin such as 5000 K, manual focus. Tap the lock so it turns yellow.'],
-              ['Same lens every time.', '1x for the face and forearm; macro for close-ups.'],
+              ['Same lens every time.', '1x for everything. For close-ups, hold the phone a hand’s width away with one eye in the photo: Willow measures size from your iris.'],
             ].map(([t, s], i) => (
               <li key={t} className="flex gap-3">
                 <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 font-mono text-[12px]">{i + 1}</span>

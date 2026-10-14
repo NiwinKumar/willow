@@ -42,6 +42,9 @@ export function QuickCapture() {
   const n = Math.min(5, Math.max(1, fixedN ?? 5))
   const steps = photoSteps(site, 'uncalibrated')
   const faceSite = site === 'face_full' || site === 'cheek_macro' || site === 'nose_macro'
+  // Close-ups: the engine measures size from the iris (one eye in view) and needs about 20 px per
+  // mm for pores, so the camera is asked for its full 4K frame and framed closer than a selfie.
+  const closeUp = site === 'cheek_macro' || site === 'nose_macro'
   const [phase, setPhase] = useState<Phase>('ask')
   const [gates, setGates] = useState<Gates>({ light: false, even: false, still: false })
   const [hint, setHint] = useState('Find brighter, even light')
@@ -71,7 +74,7 @@ export function QuickCapture() {
   async function start() {
     stop() // a retry never leaves the previous stream (and the camera light) running
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: faceSite ? 'user' : 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false })
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: faceSite ? 'user' : 'environment', width: { ideal: closeUp ? 3840 : 1920 }, height: { ideal: closeUp ? 2160 : 1440 } }, audio: false })
       stream.current = s
       // The tab went to the background or another app took the camera: say so, not a black frame.
       s.getVideoTracks()[0]?.addEventListener('ended', () => {
@@ -140,7 +143,7 @@ export function QuickCapture() {
       else if (!g.even) setHint('Face the window or lamp so both sides are lit evenly')
       else if (!g.still) setHint('Hold still')
       else if (liveSince.current !== null && performance.now() - liveSince.current <= SETTLE_MS) setHint('One moment: the camera is adjusting to the light')
-      else setHint(faceSite ? 'Fill the oval with your face, eyes on the lens' : 'Fit the square in the frame')
+      else setHint(closeUp ? (site === 'nose_macro' ? 'Nose in the middle, one eye still in view' : 'Cheek fills the frame, one eye still in view') : faceSite ? 'Fill the oval with your face, eyes on the lens' : 'Fit the square in the frame')
       const now = performance.now()
       const all = g.light && g.even && g.still
       if (g.light && g.even) nearSince.current ??= now
@@ -159,7 +162,7 @@ export function QuickCapture() {
       }
     }, 200)
     return () => window.clearInterval(id)
-  }, [phase, countdown, faceSite])
+  }, [phase, countdown, faceSite, closeUp, site])
 
   const capture = useCallback(async () => {
     const v = video.current
@@ -258,6 +261,12 @@ export function QuickCapture() {
             <li>Four pen dots mark the corners of a 4 cm square; keep all four in the frame.</li>
             <li>A sheet of plain white paper beside the arm, in the same light.</li>
           </ul>
+        ) : closeUp ? (
+          <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
+            <li>Hold the phone about a hand’s width from your face (10 to 15 cm), closer than a selfie.</li>
+            <li>Keep one eye in the photo: Willow measures size from your iris.</li>
+            <li>{site === 'nose_macro' ? 'Nose' : 'Cheek'} in the middle, facing a window or lamp. Hair back, nothing on the skin.</li>
+          </ul>
         ) : (
           <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
             <li>Hair back, glasses off, hands away from your face.</li>
@@ -277,7 +286,11 @@ export function QuickCapture() {
             ))}
           </ul>
         ) : null}
-        {!faceSite ? null : <p className="mt-6 text-[12px] text-text-3">Laptop camera? Raise the laptop so the camera is at eye level and sit facing a window. Soft or tilted photos are left out of the measurement.</p>}
+        {!faceSite ? null : closeUp ? (
+          <p className="mt-6 text-[12px] text-text-3">Use a phone for close-ups: a laptop camera is too far away and too soft to show pores.</p>
+        ) : (
+          <p className="mt-6 text-[12px] text-text-3">Laptop camera? Raise the laptop so the camera is at eye level and sit facing a window. Soft or tilted photos are left out of the measurement.</p>
+        )}
         <Link to={`/capture?site=${site}&mode=quick`} className="mt-6 inline-flex min-h-11 items-center text-[15px] text-text-2 underline-offset-2 hover:text-text hover:underline">
           Back to the photo guide
         </Link>
@@ -366,7 +379,7 @@ export function QuickCapture() {
                 return <motion.path key={a.key} d={d} fill="none" strokeWidth="2.5" strokeLinecap="round" initial={false} animate={{ stroke: on ? 'var(--color-willow-500)' : 'rgba(255,255,255,0.55)', pathLength: on ? 1 : 0.35 }} transition={{ duration: reduce ? 0 : DUR.slow, ease: EASE_OUT }} />
               })}
             </svg>
-            <motion.div animate={allPass && !reduce ? { scale: [1, 1.03, 1] } : { scale: 1 }} transition={{ duration: 1.2, ease: 'easeInOut' }} className={`absolute inset-[9%] ${faceSite ? 'rounded-[50%/42%]' : 'rounded-(--radius-tile)'} border-2 ${allPass ? 'border-willow-500' : 'border-white/70'}`} />
+            <motion.div animate={allPass && !reduce ? { scale: [1, 1.03, 1] } : { scale: 1 }} transition={{ duration: 1.2, ease: 'easeInOut' }} className={`absolute inset-[9%] ${faceSite && !closeUp ? 'rounded-[50%/42%]' : 'rounded-(--radius-tile)'} border-2 ${allPass ? 'border-willow-500' : 'border-white/70'}`} />
             {countdown !== null ? <span className="absolute inset-0 flex items-center justify-center font-mono text-[64px] font-medium text-white drop-shadow">{countdown}</span> : null}
           </div>
         </div>
