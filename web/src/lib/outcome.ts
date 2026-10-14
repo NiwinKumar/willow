@@ -20,7 +20,7 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   // Only real measurements count: done, measured (not a placeholder), photo quality passed.
   const measured = sessions.filter((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed)
   if (measured.length === 0)
-    return { kind: 'unmeasured', text: 'Not measured yet', detail: 'Willow measures forearm photos today. Face results for products appear once face measurement is ready.' }
+    return { kind: 'unmeasured', text: 'Not measured yet', detail: 'No face photo has been measured yet. Take a face session to see whether this product changed anything.' }
   const after = measured.filter((s) => !s.is_baseline && new Date(s.created_at) >= new Date(entry.started_at))
   const weeks = Math.floor((Date.now() - new Date(entry.started_at).getTime()) / (7 * 86_400_000))
   if (after.length < 2 || weeks < 2) return { kind: 'early', text: 'Too early to tell', detail: `Started ${weeks} week${weeks === 1 ? '' : 's'} ago. Willow needs at least two check-ins after a start date.` }
