@@ -49,7 +49,8 @@ export function Retailer() {
   const thinTiers = d.gaps.flatMap((g) => (['budget', 'mid', 'premium'] as const).filter((t) => g[t].options === 1).map((t) => `${g.goal}, ${t}`))
   const spf = d.conflicts.find((c) => c.pair.startsWith('No morning sunscreen'))
   const topClash = d.conflicts.find((c) => !c.pair.startsWith('No morning sunscreen'))
-  const routines = d.tiles[0].n
+  // Conflict shares are computed over every routine checked (api retailer.py), not week-8 actives.
+  const routines = d.cohort.synthetic + d.cohort.real
   return (
     <div className="pb-20">
       <div role="status" className="bg-warn/18 px-5 py-2 text-[13px] text-warn-text sm:px-8">
@@ -68,7 +69,7 @@ export function Retailer() {
           <ul className="flex gap-1 border-b border-border">
             {TABS.map((t) => (
               <li key={t}>
-                <button type="button" onClick={() => setTab(t)} aria-current={tab === t ? 'page' : undefined} className={`whitespace-nowrap border-b-2 px-3 py-2 text-[13px] ${tab === t ? 'border-text font-semibold' : 'border-transparent text-text-2 hover:text-text'}`}>{t}</button>
+                <button type="button" onClick={() => setTab(t)} aria-pressed={tab === t} className={`min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] ${tab === t ? 'border-text font-semibold' : 'border-transparent text-text-2 hover:text-text'}`}>{t}</button>
               </li>
             ))}
           </ul>

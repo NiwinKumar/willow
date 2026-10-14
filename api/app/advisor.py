@@ -78,7 +78,8 @@ TOOLS = types.Tool(
 
 
 class Reply(BaseModel):
-    message: str = Field(max_length=1200)
+    # The web sends replies back as history, which the api caps at 1000 characters per turn.
+    message: str = Field(max_length=1000)
     product_ids: list[str] = Field(default_factory=list, max_length=4)
     follow_up_suggestions: list[str] = Field(default_factory=list, max_length=3)
 

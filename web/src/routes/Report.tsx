@@ -26,6 +26,7 @@ import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } fro
 import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
 import { useAuth } from '../lib/useAuth'
+import { authErrorText } from '../lib/authErrors'
 import { useJudgeOn } from '../lib/useJudge'
 import { fresh } from './lazy'
 
@@ -101,12 +102,15 @@ export function Report() {
   const outsideCount = useCallback((s: Session) => (s.result?.metrics ?? []).filter((m) => m.verdict === 'real_change').length, [])
   const onScrub = useCallback((i: number) => view.set({ t: i }), [view])
 
-  // Keyboard: arrows scrub, L toggles the layer, ? not yet.
+  // Keyboard: arrows scrub, Home/End jump to the baseline/latest, L toggles the layer, ? lists keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'ArrowLeft') view.set({ t: Math.max(0, index - 1) })
       else if (e.key === 'ArrowRight') view.set({ t: Math.min(sessions.length - 1, index + 1) })
+      else if (e.key === 'Home') view.set({ t: 0 })
+      else if (e.key === 'End') view.set({ t: Math.max(0, sessions.length - 1) })
       else if (e.key.toLowerCase() === 'l') view.set({ layer: !view.layer })
       else if (e.key === '?') setKeys(true)
     }
@@ -121,7 +125,7 @@ export function Report() {
         <p className="mt-3 text-[15px] text-text-2">Your sessions belong to your account. A guest account keeps them on this device; Google keeps them across devices.</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button onClick={() => continueAsGuest().catch(() => toast.error('Could not sign in. Check your connection and try again.'))}>Continue as guest</Button>
-          <Button variant="secondary" onClick={() => signInWithGoogle().catch(() => toast.error('Google sign-in did not finish. Try again.'))}>Sign in with Google</Button>
+          <Button variant="secondary" onClick={() => signInWithGoogle().catch((e) => { const t = authErrorText(e); if (t) toast.error(t) })}>Sign in with Google</Button>
         </div>
       </div>
     )

@@ -1,5 +1,5 @@
-import { Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Suspense, useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
 import { AppShell } from './components/AppShell'
@@ -11,6 +11,7 @@ import { Advisor, Capture, Goals, Judge, Processing, QuickCapture, Report, Retai
 export default function App() {
   return (
     <DataProvider>
+      <PageTitle />
       <BandBarDefs />
       <Suspense fallback={<RouteLoading />}>
       <Routes>
@@ -50,4 +51,28 @@ export default function App() {
 /** Shown for the moment a page's code is loading; quiet, so a fast load just looks instant. */
 function RouteLoading() {
   return <div role="status" aria-label="Loading" className="min-h-[40dvh]" />
+}
+
+const TITLES: [RegExp, string][] = [
+  [/^\/judge/, 'Judge tour'],
+  [/^\/s\//, 'Results'],
+  [/^\/processing/, 'Measuring'],
+  [/^\/capture\/camera/, 'Camera'],
+  [/^\/capture/, 'New session'],
+  [/^\/routine/, 'Routine'],
+  [/^\/advisor/, 'Advisor'],
+  [/^\/retailer/, 'Retailer insights'],
+  [/^\/science/, 'How it works'],
+  [/^\/settings/, 'Settings'],
+  [/^\/(start|goals)/, 'Getting started'],
+]
+
+/** Each page names itself in the browser tab (and for screen readers announcing navigation). */
+function PageTitle() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    const t = TITLES.find(([re]) => re.test(pathname))?.[1]
+    document.title = t ? `${t} · Willow` : 'Willow: did your serum actually work?'
+  }, [pathname])
+  return null
 }

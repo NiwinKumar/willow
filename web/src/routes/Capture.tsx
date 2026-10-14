@@ -31,7 +31,7 @@ const RITUAL = [
 type Step = 'guide' | 'lightroom' | 'ring' | 'export' | 'upload'
 
 export function Capture() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const data = useData()
   const navigate = useNavigate()
   const { user, continueAsGuest } = useAuth()
@@ -43,7 +43,19 @@ export function Capture() {
   const [why, setWhy] = useState<number | null>(null)
   const [deviation, setDeviation] = useState(false)
   const [note, setNote] = useState('')
-  const [step, setStep] = useState<Step>('guide')
+  // The step lives in the URL, so the browser's back button goes to the previous step.
+  const STEPS: Step[] = ['guide', 'lightroom', 'ring', 'export', 'upload']
+  const step: Step = STEPS.includes(params.get('step') as Step) ? (params.get('step') as Step) : 'guide'
+  const setStep = (next: Step) => {
+    const q = new URLSearchParams(params)
+    q.set('site', site)
+    if (mode === 'uncalibrated') q.set('mode', 'quick')
+    else q.delete('mode')
+    if (next === 'guide') q.delete('step')
+    else q.set('step', next)
+    setParams(q)
+    window.scrollTo(0, 0)
+  }
   const [shots, setShots] = useState(0)
   const [rows, setRows] = useState<Row[]>([])
   const [errors, setErrors] = useState<string[]>([])
