@@ -203,6 +203,9 @@ BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
 BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red lip edge)
+# ...widened to this where the skin is between beard hairs: Oct 14 a moustache over the lip
+# gave 3 of 10 blemish candidates on a laptop selfie
+BLEMISH_MOUSTACHE_GUARD_MM = 5.0
 # Candidate crops for Gemini, sized on the face: the tight crop is 4x the mark's diameter
 # and at least 6 mm (pixel sizes covered 20 mm at 3.2 px/mm and half the face in the
 # context crop); the context crop is 3x that. Small crops are upscaled to 128 px.
