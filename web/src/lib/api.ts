@@ -2,6 +2,7 @@
 
 import type { AnalysisResult, Explanation, Product, RoutineCheck, RoutineEntry } from '../data/types'
 import { DEV_UID } from './devAuth'
+import type { LabelDetail } from './spotLabels'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
 
@@ -42,6 +43,7 @@ export type SessionView = {
     hours_since_baseline: number | null
     /** Judge mode: the hosted sample these photos were copied from. */
     sample_id?: string | null
+    label_details?: Record<string, LabelDetail>
   }
   result: AnalysisResult | null
   labels: Record<string, string>

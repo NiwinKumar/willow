@@ -7,8 +7,8 @@ caller's deterministic fallback. Logs prompt id, latency and token counts only (
 
 import json
 import logging
+import threading
 import time
-from functools import lru_cache
 
 from google import genai
 from google.genai import types
@@ -31,17 +31,27 @@ class GeminiError(Exception):
     """Gemini failed twice or could not be reached; callers fall back."""
 
 
-@lru_cache
+_client: genai.Client | None = None
+_client_lock = threading.Lock()
+
+
 def client() -> genai.Client:
-    s = get_settings()
-    # 25 s per request: a slow Gemini call falls back to deterministic output instead of
-    # holding up an analysis or a chat reply.
-    return genai.Client(
-        vertexai=True,
-        project=s.project_id,
-        location=s.vertex_location,
-        http_options=types.HttpOptions(timeout=25_000),
-    )
+    """One shared client, created under a lock. Without it, parallel first calls (explanation and
+    spot labels run together) each built a client, and the one nobody kept was closed mid-request
+    ("Cannot send a request, as the client has been closed")."""
+    global _client
+    with _client_lock:
+        if _client is None:
+            s = get_settings()
+            # 25 s per request by default: a slow Gemini call falls back to deterministic output
+            # instead of holding up an analysis or a chat reply.
+            _client = genai.Client(
+                vertexai=True,
+                project=s.project_id,
+                location=s.vertex_location,
+                http_options=types.HttpOptions(timeout=25_000),
+            )
+        return _client
 
 
 def generate_json[T: BaseModel](

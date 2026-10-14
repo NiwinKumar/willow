@@ -5,10 +5,11 @@ sessions again once their site is measured, so photos taken early still become t
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
-from app import baselines, engine, explain, views
+from app import baselines, engine, explain, labeller, views
 from app.store import Store
 
 
@@ -51,11 +52,15 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         raise
 
     measured = not engine.is_placeholder(result)
-    explanation, source = (None, None)
+    explanation, source, details = (None, None, {})
     if measured:
-        explanation, source = explain.generate(
-            result, explain_context(store, uid, doc, current, session_id)
-        )
+        # The explanation and the spot labels are independent Gemini calls: run them together.
+        context = explain_context(store, uid, doc, current, session_id)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            explained = pool.submit(explain.generate, result, context)
+            labelled = pool.submit(labeller.label_candidates, result)
+            explanation, source = explained.result()
+            details = labelled.result()
     store.session_update(
         uid,
         session_id,
@@ -67,7 +72,9 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
             "explanation": explanation,
             "explanation_source": source,
             "compared_with": baselines.compared_with(current) if baseline_map else None,
-            "labels": {},
+            # CONTRACT.md: labels = {candidate_id: label}; the rest is for the "AI-suggested" UI.
+            "labels": {cid: d["label"] for cid, d in details.items()},
+            "label_details": details,
             "analyzed_at": datetime.now(UTC),
         },
     )
