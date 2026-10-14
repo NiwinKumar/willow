@@ -54,6 +54,8 @@ MIN_SD = {
     "pigment_spots": 0.05,  # % of skin area
     "blemishes": 0.5,  # marks
     "dark_circles": 0.3,  # delta L*
+    "pores": 2.0,  # per cm2 (one or two pores more or less in a ~1 cm2 field)
+    "texture": 0.05,  # index
 }
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
@@ -210,6 +212,41 @@ CROP_SPOT_FACTOR = 4.0
 CROP_MIN_MM = 6.0
 CROP_MIN_OUT_PX = 128
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
+
+# Close-up sites (cheek_macro, nose_macro). Scale: the width of skin a close-up covers, so
+# it holds when the app shrinks the photo. MEASURE IT with scripts/macro_scale.py (a mm
+# ruler shot at the usual close-up distance); until then MACRO_SCALE_CALIBRATED is False,
+# pores/texture are indicative and the result says the scale is assumed. 30 mm is roughly
+# an iPhone macro shot at 2-3 cm.
+MACRO_FIELD_WIDTH_MM = 30.0
+MACRO_SCALE_CALIBRATED = False
+MACRO_WORK_PX_PER_MM = 50.0  # close-ups are analysed at this scale (0.05 mm pore = 2.5 px)
+MACRO_MIN_SKIN_CM2 = 0.5  # skin needed for a value
+MACRO_EDGE_FRAC = 0.03  # ignore this share of each photo edge (vignetting, cone rim)
+# pores (docs/METRICS.md A5): dark round blobs PORE_DIAMETER_MM across, PORE_MIN_SCORE x this
+# person's skin texture darker than the skin within PORE_BACKGROUND_MM
+PORE_DIAMETER_MM = (0.05, 0.3)
+PORE_BACKGROUND_MM = 0.5
+PORE_MIN_SCORE = 3.0
+# blackheads (nose close-up): pores this much darker (L*) and greyer than the skin around
+BLACKHEAD_MIN_DL = 12.0
+BLACKHEAD_MAX_CHROMA_RATIO = 0.7
+BLACKHEAD_MIN_DIAMETER_MM = 0.1
+# texture (docs/METRICS.md A6): Laplacian energy at this fine scale
+TEXTURE_SIGMA_MM = 0.1
+# Laplacian variance at the working scale. Oct 14 synthetic close-ups: sharp skin 8-18 (smooth
+# or deep skin is lower), blurred by 0.05 mm or more under 1 (pore counts break at 0.2 mm).
+# From synthetic photos only: check on real macro shots.
+MACRO_SHARPNESS_MIN = 2.0
+# Pores and texture need detail: below this many px per mm a 0.05 mm pore is under 2 px,
+# so they are not measured (Oct 14: internet-sized crops, 20-35 px/mm, "found" pimple edges,
+# a hair and a crease; a real iPhone macro shot is about 130 px/mm)
+MACRO_MIN_PX_PER_MM = 40.0
+PORE_MARK_GAP_MM = 0.3  # pores this close to a blemish / dark spot edge are its edge
+PORE_CHAIN_MM = 1.0  # a pore with PORE_CHAIN_MIN+ neighbours this close, all in a line...
+PORE_CHAIN_MIN = 5  # 3 let 4 random pores that happened to line up drop a real one
+PORE_CHAIN_ELONGATION = 4.0  # ...(long axis this many x the short) is a hair or crease
+TEXTURE_MAX_MDC_FRAC = 0.25  # texture becomes indicative when MDC95 > 25% of the value
 
 # preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
 PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor

@@ -3,7 +3,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from jsonschema import validate
+from test_macro import _macro
 
+from app.io import LOCAL_ENV
 from app.main import app
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,15 +21,17 @@ def test_fixture_is_schema_valid():
     )
 
 
-def test_placeholder_analyze_roundtrip():
+def test_analyze_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setenv(LOCAL_ENV, "1")
+    _macro(tmp_path / "frame_1.jpg")
     client = TestClient(app)
     req = {
         "schema_version": "1.0",
         "session_id": "s_test",
         "user_id": "u_test",
         "site": "cheek_macro",
-        "capture_mode": "calibrated_raw",
-        "frames": [{"uri": "gs://bucket/uploads/u_test/s_test/frame_1.dng"}],
+        "capture_mode": "uncalibrated",
+        "frames": [{"uri": str(tmp_path / "frame_1.jpg")}],
     }
     res = client.post("/v1/analyze", json=req)
     assert res.status_code == 200

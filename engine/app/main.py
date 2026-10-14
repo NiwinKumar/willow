@@ -1,7 +1,7 @@
 """Willow engine HTTP service (docs/CONTRACT.md section 2).
 
-Forearm sites and face_full run the real pipeline. Macro sites (cheek_macro, nose_macro)
-still return the contract fixture, clearly marked in `warnings`, until M3.
+Every contract site runs a real pipeline: forearm sites (pipeline), face_full
+(pipeline_face) and the close-ups cheek_macro / nose_macro (pipeline_macro).
 """
 
 import json
@@ -19,12 +19,12 @@ from jsonschema import ValidationError, validate
 from app import __version__
 from app.errors import EngineError
 from app.io import fetch_frames
-from app.pipeline import FOREARM_SITES, analyze_forearm
+from app.pipeline import analyze_forearm
 from app.pipeline_face import analyze_face
+from app.pipeline_macro import MACRO_SITES, analyze_macro
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMAS = ROOT / "schemas"
-FIXTURE = ROOT / "fixtures" / "analysis_result.sample.json"
 REQUEST_SCHEMA = json.loads((SCHEMAS / "analyze_request.schema.json").read_text())
 RESULT_SCHEMA = json.loads((SCHEMAS / "analysis_result.schema.json").read_text())
 MODE_FOR_EXT = {".dng": "calibrated_raw"}  # anything else is a normal photo -> uncalibrated
@@ -65,15 +65,6 @@ def _unexpected(_: Request, exc: Exception) -> JSONResponse:
 @app.get("/v1/health")  # Cloud Run front end swallows /healthz on *.run.app; same response
 def healthz() -> dict:
     return {"status": "ok", "engine_version": __version__}
-
-
-def _placeholder(request: dict) -> dict:
-    result = json.loads(FIXTURE.read_text())
-    for key in ("session_id", "user_id", "site", "capture_mode"):
-        result[key] = request[key]
-    result["engine_version"] = f"{__version__}-placeholder"
-    result["warnings"] = [f"placeholder: {request['site']} not analysed yet, fixture data"]
-    return result
 
 
 def _check_mode(request: dict) -> None:
@@ -120,34 +111,40 @@ async def analyze(http_request: Request) -> dict:
 
 
 def _run(request: dict) -> dict:
-    if request["site"] not in FOREARM_SITES | {"face_full"}:
-        result = _placeholder(request)
-    else:
-        _check_mode(request)
-        n = len(request["frames"])
-        with tempfile.TemporaryDirectory(prefix="willow_") as tmp:
-            t_fetch = time.perf_counter()
-            paths = fetch_frames([f["uri"] for f in request["frames"]], Path(tmp))
-            fetch_ms = (time.perf_counter() - t_fetch) * 1000
-            ids = {"session_id": request["session_id"], "user_id": request["user_id"]}
-            if request["site"] == "face_full":
-                opts = request.get("options") or {}
-                result = analyze_face(
-                    paths,
-                    baseline=request.get("baseline"),
-                    output_prefix=request.get("output_prefix"),
-                    max_candidates=opts.get("max_candidates", 40),
-                    **ids,
-                )
-            else:
-                result = analyze_forearm(
-                    paths,
-                    request["site"],
-                    [None] * n,  # forearm square found from the pen dots
-                    [None] * n,  # white paper found automatically
-                    baseline=request.get("baseline"),
-                    output_prefix=request.get("output_prefix"),
-                    **ids,
-                )
-        result["timings_ms"]["fetch"] = round(fetch_ms, 1)
+    _check_mode(request)
+    n = len(request["frames"])
+    with tempfile.TemporaryDirectory(prefix="willow_") as tmp:
+        t_fetch = time.perf_counter()
+        paths = fetch_frames([f["uri"] for f in request["frames"]], Path(tmp))
+        fetch_ms = (time.perf_counter() - t_fetch) * 1000
+        ids = {"session_id": request["session_id"], "user_id": request["user_id"]}
+        opts = request.get("options") or {}
+        if request["site"] in MACRO_SITES:
+            result = analyze_macro(
+                paths,
+                request["site"],
+                baseline=request.get("baseline"),
+                output_prefix=request.get("output_prefix"),
+                max_candidates=opts.get("max_candidates", 40),
+                **ids,
+            )
+        elif request["site"] == "face_full":
+            result = analyze_face(
+                paths,
+                baseline=request.get("baseline"),
+                output_prefix=request.get("output_prefix"),
+                max_candidates=opts.get("max_candidates", 40),
+                **ids,
+            )
+        else:
+            result = analyze_forearm(
+                paths,
+                request["site"],
+                [None] * n,  # forearm square found from the pen dots
+                [None] * n,  # white paper found automatically
+                baseline=request.get("baseline"),
+                output_prefix=request.get("output_prefix"),
+                **ids,
+            )
+    result["timings_ms"]["fetch"] = round(fetch_ms, 1)
     return result
