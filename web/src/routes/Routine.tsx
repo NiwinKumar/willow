@@ -282,7 +282,7 @@ export function Routine() {
         <div>
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Your routine</h1>
           <p className={`mt-1 text-[15px] ${worst === 'ok' || entries.length === 0 ? 'text-text-2' : 'text-warn-text'}`}>{status}</p>
-          {entries.length > 0 && !faceMeasured && data.mode === 'live' ? <p className="mt-1 text-[13px] text-text-3">Whether each product changed your skin shows here once your face photos are measured.</p> : null}
+          {entries.length > 0 && !faceMeasured && data.mode === 'live' ? <p className="mt-1 text-[13px] text-text-3">Take a face session to see, over the weeks, whether each product changed your skin.</p> : null}
         </div>
         <Button
           onClick={async () => {

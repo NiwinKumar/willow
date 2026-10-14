@@ -175,7 +175,7 @@ export function Report() {
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Saved, not measured yet</h1>
             <p className="mt-2 text-[15px] text-text-2">
-              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')}. Willow measures forearm photos today; {SITE_LABEL[session.site].toLowerCase()} measurement is still being built. Your photos are kept and can be measured when it is ready.
+              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')}. Willow measures face and forearm photos today; {SITE_LABEL[session.site].toLowerCase()} measurement is still being built. Your photos are kept and can be measured when it is ready.
             </p>
             <Link to="/capture?site=forearm_control" className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
               Photograph a forearm
