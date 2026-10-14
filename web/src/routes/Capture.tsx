@@ -22,7 +22,7 @@ const SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treate
 const RITUAL = [
   { icon: Sun, text: 'Same lamp, same spot, curtains closed.', why: 'Lighting is the biggest source of photo-to-photo change. Keeping it fixed is what makes the noise band small.' },
   { icon: Timer, text: 'Clean skin, nothing applied, waited 15 minutes.', why: 'Water, products and rubbing all change redness and shine for a while.' },
-  { icon: Wind, text: 'Hair back, glasses off, neutral face.', why: 'Hair and glasses cover regions; expressions move the landmarks the regions are built from.', faceOnly: true },
+  { icon: Wind, text: 'Hair back, glasses off, hands away from your face, neutral expression.', why: 'Hair, glasses and fingers cover skin and read as spots; expressions move the landmarks the regions are built from.', faceOnly: true },
   { icon: Thermometer, text: 'Colour card next to the skin, flat, not in shadow.', why: 'The card is how each photo gets colour-corrected. Shadow or glare on it fails the quality check.', calibratedOnly: true, faceOnly: true },
   { icon: PenLine, text: 'Four pen dots mark the corners of a 4 cm square on the forearm; all four in frame.', why: 'Willow finds the square from the dots, so every photo measures exactly the same patch of skin. A white marker works on deep skin tones.', forearmOnly: true },
   { icon: FileText, text: 'A sheet of plain white paper beside the arm, in the same light.', why: 'The paper tells Willow the colour of your lamp, so a change in light is not mistaken for a change in skin.', forearmOnly: true },

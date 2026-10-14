@@ -4,7 +4,9 @@ Face and close-up photos taken before the engine measured those sites are stored
 `measured: false`. This re-runs them oldest first, so each person's earliest saved session becomes
 their baseline and later ones are compared with it. Dry run by default.
 
-    uv run python scripts/remeasure.py [--site face_full] [--apply]
+    uv run python scripts/remeasure.py [--site face_full] [--session s_...] [--apply]
+
+`--session` runs those sessions again even if they are already measured (after a fix).
 """
 
 import sys
@@ -20,10 +22,11 @@ from app.store import FirestoreStore  # noqa: E402
 def main() -> int:
     apply = "--apply" in sys.argv
     sites = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--site"} or None
+    only = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--session"} or None
     store = FirestoreStore()
     bucket = get_settings().bucket
     for user in gcp.firestore_client().collection("users").list_documents():
-        for line in analysis.remeasure(store, bucket, user.id, sites, apply):
+        for line in analysis.remeasure(store, bucket, user.id, sites, apply, only):
             print(line)
     print("applied" if apply else "dry run (pass --apply to write)")
     return 0

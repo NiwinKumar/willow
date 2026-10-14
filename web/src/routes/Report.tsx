@@ -19,8 +19,8 @@ import { baselineFor, isSampleEngine, isUnmeasured, matchControl } from '../data
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { missingBaselines } from '../lib/baselineGuide'
-import { MOLE_NOTE, summarizeSpots } from '../lib/spotLabels'
-import { failureReasons, readableWarnings } from '../lib/warnings'
+import { MOLE_NOTE, NOT_SKIN, type SpotLabel, summarizeSpots } from '../lib/spotLabels'
+import { failureReasons, leftOutPhotos, photosUsed, readableWarnings } from '../lib/warnings'
 import { fmtDate, plural } from '../lib/format'
 import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
 import { ApiError, api } from '../lib/api'
@@ -85,6 +85,11 @@ export function Report() {
 
   const metrics = session?.result?.metrics ?? []
   const spots = useMemo(() => summarizeSpots(session?.label_details), [session])
+  // The spots list selection belongs to one session: scrubbing to another clears it.
+  const [focus, setFocus] = useState<{ sid: string; label: SpotLabel } | null>(null)
+  const spotFocus = focus && focus.sid === session?.id ? focus.label : null
+  const setSpotFocus = (label: SpotLabel | null) => setFocus(label && session ? { sid: session.id, label } : null)
+  const ringsShown = Boolean(session?.preview)
   const baselineMetric = useCallback((id: MetricId) => baseline?.result?.metrics.find((m) => m.id === id) ?? null, [baseline])
   // Quick selfies and RAW sessions are never compared, so charts and band scales use one mode.
   const sameMode = useMemo(() => sessions.filter((s) => s.capture_mode === session?.capture_mode && s.measured !== false), [sessions, session])
@@ -200,11 +205,12 @@ export function Report() {
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Your baseline</h1>
             <p className="mt-1 text-[13px] text-text-2">
-              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')} · {session.capture_mode === 'uncalibrated' ? 'phone photo' : 'calibrated'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'calibrated sessions are'} compared to this
+              {fmtDate(session.created_at)} · {photosUsed(session)} · {session.capture_mode === 'uncalibrated' ? 'phone photo' : 'calibrated'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'calibrated sessions are'} compared to this
             </p>
-            {session.n_frames < 2 ? (
+            {leftOutPhotos(session.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session.result)}</p> : null}
+            {(session.result?.frames_used ?? session.n_frames) < 2 ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-                One photo, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
+                {session.n_frames > 1 ? 'Only one photo passed' : 'One photo'}, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
               </p>
             ) : null}
             {data.mode === 'live' && missing.length ? (
@@ -212,7 +218,7 @@ export function Report() {
                 Still without a baseline:{' '}
                 {missing.map((m, i) => (
                   <span key={m}>
-                    {i ? ', ' : ''}
+                    {i === 0 ? '' : i === missing.length - 1 ? ' and ' : '; '}
                     <Link to={`/capture?site=${m}${session.capture_mode === 'uncalibrated' ? '&mode=quick' : ''}`} className="font-medium text-willow-700 underline-offset-2 hover:underline">
                       {SITE_LABEL[m]}
                     </Link>
@@ -234,13 +240,14 @@ export function Report() {
               )}
             </h1>
             <p className="mt-1 text-[13px] text-text-2">
-              Baseline {baseline ? fmtDate(baseline.created_at) : '–'} · {baseline ? plural(baseline.n_frames, 'photo', 'photos') : ''} · {session ? plural(session.n_frames, 'photo', 'photos') : ''} this session
+              Baseline {baseline ? fmtDate(baseline.created_at) : '–'} · {baseline ? photosUsed(baseline) : ''} · {session ? photosUsed(session) : ''} this session
               {session?.deviation ? <Chip tone="warn" className="ml-2">something was different</Chip> : null}
             </p>
+            {leftOutPhotos(session?.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session?.result)}</p> : null}
             {noBand ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-                Your baseline has one photo, so changes are shown but none can be called real yet.{' '}
-                {session && session.n_frames >= 2 ? 'This session has several photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
+                Your baseline has one usable photo, so changes are shown but none can be called real yet.{' '}
+                {session && (session.result?.frames_used ?? 0) >= 2 ? 'This session has several usable photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
               </p>
             ) : null}
             {data.mode === 'live' && session && !session.is_baseline && session.measured !== false && session.result?.quality.passed ? (
@@ -339,12 +346,29 @@ export function Report() {
             <h2 id="spots" className="text-[17px] font-semibold">Spots on this photo</h2>
             <Chip tone="neutral">AI-suggested</Chip>
           </div>
-          <p className="mt-1 text-[13px] text-text-2">The engine found these spots; Gemini looked at each one twice and kept a name only when both looks agreed. The rings on the photo show where they are. Names describe appearance, not a diagnosis.</p>
+          <p className="mt-1 text-[13px] text-text-2">
+            The engine found these spots; Gemini looked at each one twice and kept a name only when both looks agreed. Names describe appearance, not a diagnosis.
+            {ringsShown ? ' Rings mark them on the photo (hair and artefacts hidden); choose a name to see just those.' : ''}
+          </p>
           <ul className="mt-3 divide-y divide-border">
             {spots.map((s) => (
-              <li key={s.label} className="flex items-baseline justify-between gap-3 py-2 text-[15px]">
-                <span>{s.name}</span>
-                <span className="font-mono text-[15px]">{s.n}</span>
+              <li key={s.label}>
+                {ringsShown ? (
+                  <button
+                    type="button"
+                    aria-pressed={spotFocus === s.label}
+                    onClick={() => setSpotFocus(spotFocus === s.label ? null : s.label)}
+                    className={`-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-center justify-between gap-3 rounded-(--radius-control) px-2 text-left text-[15px] hover:bg-surface-2 ${spotFocus === s.label ? 'bg-surface-2 font-medium' : ''} ${NOT_SKIN.includes(s.label) ? 'text-text-2' : ''}`}
+                  >
+                    <span>{s.name}</span>
+                    <span className="font-mono text-[15px]">{s.n}</span>
+                  </button>
+                ) : (
+                  <div className={`flex min-h-11 items-center justify-between gap-3 text-[15px] ${NOT_SKIN.includes(s.label) ? 'text-text-2' : ''}`}>
+                    <span>{s.name}</span>
+                    <span className="font-mono text-[15px]">{s.n}</span>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -415,6 +439,7 @@ export function Report() {
       layer={view.layer}
       onSelectMetric={(id) => view.set({ m: id, layer: id !== null })}
       caption={session && !session.is_baseline && session.hours_since_baseline !== undefined ? `+${session.hours_since_baseline} h` : undefined}
+      spotFocus={spotFocus}
       className="h-full w-full"
     />
   )

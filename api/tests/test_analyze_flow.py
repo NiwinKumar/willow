@@ -1,4 +1,4 @@
-from app import engine
+from app import analysis, engine, views
 
 
 def _create(client, site="forearm_treated", mode="calibrated_raw", n=5):
@@ -289,7 +289,6 @@ def test_legacy_baselines_from_placeholders_are_ignored(client, fake):
 
 def test_saved_sessions_are_measured_again_oldest_first(client, fake, monkeypatch):
     """Face photos saved before face measurement existed: the earliest becomes the baseline."""
-    from app import analysis
 
     real_analyze = engine.analyze
 
@@ -371,3 +370,62 @@ def test_a_session_made_baseline_shows_no_deltas_against_the_old_one(client, fak
     assert after["session"]["is_baseline"] is True
     assert all(m["delta"] is None for m in after["result"]["metrics"])
     assert after["session"]["baseline"]["session_id"] == sid
+
+
+def test_stage_photo_is_the_photo_the_engine_measured(client, fake, monkeypatch):
+    """Spots are found on the first face photo that passed; the stage shows that photo."""
+    real = engine.analyze
+
+    def first_two_blurry(request):
+        result = real(request)
+        result["site"] = "face_full"
+        result["quality"]["per_frame"] = [
+            {"index": i, "passed": i >= 2, "reasons": [] if i >= 2 else ["blurry"]}
+            for i in range(len(request["frames"]))
+        ]
+        return result
+
+    monkeypatch.setattr(engine, "analyze", first_two_blurry)
+    created = _create(client, site="face_full", mode="uncalibrated", n=4)
+    _upload_all(fake, created)
+    view = client.post(f"/v1/sessions/{created['session_id']}/analyze").json()
+    assert view["session"]["preview"]["url"].endswith(f"{created['session_id']}/frame_3.jpg")
+
+
+def test_reference_index_rules():
+    face = {
+        "site": "face_full",
+        "quality": {
+            "per_frame": [
+                {"index": 0, "passed": False, "reasons": ["face_not_found"]},
+                {"index": 1, "passed": False, "reasons": ["blurry"]},
+            ]
+        },
+    }
+    assert views.reference_index(face) == 1
+    arm = {
+        "site": "forearm_control",
+        "quality": {
+            "per_frame": [
+                {"index": 0, "passed": False, "reasons": []},
+                {"index": 1, "passed": False, "reasons": ["blurry"]},
+                {"index": 2, "passed": True, "reasons": []},
+            ]
+        },
+    }
+    assert views.reference_index(arm) == 1
+    assert views.reference_index(None) == 0
+
+
+def test_remeasure_named_session_runs_again_when_already_measured(client, fake):
+    created = _create(client, site="forearm_control")
+    _upload_all(fake, created)
+    client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert analysis.remeasure(fake.store, "b", "u_test") == []
+    lines = analysis.remeasure(
+        fake.store, "b", "u_test", apply=True, sessions={created["session_id"]}
+    )
+    assert len(lines) == 1 and "measured" in lines[0]
+    assert (
+        fake.store.baseline_get("u_test", "forearm_control")["session_id"] == created["session_id"]
+    )
