@@ -148,7 +148,9 @@ def analyze_forearm(
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
         if passed_values:
-            summary = summarize([v[metric_id] for v in passed_values], base)
+            summary = summarize(
+                [v[metric_id] for v in passed_values], base, config.MIN_SD.get(metric_id, 0.0)
+            )
             extras = _mean_extras([e[metric_id] for e in passed_extras])
             if metric_id == "tone_ita":  # band must describe the reported (mean) value
                 extras["ita_band"] = ita_band(summary["value"])

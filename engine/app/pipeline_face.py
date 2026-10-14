@@ -415,7 +415,9 @@ def analyze_face(
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
         if good:
-            summary = summarize([f["values"][metric_id] for f in good], base)
+            summary = summarize(
+                [f["values"][metric_id] for f in good], base, config.MIN_SD.get(metric_id, 0.0)
+            )
             extras = _mean_extras([f["extras"][metric_id] for f in good])
             if metric_id == "tone_ita":
                 extras["ita_band"] = ita_band(summary["value"])

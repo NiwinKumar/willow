@@ -43,6 +43,16 @@ ITA_BANDS = [
 ]
 
 MDC_Z = 1.96  # 95% two-sided
+# Floor on the photo-to-photo SD per metric (same units as the metric). A session whose photos
+# all gave the same value is not noise-free: counts move by whole marks and webcams by a few
+# tenths of a* between frames. Without a floor its band is 0 and any later change is "real".
+MIN_SD = {
+    "tone_ita": 0.5,  # degrees
+    "redness": 0.2,  # a*
+    "tone_evenness": 0.1,
+    "pigment_spots": 0.05,  # % of skin area
+    "blemishes": 0.5,  # marks
+}
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
