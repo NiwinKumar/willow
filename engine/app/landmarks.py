@@ -17,6 +17,7 @@ from scipy.ndimage import binary_fill_holes
 from app import config
 
 MODEL = Path(__file__).resolve().parents[1] / "models" / "face_landmarker.task"
+HAND_MODEL = MODEL.with_name("hand_landmarker.task")
 
 # Mirrored pairs on the canonical mesh (e.g. 50 <-> 280 are the two cheekbones).
 ROI_POINTS = {
@@ -366,6 +367,56 @@ def _landmarker():
         output_facial_transformation_matrixes=True,
     )
     return mp.tasks.vision.FaceLandmarker.create_from_options(options)
+
+
+@lru_cache(maxsize=1)
+def _hand_landmarker():
+    import mediapipe as mp
+
+    if not HAND_MODEL.exists():
+        return None  # no hand model: hands are not looked for (see README)
+    options = mp.tasks.vision.HandLandmarkerOptions(
+        base_options=mp.tasks.BaseOptions(model_asset_path=str(HAND_MODEL)),
+        running_mode=mp.tasks.vision.RunningMode.IMAGE,
+        num_hands=2,
+        min_hand_detection_confidence=config.HAND_MIN_CONFIDENCE,
+        min_hand_presence_confidence=config.HAND_MIN_CONFIDENCE,
+    )
+    return mp.tasks.vision.HandLandmarker.create_from_options(options)
+
+
+def detect_hands(srgb8: np.ndarray, min_span_px: float) -> list[np.ndarray]:
+    """Hands in the photo as (21, 2) pixel landmark arrays, ignoring tiny detections (a
+    hand on a face spans at least about the eye distance; specks of skin texture do not)."""
+    import mediapipe as mp
+
+    model = _hand_landmarker()
+    if model is None:
+        return []
+    h, w = srgb8.shape[:2]
+    scale = min(1.0, config.LANDMARK_MAX_SIDE / max(h, w))
+    small = cv2.resize(srgb8, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA)
+    image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(small))
+    hands = []
+    for lm in model.detect(image).hand_landmarks:
+        pts = np.array([[p.x * w, p.y * h] for p in lm], dtype=np.float64)
+        if np.ptp(pts, axis=0).max() >= min_span_px:
+            hands.append(pts)
+    return hands
+
+
+def hand_mask(shape: tuple[int, int], hands: list[np.ndarray], margin_px: float) -> np.ndarray:
+    """Convex hull of each hand's landmarks, grown by margin_px (landmarks sit on joints
+    and fingertips; the palm and finger edges reach beyond them)."""
+    mask = np.zeros(shape, np.uint8)
+    for pts in hands:
+        cv2.fillConvexPoly(mask, cv2.convexHull(pts.astype(np.float32)).astype(np.int32), 1)
+    if hands and margin_px >= 1:
+        r = round(margin_px)
+        mask = cv2.dilate(
+            mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+        )
+    return mask.astype(bool)
 
 
 def detect_face(srgb8: np.ndarray) -> Face:

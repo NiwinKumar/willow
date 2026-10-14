@@ -344,3 +344,39 @@ def test_single_photo_counts_every_mark(tmp_path, fake_landmarks):
     _bump_photo(tmp_path / "one.jpg", [(500, 600), (350, 750)])
     r = analyze_face([str(tmp_path / "one.jpg")])
     assert next(m for m in r["metrics"] if m["id"] == "blemishes")["value"] == 2.0
+
+
+def _hand_at(monkeypatch, cx, cy, half):
+    """Stand-in for the hand landmarker: one hand whose landmarks span a square."""
+    pts = np.array(
+        [[cx + dx, cy + dy] for dx in (-half, 0, half) for dy in (-half, 0, half)], float
+    )
+    monkeypatch.setattr("app.pipeline_face.detect_hands", lambda srgb8, min_span: [pts])
+
+
+def test_hand_on_the_chin_is_cut_and_flags_occlusion(tmp_path, fake_landmarks, monkeypatch):
+    # a red bump under a hand resting on the chin: not counted, photo flagged
+    _bump_photo(tmp_path / "hand.jpg", [(500, 800)])
+    _hand_at(monkeypatch, 500, 800, 150)
+    r = analyze_face([str(tmp_path / "hand.jpg")])
+    assert "occlusion_suspected" in r["quality"]["per_frame"][0]["reasons"]
+    assert r["candidates"] == []
+
+
+def test_small_hand_near_the_face_cuts_skin_without_failing_the_photo(
+    tmp_path, fake_landmarks, monkeypatch
+):
+    _bump_photo(tmp_path / "hand.jpg", [(500, 600), (300, 860)])
+    _hand_at(monkeypatch, 300, 860, 20)  # a fingertip at the jaw corner
+    r = analyze_face([str(tmp_path / "hand.jpg")])
+    assert r["quality"]["passed"]
+    xs = [round(c["bbox"][0] + c["bbox"][2] / 2, -2) for c in r["candidates"]]
+    assert xs == [500.0]  # the bump under the fingertip is not a candidate
+
+
+def test_hand_model_loads_and_finds_no_hand_on_a_blank_image():
+    from app.landmarks import HAND_MODEL, detect_hands
+
+    if not HAND_MODEL.exists():
+        pytest.skip("hand model not downloaded")
+    assert detect_hands(np.full((480, 640, 3), 128, np.uint8), 10) == []
