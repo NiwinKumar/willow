@@ -78,7 +78,10 @@ def _frame_metrics(
     # very light skin to 1.0, which is not the camera's fault and must not fail the photo
     quality = check_frame(roi.crop(linear), roi.crop(srgb8))
     if white_px is not None:
-        linear = white_balance(linear, white_px)
+        try:
+            linear = white_balance(linear, white_px)
+        except ValueError:  # paper too dark or blown out: no reference, not a crash
+            white_px = None
     skin_lin = roi.crop(linear)
     lab = linear_srgb_to_lab(skin_lin)
     mask = skin_mask(lab)
@@ -137,6 +140,10 @@ def analyze_forearm(
             passed_values.append(values)
             passed_extras.append(extras)
 
+    # "Measured" needs a colour reference in every photo: without the paper, neither the lamp's
+    # colour nor its brightness is corrected, so tone and redness are a trend, even from a DNG.
+    if mode == "calibrated_raw" and not (white_ok and all(white_ok)):
+        confidence = "indicative"
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
@@ -172,10 +179,18 @@ def analyze_forearm(
         reasons.append("too_few_frames")
     if mode == "uncalibrated":
         warnings.insert(0, "uncalibrated photo: results are a trend only, not a measurement")
-    else:
+    elif any(white_ok):
         warnings.insert(0, "no colour card: colours corrected with the white paper only")
-    if not all(white_ok):
-        warnings.append("no white reference found in some photos: lamp colour not corrected")
+    # (the web reads "no white reference found" and " in some photos")
+    if white_ok and not any(white_ok):
+        warnings.append(
+            "no white reference found: lamp colour and brightness not corrected, so tone and "
+            "redness are a trend"
+        )
+    elif not all(white_ok):
+        warnings.append(
+            "no white reference found in some photos: lamp colour and brightness not corrected"
+        )
 
     result = {
         "schema_version": "1.0",
