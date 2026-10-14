@@ -132,6 +132,8 @@ Rules:
   shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
   this is the first reading. low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
+- With frames_used of 2 or more, blemishes and dark spots count only marks seen in at least two
+  of the photos (one photo's grain or a stray hair does not count); say so if the count is low.
 - Never attribute causation with certainty; at most "may be linked to" a routine product, and only
   if it started before this session.
 - Skin tone (tone_ita) is descriptive: never better or worse, never lighter or darker as a goal.
@@ -211,7 +213,8 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
                 "verdict": m["verdict"],
                 "direction": m["direction"],
                 "confidence": m["confidence"],
-                "unit": UNIT_DISPLAY.get(m["unit"], "").strip() or m["unit"],
+                # Unit as the app writes it; none for counts and indexes (never "index").
+                "unit": UNIT_DISPLAY.get(m["unit"], m["unit"]).strip(),
                 **shown_numbers(m),
             }
             for m in result["metrics"]

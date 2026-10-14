@@ -106,6 +106,16 @@ export function Report() {
   const spotFocus = focus && focus.sid === session?.id ? focus.label : null
   const setSpotFocus = (label: SpotLabel | null) => setFocus(label && session ? { sid: session.id, label } : null)
   const ringsShown = Boolean(session?.preview)
+  // With several photos the engine counts only spots seen in at least two of them, so the
+  // Blemishes and Dark spots numbers can be lower than this list: say why.
+  const confirmed = useMemo(() => {
+    const r = session?.result
+    const frames = r?.frames_used ?? 0
+    const cands = (r?.candidates ?? []).filter((c) => session?.label_details?.[c.id])
+    if (frames < 2 || !cands.length || cands.every((c) => c.features?.seen_in_fraction === undefined)) return null
+    const twice = cands.filter((c) => Math.round((c.features?.seen_in_fraction ?? 0) * frames) >= 2).length
+    return `${twice} of these ${cands.length} show up in more than one of your ${frames} photos. Only those count toward Blemishes and Dark spots${ringsShown ? '; the others have fainter rings' : ''}.`
+  }, [session, ringsShown])
   const baselineMetric = useCallback((id: MetricId) => baseline?.result?.metrics.find((m) => m.id === id) ?? null, [baseline])
   // Quick selfies and RAW sessions are never compared, so charts and band scales use one mode.
   const sameMode = useMemo(() => sessions.filter((s) => s.capture_mode === session?.capture_mode && s.measured !== false), [sessions, session])
@@ -401,6 +411,7 @@ export function Report() {
               </li>
             ))}
           </ul>
+          {confirmed ? <p className="mt-2 text-[13px] text-text-2">{confirmed}</p> : null}
           {spots.some((s) => s.label === 'mole') ? <p className="mt-2 text-[13px] font-medium">{MOLE_NOTE}</p> : null}
         </section>
       ) : null}
