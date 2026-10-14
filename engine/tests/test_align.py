@@ -50,3 +50,25 @@ def test_marks_match_after_the_head_moves_between_photos():
     mapped, warnings = _align(ref, [other, unmoved])
     assert warnings == []
     assert _seen_in(ref, mapped) == [0.67, 0.33]
+
+
+def _counted_frame(points, blemishes, index):
+    """A photo with counts already set, as _frame() leaves them before confirmation."""
+    f = _frame(points, blemishes, index)
+    f["values"] = {"blemishes": float(len(blemishes)), "pigment_spots": 0.0}
+    f["extras"] = {"pigment_spots": {"count": 0, "mean_contrast": 0.0}}
+    f["face_skin"] = (f["box"], np.ones((10, 10), bool))
+    return f
+
+
+def test_a_photo_whose_only_partner_cannot_be_lined_up_keeps_its_counts():
+    from app.pipeline_face import _count_confirmed
+
+    pts = np.random.default_rng(3).uniform(200, 800, (478, 2))
+    good = _counted_frame(pts, [(500.0, 600.0), (350.0, 750.0)], 0)
+    stuck = _counted_frame(np.zeros((478, 2)), [(400.0, 400.0)], 1)  # similarity() rejects it
+    with pytest.raises(ValueError):
+        similarity(stuck["face"].points, good["face"].points)
+    _count_confirmed([good, stuck])
+    assert good["values"]["blemishes"] == 2.0  # not dropped to 0 for lack of a partner
+    assert stuck["values"]["blemishes"] == 1.0
