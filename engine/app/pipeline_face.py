@@ -199,7 +199,11 @@ def _frame(path: str) -> dict:
     side_nose = np.zeros_like(face_skin)
     if face.view != "front":
         side_nose = box.crop(face.nose_mask(srgb8.shape[:2]))
-    lip_edge = box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM))
+    lip_edge = _lip_guard(
+        box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM)),
+        box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_MOUSTACHE_GUARD_MM)),
+        beard_skin,
+    )
     # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
     # red crease looks like a spot
     guard = cv2.dilate(
@@ -260,6 +264,13 @@ def _frame(path: str) -> dict:
         "box": box,
         "srgb8": srgb8,
     }
+
+
+def _lip_guard(lip_band: np.ndarray, wide_band: np.ndarray, beard_skin: np.ndarray) -> np.ndarray:
+    """Skin around the lips the blemish search skips: the lip band everywhere, and the wider
+    band where the skin is between beard hairs (a moustache over the red lip edge: the skin
+    showing between hairs next to the lip reads as a red bump)."""
+    return lip_band | (wide_band & beard_skin)
 
 
 def _beard_skin(l_star: np.ndarray, beard: np.ndarray, px_per_mm: float) -> np.ndarray:

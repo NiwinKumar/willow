@@ -392,3 +392,21 @@ def test_hand_model_loads_and_finds_no_hand_on_a_blank_image():
     if not HAND_MODEL.exists():
         pytest.skip("hand model not downloaded")
     assert detect_hands(np.full((480, 640, 3), 128, np.uint8), 10) == []
+
+
+def test_moustache_over_the_lip_is_skipped_but_beard_skin_elsewhere_is_searched():
+    from app.pipeline_face import _lip_guard
+
+    lips = np.zeros((100, 100), bool)
+    lips[60:70, 30:70] = True
+    lip_band = np.zeros_like(lips)
+    lip_band[58:72, 28:72] = True  # 1.5 mm band
+    wide = np.zeros_like(lips)
+    wide[50:80, 20:80] = True  # 5 mm band
+    beard = np.zeros_like(lips)
+    beard[50:60, 25:75] = True  # moustache, just above the lips
+    beard[85:95, 40:60] = True  # chin beard, away from the lips
+    guard = _lip_guard(lip_band, wide, beard)
+    assert guard[52, 50]  # moustache next to the lip: skipped
+    assert not guard[90, 50]  # beard on the chin: still searched
+    assert not guard[52, 22]  # ordinary skin beside the lips: only the narrow band applies
