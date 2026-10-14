@@ -63,3 +63,4 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Why: the api follows each mark across sessions (spot diary: new, still there, fading, gone; new marks per zone). Matching needs a position that does not depend on head pose; photo pixels do.
 - Impact: engine adds `app/facemap.py` and three lines in `_candidates`; the api reads the keys when present and re-runs old sessions with `scripts/remeasure.py --all --apply` to fill them.
 - Approved by: [ ] Harshini [x] Niwin
+- api/web (Niwin, no engine impact): `GET /v1/spots` returns the spot diary (`SpotDiary` in `web/src/lib/api.ts`).
