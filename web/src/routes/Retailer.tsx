@@ -80,7 +80,7 @@ export function Retailer() {
             <ul className="space-y-3">
               {d.needs.map((r) => (
                 <li key={r.goal}>
-                  <div className="flex justify-between gap-3 text-[13px]"><span className="font-medium">{r.goal}</span><span className="font-mono text-text-2"><span className="text-signal-700">{r.real}% real</span> · {r.none}% no change · n={r.n}</span></div>
+                  <div className="flex justify-between gap-3 text-[13px]"><span><span className="font-medium">{r.goal}</span><AppGoal goal={r.goal} appGoal={r.app_goal} /></span><span className="font-mono text-text-2"><span className="text-signal-700">{r.real}% real</span> · {r.none}% no change · n={r.n}</span></div>
                   <div className="mt-1 flex h-6 w-full overflow-hidden rounded-(--radius-chip)" role="img" aria-label={`${r.goal}: ${r.real}% real change, ${r.none}% no clear change, ${r.early}% too early`}>
                     <span style={{ width: `${r.real}%` }} className="bg-signal-500" />
                     <span style={{ width: `${r.none}%` }} className="chip-hatch bg-noise-band" />
@@ -143,14 +143,14 @@ export function Retailer() {
         ) : null}
 
         {tab === 'Assortment gaps' ? (
-          <Section q="Where are the assortment gaps?" csv={d.gaps.map((g) => ({ goal: g.goal, budget_options: g.budget.options, budget_rate: g.budget.rate, mid_options: g.mid.options, mid_rate: g.mid.rate, premium_options: g.premium.options, premium_rate: g.premium.rate, action: g.action }))} tiles={[{ label: 'Goal and price tier with no option', value: String(zeroTiers.length), sub: `of ${d.gaps.length * 3}; ${zeroTiers[0] ?? 'none'}` }, { label: 'Goal and price tier with one option', value: String(thinTiers.length), sub: `of ${d.gaps.length * 3}; ${thinTiers[0] ?? 'none'}` }, { label: 'Goals tracked', value: String(d.gaps.length), sub: 'each with a measured metric' }, { label: 'Most options for one goal', value: String(d.gaps.reduce((a, g) => Math.max(a, g.budget.options + g.mid.options + g.premium.options), 0)), sub: 'catalog products, all price tiers' }]}>
+          <Section q="Where are the assortment gaps?" csv={d.gaps.map((g) => ({ goal: g.goal, app_goal: g.app_goal ?? '', budget_options: g.budget.options, budget_rate: g.budget.rate, mid_options: g.mid.options, mid_rate: g.mid.rate, premium_options: g.premium.options, premium_rate: g.premium.rate, action: g.action }))} tiles={[{ label: 'Goal and price tier with no option', value: String(zeroTiers.length), sub: `of ${d.gaps.length * 3}; ${zeroTiers[0] ?? 'none'}` }, { label: 'Goal and price tier with one option', value: String(thinTiers.length), sub: `of ${d.gaps.length * 3}; ${thinTiers[0] ?? 'none'}` }, { label: 'Goals tracked', value: String(d.gaps.length), sub: 'each with a measured metric' }, { label: 'Most options for one goal', value: String(d.gaps.reduce((a, g) => Math.max(a, g.budget.options + g.mid.options + g.premium.options), 0)), sub: 'catalog products, all price tiers' }]}>
             <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-[13px]">
               <thead><tr className="text-left text-text-2"><th className="py-2 pr-3 font-medium">Goal</th><th className="py-2 pr-3 font-medium">Budget</th><th className="py-2 pr-3 font-medium">Mid</th><th className="py-2 pr-3 font-medium">Premium</th><th className="py-2 font-medium">Suggested action</th></tr></thead>
               <tbody>
                 {d.gaps.map((g) => (
                   <tr key={g.goal} className="border-t border-border">
-                    <td className="py-2 pr-3 font-medium">{g.goal}</td>
+                    <td className="py-2 pr-3"><span className="font-medium">{g.goal}</span><AppGoal goal={g.goal} appGoal={g.app_goal} /></td>
                     {[g.budget, g.mid, g.premium].map((t, i) => (
                       <td key={i} className="py-2 pr-3 font-mono">
                         {t.options} {t.options === 1 ? 'option' : 'options'}{t.rate !== null ? ` · ${Math.round(t.rate * 100)}%` : ''}
@@ -201,6 +201,7 @@ const CSV_HEADER: Record<string, string> = {
   brand: 'Brand',
   concern: 'Concern',
   goal: 'Goal',
+  app_goal: 'Goal in the app',
   n: 'People (n)',
   rate: 'Outcome rate (%)',
   lift: 'Lift vs non-users (points)',
@@ -243,6 +244,16 @@ function downloadCsv(name: string, rows: Record<string, unknown>[]) {
   a.download = `willow-${name.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '')}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+/** How a retailer goal maps to the goals people pick in the app (the retailer view is finer). */
+function AppGoal({ goal, appGoal }: { goal: string; appGoal?: string | null }) {
+  if (appGoal === undefined || appGoal === goal) return null
+  return (
+    <span className="block text-[12px] text-text-3">
+      {appGoal ? `Part of “${appGoal}” in the app` : 'Not a goal in the app yet (not measured)'}
+    </span>
+  )
 }
 
 function Section({ q, tiles, csv, children }: { q: string; tiles: { label: string; value: string; n?: number; sub: string }[]; csv: Record<string, unknown>[]; children: React.ReactNode }) {
