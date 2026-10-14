@@ -1,3 +1,5 @@
+import type { LabelDetail } from '../lib/spotLabels'
+
 /** Types mirroring docs/CONTRACT.md. Keep field names identical to the JSON. */
 
 export type Site = 'face_full' | 'cheek_macro' | 'nose_macro' | 'forearm_treated' | 'forearm_control'
@@ -112,6 +114,8 @@ export type Session = {
   hours_since_baseline?: number
   /** Live sessions only: where the explanation came from, and why a failed session failed. */
   explanation_source?: 'template' | 'gemini' | null
+  /** Gemini's spot labels with confidence (AI-suggested; live sessions with engine crops only). */
+  label_details?: Record<string, LabelDetail>
   error?: { code: string; message: string } | null
   /** True for sessions from the api (never for the illustrative demo journeys). */
   live?: boolean

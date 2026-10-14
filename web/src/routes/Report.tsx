@@ -19,6 +19,7 @@ import { baselineFor, isSampleEngine, isUnmeasured, matchControl } from '../data
 import type { Metric, MetricGroup, MetricId, Session, Site } from '../data/types'
 import { useData } from '../data/useData'
 import { missingBaselines } from '../lib/baselineGuide'
+import { MOLE_NOTE, summarizeSpots } from '../lib/spotLabels'
 import { failureReasons, readableWarnings } from '../lib/warnings'
 import { fmtDate, plural } from '../lib/format'
 import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
@@ -82,6 +83,7 @@ export function Report() {
   const [keys, setKeys] = useState(false)
 
   const metrics = session?.result?.metrics ?? []
+  const spots = useMemo(() => summarizeSpots(session?.label_details), [session])
   const baselineMetric = useCallback((id: MetricId) => baseline?.result?.metrics.find((m) => m.id === id) ?? null, [baseline])
   // Quick selfies and RAW sessions are never compared, so charts and band scales use one mode.
   const sameMode = useMemo(() => sessions.filter((s) => s.capture_mode === session?.capture_mode && s.measured !== false), [sessions, session])
@@ -327,6 +329,24 @@ export function Report() {
           </ul>
         </section>
       ))}
+      {spots.length ? (
+        <section aria-labelledby="spots" className="mx-5 my-5 rounded-(--radius-tile) border border-border p-4 sm:mx-6">
+          <div className="flex items-center justify-between gap-2">
+            <h2 id="spots" className="text-[17px] font-semibold">Spots on this photo</h2>
+            <Chip tone="neutral">AI-suggested</Chip>
+          </div>
+          <p className="mt-1 text-[13px] text-text-2">The engine found these spots; Gemini looked at each one twice and kept a name only when both looks agreed. The rings on the photo show where they are. Names describe appearance, not a diagnosis.</p>
+          <ul className="mt-3 divide-y divide-border">
+            {spots.map((s) => (
+              <li key={s.label} className="flex items-baseline justify-between gap-3 py-2 text-[15px]">
+                <span>{s.name}</span>
+                <span className="font-mono text-[15px]">{s.n}</span>
+              </li>
+            ))}
+          </ul>
+          {spots.some((s) => s.label === 'mole') ? <p className="mt-2 text-[13px] font-medium">{MOLE_NOTE}</p> : null}
+        </section>
+      ) : null}
       {session?.explanation ? (
         <section className="mx-5 my-5 rounded-(--radius-tile) bg-surface p-4 sm:mx-6">
           <div className="flex items-center justify-between">

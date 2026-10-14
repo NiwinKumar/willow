@@ -5,6 +5,7 @@ import type { MetricId, Session, Site } from '../data/types'
 import { METRIC_META } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { METRIC_ROIS } from '../mock/series'
+import { MOLE_NOTE, SPOT_NAME } from '../lib/spotLabels'
 import { Illustration } from './Illustration'
 
 type Props = {
@@ -134,6 +135,23 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
               </g>
             )
           })}
+          {/* Spots the engine found, labelled by Gemini (AI-suggested): small rings, the label on hover. */}
+          {!blank && shown === session
+            ? (session?.result?.candidates ?? [])
+                .filter((c) => session?.label_details?.[c.id])
+                .map((c) => {
+                  const [x, y, w, h] = c.bbox
+                  const d = session!.label_details![c.id]
+                  const r = Math.max(w, h) * 0.75 + 14
+                  return (
+                    <g key={c.id} pointerEvents="visiblePainted">
+                      <title>{`AI-suggested: ${SPOT_NAME[d.label][0]}${d.label === 'mole' ? `. ${MOLE_NOTE}` : ''}`}</title>
+                      <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke="var(--color-text)" strokeOpacity={0.55} strokeWidth={4} vectorEffect="non-scaling-stroke" />
+                      <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke={d.label === 'uncertain' ? 'var(--color-noise-band)' : 'var(--color-surface)'} strokeWidth={2} strokeDasharray={d.label === 'uncertain' ? '4 3' : undefined} vectorEffect="non-scaling-stroke" />
+                    </g>
+                  )
+                })
+            : null}
           <rect width={size.width} height={size.height} fill="none" stroke="var(--color-surface)" strokeWidth={2} vectorEffect="non-scaling-stroke" pointerEvents="none" />
         </svg>
         <div className="pointer-events-none absolute left-5 top-5 flex gap-2">
