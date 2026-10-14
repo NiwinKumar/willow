@@ -293,7 +293,7 @@ def _candidates(
     """Contract candidates (docs/CONTRACT.md 2.6), blemishes then dark spots of one photo:
     bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label."""
     box, srgb8 = frame["box"], frame["srgb8"]
-    h, w = srgb8.shape[:2]
+    px_per_mm = frame["face"].px_per_mm
     found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
     out = []
     for i, (kind, b) in enumerate(found[:limit], start=1):
@@ -301,14 +301,14 @@ def _candidates(
         cx, cy = box.x + b.x, box.y + b.y
         side = 2 * b.radius * 1.5
         bbox = [round(cx - side / 2, 1), round(cy - side / 2, 1), round(side, 1), round(side, 1)]
-        crop_side = int(np.clip(side * 2, *config.CROP_SIZE_PX))
+        # sized on the face, not in pixels: the same mm of skin at any photo resolution
+        crop_side = max(config.CROP_SPOT_FACTOR * 2 * b.radius, config.CROP_MIN_MM * px_per_mm)
         crops = {}
         for key, size in (
             ("crop_uri", crop_side),
             ("context_crop_uri", crop_side * config.CROP_CONTEXT),
         ):
-            x0, y0 = int(max(cx - size / 2, 0)), int(max(cy - size / 2, 0))
-            patch = np.ascontiguousarray(srgb8[y0 : min(y0 + size, h), x0 : min(x0 + size, w)])
+            patch = _centred_crop(srgb8, cx, cy, size)
             suffix = "" if key == "crop_uri" else "_ctx"
             crops[key] = (
                 save_jpeg(patch, f"{output_prefix.rstrip('/')}/crops/{cid}{suffix}.jpg")
@@ -335,6 +335,22 @@ def _candidates(
             }
         )
     return out
+
+
+def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.ndarray:
+    """A size x size crop centred on (cx, cy); past the photo edge the edge pixels repeat
+    (the spot stays at the centre, as the labeller tells Gemini). Upscaled to at least
+    CROP_MIN_OUT_PX so a low-resolution face still gives the labeller enough pixels."""
+    n = max(round(size), 1)
+    x0, y0 = round(cx - n / 2), round(cy - n / 2)
+    h, w = srgb8.shape[:2]
+    pad = max(0, -x0, -y0, x0 + n - w, y0 + n - h)
+    src = cv2.copyMakeBorder(srgb8, pad, pad, pad, pad, cv2.BORDER_REPLICATE) if pad else srgb8
+    patch = src[y0 + pad : y0 + pad + n, x0 + pad : x0 + pad + n]
+    if n < config.CROP_MIN_OUT_PX:
+        out = config.CROP_MIN_OUT_PX
+        patch = cv2.resize(patch, (out, out), interpolation=cv2.INTER_CUBIC)
+    return np.ascontiguousarray(patch)
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:

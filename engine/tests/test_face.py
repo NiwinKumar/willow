@@ -280,8 +280,19 @@ def test_blemish_candidates_with_crops(tmp_path, fake_landmarks):
     assert blem["value"] == 1 and len(r["candidates"]) == 1
     c = r["candidates"][0]
     assert c["kind"] == "blemish" and abs(c["bbox"][0] + c["bbox"][2] / 2 - 500) < 6
-    assert Image.open(c["crop_uri"]).size[0] >= 64
-    assert Image.open(c["context_crop_uri"]).size[0] == 3 * Image.open(c["crop_uri"]).size[0]
+    assert Image.open(c["crop_uri"]).size[0] >= config.CROP_MIN_OUT_PX
+    assert Image.open(c["context_crop_uri"]).size[0] >= Image.open(c["crop_uri"]).size[0]
+
+
+def test_crop_stays_centred_on_a_spot_at_the_photo_edge():
+    from app.pipeline_face import _centred_crop
+
+    img = np.full((200, 300, 3), 150, np.uint8)
+    img[5:15, 290:300] = (220, 60, 60)  # a red mark in the top-right corner
+    patch = _centred_crop(img, 295, 10, 60)  # 60 px crop centred on it, mostly off the photo
+    assert patch.shape == (128, 128, 3)  # padded with edge pixels, then upscaled
+    mid = patch[54:74, 54:74].reshape(-1, 3).mean(axis=0)
+    assert mid[0] > 200 and mid[1] < 100  # the mark is still at the centre
 
 
 def _bump_photo(path, bumps, seed=0):
