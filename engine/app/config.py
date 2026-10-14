@@ -246,6 +246,24 @@ GLOW_TEXTURE_MM = 0.5
 GLOW_TEXTURE_WEIGHT = 5.0
 GLOW_MIN_MM2 = 100.0
 
+# Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's
+# canonical face (mm, front view) and its zone, so the api can follow a mark across sessions.
+# Zone codes in candidate features are 1-based indexes into FACE_ZONES (features are numbers).
+FACE_ZONES = (
+    "forehead",
+    "nose",
+    "right_cheek",
+    "left_cheek",
+    "around_mouth",
+    "chin",
+    "right_jaw",
+    "left_jaw",
+)
+FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as forehead
+MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
+FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
+FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)
+
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
 ALIGN_WARN_MM = 3.0  # warn if a photo's rigid landmarks still differ by more than this
