@@ -150,14 +150,17 @@ export function Retailer() {
               <tbody>
                 {d.gaps.map((g) => (
                   <tr key={g.goal} className="border-t border-border">
-                    <td className="py-2 pr-3"><span className="font-medium">{g.goal}</span><AppGoal goal={g.goal} appGoal={g.app_goal} /></td>
+                    <td className="py-2 pr-3 align-top"><span className="font-medium">{g.goal}</span><AppGoal goal={g.goal} appGoal={g.app_goal} /></td>
                     {[g.budget, g.mid, g.premium].map((t, i) => (
-                      <td key={i} className="py-2 pr-3 font-mono">
-                        {t.options} {t.options === 1 ? 'option' : 'options'}{t.rate !== null ? ` · ${Math.round(t.rate * 100)}%` : ''}
-                        {t.options < 2 ? <Chip tone="warn" className="ml-1">gap</Chip> : null}
+                      <td key={i} className="py-2 pr-3 align-top">
+                        <span className="flex items-center gap-1 whitespace-nowrap font-mono">
+                          {t.options} {t.options === 1 ? 'option' : 'options'}
+                          {t.options < 2 ? <Chip tone="warn">gap</Chip> : null}
+                        </span>
+                        {t.rate !== null ? <span className="block whitespace-nowrap text-[12px] text-text-2">{Math.round(t.rate * 100)}% improved</span> : null}
                       </td>
                     ))}
-                    <td className="py-2 text-text-2">{g.action}</td>
+                    <td className="py-2 align-top text-text-2">{g.action}</td>
                   </tr>
                 ))}
               </tbody>

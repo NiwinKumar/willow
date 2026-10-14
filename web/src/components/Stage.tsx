@@ -180,8 +180,11 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                     // photo size), so neighbouring spots on one cheek stay separate rings.
                     const r = Math.max(Math.max(w, h) * 0.6, Math.max(vb.w, vb.h) * 0.008)
                     const focused = spotFocus !== null
+                    // Seen in one photo only: not counted in the numbers, so a fainter ring.
+                    const frames = session?.result?.frames_used ?? 0
+                    const once = frames >= 2 && c.features?.seen_in_fraction !== undefined && Math.round(c.features.seen_in_fraction * frames) < 2
                     return (
-                      <g key={c.id} pointerEvents="visiblePainted">
+                      <g key={c.id} pointerEvents="visiblePainted" opacity={once && !focused ? 0.5 : 1}>
                         <title>{`AI-suggested: ${SPOT_NAME[d.label][0]}${seenText(c.features?.seen_in_fraction, session?.result?.frames_used)}${d.label === 'mole' ? `. ${MOLE_NOTE}` : ''}`}</title>
                         <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke="var(--color-text)" strokeOpacity={0.55} strokeWidth={focused ? 3.5 : 3} vectorEffect="non-scaling-stroke" />
                         <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke={focused ? 'var(--color-signal-500)' : d.label === 'uncertain' ? 'var(--color-noise-band)' : 'var(--color-surface)'} strokeWidth={focused ? 2 : 1.5} strokeDasharray={d.label === 'uncertain' ? '3 2' : undefined} vectorEffect="non-scaling-stroke" />
