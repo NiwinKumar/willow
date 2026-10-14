@@ -62,6 +62,8 @@ export function Report() {
   const controlSession = session?.live ? matchControl(session, controlSessions) : (controlSessions[index] ?? null)
   const missing = session?.is_baseline ? missingBaselines(data.series, session.capture_mode).filter((m) => m !== site) : []
   const noBand = Boolean(session && !session.is_baseline && session.baseline_ref && !session.baseline_ref.has_noise_band)
+  // Passed, not the baseline, compared with nothing: it was the baseline before another was chosen.
+  const formerBaseline = Boolean(session?.live && !session.is_baseline && session.baseline_ref === null && session.result?.quality.passed && !unmeasured)
 
   const makeBaseline = async () => {
     if (!session) return
@@ -173,6 +175,29 @@ export function Report() {
 
   const titleDate = session ? (session.hours_since_baseline !== undefined && session.hours_since_baseline > 0 ? `+${session.hours_since_baseline} h` : fmtDate(session.created_at)) : ''
 
+  const baselineButton =
+    data.mode === 'live' && session && !session.is_baseline && session.measured !== false && session.result?.quality.passed ? (
+      confirmBaseline ? (
+        <div className="mt-3 rounded-(--radius-tile) border border-border bg-surface p-3">
+          <p className="text-[13px] text-text-2">
+            Choose this only if it was taken before you started a product, for example when your first session had poor light. Later sessions are compared with this one; earlier comparisons stay as they are.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button className="!min-h-10" disabled={settingBaseline} onClick={() => void makeBaseline()}>
+              {settingBaseline ? 'Saving…' : 'Make this my baseline'}
+            </Button>
+            <Button variant="quiet" className="!min-h-10" disabled={settingBaseline} onClick={() => setConfirmBaseline(false)}>
+              Keep the current one
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => setConfirmBaseline(true)}>
+          Make this my baseline
+        </Button>
+      )
+    ) : null
+
   const sheetBody = (
     <>
       <header className="px-5 pb-3 pt-1 sm:px-6">
@@ -182,8 +207,8 @@ export function Report() {
             <p className="mt-2 text-[15px] text-text-2">
               {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')}. Willow measures face and forearm photos today; {SITE_LABEL[session.site].toLowerCase()} measurement is still being built. Your photos are kept and can be measured when it is ready.
             </p>
-            <Link to="/capture?site=forearm_control" className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
-              Photograph a forearm
+            <Link to="/capture?site=face_full&mode=quick" className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+              Take a face photo
             </Link>
           </>
         ) : qualityFailed && session ? (
@@ -200,6 +225,14 @@ export function Report() {
             <Link to={`/capture?site=${session.site}${session.capture_mode === 'uncalibrated' ? '&mode=quick' : ''}`} className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
               Retake
             </Link>
+          </>
+        ) : formerBaseline && session ? (
+          <>
+            <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Your earlier baseline</h1>
+            <p className="mt-1 text-[13px] text-text-2">
+              {fmtDate(session.created_at)} · {photosUsed(session)} · this was your baseline until you chose another one, so it is not compared with it
+            </p>
+            {baselineButton}
           </>
         ) : session?.is_baseline ? (
           <>
@@ -250,27 +283,7 @@ export function Report() {
                 {session && (session.result?.frames_used ?? 0) >= 2 ? 'This session has several usable photos: make it your baseline to get a noise band.' : 'Take 5 photos and make that session your baseline.'}
               </p>
             ) : null}
-            {data.mode === 'live' && session && !session.is_baseline && session.measured !== false && session.result?.quality.passed ? (
-              confirmBaseline ? (
-                <div className="mt-3 rounded-(--radius-tile) border border-border bg-surface p-3">
-                  <p className="text-[13px] text-text-2">
-                    Choose this only if it was taken before you started a product, for example when your first session had poor light. Later sessions are compared with this one; earlier comparisons stay as they are.
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button className="!min-h-10" disabled={settingBaseline} onClick={() => void makeBaseline()}>
-                      {settingBaseline ? 'Saving…' : 'Make this my baseline'}
-                    </Button>
-                    <Button variant="quiet" className="!min-h-10" disabled={settingBaseline} onClick={() => setConfirmBaseline(false)}>
-                      Keep the current one
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => setConfirmBaseline(true)}>
-                  Make this my baseline
-                </Button>
-              )
-            ) : null}
+            {baselineButton}
           </>
         )}
       </header>

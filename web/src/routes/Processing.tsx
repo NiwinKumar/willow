@@ -238,7 +238,7 @@ export function Processing() {
               Willow measures face and forearm photos today. {SITE_LABEL[view!.session.site]} measurement is still being built, so this session has no numbers. Your photos are kept and can be measured when it is ready.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button onClick={() => navigate('/capture?site=forearm_control')}>Photograph a forearm</Button>
+              <Button onClick={() => navigate('/capture?site=face_full&mode=quick')}>Take a face photo</Button>
               <Button variant="secondary" onClick={() => navigate('/')}>Done</Button>
             </div>
           </div>

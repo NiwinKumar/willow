@@ -256,7 +256,7 @@ export function QuickCapture() {
             ))}
           </ul>
         ) : null}
-        {!faceSite ? null : <p className="mt-6 text-[12px] text-text-3">Laptop camera? Expect lower quality; the checks are looser on desktop.</p>}
+        {!faceSite ? null : <p className="mt-6 text-[12px] text-text-3">Laptop camera? Raise the laptop so the camera is at eye level and sit facing a window. Soft or tilted photos are left out of the measurement.</p>}
         <Link to={`/capture?site=${site}&mode=quick`} className="mt-6 inline-flex min-h-11 items-center text-[15px] text-text-2 underline-offset-2 hover:text-text hover:underline">
           Back to the photo guide
         </Link>
