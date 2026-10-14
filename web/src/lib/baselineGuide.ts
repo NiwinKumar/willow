@@ -45,8 +45,8 @@ export function photoSteps(site: Site, mode: CaptureMode): { same: string; betwe
       }
     case 'macro':
       return {
-        same: 'Cone touching the skin on the same spot every time. A freckle or a pen dot helps you find it.',
-        between: 'Lift the cone off and set it back on the same spot.',
+        same: 'Phone about a hand’s width from your face, the same side in the middle every time, with one eye still in the photo: Willow measures size from your iris. Face the light.',
+        between: 'Lower the phone and look away, then line up the same view again.',
       }
   }
 }
