@@ -38,6 +38,22 @@ GOAL_LABEL = {
     "dullness": "More glow",
     "dryness_barrier": "Less dryness",
 }
+# The goal a person picks in the app (web/src/lib/metrics.ts GOALS) that each catalog concern
+# belongs to. The retailer view is finer: "Fewer dark spots" and "More even tone" are both part
+# of the app's "Even tone & fewer dark spots". None: the app has no such goal (dryness is not
+# measured).
+APP_GOAL = {
+    "acne_blemishes": "Clearer skin",
+    "dark_spots_pigmentation": "Even tone & fewer dark spots",
+    "uneven_tone": "Even tone & fewer dark spots",
+    "redness_sensitivity": "Calmer skin",
+    "texture_pores": "Smoother texture & pores",
+    "oiliness_shine": "Oil control & glow",
+    "fine_lines": "Softer lines",
+    "dark_circles": "Under-eye",
+    "dullness": "Oil control & glow",
+    "dryness_barrier": None,
+}
 CONCERN_SHORT = {
     "acne_blemishes": "blemishes",
     "dark_spots_pigmentation": "dark spots",
@@ -175,6 +191,7 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         needs.append(
             {
                 "goal": GOAL_LABEL[goal],
+                "app_goal": APP_GOAL.get(goal),
                 "n": n,
                 "real": round(100 * len(real) / n),
                 "none": round(100 * len(none) / n),
@@ -290,7 +307,14 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             if thin
             else "Covered in every tier."
         )
-        gaps.append({"goal": GOAL_LABEL[concern], **tiers, "action": action})
+        gaps.append(
+            {
+                "goal": GOAL_LABEL[concern],
+                "app_goal": APP_GOAL.get(concern),
+                **tiers,
+                "action": action,
+            }
+        )
 
     # Routine conflicts.
     kinds = Counter(r["kind"] for r in raw["conflicts"])
