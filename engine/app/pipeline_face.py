@@ -26,6 +26,7 @@ from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
+from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
 from app.quality import FrameQuality, check_frame
@@ -37,8 +38,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "tone_evenness": ("tone_pigment", "Tone evenness", "index"),
     "redness": ("redness", "Redness", "a_star"),
     "blemishes": ("clarity", "Blemishes", "count"),
+    "shine": ("oil_glow", "Shine", "pct_area"),
 }
-ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -109,6 +111,17 @@ def _frame(path: str) -> dict:
     face_skin = refine_skin(
         lab[..., 0], box.crop(face_mask_full), zones, px_per_mm, np.hypot(lab[..., 1], lab[..., 2])
     )
+    # shine: highlights are bright and grey, so measure on skin before the side-view colour
+    # cut (which drops shine); hair is already cut
+    all_polys = face.all_roi_polygons()
+    t_zone = box.crop(face.t_zone_mask(srgb8.shape[:2])) & face_skin
+    u_zone = face_skin & np.logical_or.reduce(
+        [
+            box.crop(polygon_mask(srgb8.shape[:2], all_polys[c]))
+            for c in ("right_cheek", "left_cheek")
+        ]
+    )
+    shine_pct, shine_extras = shine(lab, lin, t_zone, u_zone, px_per_mm)
     if face.view != "front":  # hair, background and shine crowd a turned cheek
         face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
         # sideburns and temple hair beside the ear (beards: the lower-face stubble test in
@@ -169,6 +182,7 @@ def _frame(path: str) -> dict:
         "tone_evenness": evenness,
         "redness": float(np.mean(lab[..., 1][red_skin])),
         "blemishes": float(len(blemishes)),
+        "shine": shine_pct,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -176,6 +190,7 @@ def _frame(path: str) -> dict:
         "tone_evenness": {},
         "redness": {"erythema_index": erythema_index(lin, red_skin)},
         "blemishes": {},
+        "shine": shine_extras,
     }
     return {
         "values": values,
@@ -330,9 +345,11 @@ def analyze_face(
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
-        if good:
-            summary = summarize([f["values"][metric_id] for f in good], base)
-            extras = _mean_extras([f["extras"][metric_id] for f in good])
+        # photos that measured this metric (shine needs enough T-zone skin)
+        has = [f for f in good if f["values"][metric_id] is not None]
+        if has:
+            summary = summarize([f["values"][metric_id] for f in has], base)
+            extras = _mean_extras([f["extras"][metric_id] for f in has])
             if metric_id == "tone_ita":
                 extras["ita_band"] = ita_band(summary["value"])
             if metric_id == "pigment_spots":
