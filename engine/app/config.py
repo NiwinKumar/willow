@@ -186,7 +186,12 @@ BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
 BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red lip edge)
-CROP_SIZE_PX = (64, 128)  # candidate crop side, clamped to this range
+# Candidate crops for Gemini, sized on the face: the tight crop is 4x the mark's diameter
+# and at least 6 mm (pixel sizes covered 20 mm at 3.2 px/mm and half the face in the
+# context crop); the context crop is 3x that. Small crops are upscaled to 128 px.
+CROP_SPOT_FACTOR = 4.0
+CROP_MIN_MM = 6.0
+CROP_MIN_OUT_PX = 128
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
 
 # preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
