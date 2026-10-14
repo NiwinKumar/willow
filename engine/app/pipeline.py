@@ -12,6 +12,7 @@ from app.aggregate import summarize
 from app.color import linear_srgb_to_lab, white_balance
 from app.decode import decode_dng_srgb, linear_to_srgb8, load_photo_srgb8, srgb_to_linear
 from app.errors import EngineError
+from app.io import save_preview
 from app.markers import SpotNotFound, find_dot_squares, paper_pixels
 from app.metrics.redness import redness
 from app.metrics.tone import ita_band, tone_ita
@@ -98,6 +99,7 @@ def analyze_forearm(
     session_id: str = "s_local",
     user_id: str = "local",
     baseline: dict | None = None,
+    output_prefix: str | None = None,
 ) -> dict:
     """Analyze one taped forearm square from normal photos (uncalibrated) or DNGs.
 
@@ -112,7 +114,7 @@ def analyze_forearm(
     except ValueError as exc:
         raise EngineError("bad_request", str(exc)) from exc
     confidence = "measured" if mode == "calibrated_raw" else "indicative"
-    per_frame, passed_values, passed_extras, shape = [], [], [], None
+    per_frame, passed_values, passed_extras, shape, ref_path = [], [], [], None, None
     used_rois, white_ok, qs, warnings = [], [], [], []
     for i, (path, roi, white) in enumerate(zip(files, rois, whites, strict=True)):
         try:
@@ -125,7 +127,8 @@ def analyze_forearm(
             per_frame.append({"index": i, "passed": False, "reasons": []})
             warnings.append(f"photo {i + 1}: pen-dot square not found")
             continue
-        shape = shape or frame_shape
+        if shape is None:
+            shape, ref_path = frame_shape, path  # first photo whose square was found
         used_rois.append(used_roi)
         white_ok.append(balanced)
         qs.append(q)
@@ -201,6 +204,8 @@ def analyze_forearm(
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
     }
+    if ref_path and output_prefix:  # the photo the forearm_square ROI describes
+        save_preview(_load(ref_path)[1], output_prefix)
     if shape is not None:
         result["image_size"] = {"width": int(shape[1]), "height": int(shape[0])}
     validate(result, json.loads(SCHEMA.read_text()))

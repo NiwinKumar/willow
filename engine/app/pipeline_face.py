@@ -12,7 +12,7 @@ from app.aggregate import summarize
 from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
-from app.io import save_jpeg
+from app.io import save_jpeg, save_preview
 from app.landmarks import (
     Face,
     FaceNotFound,
@@ -212,11 +212,13 @@ def _align(ref: dict, others: list[dict]) -> tuple[list[np.ndarray], list[str]]:
             m = similarity(f["face"].points, ref_pts)
         except ValueError:
             mapped.append(np.empty((0, 2)))
-            warnings.append(f"photo {f['index'] + 1} could not be lined up with photo 1")
+            warnings.append(
+                f"photo {f['index'] + 1} could not be lined up with photo {ref['index'] + 1}"
+            )
             continue
         if residual_px(f["face"].points, ref_pts, m) > config.ALIGN_WARN_MM * mm:
             warnings.append(
-                f"photo {f['index'] + 1} lines up poorly with photo 1 (face moved or changed "
+                f"photo {f['index'] + 1} lines up poorly with photo {ref['index'] + 1} (face moved or changed "
                 "expression): spot matching across photos is less reliable"
             )
         mapped.append(transform(m, _marks(f)))
@@ -377,6 +379,8 @@ def analyze_face(
     if len(good) < len(passed):
         warnings.append("side views were left out: front-view photos in the same session")
     ref = good[0] if good else (frames[0] if frames else None)
+    if ref and output_prefix:  # the photo rois, candidate bboxes and image_size describe
+        save_preview(ref["srgb8"], output_prefix)
     candidates = []
     if good:
         mapped, align_warnings = _align(good[0], good[1:])
