@@ -18,7 +18,7 @@ from typing import Any
 from app.results import measured_result
 from app.store import Store
 
-NOISE_BAND_FRAMES = 2  # the engine needs at least two frames to measure photo-to-photo noise
+NOISE_BAND_FRAMES = 3  # engine config.MIN_FRAMES_FOR_BAND: a band needs 3 usable photos
 
 
 def key(site: str, capture_mode: str) -> str:

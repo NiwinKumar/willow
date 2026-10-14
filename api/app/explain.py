@@ -41,7 +41,7 @@ def item(metric: dict[str, Any]) -> dict[str, Any]:
     if verdict == "no_baseline" and delta is not None:
         quoted = [_signed(delta)]
         summary = (
-            f"{label}: change {quoted[0]}{trend}. Your baseline has one photo, so there is no "
+            f"{label}: change {quoted[0]}{trend}. Your baseline has too few photos, so there is no "
             "noise band yet and this cannot be called a real change."
         )
     elif verdict == "no_baseline":

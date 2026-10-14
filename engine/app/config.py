@@ -43,6 +43,7 @@ ITA_BANDS = [
 ]
 
 MDC_Z = 1.96  # 95% two-sided
+MIN_FRAMES_FOR_BAND = 3  # fewer passed photos: SD reported, no noise band (no verdicts)
 # Floor on the photo-to-photo SD per metric (same units as the metric). A session whose photos
 # all gave the same value is not noise-free: counts move by whole marks and webcams by a few
 # tenths of a* between frames. Without a floor its band is 0 and any later change is "real".
