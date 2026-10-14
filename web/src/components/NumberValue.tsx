@@ -9,8 +9,10 @@ export function NumberValue({ value, decimals, unit, size = 'lg', signed = false
   return (
     <span className={`inline-flex items-baseline gap-1 font-mono font-medium leading-none tabular-nums ${sz} ${className}`}>
       {/* A typographic minus (the same − as the rest of the app), not Intl's hyphen. */}
+      <span className="inline-flex items-baseline">
       {sign ? <span aria-hidden>{sign}</span> : null}
       <NumberFlow value={Math.abs(value)} format={{ minimumFractionDigits: decimals, maximumFractionDigits: decimals }} aria-label={`${sign === '−' ? 'minus ' : sign === '+' ? 'plus ' : ''}${Math.abs(value).toFixed(decimals)}`} />
+      </span>
       {unit ? <span className="font-sans text-[0.72em] font-normal text-text-2">{unit}</span> : null}
     </span>
   )

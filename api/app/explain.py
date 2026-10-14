@@ -257,7 +257,8 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
                 instructions=INSTRUCTIONS,
                 temperature=0.3,
                 max_output_tokens=4096,
-                attempts=1,
+                attempts=2,  # a pause and one more try on a rate limit or a slow answer
+                timeout_ms=35_000,
             )
         except gemini.GeminiError:
             break

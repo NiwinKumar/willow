@@ -254,7 +254,7 @@ function Section({ q, tiles, csv, children }: { q: string; tiles: { label: strin
           <div key={t.label} className="rounded-(--radius-tile) bg-surface p-3">
             <dt className="text-[12px] text-text-2">{t.label}</dt>
             <dd className="mt-1 font-mono text-[22px] font-medium leading-none">{t.value}</dd>
-            <dd className="mt-1 text-[11px] text-text-3">{t.sub}{t.n !== undefined ? ` · n=${t.n}` : ''}</dd>
+            <dd className="mt-1 line-clamp-3 text-[11px] text-text-3" title={t.sub}>{t.sub}{t.n !== undefined ? ` · n=${t.n}` : ''}</dd>
           </div>
         ))}
       </dl>

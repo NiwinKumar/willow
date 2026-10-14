@@ -64,7 +64,10 @@ class Answer(BaseModel):
 
 def _names(insights: dict[str, Any]) -> set[str]:
     names: set[str] = set()
-    for p in insights.get("products", []):
+    # Every product with evidence (product_outcomes), not only the top rows shown in the table:
+    # Gemini rightly answers "best for dark spots" from the full list.
+    rows = [*insights.get("products", []), *(insights.get("product_outcomes") or {}).values()]
+    for p in rows:
         names |= {p["product"], f"{p['brand']} {p['product']}", p["brand"], p["concern"]}
     names |= {b["brand"] for b in insights.get("brands", [])}
     names |= {n["goal"] for n in insights.get("needs", [])}
@@ -98,7 +101,10 @@ def problems(reply: Answer, insights: dict[str, Any], question: str) -> list[str
 
 
 def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
-    prompt = f"INSIGHTS (JSON):\n{json.dumps(insights)}\n\nQUESTION: {question}"
+    # Compact JSON: fewer input tokens, a faster answer.
+    prompt = (
+        f"INSIGHTS (JSON):\n{json.dumps(insights, separators=(',', ':'))}\n\nQUESTION: {question}"
+    )
     for attempt in range(2):
         try:
             reply = gemini.generate_json(
@@ -109,6 +115,8 @@ def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
                 temperature=0.2,
                 max_output_tokens=2048,
                 attempts=1,
+                # INSIGHTS is about 15 KB: 25 s was not always enough (Oct 14, deadline exceeded).
+                timeout_ms=50_000,
             )
         except gemini.GeminiError as exc:
             # Gemini itself is unavailable: say so (the route refunds the question).

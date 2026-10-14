@@ -157,6 +157,8 @@ def analyze_session(
     except engine.EngineError as exc:
         limits.refund(store, uid, "analyze")  # our failure: it does not use up a daily analysis
         raise HTTPException(exc.status, {"code": exc.code, "message": exc.public_message}) from exc
+    except analysis.SessionGone as exc:
+        raise _not_found() from exc
     except Exception as exc:
         # Anything else (token minting, Firestore, a malformed engine answer): never leave the
         # session "processing" for minutes; mark it failed so "Try again" works at once.

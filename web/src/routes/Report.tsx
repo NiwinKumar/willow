@@ -253,7 +253,7 @@ export function Report() {
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Your baseline</h1>
             <p className="mt-1 text-[13px] text-text-2">
-              {fmtDate(session.created_at)} · {photosUsed(session)} · {session.capture_mode === 'uncalibrated' ? 'phone photos' : 'RAW photos'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'RAW photos are'} compared to this
+              {fmtDate(session.created_at)} · {photosUsed(session)} · {session.capture_mode === 'uncalibrated' ? 'phone camera' : 'RAW'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'RAW photos are'} compared to this
             </p>
             {leftOutPhotos(session.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session.result)}</p> : null}
             {(session.result?.frames_used ?? session.n_frames) < 2 ? (

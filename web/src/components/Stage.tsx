@@ -201,12 +201,12 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
           <span className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-(--radius-chip) bg-surface/85 px-2 py-1 text-[12px] text-text-2">Hold to see your baseline</span>
         ) : null}
         {!photoReady ? (
-          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-text-3">
-            Loading the photo…
+          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="rounded-(--radius-chip) bg-surface/90 px-2 py-1 text-[13px] text-text-2">Loading the photo…</span>
           </span>
         ) : photoFailed ? (
-          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px] text-text-3">
-            The photo could not be loaded. Reload the page to try again.
+          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center">
+            <span className="rounded-(--radius-chip) bg-surface/90 px-2 py-1 text-[13px] text-text-2">The photo could not be loaded. Reload the page to try again.</span>
           </span>
         ) : null}
         {blank ? (

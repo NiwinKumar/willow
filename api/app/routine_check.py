@@ -198,7 +198,7 @@ Add only other well-known cosmetic interactions you are confident about (for exa
 strong actives that destabilise each other), or say nothing. Never flag niacinamide with
 vitamin C. In "products" lists use the ids given; in any sentence name products by brand and
 name, never by id. No percentages or other numbers unless they appear in the input. Calm,
-plain, cosmetic language; no medical claims."""
+plain, cosmetic language; no medical claims. British spelling (moisturiser, colour)."""
 
 ENTRY_ID = re.compile(r"\br_[A-Za-z0-9_]+\b")
 

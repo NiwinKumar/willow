@@ -193,7 +193,8 @@ export function Routine() {
   const current = entries.filter((e) => !e.ended_at)
   const stopped = entries.filter((e) => e.ended_at)
   const findings = openConflicts.length + (check?.duplicates.length ?? 0) + (check?.gaps.length ?? 0)
-  const status = current.length === 0 ? 'Add products to check compatibility' : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
+  // Never "Looks compatible" before the check has answered.
+  const status = current.length === 0 ? 'Add products to check compatibility' : !check ? (live && (checking || !rawCheck) ? 'Checking compatibility…' : 'Compatibility not checked') : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
   const demoResults = useMemo(() => (query.trim().length < 2 ? CATALOG : CATALOG.filter((p) => `${p.brand} ${p.name}`.toLowerCase().includes(query.toLowerCase()))), [query])
   const results = live ? liveResults : demoResults
 
@@ -282,9 +283,9 @@ export function Routine() {
               <li key={`${slot}-${e.id}`} className="flex items-start gap-3 py-3">
                 <ProductImage product={{ image_url: e.product_id ? productById(e.product_id)?.image_url : null, category: e.category }} size={48} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[15px] font-medium" title={`${e.brand} ${name(e)}`}>{e.brand} {name(e)}</span>
-                    {flagged ? <span role="img" aria-label="part of a compatibility note" title="Part of a compatibility note" className="h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
+                  <div className="flex items-start gap-2">
+                    <span className="line-clamp-2 text-[15px] font-medium leading-snug" title={`${e.brand} ${name(e)}`}>{e.brand} {name(e)}</span>
+                    {flagged ? <span role="img" aria-label="part of a compatibility note" title="Part of a compatibility note" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
                     {e.slots.length === 2 ? <Chip tone="neutral" className="shrink-0 whitespace-nowrap">AM + PM</Chip> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -330,7 +331,7 @@ export function Routine() {
             setAdd('pick')
           }}
         >
-          <Plus size={18} aria-hidden /> Add product
+          <Plus size={18} aria-hidden /> <span className="whitespace-nowrap">Add product</span>
         </Button>
       </div>
 

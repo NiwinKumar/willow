@@ -462,3 +462,20 @@ def test_engine_error_text_never_reaches_people(client, fake, monkeypatch):
     res = client.post(f"/v1/sessions/{created['session_id']}/analyze")
     assert "<html>" not in res.text
     assert res.json()["detail"]["message"].startswith("Something went wrong while measuring")
+
+
+def test_data_deleted_mid_measurement_leaves_nothing(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    real = engine.analyze
+
+    def delete_while_running(request):
+        result = real(request)
+        fake.store.delete_user("u_test")  # "Delete my data" in another tab
+        fake.put(f"results/u_test/{sid}/crops/c_001.jpg", content_type="image/jpeg")
+        return result
+
+    monkeypatch.setattr(engine, "analyze", delete_while_running)
+    assert client.post(f"/v1/sessions/{sid}/analyze").status_code == 404
+    assert not [n for n in fake.blobs if n.startswith(f"results/u_test/{sid}/")]
