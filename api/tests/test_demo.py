@@ -117,3 +117,37 @@ def test_judge_setup_never_touches_a_signed_in_account(client, fake, monkeypatch
     finally:
         app.dependency_overrides.pop(current_user, None)
     assert fake.store.routine_list("real") == []
+
+
+def test_a_sleeping_engine_reads_as_waking_and_is_asked_again_soon(client, monkeypatch):
+    from app import engine, retailer
+
+    demo.clear_cache()
+    monkeypatch.setattr(retailer, "insights", lambda: {"cohort": {"synthetic": 500, "real": 0}})
+    calls = []
+
+    def slow(timeout=engine.HEALTH_TIMEOUT_S):
+        calls.append(timeout)
+        raise engine.EngineError("engine_waking", "read timed out")
+
+    monkeypatch.setattr(engine, "health", slow)
+    assert client.get("/v1/demo/status").json()["engine"]["status"] == "waking"
+    assert client.get("/v1/demo/status").json()["engine"]["status"] == "waking"
+    assert len(calls) == 1  # kept briefly...
+    monkeypatch.setattr(demo.time, "time", lambda: 10_000_000_000.0)
+    monkeypatch.setattr(engine, "health", lambda timeout=0: {"engine_version": "0.3.1"})
+    assert client.get("/v1/demo/status").json()["engine"]["status"] == "ok"  # ...then asked again
+    assert engine.HEALTH_TIMEOUT_S > 35  # longer than a cold start
+
+
+def test_an_engine_that_refuses_is_unreachable(client, monkeypatch):
+    from app import engine, retailer
+
+    demo.clear_cache()
+    monkeypatch.setattr(retailer, "insights", lambda: {"cohort": {"synthetic": 500, "real": 0}})
+
+    def refused(timeout=0):
+        raise engine.EngineError("engine_unreachable", "403")
+
+    monkeypatch.setattr(engine, "health", refused)
+    assert client.get("/v1/demo/status").json()["engine"]["status"] == "unreachable"

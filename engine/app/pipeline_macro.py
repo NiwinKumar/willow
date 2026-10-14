@@ -54,6 +54,7 @@ LOWER_LIDS = (145, 374)  # right, left
 MOUTH_CORNERS = (61, 291)
 NOSE_WINGS = (129, 358)  # right, left
 BROW_TOPS = (105, 334)  # upper edge of each brow
+NO_LANDMARKS = np.full((478, 2), np.nan)
 IRIS = ([468, 469, 470, 471, 472], [473, 474, 475, 476, 477])  # centre, then 4 edge points
 METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
@@ -240,7 +241,7 @@ def _no_face(srgb8: np.ndarray, site: str) -> dict:
         "srgb8": srgb8,
         "shape": srgb8.shape,
         "box": Box(0, 0, w, h),
-        "face": SimpleNamespace(px_per_mm=1.0),
+        "face": SimpleNamespace(px_per_mm=1.0, points=NO_LANDMARKS),
         "blemishes": [],
         "spots": [],
         "skin_outlines": [],
@@ -357,7 +358,11 @@ def _frame(path: str, site: str) -> dict:
         "srgb8": srgb8,
         "shape": srgb8.shape,
         "box": Box(0, 0, w, h),
-        "face": SimpleNamespace(px_per_mm=px_full),  # what _candidates reads
+        # what _candidates reads: the scale, and landmarks to place marks on the face map
+        # (none in a pure macro shot: NaN points place nothing)
+        "face": SimpleNamespace(
+            px_per_mm=px_full, points=face.points if face is not None else NO_LANDMARKS
+        ),
         "blemishes": blems,
         "spots": spots,
         "skin_outlines": outlines,

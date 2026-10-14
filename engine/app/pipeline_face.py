@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from jsonschema import validate
 
-from app import config
+from app import config, facemap
 from app.aggregate import summarize
 from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
@@ -27,8 +27,10 @@ from app.landmarks import (
 )
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
+from app.metrics.glow import glow
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
+from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
 from app.quality import FrameQuality, check_frame
@@ -43,8 +45,10 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "redness": ("redness", "Redness", "a_star"),
     "blemishes": ("clarity", "Blemishes", "count"),
     "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
+    "shine": ("oil_glow", "Shine", "pct_area"),
+    "glow": ("oil_glow", "Glow", "index"),
 }
-ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "glow"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -128,6 +132,17 @@ def _frame(path: str) -> dict:
     face_skin = refine_skin(
         lab[..., 0], box.crop(face_mask_full), zones, px_per_mm, np.hypot(lab[..., 1], lab[..., 2])
     )
+    # shine: highlights are bright and grey, so measure on skin before the side-view colour
+    # cut (which drops shine); hair is already cut
+    all_polys = face.all_roi_polygons()
+    t_zone = box.crop(face.t_zone_mask(srgb8.shape[:2])) & face_skin
+    u_zone = face_skin & np.logical_or.reduce(
+        [
+            box.crop(polygon_mask(srgb8.shape[:2], all_polys[c]))
+            for c in ("right_cheek", "left_cheek")
+        ]
+    )
+    shine_pct, shine_extras = shine(lab, lin, t_zone, u_zone, px_per_mm)
     if face.view != "front":  # hair, background and shine crowd a turned cheek
         face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
         # sideburns and temple hair beside the ear (beards: the lower-face stubble test in
@@ -199,7 +214,11 @@ def _frame(path: str) -> dict:
     side_nose = np.zeros_like(face_skin)
     if face.view != "front":
         side_nose = box.crop(face.nose_mask(srgb8.shape[:2]))
-    lip_edge = box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM))
+    lip_edge = _lip_guard(
+        box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM)),
+        box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_MOUSTACHE_GUARD_MM)),
+        beard_skin,
+    )
     # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
     # red crease looks like a spot
     guard = cv2.dilate(
@@ -226,6 +245,7 @@ def _frame(path: str) -> dict:
         for sp in find_spots(lab, face_skin, search, px_per_mm, strict=strict, outline=outline)
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
     ]
+    glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -235,6 +255,8 @@ def _frame(path: str) -> dict:
         "redness": redness_a,
         "blemishes": float(len(blemishes)),
         "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
+        "shine": shine_pct,
+        "glow": glow_idx,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -245,6 +267,8 @@ def _frame(path: str) -> dict:
         "dark_circles": {"delta_a_star": float(np.mean([c[1] for c in circles]))}
         if circles
         else {},
+        "shine": shine_extras,
+        "glow": glow_extras,
     }
     return {
         "values": values,
@@ -260,6 +284,13 @@ def _frame(path: str) -> dict:
         "box": box,
         "srgb8": srgb8,
     }
+
+
+def _lip_guard(lip_band: np.ndarray, wide_band: np.ndarray, beard_skin: np.ndarray) -> np.ndarray:
+    """Skin around the lips the blemish search skips: the lip band everywhere, and the wider
+    band where the skin is between beard hairs (a moustache over the red lip edge: the skin
+    showing between hairs next to the lip reads as a red bump)."""
+    return lip_band | (wide_band & beard_skin)
 
 
 def _beard_skin(l_star: np.ndarray, beard: np.ndarray, px_per_mm: float) -> np.ndarray:
@@ -361,8 +392,11 @@ def _candidates(
     box, srgb8 = frame["box"], frame["srgb8"]
     px_per_mm = frame["face"].px_per_mm
     found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
+    found = found[:limit]
+    # where each mark sits on the canonical face, so the api can follow it across sessions
+    places = facemap.locate(frame["face"].points, [(box.x + b.x, box.y + b.y) for _, b in found])
     out, uploads = [], []
-    for i, (kind, b) in enumerate(found[:limit], start=1):
+    for i, (kind, b) in enumerate(found, start=1):
         cid = f"c_{i:03d}"
         cx, cy = box.x + b.x, box.y + b.y
         side = 2 * b.radius * 1.5
@@ -396,11 +430,24 @@ def _candidates(
                     "area_px": float(b.area_px),
                     "score": round(b.score, 2),
                     **({"seen_in_fraction": seen[i - 1]} if seen else {}),
+                    **_place_features(places[i - 1], b.radius),
                 },
             }
         )
     save_jpegs(uploads)  # all crops in parallel (network-bound)
     return out
+
+
+def _place_features(place: dict | None, radius_px: float) -> dict:
+    """Face-map features of one mark (numbers only, as the contract's features are)."""
+    if place is None:
+        return {}
+    return {
+        "face_x_mm": place["face_x_mm"],
+        "face_y_mm": place["face_y_mm"],
+        "zone": float(facemap.ZONES.index(place["zone"]) + 1),
+        "diameter_mm": round(2 * radius_px * place["mm_per_px"], 1),
+    }
 
 
 def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.ndarray:

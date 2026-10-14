@@ -168,6 +168,16 @@ class FakeFace(Face):
         none = np.zeros(shape, bool)
         return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
 
+    def t_zone_mask(self, shape):
+        m = np.zeros(shape, bool)
+        for n in ("forehead", "nose", "chin"):
+            x, y = SQUARES[n]
+            m[y : y + 120, x : x + 120] = True
+        return m
+
+    def all_roi_polygons(self):
+        return self.roi_polygons()
+
     def roi_polygons(self):
         return {
             n: np.array([[x, y], [x + 120, y], [x + 120, y + 120], [x, y + 120]], float)
@@ -230,7 +240,10 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
         "redness",
         "blemishes",
         "dark_circles",
+        "shine",
+        "glow",
     }
+    assert m["shine"]["value"] < 2.0 and m["shine"]["confidence"] == "indicative"
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
     assert m["tone_evenness"]["value"] < 2.0  # every ROI is the same colour
@@ -392,3 +405,21 @@ def test_hand_model_loads_and_finds_no_hand_on_a_blank_image():
     if not HAND_MODEL.exists():
         pytest.skip("hand model not downloaded")
     assert detect_hands(np.full((480, 640, 3), 128, np.uint8), 10) == []
+
+
+def test_moustache_over_the_lip_is_skipped_but_beard_skin_elsewhere_is_searched():
+    from app.pipeline_face import _lip_guard
+
+    lips = np.zeros((100, 100), bool)
+    lips[60:70, 30:70] = True
+    lip_band = np.zeros_like(lips)
+    lip_band[58:72, 28:72] = True  # 1.5 mm band
+    wide = np.zeros_like(lips)
+    wide[50:80, 20:80] = True  # 5 mm band
+    beard = np.zeros_like(lips)
+    beard[50:60, 25:75] = True  # moustache, just above the lips
+    beard[85:95, 40:60] = True  # chin beard, away from the lips
+    guard = _lip_guard(lip_band, wide, beard)
+    assert guard[52, 50]  # moustache next to the lip: skipped
+    assert not guard[90, 50]  # beard on the chin: still searched
+    assert not guard[52, 22]  # ordinary skin beside the lips: only the narrow band applies

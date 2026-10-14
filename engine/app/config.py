@@ -54,6 +54,8 @@ MIN_SD = {
     "pigment_spots": 0.05,  # % of skin area
     "blemishes": 0.5,  # marks
     "dark_circles": 0.3,  # delta L*
+    "shine": 0.02,  # % of T-zone (Oct 14: SD 0.017-0.023 on two sessions)
+    "glow": 1.0,  # index (Oct 14: SD 1.8-2.7, mostly lighting)
     "pores": 2.0,  # per cm2 (one or two pores more or less in a ~1 cm2 field)
     "texture": 0.05,  # index
 }
@@ -205,6 +207,9 @@ BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
 BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red lip edge)
+# ...widened to this where the skin is between beard hairs: Oct 14 a moustache over the lip
+# gave 3 of 10 blemish candidates on a laptop selfie
+BLEMISH_MOUSTACHE_GUARD_MM = 5.0
 # Candidate crops for Gemini, sized on the face: the tight crop is 4x the mark's diameter
 # and at least 6 mm (pixel sizes covered 20 mm at 3.2 px/mm and half the face in the
 # context crop); the context crop is 3x that. Small crops are upscaled to 128 px.
@@ -283,6 +288,39 @@ HAND_MIN_CONFIDENCE = 0.2
 HAND_MIN_SPAN_EYES = 0.8  # a detected hand spans at least this x the outer-eye distance
 HAND_MARGIN_MM = 10.0  # palm and finger edges beyond the landmarks
 HAND_OCCLUSION_FRAC = 0.10
+
+# shine (docs/METRICS.md C2): highlight = SHINE_DELTA_L brighter than the skin within
+# a SHINE_WINDOW_MM local median AND below SHINE_CHROMA_FRAC of its chroma (or clipped). Oct 14 on 10
+# faces: matte faces 0.5% of the T-zone (the nose-tip glint), shiny foreheads 2-27%.
+SHINE_WINDOW_MM = 12.0  # local median window (a shiny patch up to ~half this wide counts whole)
+SHINE_DELTA_L = 8.0
+SHINE_CHROMA_FRAC = 0.8
+SHINE_MIN_MM2 = 200.0  # T-zone skin needed for a value
+
+# glow (docs/METRICS.md C3), change only: median L* + median chroma - GLOW_TEXTURE_WEIGHT x
+# fine-scale L* SD (texture below GLOW_TEXTURE_MM) on the visible cheeks, shine left out.
+# Provisional weights: a 1 L* texture drop counts like a 5 L* brightness rise.
+GLOW_TEXTURE_MM = 0.5
+GLOW_TEXTURE_WEIGHT = 5.0
+GLOW_MIN_MM2 = 100.0
+
+# Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's
+# canonical face (mm, front view) and its zone, so the api can follow a mark across sessions.
+# Zone codes in candidate features are 1-based indexes into FACE_ZONES (features are numbers).
+FACE_ZONES = (
+    "forehead",
+    "nose",
+    "right_cheek",
+    "left_cheek",
+    "around_mouth",
+    "chin",
+    "right_jaw",
+    "left_jaw",
+)
+FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as forehead
+MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
+FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
+FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)
 
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
