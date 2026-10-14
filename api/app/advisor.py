@@ -39,7 +39,7 @@ measurements, check their routine and find products from Willow's facts-only cat
   no_baseline = first reading or no noise band yet; a metric marked indicative is a trend.
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
-- Be brief: 2 to 5 sentences."""
+- British spelling (colour, moisturiser). Be brief: 2 to 5 sentences."""
 
 TOOLS = types.Tool(
     function_declarations=[
@@ -186,10 +186,37 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
     return {"error": f"unknown tool {name}"}
 
 
+CURRENCY_SIGN = {"INR": "₹", "USD": "$"}
+
+
+def _words(key: str) -> str:
+    """dark_spots_pigmentation -> dark spots, pigmentation; eye_care -> eye care."""
+    return {"dark_spots_pigmentation": "dark spots", "acne_blemishes": "blemishes"}.get(
+        key, key.replace("_", " ")
+    )
+
+
 def _retrieval_line(name: str, args: dict[str, Any], out: dict[str, Any]) -> str:
     if name == "search_catalog":
-        bits = [str(v) for k, v in args.items() if v and k != "exclude_ingredients"]
-        return f"Searched the catalog ({', '.join(bits) or 'all'}): {len(out['products'])} found"
+        bits = []
+        if args.get("query"):
+            bits.append(f"“{args['query']}”")
+        for k in ("concern", "category"):
+            if args.get(k):
+                bits.append(_words(str(args[k])))
+        if args.get("max_price"):
+            sign = CURRENCY_SIGN.get(str(args.get("currency")), "")
+            amount = f"{float(args['max_price']):,.0f}"
+            bits.append(
+                f"under {sign}{amount}"
+                if sign
+                else f"under {amount} {args.get('currency') or ''}".strip()
+            )
+        if args.get("exclude_ingredients"):
+            bits.append("without " + ", ".join(map(str, args["exclude_ingredients"])))
+        n = len(out["products"])
+        found = f"{n} product{'s' if n != 1 else ''} found"
+        return f"Searched the catalog ({', '.join(bits) or 'everything'}): {found}"
     if name == "compare_products":
         return f"Compared {len(out['products'])} products"
     return "Checked your routine against the rule table"

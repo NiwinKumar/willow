@@ -20,6 +20,7 @@ CAPS: dict[str, tuple[int, int]] = {
     "label_scan": (30, 1500),
     "analyze": (60, 2000),
     "sample_runs": (12, 600),
+    "routine_check": (100, 5000),  # re-run on every routine change; past it, rules only
 }
 
 MESSAGES = {
@@ -39,6 +40,9 @@ def take(store: Store, uid: str, action: str) -> int:
             {"code": "daily_limit", "message": MESSAGES.get(action, "That is enough for today.")},
         )
     if store.usage_incr(GLOBAL_UID, day, action) > everyone:
+        # Everyone's cap: this attempt did not happen, so the person's own count goes back.
+        store.usage_incr(uid, day, action, -1)
+        store.usage_incr(GLOBAL_UID, day, action, -1)
         raise HTTPException(
             429,
             {"code": "busy", "message": "Willow is very busy today. Please try again tomorrow."},

@@ -62,7 +62,9 @@ function outcomes(view: SessionView): string[] {
 async function analyzeOnce(token: string, sessionId: string): Promise<SessionView> {
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
   let current = await api.getSession(token, sessionId)
-  for (let i = 0; current.session.status === 'processing' && i < 60; i++) {
+  // Up to ~5.5 min: a run in another tab (or before a reload) gets the api's full window
+  // (STALE_PROCESSING is 5 min) before this one may start it again.
+  for (let i = 0; current.session.status === 'processing' && i < 110; i++) {
     await wait(3000)
     current = await api.getSession(token, sessionId)
   }
@@ -159,7 +161,9 @@ export function Processing() {
         if (!mounted.current) return
         ticks.forEach(clearInterval)
         const code = e instanceof ApiError ? e.code : null
-        setError({ code, message: (code && ERROR_COPY[code]) || (e instanceof ApiError && e.message) || 'Something went wrong while measuring. Your photos are safe; try again.' })
+        // The api's own sentence only for limits (written for people); anything else gets ours.
+        const limit = e instanceof ApiError && e.status === 429 ? e.message : null
+        setError({ code, message: (code && ERROR_COPY[code]) || limit || 'Something went wrong while measuring. Your photos are safe; try again.' })
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps

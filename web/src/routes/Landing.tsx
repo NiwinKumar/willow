@@ -17,7 +17,7 @@ import { prefetchRoutes } from './lazy'
 const entries = [
   { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', demo: true },
   { title: 'Run the pipeline on sample photos', sub: 'Real RAW photos, measured live in a guest account of your own.', eta: '~40 s', to: '/capture?sample=1', demo: false },
-  { title: 'Measure your own forearm', sub: 'Phone camera or a RAW photo. Your own baseline, really measured.', eta: '~2 min', to: '/capture?site=forearm_control&mode=quick', demo: false },
+  { title: 'Measure your own skin', sub: 'A selfie, or a forearm with a phone or RAW photo. Your own baseline, really measured.', eta: '~2 min', to: '/capture?site=face_full&mode=quick', demo: false },
 ]
 
 export function Landing() {
@@ -83,12 +83,12 @@ export function Landing() {
 
         <div className="max-w-[36rem] lg:col-start-1">
           <p className="text-[17px] leading-relaxed text-text-2">
-            Willow measures your skin from standardized photos and tells you whether a change is real or just the camera. Every number comes from calibrated computer vision; the AI only explains.
+            Willow measures your skin from standardized photos and tells you whether a change is real or just the camera. Every number comes from computer vision on your own photos; the AI only explains.
           </p>
           <Link to="/judge" className="mt-6 flex min-h-11 items-center justify-between gap-3 rounded-(--radius-control) bg-text px-4 py-3 text-surface transition-opacity hover:opacity-90">
             <span>
               <span className="block text-[15px] font-semibold">Judging Willow? Take the guided tour</span>
-              <span className="block text-[13px] opacity-80">Five stops, every one live. No sign-in.</span>
+              <span className="block text-[13px] opacity-80">Five stops, all on live services. No sign-in.</span>
             </span>
             <span className="shrink-0 whitespace-nowrap font-mono text-[13px] opacity-80">~4 min</span>
           </Link>

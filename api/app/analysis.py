@@ -5,12 +5,15 @@ sessions again once their site is measured, so photos taken early still become t
 """
 
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
 from app import baselines, engine, explain, labeller, views
 from app.store import Store
+
+log = logging.getLogger("willow.analysis")
 
 
 def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any]) -> dict:
@@ -44,10 +47,11 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     try:
         result = engine.analyze(request)
     except engine.EngineError as exc:
+        log.warning("engine failed for %s/%s: %s %s", uid, session_id, exc.code, exc.message)
         store.session_update(
             uid,
             session_id,
-            {"status": "failed", "error": {"code": exc.code, "message": exc.message}},
+            {"status": "failed", "error": {"code": exc.code, "message": exc.public_message}},
         )
         raise
 

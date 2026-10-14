@@ -139,6 +139,7 @@ Rules:
 - is_baseline in the session data tells you which kind of session this is: true means the first
   reading (say so); false means a later session compared with the baseline, so never call it
   "initial" or "first". A delta of 0 or 0.0 means no measurable difference; never write "-0.0".
+- British spelling (colour, centre), as in the rest of the app.
 - headline: one short sentence. items: one per metric, most important first. next_steps: up to 3
   short practical capture or routine tips. disclaimer: "Cosmetic appearance tracking, not a
   diagnosis.\""""

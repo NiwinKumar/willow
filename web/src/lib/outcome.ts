@@ -1,5 +1,6 @@
 import type { MetricId, RoutineEntry, Session } from '../data/types'
 import { CONCERN_METRICS } from '../mock/catalog'
+import { parseDate } from './format'
 import { METRIC_META, fmtSigned, fmtValue } from './metrics'
 
 export type Outcome =
@@ -29,9 +30,14 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
     const names = [...new Set(targets.map((t) => METRIC_META[t].label.toLowerCase()))]
     return { kind: 'unmeasured', text: 'Not measured yet', detail: `This product targets ${names.join(' and ')}, which Willow does not measure yet.` }
   }
-  const after = measured.filter((s) => !s.is_baseline && new Date(s.created_at) >= new Date(entry.started_at))
-  const weeks = Math.floor((Date.now() - new Date(entry.started_at).getTime()) / (7 * 86_400_000))
-  if (after.length < 2 || weeks < 2) return { kind: 'early', text: 'Too early to tell', detail: `Started ${weeks} week${weeks === 1 ? '' : 's'} ago. Willow needs at least two check-ins after a start date.` }
+  const start = parseDate(entry.started_at)
+  const after = measured.filter((s) => !s.is_baseline && new Date(s.created_at) >= start)
+  const weeks = Math.max(0, Math.floor((Date.now() - start.getTime()) / (7 * 86_400_000)))
+  if (after.length < 2 || weeks < 2) {
+    const since = weeks === 0 ? 'Started this week.' : `Started ${weeks} week${weeks === 1 ? '' : 's'} ago.`
+    const need = after.length < 2 ? `Willow needs at least two check-ins after the start date (${after.length} so far).` : 'Most changes take at least two weeks to show.'
+    return { kind: 'early', text: 'Too early to tell', detail: `${since} ${need}` }
+  }
   const latest = after[after.length - 1]
   for (const t of checked) {
     const m = latest.result?.metrics.find((x) => x.id === t)
