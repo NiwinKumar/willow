@@ -126,7 +126,12 @@ def _frame(path: str) -> dict:
     # blemishes: band inside every outer edge, eye / lip cut-outs included (red lid and lip
     # rims reach there). Dark spots: band inside the hair / background edge only, so a dark
     # mark beside the nose or lips (a mole) is not cut off.
-    band = face.border_band(face_skin, (box.x, box.y))
+    # blemishes are found by redness and hair is not red, so they also search the skin
+    # between beard hairs (lower face cut as stubble): a pimple in a beard still counts.
+    # Dark spots do not (hair is dark).
+    beard_skin = _beard_skin(lab[..., 0], face_full & zones["lower_face"] & ~face_skin, px_per_mm)
+    blem_skin = face_skin | beard_skin
+    band = face.border_band(blem_skin, (box.x, box.y))
     spot_band = face.border_band(face_skin, (box.x, box.y), features=features)
     brows = box.crop(face.brow_guard(srgb8.shape[:2]))
     eye_corners = box.crop(face.eye_corner_guard(srgb8.shape[:2]))
@@ -142,9 +147,9 @@ def _frame(path: str) -> dict:
     ).astype(bool)
     blemishes = find_blemishes(
         lab,
-        face_skin,
+        blem_skin,
         px_per_mm,
-        search=face_skin & ~guard & ~band & ~brows & ~eye_corners & ~lip_edge & ~side_nose,
+        search=blem_skin & ~guard & ~band & ~brows & ~eye_corners & ~lip_edge & ~side_nose,
     )
     # dark spots over the whole face skin, away from shadow-prone areas and from spots
     # already counted as blemishes (a red-brown mark is one thing, not two)
@@ -191,6 +196,19 @@ def _frame(path: str) -> dict:
         "box": box,
         "srgb8": srgb8,
     }
+
+
+def _beard_skin(l_star: np.ndarray, beard: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """Skin pixels inside a beard / stubble area: not much darker than the skin within
+    ~0.5 mm (that is a hair) and not far darker than the area's own median (dense hair)."""
+    if not beard.any():
+        return beard
+    fine = cv2.GaussianBlur(l_star.astype(np.float32), (0, 0), 0.5 * px_per_mm)
+    skin = beard & (l_star >= fine - config.STUBBLE_DELTA_L)
+    skin &= l_star >= np.median(l_star[beard]) - config.HAIR_DELTA_L
+    r = max(round(0.3 * px_per_mm), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    return cv2.morphologyEx(skin.astype(np.uint8), cv2.MORPH_OPEN, kernel).astype(bool)
 
 
 def _marks(frame: dict) -> np.ndarray:
