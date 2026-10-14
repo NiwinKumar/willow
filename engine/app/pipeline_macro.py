@@ -245,6 +245,7 @@ def _no_face(srgb8: np.ndarray, site: str) -> dict:
         "spots": [],
         "skin_outlines": [],
         "detailed": False,
+        "textured": False,
         "face_found": False,
         "enough_skin": False,
         "scale_from": "unknown",
@@ -305,10 +306,14 @@ def _frame(path: str, site: str) -> dict:
         if site == "cheek_macro" and enough
         else []
     )
-    # pores and texture need detail the photo may not have (taken too far away)
-    # (a guessed scale may be far off for a photo that is not a real macro shot: stricter)
-    min_px = config.MACRO_MIN_PX_PER_MM if scale_from != "assumed" else config.MACRO_MIN_PX_ASSUMED
+    # pores need detail the photo may not have (taken too far away); texture, at a coarser
+    # scale, much less. A guessed scale may be far off for a photo that is not a real macro
+    # shot: stricter
+    assumed = scale_from == "assumed"
+    min_px = config.MACRO_MIN_PX_ASSUMED if assumed else config.MACRO_MIN_PX_PER_MM
     detailed = enough and px_full >= min_px
+    min_tex = config.MACRO_MIN_PX_ASSUMED if assumed else config.TEXTURE_MIN_PX_PER_MM
+    textured = enough and px_full >= min_tex
     pores = find_pores(lab, skin, px, [*blems_w, *spots_w]) if detailed else []
     pores_val, pores_extras = pores_per_cm2(pores, int(skin.sum()), px) if detailed else (None, {})
     blems = [_scaled(b, back) for b in blems_w]
@@ -322,7 +327,7 @@ def _frame(path: str, site: str) -> dict:
             tone_ita=ita_degrees(l_star, b_star) if enough else None,
             pigment_spots=spot_pct if enough else None,
             redness=float(np.median(lab[..., 1][skin])) if skin.any() else None,
-            texture=texture(lab, skin, px) if detailed else None,
+            texture=texture(lab, skin, px) if textured else None,
         )
         extras.update(
             tone_ita={"l_star": l_star, "b_star": b_star},
@@ -333,7 +338,7 @@ def _frame(path: str, site: str) -> dict:
     else:
         spots = []
         if "texture" in SITE_METRICS[site]:
-            values["texture"] = texture(lab, skin, px) if detailed else None
+            values["texture"] = texture(lab, skin, px) if textured else None
             extras["texture"] = {}
     values.update(blemishes=float(len(blems)), pores=pores_val)
     extras.update(
@@ -357,6 +362,7 @@ def _frame(path: str, site: str) -> dict:
         "spots": spots,
         "skin_outlines": outlines,
         "detailed": detailed,
+        "textured": textured,
         "face_found": face is not None,
         "enough_skin": enough,
         "scale_from": scale_from,
@@ -453,9 +459,9 @@ def analyze_macro(
             "comparable between your own sessions taken the same way, not as absolute values"
         )
     if any(f["enough_skin"] for f in frames) and not any(f["detailed"] for f in frames):
+        what = "pores need" if any(f["textured"] for f in frames) else "pores and texture need"
         warnings.append(
-            "pores and texture need a closer photo: hold the phone about a hand's width from "
-            "your face, or closer"
+            f"{what} a closer photo: hold the phone about a hand's width from your face, or closer"
         )
     if frames and all(f["scale_from"] == "unknown" for f in frames):
         warnings.append(
