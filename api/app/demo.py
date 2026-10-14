@@ -56,6 +56,9 @@ class Sample(BaseModel):
 _cache: dict[str, tuple[float, Any]] = {}
 
 
+STATUS_RETRY_S = 10.0  # a status with a failed check is asked again after this
+
+
 def _cached(key: str, seconds: float, make):
     hit = _cache.get(key)
     if hit and time.time() - hit[0] < seconds:
@@ -117,7 +120,7 @@ def judge_routine_entries() -> list[tuple[dict[str, Any], list[str]]]:
 
 
 def status() -> dict[str, Any]:
-    """What is running right now, checked live (cached for a minute)."""
+    """What is running right now, checked live (cached a minute, a failed check 10 s)."""
 
     def check() -> dict[str, Any]:
         settings = get_settings()
@@ -135,7 +138,12 @@ def status() -> dict[str, Any]:
             started = time.monotonic()
             try:
                 h = engine.health()
-            except Exception as exc:  # cold start timeout, IAM, network
+            except engine.EngineError as exc:
+                log.warning("status: engine check failed: %s", exc.message)
+                # still starting after HEALTH_TIMEOUT_S: the check itself woke it
+                state = "waking" if exc.code == "engine_waking" else "unreachable"
+                return {"status": state, "mode": settings.engine_mode}
+            except Exception as exc:  # IAM, token, network
                 log.warning("status: engine check failed: %s", exc)
                 return {"status": "unreachable", "mode": settings.engine_mode}
             return {
@@ -168,4 +176,12 @@ def status() -> dict[str, Any]:
         out["checked_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         return out
 
-    return _cached("status", 60, check)
+    # all good: kept a minute; a failed check only STATUS_RETRY_S (a waking engine is up soon)
+    hit = _cache.get("status")
+    if hit:
+        good = hit[1]["engine"]["status"] == "ok" and hit[1]["bigquery"]["status"] == "ok"
+        if time.time() - hit[0] < (60 if good else STATUS_RETRY_S):
+            return hit[1]
+    value = check()
+    _cache["status"] = (time.time(), value)
+    return value

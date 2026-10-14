@@ -13,8 +13,16 @@ function rows(s: DemoStatus | null): Row[] {
     {
       name: 'Measurement engine',
       where: 'Cloud Run (private), OpenCV + rawpy',
-      detail: s?.engine.status === 'ok' ? `v${s.engine.version}${s.engine.latency_ms ? (s.engine.latency_ms > 3000 ? ` · answered in ${Math.round(s.engine.latency_ms / 1000)} s (it was waking up)` : ` · answered in ${s.engine.latency_ms} ms`) : ''}` : s ? 'starting up or unreachable' : '',
-      ok: pending ? null : s.engine.status === 'ok',
+      detail:
+        s?.engine.status === 'ok'
+          ? `v${s.engine.version}${s.engine.latency_ms ? (s.engine.latency_ms > 3000 ? ` · answered in ${Math.round(s.engine.latency_ms / 1000)} s (it was waking up)` : ` · answered in ${s.engine.latency_ms} ms`) : ''}`
+          : s?.engine.status === 'waking'
+            ? 'waking up (it sleeps when idle); ready in a few seconds'
+            : s
+              ? 'not answering right now'
+              : '',
+      // waking is not a failure: shown as pending, like a check still running
+      ok: pending || s.engine.status === 'waking' ? null : s.engine.status === 'ok',
       checked: true,
     },
     { name: 'Gemini', where: s?.gemini.endpoint ?? 'Vertex AI', detail: s ? `${s.gemini.model} · configured; called on every answer` : '', ok: pending ? null : true, checked: false },
