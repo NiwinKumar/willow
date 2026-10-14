@@ -7,6 +7,7 @@ validator twice. Every number here is copied from the metrics, so it always pass
 import json
 import logging
 import re
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -162,8 +163,12 @@ UNIT_DISPLAY = {
 def _shown(x: float | None, unit: str) -> float | None:
     if x is None:
         return None
-    # "+ 0.0" reads better than "-0.0": a delta that rounds to zero is written as zero.
-    return round(x, UNIT_DISPLAY.get(unit, ("", 2))[1]) + 0.0
+    # Round half away from zero, like the web's Intl formatting: 2.5 blemishes shows as 3 on
+    # screen, so Gemini must see 3 too (Python's round() would give 2). A delta that rounds to
+    # zero is written as 0, never -0.
+    places = UNIT_DISPLAY.get(unit, ("", 2))[1]
+    q = Decimal(str(x)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+    return (int(q) if places == 0 else float(q)) + 0
 
 
 def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
