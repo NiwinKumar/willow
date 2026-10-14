@@ -19,9 +19,9 @@ SKIN_MIN_WARMTH = 0.12  # (R - B) / R: skin is warm at every tone, paper is ~0
 DOT_AREA_PX = (3, 400)  # dot size range in the small copy
 MAX_CANDIDATES = 40
 SQUARE_SIDE_FRAC = (0.03, 0.20)  # dot spacing as a fraction of photo width (~2-6 cm squares)
-PAIR_GAP_SIDES = 4.0
+PAIR_GAP_SIDES = 4.0  # two squares must be within 4 side-lengths of each other
 PAPER_BAND_BOXES = 1.5  # paper within 1.5 box-heights above/below the skin box
-PAPER_MIN_PX = 2000  # in the small copy; fewer -> use the whole sheet  # two squares must be within 4 side-lengths of each other
+PAPER_MIN_PX = 2000  # in the small copy; fewer -> use the whole sheet
 ROI_FRACTION = 0.30  # half-size of the measured square as a fraction of the dot spacing
 
 
@@ -127,11 +127,11 @@ def find_dot_square(srgb8: np.ndarray, max_score: float = 0.25) -> tuple[Box, np
 
 
 def paper_pixels(linear: np.ndarray, srgb8: np.ndarray, near: Box | None = None) -> np.ndarray:
-    """Linear RGB of the white paper: the largest bright, colourless region, edges trimmed.
+    """Linear RGB of the white paper (forearm captures): a bright, colourless region.
 
-    With `near`, only paper in a band at the same height as that box is used, because lamp
-    light falls off across the table and paper next to the skin sees the same light as it.
-    Falls back to the whole sheet if the band has too little paper.
+    With `near`, the region with the most paper level with that box is used, and only its
+    part at that height: lamp light falls off across the table, so paper beside the skin
+    sees the same light. Falls back to the whole sheet if too little is level with it.
     """
     small = srgb8[::SCALE, ::SCALE].astype(np.int16)
     bright = small.min(axis=-1) > 150
@@ -139,12 +139,17 @@ def paper_pixels(linear: np.ndarray, srgb8: np.ndarray, near: Box | None = None)
     labels = measure.label(morphology.opening(bright & neutral, morphology.disk(3)))
     if labels.max() == 0:
         raise ValueError("could not find the white paper")
-    largest = max(measure.regionprops(labels), key=lambda r: r.area)
-    mask = morphology.erosion(labels == largest.label, morphology.disk(6))
+    regions = measure.regionprops(labels)
+    if near is None:
+        best = max(regions, key=lambda r: r.area)
+    else:
+        cy = (near.y + near.h / 2) / SCALE
+        half = PAPER_BAND_BOXES * near.h / SCALE
+        best = max(regions, key=lambda r: (np.abs(r.coords[:, 0] - cy) <= half).sum())
+    mask = morphology.erosion(labels == best.label, morphology.disk(6))
     ys, xs = np.nonzero(mask)
     if near is not None:
-        cy = (near.y + near.h / 2) / SCALE
-        band = np.abs(ys - cy) <= PAPER_BAND_BOXES * near.h / SCALE
+        band = np.abs(ys - cy) <= half
         if band.sum() >= PAPER_MIN_PX:
             ys, xs = ys[band], xs[band]
     return linear[::SCALE, ::SCALE][ys, xs]

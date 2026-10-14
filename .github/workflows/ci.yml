@@ -22,6 +22,14 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with: { version: "0.12.15" }
       - run: uv sync
+      # MediaPipe's face landmarker links the GLES / EGL libraries even on CPU (same as the
+      # engine Dockerfile).
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgles2 libegl1
+      # The face model is git-ignored: fetch Google's published file, checked by hash.
+      - run: |
+          mkdir -p models
+          curl -sSfL -o models/face_landmarker.task https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          echo "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff  models/face_landmarker.task" | sha256sum -c -
       # The engine package is imported as `app` from engine/; its pyproject does not set pythonpath (Harshini's folder).
       - run: PYTHONPATH=. uv run pytest -q
   web:

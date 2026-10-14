@@ -53,3 +53,31 @@ def fetch_frames(uris: list[str], workdir: Path) -> list[str]:
             raise EngineError("internal", f"{uri}: {kind}: {exc}") from exc
         paths.append(str(dest))
     return paths
+
+
+def save_jpeg(srgb8, dest: str, quality: int = 90) -> str:
+    """Write an 8-bit sRGB array as JPEG to a gs:// URI or a local path; returns dest."""
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.fromarray(srgb8).save(buf, format="JPEG", quality=quality)
+    if dest.startswith("gs://"):
+        from google.cloud import storage
+
+        bucket, name = parse_gs_uri(dest)
+        try:
+            blob = storage.Client().bucket(bucket).blob(name)
+            blob.upload_from_string(buf.getvalue(), content_type="image/jpeg")
+        except Exception as exc:
+            code = (
+                "gcs_access_denied"
+                if type(exc).__name__ in {"Forbidden", "Unauthorized"}
+                else "internal"
+            )
+            raise EngineError(code, f"{dest}: {type(exc).__name__}: {exc}") from exc
+    else:
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_bytes(buf.getvalue())
+    return dest
