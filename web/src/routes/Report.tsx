@@ -274,7 +274,7 @@ export function Report() {
           </>
         )}
       </header>
-      {!unmeasured && isSampleEngine(session) ? (
+      {!unmeasured && session?.live && isSampleEngine(session) ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold">Sample numbers.</span> Your photos are saved. Until the measurement engine is connected, these readings come from a fixed sample, not from your skin.
         </div>
