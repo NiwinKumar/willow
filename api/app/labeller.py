@@ -39,8 +39,9 @@ Label = Literal[
 Confidence = Literal["low", "medium", "high"]
 
 INSTRUCTIONS = """You look at small cropped photos of skin found by a measurement engine. For each
-candidate you get a tight crop and a wider context crop of the same spot. Say what it most looks
-like, using only the allowed labels:
+candidate you get a tight crop and a wider context crop of the same spot. The candidate is the
+small mark at the exact centre of both crops; judge only that mark, not other marks, features or
+objects elsewhere in the crop. Say what it most looks like, using only the allowed labels:
 papule_pustule (raised, red or with a white top), open_comedone (dark open pore, blackhead),
 closed_comedone (small skin-coloured or white bump, whitehead), post_blemish_mark (flat pink,
 red or brown mark left after a blemish), freckle (small flat even brown spot), mole (distinct,
@@ -89,7 +90,7 @@ def _ask(batch: list[tuple[dict, tuple[bytes, bytes]]], site: str) -> dict[str, 
     for cand, (crop, ctx) in batch:
         parts += [
             f"Candidate {cand['id']} (engine kind: {cand.get('kind', 'unknown')}, site: {site}). "
-            "Tight crop, then context crop:",
+            "Tight crop, then context crop, the candidate at the centre of each:",
             types.Part.from_bytes(data=crop, mime_type="image/jpeg"),
             types.Part.from_bytes(data=ctx, mime_type="image/jpeg"),
         ]

@@ -17,6 +17,8 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
   const b = base?.value ?? null
   const mdc = base?.mdc95 ?? null
   const dec = decimalsFor(current)
+  // The noise band comes from the baseline photos that passed the quality check, not all uploaded.
+  const refPhotos = baseline?.result?.frames_used || baseline?.n_frames || 5
   const unit = UNIT_LABEL[current.unit]
   const points: Point[] = sessions.map((s, i) => {
     const m = s.result?.metrics.find((x) => x.id === metricId) ?? null
@@ -61,7 +63,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
       </div>
       {cluster.length && mdc !== null ? (
         <p className="text-[12px] text-text-3">
-          Your noise band (MDC95 from {baseline?.n_frames ?? 5} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
+          Your noise band (MDC95 from {refPhotos} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
         </p>
       ) : null}
       <dl className="space-y-3 text-[15px] leading-relaxed">
@@ -73,7 +75,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
           <dt className="font-semibold">How we decide real change</dt>
           <dd className="text-text-2">
             {b !== null && mdc !== null
-              ? `Your ${baseline?.n_frames ?? 5} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
+              ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
               : current.verdict === 'low_quality'
                 ? 'This photo did not pass the quality check, so it is not compared. Retake it in the same light and position.'
                 : b !== null && mdc === null

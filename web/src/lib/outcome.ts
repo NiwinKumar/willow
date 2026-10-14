@@ -1,4 +1,4 @@
-import type { RoutineEntry, Session } from '../data/types'
+import type { MetricId, RoutineEntry, Session } from '../data/types'
 import { CONCERN_METRICS } from '../mock/catalog'
 import { METRIC_META, fmtSigned, fmtValue } from './metrics'
 
@@ -15,17 +15,25 @@ export type Outcome =
 export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   if (entry.concerns.length === 0 && entry.source === 'label_scan' && !entry.product_id)
     return { kind: 'unmeasured', text: 'Concerns unknown', detail: 'This product is not in the catalog, so Willow does not know which measurements it targets.' }
-  const targets = entry.concerns.flatMap((c) => CONCERN_METRICS[c] ?? [])
+  const targets = entry.concerns.flatMap((c) => CONCERN_METRICS[c] ?? []) as MetricId[]
   if (targets.length === 0) return { kind: 'unmeasured', text: 'Not measured', detail: 'This product targets nothing Willow measures (cleansers and barrier creams, for example).' }
   // Only real measurements count: done, measured (not a placeholder), photo quality passed.
   const measured = sessions.filter((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed)
   if (measured.length === 0)
     return { kind: 'unmeasured', text: 'Not measured yet', detail: 'No face photo has been measured yet. Take a face session to see whether this product changed anything.' }
+  // Face photos measure tone, dark spots, evenness, redness and blemishes today; pores, lines and
+  // the rest need close-ups the engine does not measure yet. Never call those "no change".
+  const measurable = new Set(measured.flatMap((s) => (s.result?.metrics ?? []).filter((m) => m.value !== null).map((m) => m.id)))
+  const checked = targets.filter((t) => measurable.has(t))
+  if (checked.length === 0) {
+    const names = [...new Set(targets.map((t) => METRIC_META[t].label.toLowerCase()))]
+    return { kind: 'unmeasured', text: 'Not measured yet', detail: `This product targets ${names.join(' and ')}, which Willow does not measure yet.` }
+  }
   const after = measured.filter((s) => !s.is_baseline && new Date(s.created_at) >= new Date(entry.started_at))
   const weeks = Math.floor((Date.now() - new Date(entry.started_at).getTime()) / (7 * 86_400_000))
   if (after.length < 2 || weeks < 2) return { kind: 'early', text: 'Too early to tell', detail: `Started ${weeks} week${weeks === 1 ? '' : 's'} ago. Willow needs at least two check-ins after a start date.` }
   const latest = after[after.length - 1]
-  for (const t of targets) {
+  for (const t of checked) {
     const m = latest.result?.metrics.find((x) => x.id === t)
     if (m && m.verdict === 'real_change' && m.delta !== null) {
       return {

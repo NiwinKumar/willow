@@ -16,8 +16,7 @@ from typing import Any
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from app import catalog, gemini, numbers, routine_check
-from app.explain import BANNED
+from app import catalog, explain, gemini, numbers, routine_check
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
@@ -99,31 +98,26 @@ def _compact(p: dict[str, Any]) -> dict[str, Any]:
 
 
 def context(store: Store, uid: str) -> dict[str, Any]:
-    """Latest measured session per site and capture mode, plus the routine."""
+    """Latest measured session (quality passed) per site and capture mode, plus the routine."""
     latest: dict[str, dict[str, Any]] = {}
     for sid, doc in sorted(store.sessions_list(uid), key=lambda r: str(r[1].get("created_at"))):
         result = measured_result(doc)
-        if doc.get("status") != "done" or result is None:
+        # A session that failed the quality check has no numbers: keep the last good reading.
+        if doc.get("status") != "done" or result is None or not result["quality"]["passed"]:
             continue
         latest[f"{doc['site']} ({doc['capture_mode']})"] = {
             "session_id": sid,
             "date": iso(doc.get("created_at")),
             "is_baseline": bool(doc.get("is_baseline")),
             "photos": doc.get("n_frames"),
+            "photos_used": result["frames_used"],
             "quality_passed": result["quality"]["passed"],
+            # Rounded as the app shows them (explain.decimals), so the advisor never quotes
+            # 2.5 blemishes for a screen that says 3.
             "metrics": [
                 {
-                    k: m.get(k)
-                    for k in (
-                        "id",
-                        "label",
-                        "value",
-                        "unit",
-                        "delta",
-                        "mdc95",
-                        "verdict",
-                        "confidence",
-                    )
+                    **{k: m.get(k) for k in ("id", "label", "unit", "verdict", "confidence")},
+                    **explain.shown_numbers(m),
                 }
                 for m in result["metrics"]
             ],
@@ -284,7 +278,7 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
         bad_ids = set(reply.product_ids) - product_ids
         if (
             numbers.only_known(reply.message, allowed)
-            and not BANNED.search(reply.message)
+            and not explain.BANNED.search(reply.message)
             and not bad_ids
         ):
             return {

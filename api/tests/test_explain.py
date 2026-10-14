@@ -44,7 +44,7 @@ def test_first_reading_and_quality_failure_headlines():
     first = explain.template({"metrics": [metric], "quality": {"passed": True}})
     assert first["headline"] == "Your first reading"
     failed = explain.template({"metrics": [metric], "quality": {"passed": False}})
-    assert failed["headline"] == "These photos could not be compared"
+    assert failed["headline"] == "These photos could not be measured"
 
 
 def test_trend_wording_for_indicative_metrics():
@@ -182,8 +182,48 @@ def test_negation_anywhere_earlier_in_the_sentence():
 
 
 def test_rounding_matches_the_screen():
-    from app.explain import _shown
+    from app.explain import _shown, decimals, shown_numbers
 
-    assert _shown(2.5, "count") == 3
-    assert _shown(-0.04, "deg") == 0
-    assert _shown(1.25, "a_star") == 1.3  # never banker's 1.2
+    assert _shown(2.5, 0) == 3
+    assert _shown(-0.04, 1) == 0
+    assert _shown(1.25, 1) == 1.3  # never banker's 1.2
+    # web/src/lib/metrics.ts decimalsFor: counts whole, then by noise band (none counts as 1)
+    assert decimals({"unit": "count", "mdc95": 0.1}) == 0
+    assert decimals({"unit": "index", "mdc95": None}) == 1
+    assert decimals({"unit": "deg", "mdc95": 6.2}) == 0
+    assert decimals({"unit": "index", "mdc95": 0.3}) == 2
+    assert shown_numbers({"unit": "index", "value": 0.4237, "delta": None, "mdc95": None}) == {
+        "value": 0.4,
+        "delta": None,
+        "mdc95": None,
+    }
+
+
+def test_failed_session_gets_the_template_with_site_advice(monkeypatch):
+    from app import explain, gemini
+
+    def never(*a, **k):
+        raise AssertionError("Gemini must not be asked about a session that measured nothing")
+
+    monkeypatch.setattr(gemini, "generate_json", never)
+    result = {
+        "site": "face_full",
+        "quality": {"passed": False, "reasons": ["face_not_found"]},
+        "metrics": [
+            {
+                "id": "redness",
+                "label": "Redness",
+                "verdict": "low_quality",
+                "confidence": "indicative",
+                "value": None,
+                "delta": None,
+                "mdc95": None,
+                "unit": "a_star",
+                "direction": "none",
+            }
+        ],
+        "warnings": [],
+    }
+    exp, source = explain.generate(result, {"is_baseline": True})
+    assert source == "template"
+    assert "hands away" in exp["next_steps"][0] and "card" not in exp["next_steps"][0]

@@ -27,3 +27,35 @@ export function failureReasons(r: AnalysisResult | null | undefined): string[] {
   }
   return reasons.map((x) => QUALITY_COPY[x]?.text ?? x)
 }
+
+const LEFT_OUT: Partial<Record<string, string>> = {
+  blurry: 'soft',
+  overexposed: 'too bright',
+  underexposed: 'too dark',
+  pose_out_of_range: 'face turned',
+  face_not_found: 'no face found',
+  occlusion_suspected: 'skin covered',
+  card_not_found: 'no colour card',
+  card_delta_e_high: 'card colours off',
+}
+
+/**
+ * "Photos 1, 2 and 3 were left out (soft, face turned)." when a session passed but some of its
+ * photos did not. Photos without a reason (pen dots not found) are covered by readableWarnings.
+ */
+export function leftOutPhotos(r: AnalysisResult | null | undefined): string | null {
+  if (!r?.quality.passed) return null
+  const failed = (r.quality.per_frame ?? []).filter((f) => !f.passed && f.reasons.length)
+  if (!failed.length) return null
+  const nums = failed.map((f) => String(f.index + 1))
+  const list = nums.length === 1 ? nums[0] : `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}`
+  const why = [...new Set(failed.flatMap((f) => f.reasons.map((x) => LEFT_OUT[x]).filter(Boolean)))]
+  return `${nums.length === 1 ? 'Photo' : 'Photos'} ${list} ${nums.length === 1 ? 'was' : 'were'} left out${why.length ? ` (${why.join(', ')})` : ''}.`
+}
+
+/** "5 photos, 2 used" when the quality check left some out; else "5 photos". */
+export function photosUsed(s: { n_frames: number; result?: AnalysisResult | null }): string {
+  const used = s.result?.quality.passed ? s.result.frames_used : null
+  const n = s.n_frames === 1 ? '1 photo' : `${s.n_frames} photos`
+  return used !== null && used !== undefined && used < s.n_frames ? `${n}, ${used} used` : n
+}

@@ -32,11 +32,17 @@ export const SPOT_NAME: Record<SpotLabel, [string, string]> = {
 /** Verbatim from CLAUDE.md. */
 export const MOLE_NOTE = 'Not a medical assessment; see a dermatologist for changing moles.'
 
-/** Counts per label, most common first; "unclear" last. */
+/** Listed last: not a skin finding, or not nameable. */
+export const NOT_SKIN: SpotLabel[] = ['hair_or_artifact', 'uncertain']
+/** Left off the photo unless picked in the list: hair and glare are not on the skin. */
+export const HIDDEN_RINGS: SpotLabel[] = ['hair_or_artifact']
+
+/** Counts per label: skin findings by count, then hair or artefacts, then "unclear". */
 export function summarizeSpots(details: Record<string, LabelDetail> | undefined): { label: SpotLabel; n: number; name: string }[] {
   const counts = new Map<SpotLabel, number>()
   for (const d of Object.values(details ?? {})) counts.set(d.label, (counts.get(d.label) ?? 0) + 1)
+  const rank = (l: SpotLabel) => NOT_SKIN.indexOf(l) + 1 // 0 for skin labels
   return [...counts.entries()]
-    .sort((a, b) => (a[0] === 'uncertain' ? 1 : b[0] === 'uncertain' ? -1 : b[1] - a[1]))
+    .sort((a, b) => rank(a[0]) - rank(b[0]) || b[1] - a[1])
     .map(([label, n]) => ({ label, n, name: SPOT_NAME[label][n === 1 ? 0 : 1] }))
 }

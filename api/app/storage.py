@@ -64,7 +64,8 @@ def name_from_uri(uri: str) -> str | None:
 
 
 def signed_get_url(object_name: str) -> str:
-    """V4 GET URL valid for an hour. Each signature is an IAM signBlob call; reuse recent ones."""
+    """V4 GET URL (valid _GET_TTL_SECONDS). Each signature is an IAM signBlob call; reuse recent
+    ones."""
     now = time.time()
     hit = _signed_get_cache.get(object_name)
     if hit and hit[1] - now > _REUSE_MARGIN_SECONDS:
