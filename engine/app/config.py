@@ -181,6 +181,7 @@ BLEMISH_MIN_A_CONTRAST = 1.0  # ...and at least this much a* above nearby skin (
 BLEMISH_MIN_RED_RATIO = 0.35
 BLEMISH_DIAMETER_MM = (1.0, 5.0)
 BLEMISH_BACKGROUND_MM = 3.0  # "nearby skin" (Gaussian sigma)
+BLEMISH_HAIR_GAP_MM2 = 2.0  # holes this small in the skin mask are hair gaps, not an edge
 BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
