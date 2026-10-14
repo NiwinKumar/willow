@@ -88,7 +88,13 @@ def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
         if icc:
             src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
             profile_name = ImageCms.getProfileDescription(src).strip()
-            img = ImageCms.profileToProfile(img, src, ImageCms.createProfile("sRGB"))
+            # relative colorimetric: in-gamut colours (all skin) keep their exact values
+            img = ImageCms.profileToProfile(
+                img,
+                src,
+                ImageCms.createProfile("sRGB"),
+                renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC,
+            )
         rgb8 = np.asarray(img, dtype=np.uint8)
     sub = exif.get_ifd(EXIF_IFD)
     iso = sub.get(TAG_ISO)
@@ -131,7 +137,26 @@ def decode_dng_srgb(path: str | Path) -> np.ndarray:
             output_color=rawpy.ColorSpace.sRGB,
             output_bps=16,
         )
-    return rgb.astype(np.float32) / 65535.0
+    linear = rgb.astype(np.float32) / 65535.0
+    # The DNG's BaselineExposure says how much brighter the camera means the image to be
+    # (phones store +1 EV or more). Without it a phone DNG decodes about 2x too dark: paper and
+    # pen dots fall below the detectors' thresholds and L* (so ITA) is far off. Oct 14: +1.15 EV.
+    gain = 2.0 ** baseline_exposure(path)
+    return np.clip(linear * gain, 0.0, 1.0) if gain != 1.0 else linear
+
+
+def baseline_exposure(path: str | Path) -> float:
+    """DNG tag 50730 (BaselineExposure) in EV; 0 when absent or unreadable."""
+    try:
+        with Image.open(path) as img:
+            value = img.tag_v2.get(50730)  # TIFF/DNG IFD0
+    except (OSError, ValueError, SyntaxError):  # Pillow cannot parse every DNG
+        return 0.0
+    try:
+        ev = float(value) if value is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+    return ev if -4.0 <= ev <= 4.0 else 0.0  # a sane range; anything else is a broken tag
 
 
 def linear_to_srgb8(linear: np.ndarray) -> np.ndarray:

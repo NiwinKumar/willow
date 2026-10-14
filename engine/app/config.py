@@ -30,6 +30,7 @@ SKIN_HIGH_PCT = 99.0
 # White reference (paper) must be bright but not clipped to be usable for white balance
 WHITE_REF_MIN_LINEAR = 0.15
 WHITE_REF_TARGET = 0.85  # paper is mapped to this linear value (office paper reflects ~85%)
+WHITE_REF_MAX_CLIPPED = 0.05  # share of paper pixels at the clip level; more -> unusable
 
 # ITA bands in degrees (docs/METRICS.md A1). Descriptive only, never a score.
 ITA_BANDS = [
