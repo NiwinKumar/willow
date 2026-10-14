@@ -168,15 +168,6 @@ class FakeFace(Face):
         none = np.zeros(shape, bool)
         return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
 
-    def line_polygons(self):
-        sq = lambda x, y: np.array([[x, y], [x + 60, y], [x + 60, y + 60], [x, y + 60]], float)
-        return {
-            "right_crows_feet": sq(210, 300),
-            "left_crows_feet": sq(760, 300),
-            "right_nasolabial": sq(360, 620),
-            "left_nasolabial": sq(600, 620),
-        }
-
     def t_zone_mask(self, shape):
         m = np.zeros(shape, bool)
         for n in ("forehead", "nose", "chin"):
@@ -249,7 +240,6 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
         "redness",
         "blemishes",
         "shine",
-        "lines",
         "glow",
     }
     assert m["shine"]["value"] < 2.0 and m["shine"]["confidence"] == "indicative"

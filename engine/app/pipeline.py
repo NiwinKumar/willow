@@ -35,8 +35,6 @@ def _mean_extras(per_frame: list[dict]) -> dict:
         nums = [v for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
         if nums:  # photos without a value for this key (None) are left out of the mean
             out[key] = round(sum(nums) / len(nums), 2)
-        elif any(isinstance(v, list) for v in vals):  # e.g. regions skipped: union
-            out[key] = sorted({x for v in vals if isinstance(v, list) for x in v})
     return out
 
 
