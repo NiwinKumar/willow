@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import cv2
 import numpy as np
 from jsonschema import validate
+from scipy.ndimage import binary_fill_holes
 
 from app import config
 from app.aggregate import summarize
@@ -45,6 +46,28 @@ REGIONS = {
 }
 MACRO_SITES = set(REGIONS)  # the request schema admits only the contract's two
 CONTRACT_SITES = {"cheek_macro", "nose_macro"}
+# lower lip's lower edge and the chin / jaw line of the face mesh
+CHIN_CLOSEUP = [
+    91,
+    181,
+    84,
+    17,
+    314,
+    405,
+    321,
+    365,
+    379,
+    378,
+    400,
+    377,
+    152,
+    148,
+    176,
+    149,
+    150,
+    136,
+]
+BROW_TOPS = (105, 334)  # upper edge of each brow
 IRIS = ([468, 469, 470, 471, 472], [473, 474, 475, 476, 477])  # centre, then 4 edge points
 METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
@@ -80,6 +103,26 @@ def _skin(lab: np.ndarray, px_per_mm: float) -> np.ndarray:
     ref = np.zeros((h, w), bool)
     ref[int(0.3 * h) : int(0.7 * h), int(0.3 * w) : int(0.7 * w)] = True
     return skin_colour(lab, _edges((h, w)), ref, px_per_mm)
+
+
+def _region_skin(lab: np.ndarray, region: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """Skin of a landmark region: drops what is far darker than the region (hair, nostril
+    openings) and clipped glare. Lit skin stays (a close-up's lit centre is not glare), and
+    small dark holes (blackheads, marks, moles) are refilled."""
+    L = lab[..., 0]
+    med = float(np.median(L[region]))
+    keep = region & (L >= med - config.CLOSEUP_DARKER_L) & (L <= config.CLOSEUP_CLIPPED_L)
+    holes = binary_fill_holes(keep) & ~keep & region
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(holes.astype(np.uint8), connectivity=8)
+    small = [k for k in range(1, n) if stats[k, cv2.CC_STAT_AREA] < 2.0 * px_per_mm**2]
+    keep |= np.isin(labels, small)
+    r = max(round(0.3 * px_per_mm), 1)  # loose hair strands
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    keep = cv2.morphologyEx(keep.astype(np.uint8), cv2.MORPH_OPEN, kernel)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(keep, connectivity=8)
+    if n > 1:
+        keep = (labels == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))).astype(np.uint8)
+    return keep.astype(bool) & region
 
 
 def _find_face(srgb8: np.ndarray) -> Face | None:
@@ -127,9 +170,18 @@ def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
         for name in CHEEKS:
             if name in polys:
                 area |= polygon_mask(shape, polys[name])
-    else:  # forehead, chin
-        polys = face.roi_polygons()
-        area = polygon_mask(shape, polys[region]) if region in polys else np.zeros(shape, bool)
+    elif region == "chin":  # lower lip down to the jaw line (wider than the face ROI)
+        hull = cv2.convexHull(face.points[CHIN_CLOSEUP].astype(np.float32)).reshape(-1, 2)
+        area = polygon_mask(shape, hull)
+    else:  # forehead: the whole face outline above the brow tops (the outline is lifted
+        # into the hair; hair is cut by colour), from every view
+        front = dataclasses.replace(face, yaw=0.0)
+        (x1, y1), (x2, y2) = face.points[BROW_TOPS[0]], face.points[BROW_TOPS[1]]
+        yy, xx = np.mgrid[: shape[0], : shape[1]]
+        side = (x2 - x1) * (yy - y1) - (y2 - y1) * (xx - x1)  # sign: which side of brow line
+        up = face.points[10]  # mesh top: on the forehead side
+        up_sign = np.sign((x2 - x1) * (up[1] - y1) - (y2 - y1) * (up[0] - x1))
+        area = polygon_mask(shape, front.outline()) & (side * up_sign > 0)
     guard = face.brow_guard(shape) | face.eye_corner_guard(shape)
     return area & face.skin_mask(shape) & ~guard & _edges(shape)
 
@@ -166,7 +218,7 @@ def _frame(path: str, site: str) -> dict:
         region = _region(
             dataclasses.replace(face, points=face.points * scale), REGIONS[site], lab.shape[:2]
         )
-        skin = skin_colour(lab, region, region, px) if region.any() else region
+        skin = _region_skin(lab, region, px) if region.any() else region
     else:
         skin = _skin(lab, px)
 
