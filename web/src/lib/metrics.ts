@@ -81,7 +81,9 @@ export function decimalsFor(m: Pick<Metric, 'mdc95' | 'unit'>): number {
 
 export function fmtValue(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {
   if (v === null || Number.isNaN(v)) return '–'
-  return v.toFixed(decimalsFor(m))
+  const s = v.toFixed(decimalsFor(m))
+  // A typographic minus; a value that rounds to zero never shows as "-0.0".
+  return Number(s) === 0 ? s.replace('-', '') : s.replace('-', '−')
 }
 
 export function fmtSigned(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {

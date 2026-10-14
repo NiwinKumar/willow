@@ -77,7 +77,7 @@ export function Judge() {
         <div>
           <h1 className="max-w-[34rem] text-[clamp(32px,6vw,44px)] font-bold leading-[1.05] tracking-[-0.03em]">Judging Willow</h1>
           <p className="mt-3 max-w-[36rem] text-[17px] leading-relaxed text-text-2">
-            Five stops, about four minutes. Nothing here is a recording: you have a guest account of your own, photos are measured by the engine on Cloud Run, and Gemini answers live on Vertex AI.
+            Five stops, about four minutes. You have a guest account of your own: photos are measured by the engine on Cloud Run and Gemini answers live on Vertex AI. Stop 2 replays a finished four-day test, so you can see a real change clear its noise band.
           </p>
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-2" role="status">
             <span aria-hidden className={`h-2 w-2 rounded-full ${setup === 'ready' ? 'bg-willow-500' : setup === 'failed' ? 'bg-danger' : 'animate-pulse bg-border'}`} />
@@ -115,8 +115,8 @@ export function Judge() {
                 ) : (
                   <p className="text-[13px] text-text-2">
                     Sample photos are not available right now.{' '}
-                    <Link to="/capture?site=forearm_control&mode=quick" className="font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('run')}>
-                      Take a quick photo of your forearm instead
+                    <Link to="/capture?site=face_full&mode=quick" className="font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('run')}>
+                      Take a quick selfie instead
                     </Link>
                     .
                   </p>
@@ -157,7 +157,7 @@ export function Judge() {
               </Button>
             </Stop>
             <Stop n={5} done={seen('retailer')} title="See what a retailer learns" eta="about 1 min" tech="BigQuery · Gemini over aggregates · groups under 10 hidden">
-              <p>Outcomes, not purchases: which products produced real, measured change for which goals, from a labelled synthetic cohort of 500 people plus anyone who opted in. Ask it a question and Gemini answers with a chart, every number checked against the aggregates. The same outcome rates appear on the advisor's product cards.</p>
+              <p>Outcomes, not purchases: which products produced real, measured change for which goals, from a labelled synthetic cohort of 500 people plus anyone who opted in. Ask it a question and Gemini answers, with a chart when one helps, every number checked against the aggregates. The same outcome rates appear on the advisor's product cards.</p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button variant="secondary" onClick={() => go('retailer', '/retailer')}>
                   Open the retailer view

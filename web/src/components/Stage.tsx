@@ -47,6 +47,11 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   // room for hair and jaw) so its skin and spot rings are visible. Other sites show the whole photo.
   const result = shown?.result ?? session?.result
   const clipId = useId()
+  // Photos are a few hundred KB: say so while one loads instead of showing an empty frame.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const photoFailed = Boolean(shown?.preview?.url && failedUrl === shown.preview.url)
+  const photoReady = !shown?.preview?.url || loadedUrl === shown.preview.url || photoFailed
   const framed = Boolean(shown?.preview) // a real photo; the demo illustration keeps its full view
   const vb = useMemo(() => faceFrame(site, framed ? result : null), [site, framed, result])
 
@@ -108,7 +113,15 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
           </clipPath>
           <g clipPath={`url(#${clipId})`}>
             {shown?.preview?.url ? (
-              <image href={shown.preview.url} width={size.width} height={size.height} preserveAspectRatio="xMidYMid slice" />
+              <image
+                href={shown.preview.url}
+                width={size.width}
+                height={size.height}
+                preserveAspectRatio="xMidYMid slice"
+                onLoad={() => setLoadedUrl(shown.preview!.url)}
+                onError={() => setFailedUrl(shown.preview!.url)}
+                style={{ opacity: photoReady ? 1 : 0, transition: reduce ? undefined : 'opacity 200ms ease-out' }}
+              />
             ) : blank ? (
               <rect width={size.width} height={size.height} fill="var(--color-surface-2)" />
             ) : (
@@ -126,7 +139,8 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                         points={points}
                         fill="var(--color-signal-500)"
                         stroke="var(--color-signal-700)"
-                        strokeWidth="6"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 0.45 }}
                         exit={{ opacity: 0 }}
@@ -139,7 +153,8 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                     fill="transparent"
                     stroke={active ? 'var(--color-text)' : 'var(--color-noise-500)'}
                     strokeOpacity={active ? 0.6 : 0.45}
-                    strokeWidth={active ? 7 : 4}
+                    strokeWidth={active ? 2.5 : 1.5}
+                    vectorEffect="non-scaling-stroke"
                     className="cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -184,6 +199,15 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
         </div>
         {canFlicker && !holding ? (
           <span className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-(--radius-chip) bg-surface/85 px-2 py-1 text-[12px] text-text-2">Hold to see your baseline</span>
+        ) : null}
+        {!photoReady ? (
+          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-text-3">
+            Loading the photo…
+          </span>
+        ) : photoFailed ? (
+          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px] text-text-3">
+            The photo could not be loaded. Reload the page to try again.
+          </span>
         ) : null}
         {blank ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px] text-text-3">{session?.measured === false ? 'No photo preview yet.' : 'No photo preview yet. The numbers below are measured from your photos.'}</span>

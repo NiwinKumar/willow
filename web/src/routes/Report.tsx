@@ -47,6 +47,20 @@ export function Report() {
   const reduce = useReducedMotion()
   const series = data.series(site)
   const sessions = useMemo(() => series?.sessions.filter((s) => s.status === 'done') ?? [], [series])
+  // A session that failed after its photos were uploaded (engine down, a crash) can be measured
+  // again: offer it while it is newer than the latest result.
+  const unfinished = useMemo(() => {
+    const last = sessions[sessions.length - 1]?.created_at ?? ''
+    return [...(series?.sessions ?? [])].reverse().find((s) => s.status === 'failed' && s.created_at > last) ?? null
+  }, [series, sessions])
+  const retry = unfinished ? (
+    <div className="mx-5 mb-3 flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-3 text-[13px] sm:mx-6">
+      <span className="text-text-2">Your session from {fmtDate(unfinished.created_at)} did not finish measuring. The photos are saved.</span>
+      <Link to={`/processing/${unfinished.id}?site=${unfinished.site}&n=${unfinished.n_frames}`} className="inline-flex min-h-10 shrink-0 items-center rounded-(--radius-control) border border-border px-3 font-medium hover:bg-surface-2">
+        Try again
+      </Link>
+    </div>
+  ) : null
   const view = useViewState()
   const index = Math.min(sessions.length - 1, Math.max(0, view.t ?? sessions.length - 1))
   const session: Session | null = sessions[index] ?? null
@@ -163,6 +177,7 @@ export function Report() {
       <div className="flex min-h-dvh flex-col">
         {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
         <div className="mx-auto max-w-[36rem] px-5 py-12">
+          {retry ? <div className="-mx-5 mb-6 sm:-mx-6">{retry}</div> : null}
           <h1 className="text-[28px] font-bold tracking-[-0.02em]">No sessions yet for {SITE_LABEL[site] ?? 'this place'}</h1>
           <p className="mt-3 text-[15px] text-text-2">Take a baseline of five photos to start. Every later session is compared to it.</p>
           <Link to={`/capture?site=${site}`} className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
@@ -238,7 +253,7 @@ export function Report() {
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Your baseline</h1>
             <p className="mt-1 text-[13px] text-text-2">
-              {fmtDate(session.created_at)} · {photosUsed(session)} · {session.capture_mode === 'uncalibrated' ? 'phone photo' : 'calibrated'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'calibrated sessions are'} compared to this
+              {fmtDate(session.created_at)} · {photosUsed(session)} · {session.capture_mode === 'uncalibrated' ? 'phone photos' : 'RAW photos'} · later {session.capture_mode === 'uncalibrated' ? 'phone photos are' : 'RAW photos are'} compared to this
             </p>
             {leftOutPhotos(session.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session.result)}</p> : null}
             {(session.result?.frames_used ?? session.n_frames) < 2 ? (
@@ -287,6 +302,7 @@ export function Report() {
           </>
         )}
       </header>
+      {retry}
       {!unmeasured && session?.live && isSampleEngine(session) ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold">Sample numbers.</span> Your photos are saved. Until the measurement engine is connected, these readings come from a fixed sample, not from your skin.

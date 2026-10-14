@@ -206,3 +206,17 @@ def test_context_keeps_the_last_good_reading_and_rounds_like_the_screen(fake):
     latest = advisor.context(fake.store, "u_test")["latest_sessions"]["face_full (uncalibrated)"]
     assert latest["session_id"] == "s_good" and latest["photos_used"] == 2
     assert latest["metrics"][0]["value"] == 3
+
+
+def test_search_step_reads_like_words():
+    line = advisor._retrieval_line(
+        "search_catalog",
+        {
+            "concern": "dark_spots_pigmentation",
+            "category": "eye_care",
+            "max_price": 1000.0,
+            "currency": "INR",
+        },
+        {"products": [1, 2, 3]},
+    )
+    assert line == "Searched the catalog (dark spots, eye care, under ₹1,000): 3 products found"

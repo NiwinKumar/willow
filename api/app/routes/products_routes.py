@@ -1,9 +1,9 @@
 import secrets
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app import advisor, catalog, gemini, label_scan, limits, routine_check
 from app.auth import AuthUser, current_user
@@ -56,7 +56,14 @@ def post_label_scan(
     limits.take(store, user.uid, "label_scan")
     try:
         return label_scan.scan(body.images)
+    except label_scan.BadImage as exc:
+        limits.refund(store, user.uid, "label_scan")
+        raise HTTPException(
+            422, {"code": "bad_image", "message": "That photo could not be read. Try another."}
+        ) from exc
     except gemini.GeminiError as exc:
+        # Our side failed: the person keeps the scan.
+        limits.refund(store, user.uid, "label_scan")
         raise HTTPException(
             502, {"code": "label_scan_failed", "message": "Could not read the label. Try again."}
         ) from exc
@@ -79,6 +86,14 @@ class RoutineEntryIn(BaseModel):
     applied_sites: list[str] = Field(default_factory=list)
     started_at: date | None = None
     source: Literal["catalog", "label_scan", "manual"] = "manual"
+
+    @field_validator("started_at")
+    @classmethod
+    def _not_in_future(cls, v: date | None) -> date | None:
+        # One day of slack: the person's "today" can be ahead of UTC.
+        if v is not None and v > datetime.now(UTC).date() + timedelta(days=1):
+            raise ValueError("the start date cannot be in the future")
+        return v
 
 
 class RoutineEntryPatch(BaseModel):
@@ -166,8 +181,13 @@ def routine_delete(
 def routine_check_route(
     user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
-    """Rule table first (always), then Gemini additions marked source=model."""
+    """Rule table first (always), then Gemini additions marked source=model. Past the daily cap
+    the rule table still answers, without the AI additions."""
     entries = [{"id": eid, **e} for eid, e in store.routine_list(user.uid)]
+    try:
+        limits.take(store, user.uid, "routine_check")
+    except HTTPException:
+        return routine_check.check(entries, use_model=False)
     return routine_check.check(entries)
 
 

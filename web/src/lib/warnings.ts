@@ -15,7 +15,9 @@ export function readableWarnings(r: AnalysisResult | null | undefined): string[]
   const dots = raw.filter((w) => PEN_DOTS.test(w)).map((w) => w.match(/photo (\d+)/i)?.[1]).filter(Boolean)
   const out = raw.filter((w) => !PEN_DOTS.test(w) && !(noWhite && /white paper only/i.test(w)))
   if (dots.length) out.push(`Pen dots not found in photo ${dots.join(', ')}; ${dots.length === 1 ? 'that photo was' : 'those photos were'} not measured`)
-  return [...new Set(out)].map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+  // The engine says "in some photos" even for a one-photo session.
+  const one = (r?.quality.per_frame?.length ?? 0) === 1
+  return [...new Set(out)].map((w) => (one ? w.replace(/ in some photos/i, '') : w)).map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 }
 
 /** Why a session could not be measured, in plain words; missing pen dots explain "too few frames". */

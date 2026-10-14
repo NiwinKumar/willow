@@ -103,7 +103,12 @@ def test_ask_route_retries_once_then_answers(client, fake, monkeypatch):
     assert body["checks"]["rejected_attempts"] == 1
 
 
-def test_ask_falls_back_when_gemini_is_down(client, fake, monkeypatch):
+def test_gemini_down_is_a_clear_error_and_the_question_is_refunded(client, fake, monkeypatch):
+    from datetime import UTC, datetime
+
     monkeypatch.setattr(retailer, "insights", lambda: INSIGHTS)
-    body = client.post("/v1/retailer/ask", json={"question": "anything?"}).json()
-    assert body["checks"] is None and "could not" in body["answer"]
+    res = client.post("/v1/retailer/ask", json={"question": "anything?"})
+    assert res.status_code == 503
+    assert res.json()["detail"]["code"] == "assistant_unavailable"
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage_incr("u_test", day, "retailer_ask", 0) == 0
