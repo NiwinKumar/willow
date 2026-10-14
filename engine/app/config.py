@@ -11,8 +11,13 @@ ENGINE_VERSION = __version__  # single source of truth: app/__init__.py
 SHARPNESS_MIN = 15.0
 # Faces: sharpness at a fixed 4 px per mm of face. Measured Oct 13: sharp DNG and HEIC face
 # photos score 71-100, the same photos blurred by 0.3 mm score 1-2.
-SHARPNESS_PX_PER_MM = 4.0
-FACE_SHARPNESS_MIN = 15.0
+SHARPNESS_PX_PER_MM = 4.0  # larger faces are shrunk to this; smaller ones are measured as they are
+# A face fails when it is blurred by more than about 0.25 mm: a 1 mm spot (the smallest
+# counted) still keeps 86% of its contrast. The same blur in mm scores higher on a
+# low-resolution face, so the threshold depends on px per mm. Oct 14: median score of 3
+# sharp face photos resampled to each scale and blurred by 0.25 mm. (The old fixed 15 at
+# 4 px/mm meant about 0.18 mm, and failed usable webcam selfies at 3.2 px/mm.)
+FACE_SHARPNESS_AT = ((2.0, 41.0), (2.5, 19.0), (2.8, 12.7), (3.2, 7.8), (3.5, 5.7), (4.0, 3.6))
 CLIPPED_PCT_MAX = 2.0  # % of skin-ROI pixels at pure white
 DARK_PCT_MAX = 2.0  # % of skin-ROI pixels at pure black
 CLIP_LEVEL = 0.999  # linear value counted as clipped
