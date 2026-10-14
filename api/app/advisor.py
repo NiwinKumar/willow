@@ -24,6 +24,10 @@ from app.store import Store, iso
 log = logging.getLogger("willow.advisor")
 
 MAX_TOOL_CALLS = 5
+# Cloud Run ends a request at 300 s: no new tool round after TOOLS_BUDGET_S, no new reply
+# attempt after TURN_BUDGET_S (a call in flight takes at most ~50 s), else the fixed fallback
+TOOLS_BUDGET_S = 90.0
+TURN_BUDGET_S = 150.0
 DAILY_LIMIT = 20
 
 INSTRUCTIONS = """You are Willow's skincare advisor. You help one person understand their own
@@ -142,8 +146,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
     return {
         "latest_sessions": latest,
         "routine": routine,
-        "note": "Face and forearm sites are measured; cheek and nose close-ups are not "
-        "measured yet.",
+        "note": "Every site is measured: the face, cheek and nose close-ups (pores and texture "
+        "come only from close-ups) and the forearm squares.",
     }
 
 
@@ -273,6 +277,8 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
     product_ids: set[str] = set()
     started = time.monotonic()
     for _ in range(MAX_TOOL_CALLS):
+        if time.monotonic() - started > TOOLS_BUDGET_S:
+            break  # answer with what the tools found so far: the turn must finish in time
         res = _generate(contents, config)
         calls = res.function_calls or []
         if not calls:
@@ -314,6 +320,8 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
         if m["role"] == "user":
             allowed |= numbers.in_text(m["text"])
     for _ in range(2):
+        if time.monotonic() - started > TURN_BUDGET_S:
+            break  # the fixed fallback, well inside Cloud Run's 300 s
         try:
             reply = gemini.generate_json(
                 "advisor_reply",
@@ -322,10 +330,17 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
                 instructions=INSTRUCTIONS,
                 temperature=0.3,
                 max_output_tokens=4096,
+                attempts=1,  # the loop is the retry
             )
         except gemini.GeminiError:
             break
         bad_ids = set(reply.product_ids) - product_ids
+        # the chips are tappable questions: same rules as the message, failing ones dropped
+        follow_ups = [
+            q
+            for q in reply.follow_up_suggestions
+            if numbers.only_known(q, allowed) and not explain.BANNED.search(q)
+        ]
         if (
             numbers.only_known(reply.message, allowed)
             and not explain.BANNED.search(reply.message)
@@ -335,7 +350,7 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
                 "message": reply.message,
                 "product_ids": reply.product_ids,
                 "products": [catalog.by_id(i) for i in reply.product_ids if catalog.by_id(i)],
-                "follow_up_suggestions": reply.follow_up_suggestions,
+                "follow_up_suggestions": follow_ups,
                 "retrieval": retrieval or ["Checked your results and routine"],
                 # What the validator checked, shown under the answer.
                 "checks": {

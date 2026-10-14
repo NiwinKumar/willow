@@ -544,3 +544,20 @@ def test_remeasuring_the_baseline_refreshes_or_clears_it(client, fake, monkeypat
     analysis.remeasure(fake.store, "b", "u_test", apply=True, sessions={sid})
     assert fake.store.baseline_get("u_test", "forearm_control") is None
     assert fake.store.session_get("u_test", sid)["is_baseline"] is False
+
+
+def test_analyzing_a_finished_session_again_shows_it_and_runs_nothing(client, fake, monkeypatch):
+    from app import analysis
+
+    created = _create(client, site="face_full")
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    first = client.post(f"/v1/sessions/{sid}/analyze")
+    assert first.status_code == 200 and first.json()["session"]["status"] == "done"
+
+    def boom(*a, **k):
+        raise AssertionError("a finished session must not be measured again")
+
+    monkeypatch.setattr(analysis, "run", boom)
+    again = client.post(f"/v1/sessions/{sid}/analyze")
+    assert again.status_code == 200 and again.json()["session"]["id"] == sid

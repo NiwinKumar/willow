@@ -158,6 +158,9 @@ def locate(points: np.ndarray, xy: np.ndarray) -> list[dict | None]:
             out.append(None)
             continue
         x, y = (wt @ verts[tri])[:2]
+        if not (np.isfinite(x) and np.isfinite(y)):  # every facing triangle degenerate
+            out.append(None)
+            continue
         out.append(
             {
                 "face_x_mm": round(float(x), 1),

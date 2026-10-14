@@ -6,7 +6,7 @@ the deployed engine measures them, Firestore stores them. The test person is del
 start and at the end, so runs never pile up.
 
     uv run python scripts/e2e.py --dng path/to/forearm.dng --arm arm1.jpg arm2.jpg \
-        [--face selfie1.jpg selfie2.jpg ...]
+        [--face selfie1.jpg selfie2.jpg ...] [--closeup cheek.jpg]
 """
 
 import argparse
@@ -37,6 +37,9 @@ def main() -> int:
     )
     ap.add_argument("--label", type=Path, help="optional product label photo (calls Gemini)")
     ap.add_argument("--face", type=Path, nargs="*", default=[], help="optional face selfies (JPEG)")
+    ap.add_argument(
+        "--closeup", type=Path, help="optional cheek close-up (JPEG) with one eye in view"
+    )
     args = ap.parse_args()
 
     c = httpx.Client(base_url=args.api, headers={"X-Dev-Uid": args.uid}, timeout=180)
@@ -166,9 +169,43 @@ def main() -> int:
         )
         check("face explanation by Gemini", v5["session"].get("explanation_source") == "gemini")
 
+    # 4c. A cheek close-up: the real close-up pipeline, colours always, pores only with detail.
+    if args.closeup:
+        v6 = session("cheek_macro", "uncalibrated", [args.closeup])
+        r6 = v6.get("result") or {}
+        n_sessions += 1
+        ids6 = {m["id"] for m in r6.get("metrics", []) if m.get("value") is not None}
+        pores = next((m for m in r6.get("metrics", []) if m["id"] == "pores"), {})
+        check(
+            "cheek close-up is measured by the real close-up pipeline",
+            v6["session"].get("measured") is True
+            and r6.get("quality", {}).get("passed") is True
+            and not r6.get("engine_version", "").endswith(("-fixture", "-placeholder")),
+            f"engine {r6.get('engine_version')}, {v6['_seconds']} s",
+        )
+        check("close-up colours measured", {"tone_ita", "redness"} <= ids6, str(sorted(ids6)))
+        check(
+            "pores: a value, or a 'closer photo' note (never a guess)",
+            pores.get("value") is not None
+            or any("closer photo" in w for w in r6.get("warnings", [])),
+            f"pores {pores.get('value')}, {pores.get('extras', {}).get('scale_from')}",
+        )
+
     # 5. Reads the web uses.
     listed = c.get("/v1/sessions").json()["sessions"]
     check("sessions list has all of them", len(listed) == n_sessions, str(len(listed)))
+    spots = c.get("/v1/spots").json()
+    face_ok = [
+        x
+        for x in listed
+        if x["session"]["site"] == "face_full"
+        and (x.get("result") or {}).get("quality", {}).get("passed")
+    ]
+    check(
+        "spot diary answers with the measured face sessions as its columns",
+        isinstance(spots.get("tracks"), list) and len(spots.get("sessions", [])) == len(face_ok),
+        f"{len(spots.get('sessions', []))} sessions, {len(spots.get('tracks', []))} spots",
+    )
     tl = c.get("/v1/timeline", params={"site": "forearm_control"}).json()
     check(
         "timeline has the two measured readings and the phone-photo baseline",

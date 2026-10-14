@@ -80,9 +80,21 @@ def fake(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         storage, "signed_get_url", lambda name: f"https://storage.googleapis.com/get/{name}"
     )
-    monkeypatch.setattr(
-        storage, "list_names", lambda prefix: {n for n in cloud.blobs if n.startswith(prefix)}
-    )
+
+    def list_names(prefix: str, globs: tuple[str, ...] = storage.DISPLAYABLE) -> set[str]:
+        # as GCS match_glob does: "**/" any folders, "*" one name
+        import fnmatch
+
+        pats = [f"{prefix}{g}" for g in globs] + [
+            f"{prefix}{g.removeprefix('**/')}" for g in globs if g.startswith("**/")
+        ]  # "**/" also matches no folder at all
+        return {
+            n
+            for n in cloud.blobs
+            if n.startswith(prefix) and any(fnmatch.fnmatch(n, p) for p in pats)
+        }
+
+    monkeypatch.setattr(storage, "list_names", list_names)
 
     def delete_prefix(prefix: str) -> int:
         cloud.deleted_prefixes.append(prefix)

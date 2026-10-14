@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import analysis, gcp  # noqa: E402
+from app import analysis, engine, gcp  # noqa: E402
 from app.settings import get_settings  # noqa: E402
 from app.store import FirestoreStore  # noqa: E402
 
@@ -31,6 +31,12 @@ def main() -> int:
     if apply and get_settings().engine_mode != "http":
         print("refusing to apply: ENGINE_MODE is not http (export infra/api-env.yaml first)")
         return 2
+    if apply:
+        try:  # an engine that does not answer would mark every session it touches failed
+            print(f"engine {engine.health()['engine_version']} answers")
+        except Exception as exc:
+            print(f"refusing to apply: the engine does not answer ({exc})")
+            return 2
     sites = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--site"} or None
     only = {sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--session"} or None
     store = FirestoreStore()

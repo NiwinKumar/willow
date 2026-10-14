@@ -95,7 +95,7 @@ def fetch() -> dict[str, list[dict[str, Any]]]:
     client = bigquery.Client(project=s.project_id, location="us-central1")
     ds = f"{s.project_id}.{s.bq_dataset}"
     return {
-        name: [dict(r) for r in client.query(sql.format(ds=ds, weeks=WEEKS)).result()]
+        name: [dict(r) for r in client.query(sql.format(ds=ds, weeks=WEEKS)).result(timeout=30)]
         for name, sql in QUERIES.items()
     }
 
