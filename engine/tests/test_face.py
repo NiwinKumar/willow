@@ -223,7 +223,15 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
     r = analyze_face(files)  # schema-validated inside
     assert r["site"] == "face_full" and r["frames_used"] == 3
     m = {x["id"]: x for x in r["metrics"]}
-    assert set(m) == {"tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes"}
+    assert set(m) == {
+        "tone_ita",
+        "pigment_spots",
+        "tone_evenness",
+        "redness",
+        "blemishes",
+        "dark_circles",
+    }
+    assert abs(m["dark_circles"]["value"]) < 1.0  # under-eye and cheek are the same colour
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
     assert m["tone_evenness"]["value"] < 2.0  # every ROI is the same colour
