@@ -315,3 +315,21 @@ def test_raw_face_without_a_colour_reference_is_indicative(tmp_path, fake_landma
     r = analyze_face([str(tmp_path / "face.jpg")])
     assert r["capture_mode"] == "calibrated_raw" and not r["quality"]["card_detected"]
     assert {m["confidence"] for m in r["metrics"]} == {"indicative"}
+
+
+def test_counts_use_only_marks_seen_in_another_photo(tmp_path, fake_landmarks):
+    # the bump at (500, 600) is in all 3 photos; the one at (350, 750) only in the first
+    files = []
+    for i in range(3):
+        _bump_photo(tmp_path / f"f{i}.jpg", [(500, 600)] + ([(350, 750)] if i == 0 else []), seed=i)
+        files.append(str(tmp_path / f"f{i}.jpg"))
+    r = analyze_face(files)
+    blem = next(m for m in r["metrics"] if m["id"] == "blemishes")
+    assert blem["value"] == 1.0 and blem["within_session_sd"] == 0.0  # the fluke is not counted
+    assert len([c for c in r["candidates"] if c["kind"] == "blemish"]) == 2  # still shown
+
+
+def test_single_photo_counts_every_mark(tmp_path, fake_landmarks):
+    _bump_photo(tmp_path / "one.jpg", [(500, 600), (350, 750)])
+    r = analyze_face([str(tmp_path / "one.jpg")])
+    assert next(m for m in r["metrics"] if m["id"] == "blemishes")["value"] == 2.0
