@@ -136,6 +136,8 @@ def session_view(
             "hours_since_baseline": hours,
             # Judge mode: which hosted sample these photos were copied from (else None).
             "sample_id": doc.get("sample_id"),
+            # Gemini's spot labels with confidence and what it saw (AI-suggested, never measured).
+            "label_details": (doc.get("label_details") or {}) if measured else {},
         },
         "result": result,
         "labels": doc.get("labels") or {},
