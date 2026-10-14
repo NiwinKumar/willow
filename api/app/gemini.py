@@ -64,8 +64,11 @@ def generate_json[T: BaseModel](
     max_output_tokens: int = 4096,
     thinking: types.ThinkingLevel = types.ThinkingLevel.LOW,
     attempts: int = 2,
+    timeout_ms: int | None = None,
 ) -> T:
     config = types.GenerateContentConfig(
+        # A per-call deadline for prompts with large inputs (the client default is 25 s).
+        http_options=types.HttpOptions(timeout=timeout_ms) if timeout_ms else None,
         system_instruction=f"{SYSTEM_RULES}\n\n{instructions}",
         temperature=temperature,
         max_output_tokens=max_output_tokens,
@@ -90,6 +93,12 @@ def generate_json[T: BaseModel](
                 type(exc).__name__,
                 str(exc)[:300],
             )
+            # Rate limit or overload: a short pause usually clears it (spot labels and the
+            # explanation start several calls at once).
+            if attempt < attempts and any(
+                c in str(exc) for c in ("429", "503", "RESOURCE_EXHAUSTED")
+            ):
+                time.sleep(1.5 * attempt)
             continue
         usage = res.usage_metadata
         log.info(

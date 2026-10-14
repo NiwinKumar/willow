@@ -152,3 +152,38 @@ def test_gemini_sentences_name_products_never_ids(monkeypatch):
     notes = routine_check.check(entries)["notes"]
     assert "Applying sunscreen like B Sun Gel SPF 50 is meant for daytime." in notes
     assert not any("r_" in n for n in notes)
+
+
+def test_every_clashing_pair_is_reported_not_only_the_first():
+    from app.routine_check import rule_findings
+
+    entries = [
+        {
+            "id": "r1",
+            "brand": "A",
+            "custom_name": "Retinol",
+            "slots": ["pm"],
+            "key_actives": [{"name": "retinol"}],
+            "inci": ["retinol"],
+        },
+        {
+            "id": "r2",
+            "brand": "B",
+            "custom_name": "Adapalene",
+            "slots": ["pm"],
+            "key_actives": [{"name": "adapalene"}],
+            "inci": ["adapalene"],
+        },
+        {
+            "id": "b1",
+            "brand": "C",
+            "custom_name": "BHA",
+            "slots": ["pm"],
+            "key_actives": [{"name": "salicylic acid"}],
+            "inci": ["salicylic acid"],
+        },
+    ]
+    pairs = [
+        set(c["products"]) for c in rule_findings(entries)["conflicts"] if "retinoid" in c["issue"]
+    ]
+    assert {"r1", "b1"} in pairs and {"r2", "b1"} in pairs

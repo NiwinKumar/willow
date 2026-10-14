@@ -39,7 +39,9 @@ measurements, check their routine and find products from Willow's facts-only cat
   no_baseline = first reading or no noise band yet; a metric marked indicative is a trend.
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
-- Be brief: 2 to 5 sentences."""
+- Routine products with in_use false were stopped: do not treat them as part of the routine.
+- Quote measurements only when the question is about results; never pad an answer with them.
+- British spelling (colour, moisturiser), but say "catalog". Be brief: 2 to 5 sentences."""
 
 TOOLS = types.Tool(
     function_declarations=[
@@ -116,7 +118,9 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             # 2.5 blemishes for a screen that says 3.
             "metrics": [
                 {
-                    **{k: m.get(k) for k in ("id", "label", "unit", "verdict", "confidence")},
+                    **{k: m.get(k) for k in ("id", "label", "verdict", "confidence")},
+                    # The unit as the app writes it (° or a*), never the key ("deg", "a_star").
+                    "unit": explain.UNIT_DISPLAY.get(m["unit"], "").strip() or m["unit"],
                     **explain.shown_numbers(m),
                 }
                 for m in result["metrics"]
@@ -130,6 +134,7 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "slots": e.get("slots"),
             "started_at": e.get("started_at"),
             "ended_at": e.get("ended_at"),
+            "in_use": not e.get("ended_at"),
             "key_actives": [a["name"] for a in e.get("key_actives") or []],
         }
         for eid, e in store.routine_list(uid)
@@ -186,13 +191,60 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
     return {"error": f"unknown tool {name}"}
 
 
+CURRENCY_SIGN = {"INR": "₹", "USD": "$"}
+
+
+def _words(key: str) -> str:
+    """dark_spots_pigmentation -> dark spots, pigmentation; eye_care -> eye care."""
+    return {"dark_spots_pigmentation": "dark spots", "acne_blemishes": "blemishes"}.get(
+        key, key.replace("_", " ")
+    )
+
+
 def _retrieval_line(name: str, args: dict[str, Any], out: dict[str, Any]) -> str:
     if name == "search_catalog":
-        bits = [str(v) for k, v in args.items() if v and k != "exclude_ingredients"]
-        return f"Searched the catalog ({', '.join(bits) or 'all'}): {len(out['products'])} found"
+        bits = []
+        if args.get("query"):
+            bits.append(f"“{args['query']}”")
+        for k in ("concern", "category"):
+            if args.get(k):
+                bits.append(_words(str(args[k])))
+        if args.get("max_price"):
+            sign = CURRENCY_SIGN.get(str(args.get("currency")), "")
+            amount = f"{float(args['max_price']):,.0f}"
+            bits.append(
+                f"under {sign}{amount}"
+                if sign
+                else f"under {amount} {args.get('currency') or ''}".strip()
+            )
+        if args.get("exclude_ingredients"):
+            bits.append("without " + ", ".join(map(str, args["exclude_ingredients"])))
+        n = len(out["products"])
+        found = f"{n} product{'s' if n != 1 else ''} found"
+        return f"Searched the catalog ({', '.join(bits) or 'everything'}): {found}"
     if name == "compare_products":
         return f"Compared {len(out['products'])} products"
     return "Checked your routine against the rule table"
+
+
+def _generate(contents: list[types.Content], config: types.GenerateContentConfig):
+    """One tool-calling turn; a slow or rate-limited Gemini gets one more try after a pause."""
+    for attempt in (1, 2):
+        try:
+            return gemini.client().models.generate_content(
+                model=get_settings().gemini_model, contents=contents, config=config
+            )
+        except Exception as exc:
+            log.warning(
+                "advisor tools attempt %d failed: %s: %s",
+                attempt,
+                type(exc).__name__,
+                str(exc)[:300],
+            )
+            if attempt == 2:
+                raise
+            time.sleep(1.5)
+    raise AssertionError("unreachable")
 
 
 def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, Any]:
@@ -221,9 +273,7 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
     product_ids: set[str] = set()
     started = time.monotonic()
     for _ in range(MAX_TOOL_CALLS):
-        res = gemini.client().models.generate_content(
-            model=get_settings().gemini_model, contents=contents, config=config
-        )
+        res = _generate(contents, config)
         calls = res.function_calls or []
         if not calls:
             break

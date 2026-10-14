@@ -139,6 +139,7 @@ Rules:
 - is_baseline in the session data tells you which kind of session this is: true means the first
   reading (say so); false means a later session compared with the baseline, so never call it
   "initial" or "first". A delta of 0 or 0.0 means no measurable difference; never write "-0.0".
+- British spelling (colour, centre), as in the rest of the app.
 - headline: one short sentence. items: one per metric, most important first. next_steps: up to 3
   short practical capture or routine tips. disclaimer: "Cosmetic appearance tracking, not a
   diagnosis.\""""
@@ -256,7 +257,8 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
                 instructions=INSTRUCTIONS,
                 temperature=0.3,
                 max_output_tokens=4096,
-                attempts=1,
+                attempts=2,  # a pause and one more try on a rate limit or a slow answer
+                timeout_ms=35_000,
             )
         except gemini.GeminiError:
             break

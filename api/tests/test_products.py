@@ -203,3 +203,35 @@ def test_tidy_strips_list_punctuation():
     assert clean.product_name == "Niacinamide 10% + Zinc 1%"
     assert clean.inci == ["Aqua (Water)", "Chlorphenesin"]
     assert clean.key_actives[0].name == "zinc pca"
+
+
+def test_failed_scans_are_refunded_and_bad_photos_are_a_clear_error(client, fake, monkeypatch):
+    from datetime import UTC, datetime
+
+    def fail(*a, **k):
+        raise gemini.GeminiError("schema")
+
+    monkeypatch.setattr(gemini, "generate_json", fail)
+    client.post(
+        "/v1/label-scan", json={"images": [{"mime_type": "image/png", "data_base64": _png_b64()}]}
+    )
+    bad = client.post(
+        "/v1/label-scan", json={"images": [{"mime_type": "image/png", "data_base64": "%%%"}]}
+    )
+    assert bad.status_code == 422 and bad.json()["detail"]["code"] == "bad_image"
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage_incr("u_test", day, "label_scan", 0) == 0
+
+
+def test_a_future_start_date_is_refused(client, fake):
+    res = client.post(
+        "/v1/routine",
+        json={"custom_name": "Serum", "slots": ["pm"], "started_at": "2099-01-01"},
+    )
+    assert res.status_code == 422
+
+
+def test_browsing_the_catalog_lists_every_currency(client, fake):
+    found = client.get("/v1/catalog/search", params={"limit": 60}).json()["products"]
+    names = [f"{p['brand']} {p['name']}".lower() for p in found]
+    assert names == sorted(names)

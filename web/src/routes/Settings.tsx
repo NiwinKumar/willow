@@ -62,7 +62,7 @@ export function Settings() {
             ['Photos', 'Private bucket, us-central1. Each photo is deleted automatically 30 days after upload.'],
             ['Measurements', 'Kept in your account until you delete them.'],
             ['Face identification', 'None. Regions are found for measurement only; no identity template is computed.'],
-            ['Consent', consent ? `Version ${consent.version}, accepted ${fmtDate(consent.accepted_at)}` : 'Not recorded on this device'],
+            ['Consent', consent ? `Accepted ${fmtDate(consent.accepted_at)} (terms of ${/^\d{4}-\d{2}-\d{2}$/.test(consent.version) ? fmtDate(consent.version, { day: 'numeric', month: 'short', year: 'numeric' }) : consent.version})` : 'Not recorded on this device'],
             ['Mode', data.mode === 'demo' ? 'Demo: sample journey, nothing saved to a real account' : 'Live'],
           ].map(([k, v]) => (
             <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
@@ -94,8 +94,8 @@ export function Settings() {
 
       <section className="mt-4 rounded-(--radius-tile) border border-border bg-surface p-4">
         <h2 className="text-[17px] font-semibold">Capture settings</h2>
-        <p className="mt-1 text-[13px] text-text-2">Lightroom setup {prefs.lightroomDone() ? 'done' : 'not done yet'}. Resetting it shows the setup card again and should go with a new baseline.</p>
-        <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => { prefs.setLightroomDone(false); toast('Setup card will show again') }}>Show the Lightroom setup again</Button>
+        <p className="mt-1 text-[13px] text-text-2">RAW camera setup (Lightroom): {prefs.lightroomDone() ? 'done on this device' : 'not done yet'}. If you change the setup, take a new baseline so later photos stay comparable.</p>
+        <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => { prefs.setLightroomDone(false); toast('The setup steps will show on your next RAW capture.') }}>Show the setup steps again</Button>
       </section>
 
       <section className="mt-4 rounded-(--radius-tile) border border-danger/40 bg-surface p-4">

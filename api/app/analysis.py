@@ -5,12 +5,19 @@ sessions again once their site is measured, so photos taken early still become t
 """
 
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
-from app import baselines, engine, explain, labeller, views
+from app import baselines, engine, explain, labeller, storage, views
 from app.store import Store
+
+log = logging.getLogger("willow.analysis")
+
+
+class SessionGone(Exception):
+    """The session was deleted while it was being measured."""
 
 
 def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any]) -> dict:
@@ -44,10 +51,11 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     try:
         result = engine.analyze(request)
     except engine.EngineError as exc:
+        log.warning("engine failed for %s/%s: %s %s", uid, session_id, exc.code, exc.message)
         store.session_update(
             uid,
             session_id,
-            {"status": "failed", "error": {"code": exc.code, "message": exc.message}},
+            {"status": "failed", "error": {"code": exc.code, "message": exc.public_message}},
         )
         raise
 
@@ -61,6 +69,10 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
             labelled = pool.submit(labeller.label_candidates, result)
             explanation, source = explained.result()
             details = labelled.result()
+    if store.session_get(uid, session_id) is None:
+        # "Delete my data" ran while the engine worked: remove what it wrote since, keep nothing.
+        storage.delete_prefix(views.results_prefix(uid, session_id))
+        raise SessionGone(session_id)
     store.session_update(
         uid,
         session_id,

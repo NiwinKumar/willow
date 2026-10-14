@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
 import { AppShell } from './components/AppShell'
@@ -35,7 +35,7 @@ export default function App() {
                 <Route path="/science" element={<Science />} />
                 <Route path="/settings" element={<Settings />} />
                 {import.meta.env.DEV ? <Route path="/upload-test" element={<UploadTest />} /> : null}
-                <Route path="*" element={<div className="px-5 py-12 text-text-2">Not found.</div>} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>
             </AppShell>
@@ -45,6 +45,21 @@ export default function App() {
       </Suspense>
       <Toaster position="bottom-center" toastOptions={{ style: { fontFamily: 'var(--font-sans)' } }} />
     </DataProvider>
+  )
+}
+
+function NotFound() {
+  useEffect(() => {
+    document.title = 'Page not found · Willow'
+  }, [])
+  return (
+    <div className="mx-auto max-w-[36rem] px-5 py-12">
+      <h1 className="text-[28px] font-bold tracking-[-0.02em]">This page does not exist</h1>
+      <p className="mt-3 text-[15px] text-text-2">The link may be old or mistyped.</p>
+      <Link to="/" className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+        Go to the start
+      </Link>
+    </div>
   )
 }
 
