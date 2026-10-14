@@ -238,11 +238,22 @@ TEXTURE_SIGMA_MM = 0.1
 # or deep skin is lower), blurred by 0.05 mm or more under 1 (pore counts break at 0.2 mm).
 # From synthetic photos only: check on real macro shots.
 MACRO_SHARPNESS_MIN = 2.0
-# Pores and texture need detail: below this many px per mm a 0.05 mm pore is under 2 px,
-# so they are not measured (Oct 14: internet-sized crops, 20-35 px/mm, "found" pimple edges,
-# a hair and a crease; a real iPhone macro shot is about 130 px/mm)
-MACRO_MIN_PX_PER_MM = 40.0
+# Pores and texture need detail: not measured below this many px per mm. Oct 14 synthetic
+# pores 0.12 / 0.2 mm: counts within 10% of the truth at 20-100 px/mm on light, medium and
+# deep skin (sizes coarser below 40). The false "pores" on real 20-35 px/mm photos were
+# hairs, brows and feature edges, now left out by the face region. A phone held a hand's
+# width from the face gives ~25 px/mm; a macro shot ~130.
+MACRO_MIN_PX_PER_MM = 20.0
+# ...and this many when the scale is only the assumed MACRO_FIELD_WIDTH_MM (no face in view
+# to measure it): an ordinary photo mistaken for a macro shot is then read at 2-3x its real
+# detail (Oct 14: a 736 px cheek photo, really ~10 px/mm, read as 25 and gave pores)
+MACRO_MIN_PX_ASSUMED = 40.0
+# Close-ups with part of the face in view (a nose close-up shows an eye): the landmarker
+# needs most of a face, so the photo is also tried shrunk to these sizes on a plain canvas
+CLOSEUP_SHRINK = (0.5, 0.33)
+CLOSEUP_IRIS_MM = 11.7  # visible iris diameter, nearly the same in all adults: the scale
 PORE_MARK_GAP_MM = 0.3  # pores this close to a blemish / dark spot edge are its edge
+PORE_EDGE_MM = 0.3  # ...or this close to the skin's edge (nostril rim, lid, hairline)
 PORE_CHAIN_MM = 1.0  # a pore with PORE_CHAIN_MIN+ neighbours this close, all in a line...
 PORE_CHAIN_MIN = 5  # 3 let 4 random pores that happened to line up drop a real one
 PORE_CHAIN_ELONGATION = 4.0  # ...(long axis this many x the short) is a hair or crease

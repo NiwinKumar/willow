@@ -1,9 +1,14 @@
-"""Close-up sites (cheek_macro, nose_macro; docs/METRICS.md A5, A6, B2): a phone macro shot of
-one patch of skin, no face landmarks. Skin is found by colour; scale comes from the width of
-skin a close-up covers (MACRO_FIELD_WIDTH_MM, measured once with scripts/macro_scale.py).
+"""Close-up sites (docs/METRICS.md A5, A6, B2): a phone photo taken close to one part of the
+face. When enough of the face is in view (a nose close-up shows an eye), face landmarks give
+the region (cheek, nose, forehead, chin; brows, eyes, lips and nostrils left out) and the
+iris (CLOSEUP_IRIS_MM across) gives the scale. A pure macro shot with no face in view falls
+back to skin by colour over the whole photo and the assumed MACRO_FIELD_WIDTH_MM (measured
+once with scripts/macro_scale.py).
 
-cheek_macro: tone_ita, pigment_spots, redness, blemishes, pores, texture
-nose_macro : blemishes (extras: blackheads), pores
+cheek_macro   : tone_ita, pigment_spots, redness, blemishes, pores, texture
+nose_macro    : blemishes (extras: blackheads), pores
+forehead_macro: blemishes, pores, texture   (not in the contract yet: CLI only)
+chin_macro    : blemishes, pores, texture   (not in the contract yet: CLI only)
 """
 
 import dataclasses
@@ -20,7 +25,7 @@ from app.aggregate import summarize
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
 from app.io import save_preview
-from app.landmarks import skin_colour
+from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
 from app.metrics.blemish import find_blemishes
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.pores import blackheads, find_pores, pores_per_cm2
@@ -32,7 +37,15 @@ from app.pipeline_face import _candidates
 from app.quality import check_frame, laplacian_variance
 from app.roi import Box
 
-MACRO_SITES = {"cheek_macro", "nose_macro"}
+REGIONS = {
+    "cheek_macro": "cheek",
+    "nose_macro": "nose",
+    "forehead_macro": "forehead",
+    "chin_macro": "chin",
+}
+MACRO_SITES = set(REGIONS)  # the request schema admits only the contract's two
+CONTRACT_SITES = {"cheek_macro", "nose_macro"}
+IRIS = ([468, 469, 470, 471, 472], [473, 474, 475, 476, 477])  # centre, then 4 edge points
 METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
     "pigment_spots": ("tone_pigment", "Dark spots", "pct_area"),
@@ -44,21 +57,81 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
 SITE_METRICS = {
     "cheek_macro": ("tone_ita", "pigment_spots", "redness", "blemishes", "pores", "texture"),
     "nose_macro": ("blemishes", "pores"),
+    "forehead_macro": ("blemishes", "pores", "texture"),
+    "chin_macro": ("blemishes", "pores", "texture"),
 }
 SCALE_METRICS = {"pores", "texture"}  # need the mm scale; measured only once it is calibrated
 
 
-def _skin(lab: np.ndarray, px_per_mm: float) -> np.ndarray:
-    """Skin by colour, judged against the middle of the photo (where the close-up points):
-    drops hair, background, the cone rim and glare; keeps marks and pores (small holes
-    are refilled)."""
-    h, w = lab.shape[:2]
+def _edges(shape: tuple[int, int]) -> np.ndarray:
+    """All but MACRO_EDGE_FRAC of each photo edge (vignetting, cone rim)."""
+    h, w = shape
     e = round(config.MACRO_EDGE_FRAC * min(h, w))
     inner = np.zeros((h, w), bool)
     inner[e : h - e, e : w - e] = True
-    ref = np.zeros_like(inner)
+    return inner
+
+
+def _skin(lab: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """No face in view: skin by colour, judged against the middle of the photo (where the
+    close-up points): drops hair, background, the cone rim and glare; keeps marks and pores
+    (small holes are refilled)."""
+    h, w = lab.shape[:2]
+    ref = np.zeros((h, w), bool)
     ref[int(0.3 * h) : int(0.7 * h), int(0.3 * w) : int(0.7 * w)] = True
-    return skin_colour(lab, inner, ref, px_per_mm)
+    return skin_colour(lab, _edges((h, w)), ref, px_per_mm)
+
+
+def _find_face(srgb8: np.ndarray) -> Face | None:
+    """Face landmarks on a close-up. The landmarker needs most of a face in view, so a
+    close-up is also tried shrunk onto a plain canvas (CLOSEUP_SHRINK), landmarks mapped
+    back (they may then run off the photo)."""
+    h, w = srgb8.shape[:2]
+    for k in (1.0, *config.CLOSEUP_SHRINK):
+        if k == 1.0:
+            canvas, x0, y0 = srgb8, 0, 0
+        else:
+            small = cv2.resize(srgb8, (round(w * k), round(h * k)), interpolation=cv2.INTER_AREA)
+            canvas = np.empty_like(srgb8)
+            canvas[:] = np.median(srgb8.reshape(-1, 3), axis=0).astype(np.uint8)
+            y0, x0 = (h - small.shape[0]) // 2, (w - small.shape[1]) // 2
+            canvas[y0 : y0 + small.shape[0], x0 : x0 + small.shape[1]] = small
+        try:
+            face = detect_face(canvas)
+        except FaceNotFound:
+            continue
+        return dataclasses.replace(face, points=(face.points - [x0, y0]) / k)
+    return None
+
+
+def _iris_px_per_mm(face: Face, shape: tuple[int, int]) -> float | None:
+    """Scale from the iris nearer the camera (the larger one), if it lies inside the photo."""
+    h, w = shape
+    best = 0.0
+    for idx in IRIS:
+        pts = face.points[idx]
+        r = float(np.mean(np.hypot(*(pts[1:] - pts[0]).T)))
+        x, y = pts[0]
+        if r <= x < w - r and r <= y < h - r:
+            best = max(best, 2 * r)
+    return best / config.CLOSEUP_IRIS_MM if best else None
+
+
+def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
+    """The site's region of the face, without eyes, lids, lips, brows (and their margins)."""
+    if region == "nose":  # nostril openings are cut by colour (too dark for skin)
+        area = face.nose_mask(shape)
+    elif region == "cheek":
+        polys = face.roi_polygons()
+        area = np.zeros(shape, bool)
+        for name in CHEEKS:
+            if name in polys:
+                area |= polygon_mask(shape, polys[name])
+    else:  # forehead, chin
+        polys = face.roi_polygons()
+        area = polygon_mask(shape, polys[region]) if region in polys else np.zeros(shape, bool)
+    guard = face.brow_guard(shape) | face.eye_corner_guard(shape)
+    return area & face.skin_mask(shape) & ~guard & _edges(shape)
 
 
 def _scaled(mark, back: float):
@@ -75,14 +148,27 @@ def _scaled(mark, back: float):
 def _frame(path: str, site: str) -> dict:
     linear, srgb8 = _load(path)
     h, w = srgb8.shape[:2]
-    px_full = max(h, w) / config.MACRO_FIELD_WIDTH_MM
+    face = _find_face(srgb8)
+    iris = _iris_px_per_mm(face, (h, w)) if face is not None else None
+    if iris is not None:
+        px_full, scale_from = iris, "iris"
+    elif face is not None:
+        px_full, scale_from = face.px_per_mm, "face"  # eyes out of view: the mesh's size
+    else:
+        px_full, scale_from = max(h, w) / config.MACRO_FIELD_WIDTH_MM, "assumed"
     scale = min(config.MACRO_WORK_PX_PER_MM / px_full, 1.0)
     size = (max(round(w * scale), 1), max(round(h * scale), 1))
     lin = cv2.resize(linear.astype(np.float32), size, interpolation=cv2.INTER_AREA)
     s8 = cv2.resize(srgb8, size, interpolation=cv2.INTER_AREA)
     px, back = px_full * scale, 1.0 / scale
     lab = linear_srgb_to_lab(lin)
-    skin = _skin(lab, px)
+    if face is not None:  # the site's region; hair, nostrils and background cut by colour
+        region = _region(
+            dataclasses.replace(face, points=face.points * scale), REGIONS[site], lab.shape[:2]
+        )
+        skin = skin_colour(lab, region, region, px) if region.any() else region
+    else:
+        skin = _skin(lab, px)
 
     quality = check_frame(lin, s8, None, skin)  # exposure on the skin
     quality.reasons = [r for r in quality.reasons if r != "blurry"]
@@ -90,13 +176,17 @@ def _frame(path: str, site: str) -> dict:
     quality.sharpness = laplacian_variance(grey)  # at the working scale (pores need detail)
     if quality.sharpness < config.MACRO_SHARPNESS_MIN:
         quality.reasons.append("blurry")
-    if skin.sum() / px**2 / 100.0 < config.MACRO_MIN_SKIN_CM2:
-        quality.reasons.append("occlusion_suspected")  # too little skin in the close-up
+    enough = skin.sum() / px**2 / 100.0 >= config.MACRO_MIN_SKIN_CM2
+    if not enough:  # too little skin (or none of the site's region) in the close-up
+        quality.reasons.append("occlusion_suspected")
+        skin = np.zeros_like(skin)  # the photo fails; nothing is measured on it
 
-    blems_w = find_blemishes(lab, skin, px)
-    spots_w = find_spots(lab, skin, skin, px) if site == "cheek_macro" else []
-    # pores and texture need detail the photo may not have (an internet-sized crop)
-    detailed = px_full >= config.MACRO_MIN_PX_PER_MM
+    blems_w = find_blemishes(lab, skin, px) if enough else []
+    spots_w = find_spots(lab, skin, skin, px) if site == "cheek_macro" and enough else []
+    # pores and texture need detail the photo may not have (taken too far away)
+    # (a guessed scale may be far off for a photo that is not a real macro shot: stricter)
+    min_px = config.MACRO_MIN_PX_PER_MM if scale_from != "assumed" else config.MACRO_MIN_PX_ASSUMED
+    detailed = enough and px_full >= min_px
     pores = find_pores(lab, skin, px, [*blems_w, *spots_w]) if detailed else []
     pores_val, pores_extras = pores_per_cm2(pores, int(skin.sum()), px) if detailed else (None, {})
     blems = [_scaled(b, back) for b in blems_w]
@@ -107,19 +197,22 @@ def _frame(path: str, site: str) -> dict:
         b_star = float(np.median(lab[..., 2][skin])) if skin.any() else 0.0
         spot_pct, spot_extras = pigment_spots(spots, round(int(skin.sum()) * back * back))
         values.update(
-            tone_ita=ita_degrees(l_star, b_star),
-            pigment_spots=spot_pct,
+            tone_ita=ita_degrees(l_star, b_star) if enough else None,
+            pigment_spots=spot_pct if enough else None,
             redness=float(np.median(lab[..., 1][skin])) if skin.any() else None,
             texture=texture(lab, skin, px) if detailed else None,
         )
         extras.update(
             tone_ita={"l_star": l_star, "b_star": b_star},
             pigment_spots=spot_extras,
-            redness={"erythema_index": erythema_index(lin, skin)},
+            redness={"erythema_index": erythema_index(lin, skin)} if enough else {},
             texture={},
         )
     else:
         spots = []
+        if "texture" in SITE_METRICS[site]:
+            values["texture"] = texture(lab, skin, px) if detailed else None
+            extras["texture"] = {}
     values.update(blemishes=float(len(blems)), pores=pores_val)
     extras.update(
         blemishes={"blackheads": blackheads(pores)} if site == "nose_macro" else {},
@@ -142,6 +235,10 @@ def _frame(path: str, site: str) -> dict:
         "spots": spots,
         "skin_outline": None if contour is None else contour.reshape(-1, 2) * back,
         "detailed": detailed,
+        "face_found": face is not None,
+        "enough_skin": enough,
+        "scale_from": scale_from,
+        "px_per_mm": px_full,
     }
 
 
@@ -198,10 +295,14 @@ def analyze_macro(
                 "direction": "none",
             }
             extras = {}
+        if metric_id in SCALE_METRICS and have:
+            extras["px_per_mm"] = round(have[0]["px_per_mm"], 1)
+            extras["scale_from"] = have[0]["scale_from"]
         # colours: no colour reference in a close-up (as faces); blemishes are always
-        # indicative; pores and texture are measured once the mm scale is calibrated, and
-        # texture drops to indicative when its noise band is over 25% of its value
-        measured = metric_id in SCALE_METRICS and config.MACRO_SCALE_CALIBRATED
+        # indicative; pores and texture are measured when the mm scale is (the iris, or a
+        # calibrated close-up), and texture drops to indicative when its noise band is over
+        # 25% of its value
+        measured = metric_id in SCALE_METRICS and bool(have) and _scale_known(have[0])
         if metric_id == "texture" and summary["mdc95"] is not None and summary["value"]:
             measured &= summary["mdc95"] <= config.TEXTURE_MAX_MDC_FRAC * abs(summary["value"])
         metrics.append(
@@ -224,16 +325,18 @@ def analyze_macro(
         if mode == "uncalibrated"
         else "no colour card: colours as captured by the camera"
     ]
-    if not config.MACRO_SCALE_CALIBRATED:
+    if any(not _scale_known(f) for f in good):
         warnings.append(
             "close-up scale assumed, not measured: pore density, pore size and texture are "
             "comparable between your own sessions taken the same way, not as absolute values"
         )
-    if frames and not any(f["detailed"] for f in frames):
+    if any(f["enough_skin"] for f in frames) and not any(f["detailed"] for f in frames):
         warnings.append(
-            "pores and texture need a sharper, closer photo: use the phone's macro mode about "
-            "2-3 cm from the skin"
+            "pores and texture need a closer photo: hold the phone about a hand's width from "
+            "your face, or closer"
         )
+    if frames and all(f["face_found"] and not f["enough_skin"] for f in frames):
+        warnings.append(f"no {REGIONS[site]} skin found in the photos")
     ref = good[0] if good else (frames[0] if frames else None)
     if ref and output_prefix:
         save_preview(ref["srgb8"], output_prefix)
@@ -261,7 +364,7 @@ def analyze_macro(
         "candidates": candidates,
         "overlays": [],
         "rois": (
-            [{"name": "skin", "polygon": np.round(ref["skin_outline"], 1).tolist()}]
+            [{"name": REGIONS[site], "polygon": np.round(ref["skin_outline"], 1).tolist()}]
             if ref is not None and ref["skin_outline"] is not None
             else []
         ),
@@ -272,5 +375,12 @@ def analyze_macro(
         result["image_size"] = {"width": int(ref["shape"][1]), "height": int(ref["shape"][0])}
     for f in frames:
         f.pop("srgb8", None)
-    validate(result, json.loads(SCHEMA.read_text()))
+    if site in CONTRACT_SITES:  # forehead / chin close-ups await a contract change
+        validate(result, json.loads(SCHEMA.read_text()))
     return result
+
+
+def _scale_known(frame: dict) -> bool:
+    return frame["scale_from"] == "iris" or (
+        frame["scale_from"] == "assumed" and config.MACRO_SCALE_CALIBRATED
+    )

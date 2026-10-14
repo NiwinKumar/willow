@@ -104,10 +104,10 @@ def test_nose_close_up_counts_blackheads(tmp_path):
 
 
 def test_low_resolution_close_up_gives_no_pores(tmp_path):
-    _macro(tmp_path / "small.jpg", w=736, h=552)  # an internet-sized crop: ~25 px/mm
+    _macro(tmp_path / "small.jpg", w=450, h=338)  # too far / too small: 15 px/mm
     r = analyze_macro([str(tmp_path / "small.jpg")], "cheek_macro")
     assert _metric(r, "pores")["value"] is None and _metric(r, "texture")["value"] is None
-    assert any("macro mode" in w for w in r["warnings"])
+    assert any("closer photo" in w for w in r["warnings"])
     assert _metric(r, "redness")["value"] is not None  # colour metrics still work
 
 
@@ -130,3 +130,28 @@ def test_ruler_scale_is_measured():
     grey += np.random.default_rng(0).normal(0, 5, grey.shape)
     period, strength = tick_period_px(np.clip(grey, 0, 255).astype(np.uint8))
     assert period == pytest.approx(ppm, rel=0.02) and strength > 5
+
+
+def test_iris_sets_the_scale_when_an_eye_is_in_view():
+    from app.landmarks import Face
+    from app.pipeline_macro import _iris_px_per_mm
+
+    points = np.zeros((478, 2))
+    for centre, idx, r in (
+        ((500, 400), range(468, 473), 117.0),
+        ((1500, 400), range(473, 478), 90),
+    ):
+        pts = np.array([centre, *(np.add(centre, d) for d in ((r, 0), (0, r), (-r, 0), (0, -r)))])
+        points[list(idx)] = pts
+    face = Face(points=points, yaw=30.0, pitch=0.0, roll=0.0)
+    # the nearer (larger) iris: 234 px across = 11.7 mm -> 20 px/mm
+    assert _iris_px_per_mm(face, (2000, 3000)) == pytest.approx(20.0)
+    assert _iris_px_per_mm(face, (2000, 450)) is None  # both irises off the photo
+
+
+def test_guessed_scale_needs_a_real_macro_shot(tmp_path):
+    # no face in view, so the scale is assumed: a 30 px/mm photo is not trusted for pores
+    _macro(tmp_path / "mid.jpg", w=900, h=675)
+    r = analyze_macro([str(tmp_path / "mid.jpg")], "cheek_macro")
+    assert _metric(r, "pores")["value"] is None
+    assert _metric(r, "pores")["confidence"] == "indicative"
