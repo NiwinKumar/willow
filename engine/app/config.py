@@ -213,6 +213,7 @@ CROP_CONTEXT = 3  # context crop is 3x the candidate crop
 # preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
 PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
 PREVIEW_QUALITY = 85
+UPLOAD_WORKERS = 8  # parallel GCS transfers (frames in, crops out)
 
 # Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
 # test photos: at 0.2 confidence the only detections were a real hand and two specks a

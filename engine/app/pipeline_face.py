@@ -13,7 +13,7 @@ from app.aggregate import summarize
 from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
-from app.io import save_jpeg, save_preview
+from app.io import save_jpegs, save_preview
 from app.landmarks import (
     Face,
     FaceNotFound,
@@ -361,7 +361,7 @@ def _candidates(
     box, srgb8 = frame["box"], frame["srgb8"]
     px_per_mm = frame["face"].px_per_mm
     found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
-    out = []
+    out, uploads = [], []
     for i, (kind, b) in enumerate(found[:limit], start=1):
         cid = f"c_{i:03d}"
         cx, cy = box.x + b.x, box.y + b.y
@@ -376,11 +376,10 @@ def _candidates(
         ):
             patch = _centred_crop(srgb8, cx, cy, size)
             suffix = "" if key == "crop_uri" else "_ctx"
-            crops[key] = (
-                save_jpeg(patch, f"{output_prefix.rstrip('/')}/crops/{cid}{suffix}.jpg")
-                if output_prefix
-                else None
-            )
+            dest = f"{output_prefix.rstrip('/')}/crops/{cid}{suffix}.jpg" if output_prefix else None
+            crops[key] = dest
+            if dest:
+                uploads.append((patch, dest))
         out.append(
             {
                 "id": cid,
@@ -400,6 +399,7 @@ def _candidates(
                 },
             }
         )
+    save_jpegs(uploads)  # all crops in parallel (network-bound)
     return out
 
 
