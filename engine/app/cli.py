@@ -43,8 +43,6 @@ def main(argv: list[str] | None = None) -> None:
             "face_full",
             "cheek_macro",
             "nose_macro",
-            "forehead_macro",  # not in the contract yet
-            "chin_macro",  # not in the contract yet
         ],
     )
     a.add_argument("--roi", action="append", help="skin square x,y,w,h (default: find 4 pen dots)")
