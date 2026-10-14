@@ -177,9 +177,25 @@ def decimals(metric: dict[str, Any]) -> int:
     precision than its noise band supports. Counts are whole numbers."""
     if metric.get("unit") == "count":
         return 0
-    band = metric.get("mdc95")
+    # the band the screen formats with (this session's own), even when the band quoted is the
+    # baseline's (see with_bands)
+    band = metric.get("display_mdc95", metric.get("mdc95"))
     band = 1.0 if band is None else band
     return 0 if band >= 5 else 1 if band >= 0.5 else 2
+
+
+def with_bands(result: dict[str, Any], bands: dict[str, float | None] | None) -> dict[str, Any]:
+    """The result with each compared metric's mdc95 set to the band its verdict used: the
+    baseline's. A session's own mdc95 is its spread for later comparisons; quoting it as "the
+    noise threshold" contradicted the verdict (and is null for a one-photo session)."""
+    if not bands:
+        return result
+    metrics = []
+    for m in result["metrics"]:
+        if m.get("delta") is not None and m["id"] in bands:
+            m = {**m, "display_mdc95": m.get("mdc95"), "mdc95": bands[m["id"]]}
+        metrics.append(m)
+    return {**result, "metrics": metrics}
 
 
 def _shown(x: float | None, places: int) -> float | int | None:
@@ -245,6 +261,8 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
 
 def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """(explanation, source): Gemini when it passes the validator, else the template."""
+    context = dict(context)
+    result = with_bands(result, context.pop("bands", None))
     if not result["metrics"] or not result["quality"]["passed"]:
         # Nothing was measured: the fixed text says why and how to retake (Gemini would be told
         # this is a first reading, which a session that failed quality never is).

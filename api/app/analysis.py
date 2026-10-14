@@ -61,6 +61,7 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
 
     measured = not engine.is_placeholder(result)
     if measured and baseline_map:
+        baselines.guard_engine_version(result, current)
         baselines.guard_counts(result, current)
     explanation, source, details = (None, None, {})
     if measured:
@@ -123,6 +124,10 @@ def explain_context(
     ]
     return {
         "is_baseline": is_baseline,
+        # the band each verdict was judged against (explain.with_bands; not sent to Gemini)
+        "bands": None
+        if is_baseline
+        else {k: m.get("mdc95") for k, m in (baseline.get("metrics") or {}).items()},
         "baseline_has_noise_band": None if is_baseline else baseline.get("has_noise_band", True),
         "days_since_baseline": days,
         "routine": routine[:12],

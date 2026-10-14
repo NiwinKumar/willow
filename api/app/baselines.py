@@ -83,6 +83,8 @@ def build(session_id: str, session_doc: dict[str, Any], result: dict[str, Any]) 
         "capture_mode": session_doc["capture_mode"],
         "frames": result["frames_used"],
         "has_noise_band": result["frames_used"] >= NOISE_BAND_FRAMES,
+        # numbers from another engine version are not comparable (guard_engine_version)
+        "engine_version": result.get("engine_version"),
         "session_created_at": session_doc.get("created_at"),
         "created_at": datetime.now(UTC),
         "metrics": metrics,
@@ -127,3 +129,31 @@ def guard_counts(result: dict[str, Any], baseline: dict[str, Any] | None) -> Non
             touched = True
     if touched:
         result.setdefault("warnings", []).append(COUNTS_NOT_COMPARED)
+
+
+ENGINE_CHANGED = (
+    "not compared with your baseline: it was measured by an earlier version of Willow's "
+    "measurement, whose numbers differ. Measure the baseline again, or make a new one"
+)
+
+
+def _minor(version: str | None) -> str | None:
+    """'0.3.1' -> '0.3': patch releases do not move numbers, minor ones may."""
+    if not version:
+        return None
+    return ".".join(version.split(".")[:2])
+
+
+def guard_engine_version(result: dict[str, Any], baseline: dict[str, Any] | None) -> None:
+    """No comparison across engine versions (the engine changed, not the skin)."""
+    if not baseline or _minor(result.get("engine_version")) == _minor(
+        baseline.get("engine_version")
+    ):
+        return
+    touched = False
+    for m in result.get("metrics", []):
+        if m.get("delta") is not None:
+            m.update(delta=None, verdict="no_baseline", direction="none")
+            touched = True
+    if touched:
+        result.setdefault("warnings", []).append(ENGINE_CHANGED)
