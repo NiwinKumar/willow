@@ -309,7 +309,9 @@ def analyze_face(
         mode = capture_mode_for(files)
     except ValueError as exc:
         raise EngineError("bad_request", str(exc)) from exc
-    confidence = "measured" if mode == "calibrated_raw" else "indicative"
+    # "measured" needs a colour reference in the photo; faces never detect one (no card,
+    # no white paper), so a RAW face is as indicative as a JPEG selfie
+    confidence = "indicative"
 
     per_frame, frames, warnings = [], [], []
     for i, path in enumerate(files):
