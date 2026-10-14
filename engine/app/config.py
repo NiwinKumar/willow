@@ -254,6 +254,7 @@ CLOSEUP_SHRINK = (0.5, 0.33)
 CLOSEUP_IRIS_MM = 11.7  # visible iris diameter, nearly the same in all adults: the scale
 CLOSEUP_DARKER_L = 20.0  # in a face region, this much darker than its median is hair / nostril
 CLOSEUP_CLIPPED_L = 97.0  # and this bright is clipped glare (lit skin is kept)
+CLOSEUP_MARK_EDGE_MM = 2.0  # marks this close to a region's edge are edge shadows
 PORE_MARK_GAP_MM = 0.3  # pores this close to a blemish / dark spot edge are its edge
 PORE_EDGE_MM = 0.3  # ...or this close to the skin's edge (nostril rim, lid, hairline)
 PORE_CHAIN_MM = 1.0  # a pore with PORE_CHAIN_MIN+ neighbours this close, all in a line...

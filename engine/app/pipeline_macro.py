@@ -14,6 +14,7 @@ chin_macro    : blemishes, pores, texture   (not in the contract yet: CLI only)
 import dataclasses
 import json
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import cv2
@@ -24,6 +25,7 @@ from scipy.ndimage import binary_fill_holes
 from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab
+from app.decode import load_photo_srgb8
 from app.errors import EngineError
 from app.io import save_preview
 from app.landmarks import EYE_OUTER, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
@@ -200,6 +202,54 @@ def _scaled(mark, back: float):
     )
 
 
+def _clean_marks(marks: list, skin: np.ndarray, px_per_mm: float) -> list:
+    """Drop marks within CLOSEUP_MARK_EDGE_MM of the skin's edge (hairline, ear, lid, lip and
+    jaw shadows) and merge overlapping ones (one patch found as several): biggest kept."""
+    inside = cv2.distanceTransform(skin.astype(np.uint8), cv2.DIST_L2, 5) / px_per_mm
+    h, w = skin.shape
+    kept = []
+    for m in sorted(marks, key=lambda m: -m.radius):
+        y, x = min(int(m.y), h - 1), min(int(m.x), w - 1)
+        if inside[y, x] < config.CLOSEUP_MARK_EDGE_MM:
+            continue
+        if any(np.hypot(m.x - k.x, m.y - k.y) < m.radius + k.radius for k in kept):
+            continue
+        kept.append(m)
+    return kept
+
+
+def _no_face(srgb8: np.ndarray, site: str) -> dict:
+    """A frame that fails as face_not_found: nothing is measured on it."""
+    h, w = srgb8.shape[:2]
+    quality = SimpleNamespace(
+        passed=False, reasons=["face_not_found"], sharpness=0.0, clipped_pct=0.0
+    )
+    return {
+        "values": {m: None for m in SITE_METRICS[site]},
+        "extras": {m: {} for m in SITE_METRICS[site]},
+        "quality": quality,
+        "srgb8": srgb8,
+        "shape": srgb8.shape,
+        "box": Box(0, 0, w, h),
+        "face": SimpleNamespace(px_per_mm=1.0),
+        "blemishes": [],
+        "spots": [],
+        "skin_outline": None,
+        "detailed": False,
+        "face_found": False,
+        "enough_skin": False,
+        "scale_from": "unknown",
+        "px_per_mm": 0.0,
+    }
+
+
+def _front_camera(path: str) -> bool:
+    """A selfie-camera photo (from its lens EXIF): it cannot be a macro shot."""
+    if Path(path).suffix.lower() == ".dng":
+        return False
+    return "front" in (load_photo_srgb8(path)[1].lens or "").lower()  # already decoded once
+
+
 def _frame(path: str, site: str) -> dict:
     linear, srgb8 = _load(path)
     h, w = srgb8.shape[:2]
@@ -209,6 +259,8 @@ def _frame(path: str, site: str) -> dict:
         px_full, scale_from = iris, "iris"
     elif face is not None:
         px_full, scale_from = face.px_per_mm, "face"  # eyes out of view: the mesh's size
+    elif _front_camera(path):  # no face and no macro: neither the region nor the scale known
+        return _no_face(srgb8, site)
     else:
         px_full, scale_from = max(h, w) / config.MACRO_FIELD_WIDTH_MM, "assumed"
     scale = min(config.MACRO_WORK_PX_PER_MM / px_full, 1.0)
@@ -236,8 +288,12 @@ def _frame(path: str, site: str) -> dict:
         quality.reasons.append("occlusion_suspected")
         skin = np.zeros_like(skin)  # the photo fails; nothing is measured on it
 
-    blems_w = find_blemishes(lab, skin, px) if enough else []
-    spots_w = find_spots(lab, skin, skin, px) if site == "cheek_macro" and enough else []
+    blems_w = _clean_marks(find_blemishes(lab, skin, px), skin, px) if enough else []
+    spots_w = (
+        _clean_marks(find_spots(lab, skin, skin, px), skin, px)
+        if site == "cheek_macro" and enough
+        else []
+    )
     # pores and texture need detail the photo may not have (taken too far away)
     # (a guessed scale may be far off for a photo that is not a real macro shot: stricter)
     min_px = config.MACRO_MIN_PX_PER_MM if scale_from != "assumed" else config.MACRO_MIN_PX_ASSUMED
@@ -389,6 +445,11 @@ def analyze_macro(
         warnings.append(
             "pores and texture need a closer photo: hold the phone about a hand's width from "
             "your face, or closer"
+        )
+    if frames and all(f["scale_from"] == "unknown" for f in frames):
+        warnings.append(
+            "face not found in the selfie close-up: keep your nose and at least one eye in the "
+            "photo so the area and its size can be measured"
         )
     if frames and all(f["face_found"] and not f["enough_skin"] for f in frames):
         warnings.append(f"no {REGIONS[site]} skin found in the photos")

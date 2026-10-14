@@ -155,3 +155,20 @@ def test_guessed_scale_needs_a_real_macro_shot(tmp_path):
     r = analyze_macro([str(tmp_path / "mid.jpg")], "cheek_macro")
     assert _metric(r, "pores")["value"] is None
     assert _metric(r, "pores")["confidence"] == "indicative"
+
+
+def test_marks_at_the_region_edge_or_overlapping_are_cleaned():
+    from types import SimpleNamespace as M
+
+    from app.pipeline_macro import _clean_marks
+
+    skin = np.zeros((500, 500), bool)
+    skin[50:450, 50:450] = True  # 10 px/mm: 40 x 40 mm of skin
+    marks = [
+        M(x=60, y=250, radius=5),  # 1 mm inside the edge: an edge shadow
+        M(x=250, y=250, radius=10),  # a patch...
+        M(x=262, y=250, radius=6),  # ...found twice
+        M(x=350, y=350, radius=5),
+    ]
+    kept = _clean_marks(marks, skin, 10.0)
+    assert [(m.x, m.y) for m in kept] == [(250, 250), (350, 350)]
