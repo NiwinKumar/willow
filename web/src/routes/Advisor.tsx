@@ -111,7 +111,7 @@ export function Advisor() {
                 {t.checks ? (
                   <p className="mt-1.5 text-[12px] text-text-3">
                     {t.checks.numbers_checked > 0 ? `${t.checks.numbers_checked} ${t.checks.numbers_checked === 1 ? 'number' : 'numbers'} checked against your data and the catalog` : 'No numbers quoted'}
-                    {t.checks.products_from_tools > 0 ? `, ${t.checks.products_from_tools} ${t.checks.products_from_tools === 1 ? 'product' : 'products'} from catalog searches` : ''} · {t.checks.model}
+                    {t.checks.products_from_tools > 0 ? `, ${t.checks.products_from_tools} catalog ${t.checks.products_from_tools === 1 ? 'product' : 'products'}, each one a real listing` : ''} · {t.checks.model}
                   </p>
                 ) : null}
                 {t.product_ids?.length ? (
