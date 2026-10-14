@@ -64,4 +64,4 @@ class PatchSessionRequest(BaseModel):
 
 
 class SetBaselineRequest(BaseModel):
-    session_id: str
+    session_id: str = Field(pattern=r"^s_\d{8}_[0-9a-f]{8}$")  # never arbitrary text in a path

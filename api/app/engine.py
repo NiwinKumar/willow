@@ -126,6 +126,10 @@ def _http_analyze(request: dict[str, Any]) -> dict[str, Any]:
         raise EngineError("engine_timeout", "The engine did not answer in time", 504) from exc
     except httpx.HTTPError as exc:
         raise EngineError("engine_unreachable", str(exc)) from exc
+    if res.status_code in (429, 503, 504):
+        # every engine instance busy (concurrency 1, max 3), or Cloud Run's own timeout: the
+        # answer is not the engine's JSON; say "took too long", which invites a retry
+        raise EngineError("engine_timeout", f"engine HTTP {res.status_code}", 504)
     if res.status_code >= 400:
         try:
             err = res.json().get("error", {})

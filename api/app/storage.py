@@ -85,15 +85,16 @@ def signed_get_url(object_name: str) -> str:
     return url
 
 
-def list_names(prefix: str) -> set[str]:
-    """The displayable results under a prefix: previews and overlays only. Spot crops (dozens per
-    session once the face pipeline writes them) are never listed on a page load."""
+DISPLAYABLE = ("**/preview.jpg", "**/overlays/*")
+
+
+def list_names(prefix: str, globs: tuple[str, ...] = DISPLAYABLE) -> set[str]:
+    """The results under a prefix matching `globs`: by default previews and overlays only. Spot
+    crops (dozens per session) are listed only where a page shows them (the spot diary)."""
     client = gcp.storage_client()
     bucket = get_settings().bucket
     return {
-        b.name
-        for glob in ("**/preview.jpg", "**/overlays/*")
-        for b in client.list_blobs(bucket, prefix=prefix, match_glob=glob)
+        b.name for glob in globs for b in client.list_blobs(bucket, prefix=prefix, match_glob=glob)
     }
 
 

@@ -84,14 +84,19 @@ def spots(
             }
         )
     diary = tracks.follow(used)
-    existing = storage.list_names(views.results_prefix(user.uid)) if used else set()
+    prefix = views.results_prefix(user.uid)
+    existing = storage.list_names(prefix, (*storage.DISPLAYABLE, "**/crops/*")) if used else set()
     photos = {s["id"]: views.photo_name(user.uid, s["id"], docs[s["id"]], existing) for s in used}
+    # every sighting's tight crop; the 3x context crop only for each spot's latest sighting
+    # (each signature is an IAM call)
     crops = [
         name
         for t in diary["tracks"]
-        for o in t["observations"]
+        for i, o in enumerate(t["observations"])
         for k in ("crop_uri", "context_crop_uri")
-        if (name := storage.name_from_uri(o.get(k) or "")) and name in existing
+        if (k == "crop_uri" or i == len(t["observations"]) - 1)
+        and (name := storage.name_from_uri(o.get(k) or ""))
+        and name in existing
     ]
     signed = views.sign_all([p for p in photos.values() if p] + crops)
 

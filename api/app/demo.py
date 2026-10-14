@@ -9,11 +9,12 @@ copies the frames server-side into the person's own session; from there it is an
 
 import json
 import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app import __version__, catalog, engine, sessions, storage, views
 from app.models import CONTENT_TYPES, CaptureMode, Site
@@ -49,6 +50,17 @@ class Sample(BaseModel):
     credit: str = ""
     order: int = 0
 
+    @model_validator(mode="after")
+    def _frames_fit_the_mode(self) -> "Sample":
+        """A bad manifest entry fails when the manifest loads (and is logged), not as a 503 on
+        every judge's sample run."""
+        exts = {f.rsplit(".", 1)[-1].lower() for f in self.frames}
+        if not exts <= set(EXT_CONTENT_TYPE):
+            raise ValueError(f"sample {self.id}: unsupported frames {sorted(exts)}")
+        if (self.capture_mode == "calibrated_raw") != (exts == {"dng"}):
+            raise ValueError(f"sample {self.id}: {self.capture_mode} with {sorted(exts)} frames")
+        return self
+
     def content_types(self) -> list[str]:
         return [EXT_CONTENT_TYPE[f.rsplit(".", 1)[-1].lower()] for f in self.frames]
 
@@ -57,6 +69,7 @@ _cache: dict[str, tuple[float, Any]] = {}
 
 
 STATUS_RETRY_S = 10.0  # a status with a failed check is asked again after this
+_status_lock = threading.Lock()
 
 
 def _cached(key: str, seconds: float, make):
@@ -77,7 +90,12 @@ def samples() -> list[Sample]:
         raw = storage.read_text(MANIFEST)
         if not raw:
             return []
-        items = [Sample.model_validate(s) for s in json.loads(raw).get("samples", [])]
+        items = []
+        for entry in json.loads(raw).get("samples", []):
+            try:
+                items.append(Sample.model_validate(entry))
+            except ValueError as exc:  # one bad entry hides itself, not the whole list
+                log.error("demo manifest: skipped %s: %s", entry.get("id"), exc)
         return sorted(items, key=lambda s: (s.order, s.id))
 
     return _cached("samples", CACHE_SECONDS, load)
@@ -182,6 +200,16 @@ def status() -> dict[str, Any]:
         good = hit[1]["engine"]["status"] == "ok" and hit[1]["bigquery"]["status"] == "ok"
         if time.time() - hit[0] < (60 if good else STATUS_RETRY_S):
             return hit[1]
-    value = check()
-    _cache["status"] = (time.time(), value)
-    return value
+    # One check at a time (it can wait 45 s on a cold engine): while one runs, others get the
+    # last answer if there is one, else wait for this one.
+    if not _status_lock.acquire(blocking=hit is None):
+        return hit[1]
+    try:
+        again = _cache.get("status")
+        if again is not hit and again is not None:  # finished while this one waited
+            return again[1]
+        value = check()
+        _cache["status"] = (time.time(), value)
+        return value
+    finally:
+        _status_lock.release()

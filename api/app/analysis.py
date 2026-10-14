@@ -177,7 +177,10 @@ def remeasure(
         try:
             doc = run(store, bucket, uid, sid, d)
         except engine.EngineError as exc:
-            lines.append(f"{label}: failed ({exc.code}: {exc.message})")
+            # a re-run that fails leaves the session as it was (still on the timeline), not
+            # "failed": the old result is the person's, the failure is ours
+            store.session_update(uid, sid, {"status": d.get("status"), "error": d.get("error")})
+            lines.append(f"{label}: failed, left as it was ({exc.code}: {exc.message})")
             continue
         state = "measured" if doc.get("measured") else "still not measured"
         lines.append(f"{label}: {state}{', now the baseline' if doc.get('is_baseline') else ''}")
