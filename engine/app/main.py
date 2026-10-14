@@ -106,6 +106,7 @@ async def analyze(http_request: Request) -> dict:
                     [None] * n,  # forearm square found from the pen dots
                     [None] * n,  # white paper found automatically
                     baseline=request.get("baseline"),
+                    output_prefix=request.get("output_prefix"),
                     **ids,
                 )
         result["timings_ms"]["fetch"] = round(fetch_ms, 1)

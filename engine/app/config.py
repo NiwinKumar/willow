@@ -11,8 +11,13 @@ ENGINE_VERSION = __version__  # single source of truth: app/__init__.py
 SHARPNESS_MIN = 15.0
 # Faces: sharpness at a fixed 4 px per mm of face. Measured Oct 13: sharp DNG and HEIC face
 # photos score 71-100, the same photos blurred by 0.3 mm score 1-2.
-SHARPNESS_PX_PER_MM = 4.0
-FACE_SHARPNESS_MIN = 15.0
+SHARPNESS_PX_PER_MM = 4.0  # larger faces are shrunk to this; smaller ones are measured as they are
+# A face fails when it is blurred by more than about 0.25 mm: a 1 mm spot (the smallest
+# counted) still keeps 86% of its contrast. The same blur in mm scores higher on a
+# low-resolution face, so the threshold depends on px per mm. Oct 14: median score of 3
+# sharp face photos resampled to each scale and blurred by 0.25 mm. (The old fixed 15 at
+# 4 px/mm meant about 0.18 mm, and failed usable webcam selfies at 3.2 px/mm.)
+FACE_SHARPNESS_AT = ((2.0, 41.0), (2.5, 19.0), (2.8, 12.7), (3.2, 7.8), (3.5, 5.7), (4.0, 3.6))
 CLIPPED_PCT_MAX = 2.0  # % of skin-ROI pixels at pure white
 DARK_PCT_MAX = 2.0  # % of skin-ROI pixels at pure black
 CLIP_LEVEL = 0.999  # linear value counted as clipped
@@ -90,7 +95,9 @@ FACE_HEIGHT_MM = 74.9
 # background and shine (bright, grey) drop out; marks keep enough colour to stay.
 SIDE_MIN_CHROMA_FRAC = 0.5
 SIDE_MAX_HUE_DEG = 25.0
-SIDE_MAX_RED_SHIFT_DEG = 50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+SIDE_MAX_RED_SHIFT_DEG = (
+    50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+)
 SIDE_MAX_BRIGHTER_L = 15.0
 SIDE_MAX_DARKER_L = 30.0
 SIDE_FILL_HOLES_MM2 = 80.0
@@ -100,7 +107,8 @@ SIDE_FILL_HOLES_MM2 = 80.0
 SIDE_HAIR_WINDOW_MM = 4.0
 SIDE_HAIR_TEXTURE = 1.4
 SIDE_HAIR_CHROMA = 0.9  # fill smaller holes (a 10 mm mark that lost colour stays skin)
-MAX_ABS_PITCH = 8.0
+MAX_ABS_PITCH = 15.0  # laptop / webcam selfies sit at 8-12° (camera above the screen); ROIs stay on
+# the same skin up to 15° (canonical-mesh test in tests/test_pose.py), same as SIDE_MAX_PITCH
 MAX_ABS_ROLL = 6.0
 EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-mm scale
 
@@ -173,12 +181,32 @@ BLEMISH_MIN_A_CONTRAST = 1.0  # ...and at least this much a* above nearby skin (
 BLEMISH_MIN_RED_RATIO = 0.35
 BLEMISH_DIAMETER_MM = (1.0, 5.0)
 BLEMISH_BACKGROUND_MM = 3.0  # "nearby skin" (Gaussian sigma)
+BLEMISH_HAIR_GAP_MM2 = 2.0  # holes this small in the skin mask are hair gaps, not an edge
 BLEMISH_EDGE_MM = 0.5  # ignore spots right on the mask edge (feature borders)
 BLEMISH_MERGE_MM = 2.0  # detections closer than this are one blemish
 NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red crease)
 BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red lip edge)
-CROP_SIZE_PX = (64, 128)  # candidate crop side, clamped to this range
+# Candidate crops for Gemini, sized on the face: the tight crop is 4x the mark's diameter
+# and at least 6 mm (pixel sizes covered 20 mm at 3.2 px/mm and half the face in the
+# context crop); the context crop is 3x that. Small crops are upscaled to 128 px.
+CROP_SPOT_FACTOR = 4.0
+CROP_MIN_MM = 6.0
+CROP_MIN_OUT_PX = 128
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
+
+# preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
+PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
+PREVIEW_QUALITY = 85
+
+# Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
+# test photos: at 0.2 confidence the only detections were a real hand and two specks a
+# few px across; specks are dropped by the size rule. A hand on the chin is cut from the
+# face skin; if it covers more than HAND_OCCLUSION_FRAC of the face skin the photo gets
+# occlusion_suspected (contract reason code).
+HAND_MIN_CONFIDENCE = 0.2
+HAND_MIN_SPAN_EYES = 0.8  # a detected hand spans at least this x the outer-eye distance
+HAND_MARGIN_MM = 10.0  # palm and finger edges beyond the landmarks
+HAND_OCCLUSION_FRAC = 0.10
 
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
