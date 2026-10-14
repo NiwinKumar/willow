@@ -31,7 +31,7 @@ const verdictTone: Record<Verdict, Tone> = { real_change: 'signal', within_noise
 export function VerdictChip({ verdict, noBand = false, className = '' }: { verdict: Verdict; noBand?: boolean; className?: string }) {
   if (noBand && verdict === 'no_baseline')
     return (
-      <Chip tone="noise" className={className} title="Your baseline has one photo, so there is no noise band to compare against yet.">
+      <Chip tone="noise" className={className} title="Your baseline has fewer than 3 usable photos, so there is no noise band to compare against yet.">
         No noise band yet
       </Chip>
     )

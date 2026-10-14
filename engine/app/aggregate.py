@@ -31,7 +31,9 @@ def summarize(values: list[float], baseline: dict | None, min_sd: float = 0.0) -
     give a band of 0, and any later difference would be called real."""
     mean = statistics.fmean(values)
     sd = max(statistics.stdev(values), min_sd) if len(values) > 1 else None
-    band = mdc95(sd, len(values))
+    # A noise band needs config.MIN_FRAMES_FOR_BAND photos: from 2, the spread is so uncertain
+    # that the band came out at hundreds of degrees (Oct 14) - honest, but of no use to anyone.
+    band = mdc95(sd, len(values)) if len(values) >= config.MIN_FRAMES_FOR_BAND else None
     out = {
         "value": round(mean, 3),
         "within_session_sd": None if sd is None else round(sd, 3),
