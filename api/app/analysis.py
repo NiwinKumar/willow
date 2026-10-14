@@ -60,6 +60,8 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         raise
 
     measured = not engine.is_placeholder(result)
+    if measured and baseline_map:
+        baselines.guard_counts(result, current)
     explanation, source, details = (None, None, {})
     if measured:
         # The explanation and the spot labels are independent Gemini calls: run them together.
@@ -92,7 +94,12 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     )
     doc = store.session_get(uid, session_id) or doc
     if measured and current is None and baselines.qualifies(result):
-        baselines.set_baseline(store, uid, session_id, doc)
+        try:
+            baselines.set_baseline(store, uid, session_id, doc)
+        except Exception:
+            # The measurement is saved and shown; only the baseline pointer failed. The next
+            # session becomes the baseline instead, never "failed" for a finished session.
+            log.exception("could not set the baseline for %s/%s", uid, session_id)
         doc = store.session_get(uid, session_id) or doc
     return doc
 

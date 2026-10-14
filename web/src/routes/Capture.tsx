@@ -63,7 +63,7 @@ export function Capture() {
   // One baseline per site and capture mode: quick selfies are never compared with RAW photos.
   // Photos saved before a site is measured count: the first of them becomes the baseline later.
   // Only once the sessions have loaded: never ask for a baseline someone already has.
-  const baselineNeeded = (data.mode !== 'live' || data.status === 'ready') && baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
+  const baselineNeeded = data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
   const steps = photoSteps(site, mode)
   const expected = baselineNeeded ? 5 : 3
   const ready = rows.length > 0 && (rows.length >= expected || uploadFew)
@@ -118,7 +118,8 @@ export function Capture() {
           <div className="mt-6 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode">
             {(
               [
-                ['calibrated_raw', 'Calibrated', 'RAW photo with a white reference. Measured results.'],
+                // Faces have no colour reference yet, so even a RAW face photo is a trend.
+                ['calibrated_raw', 'RAW photo', site.startsWith('forearm') ? 'With white paper beside the arm. Measured results.' : 'Unprocessed by the phone. Trend only on the face for now.'],
                 ['uncalibrated', 'Phone photo', 'Phone camera in the browser. Trend only.'],
               ] as const
             ).map(([id, label, sub]) => (

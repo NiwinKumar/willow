@@ -21,8 +21,8 @@ import { useData } from '../data/useData'
 import { missingBaselines } from '../lib/baselineGuide'
 import { MOLE_NOTE, NOT_SKIN, type SpotLabel, summarizeSpots } from '../lib/spotLabels'
 import { failureReasons, leftOutPhotos, photosUsed, readableWarnings } from '../lib/warnings'
-import { fmtDate, plural } from '../lib/format'
-import { GROUP_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
+import { fmtDate, fmtHours, plural } from '../lib/format'
+import { GROUP_META, METRIC_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
 import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
 import { useAuth } from '../lib/useAuth'
@@ -34,6 +34,7 @@ import { fresh } from './lazy'
 const MetricDetail = lazy(() => fresh(() => import('../components/MetricDetail'))().then((m) => ({ default: m.MetricDetail })))
 
 const SNAPS = ['peek', 'half', 'full'] as const
+const SNAP_NAME = { peek: 'collapsed', half: 'half open', full: 'open' } as const
 type Snap = (typeof SNAPS)[number]
 
 export function Report() {
@@ -51,12 +52,14 @@ export function Report() {
   // again: offer it while it is newer than the latest result.
   const unfinished = useMemo(() => {
     const last = sessions[sessions.length - 1]?.created_at ?? ''
-    return [...(series?.sessions ?? [])].reverse().find((s) => s.status === 'failed' && s.created_at > last) ?? null
+    // Only failures a second try can fix (a busy or unreachable engine), never an unreadable file.
+    const retryable = (s: Session) => !s.error?.code || ['engine_timeout', 'engine_unreachable', 'internal'].includes(s.error.code)
+    return [...(series?.sessions ?? [])].reverse().find((s) => s.status === 'failed' && s.created_at > last && retryable(s)) ?? null
   }, [series, sessions])
   const retry = unfinished ? (
     <div className="mx-5 mb-3 flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-3 text-[13px] sm:mx-6">
       <span className="text-text-2">Your session from {fmtDate(unfinished.created_at)} did not finish measuring. The photos are saved.</span>
-      <Link to={`/processing/${unfinished.id}?site=${unfinished.site}&n=${unfinished.n_frames}`} className="inline-flex min-h-10 shrink-0 items-center rounded-(--radius-control) border border-border px-3 font-medium hover:bg-surface-2">
+      <Link to={`/processing/${unfinished.id}?site=${unfinished.site}&n=${unfinished.n_frames}`} className="inline-flex min-h-11 shrink-0 items-center rounded-(--radius-control) border border-border px-3 font-medium hover:bg-surface-2">
         Try again
       </Link>
     </div>
@@ -93,7 +96,8 @@ export function Report() {
       setSettingBaseline(false)
     }
   }
-  const metricId = (view.m as MetricId | null) ?? null
+  // A shared link may carry a garbled ?m=: only known metric ids select anything.
+  const metricId = view.m && view.m in METRIC_META ? (view.m as MetricId) : null
   const [expanded, setExpanded] = useState<MetricId | null>(null)
   const [snap, setSnap] = useState<Snap>('half')
   const [siteSheet, setSiteSheet] = useState(false)
@@ -106,6 +110,16 @@ export function Report() {
   const spotFocus = focus && focus.sid === session?.id ? focus.label : null
   const setSpotFocus = (label: SpotLabel | null) => setFocus(label && session ? { sid: session.id, label } : null)
   const ringsShown = Boolean(session?.preview)
+  // With several photos the engine counts only spots seen in at least two of them, so the
+  // Blemishes and Dark spots numbers can be lower than this list: say why.
+  const confirmed = useMemo(() => {
+    const r = session?.result
+    const frames = r?.frames_used ?? 0
+    const cands = (r?.candidates ?? []).filter((c) => session?.label_details?.[c.id])
+    if (frames < 2 || !cands.length || cands.every((c) => c.features?.seen_in_fraction === undefined)) return null
+    const twice = cands.filter((c) => Math.round((c.features?.seen_in_fraction ?? 0) * frames) >= 2).length
+    return `${twice} of these ${cands.length} show up in more than one of your ${frames} photos. Only those count toward Blemishes and Dark spots${ringsShown ? '; the others have fainter rings' : ''}.`
+  }, [session, ringsShown])
   const baselineMetric = useCallback((id: MetricId) => baseline?.result?.metrics.find((m) => m.id === id) ?? null, [baseline])
   // Quick selfies and RAW sessions are never compared, so charts and band scales use one mode.
   const sameMode = useMemo(() => sessions.filter((s) => s.capture_mode === session?.capture_mode && s.measured !== false), [sessions, session])
@@ -126,7 +140,9 @@ export function Report() {
   // Keyboard: arrows scrub, Home/End jump to the baseline/latest, L toggles the layer, ? lists keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const t = e.target as HTMLElement | null
+      if (e.defaultPrevented || t?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+      if (document.querySelector('[role="dialog"]')) return // a sheet is open: keys belong to it
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'ArrowLeft') view.set({ t: Math.max(0, index - 1) })
       else if (e.key === 'ArrowRight') view.set({ t: Math.min(sessions.length - 1, index + 1) })
@@ -188,7 +204,7 @@ export function Report() {
     )
   }
 
-  const titleDate = session ? (session.hours_since_baseline !== undefined && session.hours_since_baseline > 0 ? `+${session.hours_since_baseline} h` : fmtDate(session.created_at)) : ''
+  const titleDate = session ? (session.hours_since_baseline !== undefined && session.hours_since_baseline > 0 ? fmtHours(session.hours_since_baseline) : fmtDate(session.created_at)) : ''
 
   const baselineButton =
     data.mode === 'live' && session && !session.is_baseline && session.measured !== false && session.result?.quality.passed ? (
@@ -198,16 +214,16 @@ export function Report() {
             Choose this only if it was taken before you started a product, for example when your first session had poor light. Later sessions are compared with this one; earlier comparisons stay as they are.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button className="!min-h-10" disabled={settingBaseline} onClick={() => void makeBaseline()}>
+            <Button className="!min-h-11" disabled={settingBaseline} onClick={() => void makeBaseline()}>
               {settingBaseline ? 'Saving…' : 'Make this my baseline'}
             </Button>
-            <Button variant="quiet" className="!min-h-10" disabled={settingBaseline} onClick={() => setConfirmBaseline(false)}>
+            <Button variant="quiet" className="!min-h-11" disabled={settingBaseline} onClick={() => setConfirmBaseline(false)}>
               Keep the current one
             </Button>
           </div>
         </div>
       ) : (
-        <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => setConfirmBaseline(true)}>
+        <Button variant="secondary" className="mt-3 !min-h-11" onClick={() => setConfirmBaseline(true)}>
           Make this my baseline
         </Button>
       )
@@ -279,7 +295,9 @@ export function Report() {
         ) : (
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">
-              {noBand ? (
+              {metrics.length > 0 && metrics.every((m) => m.verdict === 'low_quality') ? (
+                'Nothing could be compared this time'
+              ) : noBand ? (
                 'Compared with your baseline'
               ) : (
                 <>
@@ -288,7 +306,7 @@ export function Report() {
               )}
             </h1>
             <p className="mt-1 text-[13px] text-text-2">
-              Baseline {baseline ? fmtDate(baseline.created_at) : '–'} · {baseline ? photosUsed(baseline) : ''} · {session ? photosUsed(session) : ''} this session
+              {baseline ? `Baseline ${fmtDate(baseline.created_at)} · ${photosUsed(baseline)} · ` : ''}{session ? photosUsed(session) : ''} this session
               {session?.deviation ? <Chip tone="warn" className="ml-2">something was different</Chip> : null}
             </p>
             {leftOutPhotos(session?.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session?.result)}</p> : null}
@@ -318,7 +336,7 @@ export function Report() {
           </ul>
         </div>
       ) : null}
-      {session?.result && !session.result.quality.passed && !qualityFailed ? (
+      {session?.result && session.result.quality.passed && session.result.quality.reasons.length > 0 && session.result.metrics.some((m) => m.verdict === 'low_quality') ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold text-warn-text">Photo quality differed from your reference.</span>{' '}
           {session.result.quality.reasons.map((r) => QUALITY_COPY[r]?.text).join(' ')}
@@ -345,7 +363,7 @@ export function Report() {
               const bm = baselineMetric(m.id)
               return (
                 <MetricRow
-                  key={`${session?.id}-${m.id}`}
+                  key={m.id}
                   metric={m}
                   baselineValue={session?.is_baseline ? null : (bm?.value ?? null)}
                   baselineMdc={session?.is_baseline ? null : (bm?.mdc95 ?? null)}
@@ -401,6 +419,7 @@ export function Report() {
               </li>
             ))}
           </ul>
+          {confirmed ? <p className="mt-2 text-[13px] text-text-2">{confirmed}</p> : null}
           {spots.some((s) => s.label === 'mole') ? <p className="mt-2 text-[13px] font-medium">{MOLE_NOTE}</p> : null}
         </section>
       ) : null}
@@ -408,7 +427,7 @@ export function Report() {
         <section className="mx-5 my-5 rounded-(--radius-tile) bg-surface p-4 sm:mx-6">
           <div className="flex items-center justify-between">
             <h2 className="text-[17px] font-semibold">Why this matters</h2>
-            {data.mode === 'demo' ? <Chip tone="neutral">sample explanation</Chip> : session.explanation_source === 'gemini' ? <Chip tone="neutral">AI-written, numbers verified</Chip> : <Chip tone="neutral">written from your numbers</Chip>}
+            {session.explanation_source === 'gemini' ? <Chip tone="neutral">AI-written, numbers verified</Chip> : session.explanation_source === 'template' ? <Chip tone="neutral">written from your numbers</Chip> : data.mode === 'demo' ? <Chip tone="neutral">sample explanation</Chip> : <Chip tone="neutral">written from your numbers</Chip>}
           </div>
           <p className="mt-2 text-[15px] font-medium">{session.explanation.headline}</p>
           <ul className="mt-2 space-y-2 text-[15px] leading-relaxed text-text-2">
@@ -467,7 +486,7 @@ export function Report() {
       metricId={metricId}
       layer={view.layer}
       onSelectMetric={(id) => view.set({ m: id, layer: id !== null })}
-      caption={session && !session.is_baseline && session.hours_since_baseline !== undefined ? `+${session.hours_since_baseline} h` : undefined}
+      caption={session && !session.is_baseline && session.hours_since_baseline !== undefined ? fmtHours(session.hours_since_baseline) : undefined}
       spotFocus={spotFocus}
       className="h-full w-full"
     />
@@ -530,7 +549,7 @@ export function Report() {
                 className={`flex min-h-12 w-full items-center justify-between text-left text-[15px] ${s === site ? 'font-semibold' : ''}`}
               >
                 {SITE_LABEL[s]}
-                <span className="font-mono text-[12px] text-text-3">{plural(data.series(s)?.sessions.length ?? 0, 'session', 'sessions')}</span>
+                <span className="font-mono text-[12px] text-text-3">{plural(data.series(s)?.sessions.filter((x) => x.status === 'done').length ?? 0, 'session', 'sessions')}</span>
               </button>
             </li>
           ))}
@@ -551,11 +570,12 @@ function SnapSheet({ snap, onSnap, reduce, children }: { snap: Snap; onSnap: (s:
       animate={{ height: heights[snap] }}
       transition={reduce ? { duration: 0 } : { type: 'spring', visualDuration: 0.3, bounce: 0 }}
       style={{ y }}
-      className="relative z-10 flex shrink-0 flex-col rounded-t-(--radius-sheet) bg-bg shadow-[0_-8px_24px_oklch(0.24_0.018_130/0.1)]"
+      // May shrink: on a short phone "full" plus the bars and scrubber would pass the screen height.
+      className="relative z-10 flex min-h-0 shrink flex-col rounded-t-(--radius-sheet) bg-bg shadow-[0_-8px_24px_oklch(0.24_0.018_130/0.1)]"
     >
       <motion.button
         type="button"
-        aria-label={`Results panel, ${snap}. Drag or press to resize.`}
+        aria-label={`Results panel, ${SNAP_NAME[snap]}. Press to ${snap === 'full' ? 'make it smaller' : 'make it larger'}, or drag.`}
         onPanEnd={(_, info) => {
           const projected = info.offset.y + (info.velocity.y / 1000) * 120
           const i = SNAPS.indexOf(snap)
@@ -563,8 +583,8 @@ function SnapSheet({ snap, onSnap, reduce, children }: { snap: Snap; onSnap: (s:
           else if (projected > 40) onSnap(SNAPS[Math.max(0, i - 1)])
           animate(y, 0, { type: 'spring', visualDuration: 0.3, bounce: 0 })
         }}
-        onClick={() => onSnap(snap === 'full' ? 'half' : snap === 'half' ? 'peek' : 'half')}
-        className="flex h-8 w-full shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+        onClick={() => onSnap(snap === 'peek' ? 'half' : snap === 'half' ? 'full' : 'half')}
+        className="flex h-11 w-full shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
       >
         <span className="h-1.5 w-10 rounded-full bg-noise-500/60" aria-hidden />
       </motion.button>

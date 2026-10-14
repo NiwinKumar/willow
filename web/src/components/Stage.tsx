@@ -37,7 +37,9 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   const shown = showBaseline && baseline ? baseline : session
   // Geometry follows the photo on screen: while flickering, the baseline photo has its own size,
   // regions and face position (selfies are never pixel-aligned).
-  const size = shown?.result?.image_size ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
+  // No image_size (older results): the preview's own size, never a made-up portrait frame.
+  const previewSize = shown?.preview?.width && shown.preview.height ? { width: shown.preview.width, height: shown.preview.height } : null
+  const size = shown?.result?.image_size ?? previewSize ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
   const rois = shown?.result?.rois ?? session?.result?.rois ?? []
   // A live session without the engine's preview has no picture: never draw the demo
   // illustration (its colour card and arm are not the person's), and nothing to flicker.
@@ -127,7 +129,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
             ) : (
               <Illustration site={site} session={shown} />
             )}
-            {(blank ? [] : rois).map((r) => {
+            {(blank || !photoReady ? [] : rois).map((r) => {
               const active = activeRoiNames.includes(r.name)
               const points = r.polygon.map((p) => p.join(',')).join(' ')
               return (
@@ -167,7 +169,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
             })}
             {/* Spots the engine found, labelled by Gemini (AI-suggested): small rings, the label on hover.
                 By default everything but hair and artefacts; picking a name in the spots list shows just those. */}
-            {!blank && shown === session
+            {!blank && photoReady && shown === session
               ? (session?.result?.candidates ?? [])
                   .filter((c) => {
                     const d = session?.label_details?.[c.id]
@@ -180,8 +182,11 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                     // photo size), so neighbouring spots on one cheek stay separate rings.
                     const r = Math.max(Math.max(w, h) * 0.6, Math.max(vb.w, vb.h) * 0.008)
                     const focused = spotFocus !== null
+                    // Seen in one photo only: not counted in the numbers, so a fainter ring.
+                    const frames = session?.result?.frames_used ?? 0
+                    const once = frames >= 2 && c.features?.seen_in_fraction !== undefined && Math.round(c.features.seen_in_fraction * frames) < 2
                     return (
-                      <g key={c.id} pointerEvents="visiblePainted">
+                      <g key={c.id} pointerEvents="visiblePainted" opacity={once && !focused ? 0.5 : 1}>
                         <title>{`AI-suggested: ${SPOT_NAME[d.label][0]}${seenText(c.features?.seen_in_fraction, session?.result?.frames_used)}${d.label === 'mole' ? `. ${MOLE_NOTE}` : ''}`}</title>
                         <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke="var(--color-text)" strokeOpacity={0.55} strokeWidth={focused ? 3.5 : 3} vectorEffect="non-scaling-stroke" />
                         <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke={focused ? 'var(--color-signal-500)' : d.label === 'uncertain' ? 'var(--color-noise-band)' : 'var(--color-surface)'} strokeWidth={focused ? 2 : 1.5} strokeDasharray={d.label === 'uncertain' ? '3 2' : undefined} vectorEffect="non-scaling-stroke" />

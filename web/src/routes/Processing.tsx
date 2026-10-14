@@ -198,7 +198,7 @@ export function Processing() {
       </header>
       <div className="h-[40dvh]">
         {scripted || view ? (
-          <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'frame', 'frames')} />
+          <Stage site={site} session={stageSession} baseline={null} metricId={null} layer={false} className="h-full" caption={plural(view?.session.n_frames ?? n, 'photo', 'photos')} />
         ) : (
           <div className="flex h-full items-center justify-center bg-surface-2 px-8 text-center text-[13px] text-text-3">
             {plural(n, 'photo', 'photos')} received. Measuring {n === 1 ? 'it' : 'them'} now.
@@ -215,7 +215,7 @@ export function Processing() {
         <ol className="mt-4 space-y-3" aria-live="polite">
           {LABELS.map((label, i) => {
             const state = unmeasured && i > 0 && i < done ? 'skipped' : i < done ? 'done' : error ? 'stopped' : i === done ? 'active' : 'pending'
-            const text = state === 'done' || state === 'skipped' ? (results?.[i] ?? (scripted ? scriptedResult(i, n) : label)) : label
+            const text = state === 'done' || state === 'skipped' ? (results?.[i] ?? (scripted ? scriptedResult(i, n, site) : label)) : label
             return (
               <li key={label} className="flex items-center gap-3">
                 <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${state === 'done' ? 'border-willow-500 bg-willow-100 text-willow-700' : state === 'active' ? 'border-text' : 'border-border'}`} aria-hidden>
@@ -274,6 +274,14 @@ export function Processing() {
   )
 }
 
-function scriptedResult(i: number, n: number): string {
-  return [`${n} of ${n} frames passed`, 'Colour card found, ΔE 2.4', '11 metrics against your baseline', 'Numbers verified, nothing invented'][i]
+/** The played stages of a demo run, worded from what the demo journey actually shows. */
+function scriptedResult(i: number, n: number, site: Site): string {
+  const face = site === 'face_full'
+  const metrics = DEMO_SERIES[site]?.sessions.at(-1)?.result?.metrics.length ?? 0
+  return [
+    `${n} of ${n} ${n === 1 ? 'photo' : 'photos'} passed the quality check`,
+    face ? 'Face photo: colours as the camera captured them' : 'Colours corrected with the white paper',
+    `${metrics} ${metrics === 1 ? 'metric' : 'metrics'} compared with your baseline`,
+    'Numbers verified, nothing invented',
+  ][i]
 }

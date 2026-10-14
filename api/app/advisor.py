@@ -120,7 +120,7 @@ def context(store: Store, uid: str) -> dict[str, Any]:
                 {
                     **{k: m.get(k) for k in ("id", "label", "verdict", "confidence")},
                     # The unit as the app writes it (° or a*), never the key ("deg", "a_star").
-                    "unit": explain.UNIT_DISPLAY.get(m["unit"], "").strip() or m["unit"],
+                    "unit": explain.UNIT_DISPLAY.get(m["unit"], m["unit"]).strip(),
                     **explain.shown_numbers(m),
                 }
                 for m in result["metrics"]

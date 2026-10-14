@@ -206,7 +206,7 @@ def fixture_result(request: dict[str, Any]) -> dict[str, Any]:
         if n == 1:
             m["within_session_sd"] = None
             m["mdc95"] = None
-        if uncalibrated:
+        if uncalibrated or site == "face_full":  # faces have no colour reference (engine)
             m["confidence"] = "indicative"
         _apply_baseline(m, baseline.get(metric_id))
         metrics.append(m)

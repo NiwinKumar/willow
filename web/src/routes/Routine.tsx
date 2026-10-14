@@ -75,6 +75,8 @@ export function Routine() {
   const [loadRetry, setLoadRetry] = useState(0)
   const [removing, setRemoving] = useState<RoutineEntry | null>(null)
   const [checking, setChecking] = useState(false)
+  const [checkFailed, setCheckFailed] = useState(false)
+  const [checkRetry, setCheckRetry] = useState(0)
   // Stopping a product keeps it (with its dates) under "Stopped", so its outcome stays linked;
   // "added by mistake" deletes it. The list changes only once the api confirms.
   const stopEntry = async (e: RoutineEntry) => {
@@ -114,9 +116,15 @@ export function Routine() {
       if (alive) setChecking(true)
       try {
         const res = await api.routineCheck(await getIdToken())
-        if (alive) setCheck(res)
+        if (alive) {
+          setCheck(res)
+          setCheckFailed(false)
+        }
       } catch {
-        if (alive) setCheck(null)
+        if (alive) {
+          setCheck(null)
+          setCheckFailed(true)
+        }
       } finally {
         if (alive) setChecking(false)
       }
@@ -125,7 +133,7 @@ export function Routine() {
       alive = false
       window.clearTimeout(t)
     }
-  }, [live, user, routineKey, getIdToken])
+  }, [live, user, routineKey, getIdToken, checkRetry])
   const [add, setAdd] = useState<'closed' | 'pick' | 'scan' | 'search' | 'confirm'>('closed')
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -194,7 +202,7 @@ export function Routine() {
   const stopped = entries.filter((e) => e.ended_at)
   const findings = openConflicts.length + (check?.duplicates.length ?? 0) + (check?.gaps.length ?? 0)
   // Never "Looks compatible" before the check has answered.
-  const status = current.length === 0 ? 'Add products to check compatibility' : !check ? (live && (checking || !rawCheck) ? 'Checking compatibility…' : 'Compatibility not checked') : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
+  const status = current.length === 0 ? 'Add products to check compatibility' : !check ? (live && !checkFailed ? 'Checking compatibility…' : 'Compatibility not checked') : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
   const demoResults = useMemo(() => (query.trim().length < 2 ? CATALOG : CATALOG.filter((p) => `${p.brand} ${p.name}`.toLowerCase().includes(query.toLowerCase()))), [query])
   const results = live ? liveResults : demoResults
 
@@ -362,12 +370,17 @@ export function Routine() {
 
       <section className="mt-8" aria-labelledby="compat">
         <h2 id="compat" className="text-[17px] font-semibold">Compatibility</h2>
-        {checking && !check ? (
+        {!check && live && current.length >= 1 && (checking || !checkFailed) ? (
           <p className="mt-1 text-[13px] text-text-2">Checking your routine…</p>
         ) : check ? (
           <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.conflicts.some((c) => c.source === 'model') ? ' and by AI (marked)' : ''}{check.notes.length ? ` · ${check.notes[0]}` : ''}</p>
-        ) : entries.length >= 1 && live ? (
-          <p className="mt-1 text-[13px] text-text-2">The check could not run just now. Your products are saved.</p>
+        ) : current.length >= 1 && live && checkFailed ? (
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[13px] text-text-2">
+            The check could not run just now. Your products are saved.
+            <button type="button" className="min-h-11 font-medium text-text underline-offset-2 hover:underline" onClick={() => setCheckRetry((n) => n + 1)}>
+              Check again
+            </button>
+          </p>
         ) : (
           <p className="mt-1 text-[13px] text-text-2">Add two products and Willow checks them.</p>
         )}
