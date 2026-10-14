@@ -186,3 +186,22 @@ def test_hair_follicles_are_not_a_dot_square():
         find_dot_square(_hairy_arm(with_dots=False))
     box, _ = find_dot_square(_hairy_arm(with_dots=True))
     assert abs(box.x + box.w / 2 - 475) < 8 and abs(box.y + box.h / 2 - 575) < 8
+
+
+def test_band_is_wider_for_small_sessions_and_never_zero():
+    from app.aggregate import mdc95, summarize
+
+    z = 1.96 * math.sqrt(2)
+    assert mdc95(1.0, 5) == pytest.approx(max(z, 2.776 * math.sqrt(1.2)), rel=1e-3)
+    assert mdc95(1.0, 2) > 5 * z  # an SD from 2 photos is barely known
+    flat = summarize([2.0, 2.0, 2.0], None, min_sd=0.5)  # a count that did not move
+    assert flat["mdc95"] > 0
+    later = summarize([3.0], {"mean": 2.0, "mdc95": flat["mdc95"]})
+    assert later["verdict"] == "within_noise"  # one more mark is not a real change
+
+
+def test_direction_follows_the_rounded_delta():
+    from app.aggregate import summarize
+
+    s = summarize([10.0001], {"mean": 10.0, "mdc95": 1.0})
+    assert s["delta"] == 0.0 and s["direction"] == "none"

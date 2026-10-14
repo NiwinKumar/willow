@@ -36,6 +36,7 @@ DOT_STANDOUT = 1.8
 # ...and no spot nearly as strong as the weakest dot may sit inside the square (a square
 # drawn through a field of follicles is chance, not four pen marks).
 DOT_INSIDE_FRAC = 0.6
+TEXTURE_MIN_SPOTS = 12  # fewer spots besides the dots: no skin texture to judge against
 
 
 def _small_grey(srgb8: np.ndarray) -> np.ndarray:
@@ -102,10 +103,12 @@ def _distinct(cands: list, combo: np.ndarray, rest: list[float] | None = None) -
     dots = [cands[i] for i in chosen]
     others = [c for i, c in enumerate(cands) if i not in chosen]
     weakest = min(d[2] for d in dots)
-    # Compare with the spots weaker than these dots (another real square's dots are as strong
-    # and must not count against them): ink stands far above skin texture, follicles do not.
-    weaker = [c[2] for c in others if c[2] < weakest] + [c for c in rest or [] if c < weakest]
-    if len(weaker) >= 3 and weakest < DOT_STANDOUT * float(np.median(weaker)):
+    # Skin texture is the typical spot in the photo. With many spots (hair, pores) the four dots
+    # must stand far above it; with few, the spots are the dots themselves and there is no
+    # texture to compare with.
+    # Texture = every spot but the 8 strongest (as many as two squares of dots).
+    texture = sorted([c[2] for c in cands] + list(rest or []), reverse=True)[8:]
+    if len(texture) >= TEXTURE_MIN_SPOTS and weakest < DOT_STANDOUT * float(np.median(texture)):
         return False
     quad = np.array([d[:2] for d in dots])
     # inside the dots' bounding square, shrunk a little so dots on the edge do not count

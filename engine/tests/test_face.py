@@ -336,7 +336,8 @@ def test_counts_use_only_marks_seen_in_another_photo(tmp_path, fake_landmarks):
         files.append(str(tmp_path / f"f{i}.jpg"))
     r = analyze_face(files)
     blem = next(m for m in r["metrics"] if m["id"] == "blemishes")
-    assert blem["value"] == 1.0 and blem["within_session_sd"] == 0.0  # the fluke is not counted
+    assert blem["value"] == 1.0  # the fluke is not counted
+    assert blem["within_session_sd"] == config.MIN_SD["blemishes"]  # identical counts: the floor
     assert len([c for c in r["candidates"] if c["kind"] == "blemish"]) == 2  # still shown
 
 
