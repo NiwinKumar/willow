@@ -112,3 +112,23 @@ def test_gemini_down_is_a_clear_error_and_the_question_is_refunded(client, fake,
     assert res.json()["detail"]["code"] == "assistant_unavailable"
     day = datetime.now(UTC).date().isoformat()
     assert fake.store.usage_incr("u_test", day, "retailer_ask", 0) == 0
+
+
+def test_chart_labels_may_name_any_product_with_evidence():
+    from app.retailer_ask import _names
+
+    data = {
+        "products": [],
+        "product_outcomes": {
+            "p1": {
+                "product": "Alpha Arbutin 2% + HA",
+                "brand": "Minimalist",
+                "concern": "dark spots",
+                "n": 20,
+                "rate": 0.5,
+                "weeks": 6,
+                "cont": 0.8,
+            },
+        },
+    }
+    assert "alpha arbutin 2% + ha" in _names(data)

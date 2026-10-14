@@ -62,7 +62,8 @@ export function Capture() {
   const [uploadFew, setUploadFew] = useState(false)
   // One baseline per site and capture mode: quick selfies are never compared with RAW photos.
   // Photos saved before a site is measured count: the first of them becomes the baseline later.
-  const baselineNeeded = baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
+  // Only once the sessions have loaded: never ask for a baseline someone already has.
+  const baselineNeeded = (data.mode !== 'live' || data.status === 'ready') && baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
   const steps = photoSteps(site, mode)
   const expected = baselineNeeded ? 5 : 3
   const ready = rows.length > 0 && (rows.length >= expected || uploadFew)

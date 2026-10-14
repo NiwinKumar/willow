@@ -112,10 +112,10 @@ function Dot(props: { cx?: number; cy?: number; payload?: Point }) {
 }
 
 const WHAT: Record<Metric['id'], string> = {
-  tone_ita: 'The Individual Typology Angle computed from L* and b* of your cheek (or forearm square) after colour calibration. A description of tone, never a score, and no direction is better.',
-  pigment_spots: 'The share of skin area where the melanin proxy sits well above your own skin median, after colour calibration. Reported with the count and mean contrast.',
+  tone_ita: 'The Individual Typology Angle computed from L* and b* of your cheek (or forearm square), colour-corrected when the photo has a white reference. A description of tone, never a score, and no direction is better.',
+  pigment_spots: 'The share of skin area where the melanin proxy sits well above your own skin median. Reported with the count and mean contrast.',
   tone_evenness: 'How much lightness varies across your face regions and within them. Lower means more even.',
-  redness: 'Mean a* (red-green) over the cheek and nose regions, relative to your own skin, after colour calibration. Harder to read on deep skin tones; then shown as indicative.',
+  redness: 'Mean a* (red-green) over the cheek and nose regions, relative to your own skin, colour-corrected when the photo has a white reference. Harder to read on deep skin tones; then shown as indicative.',
   blemishes: 'Candidate blemishes the engine found by local redness and shading. Gemini labels each one; the count is indicative.',
   pores: 'Dark blobs between 0.05 and 0.3 mm on the close-up, as density per cm² and mean diameter.',
   texture: 'Fine-scale roughness energy on the close-up, normalised by lightness. Downgraded to indicative if its noise band is too wide.',

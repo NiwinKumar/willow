@@ -32,7 +32,7 @@ export function QuickCapture() {
   const { user, continueAsGuest } = useAuth()
   const data = useData()
   const site = (params.get('site') as Site) ?? 'face_full'
-  const firstSession = baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
+  const firstSession = (data.mode !== 'live' || data.status === 'ready') && baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
   // Fixed once the person's sessions are known (a deep link may arrive before they load), then kept
   // for the whole capture even if the list refreshes while the camera is open.
   const known = data.mode === 'demo' || data.status === 'ready' || data.status === 'error' || data.status === 'idle'

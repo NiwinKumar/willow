@@ -127,7 +127,11 @@ export function Advisor() {
               </div>
             ),
           )}
-          {thinking ? <p className="text-[15px] text-text-3">Writing…</p> : null}
+          {thinking ? (
+            <p role="status" className="text-[15px] text-text-3">
+              {data.mode === 'demo' ? 'Writing…' : 'Gemini is reading your results and routine, and searching the catalog if needed. This takes 10 to 30 seconds.'}
+            </p>
+          ) : null}
           {turns.length === 0 ? (
             <div className="pt-8 text-[15px] text-text-2">
               <p>Ask about a result, a product or your routine.</p>
