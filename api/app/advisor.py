@@ -98,11 +98,12 @@ def _compact(p: dict[str, Any]) -> dict[str, Any]:
 
 
 def context(store: Store, uid: str) -> dict[str, Any]:
-    """Latest measured session per site and capture mode, plus the routine."""
+    """Latest measured session (quality passed) per site and capture mode, plus the routine."""
     latest: dict[str, dict[str, Any]] = {}
     for sid, doc in sorted(store.sessions_list(uid), key=lambda r: str(r[1].get("created_at"))):
         result = measured_result(doc)
-        if doc.get("status") != "done" or result is None:
+        # A session that failed the quality check has no numbers: keep the last good reading.
+        if doc.get("status") != "done" or result is None or not result["quality"]["passed"]:
             continue
         latest[f"{doc['site']} ({doc['capture_mode']})"] = {
             "session_id": sid,
@@ -111,12 +112,12 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "photos": doc.get("n_frames"),
             "photos_used": result["frames_used"],
             "quality_passed": result["quality"]["passed"],
-            # Rounded as the app shows them (explain.UNIT_DISPLAY), so the advisor never quotes
+            # Rounded as the app shows them (explain.decimals), so the advisor never quotes
             # 2.5 blemishes for a screen that says 3.
             "metrics": [
                 {
                     **{k: m.get(k) for k in ("id", "label", "unit", "verdict", "confidence")},
-                    **{k: explain._shown(m.get(k), m["unit"]) for k in ("value", "delta", "mdc95")},
+                    **explain.shown_numbers(m),
                 }
                 for m in result["metrics"]
             ],

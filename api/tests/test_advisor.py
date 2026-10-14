@@ -166,3 +166,43 @@ def test_product_tools_carry_cohort_outcomes_labelled_synthetic(monkeypatch):
     out = advisor.run_tool("compare_products", {"product_ids": [pid]}, MemoryStore(), "u")
     assert out["measured_outcomes"]["synthetic_cohort"] is True
     assert out["measured_outcomes"]["by_product"] == {pid: {"n": 40, "rate": 0.55, "weeks": 6}}
+
+
+def test_context_keeps_the_last_good_reading_and_rounds_like_the_screen(fake):
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    def doc(passed, value, when):
+        return {
+            "status": "done",
+            "site": "face_full",
+            "capture_mode": "uncalibrated",
+            "n_frames": 3,
+            "measured": True,
+            "created_at": when,
+            "result_json": json.dumps(
+                {
+                    "frames_used": 2 if passed else 0,
+                    "quality": {"passed": passed},
+                    "metrics": [
+                        {
+                            "id": "blemishes",
+                            "label": "Blemishes",
+                            "unit": "count",
+                            "value": value,
+                            "delta": None,
+                            "mdc95": None,
+                            "verdict": "no_baseline",
+                            "confidence": "indicative",
+                        }
+                    ],
+                }
+            ),
+        }
+
+    now = datetime.now(UTC)
+    fake.store.session_set("u_test", "s_good", doc(True, 2.5, now - timedelta(days=1)))
+    fake.store.session_set("u_test", "s_blurry", doc(False, None, now))
+    latest = advisor.context(fake.store, "u_test")["latest_sessions"]["face_full (uncalibrated)"]
+    assert latest["session_id"] == "s_good" and latest["photos_used"] == 2
+    assert latest["metrics"][0]["value"] == 3

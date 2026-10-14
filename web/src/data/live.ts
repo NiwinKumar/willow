@@ -68,6 +68,9 @@ export function baselineFor(session: Session | null, sessions: Session[]): Sessi
   if (!session) return null
   const id = session.baseline_ref?.session_id
   if (id) return sessions.find((s) => s.id === id) ?? null
+  // A live session the api says was compared with nothing (a former baseline, demoted by "Make
+  // this my baseline") has no baseline; never borrow today's, which may be newer than it.
+  if (session.live && !session.is_baseline && session.baseline_ref === null && session.measured !== false) return null
   return sessions.find((s) => s.is_baseline && s.capture_mode === session.capture_mode) ?? sessions.find((s) => s.is_baseline) ?? null
 }
 

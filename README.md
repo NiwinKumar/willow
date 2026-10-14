@@ -77,7 +77,7 @@ cd api && uv sync && ENGINE_MODE=fixture AUTH_MODE=dev uv run uvicorn app.main:a
 cd web && npm ci && VITE_AUTH_MODE=dev VITE_DEV_UID=local npm run dev
 ```
 
-`ENGINE_MODE=fixture` answers from the contract fixture (labelled as a sample, never as a measurement). For a full end-to-end run against the real engine, storage, Firestore, Gemini and BigQuery, see `docs/LOCAL_DEV.md` and `api/scripts/e2e.py` (27 checks).
+`ENGINE_MODE=fixture` answers from the contract fixture (labelled as a sample, never as a measurement). For a full end-to-end run against the real engine, storage, Firestore, Gemini and BigQuery, see `docs/LOCAL_DEV.md` and `api/scripts/e2e.py` (34 checks with face selfies).
 
 Tests: `cd api && uv run pytest` and `cd web && npm run lint`.
 
