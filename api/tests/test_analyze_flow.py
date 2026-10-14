@@ -501,3 +501,26 @@ def test_counts_are_not_compared_across_one_photo_and_several():
     same = {"site": "face_full", "frames_used": 3, "metrics": [{"id": "blemishes", "delta": -1}]}
     baselines.guard_counts(same, {"frames": 5})
     assert same["metrics"][0]["delta"] == -1
+
+
+def test_no_comparison_across_engine_versions_and_bands_from_the_baseline():
+    from app import baselines, explain
+
+    result = {
+        "engine_version": "0.3.0",
+        "warnings": [],
+        "metrics": [{"id": "redness", "delta": 1.0, "verdict": "real_change", "direction": "x"}],
+    }
+    baselines.guard_engine_version(result, {"engine_version": "0.2.0"})
+    assert result["metrics"][0]["delta"] is None and result["warnings"] == [
+        baselines.ENGINE_CHANGED
+    ]
+    same = {"engine_version": "0.3.4", "metrics": [{"id": "redness", "delta": 1.0}]}
+    baselines.guard_engine_version(same, {"engine_version": "0.3.0"})
+    assert same["metrics"][0]["delta"] == 1.0  # a patch release keeps comparisons
+
+    banded = explain.with_bands(
+        {"metrics": [{"id": "redness", "unit": "a_star", "delta": 1.2, "mdc95": None}]},
+        {"redness": 0.9},
+    )
+    assert banded["metrics"][0]["mdc95"] == 0.9  # the band the verdict used
