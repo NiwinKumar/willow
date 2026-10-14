@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from jsonschema import validate
 from PIL import Image
+from test_macro import _macro
 from test_skin_tones import PEN, TONES, _arm_photo
 
 from app.io import LOCAL_ENV, parse_gs_uri
@@ -86,10 +87,14 @@ def test_photo_without_dots_fails_quality_not_request(tmp_path, local_files):
     assert any("pen-dot square not found" in w for w in body["warnings"])
 
 
-def test_macro_site_is_marked_placeholder():
-    res = client.post("/v1/analyze", json=_request("cheek_macro", ["gs://b/u/s/frame_1.jpg"]))
+def test_nose_close_up_is_analyzed(tmp_path, local_files):
+    _macro(tmp_path / "nose.jpg")
+    res = client.post("/v1/analyze", json=_request("nose_macro", [str(tmp_path / "nose.jpg")]))
     assert res.status_code == 200
-    assert res.json()["warnings"][0].startswith("placeholder")
+    body = res.json()
+    validate(body, SCHEMA)
+    assert {m["id"] for m in body["metrics"]} == {"blemishes", "pores"}
+    assert not any(w.startswith("placeholder") for w in body["warnings"])
 
 
 @pytest.mark.parametrize(
