@@ -26,7 +26,7 @@ from app.aggregate import summarize
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
 from app.io import save_preview
-from app.landmarks import CHEEKS, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
+from app.landmarks import EYE_OUTER, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
 from app.metrics.blemish import find_blemishes
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.pores import blackheads, find_pores, pores_per_cm2
@@ -46,27 +46,11 @@ REGIONS = {
 }
 MACRO_SITES = set(REGIONS)  # the request schema admits only the contract's two
 CONTRACT_SITES = {"cheek_macro", "nose_macro"}
-# lower lip's lower edge and the chin / jaw line of the face mesh
-CHIN_CLOSEUP = [
-    91,
-    181,
-    84,
-    17,
-    314,
-    405,
-    321,
-    365,
-    379,
-    378,
-    400,
-    377,
-    152,
-    148,
-    176,
-    149,
-    150,
-    136,
-]
+# face mesh points the close-up regions are cut along
+LOWER_LIP_BOTTOM = 17
+LOWER_LIDS = (145, 374)  # right, left
+MOUTH_CORNERS = (61, 291)
+NOSE_WINGS = (129, 358)  # right, left
 BROW_TOPS = (105, 334)  # upper edge of each brow
 IRIS = ([468, 469, 470, 471, 472], [473, 474, 475, 476, 477])  # centre, then 4 edge points
 METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
@@ -160,30 +144,49 @@ def _iris_px_per_mm(face: Face, shape: tuple[int, int]) -> float | None:
     return best / config.CLOSEUP_IRIS_MM if best else None
 
 
+def _axes(face: Face) -> tuple[np.ndarray, np.ndarray]:
+    """Unit vectors in the photo: across the face (right eye -> left eye) and up (chin ->
+    forehead)."""
+    across = face.points[EYE_OUTER[1]] - face.points[EYE_OUTER[0]]
+    up = face.points[10] - face.points[152]
+    return across / np.linalg.norm(across), up / np.linalg.norm(up)
+
+
 def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
     """The site's region of the face, without eyes, lids, lips, brows (and their margins)."""
     if region == "nose":  # nostril openings are cut by colour (too dark for skin)
         area = face.nose_mask(shape)
-    elif region == "cheek":
-        polys = face.roi_polygons()
-        area = np.zeros(shape, bool)
-        for name in CHEEKS:
-            if name in polys:
-                area |= polygon_mask(shape, polys[name])
-    elif region == "chin":  # lower lip down to the jaw line (wider than the face ROI)
-        hull = cv2.convexHull(face.points[CHIN_CLOSEUP].astype(np.float32)).reshape(-1, 2)
-        area = polygon_mask(shape, hull)
-    else:  # forehead: the whole face outline above the brow tops (the outline is lifted
-        # into the hair; hair is cut by colour), from every view
-        front = dataclasses.replace(face, yaw=0.0)
-        (x1, y1), (x2, y2) = face.points[BROW_TOPS[0]], face.points[BROW_TOPS[1]]
-        yy, xx = np.mgrid[: shape[0], : shape[1]]
-        side = (x2 - x1) * (yy - y1) - (y2 - y1) * (xx - x1)  # sign: which side of brow line
-        up = face.points[10]  # mesh top: on the forehead side
-        up_sign = np.sign((x2 - x1) * (up[1] - y1) - (y2 - y1) * (up[0] - x1))
-        area = polygon_mask(shape, front.outline()) & (side * up_sign > 0)
+    else:  # cheek, chin, forehead: wide areas of the face outline, cut along face lines
+        across, up = _axes(face)
+        yy, xx = np.mgrid[: shape[0], : shape[1]].astype(np.float32)
+        origin = face.points[1]  # nose tip
+        s_px = (xx - origin[0]) * across[0] + (yy - origin[1]) * across[1]  # toward left eye
+        t_px = (xx - origin[0]) * up[0] + (yy - origin[1]) * up[1]  # toward the forehead
+
+        def s_of(i):
+            return float((face.points[i] - origin) @ across)
+
+        def t_of(*idx):
+            return float(np.mean([(face.points[i] - origin) @ up for i in idx]))
+
+        if region == "forehead":  # above the brow tops; front outline is lifted into the hair
+            outline = dataclasses.replace(face, yaw=0.0).outline()
+            area = polygon_mask(shape, outline) & (t_px > t_of(*BROW_TOPS))
+        elif region == "chin":  # below the lower lip, down to the jaw line
+            outline = dataclasses.replace(face, yaw=0.0).outline()
+            area = polygon_mask(shape, outline) & (t_px < t_of(LOWER_LIP_BOTTOM))
+        else:  # cheek: lower lids to mouth corners, side of the nose wing to the face edge
+            band = (t_px < t_of(*LOWER_LIDS)) & (t_px > t_of(*MOUTH_CORNERS))
+            sides = np.zeros(shape, bool)
+            if "right_cheek" in face.cheeks:
+                sides |= s_px < s_of(NOSE_WINGS[0])
+            if "left_cheek" in face.cheeks:
+                sides |= s_px > s_of(NOSE_WINGS[1])
+            area = polygon_mask(shape, face.outline()) & band & sides & ~face.nose_mask(shape)
     guard = face.brow_guard(shape) | face.eye_corner_guard(shape)
-    return area & face.skin_mask(shape) & ~guard & _edges(shape)
+    # forehead and chin are mid-face: the whole face, not only the half a turned face shows
+    whole = dataclasses.replace(face, yaw=0.0) if region in ("forehead", "chin") else face
+    return area & whole.skin_mask(shape) & ~guard & _edges(shape)
 
 
 def _scaled(mark, back: float):
