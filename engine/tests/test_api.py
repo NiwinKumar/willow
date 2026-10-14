@@ -88,7 +88,7 @@ def test_photo_without_dots_fails_quality_not_request(tmp_path, local_files):
 
 
 def test_nose_close_up_is_analyzed(tmp_path, local_files):
-    _macro(tmp_path / "nose.jpg", blackheads=2)
+    _macro(tmp_path / "nose.jpg")
     res = client.post("/v1/analyze", json=_request("nose_macro", [str(tmp_path / "nose.jpg")]))
     assert res.status_code == 200
     body = res.json()

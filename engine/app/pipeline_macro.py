@@ -6,7 +6,7 @@ back to skin by colour over the whole photo and the assumed MACRO_FIELD_WIDTH_MM
 once with scripts/macro_scale.py).
 
 cheek_macro   : tone_ita, pigment_spots, redness, blemishes, pores, texture
-nose_macro    : blemishes (extras: blackheads), pores
+nose_macro    : blemishes, pores
 forehead_macro: blemishes, pores, texture   (not in the contract yet: CLI only)
 chin_macro    : blemishes, pores, texture   (not in the contract yet: CLI only)
 """
@@ -31,7 +31,7 @@ from app.io import save_preview
 from app.landmarks import EYE_OUTER, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
 from app.metrics.blemish import find_blemishes
 from app.metrics.pigment import find_spots, pigment_spots
-from app.metrics.pores import blackheads, find_pores, pores_per_cm2
+from app.metrics.pores import find_pores, pores_per_cm2
 from app.metrics.redness import erythema_index
 from app.metrics.texture import texture
 from app.metrics.tone import ita_band, ita_degrees
@@ -96,7 +96,7 @@ def _region_skin(
 ) -> np.ndarray:
     """Skin of a landmark region: drops hair (darker AND grey), nostril openings (far darker,
     nose only) and clipped glare. Lit and shaded skin stay (a
-    close-up's light falls off across the face), and small dark holes (blackheads, marks,
+    close-up's light falls off across the face), and small dark holes (dark pores, marks,
     moles) are refilled. Keeps the `pieces` largest parts big enough to measure (cheeks: both,
     cheeks; a forehead's other bits are hair highlights or background between strands)."""
     L = lab[..., 0]
@@ -342,7 +342,7 @@ def _frame(path: str, site: str) -> dict:
             extras["texture"] = {}
     values.update(blemishes=float(len(blems)), pores=pores_val)
     extras.update(
-        blemishes={"blackheads": blackheads(pores)} if site == "nose_macro" else {},
+        blemishes={},
         pores=pores_extras,
     )
     contours = cv2.findContours(skin.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[
@@ -410,7 +410,7 @@ def analyze_macro(
             extras = _mean_extras([f["extras"][metric_id] for f in have])
             if metric_id == "tone_ita":
                 extras["ita_band"] = ita_band(summary["value"])
-            for k in ("count", "blackheads"):
+            for k in ("count",):
                 if k in extras:
                     extras[k] = round(extras[k])
         else:

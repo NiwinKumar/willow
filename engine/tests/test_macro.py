@@ -1,4 +1,4 @@
-"""Close-up sites (cheek_macro, nose_macro): pores, texture, blackheads on synthetic macro
+"""Close-up sites (cheek_macro, nose_macro): pores, texture and blemishes on synthetic macro
 photos with a known scale (MACRO_FIELD_WIDTH_MM across the long edge)."""
 
 import numpy as np
@@ -27,7 +27,6 @@ def _macro(
     bumps=0.3,
     w=W,
     h=H,
-    blackheads=0,
     hair=False,
     seed=0,
 ):
@@ -47,10 +46,6 @@ def _macro(
         y0, y1, x0, x1 = int(y - 2 * r), int(y + 2 * r) + 1, int(x - 2 * r), int(x + 2 * r) + 1
         d2 = (yy[y0:y1] - y) ** 2 + (xx[:, x0:x1] - x) ** 2
         lab[y0:y1, x0:x1, 0] -= pore_dl * np.exp(-d2 / (2 * (r * 0.7) ** 2))
-    for i in range(blackheads):  # dark, grey plugs 0.2 mm across
-        cx, cy = w * (0.2 + 0.15 * i), h * 0.5
-        disk = (xx - cx) ** 2 + (yy - cy) ** 2 <= (0.1 * ppm) ** 2
-        lab[disk] = (L - 25, 2.0, 3.0)
     if hair:  # a dark hair across the field, 0.05 mm wide
         band = np.abs((yy - h * 0.3) - 0.2 * (xx - w * 0.2)) <= 0.03 * ppm
         lab[band & (xx > 0.2 * w) & (xx < 0.8 * w), 0] -= 20
@@ -96,11 +91,12 @@ def test_a_hair_is_not_a_row_of_pores(tmp_path):
     assert hairy == pytest.approx(plain, rel=0.15)
 
 
-def test_nose_close_up_counts_blackheads(tmp_path):
-    _macro(tmp_path / "nose.jpg", blackheads=4)
+def test_nose_close_up_has_blemishes_and_pores(tmp_path):
+    true = _macro(tmp_path / "nose.jpg")
     r = analyze_macro([str(tmp_path / "nose.jpg")], "nose_macro")
     assert {m["id"] for m in r["metrics"]} == {"blemishes", "pores"}
-    assert _metric(r, "blemishes")["extras"]["blackheads"] == 4
+    assert _metric(r, "pores")["value"] == pytest.approx(true, rel=0.3)
+    assert "blackheads" not in _metric(r, "blemishes")["extras"]
 
 
 def test_low_resolution_close_up_gives_no_pores(tmp_path):
