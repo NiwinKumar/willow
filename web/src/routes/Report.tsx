@@ -99,12 +99,15 @@ export function Report() {
   const outsideCount = useCallback((s: Session) => (s.result?.metrics ?? []).filter((m) => m.verdict === 'real_change').length, [])
   const onScrub = useCallback((i: number) => view.set({ t: i }), [view])
 
-  // Keyboard: arrows scrub, L toggles the layer, ? not yet.
+  // Keyboard: arrows scrub, Home/End jump to the baseline/latest, L toggles the layer, ? lists keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'ArrowLeft') view.set({ t: Math.max(0, index - 1) })
       else if (e.key === 'ArrowRight') view.set({ t: Math.min(sessions.length - 1, index + 1) })
+      else if (e.key === 'Home') view.set({ t: 0 })
+      else if (e.key === 'End') view.set({ t: Math.max(0, sessions.length - 1) })
       else if (e.key.toLowerCase() === 'l') view.set({ layer: !view.layer })
       else if (e.key === '?') setKeys(true)
     }
