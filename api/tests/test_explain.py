@@ -179,3 +179,11 @@ def test_negation_anywhere_earlier_in_the_sentence():
     )
     assert not _claims_change("Without a noise band yet to confirm a real change.")
     assert _claims_change("No noise band yet. This is a real change.")
+
+
+def test_rounding_matches_the_screen():
+    from app.explain import _shown
+
+    assert _shown(2.5, "count") == 3
+    assert _shown(-0.04, "deg") == 0
+    assert _shown(1.25, "a_star") == 1.3  # never banker's 1.2

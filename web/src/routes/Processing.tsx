@@ -233,7 +233,7 @@ export function Processing() {
         {unmeasured && done >= LABELS.length ? (
           <div className="mt-6 space-y-3">
             <p className="text-[15px] text-text-2">
-              Willow measures forearm photos today. {SITE_LABEL[view!.session.site]} measurement is still being built, so this session has no numbers. Your photos are kept and can be measured when it is ready.
+              Willow measures face and forearm photos today. {SITE_LABEL[view!.session.site]} measurement is still being built, so this session has no numbers. Your photos are kept and can be measured when it is ready.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => navigate('/capture?site=forearm_control')}>Photograph a forearm</Button>

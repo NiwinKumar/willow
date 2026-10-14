@@ -145,7 +145,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                   const r = Math.max(w, h) * 0.75 + 14
                   return (
                     <g key={c.id} pointerEvents="visiblePainted">
-                      <title>{`AI-suggested: ${SPOT_NAME[d.label][0]}${d.label === 'mole' ? `. ${MOLE_NOTE}` : ''}`}</title>
+                      <title>{`AI-suggested: ${SPOT_NAME[d.label][0]}${seenText(c.features?.seen_in_fraction, session?.result?.frames_used)}${d.label === 'mole' ? `. ${MOLE_NOTE}` : ''}`}</title>
                       <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke="var(--color-text)" strokeOpacity={0.55} strokeWidth={4} vectorEffect="non-scaling-stroke" />
                       <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke={d.label === 'uncertain' ? 'var(--color-noise-band)' : 'var(--color-surface)'} strokeWidth={2} strokeDasharray={d.label === 'uncertain' ? '4 3' : undefined} vectorEffect="non-scaling-stroke" />
                     </g>
@@ -170,4 +170,10 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
       </div>
     </div>
   )
+}
+
+/** "seen in 2 of 3 photos" from the engine's alignment (face sessions with more than one photo). */
+function seenText(fraction: number | undefined, frames: number | undefined): string {
+  if (fraction === undefined || !frames || frames < 2) return ''
+  return ` (seen in ${Math.round(fraction * frames)} of ${frames} photos)`
 }

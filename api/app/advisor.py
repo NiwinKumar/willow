@@ -143,7 +143,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
     return {
         "latest_sessions": latest,
         "routine": routine,
-        "note": "Only forearm sites are measured today; other sites are not measured yet.",
+        "note": "Face and forearm sites are measured; cheek and nose close-ups are not "
+        "measured yet.",
     }
 
 

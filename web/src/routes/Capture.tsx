@@ -109,7 +109,7 @@ export function Capture() {
           </ul>
           {data.mode === 'live' && !MEASURED_SITES.includes(site) ? (
             <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-              {SITE_LABEL[site]} is not measured yet: photos are saved and can be measured when it is ready. Forearm photos are measured today.
+              {SITE_LABEL[site]} is not measured yet: photos are saved and can be measured when it is ready. Face and forearm photos are measured today.
             </p>
           ) : null}
           {!baselineNeeded ? <p className="mt-2 text-[13px] text-text-2">Check-in: 3 photos, compared with your baseline.</p> : null}
