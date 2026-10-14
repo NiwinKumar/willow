@@ -34,7 +34,18 @@ def ask(
     try:
         data = retailer.insights()
     except Exception as exc:
+        limits.refund(store, user.uid, "retailer_ask")
         raise HTTPException(
             503, {"code": "insights_unavailable", "message": "Insights are unavailable right now."}
         ) from exc
-    return retailer_ask.ask(body.question, data)
+    try:
+        return retailer_ask.ask(body.question, data)
+    except retailer_ask.Unavailable as exc:
+        limits.refund(store, user.uid, "retailer_ask")
+        raise HTTPException(
+            503,
+            {
+                "code": "assistant_unavailable",
+                "message": "The assistant is unavailable right now. Try again in a minute.",
+            },
+        ) from exc

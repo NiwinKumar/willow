@@ -20,7 +20,7 @@ const LIVE_STARTERS = ['What do my latest results mean?', 'Is my routine OK toge
 export function Advisor() {
   const data = useData()
   const { user, getIdToken, continueAsGuest } = useAuth()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const sessions = useMemo(() => data.series('face_full')?.sessions ?? [], [data])
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
@@ -56,11 +56,10 @@ export function Advisor() {
         setLeft(reply.remaining_today)
         setTurns((t) => [...t, { role: 'willow', text: reply.message, retrieval: reply.retrieval, product_ids: reply.product_ids, follow_ups: reply.follow_up_suggestions, checks: reply.checks }])
       } catch (e) {
-        if (e instanceof ApiError && e.status === 429) {
-          setLeft(0)
-          toast('That is 20 questions for today. Back tomorrow.')
-        }
-        setTurns((t) => [...t, { role: 'willow', text: e instanceof ApiError && e.status === 429 ? 'That is 20 questions for today. Back tomorrow.' : 'The advisor could not answer just now. Try again in a moment.' }])
+        // Your own daily limit locks the input; "busy" is everyone's limit and says so itself.
+        const limit = e instanceof ApiError && e.status === 429
+        if (limit && e.code === 'daily_limit') setLeft(0)
+        setTurns((t) => [...t, { role: 'willow', text: limit ? e.message : 'The advisor could not answer just now. Try again in a moment.' }])
       } finally {
         setThinking(false)
       }
@@ -72,6 +71,11 @@ export function Advisor() {
     if (pre && !askedPre.current) {
       askedPre.current = true
       ask(pre)
+      // Asked once: a reload must not ask (and spend a daily question) again.
+      setParams((p) => {
+        p.delete('q')
+        return p
+      }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -111,19 +115,23 @@ export function Advisor() {
                 {t.checks ? (
                   <p className="mt-1.5 text-[12px] text-text-3">
                     {t.checks.numbers_checked > 0 ? `${t.checks.numbers_checked} ${t.checks.numbers_checked === 1 ? 'number' : 'numbers'} checked against your data and the catalog` : 'No numbers quoted'}
-                    {t.checks.products_from_tools > 0 ? `, ${t.checks.products_from_tools} catalog ${t.checks.products_from_tools === 1 ? 'product' : 'products'}, each one a real listing` : ''} · {t.checks.model}
+                    {t.checks.products_from_tools > 0 ? `, ${t.checks.products_from_tools} catalog ${t.checks.products_from_tools === 1 ? 'product' : 'products'}, each one a real listing` : ''} · {modelName(t.checks.model)}
                   </p>
                 ) : null}
                 {t.product_ids?.length ? (
                   <div className="mt-3 space-y-2">
                     {t.product_ids.map((id) => productById(id)).filter((p): p is Product => Boolean(p)).map((p) => <ProductCard key={p.product_id} p={p} />)}
-                    <p className="text-[12px] text-text-3">Products come from our catalog of ingredients, prices and store links. No reviews, no ads, no commissions. Stores are listed by your region, then alphabetically.</p>
+                    <p className="text-[12px] text-text-3">Products come from our catalog of ingredients, prices and store links. No reviews, no ads, no commissions.</p>
                   </div>
                 ) : null}
               </div>
             ),
           )}
-          {thinking ? <p className="text-[15px] text-text-3">Writing…</p> : null}
+          {thinking ? (
+            <p role="status" className="text-[15px] text-text-3">
+              {data.mode === 'demo' ? 'Writing…' : 'Gemini is reading your results and routine, and searching the catalog if needed. This takes 10 to 30 seconds.'}
+            </p>
+          ) : null}
           {turns.length === 0 ? (
             <div className="pt-8 text-[15px] text-text-2">
               <p>Ask about a result, a product or your routine.</p>
@@ -243,4 +251,9 @@ function ProductCard({ p }: { p: Product }) {
       </p>
     </div>
   )
+}
+
+/** "gemini-3.8-flash" -> "Gemini 3.8 Flash". */
+function modelName(id: string): string {
+  return id.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }

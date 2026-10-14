@@ -37,7 +37,13 @@ def start_sample(
     if s is None:
         raise HTTPException(404, {"code": "not_found", "message": "sample not found"})
     limits.take(store, user.uid, "sample_runs")
-    session_id = demo.create_sample_session(store, user.uid, s)
+    try:
+        session_id = demo.create_sample_session(store, user.uid, s)
+    except Exception as exc:
+        limits.refund(store, user.uid, "sample_runs")
+        raise HTTPException(
+            503, {"code": "sample_unavailable", "message": "Could not copy the sample. Try again."}
+        ) from exc
     return {"session_id": session_id, "site": s.site, "n_frames": len(s.frames)}
 
 

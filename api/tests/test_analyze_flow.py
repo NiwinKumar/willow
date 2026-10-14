@@ -429,3 +429,53 @@ def test_remeasure_named_session_runs_again_when_already_measured(client, fake):
     assert (
         fake.store.baseline_get("u_test", "forearm_control")["session_id"] == created["session_id"]
     )
+
+
+def test_malformed_session_ids_are_not_found(client):
+    assert client.get("/v1/sessions/__x__").status_code == 404
+    assert client.get("/v1/sessions/s_" + "9" * 2000).status_code == 404
+
+
+def test_a_crash_marks_the_session_failed_with_a_plain_message(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+
+    def boom(request):
+        raise RuntimeError("token minting failed: gs://bucket/uploads/u_test/secret")
+
+    monkeypatch.setattr(engine, "analyze", boom)
+    res = client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert res.status_code == 502
+    assert "gs://" not in res.text and "RuntimeError" not in res.text
+    doc = fake.store.session_get("u_test", created["session_id"])
+    assert doc["status"] == "failed"
+
+
+def test_engine_error_text_never_reaches_people(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+
+    def html_error(request):
+        raise engine.EngineError("internal", "<html>503 Service Unavailable</html>")
+
+    monkeypatch.setattr(engine, "analyze", html_error)
+    res = client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert "<html>" not in res.text
+    assert res.json()["detail"]["message"].startswith("Something went wrong while measuring")
+
+
+def test_data_deleted_mid_measurement_leaves_nothing(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    real = engine.analyze
+
+    def delete_while_running(request):
+        result = real(request)
+        fake.store.delete_user("u_test")  # "Delete my data" in another tab
+        fake.put(f"results/u_test/{sid}/crops/c_001.jpg", content_type="image/jpeg")
+        return result
+
+    monkeypatch.setattr(engine, "analyze", delete_while_running)
+    assert client.post(f"/v1/sessions/{sid}/analyze").status_code == 404
+    assert not [n for n in fake.blobs if n.startswith(f"results/u_test/{sid}/")]

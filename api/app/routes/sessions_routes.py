@@ -1,3 +1,5 @@
+import logging
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -18,10 +20,13 @@ from app.models import (
 from app.settings import Settings, get_settings
 from app.store import Store, get_store
 
+log = logging.getLogger("willow.sessions")
 router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
 
 # A session stuck in "processing" longer than this (crashed instance) may be analyzed again.
-STALE_PROCESSING = timedelta(minutes=3)
+# Longer than the api's own 300 s request timeout, so a slow run is never started twice.
+STALE_PROCESSING = timedelta(minutes=5)
+SESSION_ID = re.compile(r"^s_\d{8}_[0-9a-f]{8}$")
 
 
 def _not_found() -> HTTPException:
@@ -29,6 +34,8 @@ def _not_found() -> HTTPException:
 
 
 def _load(store: Store, uid: str, session_id: str) -> dict[str, Any]:
+    if not SESSION_ID.match(session_id):  # never put arbitrary text into a Firestore path
+        raise _not_found()
     doc = store.session_get(uid, session_id)
     if doc is None:
         raise _not_found()
@@ -149,7 +156,26 @@ def analyze_session(
         doc = analysis.run(store, settings.bucket, uid, session_id, doc)
     except engine.EngineError as exc:
         limits.refund(store, uid, "analyze")  # our failure: it does not use up a daily analysis
-        raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}) from exc
+        raise HTTPException(exc.status, {"code": exc.code, "message": exc.public_message}) from exc
+    except analysis.SessionGone as exc:
+        raise _not_found() from exc
+    except Exception as exc:
+        # Anything else (token minting, Firestore, a malformed engine answer): never leave the
+        # session "processing" for minutes; mark it failed so "Try again" works at once.
+        log.exception("analysis crashed for %s/%s", uid, session_id)
+        limits.refund(store, uid, "analyze")
+        try:
+            store.session_update(
+                uid,
+                session_id,
+                {
+                    "status": "failed",
+                    "error": {"code": "internal", "message": engine.GENERIC_MESSAGE},
+                },
+            )
+        except Exception:
+            log.exception("could not mark %s/%s failed", uid, session_id)
+        raise HTTPException(502, {"code": "internal", "message": engine.GENERIC_MESSAGE}) from exc
     return _detail_view(store, uid, session_id, doc)
 
 

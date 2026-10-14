@@ -79,6 +79,23 @@ class EngineError(Exception):
         self.message = message
         self.status = status
 
+    @property
+    def public_message(self) -> str:
+        """What a person may read: never the engine's own text (exception names, HTML error
+        pages, gs:// paths with a uid). The detail stays in the logs."""
+        return PUBLIC_MESSAGES.get(self.code, GENERIC_MESSAGE)
+
+
+GENERIC_MESSAGE = "Something went wrong while measuring. Your photos are safe; try again."
+PUBLIC_MESSAGES = {
+    "engine_timeout": "The measurement took too long. Your photos are safe; try again.",
+    "engine_unreachable": "The measurement service did not answer. Your photos are safe; try "
+    "again.",
+    "frame_unreadable": "One of the files could not be read. Check that it is the original DNG "
+    "or JPEG.",
+    "unsupported_format": "One of the files is in a format Willow cannot read.",
+}
+
 
 def analyze(request: dict[str, Any]) -> dict[str, Any]:
     problems = contract.errors("analyze_request.schema.json", request)
