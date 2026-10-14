@@ -90,7 +90,9 @@ FACE_HEIGHT_MM = 74.9
 # background and shine (bright, grey) drop out; marks keep enough colour to stay.
 SIDE_MIN_CHROMA_FRAC = 0.5
 SIDE_MAX_HUE_DEG = 25.0
-SIDE_MAX_RED_SHIFT_DEG = 50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+SIDE_MAX_RED_SHIFT_DEG = (
+    50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+)
 SIDE_MAX_BRIGHTER_L = 15.0
 SIDE_MAX_DARKER_L = 30.0
 SIDE_FILL_HOLES_MM2 = 80.0
