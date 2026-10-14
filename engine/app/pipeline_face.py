@@ -23,6 +23,7 @@ from app.landmarks import (
     skin_colour,
 )
 from app.metrics.blemish import find_blemishes
+from app.metrics.dark_circles import dark_circles
 from app.metrics.evenness import tone_evenness
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
@@ -37,6 +38,7 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "tone_evenness": ("tone_pigment", "Tone evenness", "index"),
     "redness": ("redness", "Redness", "a_star"),
     "blemishes": ("clarity", "Blemishes", "count"),
+    "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
 }
 ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
@@ -93,6 +95,11 @@ def _frame(path: str) -> dict:
     lin = box.crop(linear)
     lab = linear_srgb_to_lab(lin)
 
+    # under-eye ROIs: skin only, away from the lashes and lid rim (the face mask cuts the
+    # eyes with EYE_MARGIN_MM)
+    for n in ("right_under_eye", "left_under_eye"):
+        if n in masks:
+            masks[n] &= box.crop(face_mask_full)
     skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
     cheek_skin = np.logical_or.reduce([skin[c] for c in face.cheeks])
     l_star = float(np.median(lab[..., 0][cheek_skin]))
@@ -163,11 +170,15 @@ def _frame(path: str) -> dict:
     ]
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
+    circles, circle_extras = dark_circles(
+        lab, lin, skin, round(config.DARK_CIRCLE_MIN_MM2 * px_per_mm**2)
+    )
     values = {
         "tone_ita": ita_degrees(l_star, b_star),
         "pigment_spots": spots_pct,
         "tone_evenness": evenness,
         "redness": float(np.mean(lab[..., 1][red_skin])),
+        "dark_circles": circles,
         "blemishes": float(len(blemishes)),
     }
     extras = {
@@ -175,6 +186,7 @@ def _frame(path: str) -> dict:
         "pigment_spots": spot_extras,
         "tone_evenness": {},
         "redness": {"erythema_index": erythema_index(lin, red_skin)},
+        "dark_circles": circle_extras,
         "blemishes": {},
     }
     return {
@@ -330,13 +342,17 @@ def analyze_face(
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
-        if good:
-            summary = summarize([f["values"][metric_id] for f in good], base)
-            extras = _mean_extras([f["extras"][metric_id] for f in good])
+        # photos that measured this metric (dark circles need a visible under-eye and cheek)
+        has = [f for f in good if f["values"][metric_id] is not None]
+        if has:
+            summary = summarize([f["values"][metric_id] for f in has], base)
+            extras = _mean_extras([f["extras"][metric_id] for f in has])
             if metric_id == "tone_ita":
                 extras["ita_band"] = ita_band(summary["value"])
             if metric_id == "pigment_spots":
                 extras["count"] = round(extras.get("count", 0))
+            if metric_id == "dark_circles":
+                extras["sides"] = round(extras.get("sides", 0))
         else:
             summary = {
                 "value": None,
