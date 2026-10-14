@@ -30,6 +30,8 @@ METRIC_INFO = {  # id -> (group, label, unit)
 def _mean_extras(per_frame: list[dict]) -> dict:
     """Average numeric extras over the good frames (text extras are recomputed by the caller)."""
     out = {}
+    if not per_frame:
+        return out
     for key, first in per_frame[0].items():
         if isinstance(first, (int, float)):
             out[key] = round(sum(e[key] for e in per_frame) / len(per_frame), 2)
