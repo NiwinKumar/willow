@@ -223,8 +223,13 @@ def analyze_forearm(
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
     }
-    if ref_path and output_prefix:  # the photo the forearm_square ROI describes
-        save_preview(_load(ref_path)[1], output_prefix)
+    if output_prefix and (ref_path or files):
+        # the photo the forearm_square ROI describes; with no square found, the first photo,
+        # so the person sees what was sent next to "pen dots not found"
+        try:
+            save_preview(_load(ref_path or files[0])[1], output_prefix)
+        except EngineError:
+            pass  # an unreadable file is already reported per photo
     if shape is not None:
         result["image_size"] = {"width": int(shape[1]), "height": int(shape[0])}
     validate(result, json.loads(SCHEMA.read_text()))
