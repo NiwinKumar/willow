@@ -212,7 +212,8 @@ export type RetailerAnswer = {
 /** Hosted sample photos for judge mode (api/app/demo.py). */
 export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number }
 
-type ServiceState = { status: 'ok' | 'unreachable' | 'unavailable'; error?: string }
+/** waking: the engine sleeps when idle; it was still starting when checked (about 35 s). */
+type ServiceState = { status: 'ok' | 'waking' | 'unreachable' | 'unavailable'; error?: string }
 export type DemoStatus = {
   api: ServiceState & { version: string; runtime: string }
   engine: ServiceState & { version?: string; mode: string; latency_ms?: number }
