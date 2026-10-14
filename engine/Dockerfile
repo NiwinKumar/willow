@@ -21,6 +21,12 @@ p = pathlib.Path('/srv/engine/models/face_landmarker.task'); p.parent.mkdir(pare
 urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', p); \
 h = hashlib.sha256(p.read_bytes()).hexdigest(); \
 assert h == '64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff', h"
+# MediaPipe hand model: hands resting on the face are cut from the skin (same checks).
+RUN python -c "import hashlib, urllib.request, pathlib; \
+p = pathlib.Path('/srv/engine/models/hand_landmarker.task'); \
+urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', p); \
+h = hashlib.sha256(p.read_bytes()).hexdigest(); \
+assert h == 'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1', h"
 RUN useradd -m appuser && chown -R appuser /srv
 USER appuser
 ENV PATH="/srv/.venv/bin:$PATH"

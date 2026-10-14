@@ -90,7 +90,9 @@ FACE_HEIGHT_MM = 74.9
 # background and shine (bright, grey) drop out; marks keep enough colour to stay.
 SIDE_MIN_CHROMA_FRAC = 0.5
 SIDE_MAX_HUE_DEG = 25.0
-SIDE_MAX_RED_SHIFT_DEG = 50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+SIDE_MAX_RED_SHIFT_DEG = (
+    50.0  # toward red; Oct 14 inflamed cheek 28-32° redder than the clear cheek
+)
 SIDE_MAX_BRIGHTER_L = 15.0
 SIDE_MAX_DARKER_L = 30.0
 SIDE_FILL_HOLES_MM2 = 80.0
@@ -179,6 +181,16 @@ NOSTRIL_GUARD_MM = 1.5  # extra band around nostrils skipped for blemishes (red 
 BLEMISH_LIP_GUARD_MM = 1.5  # band around the lips skipped for blemishes (red lip edge)
 CROP_SIZE_PX = (64, 128)  # candidate crop side, clamped to this range
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
+
+# Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
+# test photos: at 0.2 confidence the only detections were a real hand and two specks a
+# few px across; specks are dropped by the size rule. A hand on the chin is cut from the
+# face skin; if it covers more than HAND_OCCLUSION_FRAC of the face skin the photo gets
+# occlusion_suspected (contract reason code).
+HAND_MIN_CONFIDENCE = 0.2
+HAND_MIN_SPAN_EYES = 0.8  # a detected hand spans at least this x the outer-eye distance
+HAND_MARGIN_MM = 10.0  # palm and finger edges beyond the landmarks
+HAND_OCCLUSION_FRAC = 0.10
 
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
