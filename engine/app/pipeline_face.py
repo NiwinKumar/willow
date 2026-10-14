@@ -17,7 +17,9 @@ from app.landmarks import (
     Face,
     FaceNotFound,
     detect_face,
+    detect_hands,
     edge_hair,
+    hand_mask,
     polygon_mask,
     refine_skin,
     skin_colour,
@@ -78,7 +80,14 @@ def _frame(path: str) -> dict:
     box = _bbox([*polys.values(), face_outline], srgb8.shape[:2])  # face area only
     cheek_box = _bbox([polys[c] for c in face.cheeks], srgb8.shape[:2])
 
-    masks = {n: box.crop(polygon_mask(srgb8.shape[:2], p)) for n, p in polys.items()}
+    # a hand resting on the face (chin, cheek) is skin but not face: cut it everywhere
+    hands = detect_hands(srgb8, config.HAND_MIN_SPAN_EYES * face.eye_distance_px)
+    hand = box.crop(hand_mask(srgb8.shape[:2], hands, config.HAND_MARGIN_MM * face.px_per_mm))
+    masks = {}
+    for n, p in polys.items():
+        m = box.crop(polygon_mask(srgb8.shape[:2], p))
+        # keep an ROI that is mostly covered as it is (the photo fails as occluded anyway)
+        masks[n] = m & ~hand if (m & ~hand).sum() >= 0.5 * m.sum() else m
     # sharpness/exposure on the cheek area (2-D patch the Laplacian needs)
     cheek_mask = cheek_box.crop(
         np.logical_or.reduce([polygon_mask(srgb8.shape[:2], polys[c]) for c in face.cheeks])
@@ -88,6 +97,9 @@ def _frame(path: str) -> dict:
     )
     if not _pose_ok(face):
         quality.reasons.append("pose_out_of_range")
+    face_area = box.crop(face_mask_full)
+    if (face_area & hand).sum() > config.HAND_OCCLUSION_FRAC * max(face_area.sum(), 1):
+        quality.reasons.append("occlusion_suspected")
 
     # colours as the phone captured them: users do not hold a white reference
     lin = box.crop(linear)
@@ -116,6 +128,7 @@ def _frame(path: str) -> dict:
         # deep skin look the same and were cut.
         ear = face.ear_side(face_skin.shape, (box.x, box.y))
         face_skin &= ~edge_hair(lab, face_skin, cheek_skin, px_per_mm, ear)
+    face_skin &= ~hand
     # both searches skip the band where hair, jaw shadow or background meet skin and the
     # brows and eye corners; dark spots also skip the glabella, the lip / nostril edges and
     # mouth corners (shading; it is not red, so blemishes there still count). Full face skin is still "nearby skin".
