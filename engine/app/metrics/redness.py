@@ -16,5 +16,6 @@ def erythema_index(linear: np.ndarray, mask: np.ndarray) -> float:
 
 
 def redness(lab: np.ndarray, linear: np.ndarray, mask: np.ndarray) -> tuple[float, dict]:
-    a_star = float(np.mean(lab[..., 1][mask]))
+    # median, not mean: hairs and pen ink inside the square pull a mean, not a median
+    a_star = float(np.median(lab[..., 1][mask]))
     return a_star, {"erythema_index": round(erythema_index(linear, mask), 2)}

@@ -239,6 +239,7 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
         "tone_evenness",
         "redness",
         "blemishes",
+        "dark_circles",
         "shine",
         "glow",
     }
@@ -299,13 +300,26 @@ def test_blemish_candidates_with_crops(tmp_path, fake_landmarks):
     assert blem["value"] == 1 and len(r["candidates"]) == 1
     c = r["candidates"][0]
     assert c["kind"] == "blemish" and abs(c["bbox"][0] + c["bbox"][2] / 2 - 500) < 6
-    assert Image.open(c["crop_uri"]).size[0] >= 64
-    assert Image.open(c["context_crop_uri"]).size[0] == 3 * Image.open(c["crop_uri"]).size[0]
+    assert Image.open(c["crop_uri"]).size[0] >= config.CROP_MIN_OUT_PX
+    assert Image.open(c["context_crop_uri"]).size[0] >= Image.open(c["crop_uri"]).size[0]
 
 
-def _bump_photo(path, bumps, seed=0):
+def test_crop_stays_centred_on_a_spot_at_the_photo_edge():
+    from app.pipeline_face import _centred_crop
+
+    img = np.full((200, 300, 3), 150, np.uint8)
+    img[5:15, 290:300] = (220, 60, 60)  # a red mark in the top-right corner
+    patch = _centred_crop(img, 295, 10, 60)  # 60 px crop centred on it, mostly off the photo
+    assert patch.shape == (128, 128, 3)  # padded with edge pixels, then upscaled
+    mid = patch[54:74, 54:74].reshape(-1, 3).mean(axis=0)
+    assert mid[0] > 200 and mid[1] < 100  # the mark is still at the centre
+
+
+def _bump_photo(path, bumps, seed=0, texture=3.0):
     rng = np.random.default_rng(seed)
-    img = np.full((1000, 1000, 3), (198, 148, 115), np.float64) + rng.normal(0, 3, (1000, 1000, 1))
+    img = np.full((1000, 1000, 3), (198, 148, 115), np.float64) + rng.normal(
+        0, texture, (1000, 1000, 1)
+    )
     yy, xx = np.ogrid[:1000, :1000]
     for cx, cy in bumps:
         img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 9**2] = (215, 120, 105)
@@ -317,7 +331,8 @@ def test_spot_persistence_across_photos(tmp_path, fake_landmarks):
     files = []
     for i in range(3):
         bumps = [(500, 600)] + ([(350, 750)] if i == 0 else [])
-        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i)
+        # photo 1 is the sharpest, so it is the reference the candidates come from
+        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i, texture=5.0 if i == 0 else 3.0)
         files.append(str(tmp_path / f"f{i}.jpg"))
     r = analyze_face(files)
     seen = {
@@ -325,3 +340,68 @@ def test_spot_persistence_across_photos(tmp_path, fake_landmarks):
         for c in r["candidates"]
     }
     assert seen == {500.0: 1.0, 400.0: 0.33}
+
+
+def test_raw_face_without_a_colour_reference_is_indicative(tmp_path, fake_landmarks, monkeypatch):
+    # a DNG face session: colours as the camera captured them, no card or paper detected
+    monkeypatch.setattr("app.pipeline_face.capture_mode_for", lambda files: "calibrated_raw")
+    _face_photo(tmp_path / "face.jpg")
+    r = analyze_face([str(tmp_path / "face.jpg")])
+    assert r["capture_mode"] == "calibrated_raw" and not r["quality"]["card_detected"]
+    assert {m["confidence"] for m in r["metrics"]} == {"indicative"}
+
+
+def test_counts_use_only_marks_seen_in_another_photo(tmp_path, fake_landmarks):
+    # the bump at (500, 600) is in all 3 photos; the one at (350, 750) only in the first
+    files = []
+    for i in range(3):
+        bumps = [(500, 600)] + ([(350, 750)] if i == 0 else [])
+        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i, texture=5.0 if i == 0 else 3.0)
+        files.append(str(tmp_path / f"f{i}.jpg"))
+    r = analyze_face(files)
+    blem = next(m for m in r["metrics"] if m["id"] == "blemishes")
+    assert blem["value"] == 1.0  # the fluke is not counted
+    assert blem["within_session_sd"] == config.MIN_SD["blemishes"]  # identical counts: the floor
+    assert len([c for c in r["candidates"] if c["kind"] == "blemish"]) == 2  # still shown
+
+
+def test_single_photo_counts_every_mark(tmp_path, fake_landmarks):
+    _bump_photo(tmp_path / "one.jpg", [(500, 600), (350, 750)])
+    r = analyze_face([str(tmp_path / "one.jpg")])
+    assert next(m for m in r["metrics"] if m["id"] == "blemishes")["value"] == 2.0
+
+
+def _hand_at(monkeypatch, cx, cy, half):
+    """Stand-in for the hand landmarker: one hand whose landmarks span a square."""
+    pts = np.array(
+        [[cx + dx, cy + dy] for dx in (-half, 0, half) for dy in (-half, 0, half)], float
+    )
+    monkeypatch.setattr("app.pipeline_face.detect_hands", lambda srgb8, min_span: [pts])
+
+
+def test_hand_on_the_chin_is_cut_and_flags_occlusion(tmp_path, fake_landmarks, monkeypatch):
+    # a red bump under a hand resting on the chin: not counted, photo flagged
+    _bump_photo(tmp_path / "hand.jpg", [(500, 800)])
+    _hand_at(monkeypatch, 500, 800, 150)
+    r = analyze_face([str(tmp_path / "hand.jpg")])
+    assert "occlusion_suspected" in r["quality"]["per_frame"][0]["reasons"]
+    assert r["candidates"] == []
+
+
+def test_small_hand_near_the_face_cuts_skin_without_failing_the_photo(
+    tmp_path, fake_landmarks, monkeypatch
+):
+    _bump_photo(tmp_path / "hand.jpg", [(500, 600), (300, 860)])
+    _hand_at(monkeypatch, 300, 860, 20)  # a fingertip at the jaw corner
+    r = analyze_face([str(tmp_path / "hand.jpg")])
+    assert r["quality"]["passed"]
+    xs = [round(c["bbox"][0] + c["bbox"][2] / 2, -2) for c in r["candidates"]]
+    assert xs == [500.0]  # the bump under the fingertip is not a candidate
+
+
+def test_hand_model_loads_and_finds_no_hand_on_a_blank_image():
+    from app.landmarks import HAND_MODEL, detect_hands
+
+    if not HAND_MODEL.exists():
+        pytest.skip("hand model not downloaded")
+    assert detect_hands(np.full((480, 640, 3), 128, np.uint8), 10) == []

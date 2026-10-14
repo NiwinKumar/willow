@@ -193,3 +193,14 @@ def test_dark_grey_braids_at_the_hairline_are_cut():
     assert remove_hair(L, mask, PX_PER_MM)[30, 180]  # L* alone misses them
     keep = remove_hair(L, mask, PX_PER_MM, chroma)
     assert not keep[30, 180] and keep[200, 180]
+
+
+@pytest.mark.parametrize("L", [70.0, 50.0, 30.0])
+def test_same_mark_found_at_every_skin_tone(L):
+    """A mark that reflects 25% less light (the same pigment at any tone) is a smaller L* step
+    on deep skin: dL* ~ (L* + 16) / 3 * ln(1 / 0.75), 4.5 at L* 30 but 7.5 at L* 70. Fixed
+    L*-step thresholds found it on light skin only (Oct 14 review)."""
+    d_l = -(L + 16) / 3 * np.log(1 / 0.75)
+    lab = _dot(_lab(L, a_noise=0.4), 180, 180, r=9, d_l=d_l * 0.55, chroma_scale=1.1)
+    spots = find_spots(lab, _all(lab), _all(lab), PX_PER_MM)
+    assert len(spots) == 1, f"L*={L}: dL*={d_l * 0.55:.2f}"

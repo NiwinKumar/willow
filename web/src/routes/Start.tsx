@@ -19,7 +19,7 @@ const cards = [
     icon: FlaskConical,
     title: 'How we measure',
     body: 'Classical image analysis measures colour, spots, redness and texture against your own earlier photos. An AI assistant explains results and only repeats numbers we measured. It never guesses a skin age, score or diagnosis.',
-    more: 'Every number comes from calibrated computer vision: a white reference in the frame (plain paper or a colour card) corrects each photo, pen dots or face landmarks pick the regions, and five reference photos give your personal noise band. Gemini writes the explanation from those numbers; any digit it invents is rejected before you see it.',
+    more: 'Every number comes from computer vision on your own photos: on the forearm a white reference (plain paper or a colour card) corrects the colour of the light, pen dots or face landmarks pick the regions, and five reference photos give your personal noise band. Phone and face photos use the camera’s own colour, so they are shown as trends. Gemini writes the explanation from those numbers; any digit it invents is rejected before you see it.',
   },
   {
     id: 'medical',
@@ -38,7 +38,7 @@ export function Start() {
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
       <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Before your first photo</h1>
-      <p className="mt-2 text-[15px] text-text-2">Four things, each a sentence. Tap any for the detail.</p>
+      <p className="mt-2 text-[15px] text-text-2">Four things to know. Tap any for the detail.</p>
       <ul className="mt-6 space-y-3">
         {cards.map((c) => (
           <li key={c.id} className="rounded-(--radius-tile) border border-border bg-surface p-4">
@@ -47,7 +47,7 @@ export function Start() {
               <div className="min-w-0">
                 <h2 className="text-[15px] font-semibold">{c.title}</h2>
                 <p className="mt-1 text-[15px] leading-relaxed text-text-2">{c.body}</p>
-                <button type="button" onClick={() => setMore(c)} className="mt-2 min-h-11 text-[13px] font-medium text-willow-700 underline-offset-2 hover:underline">
+                <button type="button" onClick={() => setMore(c)} aria-label={`Learn more: ${c.title}`} className="mt-2 min-h-11 text-[13px] font-medium text-willow-700 underline-offset-2 hover:underline">
                   Learn more
                 </button>
               </div>

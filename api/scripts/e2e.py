@@ -5,7 +5,7 @@ ENGINE_MODE=http, see docs/LOCAL_DEV.md). Everything else is real: uploads land 
 the deployed engine measures them, Firestore stores them. The test person is deleted at the
 start and at the end, so runs never pile up.
 
-    uv run python scripts/e2e.py --dng path/to/forearm.dng --jpeg path/to/forearm.jpg \
+    uv run python scripts/e2e.py --dng path/to/forearm.dng --arm arm1.jpg arm2.jpg \
         [--face selfie1.jpg selfie2.jpg ...]
 """
 
@@ -31,7 +31,10 @@ def main() -> int:
     ap.add_argument("--api", default="http://localhost:8080")
     ap.add_argument("--uid", default="e2e_script")
     ap.add_argument("--dng", type=Path, required=True)
-    ap.add_argument("--jpeg", type=Path, required=True)
+    ap.add_argument("--jpeg", type=Path, required=False, help="unused (kept for old commands)")
+    ap.add_argument(
+        "--arm", type=Path, nargs=2, required=True, help="two dotted forearm photos with paper"
+    )
     ap.add_argument("--label", type=Path, help="optional product label photo (calls Gemini)")
     ap.add_argument("--face", type=Path, nargs="*", default=[], help="optional face selfies (JPEG)")
     args = ap.parse_args()
@@ -66,19 +69,32 @@ def main() -> int:
     check("api is in end-to-end mode", health.get("engine_mode") == "http", str(health))
     check("start clean", c.delete("/v1/me").status_code == 204)
 
-    # 1. First calibrated forearm session, one RAW photo: measured, becomes the baseline.
-    v1 = session("forearm_control", "calibrated_raw", [args.dng])
+    # 1. A forearm photo with no pen dots: the engine says so instead of measuring hair.
+    v0 = session("forearm_control", "calibrated_raw", [args.dng])
+    r0 = v0.get("result") or {}
+    check(
+        "RAW forearm without pen dots: 'not found', no made-up number, never a baseline",
+        v0.get("session", {}).get("measured") is True
+        and r0.get("quality", {}).get("passed") is False
+        and any("pen-dot square not found" in w for w in r0.get("warnings", []))
+        and v0["session"]["is_baseline"] is False,
+        f"engine {r0.get('engine_version')}, {v0['_seconds']} s",
+    )
+
+    # 2. A dotted forearm with white paper (phone photo): measured, becomes the baseline.
+    v1 = session("forearm_control", "uncalibrated", [args.arm[0]])
     r1 = v1.get("result") or {}
     check(
-        "RAW forearm is measured by the real engine",
+        "dotted forearm is measured by the real engine",
         v1.get("session", {}).get("measured") is True
+        and r1.get("quality", {}).get("passed") is True
         and not r1.get("engine_version", "").endswith(("-fixture", "-placeholder")),
         f"engine {r1.get('engine_version')}, {v1['_seconds']} s",
     )
     check("frames_used matches the upload", r1.get("frames_used") == 1, str(r1.get("frames_used")))
-    ids = {m["id"] for m in r1.get("metrics", [])}
+    ids = {m["id"] for m in r1.get("metrics", []) if m.get("value") is not None}
     check("tone and redness measured", {"tone_ita", "redness"} <= ids, str(sorted(ids)))
-    check("first session is the baseline", v1["session"]["is_baseline"] is True)
+    check("first passing session is the baseline", v1["session"]["is_baseline"] is True)
     check(
         "one-photo baseline has no noise band", v1["session"]["baseline"]["has_noise_band"] is False
     )
@@ -87,8 +103,8 @@ def main() -> int:
         {m["verdict"] for m in r1["metrics"]} <= {"no_baseline", "low_quality"},
     )
 
-    # 2. A second RAW session: compared with the baseline, but no verdict without a noise band.
-    v2 = session("forearm_control", "calibrated_raw", [args.dng])
+    # 3. A second session: compared with the baseline, but no verdict without a noise band.
+    v2 = session("forearm_control", "uncalibrated", [args.arm[1]])
     r2 = v2.get("result") or {}
     check(
         "second session is compared, not a new baseline",
@@ -100,16 +116,7 @@ def main() -> int:
         all(m["delta"] is not None for m in r2["metrics"] if m["verdict"] != "low_quality")
         and "real_change" not in {m["verdict"] for m in r2["metrics"]},
     )
-
-    # 3. A quick selfie of the same site gets its own baseline (never compared with RAW).
-    v3 = session("forearm_control", "uncalibrated", [args.jpeg])
-    r3 = v3.get("result") or {}
-    check(
-        "quick selfie is measured",
-        v3["session"].get("measured") is True,
-        f"{v3['_seconds']} s, confidence {sorted({m['confidence'] for m in r3['metrics']})}",
-    )
-    check("quick selfie has its own baseline", v3["session"]["is_baseline"] is True)
+    v3 = v1
 
     # 4. A forearm photo sent as a face: measured, no face found, never a baseline.
     v4 = session("face_full", "calibrated_raw", [args.dng])
@@ -150,16 +157,12 @@ def main() -> int:
             bool(details) and set(details) <= {x["id"] for x in cands},
             f"{len(details)} named",
         )
-        ref = next(
-            (f["index"] for f in r5["quality"]["per_frame"] if f["passed"]),
-            0,
-        )
-        # unquoted: in DEV_UPLOADS mode the photo link carries the object name as a query value
+        # The engine writes preview.jpg of the photo the rings and regions describe.
         preview = unquote((v5["session"].get("preview") or {}).get("url", ""))
         check(
-            "the photo shown is the one the spots were found on",
-            f"/frame_{ref + 1}.jpg" in preview or "/preview.jpg" in preview,
-            f"photo {ref + 1}",
+            "the photo shown is the engine's preview of the measured photo",
+            "/preview.jpg" in preview and bool(r5.get("image_size")),
+            preview.rsplit("/", 1)[-1][:40],
         )
         check("face explanation by Gemini", v5["session"].get("explanation_source") == "gemini")
 
@@ -168,8 +171,8 @@ def main() -> int:
     check("sessions list has all of them", len(listed) == n_sessions, str(len(listed)))
     tl = c.get("/v1/timeline", params={"site": "forearm_control"}).json()
     check(
-        "timeline has two RAW and one quick reading",
-        len(tl["metrics"].get("redness", [])) == 3
+        "timeline has the two measured readings and the phone-photo baseline",
+        len([p for p in tl["metrics"].get("redness", []) if p.get("value") is not None]) == 2
         and tl["baseline_session_ids"]["uncalibrated"] == v3["session"]["id"],
     )
     cat = c.get("/v1/catalog/search", params={"q": "niacinamide"}).json()["products"]

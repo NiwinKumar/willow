@@ -65,8 +65,10 @@ export function AskData() {
           ))}
         </div>
       ) : null}
+      {/* Always in the page, so the first answer is announced too. */}
+      <div aria-live="polite">
       {asked ? (
-        <div className="mt-4 border-t border-border pt-3" aria-live="polite">
+        <div className="mt-4 border-t border-border pt-3">
           <p className="text-[13px] font-medium text-text-2">{asked}</p>
           {busy ? <p className="mt-2 text-[15px] text-text-3">Reading the aggregates…</p> : null}
           {error ? <p className="mt-2 text-[15px] text-danger">{error}</p> : null}
@@ -78,7 +80,7 @@ export function AskData() {
                   <figcaption className="text-[13px] font-semibold">{chart.title}</figcaption>
                   <ul className="mt-2 space-y-1.5">
                     {chart.bars.map((b) => (
-                      <li key={b.label} className="grid grid-cols-[minmax(0,14rem)_1fr_3.5rem] items-center gap-2 text-[13px]">
+                      <li key={b.label} className="grid grid-cols-[minmax(0,40%)_1fr_auto] items-center gap-2 text-[13px] sm:grid-cols-[minmax(0,14rem)_1fr_auto]">
                         <span className="truncate text-text-2" title={b.label}>{b.label}</span>
                         <span className="h-3 rounded-sm bg-surface-2" aria-hidden>
                           <span className="block h-3 rounded-sm bg-signal-500" style={{ width: `${(Math.abs(b.value) / max) * 100}%` }} />
@@ -91,7 +93,7 @@ export function AskData() {
               ) : null}
               {reply.checks ? (
                 <p className="mt-3 text-[12px] text-text-3">
-                  {reply.checks.numbers_checked} {reply.checks.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates{reply.checks.rejected_attempts ? `, ${reply.checks.rejected_attempts} draft rejected first` : ''} · {reply.checks.model}
+                  {reply.checks.numbers_checked} {reply.checks.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates{reply.checks.rejected_attempts ? `, ${reply.checks.rejected_attempts} draft rejected first` : ''} · {reply.checks.model.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                 </p>
               ) : null}
               {reply.follow_ups.length ? (
@@ -107,6 +109,7 @@ export function AskData() {
           ) : null}
         </div>
       ) : null}
+      </div>
     </section>
   )
 }

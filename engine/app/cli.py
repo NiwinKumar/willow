@@ -69,6 +69,7 @@ def main(argv: list[str] | None = None) -> None:
             auto_white=not args.no_white,
             square=args.square or 0,
             baseline=baseline,
+            output_prefix=args.out,
         )
 
     q = result["quality"]

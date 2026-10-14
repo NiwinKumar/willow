@@ -1,5 +1,7 @@
 """Willow product API (Cloud Run service `willow-api`). Contract: docs/CONTRACT.md section 3."""
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +19,23 @@ from app.settings import get_settings
 settings = get_settings()
 
 app = FastAPI(title="Willow api", version=__version__)
+log = logging.getLogger("willow.api")
+
+
+# Registered before CORS, so it sits inside it: an unexpected error still reaches the browser as
+# JSON with CORS headers ("Something went wrong") instead of a bare 500 the web reads as offline.
+@app.middleware("http")
+async def json_errors(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        log.exception("unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": {"code": "internal", "message": "Something went wrong. Try again."}},
+        )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,

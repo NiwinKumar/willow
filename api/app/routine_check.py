@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from app import gemini, numbers
+from app.explain import BANNED
 
 Entry = dict[str, Any]
 
@@ -102,7 +103,7 @@ def rule_findings(entries: list[Entry]) -> dict[str, Any]:
                             "source": "rule",
                         }
                     )
-                    return
+                    break  # one finding per pair (not both orders); other pairs still count
 
     pair_rule(
         {"retinoid"},
@@ -139,7 +140,7 @@ def rule_findings(entries: list[Entry]) -> dict[str, Any]:
         conflicts.append(
             {
                 "products": [e["id"] for e in exfoliants],
-                "issue": "Several exfoliating products in one routine can over-exfoliate.",
+                "issue": "Several exfoliating products across your routine can over-exfoliate.",
                 "severity": "caution",
                 "suggestion": "Reduce how often you use them, or keep one.",
                 "source": "rule",
@@ -197,7 +198,7 @@ Add only other well-known cosmetic interactions you are confident about (for exa
 strong actives that destabilise each other), or say nothing. Never flag niacinamide with
 vitamin C. In "products" lists use the ids given; in any sentence name products by brand and
 name, never by id. No percentages or other numbers unless they appear in the input. Calm,
-plain, cosmetic language; no medical claims."""
+plain, cosmetic language; no medical claims. British spelling (moisturiser, colour)."""
 
 ENTRY_ID = re.compile(r"\br_[A-Za-z0-9_]+\b")
 
@@ -218,7 +219,7 @@ def _valid(add: ModelConflict, ids: set[str], allowed: set[str], rules: list[dic
     text = f"{add.issue} {add.suggestion}"
     if MYTH.search(text) and re.search(r"vitamin c|ascorbic", text, re.I):
         return False
-    if not numbers.only_known(text, allowed):
+    if not numbers.only_known(text, allowed) or BANNED.search(text):
         return False
     same = {frozenset(r["products"]) for r in rules}
     return frozenset(add.products) not in same
@@ -261,6 +262,7 @@ def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
         if (
             note
             and numbers.only_known(note, allowed)
+            and not BANNED.search(note)
             and not (MYTH.search(note) and re.search(r"vitamin c|ascorbic", note, re.I))
         ):
             result["notes"].append(note)

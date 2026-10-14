@@ -9,7 +9,7 @@ function rows(s: DemoStatus | null): Row[] {
   const pending = s === null
   return [
     { name: 'Web app', where: 'Firebase Hosting + Firebase Auth', detail: 'you are on it', ok: true, checked: true },
-    { name: 'api', where: s?.api.runtime ?? 'Cloud Run', detail: s ? `v${s.api.version}` : '', ok: pending ? null : s.api.status === 'ok', checked: true },
+    { name: 'API', where: s?.api.runtime ?? 'Cloud Run', detail: s ? `v${s.api.version}` : '', ok: pending ? null : s.api.status === 'ok', checked: true },
     {
       name: 'Measurement engine',
       where: 'Cloud Run (private), OpenCV + rawpy',
@@ -60,11 +60,11 @@ export function SystemStatus() {
               </span>
               {r.detail ? <span className="block font-mono text-[12px] text-text-2">{r.detail}</span> : null}
             </span>
-            <span className="sr-only">{r.ok === null ? 'checking' : r.ok ? 'running' : 'not responding'}</span>
+            <span className="sr-only">{r.ok === null ? (failed ? 'status unknown' : 'checking') : r.ok ? 'running' : 'not responding'}</span>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[12px] text-text-3">{failed ? 'Could not reach the api for a status check.' : status ? `Filled dots answered a live check at ${new Date(status.checked_at).toLocaleTimeString()}; hollow dots show configuration.` : 'Checking each service…'}</p>
+      <p className="mt-2 text-[12px] text-text-3">{failed ? 'Could not reach the API for a status check.' : status ? `Filled dots answered a live check at ${new Date(status.checked_at).toLocaleTimeString()}; hollow dots show configuration.` : 'Checking each service…'}</p>
     </div>
   )
 }

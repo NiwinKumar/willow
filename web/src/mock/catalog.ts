@@ -24,6 +24,21 @@ export const CONCERN_LABEL: Record<string, string> = {
   dullness: 'dullness',
 }
 
+/** Product categories as people say them (docs/CATALOG_SPEC.md keys; label scans may add others). */
+export const CATEGORY_LABEL: Record<string, string> = {
+  cleanser: 'Cleanser',
+  toner: 'Toner',
+  serum: 'Serum',
+  treatment: 'Treatment',
+  exfoliant: 'Exfoliant',
+  moisturizer: 'Moisturiser',
+  sunscreen: 'Sunscreen',
+  eye_care: 'Eye care',
+  mask: 'Mask',
+  other: 'Other',
+}
+export const categoryLabel = (c: string): string => CATEGORY_LABEL[c] ?? (c ? c.charAt(0).toUpperCase() + c.slice(1).replace(/_/g, ' ') : 'Other')
+
 /** docs/CATALOG_SPEC.md concern -> metric map. */
 export const CONCERN_METRICS: Record<string, string[]> = {
   acne_blemishes: ['blemishes', 'redness'],

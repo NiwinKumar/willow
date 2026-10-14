@@ -25,19 +25,24 @@ INSTRUCTIONS = """You are an analyst for a multi-brand skincare retailer. Answer
 using only INSIGHTS (JSON): aggregated, anonymised outcomes of people tracking their skin with
 Willow. "rate" fields are the share of people whose goal metric was still improved beyond their
 own photo noise at week 8 (an outcome, not a purchase). "cells" are the same rate per skin-tone
-band; a suppressed cell had fewer than 10 people. "lift" is the product's rate minus the average
-for the same concern. "cont" is the share still using it at week 8.
+band; a suppressed cell had fewer than 10 people. "lift" is the product's rate minus the rate of
+people with the same goal who do not use it. "cont" is the share still using it after week 4.
+"weeks" is the median weeks to the first real change.
 - Quote numbers exactly as they appear; a fraction may be written as a whole percent (0.36 -> 36%).
   Never compute new numbers (no differences, sums, averages or ratios you derive yourself).
 - If the data cannot answer the question, say so and name what would be needed.
 - Skin-tone bands describe coverage of the cohort; never rank or compare people by skin tone and
   never imply lighter skin is better.
 - If cohort.real is 0, say once that the cohort is synthetic demo data.
-- Cosmetic language; no medical claims. 2 to 4 sentences.
+- Cosmetic language; no medical claims. British spelling. 2 to 4 sentences.
 - chart: only when a comparison helps, at most 8 bars whose labels are product names, brand names,
   goals or routine issues exactly as written in INSIGHTS, and whose values are numbers from
   INSIGHTS (rates as whole percents with unit "percent"; people or product counts with unit
   "count"; weeks with unit "weeks"). Otherwise null."""
+
+
+class Unavailable(Exception):
+    """Gemini could not be reached; not the same as an answer that failed the checks."""
 
 
 class Bar(BaseModel):
@@ -59,7 +64,10 @@ class Answer(BaseModel):
 
 def _names(insights: dict[str, Any]) -> set[str]:
     names: set[str] = set()
-    for p in insights.get("products", []):
+    # Every product with evidence (product_outcomes), not only the top rows shown in the table:
+    # Gemini rightly answers "best for dark spots" from the full list.
+    rows = [*insights.get("products", []), *(insights.get("product_outcomes") or {}).values()]
+    for p in rows:
         names |= {p["product"], f"{p['brand']} {p['product']}", p["brand"], p["concern"]}
     names |= {b["brand"] for b in insights.get("brands", [])}
     names |= {n["goal"] for n in insights.get("needs", [])}
@@ -93,7 +101,10 @@ def problems(reply: Answer, insights: dict[str, Any], question: str) -> list[str
 
 
 def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
-    prompt = f"INSIGHTS (JSON):\n{json.dumps(insights)}\n\nQUESTION: {question}"
+    # Compact JSON: fewer input tokens, a faster answer.
+    prompt = (
+        f"INSIGHTS (JSON):\n{json.dumps(insights, separators=(',', ':'))}\n\nQUESTION: {question}"
+    )
     for attempt in range(2):
         try:
             reply = gemini.generate_json(
@@ -104,9 +115,12 @@ def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
                 temperature=0.2,
                 max_output_tokens=2048,
                 attempts=1,
+                # INSIGHTS is about 15 KB: 25 s was not always enough (Oct 14, deadline exceeded).
+                timeout_ms=50_000,
             )
-        except gemini.GeminiError:
-            break
+        except gemini.GeminiError as exc:
+            # Gemini itself is unavailable: say so (the route refunds the question).
+            raise Unavailable from exc
         found = problems(reply, insights, question)
         if not found:
             return {

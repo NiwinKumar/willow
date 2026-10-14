@@ -36,7 +36,7 @@ export function DemoBar() {
           ) : (
             <>
               <p>You are looking at an illustrative sample journey generated from the engine's contract fixture: a face baseline with six weekly check-ins and a self-tanner split-forearm test over four days.</p>
-              <p>The shape is real (five reference photos, a personal noise band per metric, verdicts only when a change clears it). The photos are drawn illustrations. To see real measurements, run the pipeline on sample photos from the judge tour or photograph your own forearm. The retailer view uses a synthetic cohort and says so.</p>
+              <p>The shape is real (five reference photos, a personal noise band per metric, verdicts only when a change clears it). The photos are drawn illustrations. To see real measurements, run the pipeline on sample photos from the judge tour, or take a selfie. The retailer view uses a synthetic cohort and says so.</p>
             </>
           )}
           <p>Nothing you do here is saved to a real account. Reset returns to the start.</p>

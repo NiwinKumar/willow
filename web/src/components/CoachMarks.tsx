@@ -36,7 +36,7 @@ export function CoachMarks({ id, tips }: { id: string; tips: (keyof typeof TIPS)
           <span className="mr-2 font-mono text-[11px] opacity-70">{i + 1}/{TIPS_SHOWN.length}</span>
           {TIPS_SHOWN[i]}
         </span>
-        <button type="button" onClick={next} aria-label={i + 1 >= TIPS_SHOWN.length ? 'Dismiss tips' : 'Next tip'} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-(--radius-control) hover:bg-surface/10">
+        <button type="button" onClick={next} aria-label={i + 1 >= TIPS_SHOWN.length ? 'Dismiss tips' : 'Next tip'} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-(--radius-control) hover:bg-surface/10">
           {i + 1 >= TIPS_SHOWN.length ? <X size={16} aria-hidden /> : <span className="text-[13px] font-medium">Next</span>}
         </button>
       </motion.div>

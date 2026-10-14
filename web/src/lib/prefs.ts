@@ -48,6 +48,8 @@ export const prefs = {
     memory.clear()
     try {
       for (const k of Object.keys(localStorage)) if (k.startsWith('willow.')) localStorage.removeItem(k)
+      // Demo flag, goals draft and judge tour live in sessionStorage.
+      for (const k of Object.keys(sessionStorage)) if (k.startsWith('willow.')) sessionStorage.removeItem(k)
     } catch {
       /* ignore */
     }

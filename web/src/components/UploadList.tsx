@@ -20,7 +20,6 @@ type Props = {
 export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true }: Props) {
   const { getIdToken } = useAuth()
   const [busy, setBusy] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [fatal, setFatal] = useState<string | null>(null)
   const started = useRef(false)
   const wake = useRef<WakeLockSentinel | null>(null)
@@ -71,7 +70,6 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
       if (!session.current) {
         const created = await api.createSession(token, { site, capture_mode: mode, n_frames: current.length, content_types: current.map((r) => r.contentType) })
         session.current = { id: created.session_id, targets: created.upload_urls, issuedAt: Date.now() }
-        setSessionId(created.session_id)
       } else if (Date.now() - session.current.issuedAt > 10 * 60_000) {
         const fresh = await api.reissueUploadUrls(token, session.current.id)
         session.current = { ...session.current, targets: fresh.upload_urls, issuedAt: Date.now() }
@@ -120,7 +118,8 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
         onDone(id, result.objects)
       }
     } catch (e) {
-      setFatal(e instanceof ApiError ? e.message : 'Could not reach Willow. Check your connection.')
+      const signedOut = e instanceof Error && /not signed in/i.test(e.message)
+      setFatal(e instanceof ApiError ? e.message : signedOut ? 'You were signed out. Sign in again to keep uploading.' : 'Could not reach Willow. Check your connection.')
     } finally {
       setBusy(false)
       wake.current?.release().catch(() => undefined)
@@ -168,7 +167,6 @@ export function UploadList({ site, mode, rows, onRows, onDone, autoStart = true 
           </button>
         </div>
       ) : null}
-      {sessionId ? <p className="mt-2 font-mono text-[12px] text-text-3">session {sessionId}</p> : null}
     </div>
   )
 }

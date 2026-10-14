@@ -9,16 +9,18 @@ import { ProductImage } from '../components/ProductImage'
 import { Sheet } from '../components/Sheet'
 import type { Product, RoutineCheck, RoutineEntry } from '../data/types'
 import { useData } from '../data/useData'
-import { api, type NewRoutineEntry } from '../lib/api'
-import { fmtPrice, imageCredit } from '../lib/format'
+import { ApiError, api, type NewRoutineEntry } from '../lib/api'
+import { fmtDate, fmtPrice, imageCredit, todayLocal } from '../lib/format'
 import { toJpegBase64 } from '../lib/image'
 import { sampleLabelFile } from '../lib/sampleLabel'
 import { outcomeFor } from '../lib/outcome'
 import { useAuth } from '../lib/useAuth'
-import { CATALOG, CONCERN_LABEL, productById } from '../mock/catalog'
+import { CATALOG, CONCERN_LABEL, categoryLabel, productById } from '../mock/catalog'
 import { DEMO_CHECK, DEMO_ROUTINE } from '../mock/routine'
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
+// Unknown categories (label scans) sort just before sunscreen, never above the cleanser.
+const rank = (c: string) => (ORDER.includes(c) ? ORDER.indexOf(c) : ORDER.length - 1.5)
 /** What the confirm step edits: a catalog product, or what the label scan read. */
 type Draft = {
   product_id: string | null
@@ -61,11 +63,36 @@ export function Routine() {
   const navigate = useNavigate()
   const [entries, setEntries] = useState<RoutineEntry[]>(live ? [] : DEMO_ROUTINE)
   const [rawCheck, setCheck] = useState<RoutineCheck | null>(live ? null : DEMO_CHECK)
-  // An empty routine has nothing to check: never show findings about products that are gone.
-  const check = entries.length ? rawCheck : null
+  // Findings only about products still in use: removing one clears its notes at once (the demo
+  // never re-checks; live re-checks a moment later).
+  const check = useMemo(() => {
+    const ids = new Set(entries.filter((e) => !e.ended_at).map((e) => e.id))
+    if (!rawCheck || ids.size === 0) return null
+    const keep = (products: string[]) => products.filter((id) => ids.has(id)).length >= 2
+    return { ...rawCheck, conflicts: rawCheck.conflicts.filter((c) => keep(c.products)), duplicates: rawCheck.duplicates.filter((d) => keep(d.products)) }
+  }, [rawCheck, entries])
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadRetry, setLoadRetry] = useState(0)
+  const [removing, setRemoving] = useState<RoutineEntry | null>(null)
   const [checking, setChecking] = useState(false)
-  // Removing a product deletes the entry (one added by mistake or no longer used). The list changes
-  // only once the api confirms, so the compatibility check that follows never reads the old routine.
+  const [checkFailed, setCheckFailed] = useState(false)
+  const [checkRetry, setCheckRetry] = useState(0)
+  // Stopping a product keeps it (with its dates) under "Stopped", so its outcome stays linked;
+  // "added by mistake" deletes it. The list changes only once the api confirms.
+  const stopEntry = async (e: RoutineEntry) => {
+    const ended = todayLocal()
+    if (live) {
+      try {
+        await api.patchRoutine(await getIdToken(), e.id, { ended_at: ended })
+      } catch {
+        toast.error('Could not update it. Try again.')
+        return
+      }
+    }
+    setEntries((xs) => xs.map((x) => (x.id === e.id ? { ...x, ended_at: ended } : x)))
+    setRemoving(null)
+    toast(`Marked as stopped. It stays under “Stopped” with its dates.`)
+  }
   const removeEntry = async (e: RoutineEntry) => {
     if (live) {
       try {
@@ -76,6 +103,8 @@ export function Routine() {
       }
     }
     setEntries((xs) => xs.filter((x) => x.id !== e.id))
+    setRemoving(null)
+    toast('Removed from your routine.')
   }
   const routineKey = entries.map((e) => `${e.id}:${e.slots.join('')}:${e.ended_at ?? ''}`).join('|')
 
@@ -87,9 +116,15 @@ export function Routine() {
       if (alive) setChecking(true)
       try {
         const res = await api.routineCheck(await getIdToken())
-        if (alive) setCheck(res)
+        if (alive) {
+          setCheck(res)
+          setCheckFailed(false)
+        }
       } catch {
-        if (alive) setCheck(null)
+        if (alive) {
+          setCheck(null)
+          setCheckFailed(true)
+        }
       } finally {
         if (alive) setChecking(false)
       }
@@ -98,7 +133,7 @@ export function Routine() {
       alive = false
       window.clearTimeout(t)
     }
-  }, [live, user, routineKey, getIdToken])
+  }, [live, user, routineKey, getIdToken, checkRetry])
   const [add, setAdd] = useState<'closed' | 'pick' | 'scan' | 'search' | 'confirm'>('closed')
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -116,15 +151,18 @@ export function Routine() {
     void (async () => {
       try {
         const res = await api.routine(await getIdToken())
-        if (alive) setEntries(res.entries)
+        if (alive) {
+          setEntries(res.entries)
+          setLoadFailed(false)
+        }
       } catch {
-        if (alive) toast.error('Could not load your routine. Pull to refresh or try again.')
+        if (alive) setLoadFailed(true)
       }
     })()
     return () => {
       alive = false
     }
-  }, [live, user, getIdToken])
+  }, [live, user, getIdToken, loadRetry])
 
   // Live: catalog search, latest query wins.
   useEffect(() => {
@@ -132,7 +170,7 @@ export function Routine() {
     const seq = ++searchSeq.current
     const t = window.setTimeout(async () => {
       try {
-        const res = await api.catalogSearch(await getIdToken(), { q: query.trim() || undefined, limit: 30 })
+        const res = await api.catalogSearch(await getIdToken(), { q: query.trim() || undefined, limit: 60 })
         if (seq === searchSeq.current) {
           setLiveResults(res.products)
           setSearchState('done')
@@ -150,7 +188,7 @@ export function Routine() {
     setDraft(d)
     setSlots(d.category === 'sunscreen' ? ['am'] : d.category === 'cleanser' || d.category === 'moisturizer' ? ['am', 'pm'] : ['pm'])
   }
-  const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 10))
+  const [startedAt, setStartedAt] = useState(todayLocal)
   const [dismissed, setDismissed] = useState<string[]>([])
   const sessions = data.series('face_full')?.sessions ?? []
   // Until any face photo is measured, one note says so instead of a "Not measured yet" chip on every product.
@@ -160,7 +198,11 @@ export function Routine() {
 
   const openConflicts = (check?.conflicts ?? []).filter((c) => !dismissed.includes(c.products.join('+')))
   const worst = openConflicts.some((c) => c.severity === 'avoid_same_routine') ? 'avoid' : openConflicts.some((c) => c.severity === 'caution') ? 'caution' : (check?.gaps.length ?? 0) > 0 ? 'gap' : 'ok'
-  const status = entries.length === 0 ? 'Add products to check compatibility' : worst === 'ok' ? 'Looks compatible' : `${openConflicts.length + (check?.gaps.length ?? 0)} ${openConflicts.length + (check?.gaps.length ?? 0) === 1 ? 'thing' : 'things'} to look at`
+  const current = entries.filter((e) => !e.ended_at)
+  const stopped = entries.filter((e) => e.ended_at)
+  const findings = openConflicts.length + (check?.duplicates.length ?? 0) + (check?.gaps.length ?? 0)
+  // Never "Looks compatible" before the check has answered.
+  const status = current.length === 0 ? 'Add products to check compatibility' : !check ? (live && !checkFailed ? 'Checking compatibility…' : 'Compatibility not checked') : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
   const demoResults = useMemo(() => (query.trim().length < 2 ? CATALOG : CATALOG.filter((p) => `${p.brand} ${p.name}`.toLowerCase().includes(query.toLowerCase()))), [query])
   const results = live ? liveResults : demoResults
 
@@ -195,8 +237,8 @@ export function Routine() {
       }
       setAdd('confirm')
       if (res.scan.confidence === 'low') toast('Parts of the label were hard to read. Check the details.')
-    } catch {
-      toast.error('Could not read the label. Try a sharper photo with the ingredient list filling the frame.')
+    } catch (e) {
+      toast.error(e instanceof ApiError && e.status === 429 ? e.message : 'Could not read the label. Try a sharper photo with the ingredient list filling the frame.')
     } finally {
       setReading(false)
     }
@@ -236,7 +278,7 @@ export function Routine() {
   }
 
   const section = (slot: 'am' | 'pm') => {
-    const items = entries.filter((e) => e.slots.includes(slot) && !e.ended_at).sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category))
+    const items = entries.filter((e) => e.slots.includes(slot) && !e.ended_at).sort((a, b) => rank(a.category) - rank(b.category))
     return (
       <section aria-labelledby={`slot-${slot}`}>
         <h2 id={`slot-${slot}`} className="border-b border-border pb-1 pt-5 text-[15px] font-semibold text-text-2">{slot === 'am' ? 'Morning' : 'Evening'}</h2>
@@ -249,9 +291,9 @@ export function Routine() {
               <li key={`${slot}-${e.id}`} className="flex items-start gap-3 py-3">
                 <ProductImage product={{ image_url: e.product_id ? productById(e.product_id)?.image_url : null, category: e.category }} size={48} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[15px] font-medium">{e.brand} {name(e)}</span>
-                    {flagged ? <span role="img" aria-label="part of a compatibility note" title="Part of a compatibility note" className="h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
+                  <div className="flex items-start gap-2">
+                    <span className="line-clamp-2 text-[15px] font-medium leading-snug" title={`${e.brand} ${name(e)}`}>{e.brand} {name(e)}</span>
+                    {flagged ? <span role="img" aria-label="part of a compatibility note" title="Part of a compatibility note" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
                     {e.slots.length === 2 ? <Chip tone="neutral" className="shrink-0 whitespace-nowrap">AM + PM</Chip> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -265,7 +307,7 @@ export function Routine() {
                     </button>
                   ) : null}
                 </div>
-                <button type="button" onClick={() => void removeEntry(e)} aria-label={`Remove ${e.brand} ${name(e)} from the routine`} title="Remove from the routine" className="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-(--radius-control) text-text-3 hover:bg-surface-2 hover:text-text">
+                <button type="button" onClick={() => setRemoving(e)} aria-label={`Remove ${e.brand} ${name(e)} from the routine`} title="Remove from the routine" className="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-(--radius-control) text-text-3 hover:bg-surface-2 hover:text-text">
                   <X size={16} aria-hidden />
                 </button>
               </li>
@@ -281,7 +323,7 @@ export function Routine() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">Your routine</h1>
-          <p className={`mt-1 text-[15px] ${worst === 'ok' || entries.length === 0 ? 'text-text-2' : 'text-warn-text'}`}>{status}</p>
+          <p className={`mt-1 text-[15px] ${findings === 0 || current.length === 0 ? 'text-text-2' : worst === 'ok' ? 'text-text' : 'text-warn-text'}`}>{status}</p>
           {entries.length > 0 && !faceMeasured && data.mode === 'live' ? <p className="mt-1 text-[13px] text-text-3">Take a face session to see, over the weeks, whether each product changed your skin.</p> : null}
         </div>
         <Button
@@ -297,21 +339,48 @@ export function Routine() {
             setAdd('pick')
           }}
         >
-          <Plus size={18} aria-hidden /> Add product
+          <Plus size={18} aria-hidden /> <span className="whitespace-nowrap">Add product</span>
         </Button>
       </div>
 
+      {loadFailed ? (
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-4 text-[15px]">
+          <span className="text-text-2">Could not load your routine. Nothing was lost.</span>
+          <Button variant="secondary" className="!min-h-10" onClick={() => setLoadRetry((n) => n + 1)}>Try again</Button>
+        </div>
+      ) : null}
       {section('am')}
       {section('pm')}
+      {stopped.length ? (
+        <details className="mt-5">
+          <summary className="cursor-pointer py-2 text-[15px] font-semibold text-text-2">Stopped ({stopped.length})</summary>
+          <ul className="divide-y divide-border">
+            {stopped.map((e) => (
+              <li key={e.id} className="flex items-center gap-3 py-3">
+                <ProductImage product={{ image_url: e.product_id ? productById(e.product_id)?.image_url : null, category: e.category }} size={40} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px]" title={`${e.brand} ${name(e)}`}>{e.brand} {name(e)}</span>
+                  <span className="block text-[12px] text-text-3">{fmtDate(e.started_at)} to {fmtDate(e.ended_at!)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
 
       <section className="mt-8" aria-labelledby="compat">
         <h2 id="compat" className="text-[17px] font-semibold">Compatibility</h2>
-        {checking && !check ? (
+        {!check && live && current.length >= 1 && (checking || !checkFailed) ? (
           <p className="mt-1 text-[13px] text-text-2">Checking your routine…</p>
         ) : check ? (
           <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.conflicts.some((c) => c.source === 'model') ? ' and by AI (marked)' : ''}{check.notes.length ? ` · ${check.notes[0]}` : ''}</p>
-        ) : entries.length >= 1 && live ? (
-          <p className="mt-1 text-[13px] text-text-2">The check could not run just now. Your products are saved.</p>
+        ) : current.length >= 1 && live && checkFailed ? (
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[13px] text-text-2">
+            The check could not run just now. Your products are saved.
+            <button type="button" className="min-h-11 font-medium text-text underline-offset-2 hover:underline" onClick={() => setCheckRetry((n) => n + 1)}>
+              Check again
+            </button>
+          </p>
         ) : (
           <p className="mt-1 text-[13px] text-text-2">Add two products and Willow checks them.</p>
         )}
@@ -331,7 +400,7 @@ export function Routine() {
                 <p className="mt-1 text-[15px]"><span className="font-medium">Suggested change:</span> {c.suggestion}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {live ? null : <Button variant="secondary" className="!min-h-10" onClick={() => toast('Demo: alternate nights noted on both products.')}>Apply</Button>}
-                  <Button variant="quiet" className="!min-h-10" onClick={() => navigate(`/advisor${data.mode === 'demo' ? '?demo=1&' : '?'}q=${encodeURIComponent(`Why should I keep ${c.products.map((id) => byId(id)).filter((x): x is RoutineEntry => Boolean(x)).map((x) => name(x)).join(' and ')} apart?`)}`)}>Tell me more</Button>
+                  <Button variant="quiet" className="!min-h-10" onClick={() => navigate(`/advisor${data.mode === 'demo' ? '?demo=1&' : '?'}q=${encodeURIComponent(`${c.severity === 'info' ? 'What should I know about using' : 'Why should I keep'} ${c.products.map((id) => byId(id)).filter((x): x is RoutineEntry => Boolean(x)).map((x) => name(x)).join(' and ')}${c.severity === 'info' ? ' together' : ' apart'}?`)}`)}>Tell me more</Button>
                   {c.source === 'model' ? <Button variant="quiet" className="!min-h-10" onClick={() => setDismissed((d) => [...d, c.products.join('+')])}>Dismiss</Button> : null}
                 </div>
               </li>
@@ -340,7 +409,8 @@ export function Routine() {
           {(check?.duplicates ?? []).map((d) => (
             <li key={d.active} className="rounded-(--radius-tile) border border-border bg-surface p-4">
               <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-text-2"><Copy size={18} aria-hidden /> Same active twice</span>
-              <p className="mt-2 text-[15px] text-text-2">{d.active.charAt(0).toUpperCase() + d.active.slice(1)} appears in {d.products.length} products. {d.note}</p>
+              <p className="mt-2 text-[15px]">{d.products.map((id) => byId(id)).filter((x): x is RoutineEntry => Boolean(x)).map((x) => `${x.brand} ${name(x)}`).join(' + ')}</p>
+              <p className="mt-1 text-[15px] text-text-2">{d.active.charAt(0).toUpperCase() + d.active.slice(1)} is in {d.products.length} products. {d.note}</p>
             </li>
           ))}
           {(check?.gaps ?? []).map((g) => (
@@ -435,7 +505,7 @@ export function Routine() {
               <input value={draft.brand} readOnly={draft.matched} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} aria-label="Brand" placeholder="Brand" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px] read-only:bg-surface-2" />
               <input value={draft.name} readOnly={draft.matched} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Product name" placeholder="Product name" className="w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px] read-only:bg-surface-2" />
               <div className="flex flex-wrap gap-1">
-                <Chip tone="neutral">{draft.category}</Chip>
+                <Chip tone="neutral">{categoryLabel(draft.category)}</Chip>
                 {draft.key_actives.map((a) => <Chip key={a.name} tone="willow">{a.name}{a.pct !== null ? ` ${a.pct}%` : ''}</Chip>)}
               </div>
               <details className="text-[13px] text-text-2"><summary className="cursor-pointer py-1">Ingredients ({draft.inci.length})</summary><p className="pt-1">{draft.inci.join(', ')}</p></details>
@@ -451,11 +521,26 @@ export function Routine() {
                 <button key={s} type="button" aria-pressed={slots.includes(s)} onClick={() => setSlots((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} className={`min-h-11 rounded-full border px-4 text-[15px] ${slots.includes(s) ? 'border-text bg-text text-surface' : 'border-border bg-surface'}`}>{s.toUpperCase()}</button>
               ))}
             </div>
-            <label className="mt-3 block text-[13px] font-medium">Started on<input type="date" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} className="mt-1 block w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" /></label>
+            <label className="mt-3 block text-[13px] font-medium">Started on<input type="date" value={startedAt} max={todayLocal()} onChange={(e) => setStartedAt(e.target.value)} className="mt-1 block w-full rounded-(--radius-control) border border-border bg-surface px-3 py-2 text-[16px]" /></label>
             <p className="mt-1 text-[12px] text-text-3">The start date is what links this product to your measured outcome.</p>
             <Button className="mt-4" disabled={slots.length === 0 || saving || !draft.name.trim()} onClick={() => void save(draft)}>
               {saving ? 'Adding…' : 'Add to routine'}
             </Button>
+          </div>
+        ) : null}
+      </Sheet>
+
+      <Sheet open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={removing ? `Remove ${removing.brand} ${name(removing)}?` : 'Remove'}>
+        {removing ? (
+          <div className="space-y-3">
+            <button type="button" onClick={() => void stopEntry(removing)} className="flex w-full flex-col items-start rounded-(--radius-tile) border border-border bg-surface p-4 text-left hover:bg-surface-2">
+              <span className="text-[15px] font-semibold">I stopped using it</span>
+              <span className="text-[13px] text-text-2">Kept under “Stopped” with its dates, so its link to your results stays.</span>
+            </button>
+            <button type="button" onClick={() => void removeEntry(removing)} className="flex w-full flex-col items-start rounded-(--radius-tile) border border-border bg-surface p-4 text-left hover:bg-surface-2">
+              <span className="text-[15px] font-semibold">I added it by mistake</span>
+              <span className="text-[13px] text-text-2">Deleted from your routine.</span>
+            </button>
           </div>
         ) : null}
       </Sheet>

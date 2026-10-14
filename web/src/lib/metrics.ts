@@ -81,13 +81,17 @@ export function decimalsFor(m: Pick<Metric, 'mdc95' | 'unit'>): number {
 
 export function fmtValue(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {
   if (v === null || Number.isNaN(v)) return '–'
-  return v.toFixed(decimalsFor(m))
+  const s = v.toFixed(decimalsFor(m))
+  // A typographic minus; a value that rounds to zero never shows as "-0.0".
+  return Number(s) === 0 ? s.replace('-', '') : s.replace('-', '−')
 }
 
 export function fmtSigned(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {
   if (v === null) return '–'
   const s = fmtValue(Math.abs(v), m)
-  return v < 0 ? `−${s}` : v > 0 ? `+${s}` : s
+  // The sign follows the number as shown: −0.02 shown as 0.0 has no sign.
+  if (Number(s) === 0) return s
+  return v < 0 ? `−${s}` : `+${s}`
 }
 
 export function directionText(m: Metric): string {

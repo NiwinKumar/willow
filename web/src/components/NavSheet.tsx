@@ -10,7 +10,7 @@ const baseLinks = [
   { to: '/capture', label: 'New session' },
   { to: '/routine', label: 'Routine' },
   { to: '/advisor', label: 'Advisor' },
-  { to: '/retailer', label: 'Retailer view' },
+  { to: '/retailer', label: 'Retailer insights' },
   { to: '/science', label: 'How it works' },
   { to: '/settings', label: 'Settings' },
 ]
@@ -23,11 +23,12 @@ export function Nav() {
   // Live: Results opens a site the person actually has measured results for (forearm today).
   const resultsTo = data.mode === 'demo' ? '/s/face_full' : `/s/${data.sites[0] ?? 'forearm_control'}`
   const links = baseLinks.map((l) => (l.label === 'Results' ? { ...l, to: resultsTo } : l))
+  const here = (l: { to: string; label: string }) => pathname.startsWith(l.label === 'Results' ? '/s/' : l.to.split('?')[0])
   return (
     <>
       <nav className="hidden items-center gap-4 text-[13px] text-text-2 md:flex" aria-label="Primary">
         {links.map((l) => (
-          <Link key={l.to} to={`${l.to}${q}`} className={`hover:text-text ${pathname.startsWith(l.label === 'Results' ? '/s/' : l.to.split('?')[0]) ? 'font-semibold text-text' : ''}`}>
+          <Link key={l.to} to={`${l.to}${q}`} aria-current={here(l) ? 'page' : undefined} className={`hover:text-text ${here(l) ? 'font-semibold text-text' : ''}`}>
             {l.label}
           </Link>
         ))}
@@ -39,7 +40,7 @@ export function Nav() {
         <ul className="divide-y divide-border">
           {links.map((l) => (
             <li key={l.to}>
-              <Link to={`${l.to}${q}`} onClick={() => setOpen(false)} className="block min-h-12 py-3 text-[17px]">
+              <Link to={`${l.to}${q}`} onClick={() => setOpen(false)} aria-current={here(l) ? 'page' : undefined} className={`block min-h-12 py-3 text-[17px] ${here(l) ? 'font-semibold' : ''}`}>
                 {l.label}
               </Link>
             </li>

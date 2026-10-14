@@ -37,7 +37,9 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   const shown = showBaseline && baseline ? baseline : session
   // Geometry follows the photo on screen: while flickering, the baseline photo has its own size,
   // regions and face position (selfies are never pixel-aligned).
-  const size = shown?.result?.image_size ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
+  // No image_size (older results): the preview's own size, never a made-up portrait frame.
+  const previewSize = shown?.preview?.width && shown.preview.height ? { width: shown.preview.width, height: shown.preview.height } : null
+  const size = shown?.result?.image_size ?? previewSize ?? session?.result?.image_size ?? { width: 3024, height: 4032 }
   const rois = shown?.result?.rois ?? session?.result?.rois ?? []
   // A live session without the engine's preview has no picture: never draw the demo
   // illustration (its colour card and arm are not the person's), and nothing to flicker.
@@ -47,6 +49,11 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   // room for hair and jaw) so its skin and spot rings are visible. Other sites show the whole photo.
   const result = shown?.result ?? session?.result
   const clipId = useId()
+  // Photos are a few hundred KB: say so while one loads instead of showing an empty frame.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const photoFailed = Boolean(shown?.preview?.url && failedUrl === shown.preview.url)
+  const photoReady = !shown?.preview?.url || loadedUrl === shown.preview.url || photoFailed
   const framed = Boolean(shown?.preview) // a real photo; the demo illustration keeps its full view
   const vb = useMemo(() => faceFrame(site, framed ? result : null), [site, framed, result])
 
@@ -108,13 +115,21 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
           </clipPath>
           <g clipPath={`url(#${clipId})`}>
             {shown?.preview?.url ? (
-              <image href={shown.preview.url} width={size.width} height={size.height} preserveAspectRatio="xMidYMid slice" />
+              <image
+                href={shown.preview.url}
+                width={size.width}
+                height={size.height}
+                preserveAspectRatio="xMidYMid slice"
+                onLoad={() => setLoadedUrl(shown.preview!.url)}
+                onError={() => setFailedUrl(shown.preview!.url)}
+                style={{ opacity: photoReady ? 1 : 0, transition: reduce ? undefined : 'opacity 200ms ease-out' }}
+              />
             ) : blank ? (
               <rect width={size.width} height={size.height} fill="var(--color-surface-2)" />
             ) : (
               <Illustration site={site} session={shown} />
             )}
-            {(blank ? [] : rois).map((r) => {
+            {(blank || !photoReady ? [] : rois).map((r) => {
               const active = activeRoiNames.includes(r.name)
               const points = r.polygon.map((p) => p.join(',')).join(' ')
               return (
@@ -126,7 +141,8 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                         points={points}
                         fill="var(--color-signal-500)"
                         stroke="var(--color-signal-700)"
-                        strokeWidth="6"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 0.45 }}
                         exit={{ opacity: 0 }}
@@ -139,7 +155,8 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                     fill="transparent"
                     stroke={active ? 'var(--color-text)' : 'var(--color-noise-500)'}
                     strokeOpacity={active ? 0.6 : 0.45}
-                    strokeWidth={active ? 7 : 4}
+                    strokeWidth={active ? 2.5 : 1.5}
+                    vectorEffect="non-scaling-stroke"
                     className="cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -152,7 +169,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
             })}
             {/* Spots the engine found, labelled by Gemini (AI-suggested): small rings, the label on hover.
                 By default everything but hair and artefacts; picking a name in the spots list shows just those. */}
-            {!blank && shown === session
+            {!blank && photoReady && shown === session
               ? (session?.result?.candidates ?? [])
                   .filter((c) => {
                     const d = session?.label_details?.[c.id]
@@ -165,8 +182,11 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                     // photo size), so neighbouring spots on one cheek stay separate rings.
                     const r = Math.max(Math.max(w, h) * 0.6, Math.max(vb.w, vb.h) * 0.008)
                     const focused = spotFocus !== null
+                    // Seen in one photo only: not counted in the numbers, so a fainter ring.
+                    const frames = session?.result?.frames_used ?? 0
+                    const once = frames >= 2 && c.features?.seen_in_fraction !== undefined && Math.round(c.features.seen_in_fraction * frames) < 2
                     return (
-                      <g key={c.id} pointerEvents="visiblePainted">
+                      <g key={c.id} pointerEvents="visiblePainted" opacity={once && !focused ? 0.5 : 1}>
                         <title>{`AI-suggested: ${SPOT_NAME[d.label][0]}${seenText(c.features?.seen_in_fraction, session?.result?.frames_used)}${d.label === 'mole' ? `. ${MOLE_NOTE}` : ''}`}</title>
                         <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke="var(--color-text)" strokeOpacity={0.55} strokeWidth={focused ? 3.5 : 3} vectorEffect="non-scaling-stroke" />
                         <circle cx={x + w / 2} cy={y + h / 2} r={r} fill="none" stroke={focused ? 'var(--color-signal-500)' : d.label === 'uncertain' ? 'var(--color-noise-band)' : 'var(--color-surface)'} strokeWidth={focused ? 2 : 1.5} strokeDasharray={d.label === 'uncertain' ? '3 2' : undefined} vectorEffect="non-scaling-stroke" />
@@ -184,6 +204,15 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
         </div>
         {canFlicker && !holding ? (
           <span className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-(--radius-chip) bg-surface/85 px-2 py-1 text-[12px] text-text-2">Hold to see your baseline</span>
+        ) : null}
+        {!photoReady ? (
+          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="rounded-(--radius-chip) bg-surface/90 px-2 py-1 text-[13px] text-text-2">Loading the photo…</span>
+          </span>
+        ) : photoFailed ? (
+          <span role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center">
+            <span className="rounded-(--radius-chip) bg-surface/90 px-2 py-1 text-[13px] text-text-2">The photo could not be loaded. Reload the page to try again.</span>
+          </span>
         ) : null}
         {blank ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px] text-text-3">{session?.measured === false ? 'No photo preview yet.' : 'No photo preview yet. The numbers below are measured from your photos.'}</span>

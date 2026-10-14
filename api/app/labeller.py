@@ -102,7 +102,9 @@ def _ask(batch: list[tuple[dict, tuple[bytes, bytes]]], site: str) -> dict[str, 
         instructions=INSTRUCTIONS,
         temperature=0.0,
         max_output_tokens=4096,
-        attempts=2,  # one retry: image calls occasionally pass the 25 s deadline
+        attempts=2,  # one retry
+        # 20 small images per call: on a slow Gemini day 25 s was not enough (Oct 14).
+        timeout_ms=45_000,
     )
     ids = {c["id"] for c, _ in batch}
     return {lab.id: lab for lab in reply.labels if lab.id in ids}

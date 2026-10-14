@@ -18,7 +18,7 @@ from typing import Any
 from app.results import measured_result
 from app.store import Store
 
-NOISE_BAND_FRAMES = 2  # the engine needs at least two frames to measure photo-to-photo noise
+NOISE_BAND_FRAMES = 3  # engine config.MIN_FRAMES_FOR_BAND: a band needs 3 usable photos
 
 
 def key(site: str, capture_mode: str) -> str:
@@ -83,6 +83,8 @@ def build(session_id: str, session_doc: dict[str, Any], result: dict[str, Any]) 
         "capture_mode": session_doc["capture_mode"],
         "frames": result["frames_used"],
         "has_noise_band": result["frames_used"] >= NOISE_BAND_FRAMES,
+        # numbers from another engine version are not comparable (guard_engine_version)
+        "engine_version": result.get("engine_version"),
         "session_created_at": session_doc.get("created_at"),
         "created_at": datetime.now(UTC),
         "metrics": metrics,
@@ -100,3 +102,58 @@ def set_baseline(store: Store, uid: str, session_id: str, session_doc: dict) -> 
         store.session_update(uid, old, {"is_baseline": False})
     store.session_update(uid, session_id, {"is_baseline": True})
     return doc
+
+
+# Face counts (engine, Oct 14): with 2+ usable photos only marks seen in at least two photos are
+# counted; a single photo counts every mark. A count from one kind of session against the other
+# would show a change made by the photo count, not the skin.
+CONFIRMED_COUNTS = ("blemishes", "pigment_spots")
+COUNTS_NOT_COMPARED = (
+    "blemish and dark-spot counts are not compared with your baseline this time: one of the two "
+    "sessions had a single usable photo, and counts are confirmed across photos only when there "
+    "are two or more"
+)
+
+
+def guard_counts(result: dict[str, Any], baseline: dict[str, Any] | None) -> None:
+    """Drop the comparison of confirmed counts when only one side had 2+ usable photos."""
+    if not baseline or result.get("site") != "face_full":
+        return
+    base_frames, frames = baseline.get("frames") or 0, result.get("frames_used") or 0
+    if not base_frames or not frames or (base_frames >= 2) == (frames >= 2):
+        return
+    touched = False
+    for m in result.get("metrics", []):
+        if m["id"] in CONFIRMED_COUNTS and m.get("delta") is not None:
+            m.update(delta=None, verdict="no_baseline", direction="none")
+            touched = True
+    if touched:
+        result.setdefault("warnings", []).append(COUNTS_NOT_COMPARED)
+
+
+ENGINE_CHANGED = (
+    "not compared with your baseline: it was measured by an earlier version of Willow's "
+    "measurement, whose numbers differ. Measure the baseline again, or make a new one"
+)
+
+
+def _minor(version: str | None) -> str | None:
+    """'0.3.1' -> '0.3': patch releases do not move numbers, minor ones may."""
+    if not version:
+        return None
+    return ".".join(version.split(".")[:2])
+
+
+def guard_engine_version(result: dict[str, Any], baseline: dict[str, Any] | None) -> None:
+    """No comparison across engine versions (the engine changed, not the skin)."""
+    if not baseline or _minor(result.get("engine_version")) == _minor(
+        baseline.get("engine_version")
+    ):
+        return
+    touched = False
+    for m in result.get("metrics", []):
+        if m.get("delta") is not None:
+            m.update(delta=None, verdict="no_baseline", direction="none")
+            touched = True
+    if touched:
+        result.setdefault("warnings", []).append(ENGINE_CHANGED)

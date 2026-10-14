@@ -38,7 +38,7 @@ export function Capture() {
   const reduce = useReducedMotion()
   const sample = params.get('sample') === '1'
   const initialMode: CaptureMode = params.get('mode') === 'quick' ? 'uncalibrated' : 'calibrated_raw'
-  const [site, setSite] = useState<Site>((params.get('site') as Site) ?? (data.mode === 'live' ? 'forearm_control' : 'face_full'))
+  const [site, setSite] = useState<Site>((params.get('site') as Site) ?? 'face_full')
   const [mode, setMode] = useState<CaptureMode>(initialMode)
   const [why, setWhy] = useState<number | null>(null)
   const [deviation, setDeviation] = useState(false)
@@ -62,7 +62,8 @@ export function Capture() {
   const [uploadFew, setUploadFew] = useState(false)
   // One baseline per site and capture mode: quick selfies are never compared with RAW photos.
   // Photos saved before a site is measured count: the first of them becomes the baseline later.
-  const baselineNeeded = baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
+  // Only once the sessions have loaded: never ask for a baseline someone already has.
+  const baselineNeeded = data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
   const steps = photoSteps(site, mode)
   const expected = baselineNeeded ? 5 : 3
   const ready = rows.length > 0 && (rows.length >= expected || uploadFew)
@@ -117,7 +118,8 @@ export function Capture() {
           <div className="mt-6 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode">
             {(
               [
-                ['calibrated_raw', 'Calibrated', 'RAW photo + colour card. Measured results.'],
+                // Faces have no colour reference yet, so even a RAW face photo is a trend.
+                ['calibrated_raw', 'RAW photo', site.startsWith('forearm') ? 'With white paper beside the arm. Measured results.' : 'Unprocessed by the phone. Trend only on the face for now.'],
                 ['uncalibrated', 'Phone photo', 'Phone camera in the browser. Trend only.'],
               ] as const
             ).map(([id, label, sub]) => (
@@ -367,7 +369,7 @@ function Samples() {
               <li key={p.id} className="flex items-center justify-between gap-3 rounded-(--radius-tile) border border-border bg-surface p-4">
                 <span>
                   <span className="block text-[15px] font-semibold">{p.title}</span>
-                  <span className="block text-[13px] text-text-2">{p.frames} RAW frames with colour card · {p.note}</span>
+                  <span className="block text-[13px] text-text-2">{p.frames} RAW frames · {p.note}</span>
                 </span>
                 <Button onClick={() => { enterDemo(); navigate(`/processing/sample?site=${p.id}&n=${p.frames}&sample=1&demo=1`) }}>Play</Button>
               </li>
@@ -377,8 +379,8 @@ function Samples() {
       )}
       <p className="mt-6 text-[13px] text-text-2">
         Want to measure yourself?{' '}
-        <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => { leaveDemo(); navigate('/capture?site=forearm_control&mode=quick') }}>
-          Photograph your own forearm
+        <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => { leaveDemo(); navigate('/capture?site=face_full&mode=quick') }}>
+          Take a selfie
         </button>
       </p>
     </div>

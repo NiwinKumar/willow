@@ -95,9 +95,20 @@ def tidy(result: LabelScan) -> LabelScan:
     )
 
 
+class BadImage(ValueError):
+    pass
+
+
+def decode_image(data: str) -> bytes:
+    try:
+        return base64.b64decode(data, validate=True)
+    except ValueError as exc:  # binascii.Error is a ValueError
+        raise BadImage("the photo could not be read") from exc
+
+
 def scan(images: list[LabelImage]) -> LabelScanResponse:
     parts: list[types.Part | str] = [
-        types.Part.from_bytes(data=base64.b64decode(img.data_base64), mime_type=img.mime_type)
+        types.Part.from_bytes(data=decode_image(img.data_base64), mime_type=img.mime_type)
         for img in images
     ]
     parts.append("Transcribe this product label.")

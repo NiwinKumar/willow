@@ -1,3 +1,4 @@
+import { Droplet } from 'lucide-react'
 import { useState } from 'react'
 
 import type { Product } from '../data/types'
@@ -53,7 +54,7 @@ export function ProductImage({ product, size = 48, className = '' }: Props) {
           className="h-full w-full object-contain mix-blend-multiply"
         />
       ) : (
-        <span className="text-[11px] font-medium text-text-2">{product.category.slice(0, 3)}</span>
+        <Droplet size={Math.round(size * 0.4)} aria-hidden className="text-text-3" strokeWidth={1.5} />
       )}
     </span>
   )

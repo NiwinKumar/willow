@@ -53,3 +53,14 @@ def test_spots_outside_skin_mask_are_ignored():
     skin = np.ones(lab.shape[:2], bool)
     skin[:200, :200] = False  # e.g. lips / eyes cut out
     assert find_blemishes(lab, skin, PX_PER_MM) == []
+
+
+def test_red_spot_among_hair_gaps_is_found():
+    # a beard: skin with many 1-px hair gaps cut out of the mask, and a red bump among them
+    lab = _spot(_skin_lab(60), 200, 200, r=12, d_a=8.0)
+    rng = np.random.default_rng(3)
+    skin = np.ones(lab.shape[:2], bool)
+    ys, xs = rng.integers(0, 400, 4000), rng.integers(0, 400, 4000)
+    skin[ys, xs] = False  # single-pixel hair gaps everywhere, including over the bump
+    found = find_blemishes(lab, skin, PX_PER_MM)
+    assert len(found) == 1 and abs(found[0].x - 200) < 6

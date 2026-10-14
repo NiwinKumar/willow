@@ -49,3 +49,27 @@ Counts per photo were 7, 10, 8, 17 and 16 on the same face seconds apart, so the
 - `docs/METRICS.md`: describe the face metrics as built (ROIs, side views, seen-in-photos matching), and mark cheek and nose close-ups as not built yet.
 
 When each item is merged, tell Niwin. The api re-runs saved sessions with `uv run python scripts/remeasure.py --site face_full --session <id> --apply`.
+
+---
+
+## Round 2 (after #32 to #39 were merged and deployed, Oct 14)
+
+Re-measured Niwin's 5-photo laptop session on the deployed engine: 5 of 5 photos used, the hand cut without failing any photo, 10 spots instead of 20, a preview written. Thank you. Two things are left:
+
+1. **`_count_confirmed` drops a photo's count to 0 when the other photo cannot be lined up** (`pipeline_face.py`, the `others` list). With two photos where `similarity()` fails for one, `others` is empty for the photo that did line up, so all its marks count as unconfirmed and its blemish and dark-spot values become 0 while the other photo keeps its full count. The docstring says a photo that cannot be lined up "keeps all its marks". Skip the confirmation for a frame when no other frame could be mapped. Test: two photos, the second with landmarks that `similarity()` rejects; both keep their counts.
+2. **The moustache and upper-lip edge still give 3 of 10 candidates** (blemish kind) on that session. A thin dark band of hair just above a red lip edge looks like a red bump. The lip-edge guard (`BLEMISH_LIP_GUARD_MM`) could extend upwards over the philtrum when the lower-face stubble test finds hair there, or the blemish test could require some skin all round the candidate.
+
+The api now does not compare blemish and dark-spot counts between a 1-photo session and a 2+-photo session (one counts every mark, the other only confirmed ones), and says so in the notes. Nothing for you to change there; it is only so you know why a verdict can be missing.
+
+---
+
+## Round 3: what Niwin changed in the engine (Oct 14, branch engine/quality-pass), so you know before M4
+
+Done together with a three-part review (statistics, colour/forearm, face) and measured on real photos. Please review when you can; pull before starting M4 work in these files: `aggregate.py`, `config.py`, `decode.py`, `color.py`, `markers.py`, `io.py`, `main.py`, `pipeline.py`, `pipeline_face.py`, `metrics/pigment.py`, `metrics/redness.py`.
+
+- **Noise band:** `mdc95(sd, n)` is now at least the t-based prediction interval for one new photo; `config.MIN_SD` floors the SD per metric. A 2-photo baseline used to call noise "real" about 1 time in 4.
+- **Face:** ITA from each cheek's median, then the mean (SD 6.3 -> 1.9 degrees on the laptop session); regions use hair-free `face_skin` when at least half is left; redness = mean of per-region medians; **dark_circles** added (`eye_area`, `delta_l_star`); dark-spot L* thresholds scale with skin lightness (`metrics/pigment.py tone_scale`); sharpest passed front photo is the reference; a hand over a cheek or the nose -> `occlusion_suspected`; side views not compared with a baseline; `_count_confirmed` and `_seen_in` fixed for photos that cannot be aligned; empty regions fail one photo, not the request.
+- **Forearm:** pen dots must stand out from skin texture and have nothing similar inside the square (the hairy arm with no dots no longer gives a square); paper must be colourless, brighter than skin, sheet-sized, level with the skin; BaselineExposure applied to DNGs; unusable paper is a warning, not a 500; "measured" only when every photo had paper; redness uses the median a*.
+- **Speed:** one GCS client, parallel frame downloads and crop uploads, measurement in a worker thread, models loaded at startup.
+- **Version 0.3.0.** Please bump `app/__init__.py` whenever a change can move a number: the api stores it on baselines and does not compare across minor versions.
+- Tests added for each (follicles vs ink dots, band at small n, SD floor, direction, fairness at three tones).

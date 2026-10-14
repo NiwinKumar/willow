@@ -429,3 +429,118 @@ def test_remeasure_named_session_runs_again_when_already_measured(client, fake):
     assert (
         fake.store.baseline_get("u_test", "forearm_control")["session_id"] == created["session_id"]
     )
+
+
+def test_malformed_session_ids_are_not_found(client):
+    assert client.get("/v1/sessions/__x__").status_code == 404
+    assert client.get("/v1/sessions/s_" + "9" * 2000).status_code == 404
+
+
+def test_a_crash_marks_the_session_failed_with_a_plain_message(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+
+    def boom(request):
+        raise RuntimeError("token minting failed: gs://bucket/uploads/u_test/secret")
+
+    monkeypatch.setattr(engine, "analyze", boom)
+    res = client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert res.status_code == 502
+    assert "gs://" not in res.text and "RuntimeError" not in res.text
+    doc = fake.store.session_get("u_test", created["session_id"])
+    assert doc["status"] == "failed"
+
+
+def test_engine_error_text_never_reaches_people(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+
+    def html_error(request):
+        raise engine.EngineError("internal", "<html>503 Service Unavailable</html>")
+
+    monkeypatch.setattr(engine, "analyze", html_error)
+    res = client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert "<html>" not in res.text
+    assert res.json()["detail"]["message"].startswith("Something went wrong while measuring")
+
+
+def test_data_deleted_mid_measurement_leaves_nothing(client, fake, monkeypatch):
+    created = _create(client)
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    real = engine.analyze
+
+    def delete_while_running(request):
+        result = real(request)
+        fake.store.delete_user("u_test")  # "Delete my data" in another tab
+        fake.put(f"results/u_test/{sid}/crops/c_001.jpg", content_type="image/jpeg")
+        return result
+
+    monkeypatch.setattr(engine, "analyze", delete_while_running)
+    assert client.post(f"/v1/sessions/{sid}/analyze").status_code == 404
+    assert not [n for n in fake.blobs if n.startswith(f"results/u_test/{sid}/")]
+
+
+def test_counts_are_not_compared_across_one_photo_and_several():
+    from app import baselines
+
+    result = {
+        "site": "face_full",
+        "frames_used": 3,
+        "warnings": [],
+        "metrics": [
+            {"id": "blemishes", "delta": -4.0, "verdict": "real_change", "direction": "decrease"},
+            {"id": "redness", "delta": 0.5, "verdict": "within_noise", "direction": "increase"},
+        ],
+    }
+    baselines.guard_counts(result, {"frames": 1})
+    blem, red = result["metrics"]
+    assert blem["delta"] is None and blem["verdict"] == "no_baseline"
+    assert red["delta"] == 0.5  # other metrics are compared as usual
+    assert result["warnings"] == [baselines.COUNTS_NOT_COMPARED]
+    same = {"site": "face_full", "frames_used": 3, "metrics": [{"id": "blemishes", "delta": -1}]}
+    baselines.guard_counts(same, {"frames": 5})
+    assert same["metrics"][0]["delta"] == -1
+
+
+def test_no_comparison_across_engine_versions_and_bands_from_the_baseline():
+    from app import baselines, explain
+
+    result = {
+        "engine_version": "0.3.0",
+        "warnings": [],
+        "metrics": [{"id": "redness", "delta": 1.0, "verdict": "real_change", "direction": "x"}],
+    }
+    baselines.guard_engine_version(result, {"engine_version": "0.2.0"})
+    assert result["metrics"][0]["delta"] is None and result["warnings"] == [
+        baselines.ENGINE_CHANGED
+    ]
+    same = {"engine_version": "0.3.4", "metrics": [{"id": "redness", "delta": 1.0}]}
+    baselines.guard_engine_version(same, {"engine_version": "0.3.0"})
+    assert same["metrics"][0]["delta"] == 1.0  # a patch release keeps comparisons
+
+    banded = explain.with_bands(
+        {"metrics": [{"id": "redness", "unit": "a_star", "delta": 1.2, "mdc95": None}]},
+        {"redness": 0.9},
+    )
+    assert banded["metrics"][0]["mdc95"] == 0.9  # the band the verdict used
+
+
+def test_remeasuring_the_baseline_refreshes_or_clears_it(client, fake, monkeypatch):
+    created = _create(client, site="forearm_control")
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    client.post(f"/v1/sessions/{sid}/analyze")
+    assert fake.store.baseline_get("u_test", "forearm_control")["session_id"] == sid
+
+    real = engine.analyze
+
+    def now_fails(request):  # e.g. a new engine no longer finds the square in this photo
+        result = real(request)
+        result["quality"]["passed"] = False
+        return result
+
+    monkeypatch.setattr(engine, "analyze", now_fails)
+    analysis.remeasure(fake.store, "b", "u_test", apply=True, sessions={sid})
+    assert fake.store.baseline_get("u_test", "forearm_control") is None
+    assert fake.store.session_get("u_test", sid)["is_baseline"] is False

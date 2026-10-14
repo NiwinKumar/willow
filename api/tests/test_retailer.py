@@ -81,3 +81,16 @@ def test_route_is_public_and_degrades(monkeypatch):
     monkeypatch.setattr(retailer, "insights", down)
     res = client.get("/v1/retailer/insights")
     assert res.status_code == 503
+
+
+def test_every_retailer_goal_names_a_real_app_goal():
+    """APP_GOAL must use the app's goal labels exactly (web/src/lib/metrics.ts GOALS)."""
+    import re
+    from pathlib import Path
+
+    from app import retailer
+
+    web = (Path(__file__).resolve().parents[2] / "web/src/lib/metrics.ts").read_text()
+    app_labels = set(re.findall(r"label: '([^']+)', groups:", web))
+    assert set(retailer.APP_GOAL) == set(retailer.GOAL_LABEL)
+    assert {g for g in retailer.APP_GOAL.values() if g} <= app_labels

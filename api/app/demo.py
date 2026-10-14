@@ -10,6 +10,7 @@ copies the frames server-side into the person's own session; from there it is an
 import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -129,32 +130,41 @@ def status() -> dict[str, Any]:
             "catalog": {"products": len(catalog.products())},
             "storage": {"bucket": settings.bucket},
         }
-        started = time.monotonic()
-        try:
-            h = engine.health()
-            out["engine"] = {
+
+        def engine_check() -> dict[str, Any]:
+            started = time.monotonic()
+            try:
+                h = engine.health()
+            except Exception as exc:  # cold start timeout, IAM, network
+                log.warning("status: engine check failed: %s", exc)
+                return {"status": "unreachable", "mode": settings.engine_mode}
+            return {
                 "status": "ok",
                 "version": h.get("engine_version"),
                 "mode": settings.engine_mode,
                 "latency_ms": round((time.monotonic() - started) * 1000),
             }
-        except Exception as exc:  # cold start timeout, IAM, network
-            log.warning("status: engine check failed: %s", exc)
-            out["engine"] = {"status": "unreachable", "mode": settings.engine_mode}
-        try:
-            from app import retailer
 
-            data = retailer.insights()
-            c = data["cohort"]
-            out["bigquery"] = {
+        def bigquery_check() -> dict[str, Any]:
+            try:
+                from app import retailer
+
+                c = retailer.insights()["cohort"]
+            except Exception as exc:
+                log.warning("status: bigquery check failed: %s", exc)
+                return {"status": "unavailable"}
+            return {
                 "status": "ok",
                 "dataset": settings.bq_dataset,
                 "people": c["synthetic"] + c["real"],
                 "synthetic": c["synthetic"],
             }
-        except Exception as exc:
-            log.warning("status: bigquery check failed: %s", exc)
-            out["bigquery"] = {"status": "unavailable"}
+
+        # Side by side: a cold engine (about 10 s, and the check wakes it for the judge's first
+        # run) must not also wait for BigQuery.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            eng, bq = pool.submit(engine_check), pool.submit(bigquery_check)
+            out["engine"], out["bigquery"] = eng.result(), bq.result()
         out["checked_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         return out
 
