@@ -168,6 +168,16 @@ class FakeFace(Face):
         none = np.zeros(shape, bool)
         return {"brow_core": none, "brow_zone": none, "nostril_zone": none}
 
+    def t_zone_mask(self, shape):
+        m = np.zeros(shape, bool)
+        for n in ("forehead", "nose", "chin"):
+            x, y = SQUARES[n]
+            m[y : y + 120, x : x + 120] = True
+        return m
+
+    def all_roi_polygons(self):
+        return self.roi_polygons()
+
     def roi_polygons(self):
         return {
             n: np.array([[x, y], [x + 120, y], [x + 120, y + 120], [x, y + 120]], float)
@@ -230,7 +240,10 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
         "redness",
         "blemishes",
         "dark_circles",
+        "shine",
+        "glow",
     }
+    assert m["shine"]["value"] < 2.0 and m["shine"]["confidence"] == "indicative"
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
     assert m["tone_evenness"]["value"] < 2.0  # every ROI is the same colour

@@ -143,6 +143,14 @@ class Face:
         return float(np.hypot(*(a - b)))
 
     def roi_polygons(self) -> dict[str, np.ndarray]:
+        """ROIs measured for this view (side views: the cheek and under-eye facing the
+        camera; all_roi_polygons has every ROI)."""
+        out = self.all_roi_polygons()
+        if self.view != "front":
+            out = {n: p for n, p in out.items() if n.startswith(self.view + "_")}
+        return out
+
+    def all_roi_polygons(self) -> dict[str, np.ndarray]:
         hair = self.points[FOREHEAD_HAIRLINE]
         brow = self.points[FOREHEAD_BROWS]
         top = hair + (brow - hair) * config.FOREHEAD_BAND[0]
@@ -156,8 +164,6 @@ class Face:
             hull = cv2.convexHull(pts).reshape(-1, 2)
             centre = hull.mean(axis=0)
             out[name] = centre + (hull - centre) * config.FACE_ROI_SHRINK
-        if self.view != "front":  # only the cheek and under-eye facing the camera
-            out = {n: p for n, p in out.items() if n.startswith(self.view + "_")}
         return out
 
     @property
@@ -254,6 +260,16 @@ class Face:
             guard |= polygon_mask(shape, hull)
         grown = cv2.dilate(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
         return grown.astype(bool)
+
+    def t_zone_mask(self, shape: tuple[int, int]) -> np.ndarray:
+        """Forehead (above the upper brow line), the whole nose and the chin ROI."""
+        up = self.points[10] - self.points[152]
+        up = up / np.linalg.norm(up)
+        brow = (self.points[105] + self.points[334]) / 2  # upper edge of both brows
+        yy, xx = np.mgrid[: shape[0], : shape[1]].astype(np.float32)
+        forehead = (xx - brow[0]) * up[0] + (yy - brow[1]) * up[1] > 0
+        chin = polygon_mask(shape, self.all_roi_polygons()["chin"])
+        return forehead | self.nose_mask(shape) | chin
 
     def nose_mask(self, shape: tuple[int, int]) -> np.ndarray:
         """The whole nose (bridge, sides, tip, wings), grown by SHADOW_GUARD_MM."""

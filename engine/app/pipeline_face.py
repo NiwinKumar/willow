@@ -27,8 +27,10 @@ from app.landmarks import (
 )
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
+from app.metrics.glow import glow
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
+from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
 from app.quality import FrameQuality, check_frame
@@ -43,8 +45,10 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "redness": ("redness", "Redness", "a_star"),
     "blemishes": ("clarity", "Blemishes", "count"),
     "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
+    "shine": ("oil_glow", "Shine", "pct_area"),
+    "glow": ("oil_glow", "Glow", "index"),
 }
-ALWAYS_INDICATIVE = {"blemishes"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "glow"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -128,6 +132,17 @@ def _frame(path: str) -> dict:
     face_skin = refine_skin(
         lab[..., 0], box.crop(face_mask_full), zones, px_per_mm, np.hypot(lab[..., 1], lab[..., 2])
     )
+    # shine: highlights are bright and grey, so measure on skin before the side-view colour
+    # cut (which drops shine); hair is already cut
+    all_polys = face.all_roi_polygons()
+    t_zone = box.crop(face.t_zone_mask(srgb8.shape[:2])) & face_skin
+    u_zone = face_skin & np.logical_or.reduce(
+        [
+            box.crop(polygon_mask(srgb8.shape[:2], all_polys[c]))
+            for c in ("right_cheek", "left_cheek")
+        ]
+    )
+    shine_pct, shine_extras = shine(lab, lin, t_zone, u_zone, px_per_mm)
     if face.view != "front":  # hair, background and shine crowd a turned cheek
         face_skin = skin_colour(lab, face_skin, cheek_skin, px_per_mm)
         # sideburns and temple hair beside the ear (beards: the lower-face stubble test in
@@ -230,6 +245,7 @@ def _frame(path: str) -> dict:
         for sp in find_spots(lab, face_skin, search, px_per_mm, strict=strict, outline=outline)
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
     ]
+    glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -239,6 +255,8 @@ def _frame(path: str) -> dict:
         "redness": redness_a,
         "blemishes": float(len(blemishes)),
         "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
+        "shine": shine_pct,
+        "glow": glow_idx,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -249,6 +267,8 @@ def _frame(path: str) -> dict:
         "dark_circles": {"delta_a_star": float(np.mean([c[1] for c in circles]))}
         if circles
         else {},
+        "shine": shine_extras,
+        "glow": glow_extras,
     }
     return {
         "values": values,

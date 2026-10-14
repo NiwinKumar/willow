@@ -54,6 +54,8 @@ MIN_SD = {
     "pigment_spots": 0.05,  # % of skin area
     "blemishes": 0.5,  # marks
     "dark_circles": 0.3,  # delta L*
+    "shine": 0.02,  # % of T-zone (Oct 14: SD 0.017-0.023 on two sessions)
+    "glow": 1.0,  # index (Oct 14: SD 1.8-2.7, mostly lighting)
 }
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
@@ -228,6 +230,21 @@ HAND_MIN_CONFIDENCE = 0.2
 HAND_MIN_SPAN_EYES = 0.8  # a detected hand spans at least this x the outer-eye distance
 HAND_MARGIN_MM = 10.0  # palm and finger edges beyond the landmarks
 HAND_OCCLUSION_FRAC = 0.10
+
+# shine (docs/METRICS.md C2): highlight = SHINE_DELTA_L brighter than the skin within
+# a SHINE_WINDOW_MM local median AND below SHINE_CHROMA_FRAC of its chroma (or clipped). Oct 14 on 10
+# faces: matte faces 0.5% of the T-zone (the nose-tip glint), shiny foreheads 2-27%.
+SHINE_WINDOW_MM = 12.0  # local median window (a shiny patch up to ~half this wide counts whole)
+SHINE_DELTA_L = 8.0
+SHINE_CHROMA_FRAC = 0.8
+SHINE_MIN_MM2 = 200.0  # T-zone skin needed for a value
+
+# glow (docs/METRICS.md C3), change only: median L* + median chroma - GLOW_TEXTURE_WEIGHT x
+# fine-scale L* SD (texture below GLOW_TEXTURE_MM) on the visible cheeks, shine left out.
+# Provisional weights: a 1 L* texture drop counts like a 5 L* brightness rise.
+GLOW_TEXTURE_MM = 0.5
+GLOW_TEXTURE_WEIGHT = 5.0
+GLOW_MIN_MM2 = 100.0
 
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
