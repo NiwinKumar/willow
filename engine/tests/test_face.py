@@ -306,3 +306,12 @@ def test_spot_persistence_across_photos(tmp_path, fake_landmarks):
         for c in r["candidates"]
     }
     assert seen == {500.0: 1.0, 400.0: 0.33}
+
+
+def test_raw_face_without_a_colour_reference_is_indicative(tmp_path, fake_landmarks, monkeypatch):
+    # a DNG face session: colours as the camera captured them, no card or paper detected
+    monkeypatch.setattr("app.pipeline_face.capture_mode_for", lambda files: "calibrated_raw")
+    _face_photo(tmp_path / "face.jpg")
+    r = analyze_face([str(tmp_path / "face.jpg")])
+    assert r["capture_mode"] == "calibrated_raw" and not r["quality"]["card_detected"]
+    assert {m["confidence"] for m in r["metrics"]} == {"indicative"}
