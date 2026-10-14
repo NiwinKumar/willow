@@ -30,6 +30,8 @@ METRIC_INFO = {  # id -> (group, label, unit)
 def _mean_extras(per_frame: list[dict]) -> dict:
     """Average numeric extras over the good frames (text extras are recomputed by the caller)."""
     out = {}
+    if not per_frame:
+        return out
     for key, first in per_frame[0].items():
         if isinstance(first, (int, float)):
             out[key] = round(sum(e[key] for e in per_frame) / len(per_frame), 2)
@@ -78,7 +80,10 @@ def _frame_metrics(
     # very light skin to 1.0, which is not the camera's fault and must not fail the photo
     quality = check_frame(roi.crop(linear), roi.crop(srgb8))
     if white_px is not None:
-        linear = white_balance(linear, white_px)
+        try:
+            linear = white_balance(linear, white_px)
+        except ValueError:  # paper too dark or blown out: no reference, not a crash
+            white_px = None
     skin_lin = roi.crop(linear)
     lab = linear_srgb_to_lab(skin_lin)
     mask = skin_mask(lab)
@@ -137,11 +142,17 @@ def analyze_forearm(
             passed_values.append(values)
             passed_extras.append(extras)
 
+    # "Measured" needs a colour reference in every photo: without the paper, neither the lamp's
+    # colour nor its brightness is corrected, so tone and redness are a trend, even from a DNG.
+    if mode == "calibrated_raw" and not (white_ok and all(white_ok)):
+        confidence = "indicative"
     metrics = []
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
         if passed_values:
-            summary = summarize([v[metric_id] for v in passed_values], base)
+            summary = summarize(
+                [v[metric_id] for v in passed_values], base, config.MIN_SD.get(metric_id, 0.0)
+            )
             extras = _mean_extras([e[metric_id] for e in passed_extras])
             if metric_id == "tone_ita":  # band must describe the reported (mean) value
                 extras["ita_band"] = ita_band(summary["value"])
@@ -172,10 +183,18 @@ def analyze_forearm(
         reasons.append("too_few_frames")
     if mode == "uncalibrated":
         warnings.insert(0, "uncalibrated photo: results are a trend only, not a measurement")
-    else:
+    elif any(white_ok):
         warnings.insert(0, "no colour card: colours corrected with the white paper only")
-    if not all(white_ok):
-        warnings.append("no white reference found in some photos: lamp colour not corrected")
+    # (the web reads "no white reference found" and " in some photos")
+    if white_ok and not any(white_ok):
+        warnings.append(
+            "no white reference found: lamp colour and brightness not corrected, so tone and "
+            "redness are a trend"
+        )
+    elif not all(white_ok):
+        warnings.append(
+            "no white reference found in some photos: lamp colour and brightness not corrected"
+        )
 
     result = {
         "schema_version": "1.0",
@@ -204,8 +223,13 @@ def analyze_forearm(
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
     }
-    if ref_path and output_prefix:  # the photo the forearm_square ROI describes
-        save_preview(_load(ref_path)[1], output_prefix)
+    if output_prefix and (ref_path or files):
+        # the photo the forearm_square ROI describes; with no square found, the first photo,
+        # so the person sees what was sent next to "pen dots not found"
+        try:
+            save_preview(_load(ref_path or files[0])[1], output_prefix)
+        except EngineError:
+            pass  # an unreadable file is already reported per photo
     if shape is not None:
         result["image_size"] = {"width": int(shape[1]), "height": int(shape[0])}
     validate(result, json.loads(SCHEMA.read_text()))

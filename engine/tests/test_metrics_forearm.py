@@ -156,3 +156,52 @@ def test_ita_band_matches_mean_value(tmp_path):
     ita = analyze_forearm(files, "forearm_control", [skin] * 3, [paper] * 3)["metrics"][0]
     assert ita["extras"]["ita_band"] == ita_band(ita["value"])
     assert set(ita["extras"]) == {"l_star", "b_star", "ita_band"}
+
+
+def _hairy_arm(with_dots: bool):
+    """Skin covered in hair follicles (dark specks a little darker than skin), optionally with
+    four ink dots: a field of follicles must never be read as a pen-dot square (Oct 14)."""
+    img = np.full((1200, 1000, 3), (190, 140, 110), np.float64)
+    rng = np.random.default_rng(7)
+    img += rng.normal(0, 4, img.shape)
+    yy, xx = np.ogrid[:1200, :1000]
+    dots = [(400, 500), (550, 500), (400, 650), (550, 650)]
+    for cx, cy in zip(rng.integers(30, 820, 400), rng.integers(30, 1170, 400), strict=True):
+        if min(np.hypot(cx - dx, cy - dy) for dx, dy in dots) < 30:
+            continue  # keep the dots themselves clean (a hair across a dot is another case)
+        img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 5**2] -= (
+            30  # a follicle: weak, small, dark (real: 16-34)
+        )
+    if with_dots:
+        for cx, cy in dots:
+            img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 12**2] = (40, 35, 35)
+    img[:, 850:] = 235
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+def test_hair_follicles_are_not_a_dot_square():
+    from app.markers import SpotNotFound, find_dot_square
+
+    with pytest.raises(SpotNotFound):
+        find_dot_square(_hairy_arm(with_dots=False))
+    box, _ = find_dot_square(_hairy_arm(with_dots=True))
+    assert abs(box.x + box.w / 2 - 475) < 8 and abs(box.y + box.h / 2 - 575) < 8
+
+
+def test_band_is_wider_for_small_sessions_and_never_zero():
+    from app.aggregate import mdc95, summarize
+
+    z = 1.96 * math.sqrt(2)
+    assert mdc95(1.0, 5) == pytest.approx(max(z, 2.776 * math.sqrt(1.2)), rel=1e-3)
+    assert mdc95(1.0, 2) > 5 * z  # an SD from 2 photos is barely known
+    flat = summarize([2.0, 2.0, 2.0], None, min_sd=0.5)  # a count that did not move
+    assert flat["mdc95"] > 0
+    later = summarize([3.0], {"mean": 2.0, "mdc95": flat["mdc95"]})
+    assert later["verdict"] == "within_noise"  # one more mark is not a real change
+
+
+def test_direction_follows_the_rounded_delta():
+    from app.aggregate import summarize
+
+    s = summarize([10.0001], {"mean": 10.0, "mdc95": 1.0})
+    assert s["delta"] == 0.0 and s["direction"] == "none"

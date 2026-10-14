@@ -22,7 +22,21 @@ SQUARE_SIDE_FRAC = (0.03, 0.20)  # dot spacing as a fraction of photo width (~2-
 PAIR_GAP_SIDES = 4.0  # two squares must be within 4 side-lengths of each other
 PAPER_BAND_BOXES = 1.5  # paper within 1.5 box-heights above/below the skin box
 PAPER_MIN_PX = 2000  # in the small copy; fewer -> use the whole sheet
+# What paper is and skin is not (Oct 14: the bright, washed-out edge of an arm in a
+# Lightroom export passed as "paper"): colourless in linear light, clearly brighter than the
+# skin beside it, and a sheet, not a sliver.
+PAPER_MAX_WARMTH = 0.06  # (R - B) / R in linear light; skin highlights stay warmer
+PAPER_MIN_OVER_SKIN = 1.3  # linear G of the paper over the skin box's median
+PAPER_MIN_AREA_FRAC = 0.005  # of the (small) photo
 ROI_FRACTION = 0.30  # half-size of the measured square as a fraction of the dot spacing
+# Pen ink stands far above skin texture; hair follicles and pores do not. Oct 14: on a hairy
+# forearm with no dots, follicle "dots" scored 16-34 with the chosen four at 18-23, while ink
+# dots score 60+. The four dots must beat the other spots by this factor (their median)...
+DOT_STANDOUT = 1.8
+# ...and no spot nearly as strong as the weakest dot may sit inside the square (a square
+# drawn through a field of follicles is chance, not four pen marks).
+DOT_INSIDE_FRAC = 0.6
+TEXTURE_MIN_SPOTS = 12  # fewer spots besides the dots: no skin texture to judge against
 
 
 def _small_grey(srgb8: np.ndarray) -> np.ndarray:
@@ -37,7 +51,9 @@ def _skin_like(rgb: np.ndarray) -> bool:
     return bool(r > g >= b and (r - b) / max(r, 1.0) >= SKIN_MIN_WARMTH)
 
 
-def dot_candidates(srgb8: np.ndarray) -> list[tuple[float, float, float]]:
+def dot_candidates(
+    srgb8: np.ndarray, limit: int | None = MAX_CANDIDATES
+) -> list[tuple[float, float, float]]:
     """Small round blobs on skin that stand out from it: (x, y, contrast), strongest first."""
     small = srgb8[::SCALE, ::SCALE].astype(np.float32)
     grey = small.mean(axis=-1)
@@ -53,7 +69,7 @@ def dot_candidates(srgb8: np.ndarray) -> list[tuple[float, float, float]]:
         if not _skin_like(around[int(y), int(x)]):
             continue  # specks on the table, paper edge or clothes are not pen dots
         out.append((x * SCALE, y * SCALE, float(r.intensity_mean)))
-    return sorted(out, key=lambda c: -c[2])[:MAX_CANDIDATES]
+    return sorted(out, key=lambda c: -c[2])[:limit]
 
 
 def _square_scores(pts: np.ndarray, combos: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -80,6 +96,31 @@ def _candidate_squares(cands: list, width: int, max_score: float) -> list[tuple]
     return [(score[ok][i], side[ok][i], combos[ok][i]) for i in order]
 
 
+def _distinct(cands: list, combo: np.ndarray, rest: list[float] | None = None) -> bool:
+    """Four real pen dots: clearly stronger than the other spots, and none of similar strength
+    inside the square they form."""
+    chosen = {int(i) for i in combo}
+    dots = [cands[i] for i in chosen]
+    others = [c for i, c in enumerate(cands) if i not in chosen]
+    weakest = min(d[2] for d in dots)
+    # Skin texture is the typical spot in the photo. With many spots (hair, pores) the four dots
+    # must stand far above it; with few, the spots are the dots themselves and there is no
+    # texture to compare with.
+    # Texture = every spot but the 8 strongest (as many as two squares of dots).
+    texture = sorted([c[2] for c in cands] + list(rest or []), reverse=True)[8:]
+    if len(texture) >= TEXTURE_MIN_SPOTS and weakest < DOT_STANDOUT * float(np.median(texture)):
+        return False
+    quad = np.array([d[:2] for d in dots])
+    # inside the dots' bounding square, shrunk a little so dots on the edge do not count
+    lo, hi = quad.min(axis=0), quad.max(axis=0)
+    pad = 0.1 * (hi - lo)
+    for x, y, c in others:
+        inside = lo[0] + pad[0] < x < hi[0] - pad[0] and lo[1] + pad[1] < y < hi[1] - pad[1]
+        if inside and c >= DOT_INSIDE_FRAC * weakest:
+            return False
+    return True
+
+
 def _inner_box(pts: np.ndarray, side: float) -> Box:
     cx, cy = pts.mean(axis=0)
     half = ROI_FRACTION * side  # stays inside the dots even if the square is rotated
@@ -94,9 +135,14 @@ def find_dot_squares(
     For 2, pick the best-shaped PAIR of squares that are the same size and close together
     (pen-dot squares drawn side by side), which rules out chance squares on the table.
     """
-    cands = dot_candidates(srgb8)
+    every = dot_candidates(srgb8, limit=None)  # all spots, for how strong skin texture is
+    cands = every[:MAX_CANDIDATES]
     pts = np.array([c[:2] for c in cands]) if cands else np.zeros((0, 2))
-    squares = _candidate_squares(cands, srgb8.shape[1], max_score)
+    squares = [
+        s
+        for s in _candidate_squares(cands, srgb8.shape[1], max_score)
+        if _distinct(cands, s[2], [c[2] for c in every[MAX_CANDIDATES:]])
+    ]
     chosen = None
     if n == 1 and squares:
         chosen = [squares[0]]
@@ -139,13 +185,28 @@ def paper_pixels(linear: np.ndarray, srgb8: np.ndarray, near: Box | None = None)
     labels = measure.label(morphology.opening(bright & neutral, morphology.disk(3)))
     if labels.max() == 0:
         raise ValueError("could not find the white paper")
-    regions = measure.regionprops(labels)
+    lin_small = linear[::SCALE, ::SCALE]
+    skin_g = float(np.median(near.crop(linear)[..., 1])) if near is not None else 0.0
+
+    def paper_like(r) -> bool:
+        if r.area < PAPER_MIN_AREA_FRAC * labels.size:
+            return False
+        rgb = np.median(lin_small[r.coords[:, 0], r.coords[:, 1]], axis=0)
+        warmth = (rgb[0] - rgb[2]) / max(float(rgb[0]), 1e-6)
+        return warmth <= PAPER_MAX_WARMTH and rgb[1] >= PAPER_MIN_OVER_SKIN * skin_g
+
+    regions = [r for r in measure.regionprops(labels) if paper_like(r)]
+    if not regions:
+        raise ValueError("could not find the white paper")
     if near is None:
         best = max(regions, key=lambda r: r.area)
     else:
         cy = (near.y + near.h / 2) / SCALE
         half = PAPER_BAND_BOXES * near.h / SCALE
-        best = max(regions, key=lambda r: (np.abs(r.coords[:, 0] - cy) <= half).sum())
+        level = {r.label: int((np.abs(r.coords[:, 0] - cy) <= half).sum()) for r in regions}
+        best = max(regions, key=lambda r: level[r.label])
+        if level[best.label] == 0:  # paper must be beside the skin, not anywhere in the photo
+            raise ValueError("no white paper level with the skin")
     mask = morphology.erosion(labels == best.label, morphology.disk(6))
     ys, xs = np.nonzero(mask)
     if near is not None:

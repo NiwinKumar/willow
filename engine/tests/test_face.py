@@ -223,7 +223,14 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
     r = analyze_face(files)  # schema-validated inside
     assert r["site"] == "face_full" and r["frames_used"] == 3
     m = {x["id"]: x for x in r["metrics"]}
-    assert set(m) == {"tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes"}
+    assert set(m) == {
+        "tone_ita",
+        "pigment_spots",
+        "tone_evenness",
+        "redness",
+        "blemishes",
+        "dark_circles",
+    }
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
     assert m["tone_evenness"]["value"] < 2.0  # every ROI is the same colour
@@ -295,9 +302,11 @@ def test_crop_stays_centred_on_a_spot_at_the_photo_edge():
     assert mid[0] > 200 and mid[1] < 100  # the mark is still at the centre
 
 
-def _bump_photo(path, bumps, seed=0):
+def _bump_photo(path, bumps, seed=0, texture=3.0):
     rng = np.random.default_rng(seed)
-    img = np.full((1000, 1000, 3), (198, 148, 115), np.float64) + rng.normal(0, 3, (1000, 1000, 1))
+    img = np.full((1000, 1000, 3), (198, 148, 115), np.float64) + rng.normal(
+        0, texture, (1000, 1000, 1)
+    )
     yy, xx = np.ogrid[:1000, :1000]
     for cx, cy in bumps:
         img[(xx - cx) ** 2 + (yy - cy) ** 2 <= 9**2] = (215, 120, 105)
@@ -309,7 +318,8 @@ def test_spot_persistence_across_photos(tmp_path, fake_landmarks):
     files = []
     for i in range(3):
         bumps = [(500, 600)] + ([(350, 750)] if i == 0 else [])
-        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i)
+        # photo 1 is the sharpest, so it is the reference the candidates come from
+        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i, texture=5.0 if i == 0 else 3.0)
         files.append(str(tmp_path / f"f{i}.jpg"))
     r = analyze_face(files)
     seen = {
@@ -332,11 +342,13 @@ def test_counts_use_only_marks_seen_in_another_photo(tmp_path, fake_landmarks):
     # the bump at (500, 600) is in all 3 photos; the one at (350, 750) only in the first
     files = []
     for i in range(3):
-        _bump_photo(tmp_path / f"f{i}.jpg", [(500, 600)] + ([(350, 750)] if i == 0 else []), seed=i)
+        bumps = [(500, 600)] + ([(350, 750)] if i == 0 else [])
+        _bump_photo(tmp_path / f"f{i}.jpg", bumps, seed=i, texture=5.0 if i == 0 else 3.0)
         files.append(str(tmp_path / f"f{i}.jpg"))
     r = analyze_face(files)
     blem = next(m for m in r["metrics"] if m["id"] == "blemishes")
-    assert blem["value"] == 1.0 and blem["within_session_sd"] == 0.0  # the fluke is not counted
+    assert blem["value"] == 1.0  # the fluke is not counted
+    assert blem["within_session_sd"] == config.MIN_SD["blemishes"]  # identical counts: the floor
     assert len([c for c in r["candidates"] if c["kind"] == "blemish"]) == 2  # still shown
 
 

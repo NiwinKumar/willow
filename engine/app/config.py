@@ -30,6 +30,7 @@ SKIN_HIGH_PCT = 99.0
 # White reference (paper) must be bright but not clipped to be usable for white balance
 WHITE_REF_MIN_LINEAR = 0.15
 WHITE_REF_TARGET = 0.85  # paper is mapped to this linear value (office paper reflects ~85%)
+WHITE_REF_MAX_CLIPPED = 0.05  # share of paper pixels at the clip level; more -> unusable
 
 # ITA bands in degrees (docs/METRICS.md A1). Descriptive only, never a score.
 ITA_BANDS = [
@@ -42,6 +43,20 @@ ITA_BANDS = [
 ]
 
 MDC_Z = 1.96  # 95% two-sided
+MIN_FRAMES_FOR_BAND = 3  # fewer passed photos: SD reported, no noise band (no verdicts)
+# Floor on the photo-to-photo SD per metric (same units as the metric). A session whose photos
+# all gave the same value is not noise-free: counts move by whole marks and webcams by a few
+# tenths of a* between frames. Without a floor its band is 0 and any later change is "real".
+MIN_SD = {
+    "tone_ita": 0.5,  # degrees
+    "redness": 0.2,  # a*
+    "tone_evenness": 0.1,
+    "pigment_spots": 0.05,  # % of skin area
+    "blemishes": 0.5,  # marks
+    "dark_circles": 0.3,  # delta L*
+}
+ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
+UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
 LANDMARK_MAX_SIDE = 1280  # downscale before MediaPipe; landmarks are mapped back to full res
@@ -122,6 +137,8 @@ EYE_DISTANCE_MM = 63.0  # adult average outer-eye distance, for a rough px-per-m
 # on IMG_2537 -6; false hits were mostly broad 5-9 mm shading at 2-4 L*, so marks wider
 # than SPOT_LARGE_MM need proportionally more (8 mm -> 6 L*).
 SPOT_MIN_DL = 3.0
+SPOT_TUNE_L = 60.0  # skin L* the L*-step thresholds were tuned on (Oct 13 photos)
+SPOT_TONE_MIN_SCALE = 0.4  # deepest skin: thresholds go no lower than 40%
 SPOT_LARGE_MM = 4.0
 # ...and stand out from camera grain: score (darkness / fine skin texture) at least this.
 # Not the main test: texture depends on the camera (sharp HEIC 0.9 L*, soft JPEG 0.5).
@@ -197,6 +214,7 @@ CROP_CONTEXT = 3  # context crop is 3x the candidate crop
 # preview.jpg of the reference photo for the web (CONTRACT_CHANGES proposal 1b)
 PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
 PREVIEW_QUALITY = 85
+UPLOAD_WORKERS = 8  # parallel GCS transfers (frames in, crops out)
 
 # Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
 # test photos: at 0.2 confidence the only detections were a real hand and two specks a

@@ -61,6 +61,7 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
 
     measured = not engine.is_placeholder(result)
     if measured and baseline_map:
+        baselines.guard_engine_version(result, current)
         baselines.guard_counts(result, current)
     explanation, source, details = (None, None, {})
     if measured:
@@ -93,6 +94,17 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         },
     )
     doc = store.session_get(uid, session_id) or doc
+    if measured and current is not None and current["session_id"] == session_id:
+        # Measured again (a fix or a new engine): the baseline keeps up with its own session,
+        # and stops being one if it no longer passes (a square found in hair, for example).
+        if baselines.qualifies(result):
+            baselines.set_baseline(store, uid, session_id, doc)
+        else:
+            store.baseline_delete(uid, baselines.key(doc["site"], doc["capture_mode"]))
+            store.session_update(uid, session_id, {"is_baseline": False})
+            current = None
+        doc = store.session_get(uid, session_id) or doc
+        return doc
     if measured and current is None and baselines.qualifies(result):
         try:
             baselines.set_baseline(store, uid, session_id, doc)
@@ -123,6 +135,10 @@ def explain_context(
     ]
     return {
         "is_baseline": is_baseline,
+        # the band each verdict was judged against (explain.with_bands; not sent to Gemini)
+        "bands": None
+        if is_baseline
+        else {k: m.get("mdc95") for k, m in (baseline.get("metrics") or {}).items()},
         "baseline_has_noise_band": None if is_baseline else baseline.get("has_noise_band", True),
         "days_since_baseline": days,
         "routine": routine[:12],
