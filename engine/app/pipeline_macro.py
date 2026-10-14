@@ -1,14 +1,12 @@
 """Close-up sites (docs/METRICS.md A5, A6, B2): a phone photo taken close to one part of the
 face. When enough of the face is in view (a nose close-up shows an eye), face landmarks give
-the region (cheek, nose, forehead, chin; brows, eyes, lips and nostrils left out) and the
+the region (cheek or nose; brows, eyes, lips and nostrils left out) and the
 iris (CLOSEUP_IRIS_MM across) gives the scale. A pure macro shot with no face in view falls
 back to skin by colour over the whole photo and the assumed MACRO_FIELD_WIDTH_MM (measured
 once with scripts/macro_scale.py).
 
 cheek_macro   : tone_ita, pigment_spots, redness, blemishes, pores, texture
 nose_macro    : blemishes, pores
-forehead_macro: blemishes, pores, texture   (not in the contract yet: CLI only)
-chin_macro    : blemishes, pores, texture   (not in the contract yet: CLI only)
 """
 
 import dataclasses
@@ -43,17 +41,12 @@ from app.roi import Box
 REGIONS = {
     "cheek_macro": "cheek",
     "nose_macro": "nose",
-    "forehead_macro": "forehead",
-    "chin_macro": "chin",
 }
-MACRO_SITES = set(REGIONS)  # the request schema admits only the contract's two
-CONTRACT_SITES = {"cheek_macro", "nose_macro"}
+MACRO_SITES = set(REGIONS)
 # face mesh points the close-up regions are cut along
-LOWER_LIP_BOTTOM = 17
 LOWER_LIDS = (145, 374)  # right, left
 MOUTH_CORNERS = (61, 291)
 NOSE_WINGS = (129, 358)  # right, left
-BROW_TOPS = (105, 334)  # upper edge of each brow
 NO_LANDMARKS = np.full((478, 2), np.nan)
 IRIS = ([468, 469, 470, 471, 472], [473, 474, 475, 476, 477])  # centre, then 4 edge points
 METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
@@ -67,8 +60,6 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
 SITE_METRICS = {
     "cheek_macro": ("tone_ita", "pigment_spots", "redness", "blemishes", "pores", "texture"),
     "nose_macro": ("blemishes", "pores"),
-    "forehead_macro": ("blemishes", "pores", "texture"),
-    "chin_macro": ("blemishes", "pores", "texture"),
 }
 SCALE_METRICS = {"pores", "texture"}  # need the mm scale; measured only once it is calibrated
 
@@ -98,8 +89,8 @@ def _region_skin(
     """Skin of a landmark region: drops hair (darker AND grey), nostril openings (far darker,
     nose only) and clipped glare. Lit and shaded skin stay (a
     close-up's light falls off across the face), and small dark holes (dark pores, marks,
-    moles) are refilled. Keeps the `pieces` largest parts big enough to measure (cheeks: both,
-    cheeks; a forehead's other bits are hair highlights or background between strands)."""
+    moles) are refilled. Keeps the `pieces` largest parts big enough to measure (cheeks: both
+    cheeks; a nose's other bits are hair or background)."""
     L = lab[..., 0]
     chroma = np.hypot(lab[..., 1], lab[..., 2])
     med, c_med = float(np.median(L[region])), float(np.median(chroma[region]))
@@ -168,7 +159,7 @@ def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
     """The site's region of the face, without eyes, lids, lips, brows (and their margins)."""
     if region == "nose":  # nostril openings are cut by colour (too dark for skin)
         area = face.nose_mask(shape)
-    else:  # cheek, chin, forehead: wide areas of the face outline, cut along face lines
+    else:  # cheek: a wide area of the face outline, cut along face lines
         across, up = _axes(face)
         yy, xx = np.mgrid[: shape[0], : shape[1]].astype(np.float32)
         origin = face.points[1]  # nose tip
@@ -181,24 +172,16 @@ def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
         def t_of(*idx):
             return float(np.mean([(face.points[i] - origin) @ up for i in idx]))
 
-        if region == "forehead":  # above the brow tops; front outline is lifted into the hair
-            outline = dataclasses.replace(face, yaw=0.0).outline()
-            area = polygon_mask(shape, outline) & (t_px > t_of(*BROW_TOPS))
-        elif region == "chin":  # below the lower lip, down to the jaw line
-            outline = dataclasses.replace(face, yaw=0.0).outline()
-            area = polygon_mask(shape, outline) & (t_px < t_of(LOWER_LIP_BOTTOM))
-        else:  # cheek: lower lids to mouth corners, side of the nose wing to the face edge
-            band = (t_px < t_of(*LOWER_LIDS)) & (t_px > t_of(*MOUTH_CORNERS))
-            sides = np.zeros(shape, bool)
-            if "right_cheek" in face.cheeks:
-                sides |= s_px < s_of(NOSE_WINGS[0])
-            if "left_cheek" in face.cheeks:
-                sides |= s_px > s_of(NOSE_WINGS[1])
-            area = polygon_mask(shape, face.outline()) & band & sides & ~face.nose_mask(shape)
+        # lower lids to mouth corners, side of the nose wing to the face edge
+        band = (t_px < t_of(*LOWER_LIDS)) & (t_px > t_of(*MOUTH_CORNERS))
+        sides = np.zeros(shape, bool)
+        if "right_cheek" in face.cheeks:
+            sides |= s_px < s_of(NOSE_WINGS[0])
+        if "left_cheek" in face.cheeks:
+            sides |= s_px > s_of(NOSE_WINGS[1])
+        area = polygon_mask(shape, face.outline()) & band & sides & ~face.nose_mask(shape)
     guard = face.brow_guard(shape) | face.eye_corner_guard(shape)
-    # forehead and chin are mid-face: the whole face, not only the half a turned face shows
-    whole = dataclasses.replace(face, yaw=0.0) if region in ("forehead", "chin") else face
-    return area & whole.skin_mask(shape) & ~guard & _edges(shape)
+    return area & face.skin_mask(shape) & ~guard & _edges(shape)
 
 
 def _scaled(mark, back: float):
@@ -512,8 +495,7 @@ def analyze_macro(
         result["image_size"] = {"width": int(ref["shape"][1]), "height": int(ref["shape"][0])}
     for f in frames:
         f.pop("srgb8", None)
-    if site in CONTRACT_SITES:  # forehead / chin close-ups await a contract change
-        validate(result, json.loads(SCHEMA.read_text()))
+    validate(result, json.loads(SCHEMA.read_text()))
     return result
 
 
