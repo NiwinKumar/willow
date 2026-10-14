@@ -252,7 +252,13 @@ MACRO_MIN_PX_ASSUMED = 40.0
 # needs most of a face, so the photo is also tried shrunk to these sizes on a plain canvas
 CLOSEUP_SHRINK = (0.5, 0.33)
 CLOSEUP_IRIS_MM = 11.7  # visible iris diameter, nearly the same in all adults: the scale
-CLOSEUP_DARKER_L = 20.0  # in a face region, this much darker than its median is hair / nostril
+# in a face region, hair = this much darker than the region's median AND under
+# CLOSEUP_HAIR_CHROMA of its chroma (black hair is grey; shaded skin keeps its colour: one
+# darkness cut alone took the shaded half of a chin and a cheek, IMG_2579); in the nose
+# region, nostril openings = CLOSEUP_NOSTRIL_L darker
+CLOSEUP_DARKER_L = 15.0
+CLOSEUP_HAIR_CHROMA = 0.6
+CLOSEUP_NOSTRIL_L = 35.0
 CLOSEUP_CLIPPED_L = 97.0  # and this bright is clipped glare (lit skin is kept)
 CLOSEUP_MARK_EDGE_MM = 2.0  # marks this close to a region's edge are edge shadows
 PORE_MARK_GAP_MM = 0.3  # pores this close to a blemish / dark spot edge are its edge

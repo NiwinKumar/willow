@@ -91,13 +91,21 @@ def _skin(lab: np.ndarray, px_per_mm: float) -> np.ndarray:
     return skin_colour(lab, _edges((h, w)), ref, px_per_mm)
 
 
-def _region_skin(lab: np.ndarray, region: np.ndarray, px_per_mm: float) -> np.ndarray:
-    """Skin of a landmark region: drops what is far darker than the region (hair, nostril
-    openings) and clipped glare. Lit skin stays (a close-up's lit centre is not glare), and
-    small dark holes (blackheads, marks, moles) are refilled."""
+def _region_skin(
+    lab: np.ndarray, region: np.ndarray, px_per_mm: float, pieces: int = 1, nose: bool = False
+) -> np.ndarray:
+    """Skin of a landmark region: drops hair (darker AND grey), nostril openings (far darker,
+    nose only) and clipped glare. Lit and shaded skin stay (a
+    close-up's light falls off across the face), and small dark holes (blackheads, marks,
+    moles) are refilled. Keeps the `pieces` largest parts big enough to measure (cheeks: both,
+    cheeks; a forehead's other bits are hair highlights or background between strands)."""
     L = lab[..., 0]
-    med = float(np.median(L[region]))
-    keep = region & (L >= med - config.CLOSEUP_DARKER_L) & (L <= config.CLOSEUP_CLIPPED_L)
+    chroma = np.hypot(lab[..., 1], lab[..., 2])
+    med, c_med = float(np.median(L[region])), float(np.median(chroma[region]))
+    hair = (L < med - config.CLOSEUP_DARKER_L) & (chroma < config.CLOSEUP_HAIR_CHROMA * c_med)
+    keep = region & ~hair & (L <= config.CLOSEUP_CLIPPED_L)
+    if nose:  # nostril openings (elsewhere a far darker patch is shaded skin: it keeps colour)
+        keep &= L >= med - config.CLOSEUP_NOSTRIL_L
     holes = binary_fill_holes(keep) & ~keep & region
     n, labels, stats, _ = cv2.connectedComponentsWithStats(holes.astype(np.uint8), connectivity=8)
     small = [k for k in range(1, n) if stats[k, cv2.CC_STAT_AREA] < 2.0 * px_per_mm**2]
@@ -106,9 +114,10 @@ def _region_skin(lab: np.ndarray, region: np.ndarray, px_per_mm: float) -> np.nd
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     keep = cv2.morphologyEx(keep.astype(np.uint8), cv2.MORPH_OPEN, kernel)
     n, labels, stats, _ = cv2.connectedComponentsWithStats(keep, connectivity=8)
-    if n > 1:
-        keep = (labels == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))).astype(np.uint8)
-    return keep.astype(bool) & region
+    min_px = config.MACRO_MIN_SKIN_CM2 * 100.0 * px_per_mm**2
+    big = sorted(range(1, n), key=lambda k: -stats[k, cv2.CC_STAT_AREA])[:pieces]
+    big = [k for k in big if stats[k, cv2.CC_STAT_AREA] >= min_px]
+    return np.isin(labels, big) & region
 
 
 def _find_face(srgb8: np.ndarray) -> Face | None:
@@ -234,7 +243,7 @@ def _no_face(srgb8: np.ndarray, site: str) -> dict:
         "face": SimpleNamespace(px_per_mm=1.0),
         "blemishes": [],
         "spots": [],
-        "skin_outline": None,
+        "skin_outlines": [],
         "detailed": False,
         "face_found": False,
         "enough_skin": False,
@@ -273,7 +282,9 @@ def _frame(path: str, site: str) -> dict:
         region = _region(
             dataclasses.replace(face, points=face.points * scale), REGIONS[site], lab.shape[:2]
         )
-        skin = _region_skin(lab, region, px) if region.any() else region
+        pieces = 4 if REGIONS[site] == "cheek" else 1  # cheeks: both, even if split by a crease
+        nose = REGIONS[site] == "nose"
+        skin = _region_skin(lab, region, px, pieces, nose) if region.any() else region
     else:
         skin = _skin(lab, px)
 
@@ -329,11 +340,11 @@ def _frame(path: str, site: str) -> dict:
         blemishes={"blackheads": blackheads(pores)} if site == "nose_macro" else {},
         pores=pores_extras,
     )
-    contour = max(
-        cv2.findContours(skin.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0],
-        key=cv2.contourArea,
-        default=None,
-    )
+    contours = cv2.findContours(skin.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[
+        0
+    ]
+    min_px = config.MACRO_MIN_SKIN_CM2 * 100.0 * px**2  # each measured piece (both cheeks)
+    outlines = [c.reshape(-1, 2) * back for c in contours if cv2.contourArea(c) >= min_px]
     return {
         "values": values,
         "extras": extras,
@@ -344,7 +355,7 @@ def _frame(path: str, site: str) -> dict:
         "face": SimpleNamespace(px_per_mm=px_full),  # what _candidates reads
         "blemishes": blems,
         "spots": spots,
-        "skin_outline": None if contour is None else contour.reshape(-1, 2) * back,
+        "skin_outlines": outlines,
         "detailed": detailed,
         "face_found": face is not None,
         "enough_skin": enough,
@@ -479,11 +490,10 @@ def analyze_macro(
         "metrics": metrics,
         "candidates": candidates,
         "overlays": [],
-        "rois": (
-            [{"name": REGIONS[site], "polygon": np.round(ref["skin_outline"], 1).tolist()}]
-            if ref is not None and ref["skin_outline"] is not None
-            else []
-        ),
+        "rois": [
+            {"name": REGIONS[site], "polygon": np.round(outline, 1).tolist()}
+            for outline in (ref["skin_outlines"] if ref is not None else [])
+        ],
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
         "warnings": warnings,
     }
