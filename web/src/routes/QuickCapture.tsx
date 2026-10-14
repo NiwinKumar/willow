@@ -2,6 +2,7 @@ import { Camera, RotateCcw, X } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { Button } from '../components/Button'
 import { FirstSessionGuide } from '../components/BaselineGuide'
@@ -11,6 +12,7 @@ import { baselineState, photoSteps } from '../lib/baselineGuide'
 import type { CaptureMode, Site } from '../data/types'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { validateFiles, type Row } from '../lib/upload'
+import { authErrorText } from '../lib/authErrors'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 
@@ -299,7 +301,7 @@ export function QuickCapture() {
         {!user ? (
           <div className="mt-4 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px]">
             Sign in to upload. A guest account is enough.{' '}
-            <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => void continueAsGuest()}>
+            <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => continueAsGuest().catch((e) => { const t = authErrorText(e); if (t) toast.error(t) })}>
               Continue as guest
             </button>
           </div>

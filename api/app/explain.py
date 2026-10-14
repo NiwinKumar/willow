@@ -95,6 +95,23 @@ BANNED = re.compile(
     re.I,
 )
 CHANGE_WORDS = re.compile(r"\b(real change|improv\w*|worse\w*|better)\b", re.I)
+# "cannot be called a real change yet" or "no noise band yet to confirm a real change" is the
+# hedge we ask for, not a claim: within a sentence, a mention of "real (change)" after a negation
+# does not count. "Improved", "better" and "worse" always count.
+NEGATION = re.compile(r"\b(?:cannot|can't|can not|could not|not|no|without|too early)\b", re.I)
+REAL = re.compile(r"\breal(?:\s+change)?\b", re.I)
+
+
+def _claims_change(text: str) -> bool:
+    for sentence in re.split(r"[.!?;]", text):
+        neg = NEGATION.search(sentence)
+        if neg:
+            head, tail = sentence[: neg.start()], sentence[neg.start() :]
+            sentence = head + REAL.sub(" ", tail)
+        if CHANGE_WORDS.search(sentence):
+            return True
+    return False
+
 
 INSTRUCTIONS = """Explain one skin-measurement session to the person, in plain calm words.
 Rules:
@@ -188,9 +205,9 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
     for item in exp.items:
         if item.metric_id not in verdicts:
             found.append(f"unknown metric {item.metric_id}")
-        elif verdicts[item.metric_id] != "real_change" and CHANGE_WORDS.search(item.summary):
+        elif verdicts[item.metric_id] != "real_change" and _claims_change(item.summary):
             found.append(f"change language for {item.metric_id} ({verdicts[item.metric_id]})")
-    if not any(v == "real_change" for v in verdicts.values()) and CHANGE_WORDS.search(exp.headline):
+    if not any(v == "real_change" for v in verdicts.values()) and _claims_change(exp.headline):
         found.append("change language in headline")
     return found
 
@@ -219,5 +236,9 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
             out = exp.model_dump()
             out["disclaimer"] = DISCLAIMER
             return out, "gemini"
-        log.warning("explanation rejected: %s", issues[:3])
+        log.warning(
+            "explanation rejected: %s | %s",
+            issues[:3],
+            [i.summary[:160] for i in exp.items if f"for {i.metric_id} " in " ".join(issues)],
+        )
     return template(result), "template"

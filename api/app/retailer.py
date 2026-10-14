@@ -10,8 +10,10 @@ is the start of the improved run that lasts to week 8. People who stopped before
 as "too early".
 """
 
+import logging
 import math
 import statistics
+import threading
 import time
 from collections import Counter, defaultdict
 from typing import Any
@@ -21,6 +23,8 @@ from app.settings import get_settings
 
 MIN_GROUP = 10
 WEEKS = 8
+log = logging.getLogger("willow.retailer")
+
 CACHE_SECONDS = 600
 GOAL_LABEL = {
     "acne_blemishes": "Clearer skin",
@@ -369,10 +373,23 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
 
 
 _cache: dict[str, Any] = {"at": 0.0, "data": None}
+_cache_lock = threading.Lock()
 
 
 def insights() -> dict[str, Any]:
-    if _cache["data"] is None or time.time() - _cache["at"] > CACHE_SECONDS:
-        _cache["data"] = aggregate(fetch())
-        _cache["at"] = time.time()
-    return _cache["data"]
+    """Cached for CACHE_SECONDS; one query at a time; if BigQuery fails after expiry, the last
+    good answer is served (and retried a minute later) instead of an error."""
+    if _cache["data"] is not None and time.time() - _cache["at"] <= CACHE_SECONDS:
+        return _cache["data"]
+    with _cache_lock:
+        if _cache["data"] is not None and time.time() - _cache["at"] <= CACHE_SECONDS:
+            return _cache["data"]  # another request refreshed it while this one waited
+        try:
+            _cache["data"] = aggregate(fetch())
+            _cache["at"] = time.time()
+        except Exception:
+            if _cache["data"] is None:
+                raise
+            log.warning("retailer insights refresh failed; serving the cached answer")
+            _cache["at"] = time.time() - CACHE_SECONDS + 60
+        return _cache["data"]

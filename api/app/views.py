@@ -80,6 +80,18 @@ def session_view(
     result = measured_result(doc)
     measured = result is not None
     analyzed = doc["status"] == "done"
+    if result and doc.get("is_baseline"):
+        # The baseline is the reference: deltas it carries from an older baseline (it was picked
+        # with "Make this my baseline") would contradict "Your baseline" on screen.
+        result = {
+            **result,
+            "metrics": [
+                m
+                if m.get("verdict") == "low_quality"
+                else {**m, "delta": None, "verdict": "no_baseline", "direction": "none"}
+                for m in result["metrics"]
+            ],
+        }
     preview = None
     photo = next(
         (n for n in (preview_name(uid, sid), _first_frame(doc)) if n and n in signed), None
@@ -98,11 +110,9 @@ def session_view(
             overlay_urls[overlay["metric_id"]] = signed[name]
     # The baseline this session was actually compared with (stored at analysis time), so a later
     # "Make this my baseline" never relabels old results; older docs fall back to today's.
-    if (
-        doc.get("compared_with") is not None
-        or doc.get("is_baseline") is False
-        and "compared_with" in doc
-    ):
+    if doc.get("is_baseline"):
+        baseline = None if not baseline or baseline.get("session_id") != sid else baseline
+    elif doc.get("compared_with") is not None or "compared_with" in doc:
         baseline = doc.get("compared_with")
     hours = None
     if baseline:

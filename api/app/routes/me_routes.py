@@ -87,10 +87,12 @@ def delete_me(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> Response:
-    """Delete everything stored for this person: photos, results, sessions, baselines."""
+    """Delete everything stored for this person: photos, results, sessions, baselines.
+
+    Records first, so the app forgets them at once even if removing many files takes a while."""
+    store.delete_user(user.uid)
     storage.delete_prefix(f"uploads/{user.uid}/")
     storage.delete_prefix(f"results/{user.uid}/")
-    store.delete_user(user.uid)
     return Response(status_code=204)
 
 

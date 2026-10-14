@@ -158,3 +158,24 @@ def test_one_photo_baseline_comparison_is_not_called_a_first_reading():
     assert "no noise band yet" in explain.item(m)["summary"]
     exp = explain.template({"metrics": [m], "quality": {"passed": True}})
     assert exp["headline"] == "Compared with your baseline (no noise band yet)"
+
+
+def test_hedged_mentions_of_real_change_are_not_claims():
+    from app.explain import _claims_change
+
+    assert not _claims_change("This change cannot be called real yet.")
+    assert not _claims_change("Without a noise band it cannot be confirmed as a real change.")
+    assert not _claims_change("It is not yet a real change.")
+    assert _claims_change("Redness shows a real change since your baseline.")
+    assert _claims_change("Your tone improved.")
+
+
+def test_negation_anywhere_earlier_in_the_sentence():
+    from app.explain import _claims_change
+
+    assert not _claims_change(
+        "The reading shows no measurable difference, though there is no noise band yet to "
+        "determine a real change."
+    )
+    assert not _claims_change("Without a noise band yet to confirm a real change.")
+    assert _claims_change("No noise band yet. This is a real change.")

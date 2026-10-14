@@ -44,3 +44,10 @@ def take(store: Store, uid: str, action: str) -> int:
             {"code": "busy", "message": "Willow is very busy today. Please try again tomorrow."},
         )
     return used
+
+
+def refund(store: Store, uid: str, action: str) -> None:
+    """Give a use back when the action failed on our side (engine down, Gemini unavailable)."""
+    day = datetime.now(UTC).date().isoformat()
+    store.usage_incr(uid, day, action, -1)
+    store.usage_incr(GLOBAL_UID, day, action, -1)
