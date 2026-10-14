@@ -34,42 +34,43 @@ export function BandBar({ value, baseline, mdc95, verdict, reach = 0, label, hei
   const dotX = value === null ? W / 2 : Math.min(W - 10, Math.max(10, x(value)))
   const outside = verdict === 'real_change'
   const low = verdict === 'low_quality'
+  const pct = (dotX / W) * 100
   return (
-    <svg
-      viewBox={`0 0 ${W} ${height}`}
-      preserveAspectRatio="none"
-      role="img"
-      aria-label={label}
-      className={`block h-7 w-full ${className}`}
-    >
-      <line x1="0" x2={W} y1={cy} y2={cy} stroke="var(--color-border)" strokeWidth="1" />
-      {hasBand ? (
-        <>
-          <rect x={bandX1} y={cy - bandH / 2} width={bandX2 - bandX1} height={bandH} fill="var(--color-noise-band)" />
-          <rect x={bandX1} y={cy - bandH / 2} width={bandX2 - bandX1} height={bandH} fill="url(#hatch)" opacity="0.5" />
-          <line x1={x(center)} x2={x(center)} y1={cy - bandH / 2 - 3} y2={cy + bandH / 2 + 3} stroke="var(--color-noise-500)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
-        </>
-      ) : null}
+    // The track and band stretch with the row; the dot is HTML on top, so it stays round at any
+    // width (an SVG stretched with preserveAspectRatio="none" squashes circles into ovals).
+    <div role="img" aria-label={label} className={`relative block h-7 w-full ${className}`}>
+      <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" aria-hidden className="absolute inset-0 h-full w-full">
+        <line x1="0" x2={W} y1={cy} y2={cy} stroke="var(--color-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        {hasBand ? (
+          <>
+            <rect x={bandX1} y={cy - bandH / 2} width={bandX2 - bandX1} height={bandH} fill="var(--color-noise-band)" />
+            <rect x={bandX1} y={cy - bandH / 2} width={bandX2 - bandX1} height={bandH} fill="url(#hatch)" opacity="0.5" />
+            <line x1={x(center)} x2={x(center)} y1={cy - bandH / 2 - 3} y2={cy + bandH / 2 + 3} stroke="var(--color-noise-500)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+          </>
+        ) : null}
+      </svg>
       {value !== null ? (
-        <motion.g
+        <motion.span
+          aria-hidden
           initial={false}
-          animate={{ x: dotX }}
+          animate={{ left: `${pct}%` }}
           transition={reduce ? { duration: 0 } : SPRING_SETTLE}
-          style={{ x: dotX }}
+          style={{ left: `${pct}%` }}
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
         >
           {low ? (
-            <g stroke="var(--color-warn-text)" strokeWidth="2" vectorEffect="non-scaling-stroke">
-              <line x1="-6" y1={cy - 6} x2="6" y2={cy + 6} vectorEffect="non-scaling-stroke" />
-              <line x1="-6" y1={cy + 6} x2="6" y2={cy - 6} vectorEffect="non-scaling-stroke" />
-            </g>
+            <svg width="14" height="14" viewBox="0 0 14 14" className="block" stroke="var(--color-warn-text)" strokeWidth="2">
+              <line x1="2" y1="2" x2="12" y2="12" />
+              <line x1="2" y1="12" x2="12" y2="2" />
+            </svg>
           ) : outside ? (
-            <circle cx="0" cy={cy} r="7" fill="var(--color-signal-500)" stroke="var(--color-surface)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <span className="block h-3.5 w-3.5 rounded-full border-2 border-surface bg-signal-500" />
           ) : (
-            <circle cx="0" cy={cy} r="6" fill="var(--color-surface)" stroke={verdict === 'no_baseline' ? 'var(--color-willow-500)' : 'var(--color-noise-700)'} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <span className={`block h-3 w-3 rounded-full border-2 bg-surface ${verdict === 'no_baseline' ? 'border-willow-500' : 'border-noise-700'}`} />
           )}
-        </motion.g>
+        </motion.span>
       ) : null}
-    </svg>
+    </div>
   )
 }
 

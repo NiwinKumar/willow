@@ -46,11 +46,11 @@ export function VerdictChip({ verdict, noBand = false, className = '' }: { verdi
 
 export function ConfidenceChip({ confidence }: { confidence: Confidence }) {
   return confidence === 'measured' ? (
-    <Chip tone="willow" title="Computed from calibrated colour under the capture protocol, with a personal noise band.">
+    <Chip tone="willow" title="Colour-corrected with a white reference in the photo, under the capture protocol, with a personal noise band.">
       Measured
     </Chip>
   ) : (
-    <Chip tone="info" title="A directional estimate. No noise band, never a Real change verdict.">
+    <Chip tone="info" title="A trend: colours as the camera captured them, with no colour reference in the photo. A change still has to clear your noise band to be called real.">
       Indicative
     </Chip>
   )

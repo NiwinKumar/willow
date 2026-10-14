@@ -150,16 +150,12 @@ def main() -> int:
             bool(details) and set(details) <= {x["id"] for x in cands},
             f"{len(details)} named",
         )
-        ref = next(
-            (f["index"] for f in r5["quality"]["per_frame"] if f["passed"]),
-            0,
-        )
-        # unquoted: in DEV_UPLOADS mode the photo link carries the object name as a query value
+        # The engine writes preview.jpg of the photo the rings and regions describe.
         preview = unquote((v5["session"].get("preview") or {}).get("url", ""))
         check(
-            "the photo shown is the one the spots were found on",
-            f"/frame_{ref + 1}.jpg" in preview or "/preview.jpg" in preview,
-            f"photo {ref + 1}",
+            "the photo shown is the engine's preview of the measured photo",
+            "/preview.jpg" in preview and bool(r5.get("image_size")),
+            preview.rsplit("/", 1)[-1][:40],
         )
         check("face explanation by Gemini", v5["session"].get("explanation_source") == "gemini")
 

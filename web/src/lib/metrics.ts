@@ -89,7 +89,9 @@ export function fmtValue(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): s
 export function fmtSigned(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {
   if (v === null) return '–'
   const s = fmtValue(Math.abs(v), m)
-  return v < 0 ? `−${s}` : v > 0 ? `+${s}` : s
+  // The sign follows the number as shown: −0.02 shown as 0.0 has no sign.
+  if (Number(s) === 0) return s
+  return v < 0 ? `−${s}` : `+${s}`
 }
 
 export function directionText(m: Metric): string {
