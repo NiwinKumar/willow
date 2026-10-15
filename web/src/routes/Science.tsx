@@ -28,8 +28,8 @@ export function Science() {
           ['5', 'reference photos per baseline'],
           ['95%', 'confidence behind each noise band'],
           ['1', 'white reference beside every forearm photo'],
-          // Face: tone, spots, evenness, redness, blemishes, under-eye, shine, glow; close-ups add pores and texture.
-          ['10', 'skin measurements across face and close-ups, and no scores'],
+          // Face: tone, spots, evenness, redness, blemishes, under-eye, lines, shine, glow; close-ups add pores and texture.
+          ['11', 'skin measurements across face and close-ups, and no scores'],
         ].map(([v, l]) => (
           <div key={l} className="rounded-(--radius-tile) bg-surface p-3">
             <dt className="font-mono text-[26px] font-medium leading-none">{v}</dt>
@@ -51,9 +51,9 @@ export function Science() {
         <h2 className="pt-4 text-[17px] font-semibold text-text">What Gemini does and does not do</h2>
         <p>Gemini names the spots the engine found, explains the results in plain words, reads ingredient labels, checks routines against a rule table, and acts as a shopping advisor over a facts-only catalog. It never estimates a measurement, a skin tone, a skin age or a diagnosis. Every number in its explanation is checked against the measurements; a number that is not there is rejected.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Limits, stated plainly</h2>
-        <p>Willow is a cosmetic measurement tool, not a medical assessment. It does not measure lines, hydration, firmness, UV damage or skin age. For a changing mole, bleeding or pain, see a dermatologist. Phone photos are uncalibrated and shown as trends only.</p>
+        <p>Willow is a cosmetic measurement tool, not a medical assessment. It does not measure hydration, firmness, UV damage or skin age. Lines are measured but always shown as a trend, because the light changes how deep they look. For a changing mole, bleeding or pain, see a dermatologist. Phone photos are uncalibrated and shown as trends only.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Validation</h2>
-        <p>Willow makes no accuracy claim against a lab instrument. What it checks instead is repeatability: every baseline measures how much your own photos vary, and a change is called real only when it is bigger than that. Readings that are less dependable (blemish counts, shine, glow, and redness on deep skin tones) are marked indicative wherever they appear.</p>
+        <p>Willow makes no accuracy claim against a lab instrument. What it checks instead is repeatability: every baseline measures how much your own photos vary, and a change is called real only when it is bigger than that. Readings that are less dependable (blemish counts, lines, shine, glow, and redness on deep skin tones) are marked indicative wherever they appear.</p>
         <h2 className="pt-4 text-[17px] font-semibold text-text">Algorithm versions</h2>
         <Versions />
       </section>

@@ -285,3 +285,19 @@ def test_comparisons_and_ranges_are_not_direction_claims():
         assert not [
             i for i in explain.problems(_exp(ok), data) if "sign" in i or "direction" in i
         ], ok
+
+
+def test_a_later_session_never_calls_an_uncompared_metric_a_first_reading():
+    lines = {
+        "id": "lines",
+        "label": "Lines",
+        "verdict": "no_baseline",
+        "delta": None,
+        "mdc95": 0.9,
+        "value": 2.1,
+        "unit": "index",
+        "confidence": "indicative",
+    }
+    assert "first reading" in explain.item(lines, first_reading=True)["summary"]
+    later = explain.item(lines, first_reading=False)["summary"]
+    assert "not compared with your baseline this time" in later and "first" not in later

@@ -56,8 +56,10 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   for (const { t, site } of pairs) {
     const after = afterOn(site)
     if (after.length < 2) continue
-    judged.add(t)
     const m = after[after.length - 1].result?.metrics.find((x) => x.id === t)
+    // only an actual comparison counts as judged: "no baseline" (a metric newer than the
+    // baseline) or a failed photo is "not enough check-ins yet", never "inside your band"
+    if (m && (m.verdict === 'within_noise' || m.verdict === 'real_change')) judged.add(t)
     if (m && m.verdict === 'real_change' && m.delta !== null) {
       return {
         kind: 'real',
@@ -69,6 +71,8 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
     }
   }
   // Name only what was judged: a target without two check-ins on its site is not "no change".
+  if (judged.size === 0)
+    return { kind: 'early', text: 'Too early to tell', detail: 'Willow has no comparable check-ins for what this product targets yet: the measurements need a baseline and two check-ins after the start date.' }
   const open = targets.filter((t) => !judged.has(t))
   const rest = open.length ? ` ${names(open).charAt(0).toUpperCase() + names(open).slice(1)}: not enough check-ins yet.` : ''
   return { kind: 'none', text: `No clear change yet (${weeks} wks)`, detail: `${names([...judged]).charAt(0).toUpperCase() + names([...judged]).slice(1)}: inside your noise band so far. Most effects take 4 to 8 weeks to exceed photo noise.${rest}` }

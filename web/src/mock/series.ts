@@ -46,7 +46,9 @@ export const METRIC_ROIS: Partial<Record<Metric['id'], string[]>> = {
   tone_evenness: ['forehead', 'left_cheek', 'right_cheek', 'nose', 'chin'],
   redness: ['left_cheek', 'right_cheek', 'nose', 'square', 'forearm_square'],
   blemishes: ['forehead', 'left_cheek', 'right_cheek', 'chin'],
-  lines: ['forehead'],
+  // the score is the two most lined of six zones (forehead, between the brows, beside the
+  // eyes, nose to mouth, lips, mouth corners down): the regions that hold them
+  lines: ['forehead', 'left_cheek', 'right_cheek', 'chin'],
   dark_circles: ['left_under_eye', 'right_under_eye'],
   shine: ['forehead', 'nose'],
   glow: ['left_cheek', 'right_cheek'],
@@ -152,8 +154,14 @@ export function faceSeries(): SiteSeries {
   const rng = mulberry32(42)
   // Faces have no colour reference: every face metric is a trend (engine, Oct 14).
   // The contract sample has no band for blemishes; a 5-photo baseline would have one.
-  // lines are not measured: the illustration must not show a row the product does not have
-  const fixtureMetrics = FIXTURE.metrics.filter((m) => m.id !== 'lines').map((m) => ({ ...m, confidence: 'indicative' as const, mdc95: m.mdc95 ?? (m.unit === 'count' ? 2 : null) }))
+  // Lines on the real engine's scale (mm of line per cm², 0 on young faces up to ~10, SD floor
+  // 0.3): the contract sample's 0.21 ±0.06 would look ten times more precise than it can be.
+  const fixtureMetrics = FIXTURE.metrics.map((m) => ({
+    ...m,
+    confidence: 'indicative' as const,
+    mdc95: m.mdc95 ?? (m.unit === 'count' ? 2 : null),
+    ...(m.id === 'lines' ? { value: 3.1, within_session_sd: 0.3, mdc95: 0.9 } : {}),
+  }))
   const baseVals = Object.fromEntries(fixtureMetrics.map((m) => [m.id, (m.value ?? 0) - (m.delta ?? 0)])) as Record<string, number>
   const sessions: Session[] = []
   const baselineMetrics: Metric[] = fixtureMetrics.map((m) => ({ ...m, value: +baseVals[m.id].toFixed(3), delta: null, verdict: 'no_baseline', direction: 'none' }))

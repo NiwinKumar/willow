@@ -3,7 +3,7 @@ import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip,
 
 import type { Metric, Session } from '../data/types'
 import { fmtDate, fmtHours } from '../lib/format'
-import { UNIT_LABEL, decimalsFor, fmtValue } from '../lib/metrics'
+import { decimalsFor, fmtValue, unitOf } from '../lib/metrics'
 
 type Point = { i: number; label: string; v: number | null; lo: number | null; hi: number | null; verdict: Metric['verdict'] | null; note?: string; deviation?: boolean }
 
@@ -19,7 +19,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
   const dec = decimalsFor(current)
   // The noise band comes from the baseline photos that passed the quality check, not all uploaded.
   const refPhotos = baseline?.result?.frames_used || baseline?.n_frames || 5
-  const unit = UNIT_LABEL[current.unit]
+  const unit = unitOf(current)
   // Pores come with their average size (engine extras); shown so the copy's promise holds.
   // (0 when none were found: no size to show)
   const poreMm = metricId === 'pores' && typeof current.extras?.mean_diameter_mm === 'number' && current.extras.mean_diameter_mm > 0 ? current.extras.mean_diameter_mm : null
@@ -132,7 +132,7 @@ const WHAT: Record<Metric['id'], string> = {
   blemishes: 'Candidate blemishes the engine found by local redness and shading, averaged over your photos. With several face photos, only blemishes seen in at least two of them count. Gemini labels each one; the count is indicative.',
   pores: 'Small dark openings 0.05 to 0.3 mm across on the close-up, counted per cm² of skin, with their average size. Measured when one eye is in the photo to set the size; otherwise indicative.',
   texture: 'How bumpy the skin surface looks at about half a millimetre on the close-up, adjusted for lightness so it reads the same on every tone. Lower is smoother. Indicative when your photos disagree too much.',
-  lines: 'Not measured yet: fine lines depend too much on the light to read reliably from a phone photo.',
+  lines: 'How much visible line there is on your forehead, between the brows, beside the eyes, from nose to mouth, around the lips and from the mouth corners down, in millimetres of line per cm² of skin. The score is the average of your two most lined areas. Only lines running the way that area’s lines run count, and an area is skipped when your expression creases it (raised brows, a smile). Light changes it a lot, so it is always a trend.',
   dark_circles: 'How much lighter or darker the skin under your eyes is than your cheek. Below zero means darker than your cheek. Relative to your own skin, so it works across tones.',
   shine: 'The share of your forehead, nose and chin that shows bright, colourless highlights (oil and sweat reflect the light’s colour, not the skin’s). Depends on time since washing, so indicative.',
   glow: 'Brightness, colour richness and smoothness of your cheeks combined, compared only with your own earlier photos (shine is left out). Indicative.',
@@ -145,7 +145,7 @@ const OTHER: Record<Metric['id'], string> = {
   blemishes: 'Hair and specks on the lens read as candidates; Gemini marks those as artifacts.',
   pores: 'Distance from the face, focus, makeup, and sweat.',
   texture: 'Distance and angle of the phone, dryness after cleansing, and light falling from one side.',
-  lines: 'Expression, lamp angle, and head pitch.',
+  lines: 'Expression, lamp angle and height, head pitch, and how close the camera is (a sharper, closer photo shows finer lines).',
   dark_circles: 'Sleep, allergies, brow shadow, and head pitch.',
   shine: 'Time since washing, room temperature, and products applied.',
   glow: 'Lighting, hydration from a shower, and makeup.',
