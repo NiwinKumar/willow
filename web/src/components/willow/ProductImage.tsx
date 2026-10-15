@@ -9,12 +9,14 @@ import { sizedImage } from './productVisual'
  * or it fails to load. `muted` is the routine's "not ticked yet" look, `rest` the fainter "rests today".
  * No referrer is sent, so the brand's CDN serves it as it would a direct visit.
  */
-export function ProductImage({ product, size, muted = false, rest = false, breathe = false, fallback, className = '' }: {
+export function ProductImage({ product, size, muted = false, rest = false, breathe = false, decorative = false, fallback, className = '' }: {
   product: { image_url?: string | null; category: string; name: string }
   size: number
   muted?: boolean
   rest?: boolean
   breathe?: boolean
+  /** The product's name is already the text of the same control: empty alt, so it is not read twice. */
+  decorative?: boolean
   /** Replaces the category orb as the no-photo look (Home draws its own orbs). */
   fallback?: ReactNode
   className?: string
@@ -35,7 +37,7 @@ export function ProductImage({ product, size, muted = false, rest = false, breat
     >
       <img
         src={sizedImage(src, size * 2)}
-        alt={product.name}
+        alt={decorative ? '' : product.name}
         width={size}
         height={size}
         loading="lazy"

@@ -193,7 +193,7 @@ function LiveRoutine() {
           <ul className="flex flex-col pb-3">
             {stopped.map((e) => (
               <li key={e.id} className="flex items-center gap-3 border-t border-line py-2.5">
-                <ProductImage product={imageOf(e)} size={36} muted />
+                <ProductImage product={imageOf(e)} size={36} muted decorative />
                 <button type="button" onClick={() => setInfo({ entry: e })} className="flex min-w-0 flex-1 flex-col text-left">
                   <span className="truncate text-[15px]">{entryName(e)}</span>
                   <span className="text-[12px] text-ink-2">

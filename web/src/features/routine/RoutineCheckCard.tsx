@@ -106,7 +106,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                     <span className="flex flex-wrap gap-[5px]">
                       {f.entries.map((e) => (
                         <span key={e.id} className="flex items-center gap-1.5 rounded-pill bg-white/[.12] py-[3px] pr-2.5 pl-[3px] text-[12px]">
-                          <ProductImage product={imageOf(e)} size={22} />
+                          <ProductImage product={imageOf(e)} size={22} decorative />
                           {entryName(e)}
                         </span>
                       ))}

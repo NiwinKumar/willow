@@ -1,10 +1,9 @@
-import { ArrowLeft, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Chip } from '../../components/ui/Chip'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { Sheet } from '../../components/ui/Sheet'
 import { AITag } from '../../components/willow/AITag'
 import type { Product } from '../../data/types'
 import { ApiError, api, localDay, type LabelScan, type LabelScanFailure, type NewRoutineEntry } from '../../lib/api'
@@ -16,6 +15,7 @@ import { useAuth } from '../../lib/useAuth'
 import './routine.css'
 import { ProductImage } from './productUi'
 import { activeLabel } from './routineModel'
+import { RoutineSheet } from './RoutineSheet'
 import { failureText, useRoutineWrites } from './writes'
 
 /** What the confirm step saves: a catalog product, or what a label scan read, or what the person typed. */
@@ -91,8 +91,9 @@ function scanError(e: unknown): string {
 }
 
 /**
- * "Add a product" bottom sheet (design: Willow App Routine, addOpen): search the catalog or scan a label,
- * then confirm when you use it and since when. Everything saved comes from the catalog or the label.
+ * "Add a product" bottom sheet (design: Willow App Routine, addOpen; it rises from the bottom at every width):
+ * search the catalog or scan a label, then confirm when you use it and since when. Everything saved comes
+ * from the catalog or the label.
  */
 export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: boolean; preset: AddPreset | null; inRoutine: Set<string>; onClose: () => void }) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick')
@@ -103,9 +104,9 @@ export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: bo
     if (open) setStep(preset?.product ? 'confirm' : 'pick')
   }
   return (
-    <Sheet open={open} onClose={onClose} title={step === 'confirm' ? 'Confirm details' : 'Add a product'} variant="bottom" size="md">
+    <RoutineSheet open={open} onClose={onClose} kind="bottom" title={step === 'confirm' ? 'Confirm details' : 'Add a product'} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
       {open ? <AddFlow preset={preset ?? {}} inRoutine={inRoutine} onClose={onClose} step={step} setStep={setStep} /> : null}
-    </Sheet>
+    </RoutineSheet>
   )
 }
 
@@ -156,12 +157,6 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
 
   return (
     <div className="flex flex-col gap-4">
-      {step === 'confirm' && !preset.product ? (
-        <Button variant="glass" size="sm" icon={ArrowLeft} className="-mt-1 self-start" onClick={() => setStep('pick')}>
-          Back
-        </Button>
-      ) : null}
-
       {step === 'pick' ? (
         <>
           <SegmentedControl
@@ -302,7 +297,7 @@ function CatalogSearch({ initial, inRoutine, onPick, onScan, onManual }: { initi
                   className="flex w-full items-center gap-3.5 rounded-[24px] bg-sunken p-3 text-left transition-colors hover:bg-muted disabled:opacity-70"
                   style={{ animation: `wRise .35s ${Math.min(i, 10) * 40}ms both` }}
                 >
-                  <ProductImage product={p} size={50} />
+                  <ProductImage product={p} size={50} decorative />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-[13px] text-ink-2">
                       {p.brand} · {categoryLabel(p.category)}
