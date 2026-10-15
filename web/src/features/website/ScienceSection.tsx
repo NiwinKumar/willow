@@ -1,6 +1,6 @@
 import type { MetricId, Site } from '../../data/types'
 import { METRIC_META } from '../../lib/metrics'
-import { useDemoStatus } from '../../lib/useDemoStatus'
+import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { glide } from './scroll'
 
 /** "a, b and c" */
@@ -38,6 +38,19 @@ function RunningNow() {
         engine {engine} · api {s?.api.version ?? (pending ? '…' : 'unavailable')} · web {__APP_VERSION__} · {s?.gemini.model ?? 'Gemini'}
         {s ? ` · catalog ${s.catalog.products} products` : ''}
       </p>
+      {s ? (
+        <ul aria-label="Live service checks" className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {serviceChips(s, gaveUp)
+            .filter((c) => c.key !== 'api' && c.key !== 'catalog')
+            .map((c) => (
+              <li key={c.key} className="flex items-center gap-2 rounded-pill bg-white px-3 py-1.5 text-[12.5px]">
+                <span aria-hidden className="size-2 rounded-full" style={{ background: CHIP_DOT[c.state] }} />
+                {c.label}
+                <span className="font-mono text-[11px] text-ink-2">{c.note}</span>
+              </li>
+            ))}
+        </ul>
+      ) : null}
       {failed ? <p className="m-0 text-[13px] text-ink-2">The services did not answer a version check just now; reload to ask again.</p> : null}
     </div>
   )

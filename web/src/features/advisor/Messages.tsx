@@ -3,9 +3,11 @@ import { memo } from 'react'
 import { toast } from 'sonner'
 
 import { AITag } from '../../components/willow/AITag'
+import { Disclaimer } from '../../components/willow/Disclaimer'
 import type { Product } from '../../data/types'
 import type { AdvisorReply } from '../../lib/api'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
+import { SITE_LABEL } from '../../lib/metrics'
 import { ProductImage } from '../routine/productUi'
 import { metaLine } from '../routine/routineModel'
 import { retry, type ChatMessage } from './chatStore'
@@ -16,9 +18,11 @@ const modelCaps = (id: string) => id.replace(/-/g, ' ').toUpperCase()
 
 /** Where an answer came from, from what the api says it did (checks, products, retrieval steps). */
 function provenance(r: AdvisorReply): string {
+  if (r.photos_refused) return 'WILLOW · PHOTO NOT READ · PRODUCT PHOTOS ONLY'
   if (!r.checks) return 'WILLOW · NO ANSWER PASSED THE CHECKS'
+  const photos = r.checks.photos_read ?? 0
   const catalog = r.products.length > 0 || r.retrieval.some((x) => /catalog|product/i.test(x))
-  return [modelCaps(r.checks.model), 'YOUR RESULTS', 'YOUR ROUTINE', catalog ? 'CATALOG' : null].filter(Boolean).join(' · ')
+  return [modelCaps(r.checks.model), photos ? `READ ${photos} PHOTO${photos === 1 ? '' : 'S'}` : null, 'YOUR RESULTS', 'YOUR ROUTINE', catalog ? 'CATALOG' : null].filter(Boolean).join(' · ')
 }
 
 function checkLine(r: AdvisorReply): string | null {
@@ -31,8 +35,19 @@ export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessa
   return (
     <div className="flex flex-col items-end gap-1">
       {m.context ? <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {m.context.toUpperCase()}</span> : null}
-      <div className="max-w-[min(82%,560px)] rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13px] leading-[1.45] text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
-        {m.text}
+      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13px] leading-[1.45] text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
+        {m.photos?.length ? (
+          <span className="flex flex-wrap justify-end gap-1.5">
+            {m.photos.map((p) => (
+              <img key={p.thumb} src={p.thumb} alt={`Attached photo: ${p.name}`} className="size-[120px] rounded-[18px] object-cover shadow-[inset_0_0_0_1px_rgba(255,255,255,.2)]" />
+            ))}
+          </span>
+        ) : m.photoCount ? (
+          <span className="font-mono text-[10px] tracking-[.06em] text-inverse/70">
+            ■ {m.photoCount} PRODUCT PHOTO{m.photoCount === 1 ? '' : 'S'} · NOT KEPT
+          </span>
+        ) : null}
+        <span>{m.text}</span>
       </div>
     </div>
   )
@@ -148,6 +163,52 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
           ))}
         </span>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * "AI unavailable · standard explanation" (design: the advisor's fallback answer): the latest measured
+ * session's pre-written explanation, built by code from Willow's own measurements (sent by the api with
+ * the 502). Nothing new is analysed and Gemini is not involved; the question can be asked again later.
+ */
+export function StandardCard({ m, busy }: { m: Extract<ChatMessage, { role: 'standard' }>; busy: boolean }) {
+  const s = m.standard
+  return (
+    <div className="flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }}>
+      <span className="mt-1.5">
+        <AnswerOrb />
+      </span>
+      <div role="status" className="flex min-w-0 flex-1 flex-col gap-2.5 rounded-[8px_32px_32px_32px] bg-surface p-4 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
+        <span className="font-mono text-[10px] leading-[1.5] tracking-[.05em] text-ink-2">STANDARD EXPLANATION · AI UNAVAILABLE · NO NEW ANALYSIS</span>
+        {s ? (
+          <>
+            <p className="m-0 text-[14.5px] leading-[1.55] text-pretty">
+              The AI advisor is unavailable right now, so here is the standard summary of your latest {(SITE_LABEL[s.site] ?? 'check-in').toLowerCase()} check-in, from {fmtDate(s.created_at, { day: 'numeric', month: 'short' })}. Product questions will work again when the advisor is back.
+            </p>
+            <span className="text-[15px]">{s.explanation.headline}</span>
+            {s.explanation.items.length ? (
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13.5px] leading-[1.5] text-[#3E3C38]">
+                {s.explanation.items.map((it) => (
+                  <li key={it.metric_id}>{it.summary}</li>
+                ))}
+              </ul>
+            ) : null}
+            {s.explanation.next_steps.map((t) => (
+              <span key={t} className="text-[13px] text-ink-2">
+                → {t}
+              </span>
+            ))}
+            <span className="text-[12px] text-willow-700">✓ Pre-written summary of measured results</span>
+            <Disclaimer />
+          </>
+        ) : (
+          <p className="m-0 text-[14.5px] leading-[1.55] text-pretty">The AI advisor is unavailable right now, and there is no measured check-in yet to summarise. Your results, routine and the compatibility check still work.</p>
+        )}
+        <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse">
+          Ask the advisor again
+        </button>
+      </div>
     </div>
   )
 }
