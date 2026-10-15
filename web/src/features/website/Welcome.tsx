@@ -1,6 +1,6 @@
 import './website.css'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import type { MetricId, Site } from '../../data/types'
@@ -12,61 +12,68 @@ import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
 import { useData } from '../../data/useData'
 import { useAuth } from '../../lib/useAuth'
-import { backButton, SoftBackdrop } from './Decor'
+import { SoftBackdrop } from './Decor'
 import { FIRST_CHECKIN, hasConsent } from './entry'
 
 const BACKDROP = 'radial-gradient(40% 40% at 15% 20%, rgba(255,178,122,.55), transparent 70%), radial-gradient(40% 45% at 85% 80%, rgba(156,211,255,.6), transparent 70%), radial-gradient(35% 35% at 80% 15%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
 
+type Step = 'consent' | 'goals' | 'about'
+const STEPS = ['Consent', 'Goals', 'About you', 'Capture']
+const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, about: 2 }
+const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', about: '/welcome/goals' }
+
 /**
- * Onboarding (/welcome = consent, /welcome/goals = goals, photo time, optional skin type and check-in days),
- * then the person's first check-in (or `?next=`). Consent is kept on this device (lib/prefs) and saved to the
- * account (PUT /v1/me/consent); the rest is the profile (lib/profile, PUT /v1/me/profile). Goals only reorder
- * the report.
+ * Onboarding: /welcome = consent, /welcome/goals = goals, /welcome/about = photo time, optional skin type and
+ * check-in days; then the person's first check-in (or `?next=`). Each step fits one screen (laptop and phone):
+ * a compact title, the step's content (scrolls inside only if a detail is opened) and an action bar that is
+ * always in view. Consent is kept on this device (lib/prefs) and saved to the account (PUT /v1/me/consent);
+ * the rest is the profile (lib/profile, PUT /v1/me/profile). Goals only reorder the report.
  */
 export default function Welcome() {
-  const { step } = useParams()
+  const { step: raw } = useParams()
   const { search } = useLocation()
-  const isGoals = step === 'goals'
+  const step: Step = raw === 'goals' || raw === 'about' ? raw : 'consent'
   const { user } = useAuth()
 
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [isGoals])
+  }, [step])
 
-  // Goals come after consent: someone who skipped it is sent back.
-  if (isGoals && !hasConsent()) return <Navigate to={`/welcome${search}`} replace />
+  // Goals and the rest come after consent: someone who skipped it is sent back.
+  if (step !== 'consent' && !hasConsent()) return <Navigate to={`/welcome${search}`} replace />
 
   return (
-    <div className="relative flex min-h-dvh flex-col gap-5 overflow-x-clip p-[clamp(16px,3vw,32px)]">
+    <div className="relative flex h-dvh flex-col overflow-hidden">
       <SoftBackdrop background={BACKDROP} />
-      <header className="relative flex items-center justify-between gap-3">
-        <BackButton isGoals={isGoals} search={search} />
-        <Stepper current={isGoals ? 1 : 0} />
-        <span className="hidden rounded-pill bg-white/55 px-4 py-2.5 font-mono text-[13px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
+      <header className="relative flex items-center justify-between gap-3 px-[clamp(14px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
+        <BackButton step={step} search={search} />
+        <Stepper current={STEP_INDEX[step]} />
+        <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
       </header>
-      {isGoals ? <Goals key="goals" /> : <Consent key="consent" />}
+      {step === 'goals' ? <Goals key="goals" /> : step === 'about' ? <About key="about" /> : <Consent key="consent" />}
     </div>
   )
 }
 
-function BackButton({ isGoals, search }: { isGoals: boolean; search: string }) {
+const backClass = 'grid size-11 shrink-0 place-items-center rounded-full border border-line bg-white/50 text-[18px] text-ink no-underline backdrop-blur-[12px] transition-colors hover:bg-white/80'
+
+function BackButton({ step, search }: { step: Step; search: string }) {
   const navigate = useNavigate()
-  if (isGoals)
+  const prev = PREV[step]
+  if (prev)
     return (
-      <Link to={`/welcome${search}`} aria-label="Back to consent" className={backButton}>
+      <Link to={`${prev}${search}`} aria-label={`Back to ${step === 'goals' ? 'consent' : 'goals'}`} className={backClass}>
         ←
       </Link>
     )
   // Consent goes back where the person came from (a check-in that asked for consent, or the landing).
   const canGoBack = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0
   return (
-    <button type="button" aria-label="Back" className={backButton} onClick={() => (canGoBack ? navigate(-1) : navigate('/'))}>
+    <button type="button" aria-label="Back" className={backClass} onClick={() => (canGoBack ? navigate(-1) : navigate('/'))}>
       ←
     </button>
   )
 }
-
-const STEPS = ['Consent', 'Goals', 'Capture']
 
 function Stepper({ current }: { current: number }) {
   return (
@@ -75,18 +82,18 @@ function Stepper({ current }: { current: number }) {
         const st = i < current ? 'done' : i === current ? 'on' : 'up'
         return (
           <li key={label} aria-current={st === 'on' ? 'step' : undefined} aria-label={`Step ${i + 1} of ${STEPS.length}: ${label}${st === 'done' ? ', done' : st === 'on' ? ', current' : ''}`} className="flex flex-none items-start">
-            <span aria-hidden className="relative mx-1 mt-[13px] h-0.5 overflow-hidden rounded-[2px] bg-ink/15" style={{ width: i === 0 ? 0 : 'clamp(18px,3.4vw,44px)' }}>
+            <span aria-hidden className="relative mx-0.5 mt-[10px] h-0.5 overflow-hidden rounded-[2px] bg-ink/15" style={{ width: i === 0 ? 0 : 'clamp(10px,2.4vw,32px)' }}>
               <span className="absolute inset-0 rounded-[2px] bg-selected transition-[width] duration-700 ease-[cubic-bezier(.2,.8,.2,1)]" style={{ width: st === 'up' ? '0%' : '100%' }} />
             </span>
-            <span className="flex min-w-[52px] flex-col items-center gap-[7px]">
+            <span className="flex min-w-[46px] flex-col items-center gap-1">
               <span
                 aria-hidden
-                className={`grid size-7 place-items-center rounded-full leading-none transition-colors duration-[400ms] ${st === 'up' ? 'border-[1.5px] border-ink/25 bg-transparent text-ink-2' : st === 'on' ? 'bg-selected text-lime' : 'bg-selected text-inverse'} ${st === 'done' ? 'text-[13px] font-extrabold' : 'font-dot text-[11px]'}`}
+                className={`grid size-[22px] place-items-center rounded-full leading-none transition-colors duration-[400ms] ${st === 'up' ? 'border-[1.5px] border-ink/25 bg-transparent text-ink-2' : st === 'on' ? 'bg-selected text-lime' : 'bg-selected text-inverse'} ${st === 'done' ? 'text-[11px] font-extrabold' : 'font-dot text-[9.5px]'}`}
                 style={{ animation: st === 'on' ? 'wStepPulse 2s ease-out infinite' : undefined }}
               >
                 {st === 'done' ? '✓' : String(i + 1).padStart(2, '0')}
               </span>
-              <span className={`whitespace-nowrap font-mono text-[10.5px] tracking-[.08em] transition-colors duration-[400ms] ${st === 'up' ? 'text-ink-2' : 'text-ink'}`}>{label.toUpperCase()}</span>
+              <span className={`whitespace-nowrap font-mono text-[9.5px] tracking-[.06em] transition-colors duration-[400ms] ${st === 'up' ? 'text-ink-2' : 'text-ink'}`}>{label.toUpperCase()}</span>
             </span>
           </li>
         )
@@ -94,6 +101,31 @@ function Stepper({ current }: { current: number }) {
     </ol>
   )
 }
+
+/**
+ * One onboarding step: eyebrow, serif title (h1 on a phone, greeting size on a laptop), the content (which
+ * scrolls inside itself only when it has to) and the action bar, always in view.
+ */
+function StepFrame({ eyebrow, title, sub, aside, children, actions, wide }: { eyebrow: string; title: string; sub?: ReactNode; aside?: ReactNode; children: ReactNode; actions: ReactNode; wide?: boolean }) {
+  return (
+    <main className={`relative mx-auto flex min-h-0 w-full flex-1 animate-[wRiseLg_.5s_cubic-bezier(.2,.7,.2,1)_both] flex-col px-[clamp(14px,3vw,32px)] sm:justify-center sm:pb-[2vh] ${wide ? 'max-w-[1040px]' : 'max-w-[760px]'}`}>
+      <div className="flex items-end justify-between gap-4 pt-[clamp(10px,2.4vh,28px)] pb-[clamp(8px,1.8vh,16px)] sm:pt-0">
+        <div className="min-w-0">
+          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {eyebrow}</span>
+          <h1 className="mt-1.5 mb-0 font-serif text-h1 font-normal sm:text-greeting [@media(max-height:700px)]:text-[28px]">{title}</h1>
+          {sub ? <p className="mt-1 mb-0 text-[14px] leading-[1.4] text-ink-2 [@media(max-height:700px)]:hidden">{sub}</p> : null}
+        </div>
+        {aside}
+      </div>
+      <div className="no-scrollbar -mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-2 sm:flex-initial">{children}</div>
+      <div className="flex flex-col gap-2 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))]">{actions}</div>
+    </main>
+  )
+}
+
+const card = 'rounded-[28px] backdrop-blur-[24px]'
+const cardStyle = { background: 'rgba(250,250,248,.84)', boxShadow: '0 30px 70px -40px rgba(0,0,0,.3)' }
+const primary = 'flex min-h-[52px] items-center justify-center gap-3 rounded-[20px] bg-selected text-[16px] text-inverse transition-[background-color,opacity] hover:bg-[#2A2A2A]'
 
 /** The consent wording (version CONSENT_VERSION). Every line is true of the running system. */
 const CONSENT_ITEMS = [
@@ -142,56 +174,59 @@ function Consent() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[760px] animate-[wRiseLg_.6s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-5 pb-10">
-      <div className="px-1 pb-2 pt-[clamp(20px,4vw,40px)]">
-        <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ CONSENT · VERSION {fmtDate(CONSENT_VERSION, { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}</span>
-        <h1 className="mt-3.5 mb-0 font-serif text-[clamp(44px,6vw,76px)] font-normal leading-[.95] tracking-[-0.01em]">Before your first photo</h1>
-      </div>
-      <div className="overflow-hidden rounded-[36px] backdrop-blur-[24px]" style={{ background: 'rgba(250,250,248,.82)', boxShadow: '0 30px 70px -40px rgba(0,0,0,.3)' }}>
-        {CONSENT_ITEMS.map((c, i) => (
-          <div key={c.title} className="border-b border-ink/[.07]">
-            <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`consent-${i}`} className="flex w-full items-center gap-[18px] px-[clamp(18px,3vw,28px)] py-[22px] text-left text-ink">
-              <span aria-hidden className="size-[46px] flex-none rounded-[16px]" style={{ background: c.swatch, boxShadow: 'inset 0 0 12px 2px rgba(255,255,255,.6)' }} />
-              <span className="flex flex-1 flex-col gap-1">
-                <span className="text-[19px]">{c.title}</span>
-                <span className="text-[15px] leading-[1.4] text-ink-2">{c.summary}</span>
+    <StepFrame
+      eyebrow={`CONSENT · VERSION ${fmtDate(CONSENT_VERSION, { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}`}
+      title="Before your first photo"
+      actions={
+        <>
+          <div className={`${card} flex flex-col gap-2.5 px-4 py-3 sm:px-5`} style={cardStyle}>
+            <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-[1.4]">
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="m-0 mt-px size-5 flex-none accent-[var(--action-selected)]" />
+              <span>I agree to private storage and analysis of my photos for cosmetic appearance tracking, as described above.</span>
+            </label>
+            <label className="flex cursor-pointer flex-col gap-0.5 rounded-[18px] bg-sunken px-3.5 py-2.5 [@media(max-height:700px)]:py-2">
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-[14px]">Share anonymized aggregate results</span>
+                <input type="checkbox" role="switch" checked={share} onChange={(e) => setShare(e.target.checked)} className="m-0 size-5 flex-none accent-[var(--action-selected)]" />
               </span>
-              <span aria-hidden className="text-[22px] text-ink-2">
+              <span className="text-[12.5px] leading-[1.3] text-ink-2">Optional. Off by default. Numbers only, never photos or your name. Helps retailers see which products work for whom. Groups under 10 people are never shown.</span>
+            </label>
+          </div>
+          <button type="button" onClick={accept} disabled={!agree} className={`${primary} disabled:opacity-60`}>
+            {agree ? 'Agree and continue' : 'Tick the agreement to continue'}
+          </button>
+        </>
+      }
+    >
+      <div className={`${card} overflow-hidden`} style={cardStyle}>
+        {CONSENT_ITEMS.map((c, i) => (
+          <div key={c.title} className="border-b border-ink/[.07] last:border-b-0">
+            <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`consent-${i}`} className="flex w-full items-center gap-3.5 px-4 py-[clamp(8px,1.3vh,14px)] text-left text-ink sm:px-5 [@media(max-height:700px)]:py-1.5">
+              <span aria-hidden className="size-8 flex-none rounded-[11px] [@media(max-height:700px)]:size-6 [@media(max-height:700px)]:rounded-[9px]" style={{ background: c.swatch, boxShadow: 'inset 0 0 10px 2px rgba(255,255,255,.6)' }} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[15.5px]">{c.title}</span>
+                <span className={`text-[13px] leading-[1.35] text-ink-2 ${open === i ? '' : 'line-clamp-1 [@media(max-height:700px)]:hidden'}`}>{c.summary}</span>
+              </span>
+              <span aria-hidden className="text-[20px] text-ink-2">
                 {open === i ? '−' : '+'}
               </span>
             </button>
             {open === i ? (
-              <p id={`consent-${i}`} className="m-0 pb-[22px] pl-[clamp(18px,3vw,28px)] pr-[clamp(18px,3vw,28px)] text-[15px] leading-[1.55] text-[#3E3C38] sm:pl-[92px]">
+              <p id={`consent-${i}`} className="m-0 px-4 pb-3.5 text-[14px] leading-[1.5] text-[#3E3C38] sm:pr-5 sm:pl-[66px]">
                 {c.detail}
               </p>
             ) : null}
           </div>
         ))}
-        <div className="flex flex-col gap-[18px] px-[clamp(18px,3vw,28px)] py-6">
-          <label className="flex cursor-pointer items-start gap-3.5 text-[16px] leading-[1.45]">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="m-0 size-6 flex-none accent-[var(--action-selected)]" />
-            <span>I agree to private storage and analysis of my photos for cosmetic appearance tracking, as described above.</span>
-          </label>
-          <label className="flex cursor-pointer items-center justify-between gap-3.5 rounded-[22px] bg-sunken px-[18px] py-4">
-            <span className="flex flex-col gap-[3px]">
-              <span className="text-[16px]">Share anonymized aggregate results</span>
-              <span className="text-[14px] text-ink-2">Optional. Off by default. Numbers only, never photos or your name. Helps retailers see which products work for whom. Groups under 10 people are never shown.</span>
-            </span>
-            <input type="checkbox" role="switch" checked={share} onChange={(e) => setShare(e.target.checked)} className="size-6 flex-none accent-[var(--action-selected)]" />
-          </label>
-          <p className="m-0 text-[14px] text-ink-2">
-            You can change sharing or delete your data any time, from You in the app. The full{' '}
-            <Link to="/terms" target="_blank" rel="noopener" className="text-ink underline underline-offset-2">
-              terms and privacy notice
-            </Link>{' '}
-            say who runs Willow and what it keeps.
-          </p>
-        </div>
+        <p className="m-0 border-t border-ink/[.07] px-4 py-2.5 text-[12.5px] [@media(max-height:700px)]:py-2 leading-[1.4] text-ink-2 sm:px-5">
+          Change sharing or delete your data any time, in You. Read the full{' '}
+          <Link to="/terms" target="_blank" rel="noopener" className="text-ink underline underline-offset-2">
+            terms and privacy notice
+          </Link>
+          .
+        </p>
       </div>
-      <button type="button" onClick={accept} disabled={!agree} className="min-h-[60px] self-stretch rounded-[24px] bg-selected text-[17px] text-inverse transition-opacity">
-        {agree ? 'Agree and continue' : 'Tick the agreement to continue'}
-      </button>
-    </main>
+    </StepFrame>
   )
 }
 
@@ -216,26 +251,12 @@ function goalPlaces(metrics: MetricId[]): string {
   return [...new Set(order.filter((s) => sites.includes(s)).map((s) => PLACE[s]))].join(' · ')
 }
 
-/** Pills in a track (the design's photo-time control), wrapping on narrow screens. */
-const pillTrack = 'flex flex-wrap gap-1 rounded-[26px] bg-muted p-[5px]'
-const pill = (on: boolean) => `min-h-11 rounded-pill px-5 text-[15px] text-ink transition-colors ${on ? 'bg-white' : 'bg-transparent'}`
-const panel = 'flex flex-wrap items-center justify-between gap-[18px] rounded-[32px] px-[clamp(18px,3vw,28px)] py-[22px] backdrop-blur-[20px]'
-const panelBg = { background: 'rgba(250,250,248,.82)' }
-
 function Goals() {
-  const { user, continueAsGuest } = useAuth()
-  const { setGoals, saveProfile, profile } = useData()
+  const { setGoals, profile } = useData()
   const navigate = useNavigate()
-  const [params] = useSearchParams()
+  const { search } = useLocation()
   const [picked, setPicked] = useState<GoalId[]>(() => profile.goals)
   const [hint, setHint] = useState(false)
-  const [time, setTime] = useState<PhotoTime>(() => profile.photo_time ?? 'evening')
-  const [skin, setSkin] = useState<SkinType | null>(() => profile.skin_type)
-  const [days, setDays] = useState<number[]>(() => profile.checkin?.days ?? [])
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const target = nextPath(params.get('next'), FIRST_CHECKIN)
-  const toCapture = target.startsWith('/check-in')
 
   const toggle = (id: GoalId) => {
     if (picked.includes(id)) {
@@ -248,10 +269,95 @@ function Goals() {
     }
   }
 
-  const finish = async () => {
+  const next = () => {
     // Saved on this device (and for the demo journey in this tab); every screen re-orders at once. Someone
     // signed in has it on their account now; a new guest's copy goes up as their account starts (data/store).
     setGoals(picked)
+    navigate(`/welcome/about${search}`)
+  }
+
+  return (
+    <StepFrame
+      wide
+      eyebrow="CHOOSE UP TO THREE"
+      title="What would you like to track?"
+      sub="Goals set the order of your report. Every measurement is still shown."
+      aside={
+        <span className="font-dot text-[clamp(28px,4vh,40px)] leading-none font-extrabold" role="status" aria-label={`${picked.length} of 3 goals chosen`}>
+          {picked.length}/3
+        </span>
+      }
+      actions={
+        <>
+          {hint ? (
+            <p role="status" className="m-0 self-start rounded-[14px] bg-selected px-3.5 py-2 text-[13px] text-inverse">
+              Three goals is the limit. Remove one to choose another.
+            </p>
+          ) : null}
+          <button type="button" onClick={next} className={primary}>
+            {picked.length ? 'Continue' : 'Continue without goals'} <span aria-hidden>→</span>
+          </button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {GOALS.map((g) => {
+          const on = picked.includes(g.id)
+          const look = GOAL_LOOK[g.id]
+          return (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => toggle(g.id)}
+              aria-pressed={on}
+              className="w-lift-sm relative flex h-[clamp(72px,12vh,124px)] flex-col justify-between rounded-[24px] p-3 text-left sm:p-3.5"
+              style={{ background: look.bg, color: look.fg, boxShadow: on ? 'inset 0 0 0 2px #121212, inset 0 0 30px 4px rgba(255,255,255,.35)' : 'inset 0 0 30px 4px rgba(255,255,255,.35), 0 18px 40px -32px rgba(0,0,0,.45)' }}
+            >
+              <span className="flex items-start justify-between gap-1.5">
+                <span className="truncate rounded-pill bg-white/35 px-2 py-1 font-mono text-[9.5px] tracking-[.06em]">{goalPlaces(g.metrics)}</span>
+                <span aria-hidden className={`grid size-6 flex-none place-items-center rounded-full border-[1.5px] border-white/80 text-[12px] text-inverse ${on ? 'bg-selected' : 'bg-white/30'}`}>
+                  {on ? '✓' : ''}
+                </span>
+              </span>
+              <span className="text-[clamp(16px,2.2vh,20px)] leading-[1.1] font-normal tracking-[-0.01em]">{g.label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </StepFrame>
+  )
+}
+
+const pill = (on: boolean) => `min-h-9 rounded-pill px-3.5 text-[14px] text-ink transition-colors ${on ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,.08)]' : 'bg-transparent'}`
+const track = 'flex flex-wrap gap-0.5 rounded-[22px] bg-muted p-1'
+
+function Field({ title, note, children }: { title: string; note: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5 px-4 py-[clamp(8px,1.6vh,16px)] sm:px-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="text-[16px]">{title}</span>
+        <span className="text-[12.5px] text-ink-2">{note}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** Photo time, skin type and check-in days (all on the profile; skin type and days optional). */
+function About() {
+  const { user, continueAsGuest } = useAuth()
+  const { saveProfile, profile } = useData()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const [time, setTime] = useState<PhotoTime>(() => profile.photo_time ?? 'evening')
+  const [skin, setSkin] = useState<SkinType | null>(() => profile.skin_type)
+  const [days, setDays] = useState<number[]>(() => profile.checkin?.days ?? [])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const target = nextPath(params.get('next'), FIRST_CHECKIN)
+  const toCapture = target.startsWith('/check-in')
+
+  const finish = async () => {
     const checkin = days.length ? { days, time: profile.checkin?.time ?? PHOTO_TIME_CLOCK[time], tz: browserTz() } : null
     void saveProfile({ photo_time: time, skin_type: skin, checkin }).catch(() => undefined)
     if (!user) {
@@ -273,97 +379,55 @@ function Goals() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[980px] animate-[wRiseLg_.6s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-[22px] pb-10">
-      <div className="flex flex-wrap items-end justify-between gap-5 px-1 pt-[clamp(20px,4vw,40px)]">
-        <div>
-          <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ CHOOSE UP TO THREE</span>
-          <h1 className="mt-3.5 mb-0 font-serif text-[clamp(44px,6vw,76px)] font-normal leading-[.95]">What would you like to track?</h1>
-          <p className="mt-3 mb-0 text-[15px] text-ink-2">Goals set the order of your report. Every measurement is still shown.</p>
-        </div>
-        <span className="font-dot text-[56px] font-extrabold leading-none" role="status" aria-label={`${picked.length} of 3 goals chosen`}>
-          {picked.length}/3
-        </span>
-      </div>
-      {hint ? (
-        <p role="status" className="m-0 self-start rounded-[18px] bg-selected px-[18px] py-3 text-[14px] text-inverse">
-          Three goals is the limit. Remove one to choose another.
-        </p>
-      ) : null}
-      {/* Cards grow to fill the last row, so the goals never leave a hole. */}
-      <div className="flex flex-wrap gap-3.5">
-        {GOALS.map((g) => {
-          const on = picked.includes(g.id)
-          const look = GOAL_LOOK[g.id]
-          return (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => toggle(g.id)}
-              aria-pressed={on}
-              className="w-lift-sm relative flex h-[200px] flex-[1_1_280px] flex-col justify-between rounded-[36px] p-6 text-left"
-              style={{ background: look.bg, color: look.fg, boxShadow: 'inset 0 0 40px 6px rgba(255,255,255,.35), 0 24px 50px -36px rgba(0,0,0,.45)' }}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="rounded-pill bg-white/35 px-2.5 py-1.5 font-mono text-[11px] tracking-[.08em]">{goalPlaces(g.metrics)}</span>
-                <span aria-hidden className={`grid size-[34px] place-items-center rounded-full border-[1.5px] border-white/80 text-[16px] text-inverse ${on ? 'bg-selected' : 'bg-white/30'}`}>
-                  {on ? '✓' : ''}
-                </span>
-              </span>
-              <span className="text-[28px] font-normal tracking-[-0.02em]">{g.label}</span>
-            </button>
-          )
-        })}
-      </div>
-      <div className={panel} style={panelBg}>
-        <div className="flex flex-col gap-1">
-          <span className="text-[18px]">When do you usually take photos?</span>
-          <span className="text-[14px] text-ink-2">Shine and redness can shift through the day. Same time each session is best.</span>
-        </div>
-        <div role="radiogroup" aria-label="Usual photo time" className="flex gap-1 rounded-pill bg-muted p-[5px]">
-          {PHOTO_TIMES.map((t) => (
-            <button key={t.id} type="button" role="radio" aria-checked={time === t.id} onClick={() => setTime(t.id)} className={pill(time === t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className={panel} style={panelBg}>
-        <div className="flex max-w-[360px] flex-col gap-1">
-          <span className="text-[18px]">Your skin type</span>
-          <span className="text-[14px] text-ink-2">Optional. It does not change any measurement; you can change it in You.</span>
-        </div>
-        <div role="radiogroup" aria-label="Skin type" className={pillTrack}>
-          {[...SKIN_TYPES, { id: null, label: 'Prefer not to say' }].map((t) => (
-            <button key={t.label} type="button" role="radio" aria-checked={skin === t.id} onClick={() => setSkin(t.id)} className={pill(skin === t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className={panel} style={panelBg}>
-        <div className="flex max-w-[360px] flex-col gap-1">
-          <span className="text-[18px]">Your check-in days</span>
-          <span className="text-[14px] text-ink-2">Optional. Once a week is enough; the same day and time keeps photos comparable.</span>
-        </div>
-        <div role="group" aria-label="Check-in days" className={pillTrack}>
-          {WEEKDAYS.map((d, i) => {
-            const on = days.includes(i)
-            return (
-              <button key={d} type="button" aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())} className={`${pill(on)} min-w-[52px] px-3.5`}>
-                {d}
+    <StepFrame
+      eyebrow="WHEN AND HOW YOU CHECK IN"
+      title="A little about you"
+      sub="All of this can be changed later in You."
+      actions={
+        <>
+          {error ? (
+            <p role="alert" className="m-0 rounded-[14px] bg-selected px-3.5 py-2 text-[13px] text-inverse">
+              {error}
+            </p>
+          ) : null}
+          <button type="button" onClick={() => void finish()} disabled={busy} className={primary}>
+            {busy ? 'Starting…' : toCapture ? 'Save and set up my first capture' : 'Save and continue'} <span aria-hidden>→</span>
+          </button>
+        </>
+      }
+    >
+      <div className={`${card} flex flex-col divide-y divide-ink/[.07]`} style={cardStyle}>
+        <Field title="When do you usually take photos?" note="Same time each session is best">
+          <div role="radiogroup" aria-label="Usual photo time" className={`${track} self-start`}>
+            {PHOTO_TIMES.map((t) => (
+              <button key={t.id} type="button" role="radio" aria-checked={time === t.id} onClick={() => setTime(t.id)} className={pill(time === t.id)}>
+                {t.label}
               </button>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        </Field>
+        <Field title="Your skin type" note="Optional · never changes a measurement">
+          <div role="radiogroup" aria-label="Skin type" className={`${track} self-start`}>
+            {[...SKIN_TYPES, { id: null, label: 'Prefer not to say' }].map((t) => (
+              <button key={t.label} type="button" role="radio" aria-checked={skin === t.id} onClick={() => setSkin(t.id)} className={pill(skin === t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field title="Your check-in days" note="Optional · once a week is enough">
+          <div role="group" aria-label="Check-in days" className={`${track} self-start`}>
+            {WEEKDAYS.map((d, i) => {
+              const on = days.includes(i)
+              return (
+                <button key={d} type="button" aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())} className={`${pill(on)} min-w-[40px] px-2`}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+        </Field>
       </div>
-      {error ? (
-        <p role="alert" className="m-0 rounded-[18px] bg-selected px-[18px] py-3 text-[14px] text-inverse">
-          {error}
-        </p>
-      ) : null}
-      <button type="button" onClick={() => void finish()} disabled={busy} className="flex min-h-[60px] items-center justify-center gap-3 rounded-[24px] bg-selected text-[17px] text-inverse transition-colors hover:bg-[#2A2A2A]">
-        {busy ? 'Starting…' : toCapture ? 'Save and set up my first capture' : 'Save and continue'} <span aria-hidden>→</span>
-      </button>
-    </main>
+    </StepFrame>
   )
 }
