@@ -39,19 +39,18 @@ GOAL_LABEL = {
     "dryness_barrier": "Less dryness",
 }
 # The goal a person picks in the app (web/src/lib/metrics.ts GOALS) that each catalog concern
-# belongs to. The retailer view is finer: "Fewer dark spots" and "More even tone" are both part
-# of the app's "Even tone & fewer dark spots". None: the app has no such goal (dryness is not
-# measured).
+# belongs to, 1:1 except that shine and dullness both belong to "Shine and glow". None: the app has
+# no such goal (dryness is not measured).
 APP_GOAL = {
-    "acne_blemishes": "Clearer skin",
-    "dark_spots_pigmentation": "Even tone & fewer dark spots",
-    "uneven_tone": "Even tone & fewer dark spots",
-    "redness_sensitivity": "Calmer skin",
-    "texture_pores": "Smoother texture & pores",
-    "oiliness_shine": "Oil control & glow",
-    "fine_lines": "Softer lines",
+    "acne_blemishes": "Blemishes",
+    "dark_spots_pigmentation": "Dark spots",
+    "uneven_tone": "Tone evenness",
+    "redness_sensitivity": "Redness",
+    "texture_pores": "Pores and texture",
+    "oiliness_shine": "Shine and glow",
+    "fine_lines": "Lines",
     "dark_circles": "Under-eye",
-    "dullness": "Oil control & glow",
+    "dullness": "Shine and glow",
     "dryness_barrier": None,
 }
 CONCERN_SHORT = {
