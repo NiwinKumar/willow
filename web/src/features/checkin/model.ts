@@ -1,0 +1,189 @@
+/**
+ * The check-in's vocabulary: steps, sites as the design draws them, what each site measures, the
+ * per-site preparation copy, and how many photos a check-in needs. Copy follows the engine and
+ * docs/CAPTURE_PROTOCOL.md, not the design where they disagree (see gaps/checkin.md).
+ */
+import type { CaptureMode, Session, Site } from '../../data/types'
+import { baselineState, photoSteps } from '../../lib/baselineGuide'
+import { fmtDate } from '../../lib/format'
+import { isCloseUp } from '../../lib/metrics'
+
+export type Step = 'site' | 'guide' | 'camera' | 'review' | 'files' | 'processing' | 'samples'
+export const STEPS: Step[] = ['site', 'guide', 'camera', 'review', 'files', 'processing', 'samples']
+
+export const SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+
+/** ?mode= accepts the api names and the old/short ones (quick, raw). */
+export function parseMode(raw: string | null): CaptureMode {
+  if (raw === 'calibrated_raw' || raw === 'raw' || raw === 'RAW') return 'calibrated_raw'
+  return 'uncalibrated'
+}
+export function parseSite(raw: string | null): Site | null {
+  return SITES.includes(raw as Site) ? (raw as Site) : null
+}
+
+export const isArm = (site: Site) => site.startsWith('forearm')
+export type Kind = 'face' | 'close' | 'arm'
+export const kindOf = (site: Site): Kind => (isArm(site) ? 'arm' : isCloseUp(site) ? 'close' : 'face')
+
+/** The design's names (APP drawer and CAP site cards). */
+export const SITE_NAME: Record<Site, string> = {
+  face_full: 'Face',
+  cheek_macro: 'Cheek close-up',
+  nose_macro: 'Nose close-up',
+  forearm_treated: 'Treated forearm',
+  forearm_control: 'Control forearm',
+}
+
+/** Small swatch in the picker rows (APP capVals). Hue is decoration, never data. */
+export const SITE_SWATCH: Record<Site, string> = {
+  face_full: 'radial-gradient(80% 80% at 50% 90%, #FF8A2A, #F7C6A0 70%)',
+  cheek_macro: 'radial-gradient(80% 80% at 50% 90%, #E7A07A, #F4DCCB 70%)',
+  nose_macro: 'radial-gradient(80% 80% at 50% 90%, #E58FB8, #F6D9E8 70%)',
+  forearm_treated: 'radial-gradient(80% 80% at 50% 90%, #9C84FF, #DCCCFF 70%)',
+  forearm_control: 'radial-gradient(80% 80% at 50% 90%, #7FB6FF, #CFE4FF 70%)',
+}
+
+/** Site cards on the site step (CAP siteDefs): background, ink. Close-ups are measured, so they get colour too. */
+export const SITE_CARD: Record<Site, { bg: string; fg: string }> = {
+  face_full: { bg: 'radial-gradient(90% 80% at 50% 100%, #FF8A3D 0%, #FFB27A 40%, #F4E5D8 80%)', fg: '#2A1206' },
+  cheek_macro: { bg: 'radial-gradient(90% 80% at 50% 100%, #E9A27E 0%, #F6CDB4 45%, #F4EDE6 85%)', fg: '#2A1206' },
+  nose_macro: { bg: 'radial-gradient(90% 80% at 50% 100%, #E27FB0 0%, #F5C7DD 45%, #F4ECF0 85%)', fg: '#3A0A24' },
+  forearm_treated: { bg: 'radial-gradient(90% 80% at 50% 100%, #7A5CFF 0%, #D8B8FF 45%, #EEE8F6 85%)', fg: '#1C0F4A' },
+  forearm_control: { bg: 'radial-gradient(90% 80% at 50% 100%, #3D7BFF 0%, #9CD3FF 45%, #E6EEF6 85%)', fg: '#0A1840' },
+}
+
+/** What the engine measures on each site (engine pipeline_face.py, pipeline_macro.py, pipeline.py). */
+export const SITE_MEASURES: Record<Site, string> = {
+  face_full: 'Tone, dark spots, evenness, redness, blemishes, lines, dark circles, shine and glow.',
+  cheek_macro: 'Tone, dark spots, redness, blemishes, pores and texture, up close.',
+  nose_macro: 'Blemishes and pores, up close.',
+  forearm_treated: 'Skin tone and redness on the marked square, against its own baseline.',
+  forearm_control: 'The untreated arm. Shows the drift both arms share.',
+}
+
+/** The guide hero's gradient per kind (CAP guideBg). */
+export const GUIDE_BG: Record<Kind, string> = {
+  face: 'radial-gradient(70% 55% at 50% 0%, #F567B5 0%, #8E3A9E 35%, #3A1248 65%, #1A0B22 100%)',
+  close: 'radial-gradient(70% 55% at 50% 0%, #FF9A6B 0%, #A8456A 38%, #3A1430 68%, #170A16 100%)',
+  arm: 'radial-gradient(70% 55% at 50% 0%, #8E7BFF 0%, #4B3AA8 35%, #1E1550 65%, #0B0820 100%)',
+}
+
+export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'quick')
+
+/**
+ * Photos this check-in needs: 5 when it will become the baseline for this site and mode (no
+ * baseline yet, or one too small to have a normal range), else 3. The api accepts 1 to 5.
+ */
+export function neededFor(sessions: Session[], mode: CaptureMode): number {
+  const st = baselineState(sessions, mode)
+  if (st.state === 'none') return 5
+  if (st.state === 'set' && thinBaseline(st.session)) return 5
+  return 3
+}
+
+/** A baseline with fewer than 3 usable photos has no normal range (api baselines.py). */
+export function thinBaseline(s: Session): boolean {
+  const used = s.result?.quality.passed ? s.result.frames_used : s.n_frames
+  return used < 3 || s.baseline_ref?.has_noise_band === false
+}
+
+/** One line about a site's baseline in a mode, for the picker and the site cards. */
+export function baselineLine(sessions: Session[], mode: CaptureMode): { text: string; set: boolean } {
+  const st = baselineState(sessions, mode)
+  if (st.state === 'set') return { text: `${mode === 'calibrated_raw' ? 'RAW' : 'Quick'} baseline · ${fmtDate(st.session.created_at)}`, set: true }
+  if (st.state === 'saved') return { text: `${mode === 'calibrated_raw' ? 'RAW' : 'Quick'} photos saved, not measured yet`, set: false }
+  return { text: sessions.length ? `No ${modeWord(mode)} baseline yet` : 'No photos yet', set: false }
+}
+
+export type Check = { title: string; hint: string }
+
+/** The preparation checklist per site and mode (CAP checklistDefs, corrected to the protocol). */
+export function checklist(site: Site, mode: CaptureMode): Check[] {
+  const raw = mode === 'calibrated_raw'
+  const between = photoSteps(site, mode).between
+  switch (kindOf(site)) {
+    case 'arm':
+      return [
+        { title: 'Same light as last time', hint: 'Same lamp or window, arm in the same spot on the table.' },
+        { title: 'Four pen dots on a 4 cm square', hint: 'Mark the corners once and keep all four dots in the frame. A white marker works on deep skin tones.' },
+        { title: 'White paper beside the arm', hint: 'Plain white paper in the same light tells Willow the colour of your lamp.' },
+        { title: 'Arm flat, phone straight above', hint: `Inner side up, phone level with the skin, about 30 to 40 cm away${raw ? '. A colour card beside the square helps, if you have one' : ''}.` },
+        { title: 'Bare skin on the square', hint: 'Nothing applied for 15 minutes, apart from the product you are testing on the treated arm.' },
+        { title: 'Reposition between shots', hint: between },
+      ]
+    case 'close':
+      return [
+        { title: 'Phone about 10 cm away', hint: 'A hand’s width from your face, much closer than a selfie: pores need that much detail.' },
+        { title: 'One eye still in the photo', hint: 'Willow measures size from your iris, so no spacer or ruler is needed.' },
+        { title: site === 'nose_macro' ? 'Nose in the middle' : 'Same cheek, same patch', hint: site === 'nose_macro' ? 'Centred in the frame, every time.' : 'The same side in the middle of the frame every time.' },
+        { title: 'Bare skin, facing the light', hint: 'Nothing applied for 15 minutes. Face a window or the same lamp.' },
+        { title: 'Reposition between shots', hint: between },
+      ]
+    default:
+      return [
+        { title: 'Same light as last time', hint: 'Face a window or the same lamp. No overhead spotlights.' },
+        { title: 'Bare skin', hint: 'No makeup, sunscreen or serum for at least 15 minutes.' },
+        { title: 'Hair back, glasses off', hint: 'Nothing covering forehead, cheeks or jaw; hands away from your face.' },
+        { title: 'Neutral expression', hint: 'Relaxed face, eyes open, looking at the lens. A smile creases the skin into lines that are not there at rest.' },
+        raw
+          ? { title: 'Colour card beside the cheek', hint: 'Flat, fully visible, not in shadow, in the same place every time.' }
+          : { title: 'Phone at eye level, arm’s length', hint: 'Same distance every session; your face fills the oval.' },
+        { title: 'Reposition between shots', hint: between },
+      ]
+  }
+}
+
+/** The picker's "Before you start" checks: the three that matter most for each kind. */
+export function quickChecks(site: Site): string[] {
+  switch (kindOf(site)) {
+    case 'arm':
+      return ['Four pen dots on the square, all in the frame', 'White paper beside the arm, same light', 'Arm flat in the same spot on the table']
+    case 'close':
+      return ['Phone about 10 cm (a hand’s width) away', 'One eye still in the photo', 'Bare skin, facing the light']
+    default:
+      return ['Same room and light, facing the window', 'Clean face, nothing applied', 'Hair back, face the camera straight on']
+  }
+}
+
+/** Lightroom setup (once per phone), with the values the protocol locks. */
+export function lightroomSteps(site: Site): string[] {
+  const k = kindOf(site)
+  return [
+    'Open the camera in Lightroom Mobile, tap “Auto” left of the shutter and choose Professional. File format DNG.',
+    'Lock ISO 50 to 200, shutter 1/60 to 1/125, white balance a fixed Kelvin such as 5000 K, and manual focus. Tap the lock so it turns yellow.',
+    k === 'close'
+      ? '1x lens, phone about 10 cm away with one eye in the photo: Willow measures size from your iris.'
+      : k === 'arm'
+        ? '1x lens. Four pen dots and the white paper in frame (a colour card too, if you have one).'
+        : '1x lens. Hold the colour card beside your cheek, flat and fully in frame.',
+    'Take the photos. In Lightroom select them, then Share, Export Original (not Camera Roll: that hands over a JPEG), Save to Files.',
+    'iCloud files must finish downloading. Then come back here, choose Upload files and pick the DNGs.',
+  ]
+}
+
+/** Mode facts on the site step (CAP modeFacts), true for today's engine. */
+export function modeFacts(mode: CaptureMode): { g: string; t: string }[] {
+  return mode === 'calibrated_raw'
+    ? [
+        { g: '◆', t: 'DNG files from Lightroom with locked settings, uploaded from Files.' },
+        { g: '◆', t: 'Your baseline photos give each reading a personal normal range.' },
+        { g: '!', t: 'Face colours are not card-corrected yet; the card keeps your sessions comparable.' },
+      ]
+    : [
+        { g: '◌', t: 'This device’s camera, or phone photos (JPEG, HEIC, HEIF).' },
+        { g: '◌', t: 'No colour reference, so readings carry wider uncertainty than RAW.' },
+        { g: '■', t: 'Quick photos keep their own baseline, separate from RAW.' },
+      ]
+}
+
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+export const siteLower = (site: Site) => SITE_NAME[site].toLowerCase()
+export const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** "15 OCT · AFTERNOON" (APP capWhen). */
+export function whenCaps(d = new Date()): string {
+  const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()
+  const h = d.getHours()
+  return `${day} · ${h < 12 ? 'MORNING' : h < 18 ? 'AFTERNOON' : 'EVENING'}`
+}

@@ -23,10 +23,10 @@ export function useRoutine() {
   return useQuery(['routine', uid], (t) => api.routine(t).then((r) => r.entries), { enabled: Boolean(uid) })
 }
 
-/** Products in use today (not stopped), for a slot. */
+/** Products in use today, for a slot. "Stop using" sets ended_at to today, so a product stopped today is gone. */
 export function activeIn(entries: RoutineEntry[] | undefined, slot: 'am' | 'pm'): RoutineEntry[] {
   const today = localDay()
-  return (entries ?? []).filter((e) => e.slots.includes(slot) && (!e.ended_at || e.ended_at.slice(0, 10) >= today) && e.started_at.slice(0, 10) <= today)
+  return (entries ?? []).filter((e) => e.slots.includes(slot) && (!e.ended_at || e.ended_at.slice(0, 10) > today) && e.started_at.slice(0, 10) <= today)
 }
 
 /** Routine ticks for a range of the person's own days (default: today only). */

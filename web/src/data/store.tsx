@@ -105,6 +105,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [demo])
 
+  // Goals live on this device; held in state so saving them in You re-orders Home and results at once.
+  const [goalsLive, setGoalsLive] = useState(prefs.goals)
+  const [goalsDemo, setGoalsDemo] = useState(demoGoals)
+  const setGoals = useCallback(
+    (goals: string[]) => {
+      // The demo journey (this tab) orders by the same goals, so it gets a copy too.
+      try {
+        sessionStorage.setItem('willow.goals', JSON.stringify(goals))
+      } catch {
+        /* private mode */
+      }
+      setGoalsDemo(goals)
+      if (!demo) {
+        prefs.setGoals(goals)
+        setGoalsLive(goals)
+      }
+    },
+    [demo],
+  )
+  // A new person on this device (sign-in, sign-out) reads their own saved goals.
+  const [goalsUid, setGoalsUid] = useState(uid)
+  if (goalsUid !== uid) {
+    setGoalsUid(uid)
+    setGoalsLive(prefs.goals())
+  }
+
   const upsert = useCallback(
     (view: SessionView) => {
       setOwned((o) => (o.uid === uid ? { uid, views: [...o.views.filter((v) => v.session.id !== view.session.id), view] } : { uid, views: [view] }))
@@ -114,20 +140,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DataState>(() => {
     if (demo) {
-      const goals = demoGoals()
-      const empty = { mode: 'demo' as const, sites: [], series: () => null, all: [], goals, refresh: noop, upsert: () => {} }
+      const goals = goalsDemo
+      const empty = { mode: 'demo' as const, sites: [], series: () => null, all: [], goals, setGoals, refresh: noop, upsert: () => {} }
       if (!demoPick) return { ...empty, status: 'loading' }
       if (demoPick.source !== 'real') return { ...empty, status: 'error' }
       const real = groupBySite(demoPick.views)
       const all = demoPick.views.map(toSession).sort((a, b) => a.created_at.localeCompare(b.created_at))
-      return { mode: 'demo', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, all, goals, refresh: noop, upsert: () => {} }
+      return { mode: 'demo', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, all, goals, setGoals, refresh: noop, upsert: () => {} }
     }
     const status: DataStatus = !uid ? 'idle' : loaded.uid === uid ? loaded.status : 'loading'
     const mine = owned.uid === uid ? owned.views : []
     const bySite = groupBySite(mine)
     const all = mine.map(toSession).sort((a, b) => a.created_at.localeCompare(b.created_at))
-    return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, all, goals: prefs.goals(), refresh, upsert }
-  }, [demo, demoPick, uid, loaded, owned, refresh, upsert])
+    return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, all, goals: goalsLive, setGoals, refresh, upsert }
+  }, [demo, demoPick, uid, loaded, owned, refresh, upsert, goalsLive, goalsDemo, setGoals])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

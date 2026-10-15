@@ -16,6 +16,8 @@ export type DataState = {
   /** Every session, oldest first, across sites. */
   all: Session[]
   goals: string[]
+  /** Save goals (this device; demo: this tab) and redraw every screen that orders by them. */
+  setGoals: (goals: string[]) => void
   /** Re-read every session from the api (live) or do nothing (demo). */
   refresh: () => Promise<void>
   /** Put one fresh SessionView into the cache without a full reload. */

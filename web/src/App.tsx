@@ -36,6 +36,8 @@ export default function App() {
       <PageTitle />
       <ErrorBoundary resetKey={location.pathname}>
         <Suspense fallback={<WillowLoader />}>
+          {/* While the check-in draws over a page, that page is inert (no focus, no clicks behind the sheet). */}
+          <div inert={overlay || undefined}>
           <Routes location={background ?? location}>
             <Route path="/" element={<Landing />} />
             <Route path="/science" element={<Landing />} />
@@ -65,6 +67,7 @@ export default function App() {
             <Route path="/goals" element={<Navigate to="/welcome/goals" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </div>
           {background ? (
             <Routes>
               <Route path="/check-in" element={<CheckInOverlay />} />
