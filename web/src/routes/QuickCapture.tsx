@@ -15,6 +15,7 @@ import { validateFiles, type Row } from '../lib/upload'
 import { authErrorText } from '../lib/authErrors'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
+import { useLeaveDemo } from '../lib/useLeaveDemo'
 
 type Gates = { light: boolean; even: boolean; still: boolean }
 type Phase = 'ask' | 'denied' | 'live' | 'review' | 'upload'
@@ -32,11 +33,13 @@ export function QuickCapture() {
   const { user, continueAsGuest } = useAuth()
   const data = useData()
   const site = (params.get('site') as Site) ?? 'face_full'
+  // Photos taken here are the person's own: leave demo first, so consent and the baseline are theirs.
+  const leaving = useLeaveDemo()
   // Signed out ('idle') or a failed load count as no sessions: only an in-flight load waits.
-  const firstSession = data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
-  // Fixed once the person's sessions are known (a deep link may arrive before they load), then kept
-  // for the whole capture even if the list refreshes while the camera is open.
-  const known = data.mode === 'demo' || data.status === 'ready' || data.status === 'error' || data.status === 'idle'
+  const firstSession = data.mode === 'live' && data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], 'uncalibrated').state === 'none'
+  // Fixed once the person's own sessions are known (a deep link may arrive before they load, or in
+  // demo mode), then kept for the whole capture even if the list refreshes while the camera is open.
+  const known = data.mode === 'live' && (data.status === 'ready' || data.status === 'error' || data.status === 'idle')
   const [fixedN, setFixedN] = useState<number | null>(() => (params.get('n') ? Number(params.get('n')) : null))
   if (fixedN === null && known) setFixedN(firstSession ? 5 : 3)
   const n = Math.min(5, Math.max(1, fixedN ?? 5))
@@ -136,11 +139,13 @@ export function QuickCapture() {
       const ratio = left / Math.max(1, right)
       const motion = prev.current ? diff / N : 99
       prev.current = new Uint8ClampedArray(d)
-      const g: Gates = { light: mean > 0.32 && mean < 0.75 && clipped / N < 0.02, even: ratio > 0.8 && ratio < 1.25, still: motion < 6 }
+      // A close-up shows one side of the face (often hair or background at an edge): only strong side light fails it.
+      const even = closeUp ? ratio > 0.6 && ratio < 1.6 : ratio > 0.8 && ratio < 1.25
+      const g: Gates = { light: mean > 0.32 && mean < 0.75 && clipped / N < 0.02, even, still: motion < 6 }
       setGates(g)
       if (!g.still) movedSinceShot.current = true
       if (!g.light) setHint(mean <= 0.32 ? 'Find brighter light' : 'Too bright. Turn away from the lamp')
-      else if (!g.even) setHint('Face the window or lamp so both sides are lit evenly')
+      else if (!g.even) setHint(closeUp ? 'Turn toward the light so it is not coming from one side' : 'Face the window or lamp so both sides are lit evenly')
       else if (!g.still) setHint('Hold still')
       else if (liveSince.current !== null && performance.now() - liveSince.current <= SETTLE_MS) setHint('One moment: the camera is adjusting to the light')
       else setHint(closeUp ? (site === 'nose_macro' ? 'Nose in the middle, one eye still in view' : 'Cheek fills the frame, one eye still in view') : faceSite ? 'Fill the oval with your face, eyes on the lens' : 'Fit the square in the frame')
@@ -204,7 +209,9 @@ export function QuickCapture() {
   ]
   const allPass = gates.light && gates.even && gates.still
 
-  if (data.mode === 'live' && !prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture/camera?${params.toString()}`)}`} replace />
+  if (leaving) return null
+  // Consent before any upload, whatever mode the app was in.
+  if (!prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture/camera?${params.toString()}`)}`} replace />
 
   if (fixedN === null)
     return (
@@ -216,7 +223,7 @@ export function QuickCapture() {
   if (phase === 'ask' || phase === 'denied')
     return (
       <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-6 sm:px-8">
-        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? (faceSite ? 'Willow needs your camera for this selfie' : 'Willow needs your camera for this photo') : 'Camera is blocked'}</h1>
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">{phase === 'ask' ? (closeUp ? 'Willow needs your camera for this close-up' : faceSite ? 'Willow needs your camera for this selfie' : 'Willow needs your camera for this photo') : 'Camera is blocked'}</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-2">
           {phase === 'ask'
             ? `Photos stay in your private space and are deleted after 30 days. ${n} photos, uncalibrated, so the result is a trend, not a measurement.${firstSession ? '' : ` Between photos: ${steps.between.charAt(0).toLowerCase() + steps.between.slice(1)}`}`
@@ -263,7 +270,7 @@ export function QuickCapture() {
           </ul>
         ) : closeUp ? (
           <ul className="mt-5 list-disc space-y-1 pl-5 text-[15px] text-text-2">
-            <li>Hold the phone about a hand’s width from your face (10 to 15 cm), closer than a selfie.</li>
+            <li>Hold the phone about 10 cm from your face (a hand’s width), much closer than a selfie: pores need that much detail.</li>
             <li>Keep one eye in the photo: Willow measures size from your iris.</li>
             <li>{site === 'nose_macro' ? 'Nose' : 'Cheek'} in the middle, facing a window or lamp. Hair back, nothing on the skin.</li>
           </ul>
@@ -274,7 +281,7 @@ export function QuickCapture() {
             <li>Face a window or lamp so both cheeks are lit.</li>
           </ul>
         )}
-        {phase === 'ask' && firstSession && data.mode === 'live' ? (
+        {phase === 'ask' && firstSession ? (
           <div className="mt-5">
             <FirstSessionGuide site={site} mode="uncalibrated" n={n} />
           </div>
@@ -304,8 +311,8 @@ export function QuickCapture() {
         <p className="mt-2 text-[15px] text-text-2">Tap one to retake it, or continue.</p>
         <ul className="mt-5 grid grid-cols-3 gap-2">
           {shots.map((s, i) => (
-            <li key={s.url} className="relative aspect-[3/4] overflow-hidden rounded-(--radius-control) bg-stage">
-              <img src={s.url} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+            <li key={s.url}>
+              {/* The whole thumbnail is the retake button (well over 44 px). */}
               <button
                 type="button"
                 aria-label={`Retake photo ${i + 1}`}
@@ -314,9 +321,12 @@ export function QuickCapture() {
                   setPhase('ask')
                   void start()
                 }}
-                className="absolute right-1 top-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-text"
+                className="relative block aspect-[3/4] w-full overflow-hidden rounded-(--radius-control) bg-stage transition-transform active:scale-[0.98]"
               >
-                <RotateCcw size={16} aria-hidden />
+                <img src={s.url} alt="" className="h-full w-full object-cover" />
+                <span aria-hidden className="absolute right-1 top-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-text">
+                  <RotateCcw size={16} />
+                </span>
               </button>
             </li>
           ))}
@@ -352,7 +362,8 @@ export function QuickCapture() {
               leaveDemo()
               // "Something is different today" from the capture guide travels with the session.
               const dev = params.get('dev') ? `&dev=1&note=${encodeURIComponent(params.get('note') ?? '')}` : ''
-              navigate(`/processing/${sid}?site=${site}&n=${rows.length}${dev}`)
+              // Replace: back from the report must not reopen the camera.
+              navigate(`/processing/${sid}?site=${site}&n=${rows.length}${dev}`, { replace: true })
             }} />
           </div>
         )}
@@ -391,7 +402,7 @@ export function QuickCapture() {
             <X size={18} aria-hidden />
           </button>
         </div>
-        <div className="absolute bottom-4 left-4 flex gap-1.5" aria-label={`${shots.length} of ${n} taken`}>
+        <div className="absolute bottom-4 left-4 flex gap-1.5" role="img" aria-label={`${shots.length} of ${n} photos taken`}>
           {Array.from({ length: n }, (_, i) => (
             <span key={i} className={`h-2 w-6 rounded-full ${i < shots.length ? 'bg-willow-500' : 'bg-white/50'}`} />
           ))}

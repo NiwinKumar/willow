@@ -1,5 +1,6 @@
 import type { Session } from '../data/types'
 import { METRIC_META, fmtSigned, fmtValue } from '../lib/metrics'
+import { DEMO_ROUTINE } from './routine'
 
 export type Turn = {
   role: 'user' | 'willow'
@@ -19,13 +20,26 @@ export function answer(q: string, sessions: Session[]): Turn {
   const red = latest?.result?.metrics.find((m) => m.id === 'redness')
   const lower = q.toLowerCase()
   if (lower.includes('azelaic') || lower.includes('doing anything')) {
-    const d = spots ? fmtSigned(spots.delta, spots) : '–'
-    const band = spots?.mdc95 !== null && spots ? fmtValue(spots.mdc95, spots) : '–'
+    const d = spots && spots.delta !== null ? fmtSigned(spots.delta, spots) : null
+    const band = spots && spots.mdc95 !== null ? fmtValue(spots.mdc95, spots) : null
+    const real = Boolean(d) && spots?.verdict === 'real_change'
+    // The words follow the verdict and only quote numbers that exist.
+    const spotsLine = !d
+      ? 'Since you started azelaic acid at week 2, there is no dark-spot reading to compare with your baseline yet.'
+      : real
+        ? `Since you started azelaic acid at week 2, dark spots moved ${d}${band ? ` against a noise threshold of ${band}` : ''}, which counts as a real change.`
+        : `Since you started azelaic acid at week 2, dark spots moved ${d}${band ? `, inside the noise threshold of ${band}` : ''}, so no clear change yet.`
+    const r = red && red.delta !== null ? fmtSigned(red.delta, red) : null
+    const redLine = !r ? '' : red?.verdict === 'real_change' ? ` Redness moved ${r}, beyond its band.` : ` Redness moved ${r}, inside its band, so no clear change there yet.`
+    const advice = real
+      ? ' The change may be linked to the azelaic acid; the niacinamide you were already using could also contribute, so I would keep both as they are for two more weeks before changing anything.'
+      : ' Most pigment effects take 8 to 12 weeks to clear photo noise, so I would keep the azelaic acid as it is and check again in two weeks.'
+    const inUse = DEMO_ROUTINE.filter((e) => !e.ended_at).length
     return {
       role: 'willow',
-      text: `Since you started azelaic acid at week 2, dark spots moved ${d} against a noise threshold of ${band}, which counts as a real change. Redness moved ${red ? fmtSigned(red.delta, red) : '–'}, inside its band, so no clear change there yet. The change may be linked to the azelaic acid; the niacinamide you were already using could also contribute, so I would keep both as they are for two more weeks before changing anything.`,
-      retrieval: ['Checked your results (latest session)', 'Checked your routine (5 products)'],
-      numbers: [{ token: d, metric: 'pigment_spots' }, { token: band, metric: 'pigment_spots' }, ...(red ? [{ token: fmtSigned(red.delta, red), metric: 'redness' }] : [])],
+      text: `${spotsLine}${redLine}${advice}`,
+      retrieval: ['Checked your results (latest session)', `Checked your routine (${inUse} ${inUse === 1 ? 'product' : 'products'})`],
+      numbers: [...(d ? [{ token: d, metric: 'pigment_spots' }] : []), ...(band && d ? [{ token: band, metric: 'pigment_spots' }] : []), ...(r ? [{ token: r, metric: 'redness' }] : [])],
       follow_ups: ['Should I keep using it?', 'What else helps dark spots?', 'When should I take my next photos?'],
     }
   }

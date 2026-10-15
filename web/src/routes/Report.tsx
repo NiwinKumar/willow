@@ -22,12 +22,13 @@ import { missingBaselines } from '../lib/baselineGuide'
 import { MOLE_NOTE, NOT_SKIN, type SpotLabel, summarizeSpots } from '../lib/spotLabels'
 import { failureReasons, leftOutPhotos, photosUsed, readableWarnings } from '../lib/warnings'
 import { fmtDate, fmtHours, plural } from '../lib/format'
-import { GROUP_META, METRIC_META, QUALITY_COPY, SITE_LABEL, VERDICT_RANK, orderedGroups } from '../lib/metrics'
+import { GROUP_META, METRIC_META, SITE_LABEL, VERDICT_RANK, isCloseUp, orderedGroups, qualityCopy } from '../lib/metrics'
 import { ApiError, api } from '../lib/api'
 import { useViewState } from '../lib/url'
 import { useAuth } from '../lib/useAuth'
 import { authErrorText } from '../lib/authErrors'
 import { useJudgeOn } from '../lib/useJudge'
+import { useMediaQuery } from '../lib/useMediaQuery'
 import { fresh } from './lazy'
 
 // The chart library is large and only needed when a metric is opened.
@@ -43,9 +44,13 @@ export function Report() {
   const data = useData()
   const judging = useJudgeOn()
   const navigate = useNavigate()
-  // Opened from a shared link there is no page to go back to: the arrow goes home instead.
+  // Opened from a shared link, or straight after measuring (back would reopen the camera or the
+  // upload), the arrow goes home instead.
   const location = useLocation()
+  const backHome = location.key === 'default' || Boolean((location.state as { fromProcessing?: boolean } | null)?.fromProcessing)
   const reduce = useReducedMotion()
+  // One layout mounted at a time (Tailwind lg), so the panel's ids, heading and charts exist once.
+  const wide = useMediaQuery('(min-width: 1024px)')
   const series = data.series(site)
   const sessions = useMemo(() => series?.sessions.filter((s) => s.status === 'done') ?? [], [series])
   // A session that failed after its photos were uploaded (engine down, a crash) can be measured
@@ -77,7 +82,7 @@ export function Report() {
   const controlSessions = useMemo(() => data.series('forearm_control')?.sessions ?? [], [data])
   // The illustrative journey is aligned by index; real sessions pair the nearest control photo in time.
   const controlSession = session?.live ? matchControl(session, controlSessions) : (controlSessions[index] ?? null)
-  const missing = session?.is_baseline ? missingBaselines(data.series, session.capture_mode).filter((m) => m !== site) : []
+  const missing = session?.is_baseline ? missingBaselines(data.series, session.capture_mode, data.goals).filter((m) => m !== site) : []
   const noBand = Boolean(session && !session.is_baseline && session.baseline_ref && !session.baseline_ref.has_noise_band)
   // Passed, not the baseline, compared with nothing: it was the baseline before another was chosen.
   const formerBaseline = Boolean(session?.live && !session.is_baseline && session.baseline_ref === null && session.result?.quality.passed && !unmeasured)
@@ -104,6 +109,9 @@ export function Report() {
   const [keys, setKeys] = useState(false)
 
   const metrics = session?.result?.metrics ?? []
+  const allLowQuality = metrics.length > 0 && metrics.every((m) => m.verdict === 'low_quality')
+  // Passed the quality check yet every value is empty: never "0 real changes" over an empty list.
+  const noReadings = nothingMeasured && !allLowQuality
   const spots = useMemo(() => summarizeSpots(session?.label_details), [session])
   // The spots list selection belongs to one session: scrubbing to another clears it.
   const [focus, setFocus] = useState<{ sid: string; label: SpotLabel } | null>(null)
@@ -196,7 +204,8 @@ export function Report() {
           {retry ? <div className="-mx-5 mb-6 sm:-mx-6">{retry}</div> : null}
           <h1 className="text-[28px] font-bold tracking-[-0.02em]">No sessions yet for {SITE_LABEL[site] ?? 'this place'}</h1>
           <p className="mt-3 text-[15px] text-text-2">Take a baseline of five photos to start. Every later session is compared to it.</p>
-          <Link to={`/capture?site=${site}`} className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+          {/* Face and close-ups start with the phone camera; RAW is opt-in from the guide. */}
+          <Link to={`/capture?site=${site}${site === 'face_full' || isCloseUp(site) ? '&mode=quick' : ''}`} className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
             Start a baseline
           </Link>
         </div>
@@ -236,7 +245,7 @@ export function Report() {
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">Saved, not measured yet</h1>
             <p className="mt-2 text-[15px] text-text-2">
-              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')}. Willow measures face and forearm photos today; {SITE_LABEL[session.site].toLowerCase()} measurement is still being built. Your photos are kept and can be measured when it is ready.
+              {fmtDate(session.created_at)} · {plural(session.n_frames, 'photo', 'photos')}. {SITE_LABEL[session.site]} photos were not measured when this session was saved, so it has no numbers yet. Your photos are kept and can be measured later.
             </p>
             <Link to="/capture?site=face_full&mode=quick" className="mt-4 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
               Take a face photo
@@ -295,8 +304,10 @@ export function Report() {
         ) : (
           <>
             <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.03em]">
-              {metrics.length > 0 && metrics.every((m) => m.verdict === 'low_quality') ? (
+              {allLowQuality ? (
                 'Nothing could be compared this time'
+              ) : noReadings ? (
+                'No readings came out of these photos'
               ) : noBand ? (
                 'Compared with your baseline'
               ) : (
@@ -310,6 +321,11 @@ export function Report() {
               {session?.deviation ? <Chip tone="warn" className="ml-2">something was different</Chip> : null}
             </p>
             {leftOutPhotos(session?.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session?.result)}</p> : null}
+            {session && noReadings ? (
+              <Link to={`/capture?site=${session.site}${session.capture_mode === 'uncalibrated' ? '&mode=quick' : ''}`} className="mt-3 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
+                Retake
+              </Link>
+            ) : null}
             {noBand ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
                 Your baseline has fewer than 3 usable photos, so changes are shown but none can be called real yet.{' '}
@@ -339,7 +355,7 @@ export function Report() {
       {session?.result && session.result.quality.passed && session.result.quality.reasons.length > 0 && session.result.metrics.some((m) => m.verdict === 'low_quality') ? (
         <div className="mx-5 mb-3 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] sm:mx-6">
           <span className="font-semibold text-warn-text">Photo quality differed from your reference.</span>{' '}
-          {session.result.quality.reasons.map((r) => QUALITY_COPY[r]?.text).join(' ')}
+          {session.result.quality.reasons.map((r) => qualityCopy(r, session.site)?.text).join(' ')}
         </div>
       ) : null}
       {site === 'forearm_treated' && session && !session.is_baseline ? (
@@ -454,7 +470,7 @@ export function Report() {
 
   const topBar = (
     <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-bg/85 px-3 backdrop-blur-md sm:px-6">
-      <button type="button" onClick={() => (location.key === 'default' ? navigate('/') : navigate(-1))} className="inline-flex h-11 w-11 items-center justify-center rounded-(--radius-control) hover:bg-surface-2" aria-label={location.key === 'default' ? 'Home' : 'Back'}>
+      <button type="button" onClick={() => (backHome ? navigate('/') : navigate(-1))} className="inline-flex h-11 w-11 items-center justify-center rounded-(--radius-control) hover:bg-surface-2" aria-label={backHome ? 'Home' : 'Back'}>
         <ArrowLeft size={20} aria-hidden />
       </button>
       <button type="button" onClick={() => setSiteSheet(true)} className="inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 text-[15px] font-semibold hover:bg-surface-2" aria-haspopup="dialog">
@@ -502,22 +518,25 @@ export function Report() {
     <div className="relative flex h-dvh flex-col overflow-hidden bg-bg">
       {judging ? <JudgeBar /> : data.mode === 'demo' ? <DemoBar /> : null}
       {topBar}
-      {/* Desktop: stage + scrubber left, panel right */}
-      <div className="hidden min-h-0 flex-1 lg:grid lg:grid-cols-[58%_42%]">
-        <div className="flex min-h-0 flex-col">
+      {wide ? (
+        /* Desktop: stage + scrubber left, panel right */
+        <div className="grid min-h-0 flex-1 grid-cols-[58%_42%]">
+          <div className="flex min-h-0 flex-col">
+            <div className="min-h-0 flex-1">{stage}</div>
+            {scrubber}
+          </div>
+          <div className="min-h-0 overflow-y-auto border-l border-border">{sheetBody}</div>
+        </div>
+      ) : (
+        /* Phone: stage, draggable sheet, scrubber */
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1">{stage}</div>
+          <SnapSheet snap={snap} onSnap={setSnap} reduce={Boolean(reduce)}>
+            {sheetBody}
+          </SnapSheet>
           {scrubber}
         </div>
-        <div className="min-h-0 overflow-y-auto border-l border-border">{sheetBody}</div>
-      </div>
-      {/* Phone: stage, draggable sheet, scrubber */}
-      <div className="flex min-h-0 flex-1 flex-col lg:hidden">
-        <div className="min-h-0 flex-1">{stage}</div>
-        <SnapSheet snap={snap} onSnap={setSnap} reduce={Boolean(reduce)}>
-          {sheetBody}
-        </SnapSheet>
-        {scrubber}
-      </div>
+      )}
       <CoachMarks
         id="lens"
         tips={[

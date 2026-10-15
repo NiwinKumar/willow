@@ -20,6 +20,8 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
   // The noise band comes from the baseline photos that passed the quality check, not all uploaded.
   const refPhotos = baseline?.result?.frames_used || baseline?.n_frames || 5
   const unit = UNIT_LABEL[current.unit]
+  // Pores come with their average size (engine extras); shown so the copy's promise holds.
+  const poreMm = metricId === 'pores' && typeof current.extras?.mean_diameter_mm === 'number' ? current.extras.mean_diameter_mm : null
   const points: Point[] = sessions.map((s, i) => {
     const m = s.result?.metrics.find((x) => x.id === metricId) ?? null
     return {
@@ -65,7 +67,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
       </div>
       {cluster.length && mdc !== null ? (
         <p className="text-[12px] text-text-3">
-          Your noise band (MDC95 from {refPhotos} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
+          Your noise band (from {refPhotos} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
         </p>
       ) : null}
       <dl className="space-y-3 text-[15px] leading-relaxed">
@@ -73,13 +75,21 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
           <dt className="font-semibold">What it measures</dt>
           <dd className="text-text-2">{WHAT[metricId]}</dd>
         </div>
+        {poreMm !== null ? (
+          <div>
+            <dt className="font-semibold">Average size</dt>
+            <dd className="text-text-2">
+              <span className="font-mono">{poreMm.toFixed(2)} mm</span> across, on this session’s close-ups
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt className="font-semibold">How we decide real change</dt>
           <dd className="text-text-2">
             {current.verdict === 'low_quality'
               ? 'This photo did not pass the quality check, so it is not compared. Retake it in the same light and position.'
               : b !== null && mdc !== null
-                ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
+                ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is your noise band: the smallest change that is bigger than photo-to-photo variation, with 95% confidence.`
                 : b !== null && mdc === null
                   ? 'Your baseline has fewer than 3 usable photos, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
                   : current.confidence === 'indicative'
@@ -114,15 +124,15 @@ function Dot(props: { cx?: number; cy?: number; payload?: Point }) {
 }
 
 const WHAT: Record<Metric['id'], string> = {
-  tone_ita: 'The Individual Typology Angle computed from L* and b* of your cheek (or forearm square), colour-corrected when the photo has a white reference. A description of tone, never a score, and no direction is better.',
-  pigment_spots: 'The share of skin area where the melanin proxy sits well above your own skin median. With several photos, only spots seen in at least two of them count. Reported with the count and mean contrast.',
+  tone_ita: 'A description of your skin tone from how light and how yellow-brown the skin of your cheek (or forearm square) is, colour-corrected when the photo has a white reference. It is never a score, and no direction is better.',
+  pigment_spots: 'The share of your skin covered by spots that are clearly darker than your own skin around them. With several photos, only spots seen in at least two of them count.',
   tone_evenness: 'How much lightness varies across your face regions and within them. Lower means more even.',
-  redness: 'Mean a* (red-green) over the cheek and nose regions, relative to your own skin, colour-corrected when the photo has a white reference. Harder to read on deep skin tones; then shown as indicative.',
+  redness: 'How red your cheeks and nose are, compared with your own skin, colour-corrected when the photo has a white reference. Harder to read on deep skin tones; then shown as indicative.',
   blemishes: 'Candidate blemishes the engine found by local redness and shading, averaged over your photos. With several photos, only blemishes seen in at least two of them count. Gemini labels each one; the count is indicative.',
   pores: 'Small dark openings 0.05 to 0.3 mm across on the close-up, counted per cm² of skin, with their average size. Measured when one eye is in the photo to set the size; otherwise indicative.',
   texture: 'How bumpy the skin surface looks at about half a millimetre on the close-up, adjusted for lightness so it reads the same on every tone. Lower is smoother. Indicative when your photos disagree too much.',
-  lines: 'Ridge density in the forehead, crow’s feet and nasolabial regions. Very lighting dependent, so indicative.',
-  dark_circles: 'Under-eye lightness minus cheek lightness (ΔL*). Relative to your own cheek, so it works across tones.',
+  lines: 'How many fine lines show on your forehead, beside your eyes and from nose to mouth. Very lighting dependent, so indicative.',
+  dark_circles: 'How much lighter or darker the skin under your eyes is than your cheek. Below zero means darker than your cheek. Relative to your own skin, so it works across tones.',
   shine: 'The share of your forehead, nose and chin that shows bright, colourless highlights (oil and sweat reflect the light’s colour, not the skin’s). Depends on time since washing, so indicative.',
   glow: 'Brightness, colour richness and smoothness of your cheeks combined, compared only with your own earlier photos (shine is left out). Indicative.',
 }

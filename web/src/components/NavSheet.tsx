@@ -20,8 +20,8 @@ export function Nav() {
   const { pathname } = useLocation()
   const data = useData()
   const q = data.mode === 'demo' ? '?demo=1' : ''
-  // Live: Results opens a site the person actually has measured results for (forearm today).
-  const resultsTo = data.mode === 'demo' ? '/s/face_full' : `/s/${data.sites[0] ?? 'forearm_control'}`
+  // Live: Results opens the first place with results (the face when it has any), else the face's empty state.
+  const resultsTo = data.mode === 'demo' ? '/s/face_full' : `/s/${data.sites[0] ?? 'face_full'}`
   const links = baseLinks.map((l) => (l.label === 'Results' ? { ...l, to: resultsTo } : l))
   const here = (l: { to: string; label: string }) => pathname.startsWith(l.label === 'Results' ? '/s/' : l.to.split('?')[0])
   return (

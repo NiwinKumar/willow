@@ -1,7 +1,20 @@
 import type { AnalysisResult } from '../data/types'
-import { QUALITY_COPY } from './metrics'
+import { isCloseUp, qualityCopy } from './metrics'
 
 const PEN_DOTS = /pen-dot square not found/i
+/** The engine's notes in the app's words (close-ups: docs/METRICS.md, pores and texture). */
+const PLAIN: [RegExp, string][] = [
+  [/^uncalibrated photo: results are a trend only/i, 'Phone photos: results are a trend, not a measurement'],
+  [/^no colour card: colours as captured by the camera/i, 'No colour card: colours are as the camera captured them, so results are a trend'],
+  [/^close-up scale assumed, not measured/i, 'Size on this close-up is estimated, not measured: pore and texture numbers compare with your own close-ups taken the same way, not as exact sizes'],
+  [/^pores need a closer photo/i, 'Pores need a closer photo: hold the phone about 10 cm (a hand’s width) from your face, or closer'],
+  [/^pores and texture need a closer photo/i, 'Pores and texture need a closer photo: hold the phone about 10 cm (a hand’s width) from your face, or closer'],
+  [/^face not found in the selfie close-up/i, 'Willow could not find your face in the close-up, so size could not be measured: keep your nose and at least one eye in the photo'],
+  [/^no cheek skin found in the photos/i, 'No cheek skin was found in the photos: put your cheek in the middle of the frame, phone about 10 cm away'],
+  [/^no nose skin found in the photos/i, 'No nose skin was found in the photos: put your nose in the middle of the frame, phone about 10 cm away'],
+]
+const TREND = PLAIN[0][1]
+
 const PEN_DOTS_TEXT =
   'Willow could not find the four pen dots. Mark the corners of a 4 cm square on the forearm, keep all four dots in the frame, and put white paper beside the arm.'
 
@@ -12,8 +25,9 @@ const PEN_DOTS_TEXT =
 export function readableWarnings(r: AnalysisResult | null | undefined): string[] {
   const raw = (r?.warnings ?? [])
     .filter((w) => !w.startsWith('placeholder:'))
-    // The engine's wording, in the app's: a phone photo is a trend.
-    .map((w) => (/^uncalibrated photo: results are a trend only/i.test(w) ? 'Phone photos: results are a trend, not a measurement' : w))
+    .map((w) => PLAIN.find(([re]) => re.test(w))?.[1] ?? w)
+    // One trend note is enough: a phone photo never has a colour card either.
+    .filter((w, _, all) => !(w.startsWith('No colour card: colours are as') && all.includes(TREND)))
   const noWhite = raw.some((w) => /no white reference found/i.test(w))
   const dots = raw.filter((w) => PEN_DOTS.test(w)).map((w) => w.match(/photo (\d+)/i)?.[1]).filter(Boolean)
   const out = raw.filter((w) => !PEN_DOTS.test(w) && !(noWhite && /white paper only/i.test(w)))
@@ -35,10 +49,11 @@ export function readableWarnings(r: AnalysisResult | null | undefined): string[]
 export function failureReasons(r: AnalysisResult | null | undefined): string[] {
   if (!r) return []
   const reasons = [...new Set(r.quality.reasons)]
+  const text = (x: string) => qualityCopy(x, r.site)?.text ?? x
   if ((r.warnings ?? []).some((w) => PEN_DOTS.test(w)) && (reasons.includes('too_few_frames') || r.frames_used === 0)) {
-    return [PEN_DOTS_TEXT, ...reasons.filter((x) => x !== 'too_few_frames').map((x) => QUALITY_COPY[x]?.text ?? x)]
+    return [PEN_DOTS_TEXT, ...reasons.filter((x) => x !== 'too_few_frames').map(text)]
   }
-  return reasons.map((x) => QUALITY_COPY[x]?.text ?? x)
+  return reasons.map(text)
 }
 
 const LEFT_OUT: Partial<Record<string, string>> = {
@@ -62,7 +77,8 @@ export function leftOutPhotos(r: AnalysisResult | null | undefined): string | nu
   if (!failed.length) return null
   const nums = failed.map((f) => String(f.index + 1))
   const list = nums.length === 1 ? nums[0] : `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}`
-  const why = [...new Set(failed.flatMap((f) => f.reasons.map((x) => LEFT_OUT[x]).filter(Boolean)))]
+  const word = (x: string) => (isCloseUp(r.site) && x === 'occlusion_suspected' ? 'too little skin in view' : LEFT_OUT[x])
+  const why = [...new Set(failed.flatMap((f) => f.reasons.map(word).filter(Boolean)))]
   return `${nums.length === 1 ? 'Photo' : 'Photos'} ${list} ${nums.length === 1 ? 'was' : 'were'} left out${why.length ? ` (${why.join(', ')})` : ''}.`
 }
 

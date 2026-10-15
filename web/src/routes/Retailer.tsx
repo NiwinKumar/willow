@@ -10,6 +10,9 @@ type Cell = RetailerInsights['products'][number]['cells'][number]
 /** The same suppressed aggregates as a shareable Data Studio report (api/scripts/publish_looker.py). */
 const DATA_STUDIO = 'https://datastudio.google.com/reporting/5147af6b-c268-470a-a420-2277dfcfe7df'
 
+const PANEL_ID = 'retailer-panel'
+const tabId = (t: string) => `retailer-tab-${t.toLowerCase().replace(/[^a-z]+/g, '-')}`
+
 const TABS = ['Needs next', 'Product outcomes', 'Brands', 'Assortment gaps', 'Routine conflicts', 'About this data'] as const
 
 export function Retailer() {
@@ -54,7 +57,7 @@ export function Retailer() {
   return (
     <div className="pb-20">
       <div role="status" className="bg-warn/18 px-5 py-2 text-[13px] text-warn-text sm:px-8">
-        <strong className="font-semibold">Synthetic data only</strong> · {d.cohort.synthetic} simulated users{d.cohort.real ? `, ${d.cohort.real} real` : ', no real customers'} · simulated outcomes follow Willow's measured noise model ·{' '}
+        <strong className="font-semibold">{d.cohort.real ? 'Mostly synthetic data' : 'Synthetic data only'}</strong> · {d.cohort.synthetic} simulated users{d.cohort.real ? ` and ${d.cohort.real} real ${d.cohort.real === 1 ? 'person' : 'people'} who opted in` : ', no real customers'} · simulated outcomes follow Willow's measured noise model ·{' '}
         <button type="button" className="underline-offset-2 hover:underline" onClick={() => setTab('About this data')}>About this data</button>
       </div>
       <div className="mx-auto w-full max-w-[1120px] px-5 sm:px-8">
@@ -67,13 +70,32 @@ export function Retailer() {
         <AskData />
         <nav className="-mx-5 mt-4 overflow-x-auto px-5 sm:mx-0 sm:px-0" aria-label="Retailer views">
           <ul className="flex gap-1 border-b border-border" role="tablist">
-            {TABS.map((t) => (
+            {TABS.map((t, i) => (
               <li key={t} role="presentation">
-                <button type="button" role="tab" onClick={() => setTab(t)} aria-selected={tab === t} className={`min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] ${tab === t ? 'border-text font-semibold' : 'border-transparent text-text-2 hover:text-text'}`}>{t}</button>
+                <button
+                  type="button"
+                  role="tab"
+                  id={tabId(t)}
+                  aria-controls={PANEL_ID}
+                  aria-selected={tab === t}
+                  tabIndex={tab === t ? 0 : -1}
+                  onClick={() => setTab(t)}
+                  onKeyDown={(e) => {
+                    // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+                    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+                    const to = e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : step ? (i + step + TABS.length) % TABS.length : null
+                    if (to === null) return
+                    e.preventDefault()
+                    setTab(TABS[to])
+                    document.getElementById(tabId(TABS[to]))?.focus()
+                  }}
+                  className={`min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] ${tab === t ? 'border-text font-semibold' : 'border-transparent text-text-2 hover:text-text'}`}>{t}</button>
               </li>
             ))}
           </ul>
         </nav>
+
+        <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)} tabIndex={0} className="focus-visible:outline-none">
 
         {tab === 'Needs next' ? (
           <Section q="What do customers need next?" tiles={d.tiles} csv={d.needs}>
@@ -94,7 +116,7 @@ export function Retailer() {
         ) : null}
 
         {tab === 'Product outcomes' ? (
-          <Section q="Which products actually help which profiles?" csv={d.products.map(({ cells, ...p }) => ({ ...p, ...Object.fromEntries(cells.map((c, i) => [`${d.tone_bands[i]} (%)`, c.suppressed || c.value === null ? '' : Math.round(c.value * 100)])) }))} tiles={[{ label: 'Products with evidence', value: String(evidence), sub: `10 or more users each; top ${d.products.length} shown` }, { label: 'Best outcome rate', value: best ? `${Math.round(best.rate * 100)}%` : '–', n: best?.n ?? 0, sub: best ? `${best.brand} ${best.product}` : '' }, { label: 'Median weeks to change', value: d.tiles[3].value, n: d.tiles[3].n, sub: 'held to week 8' }, { label: 'Users at week 8', value: d.tiles[0].value, n: d.tiles[0].n, sub: `${Math.round(d.cohort.dropout * 100)}% of ${routines} dropped out` }]}>
+          <Section q="Which products actually help which profiles?" csv={d.products.map(({ cells, ...p }) => ({ ...p, ...Object.fromEntries(cells.map((c, i) => [`${d.tone_bands[i]} (%)`, c.suppressed || c.value === null ? '' : Math.round(c.value * 100)])) }))} tiles={[{ label: 'Products with evidence', value: String(evidence), sub: `10 or more users each; top ${d.products.length} shown` }, { label: 'Best outcome rate', value: best ? `${Math.round(best.rate * 100)}%` : '–', n: best?.n ?? 0, sub: best ? `${best.brand} ${best.product}` : '' }, { label: 'Median weeks to change', value: d.tiles[3]?.value ?? '–', n: d.tiles[3]?.n, sub: 'held to week 8' }, { label: 'Users at week 8', value: d.tiles[0]?.value ?? '–', n: d.tiles[0]?.n, sub: `${Math.round(d.cohort.dropout * 100)}% of ${routines} dropped out` }]}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] border-collapse text-[13px]">
                 <thead>
@@ -193,6 +215,7 @@ export function Retailer() {
             <p>What this is not: evidence that any product works. It is a demonstration of what a multi-brand retailer would see once real, consented outcome data flows in.</p>
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   )
@@ -246,7 +269,8 @@ function downloadCsv(name: string, rows: Record<string, unknown>[]) {
   a.href = url
   a.download = `willow-${name.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '')}.csv`
   a.click()
-  URL.revokeObjectURL(url)
+  // Revoking at once can cancel the download in some browsers; give it a moment to start.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 /** How a retailer goal maps to the goals people pick in the app (the retailer view is finer). */

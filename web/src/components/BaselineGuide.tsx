@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 import type { CaptureMode, Site } from '../data/types'
 import { useData } from '../data/useData'
-import { BASELINE_SITES, DONT_VARY, WHY_FIVE, baselineState, photoSteps } from '../lib/baselineGuide'
+import { DONT_VARY, WHY_FIVE, baselineSites, baselineState, photoSteps } from '../lib/baselineGuide'
 import { fmtDate, plural } from '../lib/format'
 import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
 
@@ -30,7 +30,7 @@ export function FirstSessionGuide({ site, mode, n = 5 }: { site: Site; mode: Cap
   )
 }
 
-/** Which places have a baseline in this capture mode: the face and both forearm squares. */
+/** Which places have a baseline in this capture mode: the face, both forearm squares, and a cheek close-up for the "smoother" goal. */
 export function BaselineChecklist({ mode, current, onPick }: { mode: CaptureMode; current?: Site; onPick?: (site: Site) => void }) {
   const data = useData()
   const quick = mode === 'uncalibrated'
@@ -39,9 +39,11 @@ export function BaselineChecklist({ mode, current, onPick }: { mode: CaptureMode
   return (
     <section aria-labelledby="baselines">
       <h2 id="baselines" className="text-[17px] font-semibold">Your baselines{quick ? ' (phone photos)' : ''}</h2>
-      <p className="mt-1 text-[13px] text-text-2">Set one for each place you track. For a product test, set both forearms before you start using the product.</p>
+      <p className="mt-1 text-[13px] text-text-2">
+        Set one for each place you track. For a product test, set both forearms before you start using the product.{data.goals.includes('smoother') ? ' Pores and texture are measured on the cheek close-up.' : ''}
+      </p>
       <ul className="mt-3 divide-y divide-border border-y border-border">
-        {BASELINE_SITES.map((site) => {
+        {baselineSites(data.goals).map((site) => {
           const st = baselineState(data.series(site)?.sessions ?? [], mode)
           if (loading)
             return (

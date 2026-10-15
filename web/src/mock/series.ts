@@ -52,6 +52,21 @@ export const METRIC_ROIS: Partial<Record<Metric['id'], string[]>> = {
   glow: ['left_cheek', 'right_cheek'],
 }
 
+/** Close-ups name their outlines "cheek" (up to 4, same name) or "nose"; every metric is read on that skin. */
+const CLOSE_UP_ROIS: Partial<Record<Metric['id'], string[]>> = {
+  tone_ita: ['cheek'],
+  pigment_spots: ['cheek'],
+  redness: ['cheek'],
+  blemishes: ['cheek', 'nose'],
+  pores: ['cheek', 'nose'],
+  texture: ['cheek'],
+}
+
+/** The ROI names a metric lights up on this site's photo. */
+export function roisFor(site: Site): Partial<Record<Metric['id'], string[]>> {
+  return site === 'cheek_macro' || site === 'nose_macro' ? CLOSE_UP_ROIS : METRIC_ROIS
+}
+
 function explain(metrics: Metric[], hoursLabel: string | null): Explanation {
   const real = metrics.filter((m) => m.verdict === 'real_change')
   const items = metrics
