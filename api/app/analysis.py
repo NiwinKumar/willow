@@ -20,6 +20,15 @@ class SessionGone(Exception):
     """The session was deleted while it was being measured."""
 
 
+def _stage(store: Store, uid: str, session_id: str, stage: str) -> None:
+    """Best effort: a stage the check-in shows never fails the analysis (a deleted session is
+    caught after the engine answers, as before)."""
+    try:
+        store.session_update(uid, session_id, {"stage": stage})
+    except Exception:
+        log.warning("could not write stage %s for %s/%s", stage, uid, session_id)
+
+
 def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any]) -> dict:
     """Analyze one session whose frames are uploaded and return its updated doc.
 
@@ -28,7 +37,13 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     store.session_update(
         uid,
         session_id,
-        {"status": "processing", "processing_started_at": datetime.now(UTC), "error": None},
+        {
+            "status": "processing",
+            "processing_started_at": datetime.now(UTC),
+            "error": None,
+            # Live stage the check-in polls (received, engine, explaining); None when done.
+            "stage": "received",
+        },
     )
     current = baselines.get(store, uid, doc["site"], doc["capture_mode"])
     baseline_map = None
@@ -48,6 +63,7 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         "output_prefix": f"gs://{bucket}/{views.results_prefix(uid, session_id)}",
         "options": {"compute_overlays": True, "max_candidates": 40},
     }
+    _stage(store, uid, session_id, "engine")
     try:
         result = engine.analyze(request)
     except engine.EngineError as exc:
@@ -55,7 +71,11 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         store.session_update(
             uid,
             session_id,
-            {"status": "failed", "error": {"code": exc.code, "message": exc.public_message}},
+            {
+                "status": "failed",
+                "error": {"code": exc.code, "message": exc.public_message},
+                "stage": None,
+            },
         )
         raise
 
@@ -65,6 +85,7 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         baselines.guard_counts(result, current)
     explanation, source, details = (None, None, {})
     if measured:
+        _stage(store, uid, session_id, "explaining")
         # The explanation and the spot labels are independent Gemini calls: run them together.
         context = explain_context(store, uid, doc, current, session_id)
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -81,6 +102,7 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         session_id,
         {
             "status": "done",
+            "stage": None,
             "measured": measured,
             # Placeholder numbers are kept for debugging only; views never return them.
             "result_json": json.dumps(result),

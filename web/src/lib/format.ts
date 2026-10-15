@@ -4,27 +4,14 @@ export function parseDate(iso: string): Date {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso)
 }
 
-/** Today as a local calendar day, YYYY-MM-DD (for date inputs). */
-export function todayLocal(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
+/** Every date and time in the app reads the design's way ("15 Oct", "21:25") whatever the browser's locale. */
 export function fmtDate(iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }): string {
-  return parseDate(iso).toLocaleDateString(undefined, opts)
+  return parseDate(iso).toLocaleDateString('en-GB', opts)
 }
 
-export function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
-
-/** A session's short label: hours after the baseline on a short series, else its date, or its time when two sessions share a day. */
-export function sessionLabel(s: { is_baseline: boolean; created_at: string; hours_since_baseline?: number }, all: { created_at: string }[]): string {
-  if (s.hours_since_baseline !== undefined) return fmtHours(s.hours_since_baseline)
-  if (s.is_baseline) return 'Baseline'
-  const day = fmtDate(s.created_at)
-  if (all.filter((x) => fmtDate(x.created_at) === day).length > 1) return new Date(s.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-  return day
+/** "21:25": a check-in's time of day. */
+export function clockOf(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function fmtHours(h: number): string {
@@ -38,7 +25,8 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000)
 }
 
-export function plural(n: number, one: string, many: string): string {
+/** "1 photo", "3 photos" (the plural defaults to one + s). */
+export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
@@ -51,15 +39,5 @@ export function fmtPrice(price: { amount: number; currency: string }): string {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: price.currency, maximumFractionDigits: price.amount % 1 ? 2 : 0 }).format(price.amount)
   } catch {
     return `${price.amount} ${price.currency}`
-  }
-}
-
-/** "theordinary.com" for the credit line under a product image. */
-export function imageCredit(p: { image_url?: string | null; image_source?: string | null }): string | null {
-  if (!p.image_url || !p.image_source) return null
-  try {
-    return new URL(p.image_source).hostname.replace(/^www\./, '')
-  } catch {
-    return null
   }
 }

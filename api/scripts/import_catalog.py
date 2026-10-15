@@ -7,6 +7,9 @@
 Sheet columns: list fields are separated by " | "; key_actives are "name:pct" (pct may be empty);
 stores take four column triples store_N_name, store_N_url, store_N_region. image_url is the
 brand's own product image, linked (never copied); image_source is the page it is shown on.
+Each store's own price (read off that store's page for the same size) sits in the trailing
+columns store_N_price_amount, store_N_price_currency, store_N_price_checked; all three empty
+means no verified price (null).
 """
 
 import csv
@@ -16,7 +19,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.catalog import CATALOG_PATH, CATEGORIES, CONCERNS  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
+
+from app.catalog import CATALOG_PATH, CATEGORIES, CONCERNS, StorePrice  # noqa: E402
 
 SEP = " | "
 REGIONS = {"IN", "US", "UK", "EU", "KR", "SEA", "GCC", "GLOBAL"}
@@ -38,6 +43,9 @@ COLUMNS = [
     "image_url",
     "image_source",
 ] + [f"store_{i}_{f}" for i in range(1, STORE_SLOTS + 1) for f in ("name", "url", "region")]
+# Appended after the original columns so an older sheet still lines up.
+PRICE_FIELDS = ("price_amount", "price_currency", "price_checked")
+COLUMNS += [f"store_{i}_{f}" for i in range(1, STORE_SLOTS + 1) for f in PRICE_FIELDS]
 
 
 def _split(cell: str) -> list[str]:
@@ -55,6 +63,13 @@ def validate(p: dict) -> list[str]:
     problems += [
         f"store url {s['url']!r}" for s in p["stores"] if not s["url"].startswith("https://")
     ]
+    for s in p["stores"]:
+        if s.get("price") is None:
+            continue
+        try:
+            StorePrice.model_validate(s["price"])
+        except ValidationError:
+            problems.append(f"store price {s['store']!r} (amount > 0, ISO currency, YYYY-MM-DD)")
     if not p["source_url"].startswith("https://"):
         problems.append("source_url")
     if p.get("image_url") and not p["image_url"].startswith("https://"):
@@ -62,6 +77,17 @@ def validate(p: dict) -> list[str]:
     if p.get("image_url") and not (p.get("image_source") or "").startswith("https://"):
         problems.append("image_source (the page the image is shown on)")
     return problems
+
+
+def _store_price(row: dict[str, str], i: int) -> dict | None:
+    amount = (row.get(f"store_{i}_price_amount") or "").strip()
+    if not amount:
+        return None
+    return {
+        "amount": float(amount),
+        "currency": (row.get(f"store_{i}_price_currency") or "").strip().upper(),
+        "checked": (row.get(f"store_{i}_price_checked") or "").strip(),
+    }
 
 
 def from_row(row: dict[str, str]) -> dict:
@@ -74,6 +100,7 @@ def from_row(row: dict[str, str]) -> dict:
             "store": row[f"store_{i}_name"].strip(),
             "url": row[f"store_{i}_url"].strip(),
             "region": row[f"store_{i}_region"].strip(),
+            "price": _store_price(row, i),
         }
         for i in range(1, STORE_SLOTS + 1)
         if row.get(f"store_{i}_url", "").strip()
@@ -121,11 +148,15 @@ def to_row(p: dict) -> dict[str, str]:
     }
     for i in range(1, STORE_SLOTS + 1):
         s = p["stores"][i - 1] if i <= len(p["stores"]) else {"store": "", "url": "", "region": ""}
+        price = s.get("price") or {}
         row.update(
             {
                 f"store_{i}_name": s["store"],
                 f"store_{i}_url": s["url"],
                 f"store_{i}_region": s["region"],
+                f"store_{i}_price_amount": f"{price['amount']:g}" if price else "",
+                f"store_{i}_price_currency": price.get("currency", ""),
+                f"store_{i}_price_checked": price.get("checked", ""),
             }
         )
     return row

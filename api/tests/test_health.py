@@ -10,7 +10,7 @@ def test_health(client):
 def test_public_data_is_cacheable_and_large_bodies_are_compressed(client, monkeypatch):
     from app import retailer
 
-    monkeypatch.setattr(retailer, "insights", lambda: {"rows": ["x" * 50] * 100})
+    monkeypatch.setattr(retailer, "insights", lambda *a: {"rows": ["x" * 50] * 100})
     res = client.get("/v1/retailer/insights", headers={"Accept-Encoding": "gzip"})
     assert res.headers["Cache-Control"] == "public, max-age=300"
     assert res.headers["Content-Encoding"] == "gzip"

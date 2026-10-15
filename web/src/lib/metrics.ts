@@ -28,6 +28,14 @@ export const GROUP_META: Record<MetricGroup, { label: string; order: number }> =
   oil_glow: { label: 'Oil & glow', order: 6 },
 }
 
+/** Units a metric's number carries where its contract unit is too generic ("index"). */
+const METRIC_UNIT: Partial<Record<MetricId, string>> = { lines: ' mm/cm²' }
+
+/** The unit written after a metric's number (rows, detail, band). */
+export function unitOf(m: { id: MetricId; unit: Unit }): string {
+  return METRIC_UNIT[m.id] ?? UNIT_LABEL[m.unit]
+}
+
 export const UNIT_LABEL: Record<Unit, string> = {
   deg: '°',
   pct_area: '%',
@@ -39,13 +47,6 @@ export const UNIT_LABEL: Record<Unit, string> = {
   delta_l_star: '',
 }
 
-export const VERDICT_LABEL: Record<Verdict, string> = {
-  real_change: 'Real change',
-  within_noise: 'Within normal photo variation',
-  no_baseline: 'First reading',
-  low_quality: 'Photo quality too low to compare',
-}
-
 /**
  * Sites the deployed engine measures today. Other sites are saved and marked "not measured yet"
  * (the api never shows the engine's placeholder numbers). Update when the engine adds a site.
@@ -55,34 +56,56 @@ export const MEASURED_SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro',
 /** Close-ups: size comes from the iris, so one eye stays in the photo, phone about 10 cm away. */
 export const isCloseUp = (site: Site) => site === 'cheek_macro' || site === 'nose_macro'
 
-/** "face, cheek and nose close-ups, and forearm": the measured places in one readable phrase. */
-export function measuredPlaces(): string {
-  const parts: string[] = []
-  if (MEASURED_SITES.includes('face_full')) parts.push('face')
-  const close = MEASURED_SITES.filter(isCloseUp).map((s) => (s === 'cheek_macro' ? 'cheek' : 'nose'))
-  if (close.length) parts.push(`${close.join(' and ')} close-up${close.length > 1 ? 's' : ''}`)
-  if (MEASURED_SITES.some((s) => s.startsWith('forearm'))) parts.push('forearm')
-  return parts.length > 2 ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}` : parts.join(' and ')
-}
-
 export const SITE_LABEL: Record<Site, string> = {
   face_full: 'Face',
   cheek_macro: 'Cheek close-up',
   nose_macro: 'Nose close-up',
-  forearm_treated: 'Forearm, treated',
-  forearm_control: 'Forearm, control',
+  forearm_treated: 'Treated forearm',
+  forearm_control: 'Control forearm',
 }
 
-/** Goals (docs/UX_SPEC.md screen 3) and the groups they pull to the top. */
-export const GOALS: { id: string; label: string; groups: MetricGroup[] }[] = [
-  { id: 'clearer', label: 'Clearer skin', groups: ['clarity', 'redness'] },
-  { id: 'even_tone', label: 'Even tone & fewer dark spots', groups: ['tone_pigment'] },
-  { id: 'calmer', label: 'Calmer skin', groups: ['redness'] },
-  { id: 'smoother', label: 'Smoother texture & pores', groups: ['texture_pores'] },
-  { id: 'softer_lines', label: 'Softer lines', groups: ['lines'] },
-  { id: 'under_eye', label: 'Under-eye', groups: ['eye_area'] },
-  { id: 'oil_glow', label: 'Oil control & glow', groups: ['oil_glow'] },
+/** The goals a person can pick (up to three), each matched 1:1 to catalog concerns and to the metrics it
+ * pulls to the top of results. Ids are stored on the account (users/{uid}.profile.goals). */
+export type GoalId = 'dark_spots' | 'even_tone' | 'redness' | 'blemishes' | 'pores_texture' | 'lines' | 'under_eye' | 'oil_glow'
+export const GOALS: { id: GoalId; label: string; metrics: MetricId[] }[] = [
+  { id: 'dark_spots', label: 'Dark spots', metrics: ['pigment_spots'] },
+  { id: 'even_tone', label: 'Tone evenness', metrics: ['tone_evenness'] },
+  { id: 'redness', label: 'Redness', metrics: ['redness'] },
+  { id: 'blemishes', label: 'Blemishes', metrics: ['blemishes'] },
+  { id: 'pores_texture', label: 'Pores and texture', metrics: ['pores', 'texture'] },
+  { id: 'lines', label: 'Lines', metrics: ['lines'] },
+  { id: 'under_eye', label: 'Under-eye', metrics: ['dark_circles'] },
+  { id: 'oil_glow', label: 'Shine and glow', metrics: ['shine', 'glow'] },
 ]
+export const MAX_GOALS = 3
+
+/** Goal ids saved before the 8 goals (this device only), and what each became. */
+const OLD_GOALS: Record<string, GoalId[]> = {
+  even_tone: ['dark_spots', 'even_tone'],
+  clearer: ['blemishes'],
+  calmer: ['redness'],
+  smoother: ['pores_texture'],
+  softer_lines: ['lines'],
+  under_eye: ['under_eye'],
+  oil_glow: ['oil_glow'],
+}
+
+const isGoal = (g: unknown): g is GoalId => GOALS.some((x) => x.id === g)
+
+/** Known goal ids only, each once, at most three (anything else stored is dropped). */
+export function cleanGoals(ids: unknown): GoalId[] {
+  return Array.isArray(ids) ? [...new Set(ids.filter(isGoal))].slice(0, MAX_GOALS) : []
+}
+
+/** A list saved with the old goal ids, in the new ones. */
+export function migrateGoals(old: unknown): GoalId[] {
+  return Array.isArray(old) ? cleanGoals(old.flatMap((g) => (typeof g === 'string' ? (OLD_GOALS[g] ?? []) : []))) : []
+}
+
+/** The metrics the chosen goals target, in goal order. */
+export function goalMetrics(goalIds: string[]): MetricId[] {
+  return [...new Set(goalIds.flatMap((g) => GOALS.find((x) => x.id === g)?.metrics ?? []))]
+}
 
 /** Decimals a value is shown with: never more precision than the band supports. */
 export function decimalsFor(m: Pick<Metric, 'mdc95' | 'unit'>): number {
@@ -108,19 +131,24 @@ export function fmtSigned(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): 
   return v < 0 ? `−${s}` : `+${s}`
 }
 
-export function directionText(m: Metric): string {
-  const meta = METRIC_META[m.id]
-  if (m.direction === 'decrease') return meta.decrease
-  if (m.direction === 'increase') return meta.increase
-  return ''
-}
-
-/** Order groups by the user's goals, then by the default order. */
+/** Order groups by the user's goals (the groups of their goal metrics first), then by the default order. */
 export function orderedGroups(goalIds: string[]): MetricGroup[] {
   const lead: MetricGroup[] = []
-  for (const g of goalIds) for (const grp of GOALS.find((x) => x.id === g)?.groups ?? []) if (!lead.includes(grp)) lead.push(grp)
+  for (const id of goalMetrics(goalIds)) if (!lead.includes(METRIC_META[id].group)) lead.push(METRIC_META[id].group)
   const rest = (Object.keys(GROUP_META) as MetricGroup[]).filter((g) => !lead.includes(g)).sort((a, b) => GROUP_META[a].order - GROUP_META[b].order)
   return [...lead, ...rest]
+}
+
+/**
+ * Compares two metrics for goal order: groups as orderedGroups, then a goal's own metrics first inside their
+ * group (in goal order), and skin tone (descriptive only) never leading its group. 0 = no preference.
+ */
+export function byGoalOrder(goalIds: string[]): (a: MetricId, b: MetricId) => number {
+  const groups = orderedGroups(goalIds)
+  const picked = goalMetrics(goalIds)
+  const pick = (id: MetricId) => (picked.includes(id) ? picked.indexOf(id) : picked.length)
+  const tone = (id: MetricId) => (id === 'tone_ita' ? 1 : 0)
+  return (a, b) => groups.indexOf(METRIC_META[a].group) - groups.indexOf(METRIC_META[b].group) || pick(a) - pick(b) || tone(a) - tone(b)
 }
 
 export const VERDICT_RANK: Record<Verdict, number> = { real_change: 0, within_noise: 1, low_quality: 2, no_baseline: 3 }

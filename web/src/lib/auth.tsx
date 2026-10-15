@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       continueAsGuest: async () => {
+        // Local test mode is already "signed in" as the fixed test person; never make a real Firebase guest.
+        if (devUser) return
         const f = await loadSdk()
         // A page that asks before the saved sign-in is restored must not replace it with a new guest.
         await f.firebaseAuth.authStateReady()

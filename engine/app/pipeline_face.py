@@ -1,5 +1,6 @@
 """face_full analysis (M2): landmarks -> ROIs + face skin mask -> Lab -> A-tier face metrics."""
 
+import dataclasses
 import json
 import logging
 import time
@@ -13,7 +14,7 @@ from app.aggregate import summarize
 from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
-from app.io import save_jpegs, save_preview
+from app.io import save_jpegs, save_png, save_preview
 from app.landmarks import (
     Face,
     FaceNotFound,
@@ -28,12 +29,14 @@ from app.landmarks import (
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.glow import glow
+from app.metrics.lines import lines
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
 from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
+from app.overlay import redness_rgba, to_preview
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
-from app.quality import FrameQuality, check_frame
+from app.quality import FrameQuality, check_frame, region_reasons
 from app.roi import Box
 
 log = logging.getLogger("willow.face")
@@ -47,8 +50,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
     "shine": ("oil_glow", "Shine", "pct_area"),
     "glow": ("oil_glow", "Glow", "index"),
+    "lines": ("lines", "Lines", "index"),
 }
-ALWAYS_INDICATIVE = {"blemishes", "shine", "glow"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "glow", "lines"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -77,8 +81,9 @@ def _rois(face: Face, names: tuple[str, ...]) -> tuple[str, ...]:
     return names if face.view == "front" else face.cheeks
 
 
-def _frame(path: str) -> dict:
-    """Everything measured on one photo; raises FaceNotFound."""
+def _frame(path: str, overlays: bool = False) -> dict:
+    """Everything measured on one photo; raises FaceNotFound. overlays: also keep the
+    photo's a* on the preview grid for the redness overlay."""
     linear, srgb8 = _load(path)
     face = detect_face(srgb8)
     polys = face.roi_polygons()
@@ -93,9 +98,9 @@ def _frame(path: str) -> dict:
     # a hand resting on the face (chin, cheek) is skin but not face: cut it everywhere
     hands = detect_hands(srgb8, config.HAND_MIN_SPAN_EYES * face.eye_distance_px)
     hand = box.crop(hand_mask(srgb8.shape[:2], hands, config.HAND_MARGIN_MM * face.px_per_mm))
-    masks, covered = {}, False
+    masks, raw, covered = {}, {}, False
     for n, p in polys.items():
-        m = box.crop(polygon_mask(srgb8.shape[:2], p))
+        m = raw[n] = box.crop(polygon_mask(srgb8.shape[:2], p))
         if (m & ~hand).sum() >= 0.5 * m.sum():
             masks[n] = m & ~hand
         elif n in face.cheeks or n == "nose":
@@ -122,6 +127,12 @@ def _frame(path: str) -> dict:
     # colours as the phone captured them: users do not hold a white reference
     lin = box.crop(linear)
     lab = linear_srgb_to_lab(lin)
+    # where on the face each failed check is (says where, not whether: never fails a photo)
+    try:
+        regions = region_reasons(quality.reasons, raw, lin, box.crop(srgb8), face.px_per_mm, hand)
+    except (ValueError, IndexError, cv2.error) as exc:
+        log.warning("quality regions not attributed: %s", exc)
+        regions = []
 
     skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
     cheek_skin = np.logical_or.reduce([skin[c] for c in face.cheeks])
@@ -172,6 +183,14 @@ def _frame(path: str) -> dict:
     red_rois = _rois(face, REDNESS_ROIS)
     redness_a = float(np.mean([med(1, n) for n in red_rois]))
     red_skin = np.logical_or.reduce([roi_skin[n] for n in red_rois])
+    t_map = time.perf_counter()
+    # the redness metric's own a* and skin, on the preview grid (drawn for the reference photo)
+    redness_map = (
+        to_preview(lab[..., 1], red_skin, srgb8.shape[:2], origin=(box.x, box.y))
+        if overlays
+        else None
+    )
+    map_ms = (time.perf_counter() - t_map) * 1000
     evenness, _ = tone_evenness(
         {n: (lab[..., 0], lin[..., 0], roi_skin[n]) for n in _rois(face, EVENNESS_ROIS)}, px_per_mm
     )
@@ -253,6 +272,18 @@ def _frame(path: str) -> dict:
         and not (face.view != "front" and _reaches(sp, shadows))
     ]
     glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
+    # lines: landmarks in the crop's pixels. Blemishes and large dark marks (a bindi, a mole)
+    # are left out, their edges curve; small dark spots are not: on a lined face many
+    # "spots" are pieces of the lines, and small round marks fail the line shape test anyway
+    crop_face = dataclasses.replace(face, points=face.points - [box.x, box.y])
+    big = [sp for sp in spots if 2 * sp.radius >= config.LINES_MARK_MIN_MM * px_per_mm]
+    lines_val, lines_extras = lines(
+        lab,
+        crop_face,
+        _line_skin(lab, face_full & ~hand, zones.get("lower_face", np.zeros_like(face_skin))),
+        px_per_mm,
+        [*blemishes, *big],
+    )
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -264,6 +295,7 @@ def _frame(path: str) -> dict:
         "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
         "shine": shine_pct,
         "glow": glow_idx,
+        "lines": lines_val,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -276,6 +308,7 @@ def _frame(path: str) -> dict:
         else {},
         "shine": shine_extras,
         "glow": glow_extras,
+        "lines": lines_extras,
     }
     return {
         "values": values,
@@ -290,6 +323,9 @@ def _frame(path: str) -> dict:
         "spots": spots,
         "box": box,
         "srgb8": srgb8,
+        "regions": regions,
+        "redness_map": redness_map,
+        "map_ms": map_ms,
     }
 
 
@@ -486,6 +522,68 @@ def _reaches(spot, guard: np.ndarray) -> bool:
     return bool(disk.any()) and guard[y0:y1, x0:x1][disk].mean() > config.SIDE_SPOT_GUARD_OVERLAP
 
 
+def _session_lines(good: list[dict]) -> None:
+    """lines per photo on the session's own most lined zones. Scoring each photo on its own
+    top LINES_TOP_ZONES let a zone flip in and out of the top two between photos (one 5 mm
+    segment found or not moves a small zone 0 <-> ~2 mm/cm2): 5 laptop selfies of one
+    session read 1.1-2.7. The zones are picked once, by their median across the photos, and
+    every photo is scored on those, so the spread is the photos' own, not the zone choice's.
+    The zones skipped for expression in any photo are kept in the extras."""
+    frames = [f for f in good if f["values"].get("lines") is not None]
+    if not frames:
+        return
+    suffix = "_mm_per_cm2"
+    zones = {k for f in frames for k, v in f["extras"]["lines"].items() if k.endswith(suffix)}
+    medians = {}
+    for z in zones:
+        vals = [f["extras"]["lines"].get(z) for f in frames]
+        vals = [v for v in vals if v is not None]
+        # measured in at least half the photos: a zone seen once (skipped for expression or
+        # cut as beard in the rest) cannot lead the session
+        if vals and 2 * len(vals) >= len(frames):
+            medians[z] = float(np.median(vals))
+    top = sorted(medians, key=lambda z: (-medians[z], z))[: config.LINES_TOP_ZONES]
+    skipped = sorted(
+        {z for f in frames for z in f["extras"]["lines"].get("skipped_for_expression") or []}
+    )
+    for f in frames:
+        vals = [f["extras"]["lines"].get(z) for z in top]
+        vals = [v for v in vals if v is not None]
+        f["values"]["lines"] = float(np.mean(vals)) if vals else None
+        f["extras"]["lines"] = {
+            **{k: v for k, v in f["extras"]["lines"].items() if k != "skipped_for_expression"},
+            "px_per_mm": round(float(f["face"].px_per_mm), 2),
+        }
+    for f in frames:
+        f["extras"]["lines"]["top_zones"] = top
+        f["extras"]["lines"]["skipped_for_expression"] = skipped
+
+
+def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -> np.ndarray:
+    """Skin for the lines metric: the face outline minus eyes, lids and lips (`face_area`),
+    without hair (far darker AND greyer than this face's skin; below the nose, where a
+    beard or moustache grows, a little darker and greyer). Not face_skin: its stubble and
+    colour cuts take creases beside the mouth and shaded skin (Oct 15: a marionette zone
+    27% skin, one side none), the very places lines are. A crease is a shadow and keeps the
+    skin's colour (cut 0-0.4% of mouth zones on 4 lined faces, 17-33% on 2 bearded)."""
+    if not face_area.any():
+        return face_area
+    L = lab[..., 0]
+    chroma = np.hypot(lab[..., 1], lab[..., 2])
+    med_l, med_c = float(np.median(L[face_area])), float(np.median(chroma[face_area]))
+    hair = (L < med_l - config.LINES_HAIR_DARKER_L) & (chroma < config.LINES_HAIR_CHROMA * med_c)
+    beard = (L < med_l - config.LINES_BEARD_DARKER_L) & (chroma < config.LINES_BEARD_CHROMA * med_c)
+    # a beard: lines below the nose cannot be told from its hairs, so that part is left out.
+    # Judged by clear hair (the stricter test): bearded faces 25-29% of the lower face,
+    # 13 others 0-2.5% (Oct 15); the looser test also takes jaw shadow (up to 13%)
+    lower = face_area & lower_face
+    if lower.any() and (hair & lower).sum() > config.LINES_BEARD_FRAC * lower.sum():
+        hair |= lower_face
+    hair |= beard & lower_face  # moustache / stubble hairs on an otherwise clear lip
+    hair = cv2.dilate(hair.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    return face_area & ~hair
+
+
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """Drop the ROI's own darkest 1% and brightest 1% (shadow, shine, stray hair)."""
     lo, hi = np.percentile(l_star[mask], [config.SKIN_LOW_PCT, config.SKIN_HIGH_PCT])
@@ -499,11 +597,13 @@ def analyze_face(
     baseline: dict | None = None,
     output_prefix: str | None = None,
     max_candidates: int = 40,
+    compute_overlays: bool = True,
 ) -> dict:
     """Analyze 1-5 front-on face photos of one session (site face_full).
 
     Blemish candidates (with crops when output_prefix is given) come from the first photo
-    that passed the quality checks.
+    that passed the quality checks. With output_prefix and compute_overlays, the redness
+    overlay of the reference photo is written to overlays/redness.png.
     """
     t0 = time.perf_counter()
     try:
@@ -513,11 +613,12 @@ def analyze_face(
     # "measured" needs a colour reference in the photo; faces never detect one (no card,
     # no white paper), so a RAW face is as indicative as a JPEG selfie
     confidence = "indicative"
+    draw = compute_overlays and bool(output_prefix)  # overlays need somewhere to go
 
     per_frame, frames, warnings = [], [], []
     for i, path in enumerate(files):
         try:
-            f = _frame(path)
+            f = _frame(path, overlays=draw)
         except FaceNotFound:
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
@@ -529,7 +630,9 @@ def analyze_face(
         f["index"] = i
         frames.append(f)
         q = f["quality"]
-        per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons})
+        per_frame.append(
+            {"index": i, "passed": q.passed, "reasons": q.reasons, "regions": f["regions"]}
+        )
     passed = [f for f in frames if f["quality"].passed]
     # one view per summary: front photos if any passed, else the side views (each measures
     # different skin, so they are not averaged together)
@@ -539,6 +642,7 @@ def analyze_face(
     _count_confirmed(good)
 
     metrics = []
+    _session_lines(good)
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
         have = [f for f in good if f["values"][metric_id] is not None]
@@ -551,6 +655,9 @@ def analyze_face(
                 extras["ita_band"] = ita_band(summary["value"])
             if metric_id == "pigment_spots":
                 extras["count"] = round(extras.get("count", 0))
+            if metric_id == "lines":  # the lists _mean_extras drops (_session_lines)
+                for k in ("top_zones", "skipped_for_expression"):
+                    extras[k] = have[0]["extras"]["lines"].get(k, [])
         else:
             summary = {
                 "value": None,
@@ -599,6 +706,14 @@ def analyze_face(
     ref = good[0] if good else (frames[0] if frames else None)
     if ref and output_prefix:  # the photo rois, candidate bboxes and image_size describe
         save_preview(ref["srgb8"], output_prefix)
+    overlays, overlay_ms = [], sum(f["map_ms"] for f in frames)
+    if good and good[0]["redness_map"] is not None:  # same photo as preview.jpg, same size
+        t_o = time.perf_counter()
+        rgba = redness_rgba(good[0]["redness_map"], good[0]["face"].px_per_mm)
+        if rgba is not None:
+            dest = f"{output_prefix.rstrip('/')}/overlays/redness.png"
+            overlays.append({"metric_id": "redness", "uri": save_png(rgba, dest)})
+        overlay_ms += (time.perf_counter() - t_o) * 1000
     candidates = []
     if good:
         mapped, align_warnings = _align(good[0], good[1:])
@@ -607,6 +722,7 @@ def analyze_face(
         candidates = _candidates(good[0], output_prefix, max_candidates, seen)
     for f in frames:
         f.pop("srgb8", None)  # free the full-size photos
+        f.pop("redness_map", None)
     qs = [f["quality"] for f in frames]
     result = {
         "schema_version": "1.0",
@@ -635,14 +751,17 @@ def analyze_face(
         },
         "metrics": metrics,
         "candidates": candidates,
-        "overlays": [],
+        "overlays": overlays,
         # ROIs of the first photo; cross-frame alignment comes with overlays
         "rois": (
             [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in ref["polygons"].items()]
             if ref
             else []
         ),
-        "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
+        "timings_ms": {
+            "total": round((time.perf_counter() - t0) * 1000, 1),
+            **({"overlay": round(overlay_ms, 1)} if draw else {}),
+        },
         "warnings": warnings,
     }
     if ref:

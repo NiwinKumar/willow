@@ -25,6 +25,19 @@ class Settings(BaseSettings):
     # writes to the real bucket with your ADC, so no signing permission is needed on a laptop.
     dev_uploads: bool = False
     dev_public_url: str = "http://localhost:8080"
+    # Check-in reminders (app/reminders.py). Web Push is off unless all three VAPID values are set
+    # (Secret Manager in production, never committed); without them reminders are calendar only.
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str | None = None  # "mailto:..." or an https URL the push services can reach
+    # The web app, for the calendar event's link and notification clicks.
+    app_url: str = "https://willow-511508.web.app"
+    # POST /v1/internal/reminders accepts Cloud Scheduler's OIDC token only with this audience and
+    # this service account's email. Unset audience: the route answers 503 (except AUTH_MODE=dev).
+    reminders_audience: str | None = None
+    scheduler_service_account: str = "sa-scheduler@willow-511508.iam.gserviceaccount.com"
+    # A reminder goes out on the first run at or after the scheduled time, up to this long after it.
+    reminder_window_minutes: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

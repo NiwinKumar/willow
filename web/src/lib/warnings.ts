@@ -4,8 +4,8 @@ import { isCloseUp, qualityCopy } from './metrics'
 const PEN_DOTS = /pen-dot square not found/i
 /** The engine's notes in the app's words (close-ups: docs/METRICS.md, pores and texture). */
 const PLAIN: [RegExp, string][] = [
-  [/^uncalibrated photo: results are a trend only/i, 'Phone photos: results are a trend, not a measurement'],
-  [/^no colour card: colours as captured by the camera/i, 'No colour card: colours are as the camera captured them, so results are a trend'],
+  [/^uncalibrated photo: results are a trend only/i, 'Phone photo, no colour reference: compared only with your phone baseline, whose normal range is usually wider than a RAW one'],
+  [/^no colour card: colours as captured by the camera/i, 'No colour card: colours are as the camera captured them, so readings carry wider uncertainty'],
   [/^close-up scale assumed, not measured/i, 'Size on this close-up is estimated, not measured: pore and texture numbers compare with your own close-ups taken the same way, not as exact sizes'],
   [/^pores need a closer photo/i, 'Pores need a closer photo: hold the phone about 10 cm (a hand’s width) from your face, or closer'],
   [/^pores and texture need a closer photo/i, 'Pores and texture need a closer photo: hold the phone about 10 cm (a hand’s width) from your face, or closer'],
@@ -80,11 +80,4 @@ export function leftOutPhotos(r: AnalysisResult | null | undefined): string | nu
   const word = (x: string) => (isCloseUp(r.site) && x === 'occlusion_suspected' ? 'too little skin in view' : LEFT_OUT[x])
   const why = [...new Set(failed.flatMap((f) => f.reasons.map(word).filter(Boolean)))]
   return `${nums.length === 1 ? 'Photo' : 'Photos'} ${list} ${nums.length === 1 ? 'was' : 'were'} left out${why.length ? ` (${why.join(', ')})` : ''}.`
-}
-
-/** "5 photos, 2 used" when the quality check left some out; else "5 photos". */
-export function photosUsed(s: { n_frames: number; result?: AnalysisResult | null }): string {
-  const used = s.result?.quality.passed ? s.result.frames_used : null
-  const n = s.n_frames === 1 ? '1 photo' : `${s.n_frames} photos`
-  return used !== null && used !== undefined && used < s.n_frames ? `${n}, ${used} used` : n
 }
