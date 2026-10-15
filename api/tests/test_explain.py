@@ -285,3 +285,49 @@ def test_comparisons_and_ranges_are_not_direction_claims():
         assert not [
             i for i in explain.problems(_exp(ok), data) if "sign" in i or "direction" in i
         ], ok
+
+
+def test_a_later_session_never_calls_an_uncompared_metric_a_first_reading():
+    from app import baselines
+    from app.store import MemoryStore
+
+    store = MemoryStore()
+    base = {
+        "session_id": "s_20261010_aaaaaaaa",
+        "site": "face_full",
+        "capture_mode": "uncalibrated",
+        "frames": 5,
+        "has_noise_band": True,
+        "metrics": {"redness": {"mean": 13.0, "mdc95": 1.0, "n_frames": 5}},
+    }
+    store.baseline_set("u", "face_full__uncalibrated", base)
+    result = {
+        "site": "face_full",
+        "capture_mode": "uncalibrated",
+        "frames_used": 4,
+        "quality": {"passed": True},
+        "metrics": [
+            {"id": "redness", "value": 13.5, "mdc95": 1.0, "verdict": "within_noise"},
+            {"id": "lines", "value": 2.1, "mdc95": 0.9, "verdict": "no_baseline"},
+        ],
+    }
+    assert baselines.adopt_new_metrics(store, "u", base, "s_20261015_bbbbbbbb", result) == ["lines"]
+    saved = store.baseline_get("u", "face_full__uncalibrated")
+    req = baselines.for_request(saved)
+    assert req["lines"]["session_id"] == "s_20261015_bbbbbbbb"  # its own session
+    assert req["redness"]["session_id"] == "s_20261010_aaaaaaaa"
+    assert baselines.adopt_new_metrics(store, "u", saved, "s_20261016_cccccccc", result) == []
+
+    lines = {
+        "id": "lines",
+        "label": "Lines",
+        "verdict": "no_baseline",
+        "delta": None,
+        "mdc95": 0.9,
+        "value": 2.1,
+        "unit": "index",
+        "confidence": "indicative",
+    }
+    assert "first reading" in explain.item(lines, first_reading=True)["summary"]
+    later = explain.item(lines, first_reading=False)["summary"]
+    assert "not in your baseline yet" in later and "first" not in later

@@ -61,7 +61,8 @@ def for_request(baseline: dict[str, Any] | None) -> dict[str, Any] | None:
             "mean": m["mean"],
             "mdc95": m.get("mdc95"),
             "n_frames": m.get("n_frames", 0),
-            "session_id": baseline["session_id"],
+            # a metric added to the baseline later (adopt_new_metrics) names its own session
+            "session_id": m.get("session_id") or baseline["session_id"],
         }
         for metric_id, m in baseline.get("metrics", {}).items()
     }
@@ -102,6 +103,34 @@ def set_baseline(store: Store, uid: str, session_id: str, session_doc: dict) -> 
         store.session_update(uid, old, {"is_baseline": False})
     store.session_update(uid, session_id, {"is_baseline": True})
     return doc
+
+
+def adopt_new_metrics(
+    store: Store, uid: str, baseline: dict[str, Any] | None, session_id: str, result: dict
+) -> list[str]:
+    """A measurement the engine started making after the baseline was taken (lines, Oct 15)
+    has nothing to be compared with, so it would read "no baseline" forever. The first later
+    session that passed quality and measured it gives it its baseline: the metric is added to
+    the baseline doc with its own session id, and the sessions after this one are compared.
+    Returns the metric ids added."""
+    if not baseline or baseline.get("session_id") == session_id or not qualifies(result):
+        return []
+    have = baseline.get("metrics") or {}
+    new = {
+        m["id"]: {
+            "mean": m["value"],
+            "mdc95": m.get("mdc95"),
+            "n_frames": result["frames_used"],
+            "session_id": session_id,
+        }
+        for m in result["metrics"]
+        if m["id"] not in have and m["value"] is not None and m["verdict"] != "low_quality"
+    }
+    if new:
+        # (an old doc read through get() gains its derived fields too, which is harmless)
+        doc = {**baseline, "metrics": {**have, **new}}
+        store.baseline_set(uid, key(result["site"], result["capture_mode"]), doc)
+    return sorted(new)
 
 
 # Face counts (engine, Oct 14): with 2+ usable photos only marks seen in at least two photos are

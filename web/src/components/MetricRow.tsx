@@ -2,7 +2,7 @@ import { ChevronDown, Info } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
 import type { Metric } from '../data/types'
-import { METRIC_META, UNIT_LABEL, decimalsFor, directionText, fmtSigned } from '../lib/metrics'
+import { METRIC_META, decimalsFor, directionText, fmtSigned, unitOf } from '../lib/metrics'
 import { DUR, EASE_OUT, SPRING_STAMP } from '../lib/motion'
 import { BandBar } from './BandBar'
 import { ConfidenceChip, VerdictChip } from './Chip'
@@ -27,7 +27,7 @@ type Props = {
 export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, selected, expanded, onSelect, onToggle, stamp = false, noBand = false, children }: Props) {
   const reduce = useReducedMotion()
   const meta = METRIC_META[m.id]
-  const unit = UNIT_LABEL[m.unit]
+  const unit = unitOf(m)
   const dec = decimalsFor(m)
   const dirText = m.verdict === 'real_change' ? directionText(m) : ''
   return (
