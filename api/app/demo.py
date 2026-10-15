@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from app import __version__, catalog, engine, sessions, storage, views
+from app import __version__, catalog, engine, gcp, sessions, storage, views
 from app.models import CONTENT_TYPES, CaptureMode, Site
 from app.settings import get_settings
 from app.store import Store
@@ -137,6 +137,71 @@ def judge_routine_entries() -> list[tuple[dict[str, Any], list[str]]]:
     return [(p, slots) for pid, slots in JUDGE_ROUTINE if (p := catalog.by_id(pid))]
 
 
+# Live checks (decision 8). ok: answered in time; degraded: answered slowly, or busy (rate
+# limited, overloaded), or only partly (BigQuery up, insights query failing); unreachable.
+LIVE_KEYS = ("engine", "bigquery", "gemini", "storage")
+SLOW_MS = {"gemini": 6000, "storage": 2500, "bigquery": 4000}
+PROBE_TIMEOUT_S = 8
+BUSY = ("429", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE")
+
+
+def probe_gemini() -> None:
+    """Model metadata from Vertex (free, no tokens). If this account may not read model
+    metadata, the smallest real generate call instead: either way, the advisor's own path."""
+    from google.genai import types
+
+    from app import gemini
+
+    model = get_settings().gemini_model
+    http = types.HttpOptions(timeout=PROBE_TIMEOUT_S * 1000)
+    try:
+        gemini.client().models.get(model=model, config=types.GetModelConfig(http_options=http))
+    except Exception as exc:
+        if not any(c in str(exc) for c in ("403", "PERMISSION_DENIED")):
+            raise
+        gemini.client().models.generate_content(
+            model=model,
+            contents="Reply with the word ok.",
+            config=types.GenerateContentConfig(
+                http_options=http,
+                max_output_tokens=64,
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
+            ),
+        )
+
+
+def probe_storage() -> None:
+    """List one object in the captures bucket (the api's own read permission)."""
+    s = get_settings()
+    blobs = gcp.storage_client().list_blobs(s.bucket, max_results=1, timeout=PROBE_TIMEOUT_S)
+    next(iter(blobs), None)
+
+
+def probe_bigquery() -> None:
+    """Table metadata for the cohort table the insights read (free: no query, no bytes)."""
+    from google.cloud import bigquery
+
+    s = get_settings()
+    client = bigquery.Client(project=s.project_id, location="us-central1")
+    client.get_table(f"{s.project_id}.{s.bq_dataset}.sessions_flat", timeout=PROBE_TIMEOUT_S)
+
+
+def live_check(name: str, probe) -> dict[str, Any]:
+    started = time.monotonic()
+    try:
+        probe()
+    except Exception as exc:
+        ms = round((time.monotonic() - started) * 1000)
+        log.warning("status: %s check failed: %s: %s", name, type(exc).__name__, str(exc)[:200])
+        if any(c in str(exc) for c in BUSY):
+            return {"status": "degraded", "latency_ms": ms, "reason": "busy"}
+        return {"status": "unreachable", "latency_ms": None}
+    ms = round((time.monotonic() - started) * 1000)
+    if ms > SLOW_MS.get(name, 5000):
+        return {"status": "degraded", "latency_ms": ms, "reason": "slow"}
+    return {"status": "ok", "latency_ms": ms}
+
+
 def status() -> dict[str, Any]:
     """What is running right now, checked live (cached a minute, a failed check 10 s)."""
 
@@ -172,32 +237,40 @@ def status() -> dict[str, Any]:
             }
 
         def bigquery_check() -> dict[str, Any]:
+            live = live_check("bigquery", probe_bigquery)
+            if live["status"] == "unreachable":
+                return {**live, "dataset": settings.bq_dataset}
             try:
                 from app import retailer
 
                 c = retailer.insights()["cohort"]
             except Exception as exc:
-                log.warning("status: bigquery check failed: %s", exc)
-                return {"status": "unavailable"}
+                # the warehouse answers, but the insights query does not
+                log.warning("status: bigquery insights failed: %s", exc)
+                return {**live, "status": "degraded", "dataset": settings.bq_dataset}
             return {
-                "status": "ok",
+                **live,
                 "dataset": settings.bq_dataset,
                 "people": c["synthetic"] + c["real"],
                 "synthetic": c["synthetic"],
             }
 
         # Side by side: a cold engine (about 10 s, and the check wakes it for the judge's first
-        # run) must not also wait for BigQuery.
-        with ThreadPoolExecutor(max_workers=2) as pool:
+        # run) must not also wait for BigQuery, Gemini or storage.
+        with ThreadPoolExecutor(max_workers=4) as pool:
             eng, bq = pool.submit(engine_check), pool.submit(bigquery_check)
+            gem = pool.submit(live_check, "gemini", probe_gemini)
+            sto = pool.submit(live_check, "storage", probe_storage)
             out["engine"], out["bigquery"] = eng.result(), bq.result()
+            out["gemini"].update(gem.result())
+            out["storage"].update(sto.result())
         out["checked_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         return out
 
     # all good: kept a minute; a failed check only STATUS_RETRY_S (a waking engine is up soon)
     hit = _cache.get("status")
     if hit:
-        good = hit[1]["engine"]["status"] == "ok" and hit[1]["bigquery"]["status"] == "ok"
+        good = all(hit[1][k].get("status") == "ok" for k in LIVE_KEYS)
         if time.time() - hit[0] < (60 if good else STATUS_RETRY_S):
             return hit[1]
     # One check at a time (it can wait 45 s on a cold engine): while one runs, others get the

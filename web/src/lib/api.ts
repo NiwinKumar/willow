@@ -149,15 +149,51 @@ export type LabelScan = {
 }
 export type LabelScanResponse = { scan: LabelScan; match: { product_id: string; brand: string; name: string; score: number } | null }
 
+/** One block of a structured advisor answer (api advisor_blocks.py). Text uses the tiny inline markup
+ * (**bold**, ==highlight==, [product:ID], [metric:ID]); a widget names data the app draws itself. */
+export type AnswerBlock =
+  | { type: 'answer' | 'note'; text: string }
+  | { type: 'bullets'; items: string[] }
+  | { type: 'widget'; widget: { kind: 'metric_trend' | 'session_summary' | 'routine' | 'product' | 'spot_diary' | 'product_test'; params: Record<string, string | undefined> } }
+  | { type: 'products'; product_ids: string[] }
+
 export type AdvisorReply = {
+  /** Plain text of the answer (older api builds send only this). */
   message: string
+  /** The structured answer, answer first; absent from older api builds. */
+  blocks?: AnswerBlock[]
   product_ids: string[]
   products: Product[]
   follow_up_suggestions: string[]
   retrieval: string[]
-  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number }
+  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number; photos_read?: number }
+  /** A photo of skin or a face was attached: never answered (chat photos are for products only). */
+  photos_refused?: boolean
   remaining_today: number
 }
+
+/** One paid action's count today (GET /v1/me/usage); caps reset at UTC midnight (`resets_at`). */
+export type UsageCount = { used: number; cap: number; remaining: number; resets_at: string }
+export type Usage = { advisor: UsageCount; routine_check: UsageCount; label_scan: UsageCount; retailer_ask?: UsageCount }
+
+/** A product or label photo sent with an advisor question (JPEG after downscaling). */
+export type ChatImage = { mime_type: 'image/jpeg' | 'image/png' | 'image/webp'; data_base64: string }
+
+/** A stored advisor turn (GET /v1/advisor/history), oldest first. Photos are never stored, only their count. */
+export type AdvisorHistoryMessage =
+  | { id: string; role: 'user'; text: string; created_at: string; photos: number }
+  | { id: string; role: 'willow'; text: string; created_at: string; reply: Omit<AdvisorReply, 'remaining_today'> }
+
+/** The latest measured session's pre-written explanation, sent with a 502 advisor_unavailable. */
+export type StandardExplanation = { session_id: string; site: Site; capture_mode: CaptureMode | null; created_at: string; explanation: Explanation }
+
+/** Progress events of POST /v1/advisor/chat/stream, in the order the api works. */
+export type AdvisorStage =
+  | { event: 'reading_context' }
+  | { event: 'asking_gemini'; step: 'tools'; photos: number }
+  | { event: 'asking_gemini'; step: 'tool'; tool: 'search_catalog' | 'compare_products' | 'check_routine' | string }
+  | { event: 'asking_gemini'; step: 'reply'; retrieval: string[] }
+  | { event: 'checking_numbers' }
 
 type RetailerCell = { value: number | null; n: number; suppressed: boolean }
 type TierStat = { options: number; rate: number | null }
@@ -194,10 +230,13 @@ export type ProfilePatch = Partial<Omit<Profile, 'updated_at'>>
 export class ApiError extends Error {
   status: number
   code: string | null
-  constructor(status: number, message: string, code: string | null = null) {
+  /** The api's whole `detail` object, for errors that carry more than code and message. */
+  detail: Record<string, unknown> | null
+  constructor(status: number, message: string, code: string | null = null, detail: Record<string, unknown> | null = null) {
     super(message)
     this.status = status
     this.code = code
+    this.detail = detail
   }
 }
 
@@ -215,16 +254,18 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
     const text = await res.text()
     let code: string | null = null
     let message = text
+    let full: Record<string, unknown> | null = null
     try {
       const detail = (JSON.parse(text) as { detail?: { code?: string; message?: string } }).detail
       if (detail && typeof detail === 'object') {
         code = detail.code ?? null
         message = detail.message ?? text
+        full = detail as Record<string, unknown>
       }
     } catch {
       /* not JSON */
     }
-    throw new ApiError(res.status, message, code)
+    throw new ApiError(res.status, message, code, full)
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
@@ -244,14 +285,16 @@ export type RetailerAnswer = {
 export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number }
 
 /** waking: the engine sleeps when idle; it was still starting when checked (about 35 s). */
-type ServiceState = { status: 'ok' | 'waking' | 'unreachable' | 'unavailable'; error?: string }
+type ServiceState = { status: 'ok' | 'waking' | 'unreachable' | 'unavailable' | 'degraded'; error?: string }
+/** A live check (cached 60 s by the api): degraded = answered slowly, busy, or only partly. Optional: older api builds sent configuration only. */
+export type LiveCheck = { status?: 'ok' | 'degraded' | 'unreachable'; latency_ms?: number | null; reason?: 'slow' | 'busy' }
 export type DemoStatus = {
   api: ServiceState & { version: string; runtime: string }
   engine: ServiceState & { version?: string; mode: string; latency_ms?: number }
-  gemini: { model: string; endpoint: string }
-  bigquery: ServiceState & { dataset?: string; people?: number; synthetic?: number }
+  gemini: LiveCheck & { model: string; endpoint: string }
+  bigquery: ServiceState & { dataset?: string; people?: number; synthetic?: number; latency_ms?: number | null; reason?: 'slow' | 'busy' }
   catalog: { products: number }
-  storage: { bucket: string }
+  storage: LiveCheck & { bucket: string }
   checked_at: string
 }
 
@@ -333,8 +376,8 @@ export const api = {
   startSample: (token: string, sampleId: string) =>
     request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }),
   judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }),
-  advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[]) =>
-    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json({ messages }) }),
+  advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) =>
+    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json(images.length ? { messages, images } : { messages }) }),
   /** Product tests (forearm): the running one first. */
   productTests: (token: string) => request<{ tests: ProductTest[] }>(token, '/v1/product-tests'),
   startProductTest: (token: string, body: { entry_id?: string; product_id?: string; name?: string; length_days?: number; started_at?: string }) =>
@@ -353,6 +396,79 @@ export const api = {
   pushSubscribe: (token: string, subscription: PushSubscriptionJSON) => request<{ id: string; enabled: boolean }>(token, '/v1/me/push', { method: 'POST', ...json(subscription) }),
   pushUnsubscribe: (token: string, endpoint: string) => request<void>(token, '/v1/me/push', { method: 'DELETE', ...json({ endpoint }) }),
   pushTest: (token: string) => request<{ sent: number; removed: number; failed: number }>(token, '/v1/me/push/test', { method: 'POST' }),
+  /** Today's counts for the paid actions (read without counting). */
+  usage: (token: string) => request<Usage>(token, '/v1/me/usage'),
+  advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
+  clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
+  advisorChatStream,
+}
+
+/** The stream could not be used at all (old api, a proxy, no readable body): nothing was sent or counted. */
+export class StreamUnavailable extends Error {}
+
+/**
+ * POST /v1/advisor/chat/stream: progress events as the api really works, then the checked reply (never partial
+ * text). Errors before any work (422, 429) are plain HTTP errors (ApiError); a failure during the turn arrives as
+ * an `error` event and is thrown as ApiError with its detail. StreamUnavailable means "use the plain endpoint".
+ */
+async function advisorChatStream(token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[], onStage: (s: AdvisorStage) => void, signal?: AbortSignal): Promise<AdvisorReply> {
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}/v1/advisor/chat/stream`, {
+      method: 'POST',
+      signal,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) },
+      body: JSON.stringify(images.length ? { messages, images } : { messages }),
+    })
+  } catch (e) {
+    if (signal?.aborted) throw e
+    // Never reached the api (offline, CORS on an old build): nothing counted, the plain endpoint may still work.
+    throw new StreamUnavailable(String(e))
+  }
+  if (res.status === 404 || res.status === 405) throw new StreamUnavailable(`stream route ${res.status}`)
+  if (!res.ok) {
+    const text = await res.text()
+    let detail: Record<string, unknown> | null = null
+    try {
+      const d = (JSON.parse(text) as { detail?: unknown }).detail
+      if (d && typeof d === 'object') detail = d as Record<string, unknown>
+    } catch {
+      /* not JSON */
+    }
+    throw new ApiError(res.status, typeof detail?.message === 'string' ? detail.message : text, typeof detail?.code === 'string' ? detail.code : null, detail)
+  }
+  if (!res.body || !(res.headers.get('content-type') ?? '').includes('text/event-stream')) throw new StreamUnavailable('no event stream')
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += value
+    let cut: number
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, cut)
+      buffer = buffer.slice(cut + 2)
+      let event = 'message'
+      let data = ''
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event: ')) event = line.slice(7)
+        else if (line.startsWith('data: ')) data += line.slice(6)
+      }
+      if (!data) continue // a keep-alive comment
+      const payload = JSON.parse(data) as Record<string, unknown>
+      if (event === 'done') {
+        void reader.cancel()
+        return payload.reply as AdvisorReply
+      }
+      if (event === 'error') {
+        void reader.cancel()
+        throw new ApiError(Number(payload.status) || 500, String(payload.message ?? 'The advisor is unavailable right now.'), typeof payload.code === 'string' ? payload.code : null, payload)
+      }
+      onStage({ event, ...payload } as AdvisorStage)
+    }
+  }
+  // The connection closed mid-answer: the question reached the api, so it may have counted.
+  throw new Error('The connection closed before the answer arrived.')
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */

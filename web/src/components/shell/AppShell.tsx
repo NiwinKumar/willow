@@ -46,6 +46,8 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(prefs.sidebarCollapsed)
   const [checkIn, setCheckIn] = useState<{ open: boolean; preset?: { site?: Site; mode?: CaptureMode } }>({ open: false })
   const [advisor, setAdvisor] = useState<{ open: boolean; ever: boolean; seed: AdvisorSeed | null }>({ open: false, ever: false, seed: null })
+  // The advisor as a full-screen chat (Expand, or ?advisor=full); the same chat, Esc or Collapse returns to the panel.
+  const [advisorFull, setAdvisorFull] = useState(false)
   const current = destinationOf(location.pathname)
   // The check-in schedule: the Check in button says when one is due today or late (null otherwise).
   const due = useCheckinDue()?.short ?? null
@@ -59,7 +61,10 @@ export function AppShell() {
   const openAdvisor = useCallback((text?: string, context?: string) => {
     setAdvisor((a) => ({ open: true, ever: true, seed: text ? { id: (a.seed?.id ?? 0) + 1, text, context } : a.seed }))
   }, [])
-  const closeAdvisor = useCallback(() => setAdvisor((a) => ({ ...a, open: false })), [])
+  const closeAdvisor = useCallback(() => {
+    setAdvisor((a) => ({ ...a, open: false }))
+    setAdvisorFull(false)
+  }, [])
   const startCheckIn = useCallback(
     (site: Site, mode: CaptureMode, opts?: { sample?: string }) => {
       setCheckIn({ open: false })
@@ -77,6 +82,7 @@ export function AppShell() {
     if (params.get('advisor') === null) return
     const q = params.get('ask') ?? undefined
     openAdvisor(q)
+    if (params.get('advisor') === 'full') setAdvisorFull(true)
     setParams(
       (p) => {
         const n = new URLSearchParams(p)
@@ -97,11 +103,14 @@ export function AppShell() {
         e.preventDefault()
         setCheckIn({ open: true })
       }
-      if (e.key === 'Escape' && advisor.open && !document.querySelector('dialog[open]')) closeAdvisor()
+      if (e.key === 'Escape' && advisor.open && !document.querySelector('dialog[open]')) {
+        if (advisorFull) setAdvisorFull(false)
+        else closeAdvisor()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [advisor.open, checkIn.open, closeAdvisor, data.mode])
+  }, [advisor.open, advisorFull, checkIn.open, closeAdvisor, data.mode])
 
   const api = useMemo<ShellApi>(
     () => ({
@@ -124,7 +133,7 @@ export function AppShell() {
 
   const panelOpen = advisor.open && wide && roomy
   // On phones the advisor covers the whole screen: the app behind it takes no focus or clicks.
-  const covered = advisor.open && phone
+  const covered = advisor.open && (phone || advisorFull)
   // The design pads the page around the sidebar (12px gutter + sidebar + 24px) and, when the advisor panel
   // fits beside the content (≥1280px), around the panel too.
   const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
@@ -157,7 +166,7 @@ export function AppShell() {
         </div>
         {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())} advisorOpen={advisor.open} />}
         </div>
-        <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} />
+        <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />
         {checkIn.open ? (
           <Suspense fallback={null}>
             <CheckInPicker open onClose={() => setCheckIn({ open: false })} preset={checkIn.preset} onStart={startCheckIn} />
@@ -173,7 +182,7 @@ export function AppShell() {
  * first open, then kept. It slides fully out when closed and stays visible until the slide has finished.
  * Focus moves into it on open and back to where it was on close.
  */
-function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; mounted: boolean; phone: boolean; onClose: () => void; seed: AdvisorSeed | null }) {
+function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }: { open: boolean; mounted: boolean; phone: boolean; onClose: () => void; seed: AdvisorSeed | null; full: boolean; onToggleFull: () => void }) {
   const panel = useRef<HTMLDivElement>(null)
   const back = useRef<HTMLElement | null>(null)
   useEffect(() => {
@@ -185,7 +194,7 @@ function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; m
       el.focus({ preventScroll: true })
       let tries = 0
       const t = window.setInterval(() => {
-        const input = el.querySelector<HTMLElement>('textarea, input')
+        const input = el.querySelector<HTMLElement>('#ask-input') ?? el.querySelector<HTMLElement>('textarea, input')
         if (input && el.contains(document.activeElement)) input.focus({ preventScroll: true })
         if (input || ++tries > 20) window.clearInterval(t)
       }, 80)
@@ -199,13 +208,13 @@ function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; m
       ;(back.current?.isConnected ? back.current : trigger)?.focus({ preventScroll: true })
     }
   }, [open])
-  const inset = phone ? 0 : 12
+  const inset = phone || full ? 0 : 12
   return (
     <div
       ref={panel}
       role="dialog"
       aria-label="Advisor"
-      aria-modal={phone || undefined}
+      aria-modal={phone || full || undefined}
       aria-hidden={!open}
       inert={!open}
       tabIndex={-1}
@@ -214,8 +223,8 @@ function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; m
         top: inset,
         right: inset,
         bottom: inset,
-        width: phone ? '100vw' : 'min(440px, calc(100vw - 24px))',
-        borderRadius: phone ? 0 : 32,
+        width: phone || full ? '100vw' : 'min(440px, calc(100vw - 24px))',
+        borderRadius: phone || full ? 0 : 32,
         background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.92)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.75), 0 40px 80px -30px rgba(0,0,0,.4)',
         translate: open ? '0 0' : phone ? '0 40px' : 'calc(100% + 24px) 0',
@@ -223,12 +232,12 @@ function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; m
         visibility: open ? 'visible' : 'hidden',
         pointerEvents: open ? 'auto' : 'none',
         // Hidden only after the slide out, so closing animates too.
-        transition: open ? 'translate .5s var(--ease-spring), opacity .3s ease, visibility 0s' : 'translate .45s var(--ease-spring), opacity .3s ease, visibility 0s linear .45s',
+        transition: open ? 'translate .5s var(--ease-spring), opacity .3s ease, visibility 0s, width .45s var(--ease-spring), top .45s var(--ease-spring), right .45s var(--ease-spring), bottom .45s var(--ease-spring), border-radius .45s ease' : 'translate .45s var(--ease-spring), opacity .3s ease, visibility 0s linear .45s',
       }}
     >
       {mounted ? (
         <Suspense fallback={<WillowLoader inline label="Opening the advisor" />}>
-          <AdvisorPanel seed={seed} onClose={onClose} />
+          <AdvisorPanel seed={seed} onClose={onClose} full={full} onToggleFull={onToggleFull} />
         </Suspense>
       ) : null}
     </div>

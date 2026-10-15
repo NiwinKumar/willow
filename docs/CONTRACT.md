@@ -191,7 +191,11 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | POST | `/v1/label-scan` | image -> `{brand, product_name, inci[], key_actives[{name, pct?}], confidence}` (Gemini vision) |
 | GET/POST/DELETE | `/v1/routine` | routine entries |
 | POST | `/v1/routine/check` | Gemini compatibility check -> `{conflicts[], duplicates[], gaps[], notes[]}` |
-| POST | `/v1/advisor/chat` | Gemini with function calling over catalog + user's metrics -> `{message, products[]}` |
+| POST | `/v1/advisor/chat` | Gemini with function calling over catalog + user's metrics -> `{message, blocks[], products[], product_ids[], follow_up_suggestions[], retrieval[], checks?, remaining_today}`. Body `{messages[≤20], images?: [{mime_type: image/jpeg|png|webp, data_base64 ≤8 MB}] ≤3}` (product/label photos, never stored). 502 `advisor_unavailable` detail carries `standard: {session_id, site, capture_mode, created_at, explanation} \| null` (latest measured session's template explanation). See GEMINI_SPEC.md section 5 for `blocks` |
+| POST | `/v1/advisor/chat/stream` | same turn as Server-Sent Events: `reading_context`, `asking_gemini {step: tools\|tool\|reply, photos?, tool?, retrieval?}`, `checking_numbers`, then `done {reply}` or `error {status, code, message, standard?}`; 422/429 are plain HTTP errors |
+| GET/DELETE | `/v1/advisor/history` | stored chat, oldest first: `{messages: [{id, role: user\|willow, text, created_at, photos? \| reply?}], keep: 200}`; DELETE (New chat) -> 204 |
+| GET | `/v1/me/usage` | `{advisor, routine_check, label_scan, retailer_ask}` each `{used, cap, remaining, resets_at}` (UTC midnight); reading counts nothing |
+| GET | `/v1/demo/status` | public: `api`, `engine`, `gemini`, `storage`, `bigquery` (each live: `status: ok\|degraded\|unreachable` (+`waking` for the engine), `latency_ms`, `reason?: slow\|busy`), `catalog`, `checked_at`; cached 60 s (10 s after a failed check) |
 | GET | `/v1/catalog/search?q=&concern=&max_price=` | catalog search |
 | GET | `/v1/retailer/insights` | aggregate JSON for the in-app retailer view (BigQuery) |
 | GET | `/v1/me` | `{uid, consent, profile}`; `consent` and `profile` are null until saved |
@@ -238,6 +242,11 @@ users/{uid}/sessions/{session_id}
   stage: received|engine|explaining|null (written by the analysis while processing)
 users/{uid}/baselines/{site}
   session_id, created_at, metrics: {metric_id: {mean, mdc95, n_frames}}
+users/{uid}/advisor_messages/{id}          (newest 200 kept; removed by DELETE /v1/me and "New chat")
+  role: user|willow, text, created_at, photos (user: count only, photos never stored),
+  reply (willow: {message, blocks[], product_ids[], follow_up_suggestions[], retrieval[], checks})
+users/{uid}/usage/{yyyy-mm-dd}
+  advisor, routine_check, label_scan, retailer_ask, analyze, sample_runs (daily counters)
 users/{uid}/routine/{entry_id}
   product_id | null, custom_name, brand, inci[], key_actives[], started_at, ended_at,
   applied_sites[], source: catalog|label_scan|manual
