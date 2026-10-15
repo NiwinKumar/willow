@@ -27,14 +27,16 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | GET | `/v1/me` | The person's stored consent |
 | PUT | `/v1/me/consent` | `{version, aggregate_insights_opt_in}` -> `users/{uid}.consent` (the web syncs it once signed in) |
 | GET | `/v1/retailer/insights` | Public aggregates from BigQuery (synthetic cohort + opted-in people), groups under 10 suppressed |
-| DELETE | `/v1/me` | Delete the person's photos, results, sessions, baselines and routine |
+| DELETE | `/v1/me` | Delete the person's photos, results, sessions, baselines, routine and routine use log |
 | GET | `/v1/catalog/search?q=&concern=&category=&max_price=&currency=` | Catalog search (facts only) |
 | GET | `/v1/catalog/{product_id}` | One product |
 | POST | `/v1/label-scan` | `{images:[{mime_type, data_base64}]}` -> `{scan, match}` via Gemini; saves nothing |
-| GET/POST | `/v1/routine` | List / add entries (catalog facts win for a `product_id`) |
+| GET/POST | `/v1/routine?today=` | List / add entries (catalog facts win for a `product_id`); listed entries carry `recent_use` `{days_used, of_days}` over the last 2 weeks from the first tick (null if nothing ticked), counted to the person's own `today` |
+| GET | `/v1/routine/log?from=&to=` | Days with "used" ticks (default last 14 days, max 92) |
+| PUT/DELETE | `/v1/routine/log/{day}/{entry_id}/{am\|pm}` | Tick / untick a product as used on the person's own day (idempotent; ticks up to 30 days back, only for its slots and dates; unticking always allowed) |
 | POST | `/v1/routine/check` | Compatibility: rule table (`source: rule`) plus validated Gemini additions (`source: model`) |
 | POST | `/v1/advisor/chat` | `{messages:[{role, text}]}` -> `{message, products, follow_up_suggestions, retrieval, remaining_today}`; 20 a day |
-| PATCH/DELETE | `/v1/routine/{id}` | Stop (`ended_at`) or move AM/PM / remove a mistaken entry |
+| PATCH/DELETE | `/v1/routine/{id}` | Stop (`ended_at`) or move AM/PM / remove a mistaken entry (its ticks go too) |
 
 `SessionView.session` also carries `measured` (false when the engine returned a placeholder; `result` is then null), `baseline` (`{session_id, frames, has_noise_band}` of the baseline this session is compared with, same site and capture mode), `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
 

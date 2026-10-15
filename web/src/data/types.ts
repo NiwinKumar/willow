@@ -140,7 +140,13 @@ export type RoutineEntry = {
   slots: ('am' | 'pm')[]
   concerns: string[]
   source: 'catalog' | 'label_scan' | 'manual'
+  /** Days ticked as used, of the days it was in the routine in the last 2 weeks since the person started
+   * ticking (GET /v1/routine only); null when they never ticked or it had no days in that window. */
+  recent_use?: { days_used: number; of_days: number } | null
 }
+
+/** One day's routine use ticks (GET/PUT/DELETE /v1/routine/log): entry id -> slots ticked. */
+export type RoutineLogDay = { date: string; used: Record<string, ('am' | 'pm')[]> }
 
 export type RoutineCheck = {
   conflicts: { products: string[]; issue: string; severity: 'info' | 'caution' | 'avoid_same_routine'; suggestion: string; source: 'rule' | 'model' }[]

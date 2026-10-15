@@ -30,6 +30,9 @@ class Store(Protocol):
     def routine_get(self, uid: str, entry_id: str) -> Doc | None: ...
     def routine_set(self, uid: str, entry_id: str, doc: Doc) -> None: ...
     def routine_delete(self, uid: str, entry_id: str) -> None: ...
+    def routine_log_mark(self, uid: str, day: str, entry_id: str, slot: str, used: bool) -> Doc: ...
+    def routine_logs(self, uid: str, first: str, last: str) -> list[Doc]: ...
+    def routine_log_forget(self, uid: str, entry_id: str, days: list[str]) -> None: ...
     def usage_incr(self, uid: str, day: str, key: str, delta: int = 1) -> int: ...
     def user_get(self, uid: str) -> Doc | None: ...
     def user_merge(self, uid: str, fields: Doc) -> None: ...
@@ -107,6 +110,42 @@ class FirestoreStore:
     def routine_delete(self, uid: str, entry_id: str) -> None:
         self._db().document(f"users/{uid}/routine/{entry_id}").delete()
 
+    def routine_log_mark(self, uid: str, day: str, entry_id: str, slot: str, used: bool) -> Doc:
+        """users/{uid}/routine_log/{day}: {date, used: {entry_id: [slots]}}; atomic per tick."""
+        from google.cloud import firestore
+
+        ref = self._db().document(f"users/{uid}/routine_log/{day}")
+        change = firestore.ArrayUnion([slot]) if used else firestore.ArrayRemove([slot])
+        ref.set(
+            {"date": day, "used": {entry_id: change}, "updated_at": datetime.now(UTC)},
+            merge=True,
+        )
+        return ref.get().to_dict() or {"date": day, "used": {}}
+
+    def routine_logs(self, uid: str, first: str, last: str) -> list[Doc]:
+        q = (
+            self._db()
+            .collection(f"users/{uid}/routine_log")
+            .where("date", ">=", first)
+            .where("date", "<=", last)
+        )
+        return sorted((s.to_dict() for s in q.stream()), key=lambda d: d["date"])
+
+    def routine_log_forget(self, uid: str, entry_id: str, days: list[str]) -> None:
+        """Drop one product's ticks from these days (the product was removed)."""
+        from google.cloud import firestore
+        from google.cloud.firestore_v1.field_path import FieldPath
+
+        db = self._db()
+        path = FieldPath("used", entry_id).to_api_repr()  # quoted: ids may hold "-"
+        for start in range(0, len(days), 450):  # a batch holds at most 500 writes
+            batch = db.batch()
+            for day in days[start : start + 450]:
+                batch.update(
+                    db.document(f"users/{uid}/routine_log/{day}"), {path: firestore.DELETE_FIELD}
+                )
+            batch.commit()
+
     def user_get(self, uid: str) -> Doc | None:
         snap = self._db().document(f"users/{uid}").get()
         return snap.to_dict() if snap.exists else None
@@ -134,6 +173,7 @@ class MemoryStore:
         self.sessions: dict[tuple[str, str], Doc] = {}
         self.baselines: dict[tuple[str, str], Doc] = {}
         self.routine: dict[tuple[str, str], Doc] = {}
+        self.routine_log: dict[tuple[str, str], Doc] = {}
         self.usage: dict[tuple[str, str, str], int] = {}
         self.users: dict[str, Doc] = {}
 
@@ -180,6 +220,23 @@ class MemoryStore:
     def routine_delete(self, uid: str, entry_id: str) -> None:
         self.routine.pop((uid, entry_id), None)
 
+    def routine_log_mark(self, uid: str, day: str, entry_id: str, slot: str, used: bool) -> Doc:
+        doc = self.routine_log.setdefault((uid, day), {"date": day, "used": {}})
+        slots = doc["used"].setdefault(entry_id, [])
+        if used and slot not in slots:
+            slots.append(slot)
+        elif not used and slot in slots:
+            slots.remove(slot)
+        return copy.deepcopy(doc)
+
+    def routine_logs(self, uid: str, first: str, last: str) -> list[Doc]:
+        days = [d for (u, day), d in self.routine_log.items() if u == uid and first <= day <= last]
+        return copy.deepcopy(sorted(days, key=lambda d: d["date"]))
+
+    def routine_log_forget(self, uid: str, entry_id: str, days: list[str]) -> None:
+        for day in days:
+            (self.routine_log.get((uid, day)) or {}).get("used", {}).pop(entry_id, None)
+
     def user_get(self, uid: str) -> Doc | None:
         return copy.deepcopy(self.users.get(uid))
 
@@ -195,7 +252,7 @@ class MemoryStore:
         return self.usage[k]
 
     def delete_user(self, uid: str) -> None:
-        for table in (self.sessions, self.baselines, self.routine, self.usage):
+        for table in (self.sessions, self.baselines, self.routine, self.routine_log, self.usage):
             for key in [k for k in table if k[0] == uid]:
                 del table[key]
         self.users.pop(uid, None)

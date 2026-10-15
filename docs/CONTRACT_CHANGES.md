@@ -64,3 +64,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Impact: engine adds `app/facemap.py` and three lines in `_candidates`; the api reads the keys when present and re-runs old sessions with `scripts/remeasure.py --all --apply` to fill them.
 - Approved by: [ ] Harshini [x] Niwin
 - api/web (Niwin, no engine impact): `GET /v1/spots` returns the spot diary (`SpotDiary` in `web/src/lib/api.ts`).
+
+## 2026-10-15: Routine use log (api/web only, no engine impact)
+- What: the person can tick a routine product as used on a day (AM or PM), for Home's "routine today". `PUT` / `DELETE /v1/routine/log/{YYYY-MM-DD}/{entry_id}/{am|pm}` (idempotent, answers that day's ticks), `GET /v1/routine/log?from=&to=` (default last 14 days, at most 92). The day is the person's own calendar day (one day either side of UTC); ticks can be added up to 30 days back, only for a slot the product is in and only between its start and stop dates; unticking is always allowed (a mistaken tick stays removable after the product changes). Removing a product removes its ticks. `GET /v1/routine?today=YYYY-MM-DD` entries gain `recent_use: {days_used, of_days}` over the last 2 weeks, counted from the person's first tick (never "0 of 21 days" for days before ticking existed), null when nothing was ticked. The advisor gets `recent_use` per product and is told a barely used product has not had a fair test.
+- Firestore: `users/{uid}/routine_log/{YYYY-MM-DD}` = `{date, used: {entry_id: [slots]}, updated_at}`; deleted with the person (delete my data).
+- Web: `RoutineLogDay`, `api.routineLog()`, `api.setRoutineUse()`, `localDay()`; `api.routine()` sends the person's own day. No UI yet (the Home redesign uses it; demo mode will need a mock log).
+- Approved by: n/a (api and web are both Niwin's)
