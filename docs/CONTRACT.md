@@ -87,11 +87,13 @@ Timeouts: the api waits up to 120 s. Target per request: < 20 s for 5 frames.
 | `quality` | object | see 2.3 |
 | `metrics` | array of Metric | see 2.4; only metrics valid for the site |
 | `candidates` | array of Candidate | regions for Gemini to label (blemishes, spots) |
-| `overlays` | array `{metric_id, uri}` | PNG heatmaps/outlines in GCS |
+| `overlays` | array `{metric_id, uri}` | PNG heatmaps/outlines in GCS (see below) |
 | `rois` | array `{name, polygon:[[x,y],...]}` | in pixel coords of the aligned reference frame |
 | `image_size` | `{width, height}` | of the aligned reference frame |
 | `timings_ms` | object | per stage |
 | `warnings` | array of string | human-readable, non-fatal |
+
+Overlays (engine 0.3.4+, proposal in `docs/CONTRACT_CHANGES.md` 2026-10-15): with `options.compute_overlays` (default true) and an `output_prefix`, `face_full` and `cheek_macro` results list `{"metric_id": "redness", "uri": "{output_prefix}overlays/redness.png"}`. The PNG is RGBA at exactly the pixel size and orientation of `{output_prefix}preview.jpg` (the same reference photo, shrunk by the same whole factor), so the web lays it over the preview with no scaling maths. It shows where on the skin the redness metric measures (face: cheeks and nose; cheek close-up: its skin) the camera sees more red than this person's own skin median in that photo: transparent outside that skin and at or below the median, then a rose-to-deep-red ramp with rising opacity up to the skin's 98th percentile (at least 4 a* units above the median). Descriptive and cosmetic: no shared scale between people, no number, no diagnosis; it moves no metric. Absent when no photo passed, or with no `output_prefix`. `nose_macro` and forearm sites have none.
 
 ### 2.3 Quality
 ```json
@@ -102,10 +104,14 @@ Timeouts: the api waits up to 120 s. Target per request: < 20 s for 5 frames.
   "sharpness": 412.5,
   "clipped_pct": 0.3,
   "pose": {"yaw": 1.2, "pitch": -2.0, "roll": 0.4},
-  "per_frame": [{"index": 0, "passed": true, "reasons": []}],
+  "per_frame": [
+    {"index": 0, "passed": true, "reasons": [], "regions": []},
+    {"index": 1, "passed": false, "reasons": ["overexposed"], "regions": [{"reason": "overexposed", "region": "forehead"}]}
+  ],
   "reasons": []
 }
 ```
+`per_frame[].regions` (optional, engine 0.3.4+, `face_full` only): where on the face each of that photo's failed checks is, so the retake hint can say "light is too bright on your forehead". Each entry explains one of the photo's `reasons`: `overexposed` / `underexposed` (the region's own clipped / crushed pixels over the 2% gate), `blurry` (the region's sharpness under the face threshold and under 0.4x the median region's), `occlusion_suspected` (a hand over at least 25% of the region). `region` ∈ `forehead`, `left_cheek`, `right_cheek`, `nose`, `chin`, `under_eyes`, `whole` (`whole`: every region fails it, or none stands out). Other reasons (pose, face not found) are not attributed. It never changes whether a photo passed. Present (possibly empty) on every face photo the engine measured; absent for photos where no face was found, for close-ups and forearm sites, and from engines before 0.3.4.
 Gate defaults (tunable in `engine/app/config.py`): card ΔE mean <= 6 for calibrated mode; sharpness (variance of Laplacian on skin ROI) >= 100; clipped pixels in skin ROI <= 2%; |yaw|, |pitch| <= 8 deg, |roll| <= 6 deg for face sites. `reasons` uses codes: `card_not_found`, `card_delta_e_high`, `blurry`, `overexposed`, `underexposed`, `pose_out_of_range`, `face_not_found`, `occlusion_suspected`, `too_few_frames`.
 
 ### 2.4 Metric
