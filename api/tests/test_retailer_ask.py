@@ -95,7 +95,7 @@ def test_ask_route_retries_once_then_answers(client, fake, monkeypatch):
         ]
     )
     monkeypatch.setattr(gemini, "generate_json", lambda *a, **k: next(replies))
-    monkeypatch.setattr(retailer, "insights", lambda: INSIGHTS)
+    monkeypatch.setattr(retailer, "insights", lambda *a: INSIGHTS)
     res = client.post("/v1/retailer/ask", json={"question": "What works for dark spots?"})
     assert res.status_code == 200, res.text
     body = res.json()
@@ -106,7 +106,7 @@ def test_ask_route_retries_once_then_answers(client, fake, monkeypatch):
 def test_gemini_down_is_a_clear_error_and_the_question_is_refunded(client, fake, monkeypatch):
     from datetime import UTC, datetime
 
-    monkeypatch.setattr(retailer, "insights", lambda: INSIGHTS)
+    monkeypatch.setattr(retailer, "insights", lambda *a: INSIGHTS)
     res = client.post("/v1/retailer/ask", json={"question": "anything?"})
     assert res.status_code == 503
     assert res.json()["detail"]["code"] == "assistant_unavailable"
@@ -132,3 +132,63 @@ def test_chart_labels_may_name_any_product_with_evidence():
         },
     }
     assert "alpha arbutin 2% + ha" in _names(data)
+
+
+def test_answers_carry_refused_per_bar_n_and_source(client, fake, monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        gemini,
+        "generate_json",
+        lambda *a, **k: Answer(
+            answer="For fewer dark spots, Azelaic Gel reached 61% (synthetic cohort).",
+            chart=Chart(
+                title="Still improved at week 8",
+                unit="percent",
+                bars=[Bar(label="Azelaic Gel", value=61), Bar(label="Beta Plain Cream", value=20)],
+            ),
+        ),
+    )
+    monkeypatch.setattr(retailer, "insights", lambda c, r: seen.append((c, r)) or INSIGHTS)
+    res = client.post(
+        "/v1/retailer/ask",
+        json={"question": "What works for dark spots?", "cohort": "simulated", "range": "90d"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert seen == [("simulated", "90d")]
+    assert body["refused"] is False
+    assert [b["n"] for b in body["chart"]["bars"]] == [40, 30]
+    assert body["source"] == ["product_outcomes", "needs"]
+    bad = client.post("/v1/retailer/ask", json={"question": "anything?", "cohort": "all"})
+    assert bad.status_code == 422
+
+
+def test_a_refusal_has_no_chart_and_the_fallback_is_a_refusal(client, fake, monkeypatch):
+    chart = Chart(
+        title="t",
+        unit="percent",
+        bars=[Bar(label="Azelaic Gel", value=61), Bar(label="Plain Cream", value=20)],
+    )
+    refusal = Answer(answer="No.", refused=True, chart=chart)
+    assert retailer_ask.problems(refusal, INSIGHTS, "q") == ["a refusal has no chart"]
+    plain = Answer(answer="I can't name people; ask about a goal instead.", refused=True)
+    assert retailer_ask.problems(plain, INSIGHTS, "q") == []
+    monkeypatch.setattr(
+        gemini, "generate_json", lambda *a, **k: Answer(answer="It beats it by 41 points.")
+    )
+    monkeypatch.setattr(retailer, "insights", lambda *a: INSIGHTS)
+    body = client.post("/v1/retailer/ask", json={"question": "Which users changed most?"}).json()
+    assert body["refused"] is True and body["chart"] is None and body["checks"] is None
+    assert body["source"] == []
+
+
+def test_gemini_sees_months_in_words_and_no_page_plumbing():
+    data = {
+        **INSIGHTS,
+        "filters": {"cohort": "mixed", "range": "all", "since": None, "today": "2026-10-15"},
+        "empty": False,
+        "needs_by_month": {"months": ["2026-08", "2026-10"], "people": [20, 30], "goals": []},
+    }
+    v = retailer_ask.view(data)
+    assert "filters" not in v and "empty" not in v
+    assert v["needs_by_month"]["months"] == ["August 2026", "October 2026"]

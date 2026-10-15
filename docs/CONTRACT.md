@@ -87,11 +87,13 @@ Timeouts: the api waits up to 120 s. Target per request: < 20 s for 5 frames.
 | `quality` | object | see 2.3 |
 | `metrics` | array of Metric | see 2.4; only metrics valid for the site |
 | `candidates` | array of Candidate | regions for Gemini to label (blemishes, spots) |
-| `overlays` | array `{metric_id, uri}` | PNG heatmaps/outlines in GCS |
+| `overlays` | array `{metric_id, uri}` | PNG heatmaps/outlines in GCS (see below) |
 | `rois` | array `{name, polygon:[[x,y],...]}` | in pixel coords of the aligned reference frame |
 | `image_size` | `{width, height}` | of the aligned reference frame |
 | `timings_ms` | object | per stage |
 | `warnings` | array of string | human-readable, non-fatal |
+
+Overlays (engine 0.3.4+, proposal in `docs/CONTRACT_CHANGES.md` 2026-10-15): with `options.compute_overlays` (default true) and an `output_prefix`, `face_full` and `cheek_macro` results list `{"metric_id": "redness", "uri": "{output_prefix}overlays/redness.png"}`. The PNG is RGBA at exactly the pixel size and orientation of `{output_prefix}preview.jpg` (the same reference photo, shrunk by the same whole factor), so the web lays it over the preview with no scaling maths. It shows where on the skin the redness metric measures (face: cheeks and nose; cheek close-up: its skin) the camera sees more red than this person's own skin median in that photo: transparent outside that skin and at or below the median, then a rose-to-deep-red ramp with rising opacity up to the skin's 98th percentile (at least 4 a* units above the median). Descriptive and cosmetic: no shared scale between people, no number, no diagnosis; it moves no metric. Absent when no photo passed, or with no `output_prefix`. `nose_macro` and forearm sites have none.
 
 ### 2.3 Quality
 ```json
@@ -102,10 +104,14 @@ Timeouts: the api waits up to 120 s. Target per request: < 20 s for 5 frames.
   "sharpness": 412.5,
   "clipped_pct": 0.3,
   "pose": {"yaw": 1.2, "pitch": -2.0, "roll": 0.4},
-  "per_frame": [{"index": 0, "passed": true, "reasons": []}],
+  "per_frame": [
+    {"index": 0, "passed": true, "reasons": [], "regions": []},
+    {"index": 1, "passed": false, "reasons": ["overexposed"], "regions": [{"reason": "overexposed", "region": "forehead"}]}
+  ],
   "reasons": []
 }
 ```
+`per_frame[].regions` (optional, engine 0.3.4+, `face_full` only): where on the face each of that photo's failed checks is, so the retake hint can say "light is too bright on your forehead". Each entry explains one of the photo's `reasons`: `overexposed` / `underexposed` (the region's own clipped / crushed pixels over the 2% gate), `blurry` (the region's sharpness under the face threshold and under 0.4x the median region's), `occlusion_suspected` (a hand over at least 25% of the region). `region` ∈ `forehead`, `left_cheek`, `right_cheek`, `nose`, `chin`, `under_eyes`, `whole` (`whole`: every region fails it, or none stands out). Other reasons (pose, face not found) are not attributed. It never changes whether a photo passed. Present (possibly empty) on every face photo the engine measured; absent for photos where no face was found, for close-ups and forearm sites, and from engines before 0.3.4.
 Gate defaults (tunable in `engine/app/config.py`): card ΔE mean <= 6 for calibrated mode; sharpness (variance of Laplacian on skin ROI) >= 100; clipped pixels in skin ROI <= 2%; |yaw|, |pitch| <= 8 deg, |roll| <= 6 deg for face sites. `reasons` uses codes: `card_not_found`, `card_delta_e_high`, `blurry`, `overexposed`, `underexposed`, `pose_out_of_range`, `face_not_found`, `occlusion_suspected`, `too_few_frames`.
 
 ### 2.4 Metric
@@ -181,14 +187,37 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | POST | `/v1/sessions` | `{site, capture_mode, n_frames, content_types[]}` -> `{session_id, upload_urls[]}` (V4 signed PUT URLs, 15 min) |
 | POST | `/v1/sessions/{id}/analyze` | calls engine with baseline from Firestore; Gemini labels + explanation; returns `SessionView` |
 | GET | `/v1/sessions/{id}` | `SessionView` |
+| POST | `/v1/sessions/{id}/analyze?force=1` | measures a `done` session again with all its frames (counts as an analysis); a re-analyzed baseline rebuilds `baselines/{key}`, later sessions keep their stored `compared_with`; a failed forced run leaves the session `done` as it was |
+| POST | `/v1/sessions/{id}/frames` | `{add: 1-5, content_types[]}` -> `{session_id, n_frames, upload_urls[] (new frames only, index = place in the session), expires_in_seconds, dropped[]}`. Before analyze: an edit. On a `done` session (baseline top-up): status back to `uploading` (result and baseline kept until re-analyzed), frames the engine left out are dropped (`dropped`, 1-based). 409 `too_many_frames` past 5, `originals_deleted` after the 30-day lifecycle, `conflict` while analyzing or for sample runs |
+| DELETE | `/v1/sessions/{id}/frames/{index}` | before analyze only (`uploading`/`failed`): removes frame `index` (1-based; later frames move up, the object is deleted) -> `{session_id, upload_urls[] (all frames), expires_in_seconds}`; 409 `last_frame` for the only frame |
+| GET | `/v1/sessions/{id}/objects` | `{session_id, objects[{index, object_uri, exists, size, md5_base64, content_type, duplicate_of: {session_id, index} \| null}]}`: GCS metadata per frame; `duplicate_of` = a byte-identical (MD5) frame of the person's earliest other session (sample runs excluded), else an earlier frame of this one |
+| — | `SessionView.session` additions | `stage: 'received'\|'engine'\|'explaining'\|null` (live while `processing`, every view); `frame_urls: (string\|null)[]` (signed GET per frame; null for DNG or a missing object) and `crop_urls: {candidate_id: url}` (signed tight crops that exist): only in `GET /v1/sessions/{id}` and analyze answers, not in the list |
 | GET | `/v1/timeline?site=...` | per-metric series for charts |
 | POST | `/v1/baselines/{site}` | mark a session as baseline (or auto: first passing 5-frame calibrated session) |
 | POST | `/v1/label-scan` | image -> `{brand, product_name, inci[], key_actives[{name, pct?}], confidence}` (Gemini vision) |
 | GET/POST/DELETE | `/v1/routine` | routine entries |
 | POST | `/v1/routine/check` | Gemini compatibility check -> `{conflicts[], duplicates[], gaps[], notes[]}` |
-| POST | `/v1/advisor/chat` | Gemini with function calling over catalog + user's metrics -> `{message, products[]}` |
+| POST | `/v1/advisor/chat` | Gemini with function calling over catalog + user's metrics -> `{message, blocks[], products[], product_ids[], follow_up_suggestions[], retrieval[], checks?, remaining_today}`. Body `{messages[≤20], images?: [{mime_type: image/jpeg|png|webp, data_base64 ≤8 MB}] ≤3}` (product/label photos, never stored). 502 `advisor_unavailable` detail carries `standard: {session_id, site, capture_mode, created_at, explanation} \| null` (latest measured session's template explanation). See GEMINI_SPEC.md section 5 for `blocks` |
+| POST | `/v1/advisor/chat/stream` | same turn as Server-Sent Events: `reading_context`, `asking_gemini {step: tools\|tool\|reply, photos?, tool?, retrieval?}`, `checking_numbers`, then `done {reply}` or `error {status, code, message, standard?}`; 422/429 are plain HTTP errors |
+| GET/DELETE | `/v1/advisor/history` | stored chat, oldest first: `{messages: [{id, role: user\|willow, text, created_at, photos? \| reply?}], keep: 200}`; DELETE (New chat) -> 204 |
+| GET | `/v1/me/usage` | `{advisor, routine_check, label_scan, retailer_ask}` each `{used, cap, remaining, resets_at}` (UTC midnight); reading counts nothing |
+| GET | `/v1/demo/status` | public: `api`, `engine`, `gemini`, `storage`, `bigquery` (each live: `status: ok\|degraded\|unreachable` (+`waking` for the engine), `latency_ms`, `reason?: slow\|busy`), `catalog`, `checked_at`; cached 60 s (10 s after a failed check) |
 | GET | `/v1/catalog/search?q=&concern=&max_price=` | catalog search |
 | GET | `/v1/retailer/insights` | aggregate JSON for the in-app retailer view (BigQuery) |
+| GET | `/v1/me` | `{uid, consent, profile}`; `consent` and `profile` are null until saved |
+| PUT | `/v1/me/profile` | partial update of `users/{uid}.profile` (fields left out keep their value, `null` clears one) -> `{profile}`; 422 on an unknown field or value |
+| PATCH | `/v1/routine/{id}` | `{ended_at?, slots?, schedule?}`; `schedule` = `{kind: daily\|alternate\|days, days?: int[] (0=Mon), anchor: YYYY-MM-DD}` or null (every day); stamps `updated_at`. GET `/v1/routine` entries also carry `schedule`, `updated_at`, and the catalog `image_url` / `image_source` (null for own products) |
+| POST | `/v1/label-scan` (Oct 15 additions) | `scan.inci` items are `{name, confidence: high\|low}` (plain strings still accepted from the model), `scan.failure: glare\|blurry\|no_label\|cut_off\|null`; a scan with a failure and nothing read is not counted against the daily cap |
+| GET/POST | `/v1/product-tests` | list (`{tests[]}`, running one first) / start `{entry_id?, product_id?, name?, length_days? (7-56, default 28), started_at?}`; 409 while another test runs |
+| PATCH/DELETE | `/v1/product-tests/{id}` | `{name?, length_days?, ended_at?}` (end, or null to resume) / remove a test (its forearm sessions stay) |
+| GET | `/v1/me/reminder.ics` | the check-in schedule (`profile.checkin`) as one weekly `VEVENT` (`RRULE BYDAY`, `DTSTART;TZID` + `VTIMEZONE`, `VALARM` at the time, link to `/home`); 404 without a schedule |
+| GET | `/v1/me/push/key` | `{enabled, public_key}`: the VAPID public key; `enabled: false` = no keys on the api, reminders by calendar only |
+| POST | `/v1/me/push` | a browser `PushSubscription.toJSON()` `{endpoint, keys: {p256dh, auth}}` -> `{id, enabled}`; idempotent; endpoint must be a browser push service (FCM, Mozilla, Apple, WNS); 503 `push_unavailable` without keys |
+| DELETE | `/v1/me/push` | `{endpoint}` forgets that device; no body forgets every device; 204 |
+| POST | `/v1/me/push/test` | test notification to every device of this person -> `{sent, removed, failed}`; 10 per day |
+| POST | `/v1/internal/reminders` | Cloud Scheduler only (OIDC token: audience `REMINDERS_AUDIENCE`, email `SCHEDULER_SERVICE_ACCOUNT`; no check with `AUTH_MODE=dev`), every 15 min: one push to each person whose check-in time (in the schedule's time zone, DST-safe) came in the last `REMINDER_WINDOW_MINUTES` on a scheduled day and who has no (non-failed) session that local day; one per person per day; 404/410 subscriptions removed -> `{enabled, due, sent, skipped, removed, failed}` |
+| GET | `/v1/retailer/insights?cohort=simulated\|mixed\|real&range=30d\|90d\|all` | public (no sign-in) aggregate JSON for the retailer view (BigQuery). Defaults `mixed` + `all` (every row, all time); other values 422. Cached per filter (10 min) over one cached BigQuery read. Range keeps people with a reading in the last 30/90 days. Groups under 10 suppressed in the api. Fields: `cohort`, `empty` (fewer than 10 people: only the head count), `filters {cohort, range, since, today}`, `tiles`, `needs[] {goal, goal_id, n, real, none, early, weeks, weeks_n}`, `needs_by_month {months['YYYY-MM'], people[], goals[{goal, goal_id, counts[], share_of_peak[]}]}`, `kpis {catalog {products, with_outcomes, below_min, unused, not_measured}, continuation_wk8 {k, n, rate}}`, `products[]` (+ `category, goal_ids, cells_skin[], base {k, n, rate}, cont8`), `product_outcomes` (+ `category, cont8, lift`), `tone_bands`, `skin_types`, `brands`, `brands_hidden`, `categories[] {category, label, flows[{goal, goal_id, n, weeks[2,4,8], changed[], using[], rate, median_weeks, base}], brands[], brands_hidden}`, `gaps[]` (per goal; tiers + `n`), `conflicts[] {kind, pair, n, share, fix, resolves}`, `routines_checked` |
+| POST | `/v1/retailer/ask` | `{question (3-300), cohort?, range?}` (same filters as the page) -> `{answer, refused, chart: {title, unit, bars[{label, value, n}]} \| null, source[], follow_ups[], checks \| null}`; sign-in (guest ok), 20 a day |
 
 `SessionView` = `{session, result: AnalysisResult, labels: {candidate_id: label}, explanation: Explanation}`.
 
@@ -209,23 +238,49 @@ Validator: every number in `summary` must appear in the metrics JSON sent to Gem
 users/{uid}
   display_name, created_at, goal, is_demo,
   consent: {version, accepted_at, aggregate_insights_opt_in}
+  profile: {goals: string[] (<= 3 of dark_spots|even_tone|redness|blemishes|pores_texture|lines|
+             under_eye|oil_glow), photo_time: morning|midday|evening|null, display_name: string|null (<= 60),
+             skin_type: oily|combination|dry|normal|sensitive|null,
+             checkin: {days: int[] (0 = Mon .. 6 = Sun), time: "HH:MM", tz: IANA name} | null, updated_at}
 users/{uid}/sessions/{session_id}
   site, capture_mode, n_frames, created_at, status: uploading|processing|done|failed,
   frame_uris[], is_baseline, result (AnalysisResult), labels{}, explanation{}
+  content_types[], frame_md5s[] (GCS MD5 per frame, null if missing; written by GET .../objects,
+    used for duplicates across sessions), frame_seq (highest frame_N used; names never reused),
+  stage: received|engine|explaining|null (written by the analysis while processing)
 users/{uid}/baselines/{site}
   session_id, created_at, metrics: {metric_id: {mean, mdc95, n_frames}}
+users/{uid}/advisor_messages/{id}          (newest 200 kept; removed by DELETE /v1/me and "New chat")
+  role: user|willow, text, created_at, photos (user: count only, photos never stored),
+  reply (willow: {message, blocks[], product_ids[], follow_up_suggestions[], retrieval[], checks})
+users/{uid}/usage/{yyyy-mm-dd}
+  advisor, routine_check, label_scan, retailer_ask, analyze, sample_runs (daily counters)
 users/{uid}/routine/{entry_id}
   product_id | null, custom_name, brand, inci[], key_actives[], started_at, ended_at,
   applied_sites[], source: catalog|label_scan|manual
+  schedule: {kind: daily|alternate|days, days?: int[] (0=Mon..6=Sun), anchor: YYYY-MM-DD} | null
+    (alternate = every other day from anchor; null = every day), created_at, updated_at
+users/{uid}/product_tests/{test_id}
+  entry_id | null, product_id | null, name, site_pair: forearm, started_at (YYYY-MM-DD),
+  length_days (7-56), ended_at | null, created_at, updated_at
+users/{uid}/push/{sha256(endpoint)[:32]}
+  endpoint, keys: {p256dh, auth}, created_at, updated_at        (Web Push subscriptions, one per device)
+users/{uid}/reminders_sent/{YYYY-MM-DD}
+  day, at                                                       (created once per local day: reminder dedupe)
 products/{product_id}
   brand, name, category, concerns[], key_actives[{name, pct}], inci[],
   price: {amount, currency}, size, region[], image_url,
-  stores: [{store, url, region}], source_url, last_verified
+  stores: [{store, url, region, price: {amount, currency, checked: 'YYYY-MM-DD'} | null}],
+  source_url, last_verified
+  (stores[].price, added Oct 15: the price that store's own page showed for the same product
+   and size on `checked`, in the page's currency; null when not verified. Never estimated,
+   converted or copied between stores. The top-level `price` is unchanged. Served as-is by
+   GET /v1/catalog/search, GET /v1/catalog/{product_id} and advisor product cards.)
 ```
 Security rules: users read/write only their own `users/{uid}/**`; `products` read-only for signed-in users; demo users read-only.
 
 ## 5. BigQuery (Niwin owns)
-Dataset `willow_insights` (us-central1). Tables: `sessions_flat` (one row per session x metric, pseudonymous user hash, region, skin-tone band, goal), `routine_flat`, `products`. Loaded by a batch script from Firestore + the synthetic cohort generator (`is_synthetic = true` on every synthetic row; shown on every chart).
+Dataset `willow_insights` (us-central1). Tables: `sessions_flat` (one row per session x metric, pseudonymous user hash, region, skin-tone band, skin type, goals), `users_flat` (one row per person: goals, skin type, started_at, first/last reading, last week), `goals_monthly` (person x month with a reading: the goals that month), `routine_flat` (started/stopped week), `routine_conflicts` (rule-table findings incl. `duplicate_active`, `none` when clear), `products` (+ goals). Loaded by `api/scripts/export_bq.py` (WRITE_TRUNCATE, idempotent) from Firestore (opted-in people only: `users/{uid}.consent.aggregate_insights_opt_in`; goals and skin type from `users/{uid}.profile`) + the synthetic cohort generator (`is_synthetic = true` on every synthetic row; shown on every chart). Goals are the app's 8 goal ids; older rows with catalog concerns are mapped to them on read.
 
 ## 6. Shared naming
 - Session IDs: `s_{yyyymmdd}_{8 random}`.

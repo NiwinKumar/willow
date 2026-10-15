@@ -1,89 +1,149 @@
-import { Suspense, useEffect } from 'react'
-import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { Link, Navigate, Route, Routes, useLocation, useParams, type Location } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
-import { AppShell } from './components/AppShell'
-import { BandBarDefs } from './components/BandBar'
+import { CheckInOverlay } from './components/shell/CheckInOverlay'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { buttonClass } from './components/ui/Button'
+import { WillowLoader } from './components/willow/WillowLoader'
 import { DataProvider } from './data/store'
-import { Landing } from './routes/Landing'
-import { Advisor, Capture, Goals, Judge, Processing, QuickCapture, Report, Retailer, Routine, Science, Settings, Start, UploadTest } from './routes/lazy'
+import { useAuth } from './lib/useAuth'
+import Landing from './features/website/Landing'
 
+// The landing page is the only eager screen: the app shell and every destination load on first visit.
+const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({ default: m.AppShell })))
+const SignIn = lazy(() => import('./features/website/SignIn'))
+const Welcome = lazy(() => import('./features/website/Welcome'))
+const Judge = lazy(() => import('./features/website/Judge'))
+const Terms = lazy(() => import('./features/website/Terms'))
+const Retail = lazy(() => import('./features/retail/Retail'))
+const Home = lazy(() => import('./features/home/Home'))
+const Progress = lazy(() => import('./features/progress/Progress'))
+const Result = lazy(() => import('./features/progress/Result'))
+const ProductTest = lazy(() => import('./features/progress/ProductTest'))
+const Routine = lazy(() => import('./features/routine/Routine'))
+const You = lazy(() => import('./features/you/You'))
+
+/**
+ * Routes. The website (landing, sign in, welcome, judge tour) and Retail stand alone; the app lives in one
+ * shell (AppShell) with a real URL per destination. The check-in flow (/check-in) draws over the page it was
+ * opened from (background location); opened directly, it draws over Home.
+ */
 export default function App() {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const state = location.state as { background?: Location } | null
+  const overlay = location.pathname.startsWith('/check-in')
+  const background: Location | undefined = state?.background ?? (overlay ? { ...location, pathname: '/home', search: '', hash: '' } : undefined)
   return (
     <DataProvider>
       <PageTitle />
-      <BandBarDefs />
-      <ErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<RouteLoading />}>
-      <Routes>
-        <Route path="/s/:site" element={<Report />} />
-        <Route path="/processing/:sessionId" element={<Processing />} />
-        <Route path="/capture/camera" element={<QuickCapture />} />
-        <Route
-          path="*"
-          element={
-            <AppShell>
-              <Suspense fallback={<RouteLoading />}>
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/judge" element={<Judge />} />
-                <Route path="/start" element={<Start />} />
-                <Route path="/goals" element={<Goals />} />
-                <Route path="/capture" element={<Capture />} />
-                <Route path="/routine" element={<Routine />} />
-                <Route path="/advisor" element={<Advisor />} />
-                <Route path="/retailer" element={<Retailer />} />
-                <Route path="/science" element={<Science />} />
-                <Route path="/settings" element={<Settings />} />
-                {import.meta.env.DEV ? <Route path="/upload-test" element={<UploadTest />} /> : null}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              </Suspense>
-            </AppShell>
-          }
-        />
-      </Routes>
-      </Suspense>
+      <ErrorBoundary resetKey={location.pathname}>
+        <Suspense fallback={<WillowLoader />}>
+          {/* While the check-in draws over a page, that page is inert (no focus, no clicks behind the sheet). */}
+          <div inert={overlay || undefined}>
+          <Routes location={background ?? location}>
+            <Route path="/" element={<Landing />} />
+            <Route path="/science" element={<Landing />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/welcome/:step" element={<Welcome />} />
+            <Route path="/judge" element={<Judge />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/retail" element={<Retail />} />
+            <Route element={<AppShell />}>
+              <Route path="/home" element={<Page><Home /></Page>} />
+              <Route path="/progress" element={<Page><Progress /></Page>} />
+              <Route path="/progress/:day" element={<Page><Progress /></Page>} />
+              <Route path="/result" element={<Page><Result /></Page>} />
+              <Route path="/result/:sessionId" element={<Page><Result /></Page>} />
+              <Route path="/test" element={<Page><ProductTest /></Page>} />
+              <Route path="/routine" element={<Page><Routine /></Page>} />
+              <Route path="/you" element={<Page><You /></Page>} />
+            </Route>
+            {/* Old addresses (shared links, the judge notes) keep working. */}
+            <Route path="/s/:site" element={<OldReport />} />
+            <Route path="/capture/*" element={<Navigate to="/check-in" replace />} />
+            <Route path="/processing/:sessionId" element={<OldProcessing />} />
+            <Route path="/settings" element={<Navigate to="/you" replace />} />
+            <Route path="/advisor" element={<Navigate to="/home?advisor=1" replace />} />
+            <Route path="/retailer" element={<Navigate to="/retail" replace />} />
+            <Route path="/privacy" element={<Navigate to="/terms" replace />} />
+            <Route path="/start" element={<Navigate to="/welcome" replace />} />
+            <Route path="/goals" element={<Navigate to="/welcome/goals" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          </div>
+          {background ? (
+            <Routes>
+              <Route path="/check-in" element={<CheckInOverlay />} />
+            </Routes>
+          ) : null}
+        </Suspense>
       </ErrorBoundary>
-      <Toaster position="bottom-center" toastOptions={{ style: { fontFamily: 'var(--font-sans)' } }} />
+      <Toaster
+        position="bottom-center"
+        offset={104}
+        toastOptions={{ unstyled: true, classNames: { toast: 'flex items-center gap-3 rounded-pill bg-selected px-[22px] py-3.5 text-[14px] text-inverse shadow-[0_20px_40px_-16px_rgba(0,0,0,.5)] max-w-[calc(100vw-32px)]', actionButton: 'rounded-pill bg-cta px-3 py-1 text-ink text-[13px]' } }}
+      />
     </DataProvider>
   )
 }
 
-function NotFound() {
-  useEffect(() => {
-    document.title = 'Page not found · Willow'
-  }, [])
+/** Each page gets the design's enter motion (rise + blur clear) and its own error boundary. */
+function Page({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation()
   return (
-    <div className="mx-auto max-w-[36rem] px-5 py-12">
-      <h1 className="text-[28px] font-bold tracking-[-0.02em]">This page does not exist</h1>
-      <p className="mt-3 text-[15px] text-text-2">The link may be old or mistyped.</p>
-      <Link to="/" className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-text px-4 text-[15px] font-medium text-surface">
-        Go to the start
-      </Link>
-    </div>
+    <ErrorBoundary resetKey={pathname}>
+      <Suspense fallback={<WillowLoader inline />}>
+        <div key={pathname.split('/')[1]} className="animate-[wPageIn_.36s_var(--ease-standard)_both]">
+          {children}
+        </div>
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 
-/** Shown for the moment a page's code is loading; quiet, so a fast load just looks instant. */
-function RouteLoading() {
-  return <div role="status" aria-label="Loading" className="min-h-[40dvh]" />
+function OldReport() {
+  const { site } = useParams()
+  return <Navigate to={`/result?site=${site ?? 'face_full'}`} replace />
+}
+function OldProcessing() {
+  const { sessionId } = useParams()
+  return <Navigate to={`/check-in?session=${sessionId ?? ''}`} replace />
+}
+
+function NotFound() {
+  const { user, loading } = useAuth()
+  useEffect(() => {
+    document.title = 'Page not found · Willow'
+  }, [])
+  // Someone signed in goes back into the app; anyone else to the start (Home would only ask them to sign in).
+  const inApp = loading || Boolean(user)
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-[36rem] flex-col justify-center gap-4 px-5">
+      <h1 className="font-serif text-greeting">This page does not exist</h1>
+      <p className="text-[15px] text-ink-2">The link may be old or mistyped.</p>
+      <Link to={inApp ? '/home' : '/'} className={`${buttonClass({ variant: 'ink' })} self-start no-underline`}>
+        {inApp ? 'Go to Home' : 'Go to the start'}
+      </Link>
+    </main>
+  )
 }
 
 const TITLES: [RegExp, string][] = [
+  [/^\/science/, 'Science and limits'],
   [/^\/judge/, 'Judge tour'],
-  [/^\/s\//, 'Results'],
-  [/^\/processing/, 'Measuring'],
-  [/^\/capture\/camera/, 'Camera'],
-  [/^\/capture/, 'New session'],
+  [/^\/terms/, 'Terms and privacy'],
+  [/^\/signin/, 'Sign in'],
+  [/^\/welcome/, 'Getting started'],
+  [/^\/retail/, 'Retailer insights'],
+  [/^\/home/, 'Home'],
+  [/^\/progress/, 'Progress'],
+  [/^\/result/, 'Result'],
+  [/^\/test/, 'Product test'],
   [/^\/routine/, 'Routine'],
-  [/^\/advisor/, 'Advisor'],
-  [/^\/retailer/, 'Retailer insights'],
-  [/^\/science/, 'How it works'],
-  [/^\/settings/, 'Settings'],
-  [/^\/(start|goals)/, 'Getting started'],
+  [/^\/you/, 'You'],
+  [/^\/check-in/, 'Check in'],
 ]
 
 /** Each page names itself in the browser tab (and for screen readers announcing navigation). */

@@ -1,16 +1,23 @@
+import json
+import logging
+import queue
 import re
 import secrets
+import threading
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app import advisor, catalog, gemini, label_scan, limits, routine_check, routine_log
 from app.auth import AuthUser, current_user
+from app.schedule import Schedule
 from app.store import Store, get_store, iso
 
 router = APIRouter(prefix="/v1", tags=["catalog", "label-scan", "routine"])
+log = logging.getLogger("willow.api.products")
 
 Concern = Literal[
     "acne_blemishes",
@@ -56,7 +63,7 @@ def post_label_scan(
     """Read a product label. Nothing is saved: the person confirms, then POSTs /v1/routine."""
     limits.take(store, user.uid, "label_scan")
     try:
-        return label_scan.scan(body.images)
+        read = label_scan.scan(body.images)
     except label_scan.BadImage as exc:
         limits.refund(store, user.uid, "label_scan")
         raise HTTPException(
@@ -68,6 +75,11 @@ def post_label_scan(
         raise HTTPException(
             502, {"code": "label_scan_failed", "message": "Could not read the label. Try again."}
         ) from exc
+    if read.scan.unreadable:
+        # Glare, blur, no label or a cut-off list with nothing read: the photo needs retaking, and
+        # a retake should not cost another scan. `scan.failure` says which, for the retry advice.
+        limits.refund(store, user.uid, "label_scan")
+    return read
 
 
 class KeyActive(BaseModel):
@@ -87,6 +99,8 @@ class RoutineEntryIn(BaseModel):
     applied_sites: list[str] = Field(default_factory=list)
     started_at: date | None = None
     source: Literal["catalog", "label_scan", "manual"] = "manual"
+    # null: every day (app/schedule.py)
+    schedule: Schedule | None = None
 
     @field_validator("started_at")
     @classmethod
@@ -100,10 +114,20 @@ class RoutineEntryIn(BaseModel):
 class RoutineEntryPatch(BaseModel):
     ended_at: date | None = None
     slots: list[Literal["am", "pm"]] | None = None
+    # null: back to every day
+    schedule: Schedule | None = None
 
 
 def _entry_view(entry_id: str, doc: dict[str, Any]) -> dict[str, Any]:
-    return {"id": entry_id, **{k: iso(v) if isinstance(v, datetime) else v for k, v in doc.items()}}
+    view = {"id": entry_id, **{k: iso(v) if isinstance(v, datetime) else v for k, v in doc.items()}}
+    view.setdefault("schedule", None)
+    view.setdefault("updated_at", view.get("created_at"))
+    # The catalog packshot, linked where the brand already publishes it (never copied), so the
+    # routine shows product photos without a second request per product.
+    product = catalog.by_id(doc["product_id"]) if doc.get("product_id") else None
+    view["image_url"] = product.get("image_url") if product else None
+    view["image_source"] = product.get("image_source") if product else None
+    return view
 
 
 @router.get("/routine")
@@ -237,6 +261,7 @@ def add_routine_entry(
     doc["started_at"] = doc["started_at"] or datetime.now(UTC).date().isoformat()
     doc["ended_at"] = None
     doc["created_at"] = datetime.now(UTC)
+    doc["updated_at"] = doc["created_at"]
     entry_id = entry_id or f"r_{secrets.token_hex(4)}"
     store.routine_set(uid, entry_id, doc)
     return entry_id, doc
@@ -249,12 +274,14 @@ def routine_patch(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """Stop a product (ended_at) or move it between AM and PM. History is kept for the charts."""
+    """Stop a product (ended_at), move it between AM and PM, or change its schedule (every day,
+    every other day from an anchor, chosen weekdays). History is kept for the charts."""
     _check_entry_id(entry_id)
     doc = store.routine_get(user.uid, entry_id)
     if doc is None:
         raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
     doc.update(body.model_dump(mode="json", exclude_unset=True))
+    doc["updated_at"] = datetime.now(UTC)
     store.routine_set(user.uid, entry_id, doc)
     return _entry_view(entry_id, doc)
 
@@ -305,8 +332,63 @@ class ChatMessage(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 
 
+class ChatImage(BaseModel):
+    """A product or label photo attached to the question (the web sends JPEG, ≤8 MB base64)."""
+
+    mime_type: Literal["image/jpeg", "image/png", "image/webp"]
+    data_base64: str = Field(min_length=1, max_length=8_000_000)
+
+
 class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=20)
+    # Up to 3 photos, sent with the last (user) message only; never stored.
+    images: list[ChatImage] = Field(default_factory=list, max_length=3)
+
+
+def _chat_start(body: ChatRequest, uid: str, store: Store) -> tuple[list[tuple[bytes, str]], int]:
+    """Checks that need no Gemini, then counts the question: (decoded photos, count today)."""
+    if body.messages[-1].role != "user":
+        raise HTTPException(422, {"code": "bad_request", "message": "last message must be yours"})
+    try:
+        images = [(label_scan.decode_image(i.data_base64), i.mime_type) for i in body.images]
+    except label_scan.BadImage as exc:
+        raise HTTPException(422, {"code": "bad_image", "message": str(exc)}) from exc
+    return images, limits.take(store, uid, "advisor")
+
+
+def _chat_answer(
+    body: ChatRequest,
+    uid: str,
+    store: Store,
+    images: list[tuple[bytes, str]],
+    used: int,
+    on_stage: advisor.Stage | None = None,
+) -> dict[str, Any]:
+    asked_at = datetime.now(UTC)
+    try:
+        reply = advisor.chat(
+            [m.model_dump() for m in body.messages], store, uid, images=images, on_stage=on_stage
+        )
+    except Exception as exc:  # Vertex unavailable, quota, safety block
+        limits.refund(store, uid, "advisor")
+        try:
+            standard = advisor.standard_explanation(store, uid)
+        except Exception:
+            standard = None
+        raise HTTPException(
+            502,
+            {
+                "code": "advisor_unavailable",
+                "message": "The advisor is unavailable right now.",
+                # the latest session's pre-written explanation (no Gemini), for the fallback card
+                "standard": standard,
+            },
+        ) from exc
+    try:
+        advisor.remember(store, uid, body.messages[-1].text, len(images), reply, asked_at)
+    except Exception:  # the answer matters more than its copy in the history
+        log.exception("advisor history not saved")
+    return {**reply, "remaining_today": max(0, advisor.DAILY_LIMIT - used)}
 
 
 @router.post("/advisor/chat")
@@ -315,14 +397,85 @@ def advisor_chat(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    if body.messages[-1].role != "user":
-        raise HTTPException(422, {"code": "bad_request", "message": "last message must be yours"})
-    used = limits.take(store, user.uid, "advisor")
-    try:
-        reply = advisor.chat([m.model_dump() for m in body.messages], store, user.uid)
-    except Exception as exc:  # Vertex unavailable, quota, safety block
-        limits.refund(store, user.uid, "advisor")
-        raise HTTPException(
-            502, {"code": "advisor_unavailable", "message": "The advisor is unavailable right now."}
-        ) from exc
-    return {**reply, "remaining_today": max(0, advisor.DAILY_LIMIT - used)}
+    images, used = _chat_start(body, user.uid, store)
+    return _chat_answer(body, user.uid, store, images, used)
+
+
+STREAM_PING_S = 10.0
+
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post("/advisor/chat/stream")
+def advisor_chat_stream(
+    body: ChatRequest,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> StreamingResponse:
+    """The same turn as /advisor/chat, as Server-Sent Events: reading_context, asking_gemini
+    (step tools, then step reply with what the tools found), checking_numbers, then done
+    {reply} or error {status, code, message, standard?}. Each event is sent when that step
+    really starts; the reply is only sent once validated (no partial text). Errors found before
+    any work (422, 429) are plain HTTP errors, as on /advisor/chat."""
+    images, used = _chat_start(body, user.uid, store)
+    events: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
+
+    def work() -> None:
+        try:
+            reply = _chat_answer(
+                body, user.uid, store, images, used, on_stage=lambda e, d: events.put((e, d))
+            )
+            events.put(("done", {"reply": reply}))
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+            events.put(("error", {"status": exc.status_code, **detail}))
+        except Exception:
+            log.exception("advisor stream failed")
+            events.put(("error", {"status": 500, "code": "internal", "message": "Try again."}))
+
+    # The turn runs on even if the person closes the panel: it counted, and history keeps it.
+    threading.Thread(target=work, daemon=True).start()
+
+    def stream():
+        while True:
+            try:
+                event, data = events.get(timeout=STREAM_PING_S)
+            except queue.Empty:
+                yield ": still working\n\n"  # keeps proxies from closing a quiet connection
+                continue
+            yield _sse(event, data)
+            if event in ("done", "error"):
+                return
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/advisor/history")
+def advisor_history(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """The person's stored chat, oldest first (newest 200 turns kept)."""
+    return {"messages": advisor.history(store, user.uid), "keep": advisor.HISTORY_KEEP}
+
+
+@router.delete("/advisor/history", status_code=204)
+def advisor_history_clear(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> Response:
+    """New chat: forget the stored conversation."""
+    store.advisor_clear(user.uid)
+    return Response(status_code=204)
+
+
+@router.get("/me/usage")
+def my_usage(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """Today's counts for the paid actions; caps reset at UTC midnight (resets_at)."""
+    return limits.usage(store, user.uid)

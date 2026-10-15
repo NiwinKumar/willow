@@ -1,4 +1,8 @@
-/** Per-device preferences and consent record. Browser storage only, wrapped so private mode never throws. */
+/** Per-device preferences and consent record. Browser storage only, wrapped so private mode never throws.
+ * Goals, photo time, skin type and the check-in schedule are a local copy of the account's profile (lib/profile). */
+import type { CheckinSchedule, PhotoTime, SkinType } from './api'
+import { cleanGoals, migrateGoals, type GoalId } from './metrics'
+
 export type Consent = { version: string; accepted_at: string; aggregate_opt_in: boolean }
 export const CONSENT_VERSION = '2026-10-13'
 
@@ -36,12 +40,33 @@ export const prefs = {
   /** Which consent (uid:version:opt-in) was last saved to the server, so it syncs once. */
   consentSynced: () => read<string>('willow.consentSynced'),
   setConsentSynced: (k: string) => write('willow.consentSynced', k),
-  goals: () => read<string[]>('willow.goals') ?? [],
-  setGoals: (g: string[]) => write('willow.goals', g),
-  photoTime: () => read<string>('willow.photoTime'),
-  setPhotoTime: (t: string) => write('willow.photoTime', t),
+  /** The 8 goal ids (lib/metrics GOALS). A list saved under the old ids ('willow.goals') moves over once. */
+  goals: (): GoalId[] => {
+    const now = read<unknown>('willow.goals2')
+    if (now !== null) return cleanGoals(now)
+    const old = read<unknown>('willow.goals')
+    if (old === null) return []
+    const moved = migrateGoals(old)
+    write('willow.goals2', moved)
+    return moved
+  },
+  setGoals: (g: string[]) => write('willow.goals2', cleanGoals(g)),
+  photoTime: (): PhotoTime | null => {
+    const t = read<string>('willow.photoTime')
+    return t === 'morning' || t === 'midday' || t === 'evening' ? t : null
+  },
+  setPhotoTime: (t: PhotoTime | null) => write('willow.photoTime', t),
+  skinType: () => read<SkinType>('willow.skinType'),
+  setSkinType: (t: SkinType | null) => write('willow.skinType', t),
+  checkin: () => read<CheckinSchedule>('willow.checkin'),
+  setCheckin: (c: CheckinSchedule | null) => write('willow.checkin', c),
+  /** A profile change made here that the account has not confirmed yet (offline): sent on the next sync. */
+  profileDirty: () => read<boolean>('willow.profileDirty') ?? false,
+  setProfileDirty: (v: boolean) => write('willow.profileDirty', v),
   lightroomDone: () => read<boolean>('willow.lightroom') ?? false,
   setLightroomDone: (v: boolean) => write('willow.lightroom', v),
+  sidebarCollapsed: () => read<boolean>('willow.sbCol') ?? false,
+  setSidebarCollapsed: (v: boolean) => write('willow.sbCol', v),
   coachSeen: (id: string) => read<boolean>(`willow.coach.${id}`) ?? false,
   setCoachSeen: (id: string) => write(`willow.coach.${id}`, true),
   clearAll: () => {

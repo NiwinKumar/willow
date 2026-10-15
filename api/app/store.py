@@ -38,6 +38,19 @@ class Store(Protocol):
     def user_merge(self, uid: str, fields: Doc) -> None: ...
     def users_list(self) -> list[tuple[str, Doc]]: ...
     def delete_user(self, uid: str) -> None: ...
+    def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def product_test_get(self, uid: str, test_id: str) -> Doc | None: ...
+    def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None: ...
+    def product_test_delete(self, uid: str, test_id: str) -> None: ...
+    def push_list(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def push_set(self, uid: str, sub_id: str, doc: Doc) -> None: ...
+    def push_delete(self, uid: str, sub_id: str) -> None: ...
+    def reminder_claim(self, uid: str, day: str, doc: Doc) -> bool: ...
+    # Advisor (slice F): read today's counters without counting; the chat history.
+    def usage_get(self, uid: str, day: str) -> Doc: ...
+    def advisor_add(self, uid: str, turns: list[Doc], keep: int) -> None: ...
+    def advisor_list(self, uid: str) -> list[Doc]: ...
+    def advisor_clear(self, uid: str) -> None: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -165,7 +178,71 @@ class FirestoreStore:
 
     def delete_user(self, uid: str) -> None:
         db = self._db()
+        # recursive: every subcollection goes too (sessions, routine, usage, advisor_messages)
         db.recursive_delete(db.document(f"users/{uid}"))
+
+    def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]:
+        snaps = self._db().collection(f"users/{uid}/product_tests").stream()
+        return [(s.id, s.to_dict()) for s in snaps]
+
+    def product_test_get(self, uid: str, test_id: str) -> Doc | None:
+        snap = self._db().document(f"users/{uid}/product_tests/{test_id}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None:
+        self._db().document(f"users/{uid}/product_tests/{test_id}").set(doc)
+
+    def product_test_delete(self, uid: str, test_id: str) -> None:
+        self._db().document(f"users/{uid}/product_tests/{test_id}").delete()
+
+    def push_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(s.id, s.to_dict()) for s in self._db().collection(f"users/{uid}/push").stream()]
+
+    def push_set(self, uid: str, sub_id: str, doc: Doc) -> None:
+        self._db().document(f"users/{uid}/push/{sub_id}").set(doc)
+
+    def push_delete(self, uid: str, sub_id: str) -> None:
+        self._db().document(f"users/{uid}/push/{sub_id}").delete()
+
+    def reminder_claim(self, uid: str, day: str, doc: Doc) -> bool:
+        """users/{uid}/reminders_sent/{day}: created once; a second run that day gets False."""
+        from google.api_core.exceptions import AlreadyExists, Conflict
+
+        try:
+            self._db().document(f"users/{uid}/reminders_sent/{day}").create(doc)
+        except (AlreadyExists, Conflict):
+            return False
+        return True
+
+    def usage_get(self, uid: str, day: str) -> Doc:
+        snap = self._db().document(f"users/{uid}/usage/{day}").get()
+        return (snap.to_dict() or {}) if snap.exists else {}
+
+    def advisor_add(self, uid: str, turns: list[Doc], keep: int) -> None:
+        from google.cloud import firestore
+
+        db = self._db()
+        col = db.collection(f"users/{uid}/advisor_messages")
+        batch = db.batch()
+        for t in turns:
+            batch.set(col.document(t["id"]), {k: v for k, v in t.items() if k != "id"})
+        batch.commit()
+        # newest `keep` stay: everything older goes
+        old = col.order_by("created_at", direction=firestore.Query.DESCENDING).offset(keep)
+        refs = [s.reference for s in old.select([]).stream()]
+        for i in range(0, len(refs), 400):
+            prune = db.batch()
+            for ref in refs[i : i + 400]:
+                prune.delete(ref)
+            prune.commit()
+
+    def advisor_list(self, uid: str) -> list[Doc]:
+        col = self._db().collection(f"users/{uid}/advisor_messages")
+        return [{"id": s.id, **s.to_dict()} for s in col.order_by("created_at").stream()]
+
+    def advisor_clear(self, uid: str) -> None:
+        db = self._db()
+        db.recursive_delete(db.collection(f"users/{uid}/advisor_messages"))
 
 
 class MemoryStore:
@@ -176,6 +253,10 @@ class MemoryStore:
         self.routine_log: dict[tuple[str, str], Doc] = {}
         self.usage: dict[tuple[str, str, str], int] = {}
         self.users: dict[str, Doc] = {}
+        self.product_tests: dict[tuple[str, str], Doc] = {}
+        self.push: dict[tuple[str, str], Doc] = {}
+        self.reminders_sent: dict[tuple[str, str], Doc] = {}
+        self.advisor: dict[tuple[str, str], Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -255,7 +336,59 @@ class MemoryStore:
         for table in (self.sessions, self.baselines, self.routine, self.routine_log, self.usage):
             for key in [k for k in table if k[0] == uid]:
                 del table[key]
+        for table in (self.push, self.reminders_sent):
+            for key in [k for k in table if k[0] == uid]:
+                del table[key]
         self.users.pop(uid, None)
+        for key in [k for k in self.product_tests if k[0] == uid]:
+            del self.product_tests[key]
+        self.advisor_clear(uid)
+
+    def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(t, copy.deepcopy(d)) for (u, t), d in self.product_tests.items() if u == uid]
+
+    def product_test_get(self, uid: str, test_id: str) -> Doc | None:
+        doc = self.product_tests.get((uid, test_id))
+        return copy.deepcopy(doc) if doc is not None else None
+
+    def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None:
+        self.product_tests[(uid, test_id)] = copy.deepcopy(doc)
+
+    def product_test_delete(self, uid: str, test_id: str) -> None:
+        self.product_tests.pop((uid, test_id), None)
+
+    def push_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(sid, copy.deepcopy(d)) for (u, sid), d in self.push.items() if u == uid]
+
+    def push_set(self, uid: str, sub_id: str, doc: Doc) -> None:
+        self.push[(uid, sub_id)] = copy.deepcopy(doc)
+
+    def push_delete(self, uid: str, sub_id: str) -> None:
+        self.push.pop((uid, sub_id), None)
+
+    def reminder_claim(self, uid: str, day: str, doc: Doc) -> bool:
+        if (uid, day) in self.reminders_sent:
+            return False
+        self.reminders_sent[(uid, day)] = copy.deepcopy(doc)
+        return True
+
+    def usage_get(self, uid: str, day: str) -> Doc:
+        return {k: v for (u, d, k), v in self.usage.items() if u == uid and d == day}
+
+    def advisor_add(self, uid: str, turns: list[Doc], keep: int) -> None:
+        for t in turns:
+            self.advisor[(uid, t["id"])] = copy.deepcopy({k: v for k, v in t.items() if k != "id"})
+        rows = self.advisor_list(uid)
+        for doc in rows[: max(0, len(rows) - keep)]:
+            del self.advisor[(uid, doc["id"])]
+
+    def advisor_list(self, uid: str) -> list[Doc]:
+        rows = [{"id": i, **copy.deepcopy(d)} for (u, i), d in self.advisor.items() if u == uid]
+        return sorted(rows, key=lambda d: (d["created_at"], d["id"]))
+
+    def advisor_clear(self, uid: str) -> None:
+        for key in [k for k in self.advisor if k[0] == uid]:
+            del self.advisor[key]
 
 
 @lru_cache
