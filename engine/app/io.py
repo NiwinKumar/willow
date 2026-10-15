@@ -77,18 +77,25 @@ def fetch_frames(uris: list[str], workdir: Path) -> list[str]:
         return list(pool.map(one, items))
 
 
+def preview_size(height: int, width: int) -> tuple[int, int]:
+    """(width, height) of preview.jpg for a photo of this size: shrunk by a whole factor when
+    the long edge is over PREVIEW_MAX_SIDE. Overlays use the same size, pixel for pixel."""
+    import math
+
+    k = math.ceil(max(height, width) / config.PREVIEW_MAX_SIDE)
+    return (round(width / k), round(height / k)) if k > 1 else (width, height)
+
+
 def save_preview(srgb8: np.ndarray, output_prefix: str) -> str:
     """{output_prefix}/preview.jpg: the reference photo that rois, candidate bboxes and
     image_size describe (CONTRACT_CHANGES proposal 1b). Browsers cannot show DNG or (outside
     Safari) HEIC. Shrunk by a whole factor when the long edge is over PREVIEW_MAX_SIDE."""
-    import math
-
     import cv2
 
     h, w = srgb8.shape[:2]
-    k = math.ceil(max(h, w) / config.PREVIEW_MAX_SIDE)
-    if k > 1:
-        srgb8 = cv2.resize(srgb8, (round(w / k), round(h / k)), interpolation=cv2.INTER_AREA)
+    size = preview_size(h, w)
+    if size != (w, h):
+        srgb8 = cv2.resize(srgb8, size, interpolation=cv2.INTER_AREA)
     dest = f"{output_prefix.rstrip('/')}/preview.jpg"
     return save_jpeg(np.ascontiguousarray(srgb8), dest, quality=config.PREVIEW_QUALITY)
 
@@ -101,11 +108,29 @@ def save_jpeg(srgb8, dest: str, quality: int = 90) -> str:
 
     buf = io.BytesIO()
     Image.fromarray(srgb8).save(buf, format="JPEG", quality=quality)
+    return _write(buf.getvalue(), dest, "image/jpeg")
+
+
+def save_png(rgba: np.ndarray, dest: str) -> str:
+    """Write an 8-bit RGBA array as PNG (alpha kept) to a gs:// URI or a local path."""
+    import cv2
+
+    ok, data = cv2.imencode(
+        ".png",
+        cv2.cvtColor(np.ascontiguousarray(rgba), cv2.COLOR_RGBA2BGRA),
+        [cv2.IMWRITE_PNG_COMPRESSION, config.OVERLAY_PNG_COMPRESSION],
+    )
+    if not ok:
+        raise EngineError("internal", f"{dest}: PNG encoding failed")
+    return _write(data.tobytes(), dest, "image/png")
+
+
+def _write(data: bytes, dest: str, content_type: str) -> str:
     if dest.startswith("gs://"):
         bucket, name = parse_gs_uri(dest)
         try:
             blob = gcs_client().bucket(bucket).blob(name)
-            blob.upload_from_string(buf.getvalue(), content_type="image/jpeg")
+            blob.upload_from_string(data, content_type=content_type)
         except Exception as exc:
             code = (
                 "gcs_access_denied"
@@ -115,5 +140,5 @@ def save_jpeg(srgb8, dest: str, quality: int = 90) -> str:
             raise EngineError(code, f"{dest}: {type(exc).__name__}: {exc}") from exc
     else:
         Path(dest).parent.mkdir(parents=True, exist_ok=True)
-        Path(dest).write_bytes(buf.getvalue())
+        Path(dest).write_bytes(data)
     return dest

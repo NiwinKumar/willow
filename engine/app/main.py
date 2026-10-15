@@ -126,6 +126,7 @@ def _run(request: dict) -> dict:
                 baseline=request.get("baseline"),
                 output_prefix=request.get("output_prefix"),
                 max_candidates=opts.get("max_candidates", 40),
+                compute_overlays=opts.get("compute_overlays", True),
                 **ids,
             )
         elif request["site"] == "face_full":
@@ -134,6 +135,7 @@ def _run(request: dict) -> dict:
                 baseline=request.get("baseline"),
                 output_prefix=request.get("output_prefix"),
                 max_candidates=opts.get("max_candidates", 40),
+                compute_overlays=opts.get("compute_overlays", True),
                 **ids,
             )
         else:
