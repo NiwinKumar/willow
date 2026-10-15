@@ -6,10 +6,13 @@ The JSON file bundled in the image is what the api reads (fast, no Firestore rou
 
 import json
 import re
+from datetime import date
 from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 CATALOG_PATH = Path(__file__).resolve().parent.parent / "seed" / "products.json"
 
@@ -38,16 +41,40 @@ CONCERNS = (
 )
 
 
+class StorePrice(BaseModel):
+    """The price one store showed for this exact product and size, on the day it was checked.
+
+    Read off the store's own page; never estimated, converted or copied from another store.
+    A store entry without a verified price has `price: null`.
+    """
+
+    amount: float = Field(gt=0)
+    currency: str = Field(pattern=r"^[A-Z]{3}$")  # ISO 4217, the page's own currency
+    checked: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
+
+    @field_validator("checked")
+    @classmethod
+    def _real_date(cls, v: str) -> str:
+        date.fromisoformat(v)  # raises ValueError for 2026-02-30
+        return v
+
+
+def _whole(x: Any) -> Any:
+    return int(x) if isinstance(x, float) and x.is_integer() else x
+
+
+def _tidy_store(s: dict[str, Any]) -> dict[str, Any]:
+    price = s.get("price")
+    return {**s, "price": {**price, "amount": _whole(price["amount"])} if price else None}
+
+
 def _tidy(p: dict[str, Any]) -> dict[str, Any]:
     """Whole numbers as integers (prices and percentages read 445, not 445.0)."""
-
-    def whole(x: Any) -> Any:
-        return int(x) if isinstance(x, float) and x.is_integer() else x
-
     return {
         **p,
-        "price": {**p["price"], "amount": whole(p["price"]["amount"])},
-        "key_actives": [{**a, "pct": whole(a["pct"])} for a in p["key_actives"]],
+        "price": {**p["price"], "amount": _whole(p["price"]["amount"])},
+        "key_actives": [{**a, "pct": _whole(a["pct"])} for a in p["key_actives"]],
+        "stores": [_tidy_store(s) for s in p["stores"]],
     }
 
 

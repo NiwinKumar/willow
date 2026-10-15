@@ -220,7 +220,12 @@ users/{uid}/routine/{entry_id}
 products/{product_id}
   brand, name, category, concerns[], key_actives[{name, pct}], inci[],
   price: {amount, currency}, size, region[], image_url,
-  stores: [{store, url, region}], source_url, last_verified
+  stores: [{store, url, region, price: {amount, currency, checked: 'YYYY-MM-DD'} | null}],
+  source_url, last_verified
+  (stores[].price, added Oct 15: the price that store's own page showed for the same product
+   and size on `checked`, in the page's currency; null when not verified. Never estimated,
+   converted or copied between stores. The top-level `price` is unchanged. Served as-is by
+   GET /v1/catalog/search, GET /v1/catalog/{product_id} and advisor product cards.)
 ```
 Security rules: users read/write only their own `users/{uid}/**`; `products` read-only for signed-in users; demo users read-only.
 

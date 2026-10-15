@@ -1,6 +1,8 @@
 import base64
 import csv
 import importlib.util
+import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -19,7 +21,15 @@ CATALOG = (
         "price": {"amount": 590, "currency": "INR"},
         "size": "30 ml",
         "region": ["IN", "GLOBAL"],
-        "stores": [{"store": "Nykaa", "url": "https://www.nykaa.com/x", "region": "IN"}],
+        "stores": [
+            {
+                "store": "Nykaa",
+                "url": "https://www.nykaa.com/x",
+                "region": "IN",
+                "price": {"amount": 590, "currency": "INR", "checked": "2026-10-15"},
+            },
+            {"store": "Ulta", "url": "https://www.ulta.com/x", "region": "US", "price": None},
+        ],
         "source_url": "https://theordinary.com/x",
         "last_verified": "2026-10-13",
     },
@@ -34,7 +44,14 @@ CATALOG = (
         "price": {"amount": 545, "currency": "INR"},
         "size": "30 ml",
         "region": ["IN"],
-        "stores": [{"store": "Brand site", "url": "https://beminimalist.co/x", "region": "IN"}],
+        "stores": [
+            {
+                "store": "Brand site",
+                "url": "https://beminimalist.co/x",
+                "region": "IN",
+                "price": {"amount": 545.5, "currency": "INR", "checked": "2026-10-15"},
+            }
+        ],
         "source_url": "https://beminimalist.co/x",
         "last_verified": "2026-10-13",
     },
@@ -181,6 +198,11 @@ def test_import_script_round_trips_the_sheet(tmp_path, monkeypatch):
         assert mod.validate(parsed) == []
     broken = dict(back[0], category="perfume", stores=[])
     assert mod.validate(broken) == ["category 'perfume'", "no store links"]
+    bad_price = dict(
+        back[0],
+        stores=[dict(back[0]["stores"][0], price={"amount": 0, "currency": "rs", "checked": "x"})],
+    )
+    assert mod.validate(bad_price) == ["store price 'Nykaa' (amount > 0, ISO currency, YYYY-MM-DD)"]
     linked = dict(back[0], image_url="https://brand.example/p.jpg", image_source=None)
     assert mod.validate(linked) == ["image_source (the page the image is shown on)"]
     assert (
@@ -235,3 +257,32 @@ def test_browsing_the_catalog_lists_every_currency(client, fake):
     found = client.get("/v1/catalog/search", params={"limit": 60}).json()["products"]
     names = [f"{p['brand']} {p['name']}".lower() for p in found]
     assert names == sorted(names)
+
+
+def test_store_prices_come_back_from_search_and_product(client, fake):
+    found = client.get("/v1/catalog/search", params={"q": "niacinamide"}).json()["products"][0]
+    nykaa = {"amount": 590, "currency": "INR", "checked": "2026-10-15"}
+    assert found["stores"][0]["price"] == nykaa
+    assert found["stores"][1]["price"] is None
+    one = client.get("/v1/catalog/minimalist-salicylic-acid-2-face-serum").json()
+    assert one["stores"][0]["price"]["amount"] == 545.5
+
+
+def test_every_real_store_price_is_a_checked_amount_in_a_currency():
+    """The bundled catalog: each store price is real (> 0, ISO currency, a date) or null."""
+    real = json.loads(catalog.CATALOG_PATH.read_text())  # not the small fixture catalog
+    stores = [s for p in real for s in p["stores"]]
+    assert stores and all("price" in s for s in stores)
+    priced = [s["price"] for s in stores if s["price"] is not None]
+    assert priced
+    for price in priced:
+        catalog.StorePrice.model_validate(price)
+        assert price["amount"] > 0
+        assert len(price["currency"]) == 3 and price["currency"].isupper()
+        date.fromisoformat(price["checked"])
+    with pytest.raises(ValueError):
+        catalog.StorePrice.model_validate({"amount": 0, "currency": "INR", "checked": "2026-10-15"})
+    with pytest.raises(ValueError):
+        catalog.StorePrice.model_validate({"amount": 5, "currency": "Rs", "checked": "2026-10-15"})
+    with pytest.raises(ValueError):
+        catalog.StorePrice.model_validate({"amount": 5, "currency": "INR", "checked": "2026-02-30"})
