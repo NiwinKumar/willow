@@ -266,7 +266,7 @@ def payload(kind: str) -> dict[str, str]:
         return {
             "title": "Willow reminders are on",
             "body": "This is a test. Check-in reminders will reach this device.",
-            "url": "/you",
+            "url": "/home",
             "tag": "willow-test",
         }
     return {
