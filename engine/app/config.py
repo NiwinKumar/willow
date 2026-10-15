@@ -305,14 +305,17 @@ GLOW_TEXTURE_MM = 0.5
 GLOW_TEXTURE_WEIGHT = 5.0
 # lines (docs/METRICS.md C1): dark valleys in L* / local skin L*, in the direction each
 # zone's lines run, at least LINES_MIN_LENGTH_MM long; value = mm of line per cm2
-LINES_MIN_PX_PER_MM = 3.0  # a 1 mm crease is 3 px: below this, no value
+LINES_MIN_PX_PER_MM = 3.0  # a 1.2 mm crease is 3.6 px: below this, no value
 LINES_WORK_PX_PER_MM = 10.0  # analysed at this scale
-LINES_SIGMAS_MM = (0.3, 0.6, 1.0)  # valley widths ~0.6-2 mm (fine lines to folds)
+# prominent lines only (Harshini, Oct 15): fine lines come and go with the light. On 8 lined
+# and 8 young faces, dropping the 0.3 mm scale and asking 2.5% depth and 5 mm length took
+# every young face (and a 6-photo young session) to 0; lined faces 0-9.7
+LINES_SIGMAS_MM = (0.6, 1.0)  # valley widths ~1.2-2 mm (deep lines to folds)
 LINES_BACKGROUND_MM = 3.0  # local skin lightness the depth is relative to
-LINES_MIN_DEPTH = 0.02  # scale-normalised curvature of L*/local L* (about 2% darker)
+LINES_MIN_DEPTH = 0.025  # scale-normalised curvature of L*/local L* (about 2.5% darker)
 LINES_MIN_ANISOTROPY = 2.0  # across-curvature this many x the along one (pores curve both)
 LINES_ANGLE_TOL_DEG = 25.0  # off the zone's direction by more: texture, hair
-LINES_MIN_LENGTH_MM = 3.0
+LINES_MIN_LENGTH_MM = 5.0
 LINES_MAX_WIDTH_MM = 1.5  # mean width of a piece (area / length): wider is a blob
 LINES_SKELETON_PX = 1.15  # mean length of one skeleton pixel (straight 1, diagonal 1.41)
 LINES_EDGE_MM = 1.5  # left out along the skin's edge (hair, brow, lid edges)
@@ -327,6 +330,17 @@ LINES_CROW_LENGTH_MM = 10.0  # ...this far out...
 LINES_CROW_HALF_HEIGHT_MM = 8.0  # ...this far above and below the eye's axis
 LINES_FOLD_BAND_MM = (-2.0, 9.0)  # nasolabial zone: this far from the nose-wing-to-mouth line
 LINES_FOLD_PAST_MOUTH_MM = 5.0  # and past the mouth corner
+LINES_MARIONETTE_OUT_MM = 2.0  # marionette zone: from this far outside the mouth corner...
+LINES_MARIONETTE_LENGTH_MM = 18.0  # ...this far down toward the jaw...
+LINES_MARIONETTE_HALF_WIDTH_MM = 5.0  # ...this wide either side
+LINES_LIP_GAP_MM = 1.0  # lip zones start this far from the lip edge (and the nose base)
+LINES_LIP_BELOW_MM = 8.0  # band below the lower lip
+LINES_LIP_MIN_LENGTH_MM = 2.5  # lip lines are short
+LINES_LIP_SIGMAS_MM = (0.3, 0.6)  # and fine (~0.6-1.2 mm wide)
+LINES_PHILTRUM_HALF_MM = 5.0  # upper-lip strip either side of the midline left out
+LINES_LIP_MIN_DEPTH = 0.018  # lip lines are fainter (young faces 0 down to 0.018)
+LINES_LIP_EDGE_MM = 0.75  # narrow skin between lip and nose: smaller edge margin
+LINES_LIP_FAN_MM = 25.0  # lip lines fan from this far beyond the mouth (vertical mid-lip)
 LINES_MAX_BROW_RAISE = 0.8  # browInnerUp: forehead skipped (raised brows crease it)
 LINES_MAX_EXPRESSION = 0.6  # smile: crow's feet and folds skipped
 LINES_MAX_FROWN = 0.8  # brows down: glabella skipped

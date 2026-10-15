@@ -53,11 +53,11 @@ def _forehead_lines(lab, face, vertical=False):
     for k in range(-2, 3):
         if vertical:  # five 12 mm creases running up the face
             x = cx + k * 6 * PX_PER_MM
-            _crease(lab, x, y - 6 * PX_PER_MM, x, y + 6 * PX_PER_MM)
-        else:  # three 30 mm creases across
+            _crease(lab, x, y - 6 * PX_PER_MM, x, y + 6 * PX_PER_MM, 0.08, 1.4)
+        else:  # three 30 mm prominent creases across (8% darker, 1.4 mm wide)
             if abs(k) < 2:
                 yk = y + k * 5 * PX_PER_MM
-                _crease(lab, cx - 15 * PX_PER_MM, yk, cx + 15 * PX_PER_MM, yk)
+                _crease(lab, cx - 15 * PX_PER_MM, yk, cx + 15 * PX_PER_MM, yk, 0.08, 1.4)
 
 
 def test_plain_skin_has_no_lines():
@@ -114,3 +114,38 @@ def test_too_small_a_face_gives_no_value():
     face = _face()
     lab, skin = _skin(face, 60.0)
     assert lines(lab, face, skin, 2.5, []) == (None, {})  # under LINES_MIN_PX_PER_MM
+
+
+def _upper_lip(face):
+    """(x of the mouth's centre, y halfway between the lip edge and the nose base)."""
+    p = face.points
+    return float(p[[13, 14], 0].mean()), float((p[0, 1] + p[2, 1]) / 2)
+
+
+def test_lip_lines_found_and_the_philtrum_left_out():
+    face = _face()
+    lab, skin = _skin(face, 60.0)
+    cx, y = _upper_lip(face)
+    half = 3 * PX_PER_MM  # 6 mm vertical creases on the upper lip
+    for dx in (-14, -10, 10, 14):  # either side, outside the philtrum
+        x = cx + dx * PX_PER_MM
+        _crease(lab, x, y - half, x, y + half, depth=0.08, width_mm=0.6)
+    _, extras = lines(lab, face, skin, PX_PER_MM, [])
+    assert extras["lips_mm_per_cm2"] > 1.0
+
+    plain, skin = _skin(face, 60.0)
+    _crease(plain, cx, y - half, cx, y + half, depth=0.08, width_mm=1.2)  # philtrum groove
+    _, extras = lines(plain, face, skin, PX_PER_MM, [])
+    assert extras["lips_mm_per_cm2"] < 0.5
+
+
+def test_marionette_lines_found():
+    face = _face()
+    lab, skin = _skin(face, 60.0)
+    for side, sign in ((61, -1), (291, 1)):  # from each mouth corner down and outward
+        x0, y0 = face.points[side] + [sign * 3 * PX_PER_MM, 2 * PX_PER_MM]
+        _crease(
+            lab, x0, y0, x0 + sign * 3 * PX_PER_MM, y0 + 14 * PX_PER_MM, depth=0.08, width_mm=1.4
+        )
+    _, extras = lines(lab, face, skin, PX_PER_MM, [])
+    assert extras["marionette_mm_per_cm2"] > 1.0
