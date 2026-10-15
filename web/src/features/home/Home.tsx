@@ -132,8 +132,8 @@ function HomeBody() {
       part: Math.min(1, (read.baselineFrames ?? 0) / BAND_FRAMES),
       onClick: () => checkIn('face_full'),
     },
-    ...(goals.includes('smoother')
-      ? [{ t: 'Cheek close-up', d: 'For your texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: () => checkIn('cheek_macro') }]
+    ...(goals.includes('pores_texture')
+      ? [{ t: 'Cheek close-up', d: 'For your pores and texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: () => checkIn('cheek_macro') }]
       : []),
     { t: 'Add your routine', d: 'So results can point to products', state: entries?.length ? 'done' : 'todo', onClick: () => navigate('/routine') },
     { t: 'Save with Google', d: 'Keep photos and results', state: me.guest ? 'todo' : 'done', onClick: () => navigate('/you') },

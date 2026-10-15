@@ -7,7 +7,7 @@ import type { Metric, MetricId, RoutineEntry, Session } from '../../data/types'
 import { baselineFor, inFlight, isUnmeasured, stalled } from '../../data/live'
 import { localDay } from '../../lib/api'
 import { parseDate } from '../../lib/format'
-import { METRIC_META, orderedGroups, SITE_LABEL } from '../../lib/metrics'
+import { byGoalOrder, METRIC_META, SITE_LABEL } from '../../lib/metrics'
 import { verdictKind, type VerdictKind } from '../../lib/verdict'
 
 /** Back after this many days without a face check-in (no cadence is stored, so Home uses one fixed rule). */
@@ -86,14 +86,13 @@ export function readHome(all: Session[], face: Session[]): HomeRead {
   return { face, lead, baseline, baselineFrames, hasBand, person, todaySession, todayKind, lastFace }
 }
 
-/** Metrics in goal order (groups the person chose first), keeping the engine's order inside a group. */
+/** Metrics in goal order (the person's goal metrics and their groups first), keeping the engine's order
+ * otherwise. Skin tone is descriptive only: it never leads its group. */
 export function byGoals(metrics: Metric[], goals: string[]): Metric[] {
-  const order = orderedGroups(goals)
-  // Skin tone is descriptive only: it never leads its group.
-  const rank = (m: Metric, i: number) => (m.id === 'tone_ita' ? 1000 + i : i)
+  const cmp = byGoalOrder(goals)
   return metrics
-    .map((m, i) => ({ m, i: rank(m, i) }))
-    .sort((a, b) => order.indexOf(a.m.group) - order.indexOf(b.m.group) || a.i - b.i)
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => cmp(a.m.id, b.m.id) || a.i - b.i)
     .map((x) => x.m)
 }
 

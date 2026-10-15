@@ -6,7 +6,7 @@ import { baselineFor } from '../../data/live'
 import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
 import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
-import { METRIC_META, VERDICT_RANK, fmtSigned, fmtValue, orderedGroups, unitOf } from '../../lib/metrics'
+import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
 
 export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick' }
@@ -66,13 +66,11 @@ export function noBand(s: Session): boolean {
   return Boolean(!s.is_baseline && s.baseline_ref && !s.baseline_ref.has_noise_band)
 }
 
-/** Skin tone is descriptive only: it never leads its group (Home orders it the same way). */
-export const toneLast = (id: MetricId) => (id === 'tone_ita' ? 1 : 0)
 
-/** Metrics in the order of the person's goals, then changed first within a group (skin tone last in its group). */
+/** Metrics in the order of the person's goals (lib/metrics byGoalOrder: skin tone last in its group), then changed first. */
 export function orderMetrics(metrics: Metric[], goals: string[]): Metric[] {
-  const groups = orderedGroups(goals)
-  return [...metrics].sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group) || toneLast(a.id) - toneLast(b.id) || VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict])
+  const cmp = byGoalOrder(goals)
+  return [...metrics].sort((a, b) => cmp(a.id, b.id) || VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict])
 }
 
 /** Value with its unit, as written on cards ("3.1 %", "21.4°"). */
