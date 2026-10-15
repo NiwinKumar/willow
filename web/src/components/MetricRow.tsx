@@ -2,7 +2,7 @@ import { ChevronDown, Info } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
 import type { Metric } from '../data/types'
-import { METRIC_META, UNIT_LABEL, decimalsFor, directionText, fmtSigned } from '../lib/metrics'
+import { METRIC_META, decimalsFor, directionText, fmtSigned, unitOf } from '../lib/metrics'
 import { DUR, EASE_OUT, SPRING_STAMP } from '../lib/motion'
 import { BandBar } from './BandBar'
 import { ConfidenceChip, VerdictChip } from './Chip'
@@ -20,14 +20,16 @@ type Props = {
   stamp?: boolean
   /** The baseline has no noise band (one photo): show the change without a verdict. */
   noBand?: boolean
+  /** A later session (not the baseline): "no baseline" there means "not compared", not "first reading". */
+  later?: boolean
   children?: React.ReactNode
 }
 
 /** One metric, same anatomy every time: label + confidence, value + delta, band bar, verdict + wording. */
-export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, selected, expanded, onSelect, onToggle, stamp = false, noBand = false, children }: Props) {
+export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, selected, expanded, onSelect, onToggle, stamp = false, noBand = false, later = false, children }: Props) {
   const reduce = useReducedMotion()
   const meta = METRIC_META[m.id]
-  const unit = UNIT_LABEL[m.unit]
+  const unit = unitOf(m)
   const dec = decimalsFor(m)
   const dirText = m.verdict === 'real_change' ? directionText(m) : ''
   return (
@@ -58,7 +60,7 @@ export function MetricRow({ metric: m, baselineValue, baselineMdc, reach, select
               transition={{ ...SPRING_STAMP, opacity: { duration: DUR.fast } }}
               className="inline-flex"
             >
-              <VerdictChip verdict={m.verdict} noBand={noBand} />
+              <VerdictChip verdict={m.verdict} noBand={noBand} later={later && m.delta === null} />
             </motion.span>
             {dirText ? <span className="text-[13px] text-text-2">{dirText}</span> : null}
             {m.verdict === 'no_baseline' && m.id === 'tone_ita' && meta.note ? <span className="text-[13px] text-text-3">{meta.note}</span> : null}

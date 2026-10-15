@@ -28,7 +28,15 @@ export function Chip({ tone = 'neutral', children, className = '', title }: { to
 
 const verdictTone: Record<Verdict, Tone> = { real_change: 'signal', within_noise: 'noise', no_baseline: 'willow', low_quality: 'warn' }
 
-export function VerdictChip({ verdict, noBand = false, className = '' }: { verdict: Verdict; noBand?: boolean; className?: string }) {
+export function VerdictChip({ verdict, noBand = false, later = false, className = '' }: { verdict: Verdict; noBand?: boolean; later?: boolean; className?: string }) {
+  // A later session that could not compare this one (newer than the baseline, a side view):
+  // never "First reading", which only the baseline itself is.
+  if (later && verdict === 'no_baseline' && !noBand)
+    return (
+      <Chip tone="noise" className={className} title="This measurement could not be compared with your baseline this time.">
+        Not compared
+      </Chip>
+    )
   if (noBand && verdict === 'no_baseline')
     return (
       <Chip tone="noise" className={className} title="Your baseline has fewer than 3 usable photos, so there is no noise band to compare against yet.">

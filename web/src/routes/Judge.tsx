@@ -158,7 +158,7 @@ export function Judge() {
                   <Link to="/capture?site=face_full&mode=quick" className="font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('run')}>
                     take a quick selfie
                   </Link>
-                  . The engine finds your face and measures skin tone, dark spots, evenness, redness, blemishes, under-eye, shine and glow, and Gemini names the spots it found.
+                  . The engine finds your face and measures skin tone, dark spots, evenness, redness, blemishes, under-eye, lines, shine and glow, and Gemini names the spots it found.
                 </p>
                 {lastRun ? (
                   <p className="mt-2 text-[13px]">

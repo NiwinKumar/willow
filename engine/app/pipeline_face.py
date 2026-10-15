@@ -483,6 +483,43 @@ def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.nd
     return np.ascontiguousarray(patch)
 
 
+def _session_lines(good: list[dict]) -> None:
+    """lines per photo on the session's own most lined zones. Scoring each photo on its own
+    top LINES_TOP_ZONES let a zone flip in and out of the top two between photos (one 5 mm
+    segment found or not moves a small zone 0 <-> ~2 mm/cm2): 5 laptop selfies of one
+    session read 1.1-2.7. The zones are picked once, by their median across the photos, and
+    every photo is scored on those, so the spread is the photos' own, not the zone choice's.
+    The zones skipped for expression in any photo are kept in the extras."""
+    frames = [f for f in good if f["values"].get("lines") is not None]
+    if not frames:
+        return
+    suffix = "_mm_per_cm2"
+    zones = {k for f in frames for k, v in f["extras"]["lines"].items() if k.endswith(suffix)}
+    medians = {}
+    for z in zones:
+        vals = [f["extras"]["lines"].get(z) for f in frames]
+        vals = [v for v in vals if v is not None]
+        # measured in at least half the photos: a zone seen once (skipped for expression or
+        # cut as beard in the rest) cannot lead the session
+        if vals and 2 * len(vals) >= len(frames):
+            medians[z] = float(np.median(vals))
+    top = sorted(medians, key=lambda z: (-medians[z], z))[: config.LINES_TOP_ZONES]
+    skipped = sorted(
+        {z for f in frames for z in f["extras"]["lines"].get("skipped_for_expression") or []}
+    )
+    for f in frames:
+        vals = [f["extras"]["lines"].get(z) for z in top]
+        vals = [v for v in vals if v is not None]
+        f["values"]["lines"] = float(np.mean(vals)) if vals else None
+        f["extras"]["lines"] = {
+            **{k: v for k, v in f["extras"]["lines"].items() if k != "skipped_for_expression"},
+            "px_per_mm": round(float(f["face"].px_per_mm), 2),
+        }
+    for f in frames:
+        f["extras"]["lines"]["top_zones"] = top
+        f["extras"]["lines"]["skipped_for_expression"] = skipped
+
+
 def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -> np.ndarray:
     """Skin for the lines metric: the face outline minus eyes, lids and lips (`face_area`),
     without hair (far darker AND greyer than this face's skin; below the nose, where a
@@ -561,6 +598,7 @@ def analyze_face(
     _count_confirmed(good)
 
     metrics = []
+    _session_lines(good)
     for metric_id, (group, label, unit) in METRIC_INFO.items():
         base = (baseline or {}).get(metric_id)
         have = [f for f in good if f["values"][metric_id] is not None]
@@ -573,6 +611,9 @@ def analyze_face(
                 extras["ita_band"] = ita_band(summary["value"])
             if metric_id == "pigment_spots":
                 extras["count"] = round(extras.get("count", 0))
+            if metric_id == "lines":  # the lists _mean_extras drops (_session_lines)
+                for k in ("top_zones", "skipped_for_expression"):
+                    extras[k] = have[0]["extras"]["lines"].get(k, [])
         else:
             summary = {
                 "value": None,

@@ -28,6 +28,14 @@ export const GROUP_META: Record<MetricGroup, { label: string; order: number }> =
   oil_glow: { label: 'Oil & glow', order: 6 },
 }
 
+/** Units a metric's number carries where its contract unit is too generic ("index"). */
+const METRIC_UNIT: Partial<Record<MetricId, string>> = { lines: ' mm/cm²' }
+
+/** The unit written after a metric's number (rows, detail, band). */
+export function unitOf(m: { id: MetricId; unit: Unit }): string {
+  return METRIC_UNIT[m.id] ?? UNIT_LABEL[m.unit]
+}
+
 export const UNIT_LABEL: Record<Unit, string> = {
   deg: '°',
   pct_area: '%',

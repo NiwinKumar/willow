@@ -129,7 +129,7 @@ def context(store: Store, uid: str) -> dict[str, Any]:
                 {
                     **{k: m.get(k) for k in ("id", "label", "verdict", "confidence")},
                     # The unit as the app writes it (° or a*), never the key ("deg", "a_star").
-                    "unit": explain.UNIT_DISPLAY.get(m["unit"], m["unit"]).strip(),
+                    "unit": explain.unit_of(m),
                     **explain.shown_numbers(m),
                 }
                 for m in result["metrics"]
@@ -162,8 +162,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
         "routine": routine,
         "recent_window_days": routine_log.RECENT_DAYS,
         "note": "Every site is measured: the face, cheek and nose close-ups (pores and texture "
-        "come only from close-ups) and the forearm squares. Lines are not measured; say so "
-        "if asked.",
+        "come only from close-ups) and the forearm squares. Lines, shine, glow and blemishes "
+        "are always indicative (trends).",
     }
 
 

@@ -20,7 +20,7 @@ export function Goals() {
   return (
     <div className="mx-auto max-w-[36rem] px-5 pb-16 pt-4 sm:px-8">
       <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em]">What would you like to track?</h1>
-      <p className="mt-2 text-[15px] text-text-2">Pick up to three. This only changes the order of your report. Lines are not measured yet.</p>
+      <p className="mt-2 text-[15px] text-text-2">Pick up to three. This only changes the order of your report.</p>
       <ul className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Goals">
         {GOALS.map((g) => {
           const on = picked.includes(g.id)
