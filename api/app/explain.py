@@ -40,7 +40,7 @@ def label_of(metric: dict[str, Any]) -> str:
     return APP_LABEL.get(metric["id"], metric["label"])
 
 
-def item(metric: dict[str, Any]) -> dict[str, Any]:
+def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     label = label_of(metric)
     verdict = metric["verdict"]
     delta, mdc = metric.get("delta"), metric.get("mdc95")
@@ -52,8 +52,15 @@ def item(metric: dict[str, Any]) -> dict[str, Any]:
             f"{label}: change {quoted[0]}{trend}. Your baseline has too few photos, so there is no "
             "noise band yet and this cannot be called a real change."
         )
-    elif verdict == "no_baseline":
+    elif verdict == "no_baseline" and first_reading:
         summary = f"{label}: first reading. Future photos are compared to it."
+    elif verdict == "no_baseline":
+        # a later session: the baseline predates this measurement (lines, Oct 15); this one
+        # becomes its baseline (baselines.adopt_new_metrics)
+        summary = (
+            f"{label}: not in your baseline yet, so not compared this time. "
+            "From your next photos it will be."
+        )
     elif verdict == "low_quality":
         summary = f"{label}: photo quality too low to compare this time."
     elif delta is not None and mdc is not None:
@@ -81,7 +88,7 @@ RETAKE = {
 RETAKE_DEFAULT = "Retake in the same light, holding the phone steady."
 
 
-def template(result: dict[str, Any]) -> dict[str, Any]:
+def template(result: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     metrics = result["metrics"]
     real = [m for m in metrics if m["verdict"] == "real_change"]
     if not result["quality"]["passed"]:
@@ -91,8 +98,11 @@ def template(result: dict[str, Any]) -> dict[str, Any]:
         if any(m.get("delta") is not None for m in metrics):
             headline = "Compared with your baseline (no noise band yet)"
             steps = ["Take 5 photos in one session and make it your baseline."]
-        else:
+        elif first_reading:
             headline = "Your first reading"
+            steps = ["Take your next photos in the same spot and light."]
+        else:
+            headline = "Not compared with your baseline this time"
             steps = ["Take your next photos in the same spot and light."]
     elif real:
         headline = f"{len(real)} real change{'s' if len(real) != 1 else ''} since your baseline"
@@ -103,7 +113,7 @@ def template(result: dict[str, Any]) -> dict[str, Any]:
     ordered = real + [m for m in metrics if m["verdict"] != "real_change"]
     return {
         "headline": headline,
-        "items": [item(m) for m in ordered],
+        "items": [item(m, first_reading) for m in ordered],
         "next_steps": steps,
         "disclaimer": DISCLAIMER,
     }
@@ -142,7 +152,9 @@ Rules:
 - verdict real_change: say it changed beyond normal photo variation, with the delta and the noise
   band (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
   shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
-  this is the first reading. low_quality: the photo could not be compared.
+  this is the first reading, but only when is_baseline is true; on a later session it means
+  this measurement is not in the baseline yet (it started after the baseline was taken) and
+  will be compared from the next session. low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
 - Face sessions (site face_full) with frames_used of 2 or more: blemishes and dark spots count
   only marks seen in at least two of the photos; say so if the count is low. Close-ups (cheek_macro,
@@ -183,6 +195,16 @@ UNIT_DISPLAY = {
     "per_cm2": " per cm²",
     "delta_l_star": " ΔL*",
 }
+
+
+# Where the contract's unit is too generic ("index"), the metric's own (web/src/lib/metrics.ts)
+METRIC_UNIT_DISPLAY = {"lines": "mm/cm²"}
+
+
+def unit_of(metric: dict[str, Any]) -> str:
+    """The unit as the app writes it after the number ("" for counts and indexes)."""
+    own = METRIC_UNIT_DISPLAY.get(metric["id"])
+    return own if own is not None else UNIT_DISPLAY.get(metric["unit"], metric["unit"]).strip()
 
 
 def decimals(metric: dict[str, Any]) -> int:
@@ -243,7 +265,7 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
                 "direction": m["direction"],
                 "confidence": m["confidence"],
                 # Unit as the app writes it; none for counts and indexes (never "index").
-                "unit": UNIT_DISPLAY.get(m["unit"], m["unit"]).strip(),
+                "unit": unit_of(m),
                 **shown_numbers(m),
             }
             for m in result["metrics"]
@@ -322,7 +344,7 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
     if not result["metrics"] or not result["quality"]["passed"]:
         # Nothing was measured: the fixed text says why and how to retake (Gemini would be told
         # this is a first reading, which a session that failed quality never is).
-        return template(result), "template"
+        return template(result, context.get("is_baseline", True)), "template"
     data = gemini_input(result, context)
     prompt = f"Session data (JSON):\n{json.dumps(data)}"
     for _ in range(2):  # at most two Gemini calls, then the template: analysis must stay quick
@@ -351,4 +373,4 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
             issues[:3],
             [i.summary[:160] for i in exp.items if f"for {i.metric_id} " in " ".join(issues)],
         )
-    return template(result), "template"
+    return template(result, context.get("is_baseline", True)), "template"

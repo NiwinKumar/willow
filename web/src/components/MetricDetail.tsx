@@ -3,7 +3,7 @@ import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip,
 
 import type { Metric, Session } from '../data/types'
 import { fmtDate, fmtHours } from '../lib/format'
-import { UNIT_LABEL, decimalsFor, fmtValue } from '../lib/metrics'
+import { decimalsFor, fmtValue, unitOf } from '../lib/metrics'
 
 type Point = { i: number; label: string; v: number | null; lo: number | null; hi: number | null; verdict: Metric['verdict'] | null; note?: string; deviation?: boolean }
 
@@ -19,7 +19,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
   const dec = decimalsFor(current)
   // The noise band comes from the baseline photos that passed the quality check, not all uploaded.
   const refPhotos = baseline?.result?.frames_used || baseline?.n_frames || 5
-  const unit = UNIT_LABEL[current.unit]
+  const unit = unitOf(current)
   // Pores come with their average size (engine extras); shown so the copy's promise holds.
   // (0 when none were found: no size to show)
   const poreMm = metricId === 'pores' && typeof current.extras?.mean_diameter_mm === 'number' && current.extras.mean_diameter_mm > 0 ? current.extras.mean_diameter_mm : null
@@ -145,7 +145,7 @@ const OTHER: Record<Metric['id'], string> = {
   blemishes: 'Hair and specks on the lens read as candidates; Gemini marks those as artifacts.',
   pores: 'Distance from the face, focus, makeup, and sweat.',
   texture: 'Distance and angle of the phone, dryness after cleansing, and light falling from one side.',
-  lines: 'Expression, lamp angle, and head pitch.',
+  lines: 'Expression, lamp angle and height, head pitch, and how close the camera is (a sharper, closer photo shows finer lines).',
   dark_circles: 'Sleep, allergies, brow shadow, and head pitch.',
   shine: 'Time since washing, room temperature, and products applied.',
   glow: 'Lighting, hydration from a shower, and makeup.',

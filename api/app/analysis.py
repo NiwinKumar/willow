@@ -105,6 +105,13 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
             current = None
         doc = store.session_get(uid, session_id) or doc
         return doc
+    if measured and current is not None:
+        try:  # a metric the baseline predates gets its baseline from this session
+            added = baselines.adopt_new_metrics(store, uid, current, session_id, result)
+            if added:
+                log.info("baseline for %s gained %s from %s", uid, added, session_id)
+        except Exception:
+            log.exception("could not add new metrics to the baseline for %s", uid)
     if measured and current is None and baselines.qualifies(result):
         try:
             baselines.set_baseline(store, uid, session_id, doc)
