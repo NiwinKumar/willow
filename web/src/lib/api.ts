@@ -230,6 +230,11 @@ async function publicGet<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+/** The person's own calendar day (YYYY-MM-DD) in their time zone: routine ticks are per local day. */
+export function localDay(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export const api = {
   /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
   retailerInsights: async () => {
@@ -259,15 +264,20 @@ export const api = {
   catalogProduct: (token: string, productId: string) => request<Product>(token, `/v1/catalog/${productId}`),
   labelScan: (token: string, images: { mime_type: string; data_base64: string }[]) =>
     request<LabelScanResponse>(token, '/v1/label-scan', { method: 'POST', ...json({ images }) }),
-  routine: (token: string) => request<{ entries: RoutineEntry[] }>(token, '/v1/routine'),
+  // `today`: the person's own calendar day, so recent use counts their days, not the server's
+  routine: (token: string) => request<{ entries: RoutineEntry[] }>(token, `/v1/routine?today=${localDay()}`),
   addRoutine: (token: string, entry: NewRoutineEntry) => request<RoutineEntry>(token, '/v1/routine', { method: 'POST', ...json(entry) }),
   patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
-  /** Routine use ticks; `day` is the person's own calendar day (YYYY-MM-DD). Default range: last 14 days. */
-  routineLog: (token: string, range?: { from?: string; to?: string }) =>
-    request<{ from: string; to: string; days: RoutineLogDay[] }>(token, `/v1/routine/log${range ? `?${new URLSearchParams(range as Record<string, string>)}` : ''}`),
-  markUsed: (token: string, day: string, entryId: string, slot: 'am' | 'pm', used: boolean) =>
+  /** Routine use ticks; days are the person's own calendar days (YYYY-MM-DD, see localDay). Default range: last 14 days. */
+  routineLog: (token: string, range: { from?: string; to?: string } = {}) => {
+    const qs = new URLSearchParams(Object.entries(range).filter((e): e is [string, string] => Boolean(e[1])))
+    const query = qs.toString() // (URLSearchParams.size is missing before Safari 17)
+    return request<{ from: string; to: string; days: RoutineLogDay[] }>(token, `/v1/routine/log${query ? `?${query}` : ''}`)
+  },
+  /** Tick (used) or untick a routine product for a day and slot; answers that day's ticks. */
+  setRoutineUse: (token: string, day: string, entryId: string, slot: 'am' | 'pm', used: boolean) =>
     request<RoutineLogDay>(token, `/v1/routine/log/${day}/${entryId}/${slot}`, { method: used ? 'PUT' : 'DELETE' }),
   putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),

@@ -11,12 +11,13 @@ every product id from a tool result. Up to 5 tool calls per turn.
 import json
 import logging
 import time
+from datetime import timedelta
 from typing import Any
 
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from app import catalog, explain, gemini, numbers, routine_check
+from app import catalog, explain, gemini, numbers, routine_check, routine_log
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
@@ -44,6 +45,9 @@ measurements, check their routine and find products from Willow's facts-only cat
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
 - Routine products with in_use false were stopped: do not treat them as part of the routine.
+- recent_use on a routine product = days the person ticked it as used out of the days it was in
+  the routine (last 2 weeks); null = not tracked. Before judging whether a product changed
+  anything, say how often it was used; a product used on few days has not had a fair test.
 - Quote measurements only when the question is about results; never pad an answer with them.
 - British spelling (colour, moisturiser), but say "catalog". Be brief: 2 to 5 sentences."""
 
@@ -130,6 +134,12 @@ def context(store: Store, uid: str) -> dict[str, Any]:
                 for m in result["metrics"]
             ],
         }
+    entries = store.routine_list(uid)
+    # how often each product was actually ticked as used (Home's "used today"): the advisor must
+    # not call a product ineffective when it was barely used
+    now = routine_log.today()
+    first = now - timedelta(days=routine_log.RECENT_DAYS)
+    logs = store.routine_logs(uid, first.isoformat(), now.isoformat()) if entries else []
     routine = [
         {
             "id": eid,
@@ -140,8 +150,10 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "ended_at": e.get("ended_at"),
             "in_use": not e.get("ended_at"),
             "key_actives": [a["name"] for a in e.get("key_actives") or []],
+            # {days_used, of_days} over the last 2 weeks, or null if nothing was ticked
+            "recent_use": routine_log.recent_use(e, eid, logs, now),
         }
-        for eid, e in store.routine_list(uid)
+        for eid, e in entries
     ]
     return {
         "latest_sessions": latest,

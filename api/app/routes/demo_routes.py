@@ -2,6 +2,7 @@
 journey and live status. Sample runs and the routine need a sign-in (a guest is enough) so every
 judge works in an account of their own; the journey and status are public."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -59,7 +60,14 @@ def judge_setup(
     added = 0
     if not store.routine_list(user.uid):
         for i, (product, slots) in enumerate(demo.judge_routine_entries(), start=1):
-            body = RoutineEntryIn(product_id=product["product_id"], slots=slots, source="catalog")
+            # started yesterday (UTC): a judge west of UTC can tick their own "today" in the
+            # evening, which is already tomorrow in UTC
+            body = RoutineEntryIn(
+                product_id=product["product_id"],
+                slots=slots,
+                source="catalog",
+                started_at=datetime.now(UTC).date() - timedelta(days=1),
+            )
             add_routine_entry(store, user.uid, body, entry_id=f"r_judge{i}")
             added += 1
     store.user_merge(user.uid, {"judge": True})

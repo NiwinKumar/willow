@@ -32,6 +32,7 @@ class Store(Protocol):
     def routine_delete(self, uid: str, entry_id: str) -> None: ...
     def routine_log_mark(self, uid: str, day: str, entry_id: str, slot: str, used: bool) -> Doc: ...
     def routine_logs(self, uid: str, first: str, last: str) -> list[Doc]: ...
+    def routine_log_forget(self, uid: str, entry_id: str, days: list[str]) -> None: ...
     def usage_incr(self, uid: str, day: str, key: str, delta: int = 1) -> int: ...
     def user_get(self, uid: str) -> Doc | None: ...
     def user_merge(self, uid: str, fields: Doc) -> None: ...
@@ -130,6 +131,20 @@ class FirestoreStore:
         )
         return sorted((s.to_dict() for s in q.stream()), key=lambda d: d["date"])
 
+    def routine_log_forget(self, uid: str, entry_id: str, days: list[str]) -> None:
+        """Drop one product's ticks from these days (the product was removed)."""
+        from google.cloud import firestore
+        from google.cloud.firestore_v1.field_path import FieldPath
+
+        db = self._db()
+        batch = db.batch()
+        for day in days:
+            ref = db.document(f"users/{uid}/routine_log/{day}")
+            path = FieldPath("used", entry_id).to_api_repr()  # quoted: ids may hold "-"
+            batch.update(ref, {path: firestore.DELETE_FIELD})
+        if days:
+            batch.commit()
+
     def user_get(self, uid: str) -> Doc | None:
         snap = self._db().document(f"users/{uid}").get()
         return snap.to_dict() if snap.exists else None
@@ -216,6 +231,10 @@ class MemoryStore:
     def routine_logs(self, uid: str, first: str, last: str) -> list[Doc]:
         days = [d for (u, day), d in self.routine_log.items() if u == uid and first <= day <= last]
         return copy.deepcopy(sorted(days, key=lambda d: d["date"]))
+
+    def routine_log_forget(self, uid: str, entry_id: str, days: list[str]) -> None:
+        for day in days:
+            (self.routine_log.get((uid, day)) or {}).get("used", {}).pop(entry_id, None)
 
     def user_get(self, uid: str) -> Doc | None:
         return copy.deepcopy(self.users.get(uid))

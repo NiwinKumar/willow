@@ -15,7 +15,7 @@ from fastapi import HTTPException
 SLOTS = ("am", "pm")
 PAST_DAYS = 30  # ticks can be added or removed this far back (a forgotten evening, a weekend)
 MAX_RANGE_DAYS = 92  # one read covers about a quarter
-RECENT_DAYS = 28  # recent use is counted over the last four weeks
+RECENT_DAYS = 14  # recent use: the last two weeks (the log's default range too)
 
 
 def today() -> date:
@@ -31,8 +31,7 @@ def parse_day(text: str, field: str = "date") -> date:
         ) from exc
 
 
-def check_tick(day_text: str, entry: dict[str, Any] | None, slot: str) -> date:
-    """The day a tick may be written for, or a 4xx that says why not."""
+def check_day(day_text: str) -> date:
     day = parse_day(day_text)
     now = today()
     if not now - timedelta(days=PAST_DAYS) <= day <= now + timedelta(days=1):
@@ -40,6 +39,29 @@ def check_tick(day_text: str, entry: dict[str, Any] | None, slot: str) -> date:
             422,
             {"code": "bad_request", "message": f"only the last {PAST_DAYS} days can be changed"},
         )
+    return day
+
+
+def check_untick(day_text: str, slot: str) -> date:
+    """Removing a tick is always allowed (a mistaken tick must be removable after the product's
+    slots or dates changed, or after it was removed): the day window and the slot name only."""
+    if slot not in SLOTS:
+        raise HTTPException(422, {"code": "bad_request", "message": "slot must be am or pm"})
+    return check_day(day_text)
+
+
+def local_today(text: str | None) -> date:
+    """The person's own calendar day, as the app sends it, kept within a day of UTC's."""
+    now = today()
+    if not text:
+        return now
+    day = parse_day(text, "today")
+    return min(max(day, now - timedelta(days=1)), now + timedelta(days=1))
+
+
+def check_tick(day_text: str, entry: dict[str, Any] | None, slot: str) -> date:
+    """The day a tick may be written for, or a 4xx that says why not."""
+    day = check_day(day_text)
     if entry is None:
         raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
     if slot not in SLOTS:
@@ -67,12 +89,21 @@ def day_view(doc: dict[str, Any]) -> dict[str, Any]:
     return {"date": doc["date"], "used": {eid: s for eid, s in used.items() if s}}
 
 
+def ticked(doc: dict[str, Any], entry_id: str | None = None) -> bool:
+    used = doc.get("used") or {}
+    return bool(used.get(entry_id)) if entry_id else any(used.values())
+
+
 def recent_use(
     entry: dict[str, Any], entry_id: str, logs: list[dict[str, Any]], now: date
-) -> dict[str, int]:
+) -> dict[str, int] | None:
     """Days with any tick for this product, over the days it was in the routine within the last
-    RECENT_DAYS (from its start, or the window start, to today or its stop)."""
-    first = now - timedelta(days=RECENT_DAYS - 1)
+    RECENT_DAYS, counted from when the person started ticking (never "0 of 21 days" for days
+    before ticking existed). None when the person ticked nothing in the window."""
+    first_tick = min((d["date"] for d in logs if ticked(d)), default=None)
+    if first_tick is None:
+        return None
+    first = max(now - timedelta(days=RECENT_DAYS - 1), date.fromisoformat(first_tick))
     if entry.get("started_at"):
         first = max(first, date.fromisoformat(entry["started_at"][:10]))
     last = now
