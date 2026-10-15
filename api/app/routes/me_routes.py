@@ -1,8 +1,11 @@
+import re
 from datetime import UTC, datetime
-from typing import Any
+from functools import lru_cache
+from typing import Any, Literal
+from zoneinfo import available_timezones
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app import baselines, storage, tracks, views
 from app.auth import AuthUser, current_user
@@ -201,4 +204,116 @@ def get_me(
         "consent": {k: iso(v) if isinstance(v, datetime) else v for k, v in consent.items()}
         if consent
         else None,
+        "profile": _profile_out(doc["profile"]) if doc.get("profile") else None,
     }
+
+
+# The 8 goals a person can pick (web/src/lib/metrics.ts GOALS), each matched to catalog concerns.
+Goal = Literal[
+    "dark_spots",
+    "even_tone",
+    "redness",
+    "blemishes",
+    "pores_texture",
+    "lines",
+    "under_eye",
+    "oil_glow",
+]
+MAX_GOALS = 3
+PROFILE_FIELDS = ("goals", "photo_time", "display_name", "skin_type", "checkin")
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+class Checkin(BaseModel):
+    """The person's check-in schedule: weekdays (0 = Monday) at a local time in their time zone."""
+
+    model_config = ConfigDict(extra="forbid")
+    days: list[int] = Field(min_length=1, max_length=7)
+    time: str
+    tz: str = Field(min_length=1, max_length=64)
+
+    @field_validator("days")
+    @classmethod
+    def _days(cls, v: list[int]) -> list[int]:
+        if any(d < 0 or d > 6 for d in v):
+            raise ValueError("days are 0 (Monday) to 6 (Sunday)")
+        return sorted(set(v))
+
+    @field_validator("time")
+    @classmethod
+    def _time(cls, v: str) -> str:
+        if not _HHMM.match(v):
+            raise ValueError("time is HH:MM, 24-hour")
+        return v
+
+    @field_validator("tz")
+    @classmethod
+    def _tz(cls, v: str) -> str:
+        if not _known_zone(v):
+            raise ValueError("tz is an IANA time zone name")
+        return v
+
+
+_ZONE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_+\-]*(/[A-Za-z0-9_+\-]+){0,2}$")
+
+
+@lru_cache
+def _zones() -> frozenset[str]:
+    return frozenset(available_timezones())
+
+
+def _known_zone(name: str) -> bool:
+    """In the time zone database; where the image ships none, a well-formed IANA-style name."""
+    zones = _zones()
+    return name in zones or name == "UTC" if zones else bool(_ZONE_NAME.match(name))
+
+
+class ProfileUpdate(BaseModel):
+    """PUT /v1/me/profile: any subset of the profile; fields left out keep their saved value."""
+
+    model_config = ConfigDict(extra="forbid")
+    goals: list[Goal] | None = Field(default=None, max_length=MAX_GOALS)
+    photo_time: Literal["morning", "midday", "evening"] | None = None
+    display_name: str | None = Field(default=None, max_length=60)
+    skin_type: Literal["oily", "combination", "dry", "normal", "sensitive"] | None = None
+    checkin: Checkin | None = None
+
+    @field_validator("goals")
+    @classmethod
+    def _goals(cls, v: list[str] | None) -> list[str]:
+        # null clears the goals; duplicates collapse, first pick first
+        return list(dict.fromkeys(v or []))
+
+    @field_validator("display_name")
+    @classmethod
+    def _name(cls, v: str | None) -> str | None:
+        v = " ".join((v or "").split())
+        return v or None
+
+
+def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "goals": list(p.get("goals") or []),
+        "photo_time": p.get("photo_time"),
+        "display_name": p.get("display_name"),
+        "skin_type": p.get("skin_type"),
+        "checkin": p.get("checkin"),
+    }
+    out["updated_at"] = iso(p.get("updated_at"))
+    return out
+
+
+@router.put("/me/profile")
+def put_profile(
+    body: ProfileUpdate,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """CONTRACT section 4 users/{uid}.profile. Partial: only the fields sent change."""
+    saved = (store.user_get(user.uid) or {}).get("profile") or {}
+    changes = body.model_dump(include=body.model_fields_set)
+    profile = {k: saved.get(k) for k in PROFILE_FIELDS} | changes
+    profile["goals"] = profile.get("goals") or []
+    profile["updated_at"] = datetime.now(UTC)
+    store.user_merge(user.uid, {"profile": profile})
+    return {"profile": _profile_out(profile)}

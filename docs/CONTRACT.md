@@ -189,6 +189,8 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | POST | `/v1/advisor/chat` | Gemini with function calling over catalog + user's metrics -> `{message, products[]}` |
 | GET | `/v1/catalog/search?q=&concern=&max_price=` | catalog search |
 | GET | `/v1/retailer/insights` | aggregate JSON for the in-app retailer view (BigQuery) |
+| GET | `/v1/me` | `{uid, consent, profile}`; `consent` and `profile` are null until saved |
+| PUT | `/v1/me/profile` | partial update of `users/{uid}.profile` (fields left out keep their value, `null` clears one) -> `{profile}`; 422 on an unknown field or value |
 
 `SessionView` = `{session, result: AnalysisResult, labels: {candidate_id: label}, explanation: Explanation}`.
 
@@ -209,6 +211,10 @@ Validator: every number in `summary` must appear in the metrics JSON sent to Gem
 users/{uid}
   display_name, created_at, goal, is_demo,
   consent: {version, accepted_at, aggregate_insights_opt_in}
+  profile: {goals: string[] (<= 3 of dark_spots|even_tone|redness|blemishes|pores_texture|lines|
+             under_eye|oil_glow), photo_time: morning|midday|evening|null, display_name: string|null (<= 60),
+             skin_type: oily|combination|dry|normal|sensitive|null,
+             checkin: {days: int[] (0 = Mon .. 6 = Sun), time: "HH:MM", tz: IANA name} | null, updated_at}
 users/{uid}/sessions/{session_id}
   site, capture_mode, n_frames, created_at, status: uploading|processing|done|failed,
   frame_uris[], is_baseline, result (AnalysisResult), labels{}, explanation{}
