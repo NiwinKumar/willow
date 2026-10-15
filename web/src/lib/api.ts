@@ -342,6 +342,17 @@ export const api = {
   patchProductTest: (token: string, id: string, body: { name?: string; length_days?: number; ended_at?: string | null }) =>
     request<ProductTest>(token, `/v1/product-tests/${id}`, { method: 'PATCH', ...json(body) }),
   deleteProductTest: (token: string, id: string) => request<void>(token, `/v1/product-tests/${id}`, { method: 'DELETE' }),
+  /** Check-in reminders (api routes/reminders_routes.py): the schedule as a calendar file, and Web Push. */
+  reminderIcs: async (token: string): Promise<Blob> => {
+    const res = await fetch(`${API_URL}/v1/me/reminder.ics`, { headers: { Authorization: `Bearer ${token}`, ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) } })
+    if (!res.ok) throw new ApiError(res.status, 'calendar file unavailable')
+    return res.blob()
+  },
+  /** enabled false: the api has no VAPID keys, so reminders are by calendar only. */
+  pushKey: (token: string) => request<{ enabled: boolean; public_key: string | null }>(token, '/v1/me/push/key'),
+  pushSubscribe: (token: string, subscription: PushSubscriptionJSON) => request<{ id: string; enabled: boolean }>(token, '/v1/me/push', { method: 'POST', ...json(subscription) }),
+  pushUnsubscribe: (token: string, endpoint: string) => request<void>(token, '/v1/me/push', { method: 'DELETE', ...json({ endpoint }) }),
+  pushTest: (token: string) => request<{ sent: number; removed: number; failed: number }>(token, '/v1/me/push/test', { method: 'POST' }),
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */
