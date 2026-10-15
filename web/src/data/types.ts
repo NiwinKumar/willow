@@ -31,6 +31,8 @@ export type QualityReason =
   | 'face_not_found'
   | 'occlusion_suspected'
   | 'too_few_frames'
+/** Where on the face a per-photo quality reason applies (engine, optional). */
+export type QualityRegion = 'forehead' | 'left_cheek' | 'right_cheek' | 'nose' | 'chin' | 'under_eyes' | 'whole'
 
 export type Metric = {
   id: MetricId
@@ -54,7 +56,7 @@ export type Quality = {
   sharpness?: number | null
   clipped_pct?: number | null
   pose?: { yaw: number; pitch: number; roll: number } | null
-  per_frame?: { index: number; passed: boolean; reasons: QualityReason[] }[]
+  per_frame?: { index: number; passed: boolean; reasons: QualityReason[]; regions?: { reason: QualityReason; region: QualityRegion }[] }[]
   reasons: QualityReason[]
 }
 
@@ -125,6 +127,12 @@ export type Session = {
   baseline_ref?: { session_id: string; frames: number | null; has_noise_band: boolean } | null
   /** Live: the hosted sample these photos were copied from (judge sample runs), else null. */
   sample_id?: string | null
+  /** Live, while processing: the analysis stage (received, engine, explaining). */
+  stage?: 'received' | 'engine' | 'explaining' | null
+  /** Live detail views only: signed URL of each uploaded photo (null for DNG or a missing photo). */
+  frame_urls?: (string | null)[]
+  /** Live detail views only: signed tight crop per candidate id. */
+  crop_urls?: Record<string, string>
 }
 
 export type SiteSeries = { site: Site; sessions: Session[] }

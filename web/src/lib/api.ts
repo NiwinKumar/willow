@@ -18,7 +18,13 @@ export type ObjectStatus = {
   size: number | null
   md5_base64: string | null
   content_type: string | null
+  /** A byte-identical frame of the person's earliest other session (or an earlier frame of this one). */
+  duplicate_of?: { session_id: string; index: number } | null
 }
+/** POST /v1/sessions/{id}/frames: targets for the new frames only; `dropped`: left-out frames removed (1-based). */
+export type AddFramesResponse = { session_id: string; n_frames: number; upload_urls: UploadTarget[]; expires_in_seconds: number; dropped: number[] }
+/** Live analysis stage while a session is processing (api analysis.run). */
+export type AnalysisStage = 'received' | 'engine' | 'explaining'
 
 /** SessionView as the api returns it: {session, result, labels, explanation}. */
 export type SessionView = {
@@ -44,12 +50,12 @@ export type SessionView = {
     /** Judge mode: the hosted sample these photos were copied from. */
     sample_id?: string | null
     label_details?: Record<string, LabelDetail>
-    /** GET /v1/sessions/{id} only: a signed GET per uploaded frame (null for RAW or a missing file). */
-    frame_urls?: (string | null)[]
-    /** GET /v1/sessions/{id} only: signed tight crops of the spot candidates, by candidate id. */
-    crop_urls?: Record<string, string>
     /** Live analysis stage while processing, else null. */
-    stage?: 'received' | 'engine' | 'explaining' | null
+    stage?: AnalysisStage | null
+    /** Detail views only: signed GET per uploaded frame (null for DNG or a missing photo). */
+    frame_urls?: (string | null)[]
+    /** Detail views only: signed tight crop per candidate id (crops that exist). */
+    crop_urls?: Record<string, string>
   }
   result: AnalysisResult | null
   labels: Record<string, string>
@@ -278,7 +284,15 @@ export const api = {
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
   patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
-  analyze: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}/analyze`, { method: 'POST' }),
+  /** `force`: measure a done session again with every frame (counts as an analysis). */
+  analyze: (token: string, sessionId: string, force = false) =>
+    request<SessionView>(token, `/v1/sessions/${sessionId}/analyze${force ? '?force=1' : ''}`, { method: 'POST' }),
+  /** More photos for a session (an edit before analyze, or a baseline top-up). */
+  addFrames: (token: string, sessionId: string, body: { add: number; content_types: string[] }) =>
+    request<AddFramesResponse>(token, `/v1/sessions/${sessionId}/frames`, { method: 'POST', ...json(body) }),
+  /** Remove photo `index` (1-based) before analyze; answers fresh upload links for every frame. */
+  deleteFrame: (token: string, sessionId: string, index: number) =>
+    request<CreateSessionResponse>(token, `/v1/sessions/${sessionId}/frames/${index}`, { method: 'DELETE' }),
   setBaseline: (token: string, site: Site, sessionId: string) =>
     request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
