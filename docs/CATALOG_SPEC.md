@@ -38,15 +38,19 @@ Facts only: names, ingredients (INCI), concerns, prices, store links. No marketi
   "size": "30 ml",
   "region": ["IN", "GLOBAL"],
   "stores": [
-    {"store": "Nykaa", "url": "https://...", "region": "IN"},
-    {"store": "Sephora", "url": "https://...", "region": "US"},
-    {"store": "Brand site", "url": "https://...", "region": "GLOBAL"}
+    {"store": "Nykaa", "url": "https://...", "region": "IN", "price": null},
+    {"store": "Ulta", "url": "https://...", "region": "US",
+     "price": {"amount": 6, "currency": "USD", "checked": "2026-10-15"}},
+    {"store": "Brand site", "url": "https://...", "region": "GLOBAL",
+     "price": {"amount": 6, "currency": "USD", "checked": "2026-10-15"}}
   ],
   "source_url": "https://<official product page>",
   "last_verified": "2026-10-14"
 }
 ```
 Rules: copy INCI from the official page or pack; record the price you saw with currency and date; store URLs must be real product pages.
+
+Per-store prices (owner decision, Oct 15): `stores[].price` is `{amount, currency, checked}` or `null`. `amount` is the price that store's own product page showed for **this exact product and size** (sale price if that is what the page charges), `currency` is the page's ISO 4217 code, `checked` is the day it was read (YYYY-MM-DD). `null` when the page did not load, blocked automated access, showed no price, was out of stock without a price, or listed a different size or variant. Never estimate, convert currencies or copy a price from another store; re-check before showing a price as current. The top-level `price` stays as the reference price (used by `max_price` search). The api serves `stores[].price` unchanged from `/v1/catalog/search` and `/v1/catalog/{product_id}`; `scripts/import_catalog.py` validates it (amount > 0, 3-letter upper-case currency, real date). Sheet columns: `store_N_price_amount`, `store_N_price_currency`, `store_N_price_checked` (after the other columns; all empty = null).
 
 Product images (changed Oct 13, see DECISIONS): `image_url` is the brand's own official product image, **linked from where the brand or a major retailer already publishes it, never downloaded, copied into the repo or re-hosted in our bucket**. `image_source` is the page it appears on, and the UI credits it ("Image: theordinary.com"). Packshots only: no lifestyle, model, before/after or claims images. If an image fails to load, the UI falls back to the neutral category icon. Brands or retailers can ask for removal, and an empty `image_url` is always valid.
 
