@@ -16,6 +16,7 @@ dependencies = [
   "google-cloud-firestore==2.33.0",
   "httpx==0.28.1",
   "jsonschema==4.26.0",
+  "pywebpush==2.5.0",
 ]
 
 [dependency-groups]
@@ -32,3 +33,7 @@ ignore = ["B008"]  # FastAPI Depends() in defaults is the documented pattern
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.uv]
+# pywebpush's dependencies, held at releases at least two weeks old (CLAUDE.md)
+constraint-dependencies = ["aiohttp==3.14.3", "py-vapid==1.9.4"]
