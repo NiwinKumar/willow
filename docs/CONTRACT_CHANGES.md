@@ -64,3 +64,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Impact: engine adds `app/facemap.py` and three lines in `_candidates`; the api reads the keys when present and re-runs old sessions with `scripts/remeasure.py --all --apply` to fill them.
 - Approved by: [ ] Harshini [x] Niwin
 - api/web (Niwin, no engine impact): `GET /v1/spots` returns the spot diary (`SpotDiary` in `web/src/lib/api.ts`).
+
+## 2026-10-15: Routine use log (api/web only, no engine impact)
+- What: the person can tick a routine product as used on a day (AM or PM), for Home's "routine today". `PUT` / `DELETE /v1/routine/log/{YYYY-MM-DD}/{entry_id}/{am|pm}` (idempotent, answers that day's ticks), `GET /v1/routine/log?from=&to=` (default last 14 days, at most 92). The day is the person's own calendar day (may be one ahead of UTC); ticks can be changed up to 30 days back, only for a slot the product is in, and only between its start and stop dates. `GET /v1/routine` entries gain `recent_use: {days_used, of_days}` over the last 4 weeks, so a product's outcome can say how often it was actually used.
+- Firestore: `users/{uid}/routine_log/{YYYY-MM-DD}` = `{date, used: {entry_id: [slots]}, updated_at}`; deleted with the person (delete my data).
+- Web: `RoutineLogDay`, `api.routineLog()`, `api.markUsed()`; no UI yet (the Home redesign uses it).
+- Approved by: n/a (api and web are both Niwin's)
