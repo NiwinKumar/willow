@@ -17,7 +17,7 @@ const NAV: { id: Exclude<Destination, 'you' | null>; label: string; to: string; 
  * Wide screens (≥900px): the glass sidebar from the design, 212px open / 65px collapsed. A black pill
  * slides to the current destination; Advisor toggles the right panel; You sits at the foot.
  */
-export function Sidebar({ current, collapsed, onToggle, onCheckIn, advisorOpen, onAdvisor, name, initials }: { current: Destination; collapsed: boolean; onToggle: () => void; onCheckIn: () => void; advisorOpen: boolean; onAdvisor: () => void; name: string; initials: string }) {
+export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, advisorOpen, onAdvisor, name, initials }: { current: Destination; collapsed: boolean; onToggle: () => void; onCheckIn: () => void; due?: string | null; advisorOpen: boolean; onAdvisor: () => void; name: string; initials: string }) {
   const nav = useRef<HTMLElement>(null)
   const [pill, setPill] = useState<{ top: number; on: boolean }>({ top: 0, on: false })
   const { pathname } = useLocation()
@@ -37,11 +37,12 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, advisorOpen, 
         <LogoMark size={30} />
         <span className={`text-[21px] font-light tracking-[-0.03em] ${label}`}>willow</span>
       </Link>
-      <button type="button" onClick={onCheckIn} aria-label="Check in" title="Check in · N" className="cta-yellow group flex h-10 w-full shrink-0 items-center gap-[11px] overflow-hidden rounded-[25px] squircle pr-2.5 pl-[13.5px] text-[14px] whitespace-nowrap hover:brightness-[1.04]">
+      <button type="button" onClick={onCheckIn} aria-label={due ? `Check in, ${due}` : 'Check in'} title={due ? `Check in · ${due} · N` : 'Check in · N'} className="cta-yellow group relative flex h-10 w-full shrink-0 items-center gap-[11px] overflow-hidden rounded-[25px] squircle pr-2.5 pl-[13.5px] text-[14px] whitespace-nowrap hover:brightness-[1.04]">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="shrink-0 transition-[scale,translate] duration-300 ease-bounce group-hover:-translate-y-px group-hover:scale-[1.16] group-active:scale-[.85]">
           <path d="M12 5v14M5 12h14" />
         </svg>
         <span className={label}>Check in</span>
+        {due ? <DueDot className={collapsed ? 'top-1.5 left-[30px]' : 'top-1/2 right-10 -translate-y-1/2'} /> : null}
         <kbd aria-hidden className={`ml-auto grid size-[22px] shrink-0 place-items-center rounded-[7px] bg-ink/8 font-mono text-[11px] ${label}`}>N</kbd>
       </button>
       <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-0.5">
@@ -82,4 +83,9 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, advisorOpen, 
       </Link>
     </aside>
   )
+}
+
+/** Check-in due today or late (the schedule in You): a small ink dot; the button's label says it in words. */
+export function DueDot({ className = '' }: { className?: string }) {
+  return <span aria-hidden className={`pointer-events-none absolute size-2 rounded-full bg-selected shadow-[0_0_0_2px_var(--color-cta)] ${className}`} />
 }

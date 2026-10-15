@@ -13,6 +13,7 @@ from app.routes.demo_routes import router as demo_router
 from app.routes.me_routes import router as me_router
 from app.routes.product_tests_routes import router as product_tests_router
 from app.routes.products_routes import router as products_router
+from app.routes.reminders_routes import router as reminders_router
 from app.routes.retailer_routes import router as retailer_router
 from app.routes.sessions_routes import router as sessions_router
 from app.settings import get_settings
@@ -73,6 +74,7 @@ app.include_router(products_router)
 app.include_router(retailer_router)
 app.include_router(demo_router)
 app.include_router(product_tests_router)
+app.include_router(reminders_router)
 if storage.dev_uploads_enabled():
     from app.routes.dev_routes import router as dev_router
 

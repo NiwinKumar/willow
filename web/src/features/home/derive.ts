@@ -10,7 +10,7 @@ import { parseDate } from '../../lib/format'
 import { byGoalOrder, METRIC_META, SITE_LABEL } from '../../lib/metrics'
 import { verdictKind, type VerdictKind } from '../../lib/verdict'
 
-/** Back after this many days without a face check-in (no cadence is stored, so Home uses one fixed rule). */
+/** Back after this many days without a face check-in when no check-in schedule is set (lib/schedule gapDaysFor). */
 export const GAP_DAYS = 14
 /** A baseline needs this many usable photos for a normal range (api baselines.NOISE_BAND_FRAMES). */
 export const BAND_FRAMES = 3
@@ -53,7 +53,7 @@ export type HomeRead = {
   lastFace: Session | null
 }
 
-export function readHome(all: Session[], face: Session[]): HomeRead {
+export function readHome(all: Session[], face: Session[], gapDays: number = GAP_DAYS): HomeRead {
   const lead = latest(face, usable)
   const baseline = lead ? baselineFor(lead, face) : latest(face, (s) => s.is_baseline)
   // The lead's own baseline ref describes the baseline it was compared with (a demoted former baseline has
@@ -82,7 +82,7 @@ export function readHome(all: Session[], face: Session[]): HomeRead {
             ? 'rejected'
             : 'done'
 
-  const person: PersonKind = !baseline ? 'new' : !hasBand ? 'noBand' : lastFace && daysSince(lastFace.created_at) >= GAP_DAYS ? 'gap' : 'active'
+  const person: PersonKind = !baseline ? 'new' : !hasBand ? 'noBand' : lastFace && daysSince(lastFace.created_at) >= gapDays ? 'gap' : 'active'
   return { face, lead, baseline, baselineFrames, hasBand, person, todaySession, todayKind, lastFace }
 }
 

@@ -60,7 +60,7 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
   )
 }
 
-export type SetupRow = { t: string; d: string; state: 'done' | 'part' | 'todo'; part?: number; onClick: () => void }
+export type SetupRow = { t: string; d: string; state: 'done' | 'part' | 'todo'; part?: number; onClick: () => void; action?: { label: string; onClick: () => void } }
 
 /** Set up Willow: what is still missing before results mean something. */
 export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: string }) {
@@ -74,8 +74,8 @@ export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: s
       </div>
       <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
         {rows.map((r) => (
-          <li key={r.t}>
-            <button type="button" onClick={r.onClick} className="flex min-h-11 w-full items-center gap-2.5 rounded-[14px] squircle px-1.5 py-[7px] text-left text-ink transition-[background] duration-[250ms] hover:bg-ink/5">
+          <li key={r.t} className="flex items-center gap-1.5">
+            <button type="button" onClick={r.onClick} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-[14px] squircle px-1.5 py-[7px] text-left text-ink transition-[background] duration-[250ms] hover:bg-ink/5">
               <span
                 aria-hidden
                 className={`grid size-[22px] flex-none place-items-center rounded-full border-[1.5px] text-[11px] ${r.state === 'done' ? 'border-ink bg-selected text-inverse' : 'border-ink/25 text-ink'}`}
@@ -89,10 +89,17 @@ export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: s
                 </span>
                 <span className="text-[11.5px] text-ink-2">{r.d}</span>
               </span>
-              <span aria-hidden className="text-[13px] text-ink-2">
-                →
-              </span>
+              {r.action ? null : (
+                <span aria-hidden className="text-[13px] text-ink-2">
+                  →
+                </span>
+              )}
             </button>
+            {r.action ? (
+              <Pill tone="outline" className="shrink-0" onClick={r.action.onClick}>
+                {r.action.label}
+              </Pill>
+            ) : null}
           </li>
         ))}
       </ul>
