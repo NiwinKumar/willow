@@ -1,2 +1,5 @@
 /* Keyframes the Routine design uses that the shared index.css does not have (prefixed: feature-local). */
 @keyframes rtScan { 0% { top: 14% } 100% { top: 82% } }
+/* The Routine design's sheet motion (Willow App Routine.dc.html wSheet / wSlide). */
+@keyframes rtSheet { from { opacity: 0; translate: 0 40px } to { opacity: 1; translate: 0 0 } }
+@keyframes rtSlide { from { opacity: 0; translate: 40px 0 } to { opacity: 1; translate: 0 0 } }

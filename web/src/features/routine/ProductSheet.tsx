@@ -6,7 +6,6 @@ import { useMaybeShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { Chip } from '../../components/ui/Chip'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import { Sheet } from '../../components/ui/Sheet'
 import { ProductImage } from '../../components/willow/ProductImage'
 import { imageCredit } from '../../components/willow/productVisual'
 import { VerdictGlyph } from '../../components/willow/Verdict'
@@ -21,6 +20,7 @@ import { useOutcomes } from '../../lib/useOutcomes'
 import { useProductTests, testDay } from './productTests'
 import { activeLabel, categoryOf, entryName, metaLine, OUTCOME_GLYPH, useOutcomeSessions } from './routineModel'
 import { addDays, scheduleWords, usedOn, weekdayOf, WEEKDAYS } from './schedule'
+import { RoutineSheet } from './RoutineSheet'
 import { StartTest } from './StartTest'
 import { failureText, useRoutineWrites } from './writes'
 
@@ -47,9 +47,9 @@ const storePrice = (p: StorePrice) => `${fmtPrice(p)} · checked ${fmtDate(p.che
  */
 export function ProductSheet({ target, onClose, onAdd }: { target: ProductTarget | null; onClose: () => void; onAdd?: (p: Product) => void }) {
   return (
-    <Sheet open={target !== null} onClose={onClose} title="Product information" variant="side">
+    <RoutineSheet open={target !== null} onClose={onClose} kind="side" title="Product information">
       {target ? <Body target={target} onClose={onClose} onAdd={onAdd} /> : null}
-    </Sheet>
+    </RoutineSheet>
   )
 }
 
@@ -121,7 +121,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   if (productId && !product && fetched.status === 'loading')
     return (
       <div aria-busy className="flex flex-col gap-3">
-        <span className="skeleton block h-[220px] rounded-xl" />
+        <span className="skeleton block h-[300px] rounded-[40px]" />
         <span className="skeleton block h-5 w-1/2" />
         <span className="skeleton block h-8 w-3/4" />
       </div>
@@ -129,7 +129,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
 
   return (
     <div className="flex flex-col gap-3 pb-2">
-      <div className="relative grid min-h-[250px] place-items-center rounded-xl pb-6 squircle" style={{ background: `radial-gradient(60% 60% at 50% 55%, ${categoryOf(category).c[0]}, transparent 72%), var(--bg-sunken)` }}>
+      <div className="relative grid min-h-[300px] place-items-center rounded-[40px] pb-6 squircle" style={{ background: `radial-gradient(60% 60% at 50% 55%, ${categoryOf(category).c[0]}, transparent 72%), var(--bg-sunken)` }}>
         <ProductImage product={{ image_url: image.image_url, category, name }} size={image.image_url ? 160 : 120} breathe={!image.image_url} />
         <span className="absolute inset-x-5 bottom-3.5 text-[12px] text-ink-2">
           {credit ? (

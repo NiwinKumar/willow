@@ -34,7 +34,7 @@ export function ProductTestTile({ read, onOpen, className = '' }: { read: Forear
         <span className="font-dot text-[46px] leading-[.85]">{day}</span>
         {of ? <span className="text-[13px]">of {of} days</span> : null}
       </span>
-      <span aria-hidden className="grid grid-cols-[repeat(14,1fr)] gap-[3px]">
+      <span aria-hidden className="grid w-full max-w-[300px] grid-cols-[repeat(14,1fr)] gap-[3px]">
         {dots.map((d, i) => (
           <PlanDotMark key={i} dot={d} />
         ))}
