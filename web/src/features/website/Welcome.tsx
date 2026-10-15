@@ -3,9 +3,11 @@ import './website.css'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
-import type { MetricGroup, Site } from '../../data/types'
+import type { MetricId, Site } from '../../data/types'
+import type { PhotoTime, SkinType } from '../../lib/api'
 import { syncConsent } from '../../lib/consent'
-import { GOALS, METRIC_META } from '../../lib/metrics'
+import { GOALS, MAX_GOALS, METRIC_META, type GoalId } from '../../lib/metrics'
+import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
 import { useData } from '../../data/useData'
@@ -16,9 +18,10 @@ import { FIRST_CHECKIN, hasConsent } from './entry'
 const BACKDROP = 'radial-gradient(40% 40% at 15% 20%, rgba(255,178,122,.55), transparent 70%), radial-gradient(40% 45% at 85% 80%, rgba(156,211,255,.6), transparent 70%), radial-gradient(35% 35% at 80% 15%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
 
 /**
- * Onboarding (/welcome = consent, /welcome/goals = goals), then the person's first check-in (or `?next=`).
- * Consent is kept on this device (lib/prefs) and saved to the account (PUT /v1/me/consent); goals only
- * reorder the report.
+ * Onboarding (/welcome = consent, /welcome/goals = goals, photo time, optional skin type and check-in days),
+ * then the person's first check-in (or `?next=`). Consent is kept on this device (lib/prefs) and saved to the
+ * account (PUT /v1/me/consent); the rest is the profile (lib/profile, PUT /v1/me/profile). Goals only reorder
+ * the report.
  */
 export default function Welcome() {
   const { step } = useParams()
@@ -176,7 +179,13 @@ function Consent() {
             </span>
             <input type="checkbox" role="switch" checked={share} onChange={(e) => setShare(e.target.checked)} className="size-6 flex-none accent-[var(--action-selected)]" />
           </label>
-          <p className="m-0 text-[14px] text-ink-2">You can change sharing or delete your data any time, from You in the app.</p>
+          <p className="m-0 text-[14px] text-ink-2">
+            You can change sharing or delete your data any time, from You in the app. The full{' '}
+            <Link to="/terms" target="_blank" rel="noopener" className="text-ink underline underline-offset-2">
+              terms and privacy notice
+            </Link>{' '}
+            say who runs Willow and what it keeps.
+          </p>
         </div>
       </div>
       <button type="button" onClick={accept} disabled={!agree} className="min-h-[60px] self-stretch rounded-[24px] bg-selected text-[17px] text-inverse transition-opacity">
@@ -187,52 +196,52 @@ function Consent() {
 }
 
 /** Each goal drawn with one of the design's goal gradients (decoration only) and its ink colour. */
-const GOAL_LOOK: Record<string, { bg: string; fg: string }> = {
-  clearer: { bg: 'radial-gradient(90% 80% at 40% 100%, #4FB866 0%, #B8E986 45%, #EAF2E2 85%)', fg: '#0E2A12' },
-  even_tone: { bg: 'radial-gradient(90% 80% at 30% 100%, #FF8A3D 0%, #FFB27A 35%, #F6E3D4 75%)', fg: '#2A1206' },
-  calmer: { bg: 'radial-gradient(90% 80% at 50% 100%, #F25FA8 0%, #F7A6C9 45%, #F4E6EC 85%)', fg: '#3A0A22' },
-  smoother: { bg: 'radial-gradient(90% 80% at 70% 100%, #3D7BFF 0%, #9CD3FF 45%, #E6EEF6 85%)', fg: '#0A1840' },
-  softer_lines: { bg: 'radial-gradient(90% 80% at 60% 100%, #7A5CFF 0%, #D8B8FF 45%, #EEE8F6 85%)', fg: '#1C0F4A' },
-  under_eye: { bg: 'radial-gradient(90% 80% at 50% 100%, #9CD3FF 0%, #D8B8FF 45%, #F1ECF8 85%)', fg: '#1C0F4A' },
+const GOAL_LOOK: Record<GoalId, { bg: string; fg: string }> = {
+  dark_spots: { bg: 'radial-gradient(90% 80% at 30% 100%, #FF8A3D 0%, #FFB27A 35%, #F6E3D4 75%)', fg: '#2A1206' },
+  even_tone: { bg: 'radial-gradient(90% 80% at 70% 100%, #3D7BFF 0%, #9CD3FF 45%, #E6EEF6 85%)', fg: '#0A1840' },
+  redness: { bg: 'radial-gradient(90% 80% at 50% 100%, #F25FA8 0%, #F7A6C9 45%, #F4E6EC 85%)', fg: '#3A0A22' },
+  blemishes: { bg: 'radial-gradient(90% 80% at 40% 100%, #4FB866 0%, #B8E986 45%, #EAF2E2 85%)', fg: '#0E2A12' },
+  pores_texture: { bg: 'radial-gradient(90% 80% at 60% 100%, #7A5CFF 0%, #D8B8FF 45%, #EEE8F6 85%)', fg: '#1C0F4A' },
+  lines: { bg: 'radial-gradient(90% 80% at 50% 100%, #9CD3FF 0%, #D8B8FF 45%, #F1ECF8 85%)', fg: '#1C0F4A' },
+  under_eye: { bg: 'radial-gradient(90% 80% at 40% 100%, #FF6B4A 0%, #F7A6C9 45%, #F6E8E6 85%)', fg: '#3A0E06' },
   oil_glow: { bg: 'radial-gradient(90% 80% at 50% 100%, #F2B53A 0%, #F6DE5C 40%, #F5F0DA 85%)', fg: '#2A2410' },
 }
 
 const PLACE: Record<Site, string> = { face_full: 'FACE', cheek_macro: 'CLOSE-UPS', nose_macro: 'CLOSE-UPS', forearm_treated: 'FOREARM', forearm_control: 'FOREARM' }
 
 /** Where a goal's measurements come from, read off the metric table: "FACE · CLOSE-UPS". */
-function goalPlaces(groups: MetricGroup[]): string {
-  const sites = Object.values(METRIC_META)
-    .filter((m) => groups.includes(m.group))
-    .flatMap((m) => m.sites)
+function goalPlaces(metrics: MetricId[]): string {
+  const sites = metrics.flatMap((m) => METRIC_META[m].sites)
   const order: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
   return [...new Set(order.filter((s) => sites.includes(s)).map((s) => PLACE[s]))].join(' · ')
 }
 
-const TIMES = [
-  { id: 'morning', label: 'Morning' },
-  { id: 'midday', label: 'Midday' },
-  { id: 'evening', label: 'Evening' },
-]
+/** Pills in a track (the design's photo-time control), wrapping on narrow screens. */
+const pillTrack = 'flex flex-wrap gap-1 rounded-[26px] bg-muted p-[5px]'
+const pill = (on: boolean) => `min-h-11 rounded-pill px-5 text-[15px] text-ink transition-colors ${on ? 'bg-white' : 'bg-transparent'}`
+const panel = 'flex flex-wrap items-center justify-between gap-[18px] rounded-[32px] px-[clamp(18px,3vw,28px)] py-[22px] backdrop-blur-[20px]'
+const panelBg = { background: 'rgba(250,250,248,.82)' }
 
 function Goals() {
   const { user, continueAsGuest } = useAuth()
-  const { setGoals } = useData()
+  const { setGoals, saveProfile, profile } = useData()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const valid = new Set(GOALS.map((g) => g.id))
-  const [picked, setPicked] = useState<string[]>(() => prefs.goals().filter((g) => valid.has(g)).slice(0, 3))
+  const [picked, setPicked] = useState<GoalId[]>(() => profile.goals)
   const [hint, setHint] = useState(false)
-  const [time, setTime] = useState(() => (TIMES.some((t) => t.id === prefs.photoTime()) ? prefs.photoTime()! : 'evening'))
+  const [time, setTime] = useState<PhotoTime>(() => profile.photo_time ?? 'evening')
+  const [skin, setSkin] = useState<SkinType | null>(() => profile.skin_type)
+  const [days, setDays] = useState<number[]>(() => profile.checkin?.days ?? [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const target = nextPath(params.get('next'), FIRST_CHECKIN)
   const toCapture = target.startsWith('/check-in')
 
-  const toggle = (id: string) => {
+  const toggle = (id: GoalId) => {
     if (picked.includes(id)) {
       setPicked(picked.filter((g) => g !== id))
       setHint(false)
-    } else if (picked.length >= 3) setHint(true)
+    } else if (picked.length >= MAX_GOALS) setHint(true)
     else {
       setPicked([...picked, id])
       setHint(false)
@@ -240,9 +249,11 @@ function Goals() {
   }
 
   const finish = async () => {
-    // Saved on this device (and for the demo journey in this tab); every screen re-orders at once.
+    // Saved on this device (and for the demo journey in this tab); every screen re-orders at once. Someone
+    // signed in has it on their account now; a new guest's copy goes up as their account starts (data/store).
     setGoals(picked)
-    prefs.setPhotoTime(time)
+    const checkin = days.length ? { days, time: profile.checkin?.time ?? PHOTO_TIME_CLOCK[time], tz: browserTz() } : null
+    void saveProfile({ photo_time: time, skin_type: skin, checkin }).catch(() => undefined)
     if (!user) {
       // Capturing needs an account of your own: a guest one for this browser is enough.
       setBusy(true)
@@ -278,11 +289,11 @@ function Goals() {
           Three goals is the limit. Remove one to choose another.
         </p>
       ) : null}
-      {/* Cards grow to fill the last row, so seven goals never leave a hole. */}
+      {/* Cards grow to fill the last row, so the goals never leave a hole. */}
       <div className="flex flex-wrap gap-3.5">
         {GOALS.map((g) => {
           const on = picked.includes(g.id)
-          const look = GOAL_LOOK[g.id] ?? { bg: 'linear-gradient(180deg, #F4F3F0, #E3E2DD)', fg: 'var(--text-primary)' }
+          const look = GOAL_LOOK[g.id]
           return (
             <button
               key={g.id}
@@ -293,7 +304,7 @@ function Goals() {
               style={{ background: look.bg, color: look.fg, boxShadow: 'inset 0 0 40px 6px rgba(255,255,255,.35), 0 24px 50px -36px rgba(0,0,0,.45)' }}
             >
               <span className="flex items-center justify-between gap-2">
-                <span className="rounded-pill bg-white/35 px-2.5 py-1.5 font-mono text-[11px] tracking-[.08em]">{goalPlaces(g.groups)}</span>
+                <span className="rounded-pill bg-white/35 px-2.5 py-1.5 font-mono text-[11px] tracking-[.08em]">{goalPlaces(g.metrics)}</span>
                 <span aria-hidden className={`grid size-[34px] place-items-center rounded-full border-[1.5px] border-white/80 text-[16px] text-inverse ${on ? 'bg-selected' : 'bg-white/30'}`}>
                   {on ? '✓' : ''}
                 </span>
@@ -303,17 +314,46 @@ function Goals() {
           )
         })}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-[18px] rounded-[32px] px-[clamp(18px,3vw,28px)] py-[22px] backdrop-blur-[20px]" style={{ background: 'rgba(250,250,248,.82)' }}>
+      <div className={panel} style={panelBg}>
         <div className="flex flex-col gap-1">
           <span className="text-[18px]">When do you usually take photos?</span>
           <span className="text-[14px] text-ink-2">Shine and redness can shift through the day. Same time each session is best.</span>
         </div>
         <div role="radiogroup" aria-label="Usual photo time" className="flex gap-1 rounded-pill bg-muted p-[5px]">
-          {TIMES.map((t) => (
-            <button key={t.id} type="button" role="radio" aria-checked={time === t.id} onClick={() => setTime(t.id)} className={`min-h-11 rounded-pill px-5 text-[15px] text-ink transition-colors ${time === t.id ? 'bg-white' : 'bg-transparent'}`}>
+          {PHOTO_TIMES.map((t) => (
+            <button key={t.id} type="button" role="radio" aria-checked={time === t.id} onClick={() => setTime(t.id)} className={pill(time === t.id)}>
               {t.label}
             </button>
           ))}
+        </div>
+      </div>
+      <div className={panel} style={panelBg}>
+        <div className="flex max-w-[360px] flex-col gap-1">
+          <span className="text-[18px]">Your skin type</span>
+          <span className="text-[14px] text-ink-2">Optional. It does not change any measurement; you can change it in You.</span>
+        </div>
+        <div role="radiogroup" aria-label="Skin type" className={pillTrack}>
+          {[...SKIN_TYPES, { id: null, label: 'Prefer not to say' }].map((t) => (
+            <button key={t.label} type="button" role="radio" aria-checked={skin === t.id} onClick={() => setSkin(t.id)} className={pill(skin === t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={panel} style={panelBg}>
+        <div className="flex max-w-[360px] flex-col gap-1">
+          <span className="text-[18px]">Your check-in days</span>
+          <span className="text-[14px] text-ink-2">Optional. Once a week is enough; the same day and time keeps photos comparable.</span>
+        </div>
+        <div role="group" aria-label="Check-in days" className={pillTrack}>
+          {WEEKDAYS.map((d, i) => {
+            const on = days.includes(i)
+            return (
+              <button key={d} type="button" aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())} className={`${pill(on)} min-w-[52px] px-3.5`}>
+                {d}
+              </button>
+            )
+          })}
         </div>
       </div>
       {error ? (

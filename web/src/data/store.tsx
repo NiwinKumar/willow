@@ -5,9 +5,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-import { api, type SessionView } from '../lib/api'
+import { api, type ProfilePatch, type SessionView } from '../lib/api'
 import { syncConsent } from '../lib/consent'
-import { prefs } from '../lib/prefs'
+import { cleanGoals, migrateGoals, type GoalId } from '../lib/metrics'
+import { localProfile, pushProfile, syncProfile, writeLocal } from '../lib/profile'
+import { invalidate } from '../lib/query'
 import { useAuth } from '../lib/useAuth'
 import { DataContext, type DataState, type DataStatus } from './context'
 import { holdDemo, peekDemo, pickDemo, releaseDemo, type DemoPick } from './demoSource'
@@ -24,12 +26,15 @@ function storedDemo(): boolean {
   }
 }
 
-function demoGoals(): string[] {
+/** The demo journey's goals (this tab). A list saved under the old goal ids ('willow.goals') is read as the new ones. */
+const DEMO_GOALS: GoalId[] = ['dark_spots', 'even_tone', 'redness']
+function demoGoals(): GoalId[] {
   try {
-    const goals = JSON.parse(sessionStorage.getItem('willow.goals') ?? '[]') as string[]
-    return goals.length ? goals : ['even_tone', 'calmer']
+    const now = sessionStorage.getItem('willow.goals2')
+    const goals = now !== null ? cleanGoals(JSON.parse(now)) : migrateGoals(JSON.parse(sessionStorage.getItem('willow.goals') ?? '[]'))
+    return goals.length ? goals : DEMO_GOALS
   } catch {
-    return ['even_tone', 'calmer']
+    return DEMO_GOALS
   }
 }
 
@@ -125,31 +130,61 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [demo])
 
-  // Goals live on this device; held in state so saving them in You re-orders Home and results at once.
-  const [goalsLive, setGoalsLive] = useState(prefs.goals)
+  // The profile (goals, photo time, skin type, check-in days): a copy on this device, held in state so a change
+  // in You re-orders Home and results at once. Signed in, the account is the source of truth (lib/profile).
+  const [profile, setProfile] = useState(localProfile)
   const [goalsDemo, setGoalsDemo] = useState(demoGoals)
+  const edits = useRef(0)
+  const displayName = user && !user.isAnonymous ? user.displayName : null
+
+  const saveProfile = useCallback(
+    async (patch: ProfilePatch) => {
+      edits.current += 1
+      writeLocal(patch)
+      setProfile(localProfile())
+      // Someone not signed in yet sends it at sign-in (syncProfile).
+      if (!uid) return
+      await pushProfile(getIdToken)
+      invalidate(['me', uid])
+    },
+    [uid, getIdToken],
+  )
+
   const setGoals = useCallback(
     (goals: string[]) => {
+      const clean = cleanGoals(goals)
       // The demo journey (this tab) orders by the same goals, so it gets a copy too.
       try {
-        sessionStorage.setItem('willow.goals', JSON.stringify(goals))
+        sessionStorage.setItem('willow.goals2', JSON.stringify(clean))
       } catch {
         /* private mode */
       }
-      setGoalsDemo(goals)
-      if (!demo) {
-        prefs.setGoals(goals)
-        setGoalsLive(goals)
-      }
+      setGoalsDemo(clean)
+      if (!demo) void saveProfile({ goals: clean }).catch(() => undefined)
     },
-    [demo],
+    [demo, saveProfile],
   )
-  // A new person on this device (sign-in, sign-out) reads their own saved goals.
-  const [goalsUid, setGoalsUid] = useState(uid)
-  if (goalsUid !== uid) {
-    setGoalsUid(uid)
-    setGoalsLive(prefs.goals())
+
+  // A new person on this device (sign-in, sign-out) reads their own copy, then the account's (account wins).
+  const [profileUid, setProfileUid] = useState(uid)
+  if (profileUid !== uid) {
+    setProfileUid(uid)
+    setProfile(localProfile())
   }
+  useEffect(() => {
+    if (demo || !uid) return
+    let alive = true
+    const at = edits.current
+    syncProfile(getIdToken, displayName)
+      .then((p) => {
+        // A change made while this was in flight is newer than the account's copy: keep it.
+        if (alive && edits.current === at) setProfile(p)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [demo, uid, getIdToken, displayName])
 
   const upsert = useCallback(
     (view: SessionView) => {
@@ -161,19 +196,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<DataState>(() => {
     if (demo) {
       const goals = goalsDemo
-      const empty = { mode: 'demo' as const, sites: [], series: () => null, all: [], goals, setGoals, refresh: noop, upsert: () => {} }
+      const empty = { mode: 'demo' as const, sites: [], series: () => null, all: [], goals, setGoals, profile, saveProfile, refresh: noop, upsert: () => {} }
       if (!demoPick) return { ...empty, status: 'loading' }
       if (demoPick.source !== 'real') return { ...empty, status: 'error' }
       const real = groupBySite(demoPick.views)
       const all = demoPick.views.map(toSession).sort((a, b) => a.created_at.localeCompare(b.created_at))
-      return { mode: 'demo', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, all, goals, setGoals, refresh: noop, upsert: () => {} }
+      return { mode: 'demo', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, all, goals, setGoals, profile, saveProfile, refresh: noop, upsert: () => {} }
     }
     const status: DataStatus = !uid ? 'idle' : loaded.uid === uid ? loaded.status : 'loading'
     const mine = owned.uid === uid ? owned.views : []
     const bySite = groupBySite(mine)
     const all = mine.map(toSession).sort((a, b) => a.created_at.localeCompare(b.created_at))
-    return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, all, goals: goalsLive, setGoals, refresh, upsert }
-  }, [demo, demoPick, uid, loaded, owned, refresh, upsert, goalsLive, goalsDemo, setGoals])
+    return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, all, goals: profile.goals, setGoals, profile, saveProfile, refresh, upsert }
+  }, [demo, demoPick, uid, loaded, owned, refresh, upsert, profile, goalsDemo, setGoals, saveProfile])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

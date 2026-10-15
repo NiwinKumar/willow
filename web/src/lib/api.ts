@@ -160,6 +160,20 @@ export type RetailerInsights = {
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
 
+/** users/{uid}.profile (api me_routes.py): goals are lib/metrics GoalId values; days 0 = Monday. */
+export type PhotoTime = 'morning' | 'midday' | 'evening'
+export type SkinType = 'oily' | 'combination' | 'dry' | 'normal' | 'sensitive'
+export type CheckinSchedule = { days: number[]; time: string; tz: string }
+export type Profile = {
+  goals: string[]
+  photo_time: PhotoTime | null
+  display_name: string | null
+  skin_type: SkinType | null
+  checkin: CheckinSchedule | null
+  updated_at: string | null
+}
+export type ProfilePatch = Partial<Omit<Profile, 'updated_at'>>
+
 export class ApiError extends Error {
   status: number
   code: string | null
@@ -257,8 +271,8 @@ export const api = {
   setBaseline: (token: string, site: Site, sessionId: string) =>
     request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
-  /** The account as the api knows it: uid and the consent on record (null before any). */
-  me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null }>(token, '/v1/me'),
+  /** The account as the api knows it: uid, the consent and the profile on record (each null before any). */
+  me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null; profile: Profile | null }>(token, '/v1/me'),
   catalogSearch: (token: string, params: { q?: string; concern?: string; category?: string; max_price?: number; currency?: string; limit?: number }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
     return request<{ products: Product[] }>(token, `/v1/catalog/search?${qs}`)
@@ -283,6 +297,8 @@ export const api = {
     request<RoutineLogDay>(token, `/v1/routine/log/${day}/${entryId}/${slot}`, { method: used ? 'PUT' : 'DELETE' }),
   putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
+  /** Partial: only the fields sent change; null clears one. */
+  putProfile: (token: string, patch: ProfilePatch) => request<{ profile: Profile }>(token, '/v1/me/profile', { method: 'PUT', ...json(patch) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
   retailerAsk: (token: string, question: string) => request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question }) }),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
