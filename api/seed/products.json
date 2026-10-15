@@ -46,17 +46,28 @@
       {
         "store": "Brand site",
         "url": "https://theordinary.com/en-us/niacinamide-10-zinc-1-serum-100436.html",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 6.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/niacinamide-10-zinc-1-serum-oily-skin-pimprod2007111?sku=2551167",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 6.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-ordinary-niacinamide-10percent-zinc-1percent/p/15707745",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://theordinary.com/dw/image/v2/BFKJ_PRD/on/demandware.static/-/Sites-deciem-master/default/dwce8a7cdf/Images/products/The%20Ordinary/rdn-niacinamide-10pct-zinc-1pct-30ml.png",
@@ -113,12 +124,18 @@
       {
         "store": "Brand site",
         "url": "https://theordinary.com/en-us/azelaic-acid-suspension-10-exfoliator-100407.html",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 12.2,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-ordinary-azelaic-acid-suspension-10percent/p/5003158",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://theordinary.com/dw/image/v2/BFKJ_PRD/on/demandware.static/-/Sites-deciem-master/default/dw711cec9a/Images/products/The%20Ordinary/rdn-azelaic-acid-suspension-10pct-30ml.png",
@@ -201,17 +218,24 @@
       {
         "store": "Brand site",
         "url": "https://theordinary.com/en-us/glycolic-acid-7-exfoliating-toner-100418.html",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 9.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-ordinary-glycolic-acid-7percent-exfoliating-solution/p/13025179",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Boots",
         "url": "https://boots.com/the-ordinary-glycolic-acid-toning-solution-240ml-10279240",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://theordinary.com/dw/image/v2/BFKJ_PRD/on/demandware.static/-/Sites-deciem-master/default/dw8b57fa2b/Images/products/The%20Ordinary/ord-glyc-acid-7pct-100ml-Aug-UPC.png",
@@ -269,12 +293,18 @@
       {
         "store": "Brand site",
         "url": "https://theordinary.com/en-us/alpha-arbutin-2-ha-serum-100401.html",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 11.5,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-ordinary-alpha-arbutin-2percent-ha-face-serum/p/16216837",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://theordinary.com/dw/image/v2/BFKJ_PRD/on/demandware.static/-/Sites-deciem-master/default/dwa689472f/Images/products/The%20Ordinary/FY25-D41247-ORD-Web-Alp-Arb-2pct-30ml-1x1-EN-1.jpg",
@@ -346,12 +376,18 @@
       {
         "store": "Brand site",
         "url": "https://theordinary.com/en-us/retinal-02-emulsion-100646.html",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 14.9,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-ordinary-retinal-0-2percent-emulsion/p/14257004",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://theordinary.com/dw/image/v2/BFKJ_PRD/on/demandware.static/-/Sites-deciem-master/default/dwa863ca2c/Images/products/The%20Ordinary/ord-retinal-02-emulsion-15ml.png",
@@ -424,17 +460,28 @@
       {
         "store": "Brand site",
         "url": "https://www.cerave.com/skincare/cleansers/acne-benzoyl-peroxide-cleanser",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 17.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/acne-foaming-cream-cleanser-pimprod2012167?sku=2556948",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 17.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Target",
         "url": "https://www.target.com/p/cerave-acne-foaming-cream-face-cleanser-acne-treatment-face-wash-fragrance-free-5oz/-/A-76545878",
-        "region": "US"
+        "region": "US",
+        "price": null
       }
     ],
     "image_url": "https://www.cerave.com/-/media/project/loreal/brand-sites/cerave/americas/us/skincare/cleansers/acne-benzoyl-peroxide-cleanser/bpo4/desktop-700x785/bpo4-packshot-with-carton-desktop-700x785-v1.jpg?rev=5faf4f0bceed430aad11f4d1c528406d",
@@ -515,22 +562,30 @@
       {
         "store": "Brand site",
         "url": "https://www.cerave.com/skincare/facial-serums/resurfacing-retinol-serum",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 21.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/resurfacing-retinol-facial-serum-acne-prone-skin-pimprod2012179?sku=2556947",
-        "region": "US"
+        "region": "US",
+        "price": null
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/cerave-resurfacing-retinol-serum/p/20826332",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Boots",
         "url": "https://www.boots.com/cerave-resurfacing-retinol-serum-with-ceramides--niacinamide-for-blemish-prone-skin-30ml-10315626",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://www.cerave.com/-/media/project/loreal/brand-sites/cerave/americas/us/skincare/serums/resurfacing-retinol-serum/retinol/desktop-700x785/retinol-packshot-with-carton-desktop-700x785-v1.jpg?rev=f86170d06b104c3c85818ba712b4140a",
@@ -600,22 +655,30 @@
       {
         "store": "Brand site",
         "url": "https://www.cerave.com/skincare/moisturizers/pm-facial-moisturizing-lotion",
-        "region": "US"
+        "region": "US",
+        "price": null
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/pm-facial-moisturizing-lotion-xlsImpprod5140067?sku=2254422",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 19.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/cerave-pm-facial-moisturizer-ultra-lightweight-night-cream/p/13169461",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Boots",
         "url": "https://www.boots.com/cerave-facial-moisturising-lotion-52ml-10258275",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://media.ulta.com/i/ulta/2254422?w=500&h=500",
@@ -698,17 +761,24 @@
       {
         "store": "Brand site",
         "url": "https://www.cerave.com/skincare/moisturizers/am-facial-moisturizing-lotion-with-sunscreen",
-        "region": "US"
+        "region": "US",
+        "price": null
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/am-facial-moisturizing-lotion-spf-30-xlsImpprod4190253?sku=2241990",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 19.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/cerave-am-facial-moisturizing-lotion-spf-30-oil-free-moisturizer-with-sunscreen-non-comedogenic/p/13169462",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://media.ulta.com/i/ulta/2241990?w=500&h=500",
@@ -784,17 +854,20 @@
       {
         "store": "Brand site",
         "url": "https://www.laroche-posay.co.in/anthelios/anthelios-uvmune-400-invisible-fluid-spf50",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/la-roche-posay-anthelios-uvmune-400-invisible-fluid-spf-50-ultra-light-sunscreen/p/23326361",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Boots",
         "url": "https://www.boots.com/la-roche-posay-anthelios-uvmune-400-invisible-fluid-spf50-50ml-10306562",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://www.laroche-posay.co.in/-/media/project/loreal/brand-sites/lrp/apac/in/products/anthelios/anthelios-uvmune-fluid-ap-50/lrpproductpagesunantheliosuvmune400fluidapspf503337875797580front.png?sc_lang=en-in",
@@ -874,17 +947,24 @@
       {
         "store": "Brand site",
         "url": "https://www.laroche-posay.co.in/cicaplast/cicaplast-baume-b5-plus",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/cicaplast-balm-b5-soothing-therapeutic-multi-purpose-cream-pimprod2018263?sku=2570171",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 20.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/la-roche-posay-cicaplast-baume-b5-repair-moisturizer-balm-soothing-cream/p/23326362",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.laroche-posay.co.in/-/media/project/loreal/brand-sites/lrp/apac/in/products/cicaplast/cicaplast-baume-b5-plus/larocheposayproductcicaplastbaumeb5100ml3337875816847.png",
@@ -936,17 +1016,24 @@
       {
         "store": "Brand site",
         "url": "https://www.paulaschoice.in/products/skin-perfecting-2-bha-liquid-exfoliant",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 1140.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Sephora",
         "url": "https://www.sephora.com/product/paula-s-choice-skin-perfecting-2-bha-liquid-exfoliant-P469502",
-        "region": "US"
+        "region": "US",
+        "price": null
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/paula-s-choice-skin-perfecting-2percent-bha-liquid-exfoliant/p/21691685",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.paulaschoice.in/cdn/shop/files/655439020107_Cover.jpg?v=1756970986",
@@ -1019,17 +1106,24 @@
       {
         "store": "Brand site",
         "url": "https://www.paulaschoice.in/products/resist-c15-super-booster",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 4653.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Brand site",
         "url": "https://www.paulaschoice.com/c15-super-booster/777.html",
-        "region": "US"
+        "region": "US",
+        "price": null
       },
       {
         "store": "Sephora",
         "url": "https://www.sephora.com/product/c15-super-booster-P525475",
-        "region": "US"
+        "region": "US",
+        "price": null
       }
     ],
     "image_url": "https://www.paulaschoice.in/cdn/shop/products/SKU7770.png?v=1674009356",
@@ -1109,12 +1203,14 @@
       {
         "store": "Brand site",
         "url": "https://www.neutrogena.com/products/sun/ultra-sheer-dry-touch-sunscreen-broad-spectrum-spf-55/6868790",
-        "region": "US"
+        "region": "US",
+        "price": null
       },
       {
         "store": "Target",
         "url": "https://www.target.com/p/neutrogena-ultra-sheer-dry-touch-sunscreen-lotion-spf-55-3-fl-oz/-/A-12388016",
-        "region": "US"
+        "region": "US",
+        "price": null
       }
     ],
     "image_url": "https://images.ctfassets.net/3zfcttr0ztpr/5rWPgt21sJBorQuXFD45Ll/0903299d597dfad615f97d69cce34700/6868790-carousel-1-2023-08",
@@ -1166,12 +1262,18 @@
       {
         "store": "Brand site",
         "url": "https://www.bioderma.us/en/p/sensibio-h2o-micellar-water.html",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 14.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/bioderma-sensibio-h2o/p/9739",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://back-ac-prod.bioderma.com/media/catalog/product/cache/b443460c314aa18d2c50e93a48ddeb50/b/f/bf9eea8ab664d71ad70fb5972ef207cfc5b633a5ad73ebb75bd209c44d1c617b-_7b159703_7d__7b_7d__7b28703a_7d.jpg",
@@ -1244,17 +1346,24 @@
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/creamy-eye-treatment-with-avocado-pimprod2002975?sku=2536664",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 62.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/kiehl-s-creamy-eye-treatment-with-avocado/p/27236636",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Brand site",
         "url": "https://www.kiehls.com/skincare/eye-creams-and-serums/avocado-eye-cream/258.html",
-        "region": "US"
+        "region": "US",
+        "price": null
       }
     ],
     "image_url": "https://media.ulta.com/i/ulta/2536664?w=500&h=500",
@@ -1318,12 +1427,18 @@
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/rare-earth-pore-minimizing-clay-mask-pimprod2056218?sku=2649925",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 47.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Brand site",
         "url": "https://www.kiehls.com/skincare/face-masks/rare-earth-pore-minimizing-clay-mask/WW0328KIE.html",
-        "region": "US"
+        "region": "US",
+        "price": null
       }
     ],
     "image_url": "https://media.ulta.com/i/ulta/2649925?w=500&h=500",
@@ -1427,17 +1542,28 @@
       {
         "store": "Brand site",
         "url": "https://www.clinique.com/products/even-better-clinical-dark-spot-clearing-serum",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 95.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/even-better-clinical-dark-spot-clearing-serum-with-vitamin-c-pimprod2049081?sku=2635038",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 95.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/clinique-even-better-clinical-dark-spot-clearing-serum/p/17814258",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://media.ulta.com/i/ulta/2635038?w=500&h=500",
@@ -1506,17 +1632,24 @@
       {
         "store": "Brand site",
         "url": "https://beminimalist.co/products/niacinamide-10-with-matmarine",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 539.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/minimalist-10percent-niacinamide-face-serum-with-matmarine-zinc-for-reducing-oil-blemishes/p/15022069",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Minimalist-Niacinamide-Blemishes-Balancing-Clarifying/dp/B08F9MF314",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://sfycdn.speedsize.com/56385b25-4e17-4a9a-9bec-c421c18686fb/https://beminimalist.co/cdn/shop/files/Nia10New.png?v=1721398127",
@@ -1591,17 +1724,24 @@
       {
         "store": "Brand site",
         "url": "https://beminimalist.co/products/salicylic-acid-2",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 494.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/minimalist-2percent-salicylic-acid-face-serum-for-blackheads-whiteheads/p/15973485",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Minimalist-Salicylic-Exfoliant-Blackheads-Exfoliating/dp/B08GG9M863",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://sfycdn.speedsize.com/56385b25-4e17-4a9a-9bec-c421c18686fb/https://beminimalist.co/cdn/shop/products/SalicylicAcid2_1200-1-min.png?v=1646458899",
@@ -1669,17 +1809,24 @@
       {
         "store": "Brand site",
         "url": "https://beminimalist.co/products/alpha-arbutin-2",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 494.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/minimalist-alpha-arbutin-2-serum/p/1067996",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Minimalist-Hyperpigmentation-Butylresorcinol-Fragrance-Free-Non-Comedogenic/dp/B08GGDRRQ8",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://sfycdn.speedsize.com/56385b25-4e17-4a9a-9bec-c421c18686fb/https://beminimalist.co/cdn/shop/files/AlphaArNew.png?v=1721397838",
@@ -1739,17 +1886,24 @@
       {
         "store": "Brand site",
         "url": "https://beminimalist.co/products/retinol-0-3-q10",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 539.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/minimalist-retinol-0-3percent-face-serum/p/17352538",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Minimalist-Anti-Aging-Nourishment-Fragrance-Free-Non-Comedogenic/dp/B091JG3GJ5",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://sfycdn.speedsize.com/56385b25-4e17-4a9a-9bec-c421c18686fb/https://beminimalist.co/cdn/shop/files/Reti3New.png?v=1721398129",
@@ -1804,17 +1958,24 @@
       {
         "store": "Brand site",
         "url": "https://beminimalist.co/products/glycolic-acid-08-exfoliating-liquid-toner",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 449.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/minimalist-8percent-glycolic-acid-face-toner/p/7898707",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Minimalist-Glycolic-Multi-functional-Exfoliating-Underarms/dp/B0BNBXWVY3",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://sfycdn.speedsize.com/56385b25-4e17-4a9a-9bec-c421c18686fb/https://beminimalist.co/cdn/shop/files/GlycolicNew.png?v=1721398128",
@@ -1892,17 +2053,24 @@
       {
         "store": "Brand site",
         "url": "https://thedermaco.com/products/sali-cinamide-anti-acne-face-wash-with-2-salicylic-acid-2-niacinamide-100ml",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 229.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-derma-co-sali-cinamide-anti-acne-face-wash-with-2percent-salicylic-acid-2percent-niacinamide/p/17414962",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Derma-Co-Sali-Cinamide-Anti-Acne-Niacinamide/dp/B0C3RBDLS1",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://thedermaco.com/cdn/shop/files/1_pdp_2_sali_cinamide_new.jpg?v=1767606411",
@@ -1968,17 +2136,24 @@
       {
         "store": "Brand site",
         "url": "https://thedermaco.com/products/2-niacinamide-gentle-skin-cleanser-for-sensitive-dry-normal-skin-125-ml",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 367.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-derma-co-2percent-niacinamide-gentle-skin-cleanser/p/12636101",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Derma-Co-Niacinamide-Cleanser-Sensitive/dp/B0CD1RRT75",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://thedermaco.com/cdn/shop/files/1-niacinamide_gentle_skin_cleanser_for_sensitive_dry_normal_skin_79a6002c-a0fa-47c4-bed1-3aa6c41f48e7.jpg?v=1758286821",
@@ -2056,17 +2231,24 @@
       {
         "store": "Brand site",
         "url": "https://thedermaco.com/products/tran-zelaic-pigmentation-corrector-serum-with-tranexamic-acid-azelaic-acid-30-g",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 545.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-derma-co-tran-zelaic-pigmentation-corrector-serum/p/15901858",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Derma-Tran-Zelaic-Pigmentation-Corrector-Tranexamic/dp/B0D45NXZDZ",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://thedermaco.com/cdn/shop/files/tran-zelaic-pigmentation-corrector-serum-front.jpg?v=1772452253",
@@ -2163,17 +2345,24 @@
       {
         "store": "Brand site",
         "url": "https://thedermaco.com/products/1-hyaluronic-sunscreen-aqua-gel",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 439.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/the-derma-co-1percent-hyaluronic-sunscreen-aqua-gel-spf-50/p/10786853",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Derma-Co-Hyaluronic-Sunscreen-Protection/dp/B095CRM8NF",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://thedermaco.com/cdn/shop/files/1_PDP_2cce8939-1296-471f-8b74-f4fbfa814378.jpg?v=1791452607",
@@ -2258,17 +2447,24 @@
       {
         "store": "Brand site",
         "url": "https://www.dotandkey.com/products/barrier-repair-intense-moisturizer",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 339.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/dot-key-blueberry-hydrate-barrier-repair-intense-moisturizer/p/21645546",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Moisturizer-Ceramides-Hyaluronic-Moisturization-Moisture/dp/B0FK9WBXBX",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.dotandkey.com/cdn/shop/files/1_b8ecdb5f-bb1b-41b0-9e38-fa3859a5bd6a.jpg?v=1770964873",
@@ -2346,17 +2542,24 @@
       {
         "store": "Brand site",
         "url": "https://www.dotandkey.com/products/cica-calming-skin-renewing-night-gel",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 421.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/dot-key-cica-niacinamide-night-gel-with-tea-tree-oil-fights-dark-spots-acne-for-all-skin/p/6752054",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Calming-Renewing-Moisturizer-Niacinamide-Hyaluronic/dp/B09HC3QNLG",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.dotandkey.com/cdn/shop/files/1_075c2747-6b39-4135-9da9-07001a430971.jpg?v=1778925428",
@@ -2449,17 +2652,20 @@
       {
         "store": "Brand site",
         "url": "https://www.dotandkey.com/products/watermelon-cooling-spf-50-face-sunscreen",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/dot-key-watermelon-hyaluronic-cooling-sunscreen-spf-50-pa/p/14072071",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Watermelon-Hyaluronic-Moisturized-Protection-Lightweight/dp/B0BQN2YWN5",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.dotandkey.com/cdn/shop/files/1-80G_bb347e61-11ee-4d8b-ad8e-4e3602e69164.jpg?v=1790680752",
@@ -2551,17 +2757,24 @@
       {
         "store": "Brand site",
         "url": "https://www.dotandkey.com/products/mango-clay-mask",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 424.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/dot-key-mango-detan-clay-mask/p/16271379",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Mango-Removal-Glycolic-Lactic-Fragrance/dp/B0D7Q3GX47",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.dotandkey.com/cdn/shop/files/1_2671075a-ae2b-4a43-8935-434211ec2d7f.jpg?v=1727355954",
@@ -2625,22 +2838,34 @@
       {
         "store": "Brand site",
         "url": "https://plumgoodness.com/products/vitamin-c-face-serum",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 671.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/plum-15percent-vitamin-c-face-serum-with-mandarin/p/1425356",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Plum-Combination-Pigmentation-Non-Irritating-Hydrating/dp/B095KHDP1N",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Life Pharmacy",
         "url": "https://www.lifepharmacy.com/sa-ar/product/plum-mandarin-vitamin-c-15-glow-boost-serum-30ml-2310",
-        "region": "GCC"
+        "region": "GCC",
+        "price": {
+          "amount": 50.4,
+          "currency": "AED",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://plumgoodness.com/cdn/shop/files/Listing_1st_Tile_Vit_C_15_Serum_30ml_1001x1001_px.webp?v=1776943410&width=1024",
@@ -2717,17 +2942,28 @@
       {
         "store": "Brand site",
         "url": "https://plumgoodness.com/products/vitamin-c-eye-cream-with-mandarin",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 403.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/plum-3percent-vitamin-c-3percent-peptide-3percent-caffeine-eye-cream-with-mandarin/p/5020971",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Plum-Caffeine-Puffiness-Elasticity-Fragrance-Free/dp/B09TKHB937",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 380.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://plumgoodness.com/cdn/shop/files/Listing_1st_Tile_Vit_C_Under_Eye_Cream_1001x1001_px.webp?v=1776938914&width=1024",
@@ -2778,17 +3014,24 @@
       {
         "store": "Brand site",
         "url": "https://plumgoodness.com/products/green-tea-alcohol-free-pore-tightening-face-toner-for-oily-acne-prone-skin-1",
-        "region": "IN"
+        "region": "IN",
+        "price": {
+          "amount": 357.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/plum-green-tea-alcohol-free-toner/p/23990",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       },
       {
         "store": "Amazon",
         "url": "https://www.amazon.in/Plum-Acne-Prone-Glycolic-Alcohol-Free-Exfoliates/dp/B0DCJK9RJX",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://plumgoodness.com/cdn/shop/files/Listing_1st_Tile_GT_Toner_200ml_1001x1001_px_c93eaf1e-d084-4779-bce8-6a976cadbed7.webp?v=1782212495&width=1024",
@@ -2846,17 +3089,28 @@
       {
         "store": "Brand site",
         "url": "https://www.cosrx.com/products/bha-blackhead-power-liquid",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 25.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/cosrx-bha-blackhead-power-liquid",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 12.5,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://nykaa.com/cosrx-bha-blackhead-power-liquid/p/757632",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.cosrx.com/cdn/shop/files/bha-blackhead-power-liquid-cosrx-official-1_1200x1200.jpg?v=1689840681",
@@ -2901,17 +3155,28 @@
       {
         "store": "Brand site",
         "url": "https://www.cosrx.com/products/acne-pimple-master-patch",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 6.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/cosrx-acne-pimple-master-patch",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 6.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Feelunique",
         "url": "https://feelunique.com/p/COSRX-Acne-Pimple-Master-Patch-24-Patches",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://cdn.shopify.com/s/files/1/0513/3775/6828/files/acne-pimple-master-patch-cosrx-official-1.jpg?v=1724835736",
@@ -3013,17 +3278,32 @@
       {
         "store": "Brand site",
         "url": "https://www.cosrx.com/products/the-retinol-0-1-cream-1",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 21.6,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/the-retinol-0-1-cream",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 23.5,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Beauty Bay",
         "url": "https://www.beautybay.com/p/cosrx/the-retinol-01-cream/",
-        "region": "UK"
+        "region": "UK",
+        "price": {
+          "amount": 3214.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://cdn.shopify.com/s/files/1/0513/3775/6828/files/RetinolCream_800x1067_7e167f9b-dc45-4d41-babf-65b26b14cf23.jpg?v=1746679017",
@@ -3091,17 +3371,28 @@
       {
         "store": "Brand site",
         "url": "https://www.cosrx.com/products/low-ph-good-morning-gel-cleanser",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 14.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/cosrx-low-ph-good-morning-cleanser",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 14.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Nykaa",
         "url": "https://www.nykaa.com/cosrx-low-ph-good-morning-gel-cleanser/p/757643",
-        "region": "IN"
+        "region": "IN",
+        "price": null
       }
     ],
     "image_url": "https://www.cosrx.com/cdn/shop/files/low-ph-good-morning-gel-cleanser-cosrx-official-1_1200x1200.jpg?v=1768785801",
@@ -3168,17 +3459,32 @@
       {
         "store": "Brand site",
         "url": "https://www.cosrx.com/products/the-niacinamide-15-serum-번들",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 25.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/the-niacinamide-15-serum",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 25.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Beauty Bay",
         "url": "https://www.beautybay.com/p/cosrx/the-niacinamide-15-serum/",
-        "region": "UK"
+        "region": "UK",
+        "price": {
+          "amount": 2999.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://www.cosrx.com/cdn/shop/files/niacin_1200x1200.png?v=1748420816",
@@ -3262,12 +3568,22 @@
       {
         "store": "Brand site",
         "url": "https://beautyofjoseon.com/products/revive-eye-serum-ginseng-retinal",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 17.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Pure Seoul",
         "url": "https://pureseoul.co.uk/products/beauty-of-joseon-revive-eye-serum-ginseng-retinal",
-        "region": "UK"
+        "region": "UK",
+        "price": {
+          "amount": 17.5,
+          "currency": "GBP",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://beautyofjoseon.com/cdn/shop/files/revive-eye-serum-ginseng-retinal-1-front.webp?v=1770287139",
@@ -3348,12 +3664,22 @@
       {
         "store": "Brand site",
         "url": "https://beautyofjoseon.com/products/glow-deep-serum-rice-alpha-arbutin",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 17.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Cult Beauty",
         "url": "https://www.cultbeauty.com/p/beauty-of-joseon-glow-deep-serum-rice-arbutin-30ml/14866966/",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 17.25,
+          "currency": "EUR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://beautyofjoseon.com/cdn/shop/files/02_0916__30ml_1.jpg?v=1789546505",
@@ -3421,12 +3747,22 @@
       {
         "store": "Brand site",
         "url": "https://beautyofjoseon.com/products/red-bean-refreshing-pore-mask",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 16.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Cult Beauty",
         "url": "https://www.cultbeauty.com/p/beauty-of-joseon-red-bean-refreshing-pore-mask-140ml/15391668/",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 19.55,
+          "currency": "EUR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://beautyofjoseon.com/cdn/shop/files/red-bean-refreshing-pore-mask-1-front.webp?v=1770286693",
@@ -3512,12 +3848,18 @@
       {
         "store": "Brand site",
         "url": "https://beautyofjoseon.com/products/dayscreen-moisturizer-sunscreen-us",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 20.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Sephora",
         "url": "https://www.sephora.co.uk/p/beauty-of-joseon-dayscreen-moisturizer-spf-30",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://cdn.shopify.com/s/files/1/0558/4135/7989/files/03_0626__-_US.jpg?v=1782713443",
@@ -3601,17 +3943,32 @@
       {
         "store": "Brand site",
         "url": "https://en.somebymi.com/product/aha-bha-pha-30-days-miracle-toner-150ml/73/",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 22.4,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/some-by-mi-aha-bha-pha-30days-miracle-toner",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 22.44,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Beauty Bay",
         "url": "https://www.beautybay.com/p/some-by-mi/aha-bha-pha-30-days-miracle-toner/",
-        "region": "UK"
+        "region": "UK",
+        "price": {
+          "amount": 1875.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://en.somebymi.com/web/product/big/202412/595ada9757e13df90f36fac8e02e81ed.jpg",
@@ -3727,12 +4084,22 @@
       {
         "store": "Brand site",
         "url": "https://en.somebymi.com/product/galactomyces-pure-vitamin-c-glow-serum-30ml/87/",
-        "region": "GLOBAL"
+        "region": "GLOBAL",
+        "price": {
+          "amount": 28.1,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/some-by-mi-galactomyces-pure-vitamin-c-glow-serum",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 28.05,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://en.somebymi.com/web/product/big/202503/65732dfc98b59716881caba219c82fbc.jpg",
@@ -3815,17 +4182,28 @@
       {
         "store": "Brand site",
         "url": "https://roundlab.com/products/mugwort-calming-toner",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 27.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/round-lab-mugwort-calming-toner",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 27.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Pure Seoul",
         "url": "https://pureseoul.co.uk/products/mugwort-calming-toner-300ml",
-        "region": "UK"
+        "region": "UK",
+        "price": null
       }
     ],
     "image_url": "https://roundlab.com/cdn/shop/files/mugwort-calming-toner-round-lab-1.png?v=1772849391",
@@ -3913,17 +4291,32 @@
       {
         "store": "Brand site",
         "url": "https://roundlab.com/products/birch-moisturizing-cream",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 30.6,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/round-lab-birch-juice-moisturizing-cream",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 36.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Beauty Bay",
         "url": "https://www.beautybay.com/p/round-lab/birch-juice-moisturising-cream",
-        "region": "UK"
+        "region": "UK",
+        "price": {
+          "amount": 2700.0,
+          "currency": "INR",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://roundlab.com/cdn/shop/files/birch-moisturizing-cream-round-lab-3.jpg?v=1775165383",
@@ -4019,17 +4412,32 @@
       {
         "store": "Brand site",
         "url": "https://roundlab.com/products/round-lab-birch-moisturizing-sunscreen-spf-50-pa",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 24.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Soko Glam",
         "url": "https://sokoglam.com/products/rounds-lab-birch-juice-moisturizing-uvlock",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 28.0,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       },
       {
         "store": "Ulta",
         "url": "https://www.ulta.com/p/birch-juice-moisturizing-uvlock-spf-45-pimprod2049647",
-        "region": "US"
+        "region": "US",
+        "price": {
+          "amount": 24.99,
+          "currency": "USD",
+          "checked": "2026-10-15"
+        }
       }
     ],
     "image_url": "https://roundlab.com/cdn/shop/files/BIRCH_JUICE_MOISTURIZING_UVLOCK3_Large_10126e46-dfcc-4cd5-970c-146d4be65989.webp?v=1772852134",
