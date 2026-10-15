@@ -6,7 +6,7 @@ import { AITag } from '../../components/willow/AITag'
 import type { Product } from '../../data/types'
 import type { AdvisorReply } from '../../lib/api'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
-import { CategoryOrb } from '../routine/productUi'
+import { ProductImage } from '../routine/productUi'
 import { metaLine } from '../routine/routineModel'
 import { retry, type ChatMessage } from './chatStore'
 import { AnswerOrb } from './Water'
@@ -67,7 +67,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, onAsk, onPro
             {r.products.map((p) => (
               <ProductCard key={p.product_id} p={p} onOpen={() => onProduct(p)} />
             ))}
-            <span className="text-[11.5px] text-ink-2">From Willow’s catalog: ingredients, one checked price and store links. No reviews, no ads, no commissions.</span>
+            <span className="text-[11.5px] text-ink-2">{r.products.some((p) => p.stores.some((s) => s.price)) ? 'From Willow’s catalog: ingredients, store links and the prices each store showed when checked. No reviews, no ads, no commissions.' : 'From Willow’s catalog: ingredients, one checked price and store links. No reviews, no ads, no commissions.'}</span>
           </div>
         ) : null}
         {!revealing ? (
@@ -115,12 +115,12 @@ export const Answer = memo(function Answer({ m, last, busy, capped, onAsk, onPro
   )
 })
 
-/** A product the advisor named (from reply.products: real catalog listings). Stores are links only. */
+/** A product the advisor named (from reply.products: real catalog listings). Stores are links, with the price read off each store's page when the catalog has one. */
 function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3" style={{ animation: 'wRise .45s both' }}>
       <button type="button" onClick={onOpen} aria-label={`Product details: ${p.name}`} className="shrink-0 rounded-full transition-transform hover:scale-105">
-        <CategoryOrb category={p.category} size={34} />
+        <ProductImage product={p} size={44} />
       </button>
       <button type="button" onClick={onOpen} className="flex min-w-[170px] flex-1 flex-col gap-0.5 text-left">
         <span className="text-[12px] text-ink-2">{metaLine(p.brand, p.category, p.size)}</span>
@@ -132,8 +132,18 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
       {p.stores.length ? (
         <span className="flex flex-wrap gap-1.5">
           {p.stores.map((s) => (
-            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`${s.store}, opens in new tab`} className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline">
-              {s.store} <ExternalLink size={12} strokeWidth={1.5} aria-hidden />
+            <a
+              key={s.url}
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={s.price ? `Price on the store's page, checked ${fmtDate(s.price.checked)}` : undefined}
+              aria-label={`${s.store}${s.price ? `, ${fmtPrice(s.price)}, checked ${fmtDate(s.price.checked)}` : ''}, opens in new tab`}
+              className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline"
+            >
+              {s.store}
+              {s.price ? <span className="tnum text-ink-2">{fmtPrice(s.price)}</span> : null}
+              <ExternalLink size={12} strokeWidth={1.5} aria-hidden />
             </a>
           ))}
         </span>

@@ -1,21 +1,27 @@
-import { ExternalLink, Trash2 } from 'lucide-react'
+import { ExternalLink, FlaskConical, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { useMaybeShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
+import { Chip } from '../../components/ui/Chip'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Sheet } from '../../components/ui/Sheet'
+import { ProductImage } from '../../components/willow/ProductImage'
+import { imageCredit } from '../../components/willow/productVisual'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner, useRoutine } from '../../data/hooks'
-import type { Product, RoutineEntry } from '../../data/types'
-import { api } from '../../lib/api'
+import type { Product, RoutineEntry, RoutineSchedule, StorePrice } from '../../data/types'
+import { api, localDay } from '../../lib/api'
 import { CONCERN_LABEL } from '../../lib/catalog'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { outcomeFor, type Outcome } from '../../lib/outcome'
 import { useQuery } from '../../lib/query'
 import { useOutcomes } from '../../lib/useOutcomes'
-import { CategoryOrb } from './productUi'
+import { useProductTests, testDay } from './productTests'
 import { activeLabel, categoryOf, entryName, metaLine, OUTCOME_GLYPH, useOutcomeSessions } from './routineModel'
+import { addDays, scheduleWords, usedOn, weekdayOf, WEEKDAYS } from './schedule'
+import { StartTest } from './StartTest'
 import { failureText, useRoutineWrites } from './writes'
 
 export type ProductTarget = { entry: RoutineEntry } | { product: Product } | { productId: string }
@@ -28,6 +34,11 @@ const WHEN = [
 type When = (typeof WHEN)[number]['value']
 const toWhen = (s: ('am' | 'pm')[]): When => (s.length === 2 ? 'both' : s[0] === 'pm' ? 'pm' : 'am')
 const toSlots = (w: When): ('am' | 'pm')[] => (w === 'both' ? ['am', 'pm'] : [w])
+
+type Often = 'daily' | 'alternate' | 'days'
+
+/** "₹599 · checked 14 Oct": a price read off that store's page on that day (never estimated). */
+const storePrice = (p: StorePrice) => `${fmtPrice(p)} · checked ${fmtDate(p.checked)}`
 
 /**
  * "Product information" side sheet (design: Willow App Routine, infoOpen): what the catalog says, what
@@ -58,6 +69,9 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const tests = useProductTests()
+  const navigate = useNavigate()
 
   const category = product?.category ?? entry?.category ?? 'other'
   const brand = product?.brand ?? entry?.brand ?? ''
@@ -67,6 +81,28 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   const inci = product?.inci ?? entry?.inci ?? []
   const cohort = product ? outcomes?.byProduct[product.product_id] : undefined
   const outcome: Outcome | null = entry ? outcomeFor(entry, sessions) : null
+  const image = { image_url: product?.image_url ?? entry?.image_url ?? null, image_source: product?.image_source ?? entry?.image_source ?? null }
+  const credit = imageCredit(image)
+  const running = tests.running
+  // This product's running forearm test (by routine entry, else by catalog product).
+  const ownTest = running && ((entry && running.entry_id === entry.id) || (productId && running.product_id === productId)) ? running : null
+  const night = entry ? !entry.slots.includes('am') : true
+  const often: Often = entry?.schedule?.kind ?? 'daily'
+  const setSchedule = (next: RoutineSchedule | null) => entry && void run('schedule', () => writes.setSchedule(entry, next), "Couldn't change how often you use it. Try again.")
+  const pickOften = (o: Often) => {
+    if (!entry || o === often) return
+    const today = localDay()
+    if (o === 'daily') setSchedule(null)
+    else if (o === 'alternate') setSchedule({ kind: 'alternate', anchor: today })
+    // Chosen days start from today's weekday, so the product is still in use today.
+    else setSchedule({ kind: 'days', days: [weekdayOf(today)], anchor: today })
+  }
+  const toggleDay = (d: number) => {
+    if (!entry || entry.schedule?.kind !== 'days') return
+    const days = entry.schedule.days ?? []
+    const next = days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort()
+    if (next.length) setSchedule({ ...entry.schedule, days: next })
+  }
 
   const run = async (key: string, fn: () => Promise<unknown>, fail: string) => {
     setBusy(key)
@@ -94,8 +130,17 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   return (
     <div className="flex flex-col gap-3 pb-2">
       <div className="relative grid min-h-[250px] place-items-center rounded-xl pb-6 squircle" style={{ background: `radial-gradient(60% 60% at 50% 55%, ${categoryOf(category).c[0]}, transparent 72%), var(--bg-sunken)` }}>
-        <CategoryOrb category={category} size={120} breathe />
-        <span className="absolute inset-x-5 bottom-3.5 text-[12px] text-ink-2">No product photos in Willow · the colour shows the category</span>
+        <ProductImage product={{ image_url: image.image_url, category, name }} size={image.image_url ? 160 : 120} breathe={!image.image_url} />
+        <span className="absolute inset-x-5 bottom-3.5 text-[12px] text-ink-2">
+          {credit ? (
+            <a href={image.image_source!} target="_blank" rel="noopener noreferrer" className="hit44 underline-offset-4 hover:underline">
+              Image: {credit} <span aria-hidden>↗</span>
+              <span className="sr-only"> (opens in new tab)</span>
+            </a>
+          ) : (
+            'No photo for this product · the colour shows the category'
+          )}
+        </span>
       </div>
 
       <div className="flex flex-col gap-1.5 px-2 py-1.5">
@@ -140,6 +185,36 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
             value={toWhen(entry.slots)}
             onChange={(w) => void run('slots', () => writes.setSlots(entry, toSlots(w)), "Couldn't change when you use it. Try again.")}
           />
+          <span className="text-[14px] text-ink-2">How often</span>
+          <SegmentedControl
+            label="How often"
+            options={[
+              { value: 'daily', label: night ? 'Every night' : 'Every day' },
+              { value: 'alternate', label: night ? 'Every other night' : 'Every other day' },
+              { value: 'days', label: 'Chosen days' },
+            ]}
+            value={often}
+            onChange={pickOften}
+          />
+          {entry.schedule?.kind === 'days' ? (
+            <div role="group" aria-label="Days you use it" className="flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((d, i) => (
+                <Chip key={d} selected={(entry.schedule?.days ?? []).includes(i)} onToggle={() => toggleDay(i)} disabled={busy === 'schedule'}>
+                  {d}
+                </Chip>
+              ))}
+            </div>
+          ) : null}
+          {entry.schedule?.kind === 'alternate' ? (
+            <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
+              {usedOn(entry.schedule) ? (night ? 'Tonight is on.' : 'Today is on.') : night ? 'It rests tonight ☾.' : 'It rests today ☾.'}
+              <Button variant="ghost" size="sm" onClick={() => setSchedule({ kind: 'alternate', anchor: usedOn(entry.schedule) ? addDays(localDay(), 1) : localDay() })}>
+                {usedOn(entry.schedule) ? (night ? 'Rest it tonight instead' : 'Rest it today instead') : night ? 'Use it tonight instead' : 'Use it today instead'}
+              </Button>
+            </span>
+          ) : entry.schedule?.kind === 'days' ? (
+            <span className="text-[13px] text-ink-2">{scheduleWords(entry.schedule, night)}. On other days it shows as resting and isn't counted as missed.</span>
+          ) : null}
           {entry.recent_use ? (
             <span className="text-[13px] text-ink-2">
               Used on {entry.recent_use.days_used} of {plural(entry.recent_use.of_days, 'day', 'days')} lately (from your ticks).
@@ -173,6 +248,41 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
               {error}
             </p>
           ) : null}
+        </div>
+      ) : null}
+
+      {inUse ? (
+        <div className="card flex flex-col gap-3 bg-sunken px-5 py-4">
+          <span className="font-mono text-[12px] tracking-[.06em] text-ink-2">■ FOREARM TEST</span>
+          {ownTest ? (
+            <>
+              <span className="text-[15px]">
+                On your forearm · day {testDay(ownTest).day} of {ownTest.length_days}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => {
+                  onClose()
+                  navigate('/test')
+                }}
+              >
+                Open the test
+              </Button>
+            </>
+          ) : testing ? (
+            <StartTest preset={{ entry_id: entry.id, name, fixedName: true }} onCancel={() => setTesting(false)} onStarted={onClose} />
+          ) : (
+            <>
+              <span className="text-[14px] leading-[1.5] text-ink-2">
+                {running ? `A test of ${running.name} is running; end it before starting another.` : 'See what it does on one forearm square, against an untouched square on the other arm.'}
+              </span>
+              <Button variant="outline" size="sm" icon={FlaskConical} className="self-start" disabled={Boolean(running) || tests.status !== 'ready'} onClick={() => setTesting(true)}>
+                Start a forearm test with this product
+              </Button>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -246,12 +356,22 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
         <div className="flex flex-col gap-2">
           <span className="px-1.5 text-[14px] text-ink-2">Where to buy</span>
           {product.stores.map((s) => (
-            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`${s.store}, opens in new tab`} className="card flex min-h-[54px] items-center justify-between bg-sunken px-5 text-[15px] no-underline hover:bg-muted">
-              {s.store}
-              <ExternalLink size={16} strokeWidth={1.5} aria-hidden className="text-ink-2" />
+            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`${s.store}${s.price ? `, ${storePrice(s.price)}` : ''}, opens in new tab`} className="card flex min-h-[54px] items-center justify-between gap-3 bg-sunken px-5 text-[15px] no-underline hover:bg-muted">
+              <span>{s.store}</span>
+              <span className="flex items-center gap-2.5">
+                {s.price ? (
+                  <span className="flex flex-col items-end leading-tight">
+                    <span className="tnum">{fmtPrice(s.price)}</span>
+                    <span className="text-[11px] text-ink-2">checked {fmtDate(s.price.checked)}</span>
+                  </span>
+                ) : null}
+                <ExternalLink size={16} strokeWidth={1.5} aria-hidden className="text-ink-2" />
+              </span>
             </a>
           ))}
-          <span className="px-1.5 text-[12px] text-ink-2">Store links only: the price above is the catalog's one checked price. No ads, no commissions.</span>
+          <span className="px-1.5 text-[12px] text-ink-2">
+            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed. No ads, no commissions.' : 'Store links only: the price above is the catalog’s one checked price. No ads, no commissions.'}
+          </span>
         </div>
       ) : null}
     </div>

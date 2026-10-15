@@ -76,7 +76,7 @@ export function useRoutineCheck(entries: RoutineEntry[] | undefined) {
   const uid = useOwner()
   const version = (entries ?? [])
     .filter((e) => !e.ended_at)
-    .map((e) => `${e.id}:${e.slots.join('')}`)
+    .map((e) => `${e.id}:${e.slots.join('')}${e.schedule && e.schedule.kind !== 'daily' ? `:${e.schedule.kind}:${e.schedule.anchor}:${(e.schedule.days ?? []).join('')}` : ''}`)
     .sort()
     .join(',')
   // Kept for this tab too, so a reload doesn't spend another check on the same routine (cleared on sign-out).
