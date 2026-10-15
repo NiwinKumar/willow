@@ -19,6 +19,8 @@ export type FileRow = {
   problem?: string
   /** Object URL for a thumbnail (JPEG/HEIC; DNG cannot be shown by a browser). */
   thumb?: string
+  /** Uploaded and byte-identical to a photo of an earlier check-in (or an earlier one of this check-in). */
+  duplicate?: { session_id: string; index: number }
 }
 
 const MB = 1024 * 1024

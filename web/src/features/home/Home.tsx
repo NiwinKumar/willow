@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useShell } from '../../components/shell/ShellContext'
@@ -23,6 +23,7 @@ import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
 import { LeadCard, type Lead } from './LeadCard'
+import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
 import { ProductTestTile, SpotDiaryTile } from './Tiles'
 
@@ -82,6 +83,7 @@ function HomeBody() {
   const me = identity(user)
   const shell = useShell()
   const navigate = useNavigate()
+  const location = useLocation()
   const demo = data.mode === 'demo'
   // Goals live on this device (You writes them); read fresh so a change there reorders Home at once.
   const goals = data.goals
@@ -116,9 +118,11 @@ function HomeBody() {
 
   const checkIn = (site: Session['site'] = 'face_full', mode?: CaptureMode) => shell.openCheckIn({ site, mode })
   const openResult = (s: Session) => navigate(`/result/${s.id}`)
+  // Add the missing photos to a baseline without a normal range (the check-in's top-up mode).
+  const topUp = (s: Session) => navigate(`/check-in?topup=${s.id}`, { state: { background: location } })
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
-  const lead = leadFor({ read, goals, demo, checkIn, openResult })
+  const lead = leadFor({ read, goals, demo, checkIn, openResult, topUp })
   const heroLines = withTonight(heroLinesFor(read, goals, demo), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const finding = demo ? null : nextStepOf(check.data, byId)
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
@@ -133,7 +137,7 @@ function HomeBody() {
       d: read.person === 'new' ? 'About three minutes, by a window' : `${plural(read.baselineFrames ?? 0, 'usable photo', 'usable photos')} of ${BAND_FRAMES} · no normal range yet`,
       state: read.person === 'new' ? 'todo' : 'part',
       part: Math.min(1, (read.baselineFrames ?? 0) / BAND_FRAMES),
-      onClick: () => checkIn('face_full'),
+      onClick: () => (read.person === 'noBand' && read.baseline && topUpNeed(read.baseline) > 0 ? topUp(read.baseline) : checkIn('face_full')),
     },
     ...(goals.includes('pores_texture')
       ? [{ t: 'Cheek close-up', d: 'For your pores and texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: () => checkIn('cheek_macro') }]
@@ -258,7 +262,21 @@ function rowSpans(n: number): string[] {
 
 type Nav = ReturnType<typeof useNavigate>
 
-function leadFor({ read, goals, demo, checkIn, openResult }: { read: HomeRead; goals: string[]; demo: boolean; checkIn: (site?: Session['site'], mode?: CaptureMode) => void; openResult: (s: Session) => void }): Lead {
+function leadFor({
+  read,
+  goals,
+  demo,
+  checkIn,
+  openResult,
+  topUp,
+}: {
+  read: HomeRead
+  goals: string[]
+  demo: boolean
+  checkIn: (site?: Session['site'], mode?: CaptureMode) => void
+  openResult: (s: Session) => void
+  topUp: (s: Session) => void
+}): Lead {
   const baseMode = read.baseline?.capture_mode
   if (demo) {
     const s = read.lead
@@ -309,7 +327,24 @@ function leadFor({ read, goals, demo, checkIn, openResult }: { read: HomeRead; g
   switch (read.person) {
     case 'new':
       return { eyebrow: 'START HERE', title: 'Take your baseline', sub: 'Face photos by a window, about three minutes. Every later check-in is compared with this one.', big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos for a normal range', prog: 0, chips: ['Face', 'Phone or RAW'], cta: { label: 'Start baseline', onClick: () => checkIn('face_full') }, aura: 'coral' }
-    case 'noBand':
+    case 'noBand': {
+      // Photos kept (under 30 days): add the missing ones to this same baseline (design: "Add 2 photos").
+      const need = topUpNeed(read.baseline)
+      if (need > 0 && read.baseline) {
+        const b = read.baseline
+        return {
+          eyebrow: `BASELINE · ${f} OF ${BAND_FRAMES} USABLE PHOTOS`,
+          title: 'Finish your face baseline',
+          sub: `${need === 1 ? 'One more photo gives' : `${countWord(need)} more photos give`} Willow your normal range. Until then results read “Not enough data yet”. Same light as ${shortDay(b.created_at)}.`,
+          big: `${f}/${BAND_FRAMES}`,
+          bigLabel: 'usable baseline photos',
+          prog: Math.min(1, f / BAND_FRAMES),
+          chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : []), `${plural(need, 'photo')} left`],
+          cta: { label: `Add ${plural(need, 'photo')}`, onClick: () => topUp(b) },
+          secondary: { label: 'See baseline', onClick: () => openResult(b) },
+          aura: 'coral',
+        }
+      }
       return {
         eyebrow: `BASELINE · ${plural(f, 'USABLE PHOTO', 'USABLE PHOTOS')}`,
         title: 'Your baseline has no normal range yet',
@@ -322,6 +357,7 @@ function leadFor({ read, goals, demo, checkIn, openResult }: { read: HomeRead; g
         secondary: read.baseline ? { label: 'See baseline', onClick: () => openResult(read.baseline!) } : undefined,
         aura: 'coral',
       }
+    }
     case 'gap':
       return {
         eyebrow: read.lastFace ? `LAST CHECK-IN ${shortDay(read.lastFace.created_at).toUpperCase()}` : undefined,
@@ -419,7 +455,9 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean): HeroLine[
   if (read.person === 'noBand')
     return [
       { g: '◐', t: `Your baseline has ${plural(f, 'usable photo', 'usable photos')}; a normal range needs ${BAND_FRAMES}.` },
-      { g: '→', t: `A check-in with ${BAND_FRAMES} or more photos can become your baseline.` },
+      topUpNeed(read.baseline) > 0
+        ? { g: '→', t: `Add ${plural(topUpNeed(read.baseline), 'photo')} to it, in the same light, and it has one.` }
+        : { g: '→', t: `A check-in with ${BAND_FRAMES} or more photos can become your baseline.` },
       { g: '○', t: 'Your skin is only ever compared with itself.' },
     ]
   if (read.person === 'gap')

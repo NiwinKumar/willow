@@ -15,22 +15,61 @@ const STATUS: Record<FileRow['state'], { text: string; glyph: string; color: str
 
 /**
  * Step "files" (CAP 07): pick photos (RAW: the DNG originals from Files), see each file's status, upload.
- * Once the session exists its frame count is fixed, so the list locks; "Start over" makes a new attempt.
+ * Until measuring starts every row can be removed or replaced (uploaded ones too: the api drops or adds
+ * frames). Rows say when a photo looks soft (advisory) or is a duplicate of one uploaded before (the
+ * hand-over waits: Replace, Remove, or Measure anyway). `topup`: photos added to an existing baseline.
  */
-export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, onReplace, onStartOver }: { mode: CaptureMode; n: number; first: boolean; upload: Upload; camera: boolean; onPick: (files: File[]) => void; onRemove: (id: string) => void; onReplace: (id: string, file: File) => void; onStartOver: () => void }) {
+export function FilesStep({
+  mode,
+  n,
+  first,
+  upload,
+  camera,
+  soft,
+  topup,
+  dupLabel,
+  onPick,
+  onRemove,
+  onReplace,
+  onStartOver,
+}: {
+  mode: CaptureMode
+  n: number
+  first: boolean
+  upload: Upload
+  camera: boolean
+  soft: Set<string>
+  /** Topping up a baseline: when it was taken. */
+  topup: { date: string } | null
+  dupLabel: (d: { session_id: string; index: number }) => string
+  onPick: (files: File[]) => void
+  onRemove: (id: string) => void
+  onReplace: (id: string, file: File) => void
+  onStartOver: () => void
+}) {
   const raw = mode === 'calibrated_raw'
-  const { rows, busy, locked, fatal, offline } = upload
+  const { rows, busy, locked, fatal, offline, held } = upload
   const replaceInput = useRef<HTMLInputElement>(null)
   const [replacing, setReplacing] = useState<string | null>(null)
   const ok = usable(rows)
   const done = ok.filter((r) => r.state === 'done').length
   const failed = ok.filter((r) => r.state === 'failed').length
   const allUp = ok.length > 0 && done === ok.length
-  const canPick = !locked && !busy
+  const canPick = !busy
   // Quick mode also takes DNGs: a RAW set is better than phone photos and becomes a RAW check-in.
   const accept = raw ? '.dng,image/x-adobe-dng,image/dng' : '.jpg,.jpeg,image/jpeg,.heic,image/heic,.heif,image/heif,.dng,image/x-adobe-dng,image/dng'
+  const dups = ok.filter((r) => r.duplicate).length
 
-  const cta = allUp ? 'All photos uploaded · measuring next' : failed && !busy ? `${failed} upload${failed === 1 ? '' : 's'} failed · retry to continue` : busy ? `Uploading ${done} of ${ok.length}…` : `Upload ${ok.length} photo${ok.length === 1 ? '' : 's'}`
+  const cta =
+    allUp && held
+      ? `${dups} duplicate${dups === 1 ? '' : 's'} · replace or measure anyway`
+      : allUp
+        ? 'All photos uploaded · measuring next'
+        : failed && !busy
+          ? `${failed} upload${failed === 1 ? '' : 's'} failed · retry to continue`
+          : busy
+            ? `Uploading ${done} of ${ok.length}…`
+            : `Upload ${ok.length} photo${ok.length === 1 ? '' : 's'}`
 
   return (
     <div className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
@@ -39,7 +78,7 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
           <MonoEyebrow>{raw ? 'RAW · DNG originals only · up to 120 MB each' : 'Quick · JPEG, HEIC or HEIF · up to 120 MB each'}</MonoEyebrow>
           <div className="mt-3">
             <SerifTitle id="ck-title" size="md">
-              {allUp ? 'All photos uploaded' : busy ? 'Uploading' : 'Review your photos'}
+              {allUp && held ? 'Photos you’ve uploaded before' : allUp ? 'All photos uploaded' : busy ? 'Uploading' : topup ? 'Add to your baseline' : 'Review your photos'}
             </SerifTitle>
           </div>
         </div>
@@ -88,13 +127,28 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
           </button>
         </Notice>
       ) : null}
-      {!locked && ok.length > 0 && ok.length < n ? (
+      {topup && !busy && !allUp ? (
+        <Notice tone="quiet" role="status">
+          These photos join your baseline from {topup.date}: same light, distance and expression as then. Willow then measures your baseline again with every photo.
+        </Notice>
+      ) : null}
+      {!busy && !allUp && ok.length > 0 && ok.length < n ? (
         <Notice tone="yellow" role="status">
           {ok.length} of {n} photos ready.{' '}
-          {first
-            ? `A baseline needs ${n}: with ${n} photos Willow learns your normal photo-to-photo variation. With fewer than 3, changes are shown but can’t be called real yet.`
-            : `This check-in works best with ${n}; fewer makes the reading noisier.`}{' '}
+          {topup
+            ? `A normal range needs ${n} more usable photo${n === 1 ? '' : 's'} in this baseline.`
+            : first
+              ? `A baseline needs ${n}: with ${n} photos Willow learns your normal photo-to-photo variation. With fewer than 3, changes are shown but can’t be called real yet.`
+              : `This check-in works best with ${n}; fewer makes the reading noisier.`}{' '}
           Add {n - ok.length} more, or upload these.
+        </Notice>
+      ) : null}
+      {held ? (
+        <Notice tone="yellow" role="alert" className="flex flex-wrap items-center justify-between gap-2.5">
+          <span>Willow has seen {dups === 1 ? 'this photo' : 'these photos'} before. The same photo twice would hide real change; replace {dups === 1 ? 'it with a new one' : 'them with new ones'}, or measure anyway.</span>
+          <button type="button" onClick={upload.proceed} className="min-h-[42px] rounded-pill border border-ink/15 bg-white px-4 text-ink">
+            Measure anyway
+          </button>
         </Notice>
       ) : null}
       {busy ? <p className="m-0 px-1 text-[13px] text-ink-2">Keep this screen open. Uploads pause if you switch apps or lock the phone.</p> : null}
@@ -103,13 +157,15 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
         <>
           <div className="flex justify-between px-1 text-[13px] text-ink-2">
             <span>{totalLine(rows)}</span>
-            {locked ? <span>List locked: this check-in was created with these photos</span> : null}
+            {locked && !busy ? <span>Remove or replace any photo until measuring starts</span> : null}
           </div>
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
             {rows.map((r) => {
               const bad = Boolean(r.problem)
               const st = STATUS[r.state]
               const pct = bad ? 0 : Math.round(r.progress * 100)
+              const dup = !bad && r.duplicate ? dupLabel(r.duplicate) : null
+              const looksSoft = !bad && !dup && soft.has(r.id)
               return (
                 <li key={r.id} className="flex animate-rise items-center gap-3.5 rounded-[26px] bg-surface/[.92] p-3 shadow-[0_20px_40px_-36px_rgba(0,0,0,.4)]">
                   {r.thumb ? (
@@ -129,9 +185,10 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
                     <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${r.file.name} upload progress`} className="h-1.5 overflow-hidden rounded-[6px] bg-[#E4E3DE]">
                       <div className="h-full rounded-[6px] transition-[width] duration-300 ease-linear" style={{ width: `${pct}%`, background: st.bar }} />
                     </div>
-                    <span className="text-[13px]" style={{ color: bad ? 'var(--state-avoid-fg)' : st.color }}>
-                      {bad ? `! ${r.problem}` : `${st.glyph} ${r.state === 'failed' && r.error ? r.error : st.text}`}
+                    <span className="text-[13px]" style={{ color: bad || dup ? 'var(--state-avoid-fg)' : st.color }}>
+                      {bad ? `! ${r.problem}` : dup ? `! ${dup}` : `${st.glyph} ${r.state === 'failed' && r.error ? r.error : st.text}`}
                     </span>
+                    {looksSoft ? <span className="self-start rounded-pill bg-cta px-2.5 py-1 text-[12px] text-ink">Looks soft · consider retaking</span> : null}
                   </div>
                   <div className="flex flex-none gap-1.5">
                     {r.state === 'failed' && !busy ? (
@@ -139,7 +196,7 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
                         Retry
                       </button>
                     ) : null}
-                    {bad && canPick ? (
+                    {(bad || dup || looksSoft) && canPick ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -151,7 +208,7 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
                         Replace
                       </button>
                     ) : null}
-                    {!locked ? (
+                    {!busy ? (
                       <button type="button" onClick={() => onRemove(r.id)} disabled={busy} aria-label={`Remove ${r.file.name}`} className="grid size-11 place-items-center rounded-full border border-ink/12 bg-white">
                         ✕
                       </button>
@@ -197,7 +254,7 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
       >
         {cta}
       </button>
-      {locked && !busy && !allUp ? (
+      {locked && !busy && !allUp && !topup ? (
         <button type="button" onClick={onStartOver} className="min-h-11 self-center text-[14px] text-ink-2 underline underline-offset-4">
           {camera ? 'Start over with new photos' : 'Start over with different files'}
         </button>

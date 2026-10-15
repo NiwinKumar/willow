@@ -181,6 +181,11 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | POST | `/v1/sessions` | `{site, capture_mode, n_frames, content_types[]}` -> `{session_id, upload_urls[]}` (V4 signed PUT URLs, 15 min) |
 | POST | `/v1/sessions/{id}/analyze` | calls engine with baseline from Firestore; Gemini labels + explanation; returns `SessionView` |
 | GET | `/v1/sessions/{id}` | `SessionView` |
+| POST | `/v1/sessions/{id}/analyze?force=1` | measures a `done` session again with all its frames (counts as an analysis); a re-analyzed baseline rebuilds `baselines/{key}`, later sessions keep their stored `compared_with`; a failed forced run leaves the session `done` as it was |
+| POST | `/v1/sessions/{id}/frames` | `{add: 1-5, content_types[]}` -> `{session_id, n_frames, upload_urls[] (new frames only, index = place in the session), expires_in_seconds, dropped[]}`. Before analyze: an edit. On a `done` session (baseline top-up): status back to `uploading` (result and baseline kept until re-analyzed), frames the engine left out are dropped (`dropped`, 1-based). 409 `too_many_frames` past 5, `originals_deleted` after the 30-day lifecycle, `conflict` while analyzing or for sample runs |
+| DELETE | `/v1/sessions/{id}/frames/{index}` | before analyze only (`uploading`/`failed`): removes frame `index` (1-based; later frames move up, the object is deleted) -> `{session_id, upload_urls[] (all frames), expires_in_seconds}`; 409 `last_frame` for the only frame |
+| GET | `/v1/sessions/{id}/objects` | `{session_id, objects[{index, object_uri, exists, size, md5_base64, content_type, duplicate_of: {session_id, index} \| null}]}`: GCS metadata per frame; `duplicate_of` = a byte-identical (MD5) frame of the person's earliest other session (sample runs excluded), else an earlier frame of this one |
+| — | `SessionView.session` additions | `stage: 'received'\|'engine'\|'explaining'\|null` (live while `processing`, every view); `frame_urls: (string\|null)[]` (signed GET per frame; null for DNG or a missing object) and `crop_urls: {candidate_id: url}` (signed tight crops that exist): only in `GET /v1/sessions/{id}` and analyze answers, not in the list |
 | GET | `/v1/timeline?site=...` | per-metric series for charts |
 | POST | `/v1/baselines/{site}` | mark a session as baseline (or auto: first passing 5-frame calibrated session) |
 | POST | `/v1/label-scan` | image -> `{brand, product_name, inci[], key_actives[{name, pct?}], confidence}` (Gemini vision) |
@@ -222,6 +227,9 @@ users/{uid}
 users/{uid}/sessions/{session_id}
   site, capture_mode, n_frames, created_at, status: uploading|processing|done|failed,
   frame_uris[], is_baseline, result (AnalysisResult), labels{}, explanation{}
+  content_types[], frame_md5s[] (GCS MD5 per frame, null if missing; written by GET .../objects,
+    used for duplicates across sessions), frame_seq (highest frame_N used; names never reused),
+  stage: received|engine|explaining|null (written by the analysis while processing)
 users/{uid}/baselines/{site}
   session_id, created_at, metrics: {metric_id: {mean, mdc95, n_frames}}
 users/{uid}/routine/{entry_id}

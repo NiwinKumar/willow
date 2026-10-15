@@ -98,6 +98,24 @@ def list_names(prefix: str, globs: tuple[str, ...] = DISPLAYABLE) -> set[str]:
     }
 
 
+def delete_object(object_name: str) -> None:
+    """Delete one object; a missing object is fine (a removed frame that never uploaded)."""
+    blob = gcp.storage_client().bucket(get_settings().bucket).get_blob(object_name)
+    if blob is not None:
+        blob.delete()
+
+
+def list_md5s(prefix: str) -> dict[str, str]:
+    """{object name: base64 MD5} of every object under a prefix (one list call; the duplicate
+    check reads a person's earlier uploads this way)."""
+    client = gcp.storage_client()
+    return {
+        b.name: b.md5_hash
+        for b in client.list_blobs(get_settings().bucket, prefix=prefix)
+        if b.md5_hash
+    }
+
+
 def delete_prefix(prefix: str) -> int:
     """Delete every object under a prefix, 100 per batched request."""
     client = gcp.storage_client()

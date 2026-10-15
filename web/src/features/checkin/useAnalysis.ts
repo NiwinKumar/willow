@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useData } from '../../data/useData'
-import { ApiError, api, type SessionView } from '../../lib/api'
+import { ApiError, api, type AnalysisStage, type SessionView } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
 
 /** What the first read of the session said, so the screen can name the site before the result lands. */
-export type SessionMeta = Pick<SessionView['session'], 'id' | 'site' | 'capture_mode' | 'n_frames' | 'status'> & { sample_id?: string | null }
+export type SessionMeta = Pick<SessionView['session'], 'id' | 'site' | 'capture_mode' | 'n_frames' | 'status'> & { sample_id?: string | null; stage?: AnalysisStage | null }
 
 export type AnalysisState =
   | { kind: 'idle' }
@@ -14,39 +14,55 @@ export type AnalysisState =
   | { kind: 'error'; status: number | null; code: string | null; message: string; startedAt: number; endedAt: number }
   | { kind: 'offline'; startedAt: number }
 
+/** How often the live stage is read while measuring (GET /v1/sessions/{id}). */
+const STAGE_POLL_MS = 2000
+
 /**
  * Analyse a session exactly once, whatever reloads happen (the old analyzeOnce): a finished session is
  * shown as it is, one that another tab (or a reload) is analysing is waited for (up to the api's 6 min
- * stale window), anything else is analysed. analyze is one synchronous call (~35 s on a cold engine).
+ * stale window), anything else is analysed. analyze is one synchronous call (~35 s on a cold engine);
+ * while it runs, `watch` reads the session's live `stage` every 2 s so the steps tick when the api moves on.
  */
-async function analyzeOnce(token: string, sessionId: string, onMeta: (m: SessionMeta) => void, alive: () => boolean): Promise<{ view: SessionView; fresh: boolean }> {
+async function analyzeOnce(
+  token: string,
+  sessionId: string,
+  onMeta: (m: SessionMeta) => void,
+  alive: () => boolean,
+  watch: () => () => void,
+): Promise<{ view: SessionView; fresh: boolean }> {
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
   let current = await api.getSession(token, sessionId)
   onMeta(current.session)
-  for (let i = 0; current.session.status === 'processing' && i < 125 && alive(); i++) {
-    await wait(3000)
+  for (let i = 0; current.session.status === 'processing' && i < 190 && alive(); i++) {
+    await wait(STAGE_POLL_MS)
     current = await api.getSession(token, sessionId)
+    onMeta(current.session)
   }
   if (current.session.status === 'done') return { view: current, fresh: false }
   // Closed while waiting: never start (or re-try) a run nobody is watching.
   if (!alive()) throw new Error('closed')
+  const stop = watch()
   try {
     return { view: await api.analyze(token, sessionId), fresh: true }
   } catch (e) {
-    if (e instanceof ApiError && e.status === 409 && e.code === 'conflict') return analyzeOnce(token, sessionId, onMeta, alive)
+    if (e instanceof ApiError && e.status === 409 && e.code === 'conflict') return analyzeOnce(token, sessionId, onMeta, alive, watch)
     throw e
+  } finally {
+    stop()
   }
 }
 
 /**
  * The flow's measuring state, kept above the steps so Back or a re-render never starts a second run.
  * `note`/`deviation` ("Anything different today?") are PATCHed onto the session right before analyze.
+ * `stage` is the api's live analysis stage (received → engine → explaining) while measuring, else null.
  */
 export function useAnalysis(sessionId: string | null, extra: { note: string; deviation: boolean }) {
   const { user, loading: authLoading, getIdToken } = useAuth()
   const data = useData()
   const [state, setState] = useState<AnalysisState>({ kind: 'idle' })
   const [meta, setMeta] = useState<SessionMeta | null>(null)
+  const [stage, setStage] = useState<AnalysisStage | null>(null)
   const [attempt, setAttempt] = useState(0)
   const ran = useRef<string | null>(null)
   const mounted = useRef(true)
@@ -59,6 +75,7 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
     setForId(sessionId)
     setState({ kind: 'idle' })
     setMeta(null)
+    setStage(null)
   }
   const currentId = useRef(sessionId)
   // Latest values for the async run below (declared first, so it runs before the run effect).
@@ -91,7 +108,32 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
     ran.current = key
     const startedAt = Date.now()
     setState({ kind: 'running', startedAt })
+    setStage(null)
     const live = () => mounted.current && currentId.current === sessionId
+    const onMeta = (m: SessionMeta) => {
+      if (!live()) return
+      setMeta(m)
+      setStage(m.status === 'processing' ? (m.stage ?? null) : null)
+    }
+    /** Read the stage every STAGE_POLL_MS while analyze is in flight; returns the stop function. */
+    const watch = () => {
+      let on = true
+      void (async () => {
+        while (on && live()) {
+          await new Promise((r) => setTimeout(r, STAGE_POLL_MS))
+          if (!on || !live()) break
+          try {
+            const v = await api.getSession(await getIdToken(), sessionId)
+            if (on && live()) setStage(v.session.stage ?? null)
+          } catch {
+            /* a missed reading: the next one, or the answer, catches up */
+          }
+        }
+      })()
+      return () => {
+        on = false
+      }
+    }
     void (async () => {
       if (!navigator.onLine) {
         setState({ kind: 'offline', startedAt })
@@ -108,7 +150,7 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
             /* the note is optional: measuring goes ahead without it */
           }
         }
-        const { view, fresh } = await analyzeOnce(token, sessionId, (m) => live() && setMeta(m), live)
+        const { view, fresh } = await analyzeOnce(token, sessionId, onMeta, live, watch)
         // Into the cache even if the person closed the check-in: Home shows it without a refetch.
         upsert.current(view)
         if (!live()) return
@@ -128,5 +170,5 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
   }, [sessionId, attempt, authLoading, user, getIdToken])
 
   const retry = useCallback(() => setAttempt((a) => a + 1), [])
-  return { state, meta, retry }
+  return { state, meta, stage, retry }
 }
