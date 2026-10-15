@@ -10,9 +10,11 @@ every product id from a tool result. Up to 5 tool calls per turn.
 
 import json
 import logging
+import secrets
 import time
-from datetime import timedelta
-from typing import Any
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
 
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -21,6 +23,9 @@ from app import catalog, explain, gemini, numbers, routine_check, routine_log
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
+
+# Progress for the streaming route: (event, data). Only real steps are reported, never a timer.
+Stage = Callable[[str, dict[str, Any]], None]
 
 log = logging.getLogger("willow.advisor")
 
@@ -87,11 +92,30 @@ TOOLS = types.Tool(
 )
 
 
+# Added to the instructions only when the person attached photos to the question.
+PHOTO_RULES = """
+- The person attached photos to their last message. Willow reads product and label photos only:
+  identify the product (brand and name as printed), read the label (ingredients, claims), then
+  use search_catalog to find it in the catalog and answer from the catalog's facts.
+- Never describe, judge or estimate anything about skin, a face or a person in a photo. If a photo
+  shows a face or skin rather than a product, set photos_show to face_or_skin.
+- Do not quote numbers read from a photo (SPF, percentages, sizes) unless the same number is in a
+  tool result; say what the label says in words instead."""
+
+
 class Reply(BaseModel):
     # The web sends replies back as history, which the api caps at 1000 characters per turn.
     message: str = Field(max_length=1000)
     product_ids: list[str] = Field(default_factory=list, max_length=4)
     follow_up_suggestions: list[str] = Field(default_factory=list, max_length=3)
+    # What attached photos show ("none" without photos); face_or_skin is never answered.
+    photos_show: Literal["none", "product_or_label", "face_or_skin", "other"] = "none"
+
+
+PHOTO_REFUSAL = (
+    "Willow reads product and label photos only, so I have not looked at this photo. To follow "
+    "your skin, take a check-in: those photos are measured by Willow, not by the advisor."
+)
 
 
 def _compact(p: dict[str, Any]) -> dict[str, Any]:
@@ -270,21 +294,37 @@ def _generate(contents: list[types.Content], config: types.GenerateContentConfig
     raise AssertionError("unreachable")
 
 
-def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, Any]:
+def _no_stage(event: str, data: dict[str, Any]) -> None:
+    return None
+
+
+def chat(
+    messages: list[dict[str, str]],
+    store: Store,
+    uid: str,
+    images: list[tuple[bytes, str]] | None = None,
+    on_stage: Stage | None = None,
+) -> dict[str, Any]:
+    """One advisor turn. `images`: (bytes, mime type) product or label photos attached to the
+    last message (up to 3). `on_stage` hears each real step as it starts (streaming route)."""
+    stage = on_stage or _no_stage
+    images = images or []
+    stage("reading_context", {})
     ctx = context(store, uid)
+    instructions = INSTRUCTIONS + (PHOTO_RULES if images else "")
+    photo_parts = [types.Part.from_bytes(data=data, mime_type=mime) for data, mime in images]
     contents: list[types.Content] = [
         types.Content(role="user", parts=[types.Part(text=f"CONTEXT (JSON):\n{json.dumps(ctx)}")]),
         types.Content(role="model", parts=[types.Part(text="Understood.")]),
     ]
-    for m in messages:
-        contents.append(
-            types.Content(
-                role="user" if m["role"] == "user" else "model", parts=[types.Part(text=m["text"])]
-            )
-        )
+    for i, m in enumerate(messages):
+        parts = [types.Part(text=m["text"])]
+        if photo_parts and i == len(messages) - 1:
+            parts = [*photo_parts, *parts]
+        contents.append(types.Content(role="user" if m["role"] == "user" else "model", parts=parts))
 
     config = types.GenerateContentConfig(
-        system_instruction=f"{gemini.SYSTEM_RULES}\n\n{INSTRUCTIONS}",
+        system_instruction=f"{gemini.SYSTEM_RULES}\n\n{instructions}",
         temperature=0.3,
         max_output_tokens=4096,
         tools=[TOOLS],
@@ -293,8 +333,12 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
     )
     tool_outputs: list[dict[str, Any]] = []
     retrieval: list[str] = []
+    if images:
+        n = len(images)
+        retrieval.append(f"Read {n} product photo{'s' if n != 1 else ''} you attached")
     product_ids: set[str] = set()
     started = time.monotonic()
+    stage("asking_gemini", {"step": "tools", "photos": len(images)})
     for _ in range(MAX_TOOL_CALLS):
         if time.monotonic() - started > TOOLS_BUDGET_S:
             break  # answer with what the tools found so far: the turn must finish in time
@@ -320,6 +364,7 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
             {
                 "prompt_id": "advisor_tools",
                 "tools": len(tool_outputs),
+                "photos": len(images),
                 "latency_ms": round((time.monotonic() - started) * 1000),
             }
         )
@@ -332,6 +377,12 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
         "Write the reply to the last USER message. product_ids: only ids from TOOL RESULTS or "
         "the routine in CONTEXT that you actually recommend or discuss. "
         "follow_up_suggestions: up to 3 short questions the person might ask next."
+        + (
+            f"\nThe last USER message came with {len(images)} attached photo(s), above. "
+            "photos_show: what they show."
+            if images
+            else ""
+        )
     )
     # Products it may show: anything a tool returned, plus the person's own routine products.
     product_ids |= {r["product_id"] for r in ctx["routine"] if r.get("product_id")}
@@ -341,21 +392,33 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
     for m in messages:
         if m["role"] == "user":
             allowed |= numbers.in_text(m["text"])
+    stage("asking_gemini", {"step": "reply", "retrieval": retrieval})
     for _ in range(2):
         if time.monotonic() - started > TURN_BUDGET_S:
             break  # the fixed fallback, well inside Cloud Run's 300 s
         try:
             reply = gemini.generate_json(
                 "advisor_reply",
-                [final_prompt],
+                [*photo_parts, final_prompt],
                 Reply,
-                instructions=INSTRUCTIONS,
+                instructions=instructions,
                 temperature=0.3,
                 max_output_tokens=4096,
                 attempts=1,  # the loop is the retry
             )
         except gemini.GeminiError:
             break
+        stage("checking_numbers", {})
+        if images and reply.photos_show == "face_or_skin":
+            # Never answered, whatever the model wrote: chat photos are for products only.
+            return {
+                "message": PHOTO_REFUSAL,
+                "product_ids": [],
+                "products": [],
+                "follow_up_suggestions": [],
+                "retrieval": ["Photo not read: it shows skin or a face, not a product"],
+                "photos_refused": True,
+            }
         bad_ids = set(reply.product_ids) - product_ids
         # the chips are tappable questions: same rules as the message, failing ones dropped
         follow_ups = [
@@ -380,6 +443,7 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
                     "tool_calls": len(tool_outputs),
                     "numbers_checked": len(set(numbers.NUMBER.findall(reply.message))),
                     "products_from_tools": len(reply.product_ids),
+                    "photos_read": len(images),
                 },
             }
         log.warning("advisor reply rejected (ids %s)", sorted(bad_ids))
@@ -390,4 +454,108 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
         "products": [],
         "follow_up_suggestions": [],
         "retrieval": retrieval,
+    }
+
+
+# --- History (users/{uid}/advisor_messages, newest HISTORY_KEEP kept) -------------------------
+
+HISTORY_KEEP = 200
+# Stored with a willow turn so it can be drawn again (products are looked up again on read).
+REPLY_FIELDS = ("message", "product_ids", "follow_up_suggestions", "retrieval", "checks")
+
+
+def _turn_id(at: datetime, role: str) -> str:
+    # sortable by time, then user before willow within the same millisecond
+    order = "0" if role == "user" else "1"
+    return f"{int(at.timestamp() * 1000):013d}{order}{secrets.token_hex(4)}"
+
+
+def remember(
+    store: Store,
+    uid: str,
+    question: str,
+    photos: int,
+    reply: dict[str, Any],
+    asked_at: datetime,
+    answered_at: datetime | None = None,
+) -> None:
+    """Store one question and its answer. Photos are never stored, only how many there were."""
+    answered_at = max(answered_at or datetime.now(UTC), asked_at + timedelta(milliseconds=1))
+    user = {
+        "id": _turn_id(asked_at, "user"),
+        "role": "user",
+        "text": question,
+        "photos": photos,
+        "created_at": asked_at,
+    }
+    willow = {
+        "id": _turn_id(answered_at, "willow"),
+        "role": "willow",
+        "text": reply["message"],
+        "created_at": answered_at,
+        "reply": {k: reply.get(k) for k in REPLY_FIELDS if k in reply}
+        | ({"photos_refused": True} if reply.get("photos_refused") else {}),
+    }
+    store.advisor_add(uid, [user, willow], HISTORY_KEEP)
+
+
+def history(store: Store, uid: str) -> list[dict[str, Any]]:
+    """Oldest first, as the chat draws it; a willow turn carries its reply with live products."""
+    out = []
+    for doc in store.advisor_list(uid):
+        row: dict[str, Any] = {
+            "id": doc["id"],
+            "role": doc["role"],
+            "text": doc.get("text", ""),
+            "created_at": iso(doc.get("created_at")),
+        }
+        if doc["role"] == "user":
+            row["photos"] = int(doc.get("photos") or 0)
+        else:
+            reply = dict(doc.get("reply") or {})
+            ids = list(reply.get("product_ids") or [])
+            reply.update(
+                message=reply.get("message") or row["text"],
+                product_ids=ids,
+                products=[p for i in ids if (p := catalog.by_id(i))],
+                follow_up_suggestions=list(reply.get("follow_up_suggestions") or []),
+                retrieval=list(reply.get("retrieval") or []),
+            )
+            row["reply"] = reply
+        out.append(row)
+    return out
+
+
+# --- "AI unavailable": the standard (template) explanation of the latest session --------------
+
+
+def standard_explanation(store: Store, uid: str) -> dict[str, Any] | None:
+    """The pre-written explanation of the latest measured session (the face first), the same
+    template analysis falls back to. No Gemini, no new analysis: it is what Willow already
+    measured, worded by code."""
+    rows = []
+    for sid, doc in store.sessions_list(uid):
+        result = measured_result(doc)
+        if doc.get("status") == "done" and result and result["quality"]["passed"]:
+            rows.append((doc["site"] == "face_full", str(doc.get("created_at")), sid, doc, result))
+    if not rows:
+        return None
+    _, _, sid, doc, result = max(rows, key=lambda r: (r[0], r[1]))
+    stored = doc.get("explanation")
+    if doc.get("explanation_source") == "template" and stored:
+        explanation = stored
+    else:
+        from app import baselines
+
+        # quote the band each verdict was judged against (the baseline's), as analysis does
+        base = baselines.get(store, uid, doc["site"], doc.get("capture_mode", ""))
+        own = not base or base.get("session_id") == sid
+        bands = None if own else {k: m.get("mdc95") for k, m in (base.get("metrics") or {}).items()}
+        explanation = explain.template(explain.with_bands(result, bands), own)
+    return {
+        "session_id": sid,
+        "site": doc["site"],
+        "capture_mode": doc.get("capture_mode"),
+        "created_at": iso(doc.get("created_at")),
+        "explanation": explanation,
     }
