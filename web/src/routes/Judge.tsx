@@ -137,7 +137,7 @@ export function Judge() {
           <ol className="mt-8 border-t border-border">
             <Stop n={1} done={seen('run') || Boolean(lastRun)} title="Measure real photos" eta="about 40 s" tech="Cloud Run engine · RAW decoding · noise band · Gemini explanation">
               <p>
-                One tap copies consented RAW photos into your account and runs the full pipeline: quality checks, colour correction, the measured square, then a plain-language explanation whose every number is checked.
+                One tap copies consented sample photos into your account and runs the full pipeline: quality checks, colour correction when a white reference is in the photo, the measured regions, then a plain-language explanation whose every number is checked.
               </p>
               <div className="mt-3">
                 {samples.state === 'ready' && samples.samples.length ? (
@@ -158,7 +158,7 @@ export function Judge() {
                   <Link to="/capture?site=face_full&mode=quick" className="font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('run')}>
                     take a quick selfie
                   </Link>
-                  . The engine finds your face, measures tone, dark spots, evenness, redness and blemishes, and Gemini names the spots it found.
+                  . The engine finds your face and measures skin tone, dark spots, evenness, redness, blemishes, under-eye, shine and glow, and Gemini names the spots it found.
                 </p>
                 {lastRun ? (
                   <p className="mt-2 text-[13px]">

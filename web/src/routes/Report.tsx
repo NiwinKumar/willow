@@ -47,7 +47,8 @@ export function Report() {
   // Opened from a shared link, or straight after measuring (back would reopen the camera or the
   // upload), the arrow goes home instead.
   const location = useLocation()
-  const backHome = location.key === 'default' || Boolean((location.state as { fromProcessing?: boolean } | null)?.fromProcessing)
+  // Fixed at mount: scrubbing or picking a metric replaces the URL (new key, no state).
+  const [backHome] = useState(() => location.key === 'default' || Boolean((location.state as { fromProcessing?: boolean } | null)?.fromProcessing))
   const reduce = useReducedMotion()
   // One layout mounted at a time (Tailwind lg), so the panel's ids, heading and charts exist once.
   const wide = useMediaQuery('(min-width: 1024px)')
@@ -283,7 +284,7 @@ export function Report() {
             {leftOutPhotos(session.result) ? <p className="mt-1 text-[13px] text-text-2">{leftOutPhotos(session.result)}</p> : null}
             {(session.result?.frames_used ?? session.n_frames) < 3 ? (
               <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-                {(session.result?.frames_used ?? session.n_frames) === 1 ? (session.n_frames > 1 ? 'Only one photo passed' : 'One photo') : 'Only two photos passed'}, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
+                {(session.result?.frames_used ?? session.n_frames) === 1 ? (session.n_frames > 1 ? 'Only one photo passed' : 'One photo') : session.n_frames > 2 ? 'Only two photos passed' : 'Two photos'}, so there is no noise band yet: Willow cannot tell a real change from normal photo-to-photo variation. Take a session of 5 photos and make it your baseline.
               </p>
             ) : null}
             {data.mode === 'live' && missing.length ? (

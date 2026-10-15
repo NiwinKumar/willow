@@ -64,9 +64,9 @@ function outcomes(view: SessionView): string[] {
 async function analyzeOnce(token: string, sessionId: string): Promise<SessionView> {
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
   let current = await api.getSession(token, sessionId)
-  // Up to ~5.5 min: a run in another tab (or before a reload) gets the api's full window
-  // (STALE_PROCESSING is 5 min) before this one may start it again.
-  for (let i = 0; current.session.status === 'processing' && i < 110; i++) {
+  // Up to ~6.3 min: a run in another tab (or before a reload) gets the api's full window
+  // (STALE_PROCESSING is 6 min) before this one may start it again.
+  for (let i = 0; current.session.status === 'processing' && i < 125; i++) {
     await wait(3000)
     current = await api.getSession(token, sessionId)
   }

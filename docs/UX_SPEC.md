@@ -11,7 +11,7 @@
 | metric | user label | decrease means | increase means | notes |
 |---|---|---|---|---|
 | tone_ita | Skin tone (ITA°) | "change detected" | "change detected" | Never "better/worse". Shown in Science panel + product tests. |
-| pigment_spots | Dark spots | "fewer/lighter spots" | "more visible spots" | |
+| pigment_spots | Dark spots | "fewer/fainter spots" | "more visible spots" | |
 | tone_evenness | Tone evenness | "more even" | "less even" | value is unevenness; lower = more even |
 | redness | Redness | "calmer" | "more redness" | caveat for deep skin tones |
 | blemishes | Blemishes | "fewer blemishes" | "more blemishes" | indicative |

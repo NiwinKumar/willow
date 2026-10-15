@@ -119,7 +119,7 @@ export function Capture() {
           ) : null}
           {site === 'face_full' && data.goals.includes('smoother') ? (
             <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-              Tracking texture and pores? They are measured on a cheek close-up, not the full face.{' '}
+              Tracking texture and pores? Pores are measured on cheek and nose close-ups, texture on the cheek close-up, not the full face.{' '}
               <button type="button" onClick={() => setSite('cheek_macro')} className="font-medium text-willow-700 underline-offset-2 hover:underline">
                 Photograph a cheek close-up
               </button>

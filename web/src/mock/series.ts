@@ -152,7 +152,8 @@ export function faceSeries(): SiteSeries {
   const rng = mulberry32(42)
   // Faces have no colour reference: every face metric is a trend (engine, Oct 14).
   // The contract sample has no band for blemishes; a 5-photo baseline would have one.
-  const fixtureMetrics = FIXTURE.metrics.map((m) => ({ ...m, confidence: 'indicative' as const, mdc95: m.mdc95 ?? (m.unit === 'count' ? 2 : null) }))
+  // lines are not measured: the illustration must not show a row the product does not have
+  const fixtureMetrics = FIXTURE.metrics.filter((m) => m.id !== 'lines').map((m) => ({ ...m, confidence: 'indicative' as const, mdc95: m.mdc95 ?? (m.unit === 'count' ? 2 : null) }))
   const baseVals = Object.fromEntries(fixtureMetrics.map((m) => [m.id, (m.value ?? 0) - (m.delta ?? 0)])) as Record<string, number>
   const sessions: Session[] = []
   const baselineMetrics: Metric[] = fixtureMetrics.map((m) => ({ ...m, value: +baseVals[m.id].toFixed(3), delta: null, verdict: 'no_baseline', direction: 'none' }))

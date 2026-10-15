@@ -27,8 +27,8 @@ export function answer(q: string, sessions: Session[]): Turn {
     const spotsLine = !d
       ? 'Since you started azelaic acid at week 2, there is no dark-spot reading to compare with your baseline yet.'
       : real
-        ? `Since you started azelaic acid at week 2, dark spots moved ${d}${band ? ` against a noise threshold of ${band}` : ''}, which counts as a real change.`
-        : `Since you started azelaic acid at week 2, dark spots moved ${d}${band ? `, inside the noise threshold of ${band}` : ''}, so no clear change yet.`
+        ? `Since you started azelaic acid at week 2, dark spots moved ${d}${band ? ` against a noise band of ${band}` : ''}, which counts as a real change.`
+        : `Since you started azelaic acid at week 2, dark spots moved ${d}${band ? `, inside the noise band of ${band}` : ''}, so no clear change yet.`
     const r = red && red.delta !== null ? fmtSigned(red.delta, red) : null
     const redLine = !r ? '' : red?.verdict === 'real_change' ? ` Redness moved ${r}, beyond its band.` : ` Redness moved ${r}, inside its band, so no clear change there yet.`
     const advice = real

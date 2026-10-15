@@ -6,7 +6,7 @@ export const METRIC_META: Record<
   { label: string; group: MetricGroup; decrease: string; increase: string; note?: string; sites: Site[] }
 > = {
   tone_ita: { label: 'Skin tone (ITA°)', group: 'tone_pigment', decrease: 'change detected', increase: 'change detected', note: 'Descriptive only. No direction is better.', sites: ['face_full', 'cheek_macro', 'forearm_treated', 'forearm_control'] },
-  pigment_spots: { label: 'Dark spots', group: 'tone_pigment', decrease: 'fewer / lighter spots', increase: 'more visible spots', sites: ['face_full', 'cheek_macro'] },
+  pigment_spots: { label: 'Dark spots', group: 'tone_pigment', decrease: 'fewer / fainter spots', increase: 'more visible spots', sites: ['face_full', 'cheek_macro'] },
   tone_evenness: { label: 'Tone evenness', group: 'tone_pigment', decrease: 'more even', increase: 'less even', note: 'Lower is more even.', sites: ['face_full'] },
   redness: { label: 'Redness', group: 'redness', decrease: 'calmer', increase: 'more redness', note: 'Harder to read on deep skin tones.', sites: ['face_full', 'cheek_macro', 'forearm_treated', 'forearm_control'] },
   blemishes: { label: 'Blemishes', group: 'clarity', decrease: 'fewer blemishes', increase: 'more blemishes', sites: ['face_full', 'cheek_macro', 'nose_macro'] },
