@@ -4,15 +4,18 @@ import { Toaster } from 'sonner'
 
 import { AppShell } from './components/AppShell'
 import { BandBarDefs } from './components/BandBar'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { DataProvider } from './data/store'
 import { Landing } from './routes/Landing'
 import { Advisor, Capture, Goals, Judge, Processing, QuickCapture, Report, Retailer, Routine, Science, Settings, Start, UploadTest } from './routes/lazy'
 
 export default function App() {
+  const { pathname } = useLocation()
   return (
     <DataProvider>
       <PageTitle />
       <BandBarDefs />
+      <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<RouteLoading />}>
       <Routes>
         <Route path="/s/:site" element={<Report />} />
@@ -43,6 +46,7 @@ export default function App() {
         />
       </Routes>
       </Suspense>
+      </ErrorBoundary>
       <Toaster position="bottom-center" toastOptions={{ style: { fontFamily: 'var(--font-sans)' } }} />
     </DataProvider>
   )

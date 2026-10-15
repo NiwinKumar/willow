@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
@@ -158,12 +159,22 @@ def routine_patch(
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
     """Stop a product (ended_at) or move it between AM and PM. History is kept for the charts."""
+    _check_entry_id(entry_id)
     doc = store.routine_get(user.uid, entry_id)
     if doc is None:
         raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
     doc.update(body.model_dump(mode="json", exclude_unset=True))
     store.routine_set(user.uid, entry_id, doc)
     return _entry_view(entry_id, doc)
+
+
+ENTRY_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _check_entry_id(entry_id: str) -> None:
+    """Never put arbitrary text into a Firestore path."""
+    if not ENTRY_ID.match(entry_id):
+        raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
 
 
 @router.delete("/routine/{entry_id}", status_code=204)
@@ -173,6 +184,7 @@ def routine_delete(
     store: Store = Depends(get_store),
 ) -> Response:
     """Remove an entry added by mistake. To stop using a product, PATCH ended_at instead."""
+    _check_entry_id(entry_id)
     store.routine_delete(user.uid, entry_id)
     return Response(status_code=204)
 

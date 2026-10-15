@@ -57,7 +57,7 @@ def test_trend_wording_for_indicative_metrics():
         "mdc95": 1.9,
     }
     assert explain.item(m)["summary"] == (
-        "Shine: within normal photo variation (trend only) (change +0.4, noise threshold 1.9)."
+        "Shine: within normal photo variation (trend only) (change +0.4, noise band ±1.9)."
     )
 
 
@@ -227,3 +227,61 @@ def test_failed_session_gets_the_template_with_site_advice(monkeypatch):
     exp, source = explain.generate(result, {"is_baseline": True})
     assert source == "template"
     assert "hands away" in exp["next_steps"][0] and "card" not in exp["next_steps"][0]
+
+
+def _data(delta, verdict="within_noise", days=None, routine=()):
+    return {
+        "frames_used": 3,
+        "days_since_baseline": days,
+        "routine": list(routine),
+        "metrics": [
+            {
+                "id": "redness",
+                "label": "Redness",
+                "verdict": verdict,
+                "direction": "decrease" if delta < 0 else "increase",
+                "confidence": "indicative",
+                "unit": "a*",
+                "value": 13.4,
+                "delta": delta,
+                "mdc95": 2.5,
+            }
+        ],
+    }
+
+
+def _exp(summary):
+    return explain._Explanation(
+        headline="Your redness reading.",
+        items=[explain._Item(metric_id="redness", summary=summary)],
+        next_steps=[],
+        disclaimer="x",
+    )
+
+
+def test_a_change_quoted_with_the_wrong_sign_or_direction_is_rejected():
+    data = _data(-0.8, days=None, routine=[{"product": "x", "started_at": "2026-10-01"}])
+    bad = _exp("Redness increased by +0.8 a*, about 1 point higher after 10 days.")
+    issues = explain.problems(bad, data)
+    assert any("sign" in i or "direction" in i for i in issues)
+    assert any("unknown number" in i for i in issues)  # 10 came only from a date
+
+
+def test_the_right_sign_and_direction_pass():
+    data = _data(-0.8, routine=[{"product": "Minimalist Retinol 0.3%", "started_at": "2026-10-01"}])
+    ok = _exp("Redness went down by -0.8 a*, within normal photo variation (2.5).")
+    assert explain.problems(ok, data) == []
+    named = _exp("Redness is 13.4 a*, no clear change yet while using Minimalist Retinol 0.3%.")
+    assert explain.problems(named, data) == []
+
+
+def test_comparisons_and_ranges_are_not_direction_claims():
+    data = _data(0.8)
+    for ok in (
+        "Redness changed by 0.8 a*, lower than the noise band of 2.5, so no clear change yet.",
+        "Redness: no clear change yet (+0.8); lower values mean calmer skin.",
+        "Redness rose by +0.8, within normal photo variation. Check again in 1-2 weeks.",
+    ):
+        assert not [
+            i for i in explain.problems(_exp(ok), data) if "sign" in i or "direction" in i
+        ], ok

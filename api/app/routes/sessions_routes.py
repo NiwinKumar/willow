@@ -25,7 +25,7 @@ router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
 
 # A session stuck in "processing" longer than this (crashed instance) may be analyzed again.
 # Longer than the api's own 300 s request timeout, so a slow run is never started twice.
-STALE_PROCESSING = timedelta(minutes=5)
+STALE_PROCESSING = timedelta(minutes=6)  # longer than Cloud Run's 300 s request limit
 SESSION_ID = re.compile(r"^s_\d{8}_[0-9a-f]{8}$")
 
 
@@ -135,6 +135,11 @@ def analyze_session(
 ) -> dict[str, Any]:
     uid = user.uid
     doc = _load(store, uid, session_id)
+    if doc.get("status") == "done":
+        # Already measured (a reload, a second tab, a direct call): show it. Running again would
+        # spend a daily analysis and could drop a baseline whose re-run fails the quality gate;
+        # re-measuring is scripts/remeasure.py's job.
+        return _detail_view(store, uid, session_id, doc)
 
     missing = []
     for i, uri in enumerate(doc["frame_uris"], start=1):
@@ -148,7 +153,14 @@ def analyze_session(
         )
     limits.take(store, uid, "analyze")
     # Atomic: of two tabs (or a reload) only one runs the engine; the other waits and reads.
-    if not store.session_claim(uid, session_id, STALE_PROCESSING):
+    try:
+        claimed = store.session_claim(uid, session_id, STALE_PROCESSING)
+    except Exception as exc:  # deleted between the load and the claim ("delete my data")
+        limits.refund(store, uid, "analyze")
+        if store.session_get(uid, session_id) is None:
+            raise _not_found() from exc
+        raise
+    if not claimed:
         limits.refund(store, uid, "analyze")
         raise HTTPException(409, {"code": "conflict", "message": "analysis already running"})
 

@@ -158,7 +158,11 @@ def test_spots_route_builds_the_diary(fake, client, monkeypatch):
         fake.put(f"results/u_test/s{day}/preview.jpg", content_type="image/jpeg")
     fake.put("results/u_test/s/crops/c_001.jpg", content_type="image/jpeg")
     # measured before the face map: counted, not used
-    old = _doc(3, [{"id": "c_001", "kind": "blemish", "bbox": [0, 0, 1, 1], "features": {}}])
+    old = _doc(
+        3,
+        [{"id": "c_001", "kind": "blemish", "bbox": [0, 0, 1, 1], "features": {}}],
+        engine="0.3.0",
+    )
     fake.store.session_set("u_test", "old", old)
     fake.store.session_set("u_test", "side", _doc(4, [_cand(30.0, -5.0)], front=False))
     body = client.get("/v1/spots").json()
@@ -195,3 +199,36 @@ def test_a_flicker_that_ended_does_not_make_a_mark_come_back():
     ]
     [t] = tracks.follow(s)["tracks"]
     assert not t["came_back"]
+
+
+def test_a_spot_missed_last_time_counts_days_to_its_last_sighting_and_ties_keep_the_latest_zone():
+    s = [
+        _session(0, [_mark(30.0, -5.0, zone=2)]),
+        _session(1, [_mark(30.5, -5.0, zone=4)]),
+        _session(9, []),
+    ]
+    [t] = tracks.follow(s)["tracks"]
+    assert t["status"] == "not_seen_last_time"
+    assert t["days_visible"] == {"at_least": 1.0, "at_most": None}  # not 9: missed on day 9
+    assert t["zone"] == "left_cheek"  # one sighting each: the latest wins, on every server
+
+
+def test_the_diary_signs_crops_that_exist_and_context_only_for_the_latest(
+    fake, client, monkeypatch
+):
+    from app import storage
+
+    monkeypatch.setattr(
+        storage, "name_from_uri", lambda uri: uri.removeprefix("gs://test-bucket/") or None
+    )
+    for day in (0, 1):
+        c = _cand(30.0, -5.0)
+        c["crop_uri"] = f"gs://test-bucket/results/u_test/s{day}/crops/c_001.jpg"
+        c["context_crop_uri"] = f"gs://test-bucket/results/u_test/s{day}/crops/c_001_ctx.jpg"
+        fake.store.session_set("u_test", f"s{day}", _doc(day, [c]))
+        fake.put(c["crop_uri"].removeprefix("gs://test-bucket/"), content_type="image/jpeg")
+        fake.put(c["context_crop_uri"].removeprefix("gs://test-bucket/"), content_type="image/jpeg")
+    [t] = client.get("/v1/spots").json()["tracks"]
+    first, last = t["observations"]
+    assert first["crop_url"] and last["crop_url"] and last["context_crop_url"]
+    assert first["context_crop_url"] is None

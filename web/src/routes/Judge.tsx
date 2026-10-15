@@ -31,8 +31,11 @@ export function Judge() {
   const navigate = useNavigate()
   const tour = useJudge()
   const samples = useSamples()
-  const [setup, setSetup] = useState<'idle' | 'working' | 'ready' | 'failed'>('idle')
+  // 'no-guest': the guest account itself could not be made; 'failed': it exists, the tour setup did not run.
+  const [setup, setSetup] = useState<'idle' | 'working' | 'ready' | 'failed' | 'no-guest'>('idle')
   const [routineAdded, setRoutineAdded] = useState(0)
+  const [attempt, setAttempt] = useState(0)
+  const [restarting, setRestarting] = useState(false)
   const started = useRef<string | null>(null)
 
   // Judges never need to sign in: a fresh guest account is made for them.
@@ -43,11 +46,12 @@ export function Judge() {
   }, [])
   useEffect(() => {
     if (loading || user) return
-    continueAsGuest().catch(() => setSetup('failed'))
-  }, [loading, user, continueAsGuest])
+    continueAsGuest().catch(() => setSetup('no-guest'))
+  }, [loading, user, continueAsGuest, attempt])
   useEffect(() => {
     if (!user || started.current === user.uid) return
     started.current = user.uid
+    setRestarting(false)
     setSetup('working')
     getIdToken()
       .then((t) => api.judgeSetup(t))
@@ -55,8 +59,14 @@ export function Judge() {
         setRoutineAdded(r.routine_added)
         setSetup('ready')
       })
+      // The api may still be waking up: Retry runs the setup again for the same account.
       .catch(() => setSetup('failed'))
-  }, [user, getIdToken])
+  }, [user, getIdToken, attempt])
+  const retry = () => {
+    started.current = null
+    setSetup('idle')
+    setAttempt((n) => n + 1)
+  }
 
   const go = (stop: JudgeStop, to: string, demo = false) => {
     judge.visit(stop)
@@ -70,6 +80,9 @@ export function Judge() {
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
   const lastRun = ran[ran.length - 1]
   const seen = (s: JudgeStop) => tour.seen.includes(s)
+  // Ready only with someone signed in: "Start fresh" signs out first, and that moment is not ready.
+  const ready = setup === 'ready' && user ? user : null
+  const failed = setup === 'failed' || setup === 'no-guest'
 
   return (
     <div className="mx-auto w-full max-w-[1120px] px-5 pb-20 pt-4 sm:px-8">
@@ -80,21 +93,40 @@ export function Judge() {
             Five stops, about four minutes. You have a guest account of your own: photos are measured by the engine on Cloud Run and Gemini answers live on Vertex AI. Stop 2 replays a finished four-day test, so you can see a real change clear its noise band.
           </p>
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-2" role="status">
-            <span aria-hidden className={`h-2 w-2 rounded-full ${setup === 'ready' ? 'bg-willow-500' : setup === 'failed' ? 'bg-danger' : 'animate-pulse bg-border'}`} />
-            {setup === 'ready'
-              ? user?.isAnonymous
+            <span aria-hidden className={`h-2 w-2 rounded-full ${ready ? 'bg-willow-500' : failed ? 'bg-danger' : 'animate-pulse bg-border'}`} />
+            {ready
+              ? ready.isAnonymous
                 ? `Your guest account is ready${routineAdded ? `, with a ${routineAdded}-product routine to check` : ''}.`
-                : `Signed in${user?.email ? ` as ${user.email}` : ''}: the stops use your own account and routine.`
-              : setup === 'failed'
-                ? 'Could not make a guest account. Reload the page to try again.'
-                : 'Making you a guest account…'}
-            {setup === 'ready' && user?.isAnonymous ? (
+                : `Signed in${ready.email ? ` as ${ready.email}` : ''}: the stops use your own account and routine.`
+              : setup === 'no-guest'
+                ? 'Could not make a guest account.'
+                : setup === 'failed'
+                  ? 'Could not prepare your tour.'
+                  : restarting
+                    ? 'Making you a fresh guest account…'
+                    : user && !user.isAnonymous
+                      ? 'Preparing your tour…'
+                      : 'Making you a guest account…'}
+            {failed ? (
+              <button type="button" className="min-h-11 font-medium text-text underline-offset-2 hover:underline" onClick={retry}>
+                Retry
+              </button>
+            ) : null}
+            {ready?.isAnonymous ? (
               <button
                 type="button"
                 className="font-medium text-text underline-offset-2 hover:underline"
                 onClick={() => {
+                  setRestarting(true)
+                  setSetup('idle')
                   judge.stop()
-                  void signOutUser().then(() => judge.start())
+                  void signOutUser()
+                    .catch(() => {
+                      // Still signed in to the same guest account: it stays ready.
+                      setRestarting(false)
+                      setSetup('ready')
+                    })
+                    .then(() => judge.start())
                 }}
               >
                 Start fresh
@@ -105,7 +137,7 @@ export function Judge() {
           <ol className="mt-8 border-t border-border">
             <Stop n={1} done={seen('run') || Boolean(lastRun)} title="Measure real photos" eta="about 40 s" tech="Cloud Run engine · RAW decoding · noise band · Gemini explanation">
               <p>
-                One tap copies consented RAW photos into your account and runs the full pipeline: quality checks, colour correction, the measured square, then a plain-language explanation whose every number is checked.
+                One tap copies consented sample photos into your account and runs the full pipeline: quality checks, colour correction when a white reference is in the photo, the measured regions, then a plain-language explanation whose every number is checked.
               </p>
               <div className="mt-3">
                 {samples.state === 'ready' && samples.samples.length ? (
@@ -126,7 +158,7 @@ export function Judge() {
                   <Link to="/capture?site=face_full&mode=quick" className="font-medium text-text underline-offset-2 hover:underline" onClick={() => judge.visit('run')}>
                     take a quick selfie
                   </Link>
-                  . The engine finds your face, measures tone, dark spots, evenness, redness and blemishes, and Gemini names the spots it found.
+                  . The engine finds your face and measures skin tone, dark spots, evenness, redness, blemishes, under-eye, shine and glow, and Gemini names the spots it found.
                 </p>
                 {lastRun ? (
                   <p className="mt-2 text-[13px]">

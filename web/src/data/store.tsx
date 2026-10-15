@@ -1,5 +1,5 @@
 /**
- * Data seam. Demo mode serves the illustrative sample journeys; live mode reads the signed-in
+ * Data seam. Demo mode serves the team's seeded journey (or the illustrative one); live mode reads the signed-in
  * person's sessions from the api. Screens never know which one they got.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -11,6 +11,7 @@ import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
 import { DEMO_SERIES, DEMO_SITES } from '../mock/series'
 import { DataContext, type DataState, type DataStatus } from './context'
+import { holdDemo, peekDemo, pickDemo, releaseDemo, type DemoPick } from './demoSource'
 import { groupBySite, sitesWithResults } from './live'
 import { DEMO_EVENT } from './useData'
 
@@ -85,19 +86,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [demo, uid, load, apply])
 
   // Demo mode prefers the seeded real journey (api /v1/demo/journey) and falls back to the illustration.
-  // Signed photo URLs last about an hour: refetch when demo mode is entered again after 10 minutes.
-  const [journey, setJourney] = useState<{ views: SessionView[]; at: number } | null>(null)
+  // The source is picked once per demo entry (waiting up to 1.5 s) and held until demo mode is left,
+  // so a report never swaps its data under the viewer.
+  const [demoPick, setDemoPick] = useState<DemoPick | null>(() => (demo ? peekDemo() : null))
+  const [pickedFor, setPickedFor] = useState(demo)
+  if (pickedFor !== demo) {
+    setPickedFor(demo)
+    setDemoPick(demo ? peekDemo() : null)
+  }
   useEffect(() => {
-    if (!demo || (journey && Date.now() - journey.at < 600_000)) return
+    if (!demo) return
     let alive = true
-    api
-      .demoJourney()
-      .then((r) => alive && setJourney({ views: r.sessions.filter((v) => v.session.status === 'done'), at: Date.now() }))
-      .catch(() => alive && setJourney({ views: [], at: Date.now() }))
+    // A pick already made (the one the landing page described) is held at once; otherwise wait for one.
+    const now = peekDemo()
+    if (now) holdDemo(now)
+    void pickDemo().then((p) => {
+      if (!alive) return
+      holdDemo(p)
+      setDemoPick(p)
+    })
     return () => {
       alive = false
+      releaseDemo()
     }
-  }, [demo, journey])
+  }, [demo])
 
   const upsert = useCallback(
     (view: SessionView) => {
@@ -108,17 +120,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DataState>(() => {
     if (demo) {
-      if (journey?.views.length) {
-        const real = groupBySite(journey.views)
-        return { mode: 'demo', demoSource: 'real', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
+      const goals = demoGoals()
+      if (!demoPick) return { mode: 'demo', status: 'loading', sites: [], series: () => null, goals, refresh: noop, upsert: () => {} }
+      if (demoPick.source === 'real') {
+        const real = groupBySite(demoPick.views)
+        return { mode: 'demo', demoSource: 'real', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, goals, refresh: noop, upsert: () => {} }
       }
-      return { mode: 'demo', demoSource: 'illustrative', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals: demoGoals(), refresh: noop, upsert: () => {} }
+      return { mode: 'demo', demoSource: 'illustrative', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals, refresh: noop, upsert: () => {} }
     }
     const status: DataStatus = !uid ? 'idle' : loaded.uid === uid ? loaded.status : 'loading'
     const mine = owned.uid === uid ? owned.views : []
     const bySite = groupBySite(mine)
     return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, goals: prefs.goals(), refresh, upsert }
-  }, [demo, journey, uid, loaded, owned, refresh, upsert])
+  }, [demo, demoPick, uid, loaded, owned, refresh, upsert])
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+  // Screens read demo data as always ready, so they wait here (at most 1.5 s) until the source is picked.
+  return (
+    <DataContext.Provider value={value}>
+      {demo && !demoPick ? (
+        <div className="flex min-h-dvh items-center justify-center" role="status" aria-live="polite">
+          <p className="text-[15px] text-text-2">Loading the sample journey…</p>
+        </div>
+      ) : (
+        children
+      )}
+    </DataContext.Provider>
+  )
 }

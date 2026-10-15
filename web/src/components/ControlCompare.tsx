@@ -57,7 +57,7 @@ export function ControlCompare({ treated, control, treatedBaseline, controlBasel
     noise: 'Within normal photo variation on both sides',
   }[kind]
   const body = {
-    no_band: `Treated moved ${tr} and untreated ${un}. A baseline with one photo has no noise band, so the difference cannot be judged yet. Take 5 photos of each square and make them your baselines.`,
+    no_band: `Treated moved ${tr} and untreated ${un}. A baseline with fewer than 3 usable photos has no noise band, so the difference cannot be judged yet. Take 5 photos of each square and make them your baselines.`,
     treated: `The treated side changed by ${tr} and the untreated side by ${un}. The gap (${fmtSigned(dd, t)}${u}) is outside photo noise for a difference (±${fmtValue(band, t)}${u}), so lighting or time of day are unlikely to explain it and it may be linked to the product. The untreated side staying inside its band is the test working as expected.`,
     both_more: `Both sides moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated side moved more by ${fmtSigned(dd, t)}${u}, beyond the noise for a difference (±${fmtValue(band, t)}${u}); that extra part may be linked to the product.`,
     not_attributable: `Treated moved ${tr} and untreated ${un}. ${treatedReal ? 'Both moved outside their bands by a similar amount' : 'The untreated side moved outside its band'}, so something other than the product, such as lighting, sun or temperature, likely moved the reading. We can't attribute this to the product.`,

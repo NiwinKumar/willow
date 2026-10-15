@@ -90,6 +90,7 @@ export function Advisor() {
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-56px)] w-full max-w-[1120px] flex-col px-5 sm:px-8 lg:grid lg:grid-cols-[minmax(0,680px)_1fr] lg:gap-8">
       <div className="flex min-h-0 flex-1 flex-col">
+        <h1 className="sr-only">Advisor</h1>
         <p className="mt-2 rounded-(--radius-tile) bg-surface-2 px-3 py-2 text-[13px] text-text-2">
           I can explain your measurements, check your routine and find products from a facts-only catalog. I can't diagnose skin conditions or replace a dermatologist.
         </p>

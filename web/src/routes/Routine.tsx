@@ -13,7 +13,7 @@ import { ApiError, api, type NewRoutineEntry } from '../lib/api'
 import { fmtDate, fmtPrice, imageCredit, todayLocal } from '../lib/format'
 import { toJpegBase64 } from '../lib/image'
 import { sampleLabelFile } from '../lib/sampleLabel'
-import { outcomeFor } from '../lib/outcome'
+import { OUTCOME_SITES, outcomeFor } from '../lib/outcome'
 import { useAuth } from '../lib/useAuth'
 import { CATALOG, CONCERN_LABEL, categoryLabel, productById } from '../mock/catalog'
 import { DEMO_CHECK, DEMO_ROUTINE } from '../mock/routine'
@@ -72,6 +72,8 @@ export function Routine() {
     return { ...rawCheck, conflicts: rawCheck.conflicts.filter((c) => keep(c.products)), duplicates: rawCheck.duplicates.filter((d) => keep(d.products)) }
   }, [rawCheck, entries])
   const [loadFailed, setLoadFailed] = useState(false)
+  // Live: false until the first GET /routine answers, so nothing reads "Nothing yet." before then.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null)
   const [loadRetry, setLoadRetry] = useState(0)
   const [removing, setRemoving] = useState<RoutineEntry | null>(null)
   const [checking, setChecking] = useState(false)
@@ -154,6 +156,7 @@ export function Routine() {
         if (alive) {
           setEntries(res.entries)
           setLoadFailed(false)
+          setLoadedFor(user.uid)
         }
       } catch {
         if (alive) setLoadFailed(true)
@@ -190,9 +193,12 @@ export function Routine() {
   }
   const [startedAt, setStartedAt] = useState(todayLocal)
   const [dismissed, setDismissed] = useState<string[]>([])
-  const sessions = data.series('face_full')?.sessions ?? []
+  // Face and close-up sessions: pores and texture are measured on the close-ups.
+  const sessions = OUTCOME_SITES.flatMap((site) => data.series(site)?.sessions ?? [])
   // Until any face photo is measured, one note says so instead of a "Not measured yet" chip on every product.
-  const faceMeasured = sessions.some((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed)
+  const faceMeasured = sessions.some((s) => s.site === 'face_full' && s.status === 'done' && s.measured !== false && s.result?.quality.passed)
+  // Live and signed in: the saved routine has not answered yet (a failed load shows its own notice).
+  const routineLoading = live && Boolean(user) && loadedFor !== user?.uid && !loadFailed
   const byId = (id: string) => entries.find((e) => e.id === id)
   const name = (e: RoutineEntry) => (e.product_id ? (CATALOG.find((p) => p.product_id === e.product_id)?.name ?? e.custom_name) : e.custom_name)
 
@@ -202,7 +208,7 @@ export function Routine() {
   const stopped = entries.filter((e) => e.ended_at)
   const findings = openConflicts.length + (check?.duplicates.length ?? 0) + (check?.gaps.length ?? 0)
   // Never "Looks compatible" before the check has answered.
-  const status = current.length === 0 ? 'Add products to check compatibility' : !check ? (live && !checkFailed ? 'Checking compatibility…' : 'Compatibility not checked') : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
+  const status = routineLoading ? 'Loading your routine…' : current.length === 0 ? 'Add products to check compatibility' : !check ? (live && !checkFailed ? 'Checking compatibility…' : 'Compatibility not checked') : findings === 0 ? 'Looks compatible' : `${findings} ${findings === 1 ? 'thing' : 'things'} to look at`
   const demoResults = useMemo(() => (query.trim().length < 2 ? CATALOG : CATALOG.filter((p) => `${p.brand} ${p.name}`.toLowerCase().includes(query.toLowerCase()))), [query])
   const results = live ? liveResults : demoResults
 
@@ -282,7 +288,18 @@ export function Routine() {
     return (
       <section aria-labelledby={`slot-${slot}`}>
         <h2 id={`slot-${slot}`} className="border-b border-border pb-1 pt-5 text-[15px] font-semibold text-text-2">{slot === 'am' ? 'Morning' : 'Evening'}</h2>
-        {items.length === 0 ? <p className="py-3 text-[13px] text-text-3">Nothing yet.</p> : null}
+        {routineLoading ? (
+          <div aria-hidden className="space-y-3 py-3">
+            {[0, 1].map((k) => (
+              <div key={k} className="flex items-center gap-3">
+                <span className="h-12 w-12 shrink-0 animate-pulse rounded-(--radius-control) bg-surface-2" />
+                <span className="h-4 flex-1 animate-pulse rounded bg-surface-2" />
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="py-3 text-[13px] text-text-3">Nothing yet.</p>
+        ) : null}
         <ul className="divide-y divide-border">
           {items.map((e) => {
             const o = outcomeFor(e, sessions)
@@ -293,7 +310,12 @@ export function Routine() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start gap-2">
                     <span className="line-clamp-2 text-[15px] font-medium leading-snug" title={`${e.brand} ${name(e)}`}>{e.brand} {name(e)}</span>
-                    {flagged ? <span role="img" aria-label="part of a compatibility note" title="Part of a compatibility note" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warn" /> : null}
+                    {flagged ? (
+                      <span className="mt-0.5 inline-flex shrink-0 items-center text-warn-text" title="Part of a compatibility note">
+                        <AlertTriangle size={14} aria-hidden />
+                        <span className="sr-only">Part of a compatibility note</span>
+                      </span>
+                    ) : null}
                     {e.slots.length === 2 ? <Chip tone="neutral" className="shrink-0 whitespace-nowrap">AM + PM</Chip> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -302,7 +324,7 @@ export function Routine() {
                     ))}
                   </div>
                   {faceMeasured || o.text !== 'Not measured yet' ? (
-                    <button type="button" title={o.detail} onClick={() => (o.kind === 'real' ? navigate(`/s/face_full?${data.mode === 'demo' ? 'demo=1&' : ''}m=${o.metric}&layer=1`) : toast(o.detail))} className="mt-2 inline-flex">
+                    <button type="button" title={o.detail} onClick={() => (o.kind === 'real' ? navigate(`/s/${o.site}?${data.mode === 'demo' ? 'demo=1&' : ''}m=${o.metric}&layer=1`) : toast(o.detail))} className="mt-2 inline-flex">
                       <Chip tone={o.kind === 'real' ? 'signal' : o.kind === 'none' ? 'noise' : 'neutral'}>{o.text}</Chip>
                     </button>
                   ) : null}
@@ -370,7 +392,7 @@ export function Routine() {
 
       <section className="mt-8" aria-labelledby="compat">
         <h2 id="compat" className="text-[17px] font-semibold">Compatibility</h2>
-        {!check && live && current.length >= 1 && (checking || !checkFailed) ? (
+        {routineLoading ? null : !check && live && current.length >= 1 && (checking || !checkFailed) ? (
           <p className="mt-1 text-[13px] text-text-2">Checking your routine…</p>
         ) : check ? (
           <p className="mt-1 text-[12px] text-text-3">Checked against the rule table{check.conflicts.some((c) => c.source === 'model') ? ' and by AI (marked)' : ''}{check.notes.length ? ` · ${check.notes[0]}` : ''}</p>
@@ -418,7 +440,11 @@ export function Routine() {
               <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-willow-700"><CircleAlert size={18} aria-hidden /> Missing step</span>
               <p className="mt-2 text-[15px]">{g.need}. <span className="text-text-2">{g.why}</span></p>
               <p className="mt-1 text-[15px]"><span className="font-medium">Suggested change:</span> {g.suggestion}</p>
-              <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => { setQuery('SPF'); setAdd('search') }}>Find a sunscreen</Button>
+              {/sunscreen|spf/i.test(g.need) ? (
+                <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => { setQuery('SPF'); setAdd('search') }}>Find a sunscreen</Button>
+              ) : (
+                <Button variant="secondary" className="mt-3 !min-h-10" onClick={() => { setQuery(''); setAdd('search') }}>Search the catalog</Button>
+              )}
             </li>
           ))}
         </ul>

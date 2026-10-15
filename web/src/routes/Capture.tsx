@@ -12,10 +12,11 @@ import { validateFiles, type Row } from '../lib/upload'
 import { enterDemo, leaveDemo, useData } from '../data/useData'
 import type { CaptureMode, Site } from '../lib/api'
 import { DONT_VARY, baselineState, photoSteps } from '../lib/baselineGuide'
-import { MEASURED_SITES, SITE_LABEL } from '../lib/metrics'
+import { MEASURED_SITES, SITE_LABEL, isCloseUp, measuredPlaces } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
+import { useLeaveDemo } from '../lib/useLeaveDemo'
 import { useSamples } from '../lib/useSamples'
 
 const SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
@@ -37,6 +38,8 @@ export function Capture() {
   const { user, continueAsGuest } = useAuth()
   const reduce = useReducedMotion()
   const sample = params.get('sample') === '1'
+  // A capture is the person's own (the sample replay stays in demo): leave demo before anything else.
+  const leaving = useLeaveDemo(!sample)
   const initialMode: CaptureMode = params.get('mode') === 'quick' ? 'uncalibrated' : 'calibrated_raw'
   const [site, setSite] = useState<Site>((params.get('site') as Site) ?? 'face_full')
   const [mode, setMode] = useState<CaptureMode>(initialMode)
@@ -62,15 +65,16 @@ export function Capture() {
   const [uploadFew, setUploadFew] = useState(false)
   // One baseline per site and capture mode: quick selfies are never compared with RAW photos.
   // Photos saved before a site is measured count: the first of them becomes the baseline later.
-  // Only once the sessions have loaded: never ask for a baseline someone already has.
-  const baselineNeeded = data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
+  // Only once the person's own sessions have loaded (never the demo's): never ask for a baseline someone already has.
+  const baselineNeeded = data.mode === 'live' && data.status !== 'loading' && baselineState(data.series(site)?.sessions ?? [], mode).state === 'none'
   const steps = photoSteps(site, mode)
   const expected = baselineNeeded ? 5 : 3
   const ready = rows.length > 0 && (rows.length >= expected || uploadFew)
 
   if (sample) return <Samples />
+  if (leaving) return null
   // Consent comes before the first photo (UX_SPEC screen 2), then goals, then back here.
-  if (data.mode === 'live' && !prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture?${params.toString()}`)}`} replace />
+  if (!prefs.consent()) return <Navigate to={`/start?next=${encodeURIComponent(`/capture?${params.toString()}`)}`} replace />
 
   const ring = (
     <div className="relative mx-auto h-44 w-44" role="img" aria-label={`${shots} of ${expected} photos taken`}>
@@ -108,9 +112,17 @@ export function Capture() {
               </li>
             ))}
           </ul>
-          {data.mode === 'live' && !MEASURED_SITES.includes(site) ? (
+          {!MEASURED_SITES.includes(site) ? (
             <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
-              {SITE_LABEL[site]} is not measured yet: photos are saved and can be measured when it is ready. Face and forearm photos are measured today.
+              {SITE_LABEL[site]} is not measured yet: photos are saved and can be measured when it is ready. Willow measures {measuredPlaces()} photos today.
+            </p>
+          ) : null}
+          {site === 'face_full' && data.goals.includes('smoother') ? (
+            <p className="mt-2 rounded-(--radius-tile) bg-surface-2 p-3 text-[13px] text-text-2">
+              Tracking texture and pores? Pores are measured on cheek and nose close-ups, texture on the cheek close-up, not the full face.{' '}
+              <button type="button" onClick={() => setSite('cheek_macro')} className="font-medium text-willow-700 underline-offset-2 hover:underline">
+                Photograph a cheek close-up
+              </button>
             </p>
           ) : null}
           {!baselineNeeded ? <p className="mt-2 text-[13px] text-text-2">Check-in: 3 photos, compared with your baseline.</p> : null}
@@ -153,10 +165,10 @@ export function Capture() {
                 {why === i ? <p className="pb-3 pl-9 text-[13px] leading-relaxed text-text-2">{r.why}</p> : null}
               </li>
             ))}
-            {site === 'cheek_macro' || site === 'nose_macro' ? (
+            {isCloseUp(site) ? (
               <li className="flex min-h-12 items-center gap-3 py-2">
                 <Camera size={22} aria-hidden className="shrink-0 text-willow-700" />
-                <span className="text-[15px]">Cone touching the cheek for close-ups.</span>
+                <span className="text-[15px]">Phone about 10 cm (a hand’s width) from your face, one eye still in the photo.</span>
               </li>
             ) : null}
             <li className="flex min-h-12 items-center gap-3 py-2">
@@ -193,7 +205,7 @@ export function Capture() {
               ['Open the camera in Lightroom Mobile.', 'Camera, then tap “Auto” left of the shutter and choose “Professional”.'],
               ['File format DNG.', 'In the capture settings, pick DNG. This is the RAW file Willow needs.'],
               ['Set and lock.', 'ISO 50 to 200, shutter 1/60 to 1/125, white balance a fixed Kelvin such as 5000 K, manual focus. Tap the lock so it turns yellow.'],
-              ['Same lens every time.', '1x for the face and forearm; macro for close-ups.'],
+              ['Same lens every time.', '1x for everything. For close-ups, hold the phone about 10 cm (a hand’s width) away with one eye in the photo: Willow measures size from your iris.'],
             ].map(([t, s], i) => (
               <li key={t} className="flex gap-3">
                 <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 font-mono text-[12px]">{i + 1}</span>
@@ -329,7 +341,8 @@ export function Capture() {
                 onRows={setRows}
                 onDone={(sid) => {
                   leaveDemo()
-                  navigate(`/processing/${sid}?site=${site}&n=${rows.length}${deviation ? `&dev=1&note=${encodeURIComponent(note)}` : ''}`)
+                  // Replace: the upload screen is done; processing then replaces itself with the report.
+                  navigate(`/processing/${sid}?site=${site}&n=${rows.length}${deviation ? `&dev=1&note=${encodeURIComponent(note)}` : ''}`, { replace: true })
                 }}
               />
             </div>

@@ -73,3 +73,22 @@ Done together with a three-part review (statistics, colour/forearm, face) and me
 - **Speed:** one GCS client, parallel frame downloads and crop uploads, measurement in a worker thread, models loaded at startup.
 - **Version 0.3.0.** Please bump `app/__init__.py` whenever a change can move a number: the api stores it on baselines and does not compare across minor versions.
 - Tests added for each (follicles vs ink dots, band at small n, SD floor, direction, fairness at three tones).
+
+---
+
+## Round 4: close-ups merged (#51), what changed around them, and what is left (Oct 15)
+
+#51 is merged and deployed; engine tests pass with main (152). Niwin connected close-ups through the api and app (PR #52) and changed three small things in the engine, so you know before you touch these files:
+
+- **`pipeline_macro._front_camera`**: a JPEG with no camera EXIF at all (no Model, no LensModel) is now treated as "cannot be a macro shot". The web app's camera saves a canvas JPEG with no EXIF, always from the front camera; before, such a close-up with no face in view was measured on the assumed 30 mm field (128 px/mm at 4K: invented pores and tone). It now fails as `face_not_found`. `tests/test_macro.py` `_macro` writes a camera Model tag so the synthetic macro shots still use the assumed scale; a new test covers the web case.
+- **`confidence`** for pores and texture is "measured" only when every photo used has a known scale (`all(map(_scale_known, have))`), not just the first.
+- **`facemap.locate`** returns no position if the result is not finite (all facing triangles degenerate).
+- Engine version **0.3.2**.
+
+What the reviews found for you (not changed):
+
+1. **The face scale is about 1.4x off (high, but do it after the demo).** `config.EYE_DISTANCE_MM = 63` is commented "outer-eye distance", but 63 mm is the distance between pupils; the outer eye corners (mesh 33, 263) are 89 mm apart on MediaPipe's canonical face, and the adult average is about 88-90 mm. Independent check: on Niwin's laptop selfie the iris (11.7 mm) gives 2.26 px/mm; the eye-corner scale gives 3.2. Every `*_MM` threshold on faces therefore covers about 1.4x more pixels than its name says. They were tuned on real photos at this scale, so they work; changing it moves many numbers 2 days before freeze. Suggest after submission: switch to the iris (or 89 mm) and rescale the face thresholds together, then bump the minor version.
+2. **Close-ups need a check on real phone photos.** Everything Niwin could test was synthetic or a crop of a laptop selfie. On a tiny crop (222 x 190 px, one eye and a cheek) the landmarks found on the shrunk canvas were off (iris scale 1.77 vs 2.26 on the full photo) and ITA came out -25 vs +16 for the same skin. A real 4K close-up should behave better, but please run 5 real close-ups (front camera at ~10 cm with one eye in view, the way the app now asks) and compare tone and redness with the face session of the same minute. Also consider failing a close-up whose skin region is below some pixel count (the tiny crop passed quality).
+3. **Close-up guidance in the app says "about 10 cm, one eye in view"** (pores need ~20 px/mm: a 4K front camera gives roughly 25 px/mm at 10 cm and 17 at 15 cm). If your real photos say otherwise, tell Niwin and the copy changes.
+4. **Candidates are cut at 40, blemishes first** (`_candidates`). A face with many marks loses dark spots at the cut, and the cut moves between sessions, which the spot diary (`/v1/spots`) would read as spots disappearing. If you can, order by score (or keep confirmed ones first) so the same strong marks always make the cut.
+5. **Close-ups average each photo's own count** (no cross-photo matching like faces). Fine for now; the explanation prompt says so.

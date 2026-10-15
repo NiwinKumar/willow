@@ -20,6 +20,9 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
   // The noise band comes from the baseline photos that passed the quality check, not all uploaded.
   const refPhotos = baseline?.result?.frames_used || baseline?.n_frames || 5
   const unit = UNIT_LABEL[current.unit]
+  // Pores come with their average size (engine extras); shown so the copy's promise holds.
+  // (0 when none were found: no size to show)
+  const poreMm = metricId === 'pores' && typeof current.extras?.mean_diameter_mm === 'number' && current.extras.mean_diameter_mm > 0 ? current.extras.mean_diameter_mm : null
   const points: Point[] = sessions.map((s, i) => {
     const m = s.result?.metrics.find((x) => x.id === metricId) ?? null
     return {
@@ -65,7 +68,7 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
       </div>
       {cluster.length && mdc !== null ? (
         <p className="text-[12px] text-text-3">
-          Your noise band (MDC95 from {refPhotos} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
+          Your noise band (from {refPhotos} reference photos): ±{mdc !== null ? mdc.toFixed(dec) : '–'}{unit}. Hollow dots sit inside it; filled dots are outside.
         </p>
       ) : null}
       <dl className="space-y-3 text-[15px] leading-relaxed">
@@ -73,13 +76,21 @@ export function MetricDetail({ metricId, sessions, current, baseline }: { metric
           <dt className="font-semibold">What it measures</dt>
           <dd className="text-text-2">{WHAT[metricId]}</dd>
         </div>
+        {poreMm !== null ? (
+          <div>
+            <dt className="font-semibold">Average size</dt>
+            <dd className="text-text-2">
+              <span className="font-mono">{poreMm.toFixed(2)} mm</span> across, on this session’s close-ups
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt className="font-semibold">How we decide real change</dt>
           <dd className="text-text-2">
             {current.verdict === 'low_quality'
               ? 'This photo did not pass the quality check, so it is not compared. Retake it in the same light and position.'
               : b !== null && mdc !== null
-                ? `Your ${refPhotos} reference photos varied by about ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change. This is the MDC95: the smallest change bigger than photo-to-photo noise with 95% confidence.`
+                ? `From your ${refPhotos} reference photos, Willow set a noise band of ±${mdc.toFixed(dec)}${unit}. A reading has to move more than that to count as a real change: the smallest change bigger than photo-to-photo variation, with 95% confidence.`
                 : b !== null && mdc === null
                   ? 'Your baseline has fewer than 3 usable photos, so there is no noise band yet: changes are shown but cannot be called real. A baseline of 5 photos measures your normal photo-to-photo variation.'
                   : current.confidence === 'indicative'
@@ -114,17 +125,17 @@ function Dot(props: { cx?: number; cy?: number; payload?: Point }) {
 }
 
 const WHAT: Record<Metric['id'], string> = {
-  tone_ita: 'The Individual Typology Angle computed from L* and b* of your cheek (or forearm square), colour-corrected when the photo has a white reference. A description of tone, never a score, and no direction is better.',
-  pigment_spots: 'The share of skin area where the melanin proxy sits well above your own skin median. With several photos, only spots seen in at least two of them count. Reported with the count and mean contrast.',
+  tone_ita: 'A description of your skin tone from how light and how yellow-brown the skin of your cheek (or forearm square) is, colour-corrected when the photo has a white reference. It is never a score, and no direction is better.',
+  pigment_spots: 'The share of your skin covered by spots that are clearly darker than your own skin around them. With several face photos, only spots seen in at least two of them count.',
   tone_evenness: 'How much lightness varies across your face regions and within them. Lower means more even.',
-  redness: 'Mean a* (red-green) over the cheek and nose regions, relative to your own skin, colour-corrected when the photo has a white reference. Harder to read on deep skin tones; then shown as indicative.',
-  blemishes: 'Candidate blemishes the engine found by local redness and shading, averaged over your photos. With several photos, only blemishes seen in at least two of them count. Gemini labels each one; the count is indicative.',
-  pores: 'Dark blobs between 0.05 and 0.3 mm on the close-up, as density per cm² and mean diameter.',
-  texture: 'Fine-scale roughness energy on the close-up, normalised by lightness. Downgraded to indicative if its noise band is too wide.',
-  lines: 'Ridge density in the forehead, crow’s feet and nasolabial regions. Very lighting dependent, so indicative.',
-  dark_circles: 'Under-eye lightness minus cheek lightness (ΔL*). Relative to your own cheek, so it works across tones.',
-  shine: 'The share of specular highlight pixels in the T-zone versus the U-zone. Depends on time since washing, so indicative.',
-  glow: 'A composite of lightness versus your baseline, chroma and fine-scale smoothness. Change only, indicative.',
+  redness: 'How red your cheeks and nose are, compared with your own skin, colour-corrected when the photo has a white reference. Harder to read on deep skin tones; then shown as indicative.',
+  blemishes: 'Candidate blemishes the engine found by local redness and shading, averaged over your photos. With several face photos, only blemishes seen in at least two of them count. Gemini labels each one; the count is indicative.',
+  pores: 'Small dark openings 0.05 to 0.3 mm across on the close-up, counted per cm² of skin, with their average size. Measured when one eye is in the photo to set the size; otherwise indicative.',
+  texture: 'How bumpy the skin surface looks at about half a millimetre on the close-up, adjusted for lightness so it reads the same on every tone. Lower is smoother. Indicative when your photos disagree too much.',
+  lines: 'Not measured yet: fine lines depend too much on the light to read reliably from a phone photo.',
+  dark_circles: 'How much lighter or darker the skin under your eyes is than your cheek. Below zero means darker than your cheek. Relative to your own skin, so it works across tones.',
+  shine: 'The share of your forehead, nose and chin that shows bright, colourless highlights (oil and sweat reflect the light’s colour, not the skin’s). Depends on time since washing, so indicative.',
+  glow: 'Brightness, colour richness and smoothness of your cheeks combined, compared only with your own earlier photos (shine is left out). Indicative.',
 }
 const OTHER: Record<Metric['id'], string> = {
   tone_ita: 'A different lamp, a moved paper or colour card, sun exposure, a tan, and time of day.',
@@ -132,8 +143,8 @@ const OTHER: Record<Metric['id'], string> = {
   tone_evenness: 'Lighting gradients across the face, hair, and a slight head turn.',
   redness: 'Exercise, heat, a hot shower, cleansing minutes before the photo, and emotion.',
   blemishes: 'Hair and specks on the lens read as candidates; Gemini marks those as artifacts.',
-  pores: 'Cone distance, makeup, and sweat.',
-  texture: 'Cone angle, dryness after cleansing, and flash position.',
+  pores: 'Distance from the face, focus, makeup, and sweat.',
+  texture: 'Distance and angle of the phone, dryness after cleansing, and light falling from one side.',
   lines: 'Expression, lamp angle, and head pitch.',
   dark_circles: 'Sleep, allergies, brow shadow, and head pitch.',
   shine: 'Time since washing, room temperature, and products applied.',
