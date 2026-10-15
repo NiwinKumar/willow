@@ -42,6 +42,10 @@ class Store(Protocol):
     def product_test_get(self, uid: str, test_id: str) -> Doc | None: ...
     def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None: ...
     def product_test_delete(self, uid: str, test_id: str) -> None: ...
+    def push_list(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def push_set(self, uid: str, sub_id: str, doc: Doc) -> None: ...
+    def push_delete(self, uid: str, sub_id: str) -> None: ...
+    def reminder_claim(self, uid: str, day: str, doc: Doc) -> bool: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -184,6 +188,24 @@ class FirestoreStore:
 
     def product_test_delete(self, uid: str, test_id: str) -> None:
         self._db().document(f"users/{uid}/product_tests/{test_id}").delete()
+    def push_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(s.id, s.to_dict()) for s in self._db().collection(f"users/{uid}/push").stream()]
+
+    def push_set(self, uid: str, sub_id: str, doc: Doc) -> None:
+        self._db().document(f"users/{uid}/push/{sub_id}").set(doc)
+
+    def push_delete(self, uid: str, sub_id: str) -> None:
+        self._db().document(f"users/{uid}/push/{sub_id}").delete()
+
+    def reminder_claim(self, uid: str, day: str, doc: Doc) -> bool:
+        """users/{uid}/reminders_sent/{day}: created once; a second run that day gets False."""
+        from google.api_core.exceptions import AlreadyExists, Conflict
+
+        try:
+            self._db().document(f"users/{uid}/reminders_sent/{day}").create(doc)
+        except (AlreadyExists, Conflict):
+            return False
+        return True
 
 
 class MemoryStore:
@@ -195,6 +217,8 @@ class MemoryStore:
         self.usage: dict[tuple[str, str, str], int] = {}
         self.users: dict[str, Doc] = {}
         self.product_tests: dict[tuple[str, str], Doc] = {}
+        self.push: dict[tuple[str, str], Doc] = {}
+        self.reminders_sent: dict[tuple[str, str], Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -274,6 +298,9 @@ class MemoryStore:
         for table in (self.sessions, self.baselines, self.routine, self.routine_log, self.usage):
             for key in [k for k in table if k[0] == uid]:
                 del table[key]
+        for table in (self.push, self.reminders_sent):
+            for key in [k for k in table if k[0] == uid]:
+                del table[key]
         self.users.pop(uid, None)
         for key in [k for k in self.product_tests if k[0] == uid]:
             del self.product_tests[key]
@@ -290,6 +317,21 @@ class MemoryStore:
 
     def product_test_delete(self, uid: str, test_id: str) -> None:
         self.product_tests.pop((uid, test_id), None)
+
+    def push_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(sid, copy.deepcopy(d)) for (u, sid), d in self.push.items() if u == uid]
+
+    def push_set(self, uid: str, sub_id: str, doc: Doc) -> None:
+        self.push[(uid, sub_id)] = copy.deepcopy(doc)
+
+    def push_delete(self, uid: str, sub_id: str) -> None:
+        self.push.pop((uid, sub_id), None)
+
+    def reminder_claim(self, uid: str, day: str, doc: Doc) -> bool:
+        if (uid, day) in self.reminders_sent:
+            return False
+        self.reminders_sent[(uid, day)] = copy.deepcopy(doc)
+        return True
 
 
 @lru_cache
