@@ -8,7 +8,8 @@
     "build": "node scripts/check-public.mjs && tsc -b && vite build",
     "lint": "oxlint && tsc -b --noEmit",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.ts"
+    "test": "node --test tests/*.test.ts scripts/*.test.mjs",
+    "preview": "vite preview"
   },
   "dependencies": {
     "firebase": "12.19.0",

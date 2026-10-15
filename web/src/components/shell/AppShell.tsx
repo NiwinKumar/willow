@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'rea
 
 import type { CaptureMode, Site } from '../../data/types'
 import { useData } from '../../data/useData'
+import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { prefs } from '../../lib/prefs'
@@ -46,6 +47,8 @@ export function AppShell() {
   const [checkIn, setCheckIn] = useState<{ open: boolean; preset?: { site?: Site; mode?: CaptureMode } }>({ open: false })
   const [advisor, setAdvisor] = useState<{ open: boolean; ever: boolean; seed: AdvisorSeed | null }>({ open: false, ever: false, seed: null })
   const current = destinationOf(location.pathname)
+  // The check-in schedule: the Check in button says when one is due today or late (null otherwise).
+  const due = useCheckinDue()?.short ?? null
 
   // A new page starts at the top (a #anchor such as #spot-diary scrolls itself); query changes keep the scroll.
   useEffect(() => {
@@ -140,6 +143,7 @@ export function AppShell() {
               setCollapsed(!collapsed)
             }}
             onCheckIn={() => setCheckIn({ open: true })}
+            due={due}
             advisorOpen={advisor.open}
             onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())}
             name={me.short}
@@ -151,7 +155,7 @@ export function AppShell() {
         <div className="relative z-[1]">
           <Outlet />
         </div>
-        {wide ? null : <Dock current={current} onCheckIn={() => setCheckIn({ open: true })} onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())} advisorOpen={advisor.open} />}
+        {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())} advisorOpen={advisor.open} />}
         </div>
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} />
         {checkIn.open ? (

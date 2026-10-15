@@ -37,6 +37,12 @@ Env vars:
 | BQ_DATASET | willow_insights | |
 | ALLOWED_ORIGINS | http://localhost:5173,https://willow-511508.web.app,https://willow-511508.firebaseapp.com | CORS |
 | DEMO_USER_ID | demo_willow | read-only seeded account |
+| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY | (Secret Manager `willow-vapid-public` / `willow-vapid-private`) | Web Push keys (base64url, raw P-256). Unset = push off and the app offers calendar reminders only; tests and fixture mode need neither. Generate a local pair with the one-liner in `infra/setup.sh` ("Check-in reminders"); never commit them |
+| VAPID_SUBJECT | https://willow-511508.web.app | contact for the push services (`mailto:` or https); push needs all three VAPID values |
+| APP_URL | https://willow-511508.web.app | the web app, for the calendar event's link |
+| REMINDERS_AUDIENCE | https://willow-api-hrlt7lqdwa-uc.a.run.app/v1/internal/reminders | OIDC audience Cloud Scheduler's token must carry; unset = `/v1/internal/reminders` answers 503 (`AUTH_MODE=dev` skips the check) |
+| SCHEDULER_SERVICE_ACCOUNT | sa-scheduler@willow-511508.iam.gserviceaccount.com | the only identity allowed to run reminders |
+| REMINDER_WINDOW_MINUTES | 30 | a reminder goes out on the first scheduler run up to this long after the check-in time |
 
 ## web (Niwin)
 ```bash
@@ -44,10 +50,13 @@ cd web && npm install && npm run dev
 ```
 `web/.env.local` (never committed): `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_API_URL`.
 
+Reminders locally: with `AUTH_MODE=dev`, `curl -X POST localhost:<port>/v1/internal/reminders` runs one scheduler pass. Web Push needs a browser that allows notifications (headless Chrome denies them) and, on iPhone/iPad, Willow added to the Home Screen (iOS 16.4+). The service worker is `web/public/sw.js` (notifications only, no caching).
+
 ## Testing strategy
 - engine: synthetic arrays with known answers per metric; synthetic card for calibration; schema validation for every response; one golden real DNG test kept OUT of git (runs only if `data/golden/` exists).
 - api: pytest with `ENGINE_MODE=fixture` and a mocked Gemini client; schema validation of Gemini outputs; number-validator unit tests.
 - web: `npm test` runs pure-function tests in `web/tests/*.test.ts` with Node's own runner (no extra dependency; Node strips the types), for example the "Looks soft" sharpness heuristic; one Playwright smoke test (landing -> demo journey -> report) if time.
+- web: `npm test` (node's test runner, `web/scripts/*.test.mjs`) for pure utilities such as the check-in schedule rules; one Playwright smoke test (landing -> demo journey -> report) if time.
 - Before each merge: `ruff check`, `pytest` / `npm run lint && npm run build`.
 
 ## End-to-end test (real pipeline, from a laptop)

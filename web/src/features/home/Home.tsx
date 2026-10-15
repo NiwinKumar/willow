@@ -7,12 +7,15 @@ import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
+import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
 import type { CaptureMode, RoutineEntry, RoutineCheck, Session } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
 import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
+import { addToCalendar } from '../../lib/reminders'
+import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
 import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
@@ -79,7 +82,7 @@ function Frame({ children, busy }: { children: ReactNode; busy?: boolean }) {
 
 function HomeBody() {
   const data = useData()
-  const { user } = useAuth()
+  const { user, getIdToken } = useAuth()
   const me = identity(user)
   const shell = useShell()
   const navigate = useNavigate()
@@ -88,7 +91,10 @@ function HomeBody() {
   // Goals live on this device (You writes them); read fresh so a change there reorders Home at once.
   const goals = data.goals
   const face = data.series('face_full')?.sessions ?? EMPTY
-  const read = useMemo(() => readHome(data.all, face), [data.all, face])
+  // The check-in schedule (You): when check-ins are due, the weekly day, and how long a gap is.
+  const checkin = useCheckin()
+  const due = useCheckinDue()
+  const read = useMemo(() => readHome(data.all, face, gapDaysFor(checkin)), [data.all, face, checkin])
 
   // A check-in still uploading or measuring: re-read sessions every 10 s until its result lands.
   const running = !demo && data.all.some((s) => inFlight(s) && !stalled(s))
@@ -122,8 +128,12 @@ function HomeBody() {
   const topUp = (s: Session) => navigate(`/check-in?topup=${s.id}`, { state: { background: location } })
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
-  const lead = leadFor({ read, goals, demo, checkIn, openResult, topUp })
-  const heroLines = withTonight(heroLinesFor(read, goals, demo), demo ? null : tonightLine(activeIn(entries, 'pm')))
+  const closeUp = { wanted: goals.includes('pores_texture') || goals.includes('smoother'), doneToday: (data.series('cheek_macro')?.sessions ?? EMPTY).some((s) => counts(s) && dayOf(s.created_at) === day) }
+  const placeChips = !demo && checkin && due ? dueChips(checkin, due, closeUp) : ['Face']
+  const lead = leadFor({ read, goals, demo, checkIn, openResult, topUp, placeChips })
+  const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
+  const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
+  const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
   const finding = demo ? null : nextStepOf(check.data, byId)
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
@@ -139,10 +149,17 @@ function HomeBody() {
       part: Math.min(1, (read.baselineFrames ?? 0) / BAND_FRAMES),
       onClick: () => (read.person === 'noBand' && read.baseline && topUpNeed(read.baseline) > 0 ? topUp(read.baseline) : checkIn('face_full')),
     },
-    ...(goals.includes('pores_texture')
+    ...(closeUp.wanted
       ? [{ t: 'Cheek close-up', d: 'For your pores and texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: () => checkIn('cheek_macro') }]
       : []),
     { t: 'Add your routine', d: 'So results can point to products', state: entries?.length ? 'done' : 'todo', onClick: () => navigate('/routine') },
+    {
+      t: 'Set a reminder',
+      d: checkin ? scheduleText(checkin) : 'A few times a week',
+      state: checkin ? 'done' : 'todo',
+      onClick: () => navigate({ pathname: '/you', hash: '#reminders' }),
+      action: checkin ? { label: 'Add to calendar', onClick: () => void saveCalendar(checkin) } : undefined,
+    },
     { t: 'Save with Google', d: 'Keep photos and results', state: me.guest ? 'todo' : 'done', onClick: () => navigate('/you') },
   ]
 
@@ -209,7 +226,7 @@ function HomeBody() {
   }
 
   const recent = recentRows({ all: data.all, entries: demo ? undefined : entries, joined: demo ? null : (user?.metadata?.creationTime ?? null), goals, navigate })
-  const week = demo ? null : weekOf(data.all, read, goals)
+  const week = demo ? null : weekOf(data.all, read, goals, weeklyDayOf(checkin))
 
   return (
     <Frame>
@@ -226,6 +243,7 @@ function HomeBody() {
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <HeroCard
             name={me.guest ? null : me.first}
+            next={heroNext}
             lines={heroLines}
             onAsk={demo ? undefined : () => (read.person === 'new' || read.person === 'noBand' ? ask('How do I take a good face baseline?', 'Today') : ask('Explain today’s read: what changed and what should I do today?', 'Today'))}
           />
@@ -269,6 +287,7 @@ function leadFor({
   checkIn,
   openResult,
   topUp,
+  placeChips,
 }: {
   read: HomeRead
   goals: string[]
@@ -276,6 +295,7 @@ function leadFor({
   checkIn: (site?: Session['site'], mode?: CaptureMode) => void
   openResult: (s: Session) => void
   topUp: (s: Session) => void
+  placeChips: string[]
 }): Lead {
   const baseMode = read.baseline?.capture_mode
   if (demo) {
@@ -365,7 +385,7 @@ function leadFor({
         sub: 'Your baseline still holds. One check-in picks up where you left off.',
         big: read.lastFace ? String(daysSince(read.lastFace.created_at)) : undefined,
         bigLabel: 'days since your last check-in',
-        chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
+        chips: [...placeChips, ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
         cta: { label: 'Check in now', onClick: () => checkIn('face_full', baseMode) },
         aura: 'sky',
       }
@@ -376,7 +396,7 @@ function leadFor({
         sub: 'Same window light as last time keeps results comparable.',
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
         bigLabel: 'days since your baseline',
-        chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
+        chips: [...placeChips, ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
         cta: { label: 'Check in', onClick: () => checkIn('face_full', baseMode) },
         aura: 'violet',
       }
@@ -427,7 +447,7 @@ function linesFrom(s: Session, face: Session[], goals: string[]): HeroLine[] {
   return out
 }
 
-function heroLinesFor(read: HomeRead, goals: string[], demo: boolean): HeroLine[] {
+function heroLinesFor(read: HomeRead, goals: string[], demo: boolean, due: Due | null): HeroLine[] {
   const fromLead = read.lead ? linesFrom(read.lead, read.face, goals) : []
   if (demo) return fromLead.slice(0, 3)
   const t = read.todaySession
@@ -465,7 +485,9 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean): HeroLine[
       { g: '○', t: 'Welcome back. Your baseline still holds.' },
       { g: '→', t: 'One check-in today picks the trend back up.' },
     ]
-  return [...fromLead.slice(0, 2), { g: '→', t: 'Check in today, by the same window light.' }]
+  // On a day the schedule doesn't ask for a check-in, say when the next one is.
+  const nextLine = due && due.kind === 'upcoming' ? `Next check-in ${fmtDay(due.next)}, by the same window light.` : 'Check in today, by the same window light.'
+  return [...fromLead.slice(0, 2), { g: '→', t: nextLine }]
 }
 
 /** "☾ Tonight is a glycolic night." when an every-other-night product is on tonight and another rests (from the schedules; no numbers). */
@@ -546,12 +568,15 @@ function summaryOf(s: Session): string {
 const WEEKDAY = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const WEEKDAY_NAME = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-/** This week: shown on the weekday of the face baseline (the person's check-in day) once they checked in this week. */
-function weekOf(all: Session[], read: HomeRead, goals: string[]) {
+/**
+ * This week: shown on the person's weekly day (the first day of their check-in schedule, else the weekday of
+ * the face baseline) once they checked in this week.
+ */
+function weekOf(all: Session[], read: HomeRead, goals: string[], weeklyDay: number | null) {
   if (!read.baseline) return null
   const now = new Date()
   const dow = (now.getDay() + 6) % 7
-  if ((parseDate(read.baseline.created_at).getDay() + 6) % 7 !== dow) return null
+  if ((weeklyDay ?? (parseDate(read.baseline.created_at).getDay() + 6) % 7) !== dow) return null
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow)
   const days = Array.from({ length: 7 }, (_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i))
   const keys = days.map((d) => localDay(d))
