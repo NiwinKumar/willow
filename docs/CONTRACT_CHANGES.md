@@ -70,3 +70,15 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Firestore: `users/{uid}/routine_log/{YYYY-MM-DD}` = `{date, used: {entry_id: [slots]}, updated_at}`; deleted with the person (delete my data).
 - Web: `RoutineLogDay`, `api.routineLog()`, `api.setRoutineUse()`, `localDay()`; `api.routine()` sends the person's own day. No UI yet (the Home redesign uses it; demo mode will need a mock log).
 - Approved by: n/a (api and web are both Niwin's)
+
+## 2026-10-15: Visible pores from face photos (proposed by Harshini)
+- Why: most people will never take a close-up, so pores were missing for them. A normal selfie cannot resolve every pore, but it does show the enlarged, visible ones.
+- Change: `face_full` results also carry `pores` (group `texture_pores`, unit `per_cm2`, confidence always `indicative`). No new metric id, unit or field; `schema_version` stays 1.0.
+  - `docs/CONTRACT.md` 2.5 metric table: `pores` sites become `face_full, cheek_macro, nose_macro`.
+  - Value: visible (enlarged, 0.2-0.6 mm) pores per cm2 of the cheek regions, from photos with at least 8 px/mm (about 13-17 on a phone selfie held at arm's length); `null` below that. `extras`: `mean_diameter_mm`, `count`.
+  - Not the same number as a close-up's `pores` (which also counts fine pores from 20 px/mm): a person's face-photo pores are compared with their own face photos only.
+- Evidence (Oct 15): synthetic pores 0.25 mm at L* 75 / 55 / 32 counted within 7% from 8 px/mm; the same real photo shrunk from 15 to 8.6 px/mm stays within about 1 pore per cm2.
+- Impact on engine: branch `engine/face-pores`.
+- Impact on api (Niwin): none beyond passing the metric through (it is already a known id); the metric-per-site lists if the api keeps one.
+- Impact on web (Niwin): `lib/metrics.ts` `pores.sites` add `face_full`; copy: "Visible pores" on face results, "macro only" note in `docs/UX_SPEC.md` no longer true.
+- Approved by: [x] Harshini [ ] Niwin

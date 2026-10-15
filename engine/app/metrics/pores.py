@@ -49,10 +49,15 @@ def _drop_chains(pores: list[Pore], px_per_mm: float) -> list[Pore]:
 
 
 def find_pores(
-    lab: np.ndarray, skin: np.ndarray, px_per_mm: float, marks: list | None = None
+    lab: np.ndarray,
+    skin: np.ndarray,
+    px_per_mm: float,
+    marks: list | None = None,
+    diameter_mm: tuple[float, float] | None = None,
 ) -> list[Pore]:
     """Pores in `skin`, away from `marks` (blemishes / dark spots with x, y, radius in the
-    input's pixels: a pimple's or mark's edge is not a pore)."""
+    input's pixels: a pimple's or mark's edge is not a pore). `diameter_mm`: size range
+    (default PORE_DIAMETER_MM; a face photo looks for enlarged pores only)."""
     lab, px, back = _to_work(lab.astype(np.float32), px_per_mm)
     skin = cv2.resize(skin.astype(np.uint8), lab.shape[1::-1], interpolation=cv2.INTER_NEAREST) > 0
     L = lab[..., 0]
@@ -61,7 +66,7 @@ def find_pores(
     darker = np.where(skin, l_bg - L, 0).astype(np.float32)
     spread = robust_spread(darker[skin])
     z = np.clip(darker / spread, 0, None)
-    r_min, r_max = (d * px / 2 for d in config.PORE_DIAMETER_MM)
+    r_min, r_max = (d * px / 2 for d in diameter_mm or config.PORE_DIAMETER_MM)
     blobs = blob_log(
         z / 10,
         min_sigma=max(r_min / 1.414, 0.5),

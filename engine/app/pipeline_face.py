@@ -29,6 +29,7 @@ from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.glow import glow
 from app.metrics.pigment import find_spots, pigment_spots
+from app.metrics.pores import find_pores, pores_per_cm2
 from app.metrics.redness import erythema_index
 from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
@@ -47,8 +48,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
     "shine": ("oil_glow", "Shine", "pct_area"),
     "glow": ("oil_glow", "Glow", "index"),
+    "pores": ("texture_pores", "Pores", "per_cm2"),
 }
-ALWAYS_INDICATIVE = {"blemishes", "shine", "glow"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "glow", "pores"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -246,6 +248,9 @@ def _frame(path: str) -> dict:
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
     ]
     glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
+    pores_val, pores_extras = _visible_pores(
+        lab, [roi_skin[c] for c in face.cheeks], px_per_mm, [*blemishes, *spots]
+    )
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -257,6 +262,7 @@ def _frame(path: str) -> dict:
         "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
         "shine": shine_pct,
         "glow": glow_idx,
+        "pores": pores_val,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -269,6 +275,7 @@ def _frame(path: str) -> dict:
         else {},
         "shine": shine_extras,
         "glow": glow_extras,
+        "pores": pores_extras,
     }
     return {
         "values": values,
@@ -464,6 +471,23 @@ def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.nd
         out = config.CROP_MIN_OUT_PX
         patch = cv2.resize(patch, (out, out), interpolation=cv2.INTER_CUBIC)
     return np.ascontiguousarray(patch)
+
+
+def _visible_pores(
+    lab: np.ndarray, cheeks: list[np.ndarray], px_per_mm: float, marks: list
+) -> tuple[float | None, dict]:
+    """Visible pores on the cheeks of a face photo (docs/METRICS.md A5): enlarged pores
+    FACE_PORE_DIAMETER_MM across, per cm2 of cheek skin. A selfie cannot resolve the finest
+    pores, so this is a count of the visible ones, not of every pore (close-ups count those).
+    The cheek regions sit away from the nose side, under-eye and fold shadows."""
+    if px_per_mm < config.FACE_PORE_MIN_PX_PER_MM:
+        return None, {}
+    skin = np.logical_or.reduce(cheeks)
+    if not skin.any():
+        return None, {}
+    pores = find_pores(lab, skin, px_per_mm, marks, config.FACE_PORE_DIAMETER_MM)
+    value, extras = pores_per_cm2(pores, int(skin.sum()), px_per_mm)
+    return value, extras
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:

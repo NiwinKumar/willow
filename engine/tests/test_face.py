@@ -242,7 +242,9 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
         "dark_circles",
         "shine",
         "glow",
+        "pores",
     }
+    assert m["pores"]["confidence"] == "indicative"
     assert m["shine"]["value"] < 2.0 and m["shine"]["confidence"] == "indicative"
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
@@ -423,3 +425,24 @@ def test_moustache_over_the_lip_is_skipped_but_beard_skin_elsewhere_is_searched(
     assert guard[52, 50]  # moustache next to the lip: skipped
     assert not guard[90, 50]  # beard on the chin: still searched
     assert not guard[52, 22]  # ordinary skin beside the lips: only the narrow band applies
+
+
+@pytest.mark.parametrize("L", [75.0, 55.0, 32.0])
+def test_visible_pores_counted_in_a_face_photo_at_every_tone(L):
+    from app.pipeline_face import _visible_pores
+
+    ppm, rng = 10.0, np.random.default_rng(0)
+    h = w = 400  # 40 x 40 mm of cheek
+    lab = np.empty((h, w, 3), np.float32)
+    lab[..., 0] = L + rng.normal(0, 0.5, (h, w))
+    lab[..., 1], lab[..., 2] = 13.0, 17.0
+    yy, xx = np.mgrid[:h, :w]
+    n = 160  # 10 per cm2, 0.35 mm across, 8 L* darker
+    for x, y in zip(rng.uniform(20, w - 20, n), rng.uniform(20, h - 20, n), strict=True):
+        lab[..., 0] -= 8.0 * np.exp(
+            -((xx - x) ** 2 + (yy - y) ** 2) / (2 * (0.35 * ppm / 2 * 0.7) ** 2)
+        )
+    cheek = np.ones((h, w), bool)
+    value, extras = _visible_pores(lab, [cheek], ppm, [])
+    assert value == pytest.approx(10.0, rel=0.25) and extras["count"] > 100
+    assert _visible_pores(lab, [cheek], 6.0, []) == (None, {})  # too far away for pores
