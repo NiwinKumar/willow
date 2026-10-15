@@ -178,3 +178,34 @@ def test_one_lined_zone_is_not_averaged_away():
     zones = [v for k, v in extras.items() if k.endswith("_mm_per_cm2") and v is not None]
     assert len(zones) >= 4
     assert value == pytest.approx(extras["forehead_mm_per_cm2"] / config.LINES_TOP_ZONES, abs=0.02)
+
+
+def test_a_session_scores_every_photo_on_the_same_zones():
+    from types import SimpleNamespace
+
+    from app.pipeline_face import _session_lines
+
+    def frame(fore, crow, naso, skipped=()):
+        z = {
+            "forehead_mm_per_cm2": fore,
+            "crows_feet_mm_per_cm2": crow,
+            "nasolabial_mm_per_cm2": naso,
+        }
+        top = sorted(z.values(), reverse=True)[:2]
+        return {
+            "values": {"lines": sum(top) / 2},
+            "extras": {"lines": {**z, "skipped_for_expression": list(skipped)}},
+            "face": SimpleNamespace(px_per_mm=4.0),
+        }
+
+    # the nasolabial zone flips between 0 and 2 (one segment found or not): scored on each
+    # photo's own top two it moves the value by 1; on the session's top zones it does not
+    frames = [frame(2.0, 1.0, 0.0), frame(2.0, 1.0, 2.0, ["glabella"]), frame(2.0, 1.0, 0.0)]
+    _session_lines(frames)
+    assert [f["values"]["lines"] for f in frames] == [1.5, 1.5, 1.5]
+    assert frames[0]["extras"]["lines"]["top_zones"] == [
+        "forehead_mm_per_cm2",
+        "crows_feet_mm_per_cm2",
+    ]
+    assert frames[0]["extras"]["lines"]["skipped_for_expression"] == ["glabella"]
+    assert frames[0]["extras"]["lines"]["px_per_mm"] == 4.0
