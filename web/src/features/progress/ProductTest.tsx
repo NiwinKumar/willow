@@ -18,8 +18,26 @@ import { MODE_LABEL, baselineFor, dayOf, metricOf, sessionState } from './model'
 import { Crumb, Page, Pills } from './parts'
 
 const isMode = (v: string | null): v is CaptureMode => v === 'calibrated_raw' || v === 'uncalibrated'
-const deg = (v: number | null, m: Pick<Metric, 'unit' | 'mdc95'>) => (v === null ? '—' : `${fmtValue(v, m)}°`)
-const sdeg = (v: number | null, m: Pick<Metric, 'unit' | 'mdc95'>) => (v === null ? '—' : `${fmtSigned(v, m)}°`)
+
+/** What the test compares: skin tone (ITA°, descriptive) or redness (each arm against its own baseline). */
+type ArmMetric = 'tone_ita' | 'redness'
+const ARM: Record<ArmMetric, { short: string; name: string; unit: string; axis: string; note: string }> = {
+  tone_ita: {
+    short: 'ITA°',
+    name: 'ITA°',
+    unit: '°',
+    axis: 'ITA° · lower means darker · descriptive, not better or worse',
+    note: 'A change in tone, such as darkening from a self-tanner, is reported as change, not as better or worse.',
+  },
+  redness: {
+    short: 'REDNESS',
+    name: 'Redness',
+    unit: '',
+    axis: 'Redness · higher means more red than that arm’s own baseline',
+    note: 'Redness is compared with each arm’s own skin only. Heat, exercise or a hot shower can raise it on both arms, which is what the control arm is there to show.',
+  },
+}
+const isArmMetric = (v: string | null): v is ArmMetric => v === 'tone_ita' || v === 'redness'
 
 /**
  * Treated vs control (old ControlCompare kinds): each arm against its own baseline and band; the verdict is on
@@ -49,7 +67,7 @@ function compare(t: Metric, c: Metric | null, tb: Metric | null, cb: Metric | nu
   return { kind, dd, band }
 }
 
-/** Product test (design "Treated vs control"): forearm_treated against forearm_control, ITA° over time. */
+/** Product test (design "Treated vs control"): forearm_treated against forearm_control, ITA° or redness over time. */
 export default function ProductTest() {
   const data = useData()
   const shell = useShell()
@@ -66,6 +84,22 @@ export default function ProductTest() {
   const tBase = baselineFor(current, treatedAll)
   const control = matchControl(current, controlAll)
   const cBase = baselineFor(control, controlAll)
+  // Redness is offered when this mode's treated check-ins measured it (the engine reads both on the square).
+  const hasRedness = treated.some((s) => metricOf(s, 'redness')?.value != null)
+  const qMetric = params.get('metric')
+  const metricId: ArmMetric = isArmMetric(qMetric) && (qMetric === 'tone_ita' || hasRedness) ? qMetric : 'tone_ita'
+  const look = ARM[metricId]
+  const deg = (v: number | null, m: Pick<Metric, 'unit' | 'mdc95'>) => (v === null ? '—' : `${fmtValue(v, m)}${look.unit}`)
+  const sdeg = (v: number | null, m: Pick<Metric, 'unit' | 'mdc95'>) => (v === null ? '—' : `${fmtSigned(v, m)}${look.unit}`)
+  const setParam = (k: string, v: string) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p)
+        n.set(k, v)
+        return n
+      },
+      { replace: true },
+    )
 
   if ((data.status === 'loading' || data.status === 'idle') && !data.all.length) return <WillowLoader inline label="Loading your product test" />
 
@@ -88,21 +122,21 @@ export default function ProductTest() {
       </Page>
     )
 
-  const t = metricOf(current, 'tone_ita')
-  const c = metricOf(control, 'tone_ita')
-  const tb = metricOf(tBase, 'tone_ita')
-  const cb = metricOf(cBase, 'tone_ita')
+  const t = metricOf(current, metricId)
+  const c = metricOf(control, metricId)
+  const tb = metricOf(tBase, metricId)
+  const cb = metricOf(cBase, metricId)
   const isBase = sessionState(current) === 'baseline'
   // Calendar days in the person's own time zone: a baseline at 21:00 and a check-in at 08:00 next morning is day 1.
   const daysSince = (s: Session, base: Session) => Math.max(0, Math.round((parseDate(dayOf(s)).getTime() - parseDate(dayOf(base)).getTime()) / 86_400_000))
   const dayN = tBase ? daysSince(current, tBase) : 0
   const res = t && !isBase ? compare(t, c, tb, cb) : null
-  const fm: Pick<Metric, 'unit' | 'mdc95'> = { unit: 'deg', mdc95: tb?.mdc95 ?? t?.mdc95 ?? 1 }
+  const fm: Pick<Metric, 'unit' | 'mdc95'> = { unit: t?.unit ?? (metricId === 'tone_ita' ? 'deg' : 'a_star'), mdc95: tb?.mdc95 ?? t?.mdc95 ?? 1 }
 
   // Chart: every treated check-in in this mode, with the control taken within 3 hours of it.
   const when = (s: Session) => (s.hours_since_baseline !== undefined ? fmtHours(s.hours_since_baseline).replace('Baseline', 'BASE').toUpperCase() : tBase ? `DAY ${daysSince(s, tBase)}` : fmtDate(s.created_at).toUpperCase())
-  const tv = treated.map((s) => metricOf(s, 'tone_ita')?.value ?? null)
-  const cv = treated.map((s) => metricOf(matchControl(s, controlAll), 'tone_ita')?.value ?? null)
+  const tv = treated.map((s) => metricOf(s, metricId)?.value ?? null)
+  const cv = treated.map((s) => metricOf(matchControl(s, controlAll), metricId)?.value ?? null)
   const labels = treated.map(when)
 
   const arm = (name: string, m: Metric | null, base: Metric | null, session: Session | null, bg: string, glow: string) => {
@@ -118,7 +152,7 @@ export default function ProductTest() {
         </span>
         <span className="flex flex-col items-center gap-1.5">
           {m && (isBase ? m.value : m.delta) !== null ? <span className="font-dot text-[clamp(45px,4vw,48px)] leading-[.9] tnum">{isBase ? deg(m.value, fm) : sdeg(m.delta, fm)}</span> : <span className="text-[40px] leading-[.9] opacity-70">—</span>}
-          <span className="text-[15px] opacity-85">{isBase ? 'ITA° at the start' : 'ITA° change vs its own baseline'}</span>
+          <span className="text-[15px] opacity-85">{isBase ? `${look.name} at the start` : `${look.name} change vs its own baseline`}</span>
         </span>
         <span className="flex flex-wrap justify-between gap-2 text-[14px] opacity-90">
           <span>{m && base && !isBase ? `from ${deg(base.value, fm)} to ${deg(m.value, fm)}` : m ? '' : 'no photo within 3 hours'}</span>
@@ -130,11 +164,11 @@ export default function ProductTest() {
 
   const copy = (() => {
     if (isBase) return { h: 'Day 0: your starting point.', b: 'This is the treated arm’s baseline. Later check-ins of both arms are compared with their own baselines, then with each other.' }
-    if (!res || !t) return { h: 'Not enough to compare yet.', b: 'This check-in has no tone reading to compare.' }
+    if (!res || !t) return { h: 'Not enough to compare yet.', b: `This check-in has no ${metricId === 'tone_ita' ? 'tone' : 'redness'} reading to compare.` }
     const tr = sdeg(t.delta, fm)
     const un = c ? sdeg(c.delta, fm) : '—'
     const dd = res.dd !== null ? sdeg(res.dd, fm) : '—'
-    const band = res.band !== null ? `±${fmtValue(res.band, fm)}°` : ''
+    const band = res.band !== null ? `±${fmtValue(res.band, fm)}${look.unit}` : ''
     switch (res.kind) {
       case 'missing':
         return { h: 'The control arm wasn’t photographed with this check-in.', b: `The treated arm moved ${tr}. Without an untreated photo taken within 3 hours, Willow can’t separate the product from shared drift such as light or time of day. ${cBase ? 'Photograph both arms next time.' : 'Set a baseline for the untreated square first.'}` }
@@ -159,11 +193,21 @@ export default function ProductTest() {
       <div className="flex flex-wrap items-end justify-between gap-3 pt-[clamp(8px,2vw,24px)] pb-2">
         <div className="flex flex-col gap-2.5">
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">
-            ■ TREATED VS CONTROL · {MODE_LABEL[mode].toUpperCase()} · DAY {dayN} · ITA°
+            ■ TREATED VS CONTROL · {MODE_LABEL[mode].toUpperCase()} · DAY {dayN} · {look.short}
           </span>
           <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Treated arm vs control arm</h1>
         </div>
-        {modes.length > 1 ? <Pills label="Capture mode" tone="white" options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} value={mode} onChange={(m) => setParams({ mode: m }, { replace: true })} /> : null}
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {hasRedness ? (
+            <Pills
+              label="Compare"
+              options={(['tone_ita', 'redness'] as ArmMetric[]).map((m) => ({ value: m, label: ARM[m].name }))}
+              value={metricId}
+              onChange={(m) => setParam('metric', m)}
+            />
+          ) : null}
+          {modes.length > 1 ? <Pills label="Capture mode" tone="white" options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} value={mode} onChange={(m) => setParam('mode', m)} /> : null}
+        </div>
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3.5">
         {arm('Treated forearm', t, tb, current, 'radial-gradient(80% 60% at 50% 0%, #F567B5 0%, #8E3A9E 40%, #2A0F36 80%)', 'rgba(245,103,181,.25)')}
@@ -172,7 +216,7 @@ export default function ProductTest() {
           <span className="text-[20px]">Difference between the changes</span>
           <span className="flex flex-col items-center gap-1.5">
             {res?.dd !== null && res?.dd !== undefined ? <span className="font-dot text-[clamp(45px,4vw,48px)] leading-[.9] tnum">{sdeg(res.dd, fm)}</span> : <span className="text-[40px] leading-[.9] text-ink-3">—</span>}
-            <span className="text-[15px] text-ink-2">{res?.band !== null && res?.band !== undefined ? `combined uncertainty ±${fmtValue(res.band, fm)}°` : 'combined uncertainty —'}</span>
+            <span className="text-[15px] text-ink-2">{res?.band !== null && res?.band !== undefined ? `combined uncertainty ±${fmtValue(res.band, fm)}${look.unit}` : 'combined uncertainty —'}</span>
           </span>
           <span className="flex items-center gap-2 self-start rounded-pill bg-selected px-3.5 py-[9px] text-[14px] text-inverse">
             <VerdictGlyph kind={res ? KIND[res.kind].glyph : 'baseline'} onDark />
@@ -183,7 +227,7 @@ export default function ProductTest() {
       <section aria-label="Both arms over time" className="flex flex-col gap-3.5 rounded-[44px] bg-black p-[clamp(20px,3vw,32px)] text-white squircle">
         <div className="flex flex-wrap items-baseline justify-between gap-2.5">
           <h2 className="m-0 text-[26px] font-light">Both arms, check-in by check-in</h2>
-          <span className="text-[13px] text-white/60">ITA° · lower means darker · descriptive, not better or worse</span>
+          <span className="text-[13px] text-white/60">{look.axis}</span>
         </div>
         <ForearmChart
           series={[
@@ -192,9 +236,9 @@ export default function ProductTest() {
           ]}
           labels={labels}
           format={(v) => fmtValue(v, fm)}
-          unit="°"
-          caption="ITA° per check-in, treated and control arm"
-          summary={`ITA° over ${plural(treated.length, 'check-in', 'check-ins')}. Treated: ${tv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}. Control: ${cv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}.`}
+          unit={look.unit}
+          caption={`${look.name} per check-in, treated and control arm`}
+          summary={`${look.name} over ${plural(treated.length, 'check-in', 'check-ins')}. Treated: ${tv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}. Control: ${cv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}.`}
         />
         <div className="flex flex-wrap gap-[18px] text-[14px]">
           <span className="flex items-center gap-2">
@@ -210,7 +254,7 @@ export default function ProductTest() {
       <section className="flex flex-col gap-2.5 rounded-[36px] bg-surface/85 p-[clamp(22px,3vw,30px)] squircle">
         <h2 className="m-0 text-[22px] font-normal">{copy.h}</h2>
         <p className="m-0 max-w-[860px] leading-[1.55] text-ink-2">{copy.b}</p>
-        <p className="m-0 text-[14px] leading-normal text-ink-2">A change in tone, such as darkening from a self-tanner, is reported as change, not as better or worse.</p>
+        <p className="m-0 text-[14px] leading-normal text-ink-2">{look.note}</p>
         <Button variant="ink" size="lg" onClick={photograph} className="mt-1.5 self-start">
           Photograph both arms
         </Button>
