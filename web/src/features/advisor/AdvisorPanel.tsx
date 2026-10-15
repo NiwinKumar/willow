@@ -64,8 +64,9 @@ function ContextChip() {
   const products = (routine.data ?? []).filter((e) => !e.ended_at).length
   const dots = ['var(--aura-coral)', 'var(--willow-400)', 'var(--aura-violet)']
   return (
-    <div className="relative ml-auto" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-10 items-center gap-2.5 rounded-pill bg-surface/80 px-3.5 text-[13px] shadow-[0_10px_30px_-18px_rgba(0,0,0,.3)] backdrop-blur-[14px]">
+    <div className="relative ml-auto" onPointerEnter={(e) => e.pointerType === 'mouse' && setOpen(true)} onPointerLeave={(e) => e.pointerType === 'mouse' && setOpen(false)}>
+      {/* Hover opens it for a mouse; a tap (which also fires enter) or a key toggles it. */}
+      <button type="button" onClick={(e) => setOpen((o) => ((e.nativeEvent as PointerEvent).pointerType === 'mouse' ? true : !o))} aria-expanded={open} className="flex min-h-10 items-center gap-2.5 rounded-pill bg-surface/80 px-3.5 text-[13px] shadow-[0_10px_30px_-18px_rgba(0,0,0,.3)] backdrop-blur-[14px]">
         <span aria-hidden className="flex pl-[3px]">
           {dots.map((c) => (
             <span key={c} className="-ml-[3px] size-2.5 rounded-full shadow-[0_0_0_2px_var(--bg-surface)]" style={{ background: c }} />
@@ -137,7 +138,8 @@ function Chat({ seed }: { seed: AdvisorSeed | null }) {
   const shell = useShell()
   const navigate = useNavigate()
   const wide = useMediaQuery('(min-width: 900px)')
-  const { getIdToken } = useAuth()
+  const { getIdToken, user } = useAuth()
+  const uid = user?.uid ?? null
   const starters = useStarters()
   const scroller = useRef<HTMLDivElement>(null)
   const [product, setProduct] = useState<Product | null>(null)
@@ -145,7 +147,8 @@ function Chat({ seed }: { seed: AdvisorSeed | null }) {
   const capped = chat.capMessage !== null
   const started = chat.messages.length > 0
 
-  useEffect(() => setTokenSource(getIdToken), [getIdToken])
+  // Another person on this tab (Google switch, sign-out then sign-in) never sees the last one's chat.
+  useEffect(() => setTokenSource(getIdToken, uid), [getIdToken, uid])
   // A question from elsewhere in the app (Routine, Results): asked once per seed.
   useEffect(() => {
     if (seed && takeSeed(seed)) ask(seed.text, seed.context)

@@ -311,7 +311,7 @@ export default function Result() {
     track && diary
       ? {
           bbox: obs?.bbox ?? null,
-          tag: tagText(track, sIdx),
+          tag: tagText(track, sIdx, diary),
           area: track.zone ? ZONE_NAME[track.zone] : 'Spot',
           status: statusText(track, diary),
           backLabel: fromSession ? fmtDate(fromSession.created_at) : 'this check-in',
@@ -374,7 +374,7 @@ export default function Result() {
           ) : null}
 
           {st === 'unmeasured' ? (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3.5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-3.5">
               {Array.from({ length: session.n_frames }, (_, i) => (
                 <div key={i} className="flex aspect-square flex-col justify-between overflow-hidden rounded-[36px] p-[18px] squircle" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
                   <span className="font-mono text-[11px] text-ink-2 uppercase">
@@ -420,7 +420,7 @@ export default function Result() {
 function RejectedPhotos({ session }: { session: Session }) {
   const frames = session.result?.quality.per_frame?.length ? session.result.quality.per_frame : [{ index: 0, passed: false, reasons: session.result?.quality.reasons ?? [] }]
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-3.5">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] gap-3.5">
       {frames
         .filter((f) => !f.passed)
         .map((f) => {

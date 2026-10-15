@@ -16,6 +16,7 @@ import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
 import { useDemoStatus } from '../../lib/useDemoStatus'
+import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
 
 const MAX_GOALS = 3
@@ -153,6 +154,7 @@ function AccountCard() {
     try {
       await signOutUser()
       clearQueries()
+      resetChat()
       prefs.clearAll()
       navigate('/', { replace: true })
     } catch {
@@ -445,6 +447,7 @@ function DeleteCard() {
       await signOutUser().catch(() => undefined)
     }
     clearQueries()
+    resetChat()
     prefs.clearAll()
     // Drop the sessions the app still holds in memory (the server copy is already gone).
     void data.refresh()

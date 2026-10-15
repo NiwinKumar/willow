@@ -12,7 +12,7 @@ const SKELETON = 'linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,
  * The dark compatibility-check card (design: "■ ROUTINE CHECK"). It runs by itself whenever the routine
  * changes (useRoutineCheck is keyed by the routine), so there is no "stale" state; "Run again" re-asks.
  */
-export function RoutineCheckCard({ check, findings, count, onFind }: { check: QueryResult<RoutineCheck>; findings: Finding[]; count: number; onFind: (f: Finding) => void }) {
+export function RoutineCheckCard({ check, findings, count, onFind }: { check: QueryResult<RoutineCheck> & { rerun: () => Promise<void> }; findings: Finding[]; count: number; onFind: (f: Finding) => void }) {
   const shell = useShell()
   const [rerun, setRerun] = useState(false)
   const running = check.status === 'loading' || rerun
@@ -24,7 +24,7 @@ export function RoutineCheckCard({ check, findings, count, onFind }: { check: Qu
   const runAgain = async () => {
     setRerun(true)
     try {
-      await check.refetch()
+      await check.rerun()
     } finally {
       setRerun(false)
     }

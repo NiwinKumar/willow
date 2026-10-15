@@ -22,6 +22,8 @@ function markSeen(id: string) {
   }
 }
 
+const WORD_LIMIT = 50
+
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
@@ -34,13 +36,18 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
     if (!ex) return ''
     return [ex.headline, ...ex.items.map((i) => i.summary)].filter(Boolean).join(' ')
   }, [ex])
-  const words = useMemo(() => (text ? text.split(/\s+/) : []), [text])
+  const allWords = useMemo(() => (text ? text.split(/\s+/) : []), [text])
+  // A long explanation would stretch the hero beside it far past the design's height: the first part shows,
+  // the rest on request (screen readers always get the whole text).
+  const [more, setMore] = useState(false)
+  const long = allWords.length > WORD_LIMIT + 15
+  const words = long && !more ? allWords.slice(0, WORD_LIMIT) : allWords
   // Reveal once per session per browser session; the parent remounts this card per session (key).
   const [instant] = useState(() => !text || seen(session.id) || reduced())
   const [count, setCount] = useState(0)
-  const shown = instant ? words.length : count
+  const shown = instant || more ? words.length : count
   useEffect(() => {
-    if (instant) return
+    if (instant || more) return
     const t0 = Date.now()
     const timer = window.setInterval(() => {
       const n = Math.floor((Date.now() - t0) / 34)
@@ -51,7 +58,7 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
       }
     }, 34)
     return () => window.clearInterval(timer)
-  }, [instant, words.length, session.id])
+  }, [instant, more, words.length, session.id])
 
   const source = !measured
     ? 'WILLOW · NO MEASUREMENTS TO EXPLAIN'
@@ -67,7 +74,7 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
           <span className="text-[15px]">Explanation</span>
           <span className="font-mono text-[11px] tracking-[.04em] text-ink-2">{source}</span>
         </span>
-        {session.explanation_source === 'gemini' && measured ? <AITag className="ml-auto" /> : null}
+        {session.explanation_source === 'gemini' && measured ? <AITag className="ml-auto shrink-0 whitespace-nowrap" /> : null}
       </div>
       {text ? (
         <div aria-busy={busy}>
@@ -79,8 +86,13 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
                 {w}{' '}
               </span>
             ))}
-            {busy ? <span className="inline-block h-[18px] w-[9px] animate-[wBlink_1s_steps(2)_infinite] rounded-[4px] bg-[var(--aura-sky)] align-[-3px]" /> : null}
+            {busy ? <span className="inline-block h-[18px] w-[9px] animate-[wBlink_1s_steps(2)_infinite] rounded-[4px] bg-[var(--aura-sky)] align-[-3px]" /> : long && !more ? '…' : null}
           </p>
+          {long && !busy ? (
+            <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="mt-1 min-h-11 text-[14px] underline underline-offset-4">
+              {more ? 'Show less' : 'Read the whole explanation'}
+            </button>
+          ) : null}
         </div>
       ) : (
         <p className="m-0 text-[18px] leading-[1.55] font-light">{measured ? 'No explanation was written for this check-in. The numbers below are measured from your photos.' : 'Nothing was measured on this check-in, so there is nothing to explain yet.'}</p>

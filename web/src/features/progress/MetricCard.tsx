@@ -28,7 +28,7 @@ export function MetricCard({ metric: m, session, band, compared, onOpen, delay =
   const kind = verdictKind(m, session)
   const unit = unitOf(m).trim()
   const ratio = compared && band && m.delta !== null ? m.delta / band : null
-  const deltaLabel = session.is_baseline ? 'Baseline value' : !compared ? 'Not compared' : `Δ ${deltaText(m)}`
+  const deltaLabel = session.is_baseline ? 'Baseline value' : !compared ? VERDICT_WORDS.notCompared.short : `Δ ${deltaText(m)}`
   const bandLabel = band !== null ? `range ${bandText(m, band)} · ${confidenceOf(m, session).label.toLowerCase()}` : 'no normal range yet'
   return (
     <button

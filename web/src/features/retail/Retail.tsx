@@ -48,7 +48,7 @@ export default function Retail() {
     <div data-theme="dark" className="relative min-h-dvh overflow-x-clip bg-canvas pb-20 font-ui text-ink">
       <Backdrop />
       {d ? <CohortBanner d={d} /> : null}
-      <Header />
+      <Header ready={state === 'ready'} />
 
       <main className="relative z-[1] mx-auto flex max-w-[1320px] flex-col gap-4 px-[clamp(16px,4vw,40px)]">
         <div className="flex flex-wrap items-end justify-between gap-5 pb-1 pt-[clamp(16px,4vw,48px)]">
@@ -162,9 +162,11 @@ const SECTIONS = [
 ] as const
 
 /** The section in view, for the nav pill (the design marked "Ask" only; this follows the scroll). */
-function useSectionInView(): string | null {
+function useSectionInView(ready: boolean): string | null {
   const [active, setActive] = useState<string | null>(null)
   useEffect(() => {
+    // The sections exist only once the dashboard is drawn (never on the loading, failed or empty states).
+    if (!ready) return
     const seen = new Map<string, boolean>()
     const io = new IntersectionObserver(
       (entries) => {
@@ -173,24 +175,17 @@ function useSectionInView(): string | null {
       },
       { rootMargin: '-30% 0px -55% 0px' },
     )
-    // Sections mount after the data arrives: look again until they are there.
-    const attach = () => {
-      const els = SECTIONS.map(([id]) => document.getElementById(id)).filter((el): el is HTMLElement => el !== null)
-      els.forEach((el) => io.observe(el))
-      return els.length
-    }
-    let timer: number | undefined
-    if (!attach()) timer = window.setInterval(() => attach() && window.clearInterval(timer), 500)
-    return () => {
-      window.clearInterval(timer)
-      io.disconnect()
-    }
-  }, [])
+    SECTIONS.forEach(([id]) => {
+      const el = document.getElementById(id)
+      if (el) io.observe(el)
+    })
+    return () => io.disconnect()
+  }, [ready])
   return active
 }
 
-function Header() {
-  const active = useSectionInView()
+function Header({ ready }: { ready: boolean }) {
+  const active = useSectionInView(ready)
   return (
     <header className="relative z-[2] flex flex-wrap items-center justify-between gap-3 px-[clamp(16px,4vw,40px)] py-[18px]">
       <Link to="/" aria-label="Willow home" className="flex items-center gap-2.5 no-underline">
@@ -268,7 +263,8 @@ function Kpis({ d }: { d: Insights }) {
   const evidence = outcomes(d).length
   const kpis = [
     {
-      label: 'Consented users',
+      // Simulated people never consented to anything: only real rows are "consented users".
+      label: kind === 'simulated' ? 'Simulated users' : kind === 'real' ? 'Consented users' : 'Users',
       value: String(totalUsers(d.cohort)),
       unit: kind === 'simulated' ? 'synthetic' : kind,
       note: `${kind === 'mixed' ? `${d.cohort.real} REAL · ${d.cohort.synthetic} SIMULATED · ` : ''}${active ? `${active.n} REACHED WEEK ${d.cohort.weeks}` : ''}`,

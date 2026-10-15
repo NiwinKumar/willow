@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import type { RoutineEntry, Session } from '../../data/types'
-import { daysBetween, fmtDate, plural } from '../../lib/format'
+import { fmtDate, plural } from '../../lib/format'
 import { METRIC_META, fmtSigned, unitOf } from '../../lib/metrics'
 import { outcomeFor } from '../../lib/outcome'
+import { daysSince } from '../home/derive'
 import { CategoryOrb } from './productUi'
 import { entryName, type Finding } from './routineModel'
 
@@ -105,10 +105,10 @@ export function Suggestions({ findings, entries, sessions, onFind }: { findings:
  */
 export function ProductTestCard({ treated }: { treated: Session[] }) {
   const navigate = useNavigate()
-  const [now] = useState(() => new Date().toISOString())
   if (treated.length === 0) return null
-  const base = treated.filter((s) => s.is_baseline).at(-1) ?? treated[0]
-  const day = Math.max(0, daysBetween(base.created_at, now))
+  // Same day count as Home's tile: calendar days in the person's time zone since the treated baseline.
+  const base = treated.filter((s) => s.is_baseline).at(-1) ?? treated.find((s) => s.status === 'done') ?? treated[0]
+  const day = Math.max(0, daysSince(base.created_at))
   const after = treated.filter((s) => !s.is_baseline && s.created_at > base.created_at)
   const dots = treated.slice(-28)
   return (

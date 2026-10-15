@@ -30,6 +30,8 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
   const created = useRef<Created | null>(null)
   const wake = useRef<WakeLockSentinel | null>(null)
   const alive = useRef(true)
+  // Aborts the PUTs in flight when the check-in closes.
+  const abort = useRef(new AbortController())
   const doneRef = useRef(onDone)
   doneRef.current = onDone
   // Everyone waiting for the network (paused rows, a run started offline) wakes on `online` or Retry now.
@@ -48,6 +50,7 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
 
   useEffect(() => {
     alive.current = true
+    if (abort.current.signal.aborted) abort.current = new AbortController()
     const on = () => {
       setOffline(false)
       wakeWaiters()
@@ -57,8 +60,11 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
     window.addEventListener('offline', off)
     return () => {
       alive.current = false
+      abort.current.abort()
       window.removeEventListener('online', on)
       window.removeEventListener('offline', off)
+      // Rows paused for the network stop waiting; their workers see alive=false and end.
+      wakeWaiters()
       wake.current?.release().catch(() => undefined)
     }
   }, [wakeWaiters])
@@ -74,7 +80,13 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
 
   async function requestWake() {
     try {
-      wake.current = (await navigator.wakeLock?.request('screen')) ?? null
+      const lock = (await navigator.wakeLock?.request('screen')) ?? null
+      // Closed while the lock was being granted: let it go straight away.
+      if (!alive.current) {
+        lock?.release().catch(() => undefined)
+        return
+      }
+      wake.current = lock
       wake.current?.addEventListener('release', () => {
         wake.current = null
       })
@@ -99,10 +111,12 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
     // Done rows stay done (a retry never sends them again); everything else starts over.
     setRows(rowsRef.current.map((r) => (r.problem || r.state === 'done' ? r : { ...r, state: 'ready', error: undefined, progress: 0 })))
     try {
-      while (!navigator.onLine) {
+      while (!navigator.onLine && alive.current) {
         setOffline(true)
         await waitOnline()
       }
+      // Closed while waiting for the network: never create a session nobody uploads to.
+      if (!alive.current) return
       const token = await getIdToken()
       if (!created.current) {
         const res = await api.createSession(token, { site, capture_mode: mode, n_frames: good.length, content_types: good.map((r) => r.contentType) })
@@ -114,14 +128,13 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
       const targetsNow = async () => {
         const c = created.current!
         if (Date.now() - c.issuedAt > RENEW_AFTER) {
-          renewing ??= api
-            .reissueUploadUrls(await getIdToken(), c.id)
-            .then((fresh) => {
-              created.current = { ...c, targets: fresh.upload_urls, issuedAt: Date.now() }
-            })
-            .finally(() => {
-              renewing = null // a failed renewal is retried by the next attempt
-            })
+          // Assigned before any await, so both workers share one renewal.
+          renewing ??= (async () => {
+            const fresh = await api.reissueUploadUrls(await getIdToken(), c.id)
+            created.current = { ...c, targets: fresh.upload_urls, issuedAt: Date.now() }
+          })().finally(() => {
+            renewing = null // a failed renewal is retried by the next attempt
+          })
           await renewing
         }
         return created.current!.targets
@@ -135,10 +148,11 @@ export function useUpload({ site, mode, onDone }: { site: Site; mode: CaptureMod
             patch(id, { state: 'uploading', error: undefined })
             try {
               const row = rowsRef.current.find((r) => r.id === id)!
-              await putSigned((await targetsNow())[slot], row.file, (f) => patch(id, { progress: f }))
+              await putSigned((await targetsNow())[slot], row.file, (f) => patch(id, { progress: f }), abort.current.signal)
               patch(id, { state: 'done', progress: 1 })
               break
             } catch {
+              if (!alive.current) break
               if (!navigator.onLine) {
                 // Offline: wait without spending a try; the row resumes from the start.
                 patch(id, { state: 'paused', progress: 0 })

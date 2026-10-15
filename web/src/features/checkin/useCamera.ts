@@ -71,15 +71,28 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
   const shotRef = useRef(onShot)
   shotRef.current = onShot
 
+  // Each start() gets a number; a stream that arrives after a newer start, or after the step closed, is stopped at once.
+  const generation = useRef(0)
+  const mounted = useRef(true)
   const stop = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop())
     stream.current = null
   }, [])
-  useEffect(() => stop, [stop])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      // A counter, not a DOM node: bumping it makes any start() still waiting on the browser stop its stream.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      generation.current++
+      stop()
+    }
+  }, [stop])
 
   const start = useCallback(
     async (want: Facing = facing) => {
       stop() // a retry never leaves the previous stream (and the camera light) running
+      const gen = ++generation.current
       if (!navigator.mediaDevices?.getUserMedia) {
         setPhase('unavailable')
         return
@@ -88,6 +101,11 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
       try {
         // Close-ups need about 20 px per mm for pores: ask for the full 4K frame.
         const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: want, width: { ideal: closeUp ? 3840 : 1920 }, height: { ideal: closeUp ? 2160 : 1440 } }, audio: false })
+        if (gen !== generation.current || !mounted.current) {
+          // Back was pressed (or another start began) while the browser was asking: never leave the camera on.
+          s.getTracks().forEach((t) => t.stop())
+          return
+        }
         stream.current = s
         const track = s.getVideoTracks()[0]
         // The tab went to the background or another app took the camera: say so, never a black frame.
@@ -100,12 +118,14 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
         setSettled(false)
         setManual(false)
         window.setTimeout(() => {
+          if (gen !== generation.current) return
           setSettled(true)
           if (track) void holdCamera(track)
         }, SETTLE_MS)
         setFacing(want)
         setPhase('live')
       } catch (e) {
+        if (gen !== generation.current || !mounted.current) return
         const name = (e as { name?: string })?.name
         setPhase(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'unavailable')
       }

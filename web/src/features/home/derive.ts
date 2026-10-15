@@ -59,8 +59,11 @@ export type HomeRead = {
 export function readHome(all: Session[], face: Session[]): HomeRead {
   const lead = latest(face, usable)
   const baseline = lead ? baselineFor(lead, face) : latest(face, (s) => s.is_baseline)
-  const baselineFrames = baseline ? (baseline.baseline_ref?.frames ?? baseline.result?.frames_used ?? null) : null
-  const hasBand = baseline ? (baseline.baseline_ref?.has_noise_band ?? (baselineFrames ?? 0) >= BAND_FRAMES) : false
+  // The lead's own baseline ref describes the baseline it was compared with (a demoted former baseline has
+  // no ref of its own); the baseline's ref describes itself when it is the current one.
+  const ref = baseline && lead?.baseline_ref?.session_id === baseline.id ? lead.baseline_ref : baseline?.baseline_ref
+  const baselineFrames = baseline ? (ref?.frames ?? baseline.result?.frames_used ?? null) : null
+  const hasBand = baseline ? (ref?.has_noise_band ?? (baselineFrames ?? 0) >= BAND_FRAMES) : false
   const lastFace = latest(face)
 
   const t = today()

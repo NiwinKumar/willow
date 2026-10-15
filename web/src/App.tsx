@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Navigate, Route, Routes, useLocation, useParams, type Location } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation, useParams, type Location } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
 import { AppShell } from './components/shell/AppShell'
@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { buttonClass } from './components/ui/Button'
 import { WillowLoader } from './components/willow/WillowLoader'
 import { DataProvider } from './data/store'
+import { useAuth } from './lib/useAuth'
 import Landing from './features/website/Landing'
 
 const SignIn = lazy(() => import('./features/website/SignIn'))
@@ -108,21 +109,25 @@ function OldProcessing() {
 }
 
 function NotFound() {
+  const { user, loading } = useAuth()
   useEffect(() => {
     document.title = 'Page not found · Willow'
   }, [])
+  // Someone signed in goes back into the app; anyone else to the start (Home would only ask them to sign in).
+  const inApp = loading || Boolean(user)
   return (
     <main className="mx-auto flex min-h-dvh max-w-[36rem] flex-col justify-center gap-4 px-5">
       <h1 className="font-serif text-greeting">This page does not exist</h1>
       <p className="text-[15px] text-ink-2">The link may be old or mistyped.</p>
-      <a href="/home" className={`${buttonClass({ variant: 'ink' })} self-start no-underline`}>
-        Go to Home
-      </a>
+      <Link to={inApp ? '/home' : '/'} className={`${buttonClass({ variant: 'ink' })} self-start no-underline`}>
+        {inApp ? 'Go to Home' : 'Go to the start'}
+      </Link>
     </main>
   )
 }
 
 const TITLES: [RegExp, string][] = [
+  [/^\/science/, 'Science and limits'],
   [/^\/judge/, 'Judge tour'],
   [/^\/signin/, 'Sign in'],
   [/^\/welcome/, 'Getting started'],

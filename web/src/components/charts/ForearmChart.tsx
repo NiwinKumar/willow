@@ -33,7 +33,7 @@ export function ForearmChart({ series, labels, format, unit = '', summary, capti
           <g key={`t${i}`}>
             <line x1={60} x2={580} y1={g.Y(t)} y2={g.Y(t)} stroke="#fff" strokeOpacity={0.08} />
             <text x={52} y={g.Y(t) + 4} textAnchor="end" fill={MUTED} fontSize={11} fontFamily={MONO}>
-              {Number.isInteger(t) ? t.toFixed(0) : t.toFixed(1)}
+              {(Number.isInteger(t) ? t.toFixed(0) : t.toFixed(1)).replace(/^-(?=[\d.]*[1-9])/, '−').replace(/^-/, '')}
               {unit}
             </text>
           </g>

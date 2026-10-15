@@ -58,7 +58,7 @@ export function GuideStep(props: {
       >
         <div>
           <span className="font-mono text-[12px] tracking-[.08em] opacity-90">
-            ■ {name.toUpperCase()} · {raw ? 'RAW' : 'QUICK'} · {first ? 'FIRST SESSION' : 'LATER SESSION'}
+            ■ {name.toUpperCase()} · {raw ? 'RAW' : 'QUICK'} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
           </span>
           <h1 id="ck-title" tabIndex={-1} className="mt-[18px] mb-0 text-[clamp(30px,3.4vw,44px)] leading-[1.05] font-light tracking-[-0.02em] outline-none">
             {first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}

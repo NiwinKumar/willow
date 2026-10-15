@@ -3,11 +3,11 @@ import './website.css'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { enterDemo, leaveDemo } from '../../data/useData'
-import { api, type SessionView } from '../../lib/api'
+import type { Session } from '../../data/types'
+import { enterDemo, leaveDemo, useData } from '../../data/useData'
+import { api } from '../../lib/api'
 import { identity } from '../../lib/identity'
 import { judge, JUDGE_STOPS, type JudgeStop } from '../../lib/judge'
-import { useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { useDemoStatus } from '../../lib/useDemoStatus'
 import { useJudge } from '../../lib/useJudge'
@@ -44,13 +44,12 @@ const LOOK: Record<JudgeStop, { bg: string; fg: string; dark?: boolean }> = {
 const STAMP = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false } as const
 
 /** A previous sample run, in the design's "14 OCT 09:12 · 4 measured · 1 rejected" form, from the session itself. */
-function runLine(v: SessionView): { when: string; result: string } {
-  const when = new Date(v.session.created_at).toLocaleString('en-GB', STAMP).replace(',', '').toUpperCase()
-  const s = v.session
+function runLine(s: Session): { when: string; result: string } {
+  const when = new Date(s.created_at).toLocaleString('en-GB', STAMP).replace(',', '').toUpperCase()
   if (s.status === 'failed') return { when, result: s.error?.code === 'too_few_frames' ? 'no photo passed' : 'failed' }
   if (s.status !== 'done') return { when, result: s.status === 'uploading' ? 'uploading' : 'measuring' }
-  const frames = v.result?.quality.per_frame
-  if (!frames?.length) return { when, result: `${v.result?.frames_used ?? s.n_frames} measured` }
+  const frames = s.result?.quality.per_frame
+  if (!frames?.length) return { when, result: `${s.result?.frames_used ?? s.n_frames} measured` }
   const passed = frames.filter((f) => f.passed).length
   const rejected = frames.length - passed
   return { when, result: `${passed} measured${rejected ? ` · ${rejected} rejected` : ''}` }
@@ -98,8 +97,9 @@ export default function Judge() {
       .catch(() => setSetup('failed'))
   }, [user, getIdToken, attempt])
 
-  const runs = useQuery(['judge-runs', user?.uid ?? null], (t) => api.listSessions(t).then((r) => r.sessions.filter((v) => v.session.sample_id)), { enabled: setup === 'ready' && Boolean(user) })
-  const prevRuns = [...(runs.data ?? [])].sort((a, b) => b.session.created_at.localeCompare(a.session.created_at)).slice(0, 3)
+  // Previous sample runs come from the sessions the app already loads for this account (no second fetch).
+  const data = useData()
+  const prevRuns = data.mode === 'live' ? data.all.filter((s) => s.sample_id).reverse().slice(0, 3) : []
 
   const retry = () => {
     started.current = null
@@ -284,7 +284,7 @@ export default function Judge() {
                     {prevRuns.map((v) => {
                       const r = runLine(v)
                       return (
-                        <Link key={v.session.id} to={`/result/${v.session.id}`} onClick={() => judge.visit('run')} className="flex min-h-9 items-center justify-between gap-2 rounded-[14px] bg-white/45 px-3 py-2 font-mono text-[12px] no-underline" style={{ color: look.fg }}>
+                        <Link key={v.id} to={`/result/${v.id}`} onClick={() => judge.visit('run')} className="flex min-h-9 items-center justify-between gap-2 rounded-[14px] bg-white/45 px-3 py-2 font-mono text-[12px] no-underline" style={{ color: look.fg }}>
                           <span>{r.when}</span>
                           <span>{r.result}</span>
                         </Link>

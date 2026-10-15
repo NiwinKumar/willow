@@ -297,9 +297,12 @@ export const api = {
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */
-export function putSigned(target: UploadTarget, file: File, onProgress: (fraction: number) => void): Promise<void> {
+export function putSigned(target: UploadTarget, file: File, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('Upload cancelled'))
     const xhr = new XMLHttpRequest()
+    // Closing the check-in cancels the PUT in flight ("the rest are not sent").
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
     xhr.open('PUT', target.url)
     for (const [k, v] of Object.entries(target.headers)) xhr.setRequestHeader(k, v)
     // A stalled connection (or a phone that backgrounded the tab) must end in a Retry, never an

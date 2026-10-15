@@ -7,7 +7,7 @@ import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/ty
 import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META, VERDICT_RANK, fmtSigned, fmtValue, orderedGroups, unitOf } from '../../lib/metrics'
-import { verdictKind, type VerdictKind } from '../../lib/verdict'
+import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
 
 export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick' }
 export const MODE_LONG: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick photo' }
@@ -119,13 +119,14 @@ export const DAY_BG: Record<DayStatus, string> = {
   other: 'linear-gradient(180deg, #F4F3F0, #E3E2DD)',
 }
 
+/** Calendar key words: the verdict words of lib/verdict.ts, plus the one day state that is not a verdict. */
 export const DAY_WORDS: Record<DayStatus, string> = {
-  baseline: 'Baseline',
-  changed: 'Changed',
-  normal: 'Within normal range',
-  notEnough: 'No normal range yet',
+  baseline: VERDICT_WORDS.baseline.label,
+  changed: VERDICT_WORDS.changed.label,
+  normal: VERDICT_WORDS.normal.label,
+  notEnough: VERDICT_WORDS.notEnough.label,
   rejected: 'No usable photos',
-  other: 'Not compared',
+  other: VERDICT_WORDS.notCompared.short,
 }
 
 /** Day-detail hero gradient and glow per status (design HB). */

@@ -14,7 +14,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { useAuth } from './useAuth'
 
 export type QueryStatus = 'idle' | 'loading' | 'ready' | 'error'
-type Entry<T> = { v: number; data: T | undefined; error: unknown; status: QueryStatus; at: number; inflight: Promise<void> | null; fetcher: ((token: string) => Promise<T>) | null; token: (() => Promise<string>) | null }
+type Entry<T> = { v: number; gen: number; data: T | undefined; error: unknown; status: QueryStatus; at: number; inflight: Promise<void> | null; fetcher: ((token: string) => Promise<T>) | null; token: (() => Promise<string>) | null }
 
 const cache = new Map<string, Entry<unknown>>()
 const listeners = new Map<string, Set<() => void>>()
@@ -24,7 +24,7 @@ const keyOf = (parts: readonly unknown[]) => JSON.stringify(parts)
 function entry<T>(k: string): Entry<T> {
   let e = cache.get(k) as Entry<T> | undefined
   if (!e) {
-    e = { v: 0, data: undefined, error: null, status: 'idle', at: 0, inflight: null, fetcher: null, token: null }
+    e = { v: 0, gen: 0, data: undefined, error: null, status: 'idle', at: 0, inflight: null, fetcher: null, token: null }
     cache.set(k, e as Entry<unknown>)
   }
   return e
@@ -42,18 +42,24 @@ function run<T>(k: string): Promise<void> {
   if (!e.fetcher || !e.token) return Promise.resolve()
   if (e.inflight) return e.inflight
   const { fetcher, token } = e
+  // A write (setQueryData) or invalidate during this read bumps gen: the answer may predate that write,
+  // so it is dropped and read again (two quick routine ticks would otherwise undo the second one).
+  const gen = e.gen
   // A failed refetch keeps the last good answer on screen (status stays ready, error is set).
   if (e.data === undefined) e.status = 'loading'
   emit(k)
+  let again = false
   e.inflight = token()
     .then((t) => fetcher(t))
     .then((data) => {
+      if (e.gen !== gen) return void (again = true)
       e.data = data
       e.error = null
       e.status = 'ready'
       e.at = Date.now()
     })
     .catch((err) => {
+      if (e.gen !== gen) return void (again = true)
       e.error = err
       if (e.data === undefined) e.status = 'error'
     })
@@ -61,6 +67,7 @@ function run<T>(k: string): Promise<void> {
       e.inflight = null
       emit(k)
     })
+    .then(() => (again && cache.get(k) === e ? run<T>(k) : undefined))
   return e.inflight
 }
 
@@ -101,6 +108,7 @@ export function setQueryData<T>(parts: readonly unknown[], update: T | ((prev: T
   const k = keyOf(parts)
   const e = entry<T>(k)
   e.data = typeof update === 'function' ? (update as (p: T | undefined) => T)(e.data) : update
+  e.gen++
   e.status = 'ready'
   e.at = Date.now()
   emit(k)
@@ -118,6 +126,7 @@ export function invalidate(prefix: readonly unknown[]) {
     if (k.startsWith(head)) {
       const e = cache.get(k)!
       e.at = 0
+      if (e.inflight) e.gen++ // the read already on its way may predate the change: read again after it
       if (listeners.get(k)?.size) void run(k)
     }
   }

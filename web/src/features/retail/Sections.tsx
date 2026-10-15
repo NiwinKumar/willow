@@ -26,7 +26,7 @@ export function SimBadge({ d }: { d: Insights }) {
   if (kind === 'real') return null
   return (
     <span className="retail-synthetic inline-flex min-h-6 items-center rounded-pill px-2.5 font-mono text-[11px] tracking-[.08em]">
-      {kind === 'mixed' ? 'MIXED · MOSTLY SIMULATED' : 'SIMULATED'}
+      {kind === 'mixed' ? (d.cohort.synthetic > d.cohort.real ? 'MIXED · MOSTLY SIMULATED' : 'MIXED · PART SIMULATED') : 'SIMULATED'}
     </span>
   )
 }

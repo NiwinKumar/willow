@@ -8,7 +8,7 @@ import { useCallback } from 'react'
 import { api, localDay } from '../lib/api'
 import { clearQueries, getQueryData, invalidate, setQueryData, useQuery } from '../lib/query'
 import { useAuth } from '../lib/useAuth'
-import type { RoutineEntry, RoutineLogDay } from './types'
+import type { RoutineCheck, RoutineEntry, RoutineLogDay } from './types'
 import { useData } from './useData'
 
 /** The signed-in person's uid when their own data can be read (live mode, signed in), else null. */
@@ -79,7 +79,38 @@ export function useRoutineCheck(entries: RoutineEntry[] | undefined) {
     .map((e) => `${e.id}:${e.slots.join('')}`)
     .sort()
     .join(',')
-  return useQuery(['routine-check', uid, version], (t) => api.routineCheck(t), { enabled: Boolean(uid) && entries !== undefined && version.length > 0, staleMs: Infinity })
+  // Kept for this tab too, so a reload doesn't spend another check on the same routine (cleared on sign-out).
+  const saved = `willow.check.${uid}.${version}`
+  const query = useQuery(
+    ['routine-check', uid, version],
+    async (t) => {
+      try {
+        const hit = sessionStorage.getItem(saved)
+        if (hit) return JSON.parse(hit) as RoutineCheck
+      } catch {
+        /* private mode */
+      }
+      const check = await api.routineCheck(t)
+      try {
+        sessionStorage.setItem(saved, JSON.stringify(check))
+      } catch {
+        /* private mode or full */
+      }
+      return check
+    },
+    { enabled: Boolean(uid) && entries !== undefined && version.length > 0, staleMs: Infinity },
+  )
+  const { refetch } = query
+  /** "Run again": a fresh check, not the one kept for this tab. */
+  const rerun = useCallback(() => {
+    try {
+      sessionStorage.removeItem(saved)
+    } catch {
+      /* private mode */
+    }
+    return refetch()
+  }, [saved, refetch])
+  return { ...query, rerun }
 }
 
 export function useSpots() {
