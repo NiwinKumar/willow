@@ -149,3 +149,22 @@ def test_marionette_lines_found():
         )
     _, extras = lines(lab, face, skin, PX_PER_MM, [])
     assert extras["marionette_mm_per_cm2"] > 1.0
+
+
+def test_line_skin_keeps_shaded_skin_and_cuts_hair_and_beards():
+    from app.pipeline_face import _line_skin
+
+    h, w = 200, 200
+    lab = np.empty((h, w, 3), np.float32)
+    lab[...] = (65.0, 12.0, 18.0)
+    lab[:, :60] = (40.0, 9.0, 13.5)  # shaded skin: much darker, keeps its colour
+    lab[:40, 100:] = (20.0, 1.0, 1.0)  # dark grey hair
+    area = np.ones((h, w), bool)
+    lower = np.zeros((h, w), bool)
+    lower[120:] = True
+    skin = _line_skin(lab, area, lower)
+    assert skin[:, :50].all() and not skin[:35, 105:].any()
+    assert skin[150:, 150:].all()  # a clear lower face is kept
+
+    lab[130:, 70:] = (15.0, 2.0, 2.0)  # a beard over most of the lower face
+    assert not _line_skin(lab, area, lower)[120:].any()

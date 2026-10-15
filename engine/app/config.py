@@ -345,6 +345,11 @@ LINES_MAX_BROW_RAISE = 0.8  # browInnerUp: forehead skipped (raised brows crease
 LINES_MAX_EXPRESSION = 0.6  # smile: crow's feet and folds skipped
 LINES_MAX_FROWN = 0.8  # brows down: glabella skipped
 LINES_GREY_HAIR_CHROMA = 0.5  # forehead pixels under this x the zone's median chroma: grey hair
+LINES_HAIR_DARKER_L = 15.0  # line skin: hair is this much darker than the face's median L*...
+LINES_HAIR_CHROMA = 0.6  # ...and under this x its median chroma (shaded skin keeps its colour)
+LINES_BEARD_DARKER_L = 8.0  # below the nose (beard, moustache): this much darker...
+LINES_BEARD_CHROMA = 0.75  # ...and under this x the median chroma
+LINES_BEARD_FRAC = 0.1  # that much of the lower face: a beard, no lines measured below the nose
 GLOW_MIN_MM2 = 100.0
 
 # Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's
