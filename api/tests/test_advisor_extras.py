@@ -207,11 +207,13 @@ def test_stream_sends_each_real_step_then_the_checked_reply(client, fake, monkey
         "reading_context",
         "asking_gemini",
         "asking_gemini",
+        "asking_gemini",
         "checking_numbers",
         "done",
     ]
-    assert events[1][1]["step"] == "tools" and events[2][1]["step"] == "reply"
-    assert events[2][1]["retrieval"] == ["Checked your routine against the rule table"]
+    assert [events[i][1]["step"] for i in (1, 2, 3)] == ["tools", "tool", "reply"]
+    assert events[2][1]["tool"] == "check_routine"
+    assert events[3][1]["retrieval"] == ["Checked your routine against the rule table"]
     reply = events[-1][1]["reply"]
     assert reply["message"] == HI["message"] and reply["remaining_today"] == 19
     # stored like the plain endpoint
