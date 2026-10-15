@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
+import { Scrubber, type ScrubberTick } from '../../components/charts'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -16,13 +17,14 @@ import { METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
 import { ExplanationCard, NextAction } from './ExplanationCard'
 import { MetricCard } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
-import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, usableLine } from './model'
+import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
 import { Crumb, Page, Pills, StatusCard, TomorrowSheet } from './parts'
 import { PhotoPanel, type DiaryFocus } from './PhotoPanel'
 import { heroFor } from './hero'
 import { ResultHero } from './ResultHero'
 import { ZONE_NAME, statusText, tagText } from './diaryText'
 import { SpotDiary } from './SpotDiary'
+import { useSessionView } from './useSessionView'
 
 type SitePill = Site | 'forearm'
 const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)
@@ -59,6 +61,19 @@ export default function Result() {
   const baseline = useMemo(() => baselineFor(session, siteSessions), [session, siteSessions])
   const state = session ? sessionState(session) : null
   const ordered = useMemo(() => orderMetrics(session?.result?.metrics ?? [], data.goals), [session, data.goals])
+  const order = useMemo(() => ordered.map((m) => m.id), [ordered])
+  // The single-session view signs what the list does not: the redness overlay, every frame, the spot crops.
+  const view = useSessionView(session && state !== 'pending' ? session.id : null)
+  // The scrubber: this place's check-ins in this capture mode, oldest first.
+  const ticks = useMemo<ScrubberTick[]>(
+    () =>
+      modeSessions.map((s) => {
+        const st = sessionState(s)
+        return { id: s.id, short: shortWhen(s, modeSessions), label: optionLabel(s, modeSessions), kind: st === 'baseline' ? 'baseline' : st === 'rejected' ? 'rejected' : st === 'compared' || st === 'former' ? 'measured' : 'unfinished' }
+      }),
+    [modeSessions],
+  )
+  const tickIndex = session ? modeSessions.findIndex((s) => s.id === session.id) : -1
 
   // Still measuring: read again every few seconds until the api answers (no made-up progress). A session
   // stuck for 30 min will not move by waiting, so polling stops there.
@@ -238,6 +253,15 @@ export default function Result() {
           </div>
         </div>
       </div>
+      {tickIndex >= 0 && ticks.length > 1 ? (
+        <section aria-label={`Your ${MODE_LABEL[mode]} check-ins`} className="flex flex-col gap-1 rounded-[28px] bg-white/55 px-3 pt-2.5 pb-2 squircle">
+          <div className="flex items-baseline justify-between gap-3 px-1">
+            <span className="font-mono text-[11px] tracking-[.08em] whitespace-nowrap text-ink-2">■ {MODE_LABEL[mode].toUpperCase()} CHECK-INS · {ticks.length}</span>
+            <span className="text-[12px] text-ink-2">Drag, or use ← →</span>
+          </div>
+          <Scrubber ticks={ticks} index={tickIndex} label={`${SITE_LABEL[site]} check-in`} onChange={(i) => navigate(`/result/${modeSessions[i].id}`, { replace: true })} />
+        </section>
+      ) : null}
     </>
   )
 
@@ -396,19 +420,20 @@ export default function Result() {
           {st === 'unmeasured' ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-3.5">
               {Array.from({ length: session.n_frames }, (_, i) => (
-                <div key={i} className="flex aspect-square flex-col justify-between overflow-hidden rounded-[36px] p-[18px] squircle" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
-                  <span className="font-mono text-[11px] text-ink-2 uppercase">
+                <div key={i} className="relative flex aspect-square flex-col justify-between overflow-hidden rounded-[36px] p-[18px] squircle" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
+                  <FrameThumb url={view?.session.frame_urls?.[i]} alt={`${SITE_LABEL[site]}, photo ${i + 1} (saved, not measured)`} />
+                  <span className="relative self-start rounded-pill bg-white/80 px-2 py-0.5 font-mono text-[11px] text-ink-2 uppercase">
                     {SITE_LABEL[site]} · photo {i + 1}
                   </span>
-                  <span className="self-start rounded-pill bg-white px-3 py-2 text-[13px]">✓ Saved · — not measured</span>
+                  <span className="relative self-start rounded-pill bg-white px-3 py-2 text-[13px]">✓ Saved · — not measured</span>
                 </div>
               ))}
             </div>
           ) : null}
 
-          {st === 'rejected' ? <RejectedPhotos session={session} /> : null}
+          {st === 'rejected' ? <RejectedPhotos session={session} frameUrls={view?.session.frame_urls} /> : null}
 
-          {measured ? <PhotoPanel ref={stageRef} session={session} focus={focus} /> : null}
+          {measured ? <PhotoPanel ref={stageRef} session={session} focus={focus} baseline={st === 'compared' ? baseline : null} view={view} order={order} onOpenMetric={showMetric} /> : null}
 
           {diaryOn ? (
             <SpotDiary
@@ -440,8 +465,15 @@ export default function Result() {
   )
 }
 
-/** One card per photo that did not pass, with the reason and the fix (no thumbnails: the api signs only the reference photo). */
-function RejectedPhotos({ session }: { session: Session }) {
+/** A saved photo as a tile background (signed per frame by GET /v1/sessions/{id}); nothing for RAW, missing or unreadable files. */
+function FrameThumb({ url, alt }: { url: string | null | undefined; alt: string }) {
+  const [failed, setFailed] = useState<string | null>(null)
+  if (!url || failed === url) return null
+  return <img src={url} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(url)} className="absolute inset-0 size-full object-cover" />
+}
+
+/** One card per photo that did not pass, with the reason and the fix; the photo itself when the api signed it. */
+function RejectedPhotos({ session, frameUrls }: { session: Session; frameUrls?: (string | null)[] }) {
   const frames = session.result?.quality.per_frame?.length ? session.result.quality.per_frame : [{ index: 0, passed: false, reasons: session.result?.quality.reasons ?? [] }]
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] gap-3.5">
@@ -451,8 +483,9 @@ function RejectedPhotos({ session }: { session: Session }) {
           const copy = f.reasons.map((r) => qualityCopy(r, session.site)).filter(Boolean)
           return (
             <div key={f.index} className="flex flex-col gap-3 rounded-[36px] bg-surface p-3.5 squircle">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-[26px]" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
-                <span className="absolute top-3.5 left-3.5 font-mono text-[11px] text-ink-2">PHOTO {f.index + 1}</span>
+              <div className="relative aspect-[4/5] overflow-hidden rounded-[26px]" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
+                <FrameThumb url={frameUrls?.[f.index]} alt={`Photo ${f.index + 1}, not used: ${f.reasons.length ? f.reasons.map((r) => REASON_SHORT[r] ?? r).join(', ').toLowerCase() : 'did not pass the quality check'}`} />
+                <span className="absolute top-3.5 left-3.5 rounded-pill bg-white/80 px-2 py-0.5 font-mono text-[11px] text-ink-2">PHOTO {f.index + 1}</span>
                 <span aria-hidden className="absolute top-3.5 right-3.5 grid size-[34px] place-items-center rounded-full bg-[var(--aura-coral)] text-white">
                   !
                 </span>
