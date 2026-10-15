@@ -389,6 +389,7 @@ export function Report() {
                   expanded={expanded === m.id}
                   stamp
                   noBand={noBand && m.verdict === 'no_baseline' && m.delta !== null}
+                  later={Boolean(session && !session.is_baseline)}
                   onSelect={() => view.set({ m: metricId === m.id ? null : m.id, layer: metricId !== m.id })}
                   onToggle={() => {
                     setExpanded(expanded === m.id ? null : m.id)

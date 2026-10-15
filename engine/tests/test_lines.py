@@ -209,3 +209,25 @@ def test_a_session_scores_every_photo_on_the_same_zones():
     ]
     assert frames[0]["extras"]["lines"]["skipped_for_expression"] == ["glabella"]
     assert frames[0]["extras"]["lines"]["px_per_mm"] == 4.0
+
+
+def test_a_zone_seen_in_only_one_photo_does_not_lead_the_session():
+    from types import SimpleNamespace
+
+    from app.pipeline_face import _session_lines
+
+    def frame(**zones):
+        z = {f"{k}_mm_per_cm2": v for k, v in zones.items()}
+        return {
+            "values": {"lines": 1.0},
+            "extras": {"lines": z},
+            "face": SimpleNamespace(px_per_mm=4.0),
+        }
+
+    # forehead skipped for expression in 3 of 4 photos, and high in the one that has it
+    frames = [frame(forehead=5.0, crows_feet=1.0, nasolabial=1.0)] + [
+        frame(forehead=None, crows_feet=1.0, nasolabial=1.0) for _ in range(3)
+    ]
+    _session_lines(frames)
+    assert "forehead_mm_per_cm2" not in frames[0]["extras"]["lines"]["top_zones"]
+    assert [f["values"]["lines"] for f in frames] == [1.0, 1.0, 1.0, 1.0]
