@@ -28,7 +28,7 @@ export async function createAccount(name: string, email: string, password: strin
   const user = current?.isAnonymous
     ? (await fa.linkWithCredential(current, fa.EmailAuthProvider.credential(email, password))).user
     : (await fa.createUserWithEmailAndPassword(firebaseAuth, email, password)).user
-  // The name lives on the Firebase profile only (lib/identity reads displayName); no api stores it.
+  // The name lives on the Firebase profile (lib/identity reads displayName); SignIn also saves it to the account profile.
   await fa.updateProfile(user, { displayName: name.trim() })
 }
 

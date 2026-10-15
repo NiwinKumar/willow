@@ -404,6 +404,7 @@ const FOOTER: { title: string; links: FooterLink[] }[] = [
       { label: 'Sign in', to: '/signin' },
       { label: 'Create account', to: '/signin?mode=signup' },
       { label: 'Privacy and deletion', to: '/you' },
+      { label: 'Terms and privacy notice', to: '/terms' },
     ],
   },
   {
