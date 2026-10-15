@@ -196,19 +196,40 @@ export type AdvisorStage =
   | { event: 'checking_numbers' }
 
 type RetailerCell = { value: number | null; n: number; suppressed: boolean }
-type TierStat = { options: number; rate: number | null }
+/** n: users of that tier's products at week 8 (null under 10). */
+type TierStat = { options: number; rate: number | null; n?: number | null }
+/** Retailer filters (GET /v1/retailer/insights?cohort=&range=); defaults mixed + all. */
+export type RetailerCohort = 'simulated' | 'mixed' | 'real'
+export type RetailerRange = '30d' | '90d' | 'all'
+/** A group's k of n (n ≥ 10; null when the group is under 10). */
+type RetailerBase = { k: number; n: number; rate: number } | null
+export type RetailerFlow = { goal: string; goal_id: string; n: number; weeks: number[]; changed: number[]; using: number[]; rate: number; median_weeks: number | null; base: RetailerBase }
+export type RetailerBrand = { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }
 export type RetailerInsights = {
   cohort: { synthetic: number; real: number; weeks: number; dropout: number; seed: number }
+  /** Fewer than 10 people in the filter: only the head count is sent. */
+  empty?: boolean
+  filters?: { cohort: RetailerCohort; range: RetailerRange; since: string | null; today: string }
   tiles: { label: string; value: string; n: number; sub: string }[]
-  // app_goal: the goal a person picks in the app that this finer retailer goal belongs to (null: none)
-  needs: { goal: string; app_goal?: string | null; n: number; real: number; none: number; early: number }[]
-  products: { product_id: string; product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
+  // goal_id: one of the app's 8 goals; weeks: median weeks to a real change (null when under 10 changed)
+  needs: { goal: string; goal_id?: string; app_goal?: string | null; n: number; real: number; none: number; early: number; weeks?: number | null; weeks_n?: number | null }[]
+  /** Goal demand per month ('YYYY-MM'): people with a reading that month; counts under 10 are null. */
+  needs_by_month?: { months: string[]; people: (number | null)[]; goals: { goal: string; goal_id: string; counts: (number | null)[]; share_of_peak: (number | null)[] }[] }
+  kpis?: {
+    catalog: { products: number; with_outcomes: number; below_min: number; unused: number; not_measured: number } | null
+    continuation_wk8: RetailerBase
+  }
+  products: { product_id: string; product: string; brand: string; concern: string; category?: string; goal_ids?: string[]; n: number; cells: RetailerCell[]; cells_skin?: RetailerCell[]; rate: number; lift: number | null; base?: RetailerBase; weeks: number | null; cont: number; cont8?: number }[]
   tone_bands: string[]
-  brands: { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }[]
-  gaps: { goal: string; app_goal?: string | null; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
-  conflicts: { pair: string; share: number; fix: string; resolves: string[] }[]
+  skin_types?: string[]
+  brands: RetailerBrand[]
+  brands_hidden?: number
+  categories?: { category: string; label: string; flows: RetailerFlow[]; brands: RetailerBrand[]; brands_hidden: number }[]
+  gaps: { goal: string; goal_id?: string; app_goal?: string | null; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
+  conflicts: { kind?: string; pair: string; n?: number; share: number; fix: string; resolves: string[] }[]
+  routines_checked?: number
   /** Every product with at least 10 people: outcome rate, people, median weeks to first real change. */
-  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null; product: string; brand: string; concern: string; cont: number }>
+  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null; product: string; brand: string; concern: string; cont: number; category?: string; cont8?: number; lift?: number | null }>
 }
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
@@ -276,7 +297,12 @@ const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
 /** Gemini's answer over the retailer aggregates (api retailer_ask.py); every number checked. */
 export type RetailerAnswer = {
   answer: string
-  chart: { title: string; unit: 'percent' | 'count' | 'weeks'; bars: { label: string; value: number }[] } | null
+  /** No numbers given: individual-level or unavailable data, or no draft passed the checks. */
+  refused?: boolean
+  /** n: the group a percent bar's rate is of (null for counts, weeks, or labels without one). */
+  chart: { title: string; unit: 'percent' | 'count' | 'weeks'; bars: { label: string; value: number; n?: number | null }[] } | null
+  /** The aggregate tables the answer drew on (product_outcomes, needs, brands, …). */
+  source?: string[]
   follow_ups: string[]
   checks: { model: string; numbers_checked: number; rejected_attempts: number } | null
 }
@@ -311,8 +337,9 @@ export function localDay(d: Date = new Date()): string {
 
 export const api = {
   /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
-  retailerInsights: async () => {
-    const res = await fetch(`${API_URL}/v1/retailer/insights`)
+  retailerInsights: async (filters?: { cohort: RetailerCohort; range: RetailerRange }) => {
+    const qs = filters ? `?${new URLSearchParams(filters).toString()}` : ''
+    const res = await fetch(`${API_URL}/v1/retailer/insights${qs}`)
     if (!res.ok) throw new ApiError(res.status, 'insights unavailable')
     return (await res.json()) as RetailerInsights
   },
@@ -368,7 +395,8 @@ export const api = {
   /** Partial: only the fields sent change; null clears one. */
   putProfile: (token: string, patch: ProfilePatch) => request<{ profile: Profile }>(token, '/v1/me/profile', { method: 'PUT', ...json(patch) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
-  retailerAsk: (token: string, question: string) => request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question }) }),
+  retailerAsk: (token: string, question: string, filters?: { cohort: RetailerCohort; range: RetailerRange }) =>
+    request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question, ...filters }) }),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),

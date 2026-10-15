@@ -1,34 +1,47 @@
 import './retail.css'
 
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { LogoMark } from '../../components/willow/Logo'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { api } from '../../lib/api'
 import { AskAggregates } from './AskAggregates'
-import { cohortKind, DATA_STUDIO, MIN_GROUP, outcomes, totalUsers, type CohortKind, type Insights } from './data'
-import { BrandsCard, ConflictsCard, GapsCard, NeedsCard, OutcomesCard } from './Sections'
+import { COHORTS, cohortKind, DATA_STUDIO, DEFAULT_FILTERS, MIN_GROUP, RANGES, totalUsers, type CohortKind, type Filters, type Insights } from './data'
+import { AllProductsCard, CategoryCard, ConflictsCard, GapsCard, NeedsCard, OutcomesCard, SegRadio } from './Sections'
 
 /**
  * Retailer insights (Willow Retail.dc.html): a standalone dark dashboard over the public, suppressed
  * aggregates (GET /v1/retailer/insights) and the Gemini "Ask" (POST /v1/retailer/ask, guest sign-in).
  */
 export default function Retail() {
-  const [d, setD] = useState<Insights | null>(null)
-  const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  // The last answer and the request it belongs to: a different filter (or a retry) shows loading until its own arrives.
+  const [res, setRes] = useState<{ key: string; d: Insights | null; failed: boolean }>({ key: '', d: null, failed: false })
+  // The filters live in the URL (?cohort=&range=), so a filtered view can be shared or reloaded.
+  const [params, setParams] = useSearchParams()
+  const filters: Filters = {
+    cohort: COHORTS.find((c) => c.value === params.get('cohort'))?.value ?? DEFAULT_FILTERS.cohort,
+    range: RANGES.find((r) => r.value === params.get('range'))?.value ?? DEFAULT_FILTERS.range,
+  }
+  const setFilters = (f: Partial<Filters>) => {
+    const next = { ...filters, ...f }
+    setParams(next.cohort === DEFAULT_FILTERS.cohort && next.range === DEFAULT_FILTERS.range ? {} : next, { replace: true })
+  }
 
+  const key = `${filters.cohort}|${filters.range}|${attempt}`
   useEffect(() => {
     let alive = true
     api
-      .retailerInsights()
-      .then((r) => alive && setD(r))
-      .catch(() => alive && setFailed(true))
+      .retailerInsights({ cohort: filters.cohort, range: filters.range })
+      .then((r) => alive && setRes({ key, d: r, failed: false }))
+      .catch(() => alive && setRes({ key, d: null, failed: true }))
     return () => {
       alive = false
     }
-  }, [attempt])
+  }, [key, filters.cohort, filters.range])
+  const d = res.key === key ? res.d : null
+  const failed = res.key === key && res.failed
 
   // The whole document goes dark while this page is open (overscroll, the toast), and back when it closes.
   useEffect(() => {
@@ -43,7 +56,8 @@ export default function Retail() {
     }
   }, [])
 
-  const state = d ? (totalUsers(d.cohort) === 0 ? 'empty' : 'ready') : failed ? 'failed' : 'loading'
+  const state = d ? (d.empty || totalUsers(d.cohort) === 0 ? 'empty' : 'ready') : failed ? 'failed' : 'loading'
+  const rangeCaps = RANGES.find((r) => r.value === filters.range)!.caps
   return (
     <div data-theme="dark" className="relative min-h-dvh overflow-x-clip bg-canvas pb-20 font-ui text-ink">
       <Backdrop />
@@ -58,7 +72,7 @@ export default function Retail() {
             are trying to change
           </h1>
           <p className="m-0 max-w-[420px] leading-normal text-ink-2">
-            Anonymized aggregates. Every rate shows its denominator. Groups below {MIN_GROUP} people are suppressed everywhere, including exports and answers.
+            Anonymised aggregates. Every rate shows its denominator. Groups below {MIN_GROUP} people are suppressed everywhere, including exports and answers.
           </p>
         </div>
 
@@ -66,11 +80,13 @@ export default function Retail() {
           Best on a laptop. On a smaller screen the cards stack and wide tables scroll sideways.
         </p>
 
-        {d ? (
-          <p aria-live="polite" className="m-0 py-2 font-mono text-[13px] text-ink-2">
-            {totalUsers(d.cohort)} USERS · {d.cohort.weeks} WEEKLY READINGS EACH · ALL DATA TO DATE
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2.5 py-2">
+          <SegRadio label="Date range" options={RANGES} value={filters.range} onChange={(range) => setFilters({ range })} />
+          <SegRadio label="Cohort" options={COHORTS} value={filters.cohort} onChange={(cohort) => setFilters({ cohort })} />
+          <span aria-live="polite" className="font-mono text-[13px] text-ink-2">
+            {state === 'ready' && d ? `${totalUsers(d.cohort)} USERS · ${rangeCaps}${d.filters ? ` TO ${d.filters.today}` : ''}` : ''}
+          </span>
+        </div>
 
         {state === 'loading' ? <Loading /> : null}
         {state === 'failed' ? (
@@ -79,36 +95,46 @@ export default function Retail() {
             glyph="—"
             title="Aggregates couldn’t load"
             text="The warehouse didn’t respond. No partial numbers are shown."
-            action={{
-              label: 'Retry',
-              onClick: () => {
-                setFailed(false)
-                setAttempt((a) => a + 1)
-              },
-            }}
+            action={{ label: 'Retry', onClick: () => setAttempt((a) => a + 1) }}
           />
         ) : null}
-        {state === 'empty' ? <Notice glyph="00" title="No consented data yet" text="No one has shared aggregate results yet, so there is nothing to show." /> : null}
-        {state === 'ready' && d ? <Dashboard d={d} /> : null}
+        {state === 'empty' && d ? (
+          <Notice
+            glyph="00"
+            title={filters.cohort === 'real' ? 'No consented data in this range' : 'Not enough data in this range'}
+            text={emptyText(d, filters)}
+            action={filters.cohort === 'simulated' && filters.range === 'all' ? undefined : { label: 'Show all time, simulated cohort', onClick: () => setFilters({ cohort: 'simulated', range: 'all' }) }}
+          />
+        ) : null}
+        {state === 'ready' && d ? <Dashboard d={d} filters={filters} /> : null}
       </main>
     </div>
   )
 }
 
-function Dashboard({ d }: { d: Insights }) {
+function emptyText(d: Insights, f: Filters): string {
+  const n = totalUsers(d.cohort)
+  const who = f.cohort === 'real' ? 'real consented' : f.cohort === 'simulated' ? 'simulated' : ''
+  const when = f.range === 'all' ? 'so far' : `in the last ${f.range === '30d' ? 30 : 90} days`
+  if (n === 0) return `No ${who ? `${who} ` : ''}users shared aggregate results ${when}.`
+  return `Only ${n} ${who ? `${who} ` : ''}${n === 1 ? 'user' : 'users'} ${when}, which is below the reporting threshold of ${MIN_GROUP}.`
+}
+
+function Dashboard({ d, filters }: { d: Insights; filters: Filters }) {
   return (
     <>
       <Kpis d={d} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,520px),1fr))] gap-4">
         <NeedsCard d={d} />
-        <BrandsCard d={d} />
+        <CategoryCard d={d} />
       </div>
       <OutcomesCard d={d} />
+      <AllProductsCard d={d} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,520px),1fr))] gap-4">
         <GapsCard d={d} />
         <ConflictsCard d={d} />
       </div>
-      <AskAggregates d={d} />
+      <AskAggregates d={d} filters={filters} />
       <About d={d} />
     </>
   )
@@ -255,31 +281,44 @@ function Notice({ glyph, title, text, action, role }: { glyph: string; title: st
 
 /* ───────────────────────────── KPIs ───────────────────────────── */
 
+type Kpi = { label: string; value: string; unit: string; note: string }
+
 function Kpis({ d }: { d: Insights }) {
   const kind = cohortKind(d.cohort)
   const active = d.tiles.find((t) => t.label === 'Active users')
-  const median = d.tiles.find((t) => t.label.startsWith('Median weeks'))
-  const unmet = d.tiles.find((t) => t.label.startsWith('Unmet'))
-  const evidence = outcomes(d).length
-  const kpis = [
+  const catalog = d.kpis?.catalog ?? null
+  const cont = d.kpis?.continuation_wk8 ?? null
+  // The design's median is for one goal: the most-chosen goal whose median is shown (10+ people changed).
+  const goal = d.needs.find((n) => n.weeks !== null && n.weeks !== undefined)
+  const hidden = catalog ? [catalog.below_min ? `${catalog.below_min} BELOW n=${MIN_GROUP} · SUPPRESSED` : '', catalog.not_measured ? `${catalog.not_measured} NOT MEASURED` : '', catalog.unused ? `${catalog.unused} UNUSED` : ''].filter(Boolean).join(' · ') : ''
+  const kpis: Kpi[] = [
     {
       // Simulated people never consented to anything: only real rows are "consented users".
       label: kind === 'simulated' ? 'Simulated users' : kind === 'real' ? 'Consented users' : 'Users',
       value: String(totalUsers(d.cohort)),
       unit: kind === 'simulated' ? 'synthetic' : kind,
-      note: `${kind === 'mixed' ? `${d.cohort.real} REAL · ${d.cohort.synthetic} SIMULATED · ` : ''}${active ? `${active.n} REACHED WEEK ${d.cohort.weeks}` : ''}`,
+      note: `${kind === 'mixed' ? `${d.cohort.real} REAL · ${d.cohort.synthetic} SIMULATED · ` : ''}${active && active.value !== '–' ? `${active.n} REACHED WEEK ${d.cohort.weeks}` : `FEWER THAN ${MIN_GROUP} AT WEEK ${d.cohort.weeks}`}`,
     },
-    { label: 'Products with outcomes', value: String(evidence), unit: evidence === 1 ? 'product' : 'products', note: `EACH WITH ${MIN_GROUP}+ PEOPLE AT WEEK ${d.cohort.weeks}` },
-    median ? { label: 'Median time to change', value: median.value, unit: median.value === '–' ? '' : 'weeks', note: `ALL GOALS · n=${median.n}` } : null,
-    unmet ? { label: `No real change by week ${d.cohort.weeks}`, value: unmet.value.replace('%', ''), unit: unmet.value.endsWith('%') ? '%' : '', note: `IN A GOAL METRIC · n=${unmet.n}` } : null,
-  ].filter((k): k is { label: string; value: string; unit: string; note: string } => k !== null)
+    {
+      label: 'Products with outcomes',
+      value: String(catalog?.with_outcomes ?? Object.keys(d.product_outcomes ?? {}).length),
+      unit: catalog ? `of ${catalog.products}` : 'products',
+      note: hidden || `EACH WITH ${MIN_GROUP}+ PEOPLE AT WEEK ${d.cohort.weeks}`,
+    },
+    goal
+      ? { label: 'Median time to change', value: String(goal.weeks), unit: 'weeks', note: `${goal.goal.toUpperCase()} GOAL · n=${goal.weeks_n}` }
+      : { label: 'Median time to change', value: '—', unit: 'suppressed', note: `FEWER THAN ${MIN_GROUP} CHANGED IN ANY GOAL` },
+    cont
+      ? { label: `Continuation at wk ${d.cohort.weeks}`, value: String(Math.round(cont.rate * 100)), unit: '%', note: `${cont.k} / ${cont.n} USERS STILL USING A GOAL PRODUCT` }
+      : { label: `Continuation at wk ${d.cohort.weeks}`, value: '—', unit: 'suppressed', note: `n < ${MIN_GROUP}` },
+  ]
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3">
       {kpis.map((k, i) => (
         <div key={k.label} className="flex flex-col gap-3.5 rounded-[32px] border border-line bg-surface p-[22px] animate-[wRise_.5s_both]" style={{ animationDelay: `${i * 70}ms` }}>
           <span className="text-[14px] text-ink-2">{k.label}</span>
           <span className="flex items-baseline gap-2">
-            <span className="font-dot text-[52px] leading-[.9]">{k.value === '–' ? '—' : k.value}</span>
+            <span className="font-dot text-[52px] leading-[.9]">{k.value}</span>
             <span className="text-[14px] text-ink-2">{k.unit}</span>
           </span>
           <span className="font-mono text-[12px] text-ink-2">{k.note}</span>
@@ -299,7 +338,7 @@ function About({ d }: { d: Insights }) {
       v:
         kind === 'real'
           ? `${d.cohort.real} real people who opted in to anonymized sharing. Small, so many groups fall below the threshold.`
-          : `${d.cohort.synthetic} synthetic people${d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ''}, each with one to three goals, a routine of real catalogue products and ${d.cohort.weeks} weekly readings; ${Math.round(d.cohort.dropout * 100)}% stopped early. Fixed seed (${d.cohort.seed}), so the numbers are reproducible.${d.cohort.real ? '' : ' No real customer is represented.'}`,
+          : `${d.cohort.synthetic} synthetic people${d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ''}, who started in August, September or October with one to three goals, a routine of real catalogue products and a reading every week up to today; ${Math.round(d.cohort.dropout * 100)}% stopped early. Fixed seed (${d.cohort.seed}), so the numbers are reproducible.${d.cohort.real ? '' : ' No real customer is represented.'}`,
     },
     {
       k: 'REAL CHANGE',
@@ -308,7 +347,7 @@ function About({ d }: { d: Insights }) {
     { k: 'SUPPRESSION', v: `Any group with fewer than ${MIN_GROUP} people is hidden in the data query and the api, so also in charts, tables, exports and answers.` },
     {
       k: 'ASSUMPTIONS',
-      v: 'Outcomes are associations with product use, not proof of effect: people chose their own products and groups are not randomised. In the simulation each product moves its target metrics by 0.2 to 1.1 times the noise band, about 3 in 10 have no effect, and tone band and region have no effect.',
+      v: 'Outcomes are associations with product use, not proof of effect: people chose their own products and groups are not randomised. In the simulation each product moves its target metrics by 0.2 to 1.1 times the noise band, about 3 in 10 have no effect, and tone band, skin type and region have no effect. The month-to-month shift in goals is invented, to show the month view.',
     },
   ]
   return (

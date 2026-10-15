@@ -4,10 +4,10 @@ import { ApiError, api, type RetailerAnswer } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { SimBadge } from './Sections'
-import { chartSources, cohortKind, lookupLabel, MIN_GROUP, type Insights } from './data'
+import { cohortKind, MIN_GROUP, type Filters, type Insights } from './data'
 
-/** Questions the aggregates can answer (needs, outcomes, gaps, conflicts, lift). */
-const SUGGESTIONS = ['Which products work best for dark spots?', 'Where are we missing affordable options?', 'Which routine problems are most common?', 'How do outcomes compare with non-users?']
+/** The design's starters: each one is answerable from the aggregates (the last is refused: no individuals). */
+const SUGGESTIONS = ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How do outcomes compare with non-users?', 'Which users changed the most?']
 
 const BAR_COLOURS = ['var(--aura-pink)', 'var(--aura-coral)', 'var(--willow-400)', 'var(--aura-sky)', 'var(--aura-violet)', 'var(--aura-apricot)', 'var(--aura-ice)', 'var(--aura-lilac)']
 
@@ -34,7 +34,7 @@ function errorOf(e: unknown): Turn['error'] {
 }
 
 /** "Ask the aggregates": Gemini answers from the same aggregates as the page, and the api checks every number. */
-export function AskAggregates({ d }: { d: Insights }) {
+export function AskAggregates({ d, filters }: { d: Insights; filters: Filters }) {
   const { user, continueAsGuest, getIdToken } = useAuth()
   const [thread, setThread] = useState<Turn[]>([])
   const [draft, setDraft] = useState('')
@@ -63,7 +63,8 @@ export function AskAggregates({ d }: { d: Insights }) {
     setBusy(true)
     try {
       if (!user) await continueAsGuest()
-      const reply = await api.retailerAsk(await getIdToken(), q)
+      // The same filters as the page, so the answer reads the aggregates on screen.
+      const reply = await api.retailerAsk(await getIdToken(), q, filters)
       setThread((t) => t.map((m) => (m.id === id ? { ...m, reply } : m)))
       setRevealing(id)
     } catch (e) {
@@ -85,7 +86,7 @@ export function AskAggregates({ d }: { d: Insights }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h2 id="ask-h" className="m-0 text-[clamp(30px,4vw,52px)] font-light leading-none tracking-[-0.03em]">Ask the aggregates</h2>
         <span className="max-w-[420px] text-[14px] leading-normal text-[#C9CFFF]">
-          Gemini answers from the aggregates on this page only, with suppression applied. Any number it writes that is not in them is rejected. Individual people can’t be looked up.
+          Gemini answers from the aggregates on this page only (same filters), with suppression applied. Any number it writes that is not in them is rejected. Individual people can’t be looked up.
         </span>
       </div>
 
@@ -171,12 +172,16 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
 
   const kind = cohortKind(d.cohort)
   const checked = reply.checks
-  const chart = reply.chart
-  const tag = checked ? `GEMINI · GROUNDED IN AGGREGATES · ${kind === 'real' ? 'REAL' : kind === 'mixed' ? 'MIXED' : 'SIMULATED'}` : 'NO NUMBERS RETURNED'
-  const sources = chartSources(d, chart)
-  const prov = checked
-    ? `SOURCE ${sources.length ? sources.join(' · ') : 'retailer aggregates'} · n≥${MIN_GROUP} · VALIDATOR: ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} found in the aggregates ✓${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model.toUpperCase()}`
-    : 'VALIDATOR: no draft used only numbers from the aggregates · no numbers returned'
+  // refused: no numbers given (individual-level or unavailable data, or no draft passed the checks).
+  const refused = reply.refused ?? !checked
+  const chart = refused ? null : reply.chart
+  const tag = refused ? 'NO NUMBERS RETURNED' : `GEMINI · GROUNDED IN AGGREGATES · ${kind === 'real' ? 'REAL' : kind === 'mixed' ? 'MIXED' : 'SIMULATED'}`
+  const sources = reply.source ?? []
+  const prov = !checked
+    ? 'VALIDATOR: no draft used only numbers from the aggregates · no numbers returned'
+    : refused
+      ? `POLICY · aggregates only · n≥${MIN_GROUP} · ${checked.model.toUpperCase()}`
+      : `SOURCE ${sources.length ? sources.join(' · ') : 'retailer aggregates'} · n≥${MIN_GROUP} · VALIDATOR: ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} found in the aggregates ✓${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model.toUpperCase()}`
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-3.5 animate-[wRise_.4s_both]" aria-busy={!done}>
       <div className="flex flex-col gap-3 rounded-[32px] border border-white/[.12] bg-glass p-[22px] [-webkit-backdrop-filter:blur(14px)] [backdrop-filter:blur(14px)]">
@@ -207,10 +212,12 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
       </div>
       {chart && done ? (
         <AnswerChart d={d} chart={chart} />
-      ) : !checked && done ? (
+      ) : refused && done ? (
         <div className="flex flex-col justify-center gap-2 rounded-[32px] border border-dashed border-white/20 bg-black/60 p-[22px] animate-[wRise_.45s_both]">
           <span className="font-dot text-[40px] text-ink-3">—</span>
-          <span className="text-[14px] leading-normal text-ink-2">No chart: the answer could not be checked against the aggregates, so no number is shown.</span>
+          <span className="text-[14px] leading-normal text-ink-2">
+            {checked ? 'No chart: this question asks for individual-level data, or data the aggregates don’t hold.' : 'No chart: the answer could not be checked against the aggregates, so no number is shown.'}
+          </span>
         </div>
       ) : null}
     </div>
@@ -219,8 +226,8 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
 
 function AnswerChart({ d, chart }: { d: Insights; chart: NonNullable<RetailerAnswer['chart']> }) {
   const max = Math.max(...chart.bars.map((b) => Math.abs(b.value)), 1)
-  // Per-bar n is not in the answer; percent bars look their label up in the aggregates (every label must be one of them).
-  const bars = chart.bars.map((b) => ({ ...b, n: chart.unit === 'percent' ? (lookupLabel(d, b.label)?.n ?? null) : null }))
+  // n per percent bar comes from the api (the group the rate is of; null when the label has none).
+  const bars = chart.bars.map((b) => ({ ...b, n: chart.unit === 'percent' ? (b.n ?? null) : null }))
   const axis = chart.unit === 'percent' ? `% OF PEOPLE${bars.some((b) => b.n !== null) ? ' · n PER BAR' : ''} · 0–${max}%` : chart.unit === 'weeks' ? `WEEKS · 0–${max}` : `COUNT · 0–${max}`
   const alt = `${chart.title}: ${bars.map((b) => `${b.label} ${UNIT[chart.unit](b.value)}${b.n !== null ? `, n=${b.n}` : ''}`).join('; ')}`
   return (
