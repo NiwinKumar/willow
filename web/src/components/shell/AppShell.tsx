@@ -83,7 +83,7 @@ export function AppShell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
-      if ((e.key === 'n' || e.key === 'N') && data.mode === 'live' && !checkIn.open) {
+      if ((e.key === 'n' || e.key === 'N') && data.mode === 'live' && !checkIn.open && !window.location.pathname.startsWith('/check-in')) {
         e.preventDefault()
         setCheckIn({ open: true })
       }

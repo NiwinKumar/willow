@@ -1,0 +1,22 @@
+/* Keyframes the capture design uses that the shared stylesheet does not have (Willow Capture.dc.html). */
+@keyframes wSpin { to { rotate: 360deg } }
+@keyframes wPop { 0% { scale: 1.6; opacity: 0 } 30% { scale: 1; opacity: 1 } 100% { scale: .9; opacity: .2 } }
+@keyframes wFlash { 0% { opacity: .9 } 100% { opacity: 0 } }
+@keyframes wFade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes wCkDot { from { scale: .6; opacity: 0 } to { scale: 1; opacity: 1 } }
+
+/* The dotted ring the camera draws around the face, arm or close-up (CAP guide mask). */
+.ck-guide {
+  background-image: radial-gradient(circle, var(--ck-dot, rgba(255, 255, 255, .55)) 1.3px, transparent 1.8px);
+  background-size: 14px 14px;
+  -webkit-mask-image: radial-gradient(closest-side, transparent 86%, #000 89%, #000 100%);
+  mask-image: radial-gradient(closest-side, transparent 86%, #000 89%, #000 100%);
+  transition: all .4s;
+}
+
+/* Striped placeholder for files a browser cannot draw (DNG) and for problem files (CAP thumb). */
+.ck-stripes { background: repeating-linear-gradient(135deg, #E2DFD9 0 6px, #EDEBE6 6px 12px); }
+.ck-stripes-bad { background: repeating-linear-gradient(135deg, #F2D6CC 0 6px, #F6E4DD 6px 12px); }
+
+.ck-details > summary { list-style: none; }
+.ck-details > summary::-webkit-details-marker { display: none; }

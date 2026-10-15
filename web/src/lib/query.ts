@@ -14,7 +14,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { useAuth } from './useAuth'
 
 export type QueryStatus = 'idle' | 'loading' | 'ready' | 'error'
-type Entry<T> = { data: T | undefined; error: unknown; status: QueryStatus; at: number; inflight: Promise<void> | null; fetcher: ((token: string) => Promise<T>) | null; token: (() => Promise<string>) | null }
+type Entry<T> = { v: number; data: T | undefined; error: unknown; status: QueryStatus; at: number; inflight: Promise<void> | null; fetcher: ((token: string) => Promise<T>) | null; token: (() => Promise<string>) | null }
 
 const cache = new Map<string, Entry<unknown>>()
 const listeners = new Map<string, Set<() => void>>()
@@ -24,13 +24,16 @@ const keyOf = (parts: readonly unknown[]) => JSON.stringify(parts)
 function entry<T>(k: string): Entry<T> {
   let e = cache.get(k) as Entry<T> | undefined
   if (!e) {
-    e = { data: undefined, error: null, status: 'idle', at: 0, inflight: null, fetcher: null, token: null }
+    e = { v: 0, data: undefined, error: null, status: 'idle', at: 0, inflight: null, fetcher: null, token: null }
     cache.set(k, e as Entry<unknown>)
   }
   return e
 }
 
+/** Entries change in place, so readers subscribe to a version number that every change bumps. */
 function emit(k: string) {
+  const e = cache.get(k)
+  if (e) e.v++
   listeners.get(k)?.forEach((l) => l())
 }
 
@@ -78,7 +81,7 @@ export function useQuery<T>(parts: readonly unknown[], fetcher: (token: string) 
     },
     [k],
   )
-  const snapshot = useSyncExternalStore(subscribe, () => cache.get(k) ?? null)
+  useSyncExternalStore(subscribe, () => cache.get(k)?.v ?? -1)
   useEffect(() => {
     if (!enabled) return
     const e = entry<T>(k)
@@ -89,7 +92,7 @@ export function useQuery<T>(parts: readonly unknown[], fetcher: (token: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [k, enabled, staleMs, getIdToken])
   const refetch = useCallback(() => run<T>(k), [k])
-  const e = snapshot as Entry<T> | null
+  const e = (cache.get(k) as Entry<T> | undefined) ?? null
   return { data: enabled ? e?.data : undefined, status: enabled ? (e?.status ?? 'loading') : 'idle', error: e?.error ?? null, refetch }
 }
 
@@ -122,6 +125,7 @@ export function invalidate(prefix: readonly unknown[]) {
 
 /** Forget everything (sign-out, delete): the next person starts from nothing. */
 export function clearQueries() {
+  const keys = [...listeners.keys()]
   cache.clear()
-  for (const k of listeners.keys()) emit(k)
+  for (const k of keys) listeners.get(k)?.forEach((l) => l())
 }

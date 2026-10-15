@@ -149,13 +149,13 @@ export type RetailerInsights = {
   tiles: { label: string; value: string; n: number; sub: string }[]
   // app_goal: the goal a person picks in the app that this finer retailer goal belongs to (null: none)
   needs: { goal: string; app_goal?: string | null; n: number; real: number; none: number; early: number }[]
-  products: { product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
+  products: { product_id: string; product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
   tone_bands: string[]
   brands: { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }[]
   gaps: { goal: string; app_goal?: string | null; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
   conflicts: { pair: string; share: number; fix: string; resolves: string[] }[]
   /** Every product with at least 10 people: outcome rate, people, median weeks to first real change. */
-  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null }>
+  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null; product: string; brand: string; concern: string; cont: number }>
 }
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
