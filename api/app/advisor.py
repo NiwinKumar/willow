@@ -17,8 +17,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from google.genai import types
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
+from app import advisor_blocks as blocks_mod
 from app import catalog, explain, gemini, numbers, routine_check, routine_log
 from app.results import measured_result
 from app.settings import get_settings
@@ -55,7 +56,29 @@ measurements, check their routine and find products from Willow's facts-only cat
   tracked. Before judging whether a product changed anything, say how often it was used, quoting
   only days_used and of_days; a product used on few days has not had a fair test.
 - Quote measurements only when the question is about results; never pad an answer with them.
-- British spelling (colour, moisturiser), but say "catalog". Be brief: 2 to 5 sentences."""
+- British spelling (colour, moisturiser), but say "catalog"."""
+
+# How the reply is written (the final, structured call).
+FORMAT_RULES = """
+Write the reply as blocks, answer first:
+- blocks[0] is type "answer": one direct sentence that answers the question. No preamble, no
+  restating the question, no filler ("Great question", "I hope this helps").
+- Then only if needed: one "bullets" block (2 to 4 short items, a few words each), a "widget",
+  a "products" block, and at most one short "note" (a caveat or the next step).
+- At most about 80 words of text in all, unless the person asks for detail. Never one long
+  paragraph.
+- Mark the key fact in each block with **bold**; use ==highlight== at most once, for the single
+  most important thing. Name a catalog or routine product as [product:PRODUCT_ID] (the app shows
+  its name and opens it); name a measurement as [metric:METRIC_ID] with ids from: tone_ita,
+  pigment_spots, tone_evenness, redness, blemishes, pores, texture, lines, dark_circles, shine,
+  glow.
+- Prefer a widget to describing data in words; the app draws it from the person's own data, so
+  never put numbers in it. Kinds: metric_trend {metric_id, site?} for how one measurement moved;
+  session_summary {session_id from CONTEXT or "latest", site?} for what one check-in showed;
+  routine {slot? am|pm} for their routine; product {product_id} for one product; spot_diary {}
+  for their tracked spots; product_test {} for the treated vs control forearm test. At most 2.
+- products block: up to 4 product_ids you recommend or discuss (from tool results or the
+  routine)."""
 
 TOOLS = types.Tool(
     function_declarations=[
@@ -104,14 +127,27 @@ PHOTO_RULES = """
 
 
 class Reply(BaseModel):
-    # The web sends replies back as history, which the api caps at 1000 characters per turn.
-    message: str = Field(max_length=1000)
+    """Gemini's structured reply (advisor_blocks): the api derives the plain `message`."""
+
+    blocks: list[blocks_mod.Block] = Field(default_factory=list, max_length=8)
     product_ids: list[str] = Field(default_factory=list, max_length=4)
     follow_up_suggestions: list[str] = Field(default_factory=list, max_length=3)
     # What attached photos show ("none" without photos); face_or_skin is never answered.
     photos_show: Literal["none", "product_or_label", "face_or_skin", "other"] = "none"
 
+    @model_validator(mode="before")
+    @classmethod
+    def _plain_message(cls, data: Any) -> Any:
+        """A reply written as one plain `message` (the shape before blocks) is one answer block."""
+        if isinstance(data, dict) and data.get("message") and not data.get("blocks"):
+            data = {**data, "blocks": [{"type": "answer", "text": data["message"]}]}
+        return data
 
+
+NO_ANSWER = (
+    "I could not put together an answer I can stand behind. Try asking in a different way, or "
+    "ask about one product or one measurement at a time."
+)
 PHOTO_REFUSAL = (
     "Willow reads product and label photos only, so I have not looked at this photo. To follow "
     "your skin, take a check-in: those photos are measured by Willow, not by the advisor."
@@ -350,6 +386,7 @@ def chat(
         parts = []
         for call in calls:
             args = dict(call.args or {})
+            stage("asking_gemini", {"step": "tool", "tool": call.name})
             out = run_tool(call.name, args, store, uid)
             tool_outputs.append({"tool": call.name, "args": args, "result": out})
             retrieval.append(_retrieval_line(call.name, args, out))
@@ -374,8 +411,9 @@ def chat(
     final_prompt = (
         f"CONTEXT (JSON):\n{json.dumps(ctx)}\n\nTOOL RESULTS (JSON):\n"
         f"{json.dumps(tool_outputs)}\n\nCONVERSATION:\n{transcript}\n\n"
-        "Write the reply to the last USER message. product_ids: only ids from TOOL RESULTS or "
-        "the routine in CONTEXT that you actually recommend or discuss. "
+        "Write the reply to the last USER message as blocks, answer first. Product ids (in "
+        "[product:ID], products blocks, product widgets and product_ids): only ids from TOOL "
+        "RESULTS or the routine in CONTEXT that you actually recommend or discuss. "
         "follow_up_suggestions: up to 3 short questions the person might ask next."
         + (
             f"\nThe last USER message came with {len(images)} attached photo(s), above. "
@@ -392,6 +430,8 @@ def chat(
     for m in messages:
         if m["role"] == "user":
             allowed |= numbers.in_text(m["text"])
+    # sessions a session_summary widget may name: the ones in CONTEXT
+    session_ids = {s["session_id"] for s in ctx["latest_sessions"].values()}
     stage("asking_gemini", {"step": "reply", "retrieval": retrieval})
     for _ in range(2):
         if time.monotonic() - started > TURN_BUDGET_S:
@@ -401,7 +441,7 @@ def chat(
                 "advisor_reply",
                 [*photo_parts, final_prompt],
                 Reply,
-                instructions=instructions,
+                instructions=instructions + FORMAT_RULES,
                 temperature=0.3,
                 max_output_tokens=4096,
                 attempts=1,  # the loop is the retry
@@ -413,43 +453,64 @@ def chat(
             # Never answered, whatever the model wrote: chat photos are for products only.
             return {
                 "message": PHOTO_REFUSAL,
+                "blocks": [{"type": "answer", "text": PHOTO_REFUSAL}],
                 "product_ids": [],
                 "products": [],
                 "follow_up_suggestions": [],
                 "retrieval": ["Photo not read: it shows skin or a face, not a product"],
                 "photos_refused": True,
             }
-        bad_ids = set(reply.product_ids) - product_ids
-        # the chips are tappable questions: same rules as the message, failing ones dropped
+        used_ids = set(reply.product_ids) | blocks_mod.product_refs(reply.blocks)
+        bad_ids = {i for i in used_ids if i not in product_ids or not catalog.by_id(i)}
+        bad_metrics = blocks_mod.bad_metric_refs(reply.blocks)
+        written = [blocks_mod.strip(t) for t in blocks_mod.texts(reply.blocks)]
+        # the chips are tappable questions: same rules as the text, failing ones dropped
         follow_ups = [
             q
             for q in reply.follow_up_suggestions
             if numbers.only_known(q, allowed) and not explain.BANNED.search(q)
         ]
+        has_answer = any(b.type == "answer" and (b.text or "").strip() for b in reply.blocks)
         if (
-            numbers.only_known(reply.message, allowed)
-            and not explain.BANNED.search(reply.message)
+            has_answer
+            and all(
+                numbers.only_known(t, allowed) and not explain.BANNED.search(t) for t in written
+            )
             and not bad_ids
+            and not bad_metrics
         ):
+            out_blocks = blocks_mod.normalize(reply.blocks, session_ids, product_ids)
+            # every product the answer names, in the order it first names them
+            shown_ids = list(
+                dict.fromkeys([*blocks_mod.ordered_product_refs(reply.blocks), *reply.product_ids])
+            )[:6]
+            products = [p for i in shown_ids if (p := catalog.by_id(i))]
+            names = {p["product_id"]: f"{p['brand']} {p['name']}" for p in products}
             return {
-                "message": reply.message,
-                "product_ids": reply.product_ids,
-                "products": [catalog.by_id(i) for i in reply.product_ids if catalog.by_id(i)],
+                "message": blocks_mod.message_of(out_blocks, names, blocks_mod.METRIC_LABELS),
+                "blocks": out_blocks,
+                "product_ids": shown_ids,
+                "products": products,
                 "follow_up_suggestions": follow_ups,
                 "retrieval": retrieval or ["Checked your results and routine"],
-                # What the validator checked, shown under the answer.
+                # What the validator checked, shown in the answer's info popover.
                 "checks": {
                     "model": get_settings().gemini_model,
                     "tool_calls": len(tool_outputs),
-                    "numbers_checked": len(set(numbers.NUMBER.findall(reply.message))),
-                    "products_from_tools": len(reply.product_ids),
+                    "numbers_checked": len({n for t in written for n in numbers.NUMBER.findall(t)}),
+                    "products_from_tools": len(shown_ids),
                     "photos_read": len(images),
                 },
             }
-        log.warning("advisor reply rejected (ids %s)", sorted(bad_ids))
+        log.warning(
+            "advisor reply rejected (ids %s, metrics %s, answer %s)",
+            sorted(bad_ids),
+            sorted(bad_metrics),
+            has_answer,
+        )
     return {
-        "message": "I could not put together an answer I can stand behind. Try asking in a "
-        "different way, or ask about one product or one measurement at a time.",
+        "message": NO_ANSWER,
+        "blocks": [{"type": "answer", "text": NO_ANSWER}],
         "product_ids": [],
         "products": [],
         "follow_up_suggestions": [],
@@ -461,7 +522,7 @@ def chat(
 
 HISTORY_KEEP = 200
 # Stored with a willow turn so it can be drawn again (products are looked up again on read).
-REPLY_FIELDS = ("message", "product_ids", "follow_up_suggestions", "retrieval", "checks")
+REPLY_FIELDS = ("message", "blocks", "product_ids", "follow_up_suggestions", "retrieval", "checks")
 
 
 def _turn_id(at: datetime, role: str) -> str:
@@ -516,6 +577,9 @@ def history(store: Store, uid: str) -> list[dict[str, Any]]:
             ids = list(reply.get("product_ids") or [])
             reply.update(
                 message=reply.get("message") or row["text"],
+                # turns stored before blocks: the message is the answer
+                blocks=list(reply.get("blocks") or [])
+                or [{"type": "answer", "text": reply.get("message") or row["text"]}],
                 product_ids=ids,
                 products=[p for i in ids if (p := catalog.by_id(i))],
                 follow_up_suggestions=list(reply.get("follow_up_suggestions") or []),
