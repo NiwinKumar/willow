@@ -120,12 +120,16 @@ SIDE_MAX_RED_SHIFT_DEG = (
 SIDE_MAX_BRIGHTER_L = 15.0
 SIDE_MAX_DARKER_L = 30.0
 SIDE_FILL_HOLES_MM2 = 80.0
+SIDE_SHINE_MAX_L = 95.0  # brighter skin of the cheek's hue up to this is shine, still skin
+SIDE_SHINE_MIN_CHROMA_FRAC = 0.25  # ...if it keeps this share of the cheek's chroma
+SIDE_MIN_PIECE_MM2 = 150.0  # every skin piece this big is kept (hair leaves only small ones)
 # Side-view hair at the face edge (sideburns, temples): fine texture this many times the
 # skin's median AND chroma below this share of the cheek's, over a 4 mm window. Oct 13
 # side views: sideburn texture 1.8-4.4x vs cheek 1.0-1.1x, chroma 17-25 vs cheek 24-29.
 SIDE_HAIR_WINDOW_MM = 4.0
 SIDE_HAIR_TEXTURE = 1.4
 SIDE_HAIR_CHROMA = 0.9  # fill smaller holes (a 10 mm mark that lost colour stays skin)
+SIDE_HAIR_DARKER_L = 5.0  # and this much darker than the skin's median L* (shine is lighter)
 MAX_ABS_PITCH = 15.0  # laptop / webcam selfies sit at 8-12° (camera above the screen); ROIs stay on
 # the same skin up to 15° (canonical-mesh test in tests/test_pose.py), same as SIDE_MAX_PITCH
 MAX_ABS_ROLL = 6.0

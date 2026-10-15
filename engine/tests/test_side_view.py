@@ -102,3 +102,37 @@ def test_skin_colour_keeps_inflamed_red_skin():
     ref = np.zeros_like(mask)
     ref[20:120, 40:200] = True
     assert skin_colour(lab, mask, ref, PX_PER_MM)[185, 120]
+
+
+def test_shiny_rough_skin_at_the_ear_side_is_not_hair():
+    rng = np.random.default_rng(0)
+    h, w, ppm = 300, 300, 5.0
+    lab = np.empty((h, w, 3), np.float32)
+    lab[...] = (55.0, 14.0, 18.0)
+    lab[..., 0] += rng.normal(0, 1.0, (h, w))
+    skin = np.ones((h, w), bool)
+    ear = np.zeros((h, w), bool)
+    ear[:, 200:] = True
+    cheek = ~ear
+    # shine on marked skin beside the ear: rough, greyish, but LIGHTER than the skin
+    lab[:, 230:, 0] = 70.0 + rng.normal(0, 6.0, (h, 70))
+    lab[:, 230:, 1:] = (8.0, 10.0)
+    assert not edge_hair(lab, skin, cheek, ppm, ear)[:, 240:].any()
+    # a sideburn: rough, grey and darker
+    lab[:, 230:, 0] = 30.0 + rng.normal(0, 6.0, (h, 70))
+    assert edge_hair(lab, skin, cheek, ppm, ear)[:, 240:].mean() > 0.8
+
+
+def test_side_colour_keeps_every_large_skin_piece_and_shine():
+    h, w, ppm = 300, 300, 5.0
+    lab = np.empty((h, w, 3), np.float32)
+    lab[...] = (60.0, 14.0, 18.0)
+    lab[:, 140:160] = (15.0, 1.0, 1.0)  # a band of hair splits the skin in two
+    lab[20:60, 200:280] = (85.0, 9.0, 12.0)  # shine: brighter, paler, same hue
+    mask = np.ones((h, w), bool)
+    ref = np.zeros((h, w), bool)
+    ref[100:200, 20:120] = True
+    keep = skin_colour(lab, mask, ref, ppm)
+    assert keep[:, :130].mean() > 0.9 and keep[:, 170:].mean() > 0.9  # both pieces
+    assert keep[25:55, 205:275].all()  # shine stays skin
+    assert not keep[:, 145:155].any()  # hair does not
