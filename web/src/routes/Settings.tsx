@@ -25,7 +25,7 @@ export function Settings() {
 
   // What deleting does depends on who is signed in, not on demo mode: the demo journey is never stored for you.
   const deletes = user
-    ? `Removes your photos, results and ${user.isAnonymous ? 'guest account' : 'Willow account'} from the server. Minutes, not days. There is no undo.`
+    ? `Removes your photos, results, routine (and the days you ticked products as used) and ${user.isAnonymous ? 'guest account' : 'Willow account'} from the server. Minutes, not days. There is no undo.`
     : 'You are not signed in, so nothing of yours is stored on the server. This clears the settings saved on this device.'
   async function deleteEverything() {
     setDeleting(true)
@@ -69,6 +69,7 @@ export function Settings() {
             ['Account', user ? (user.isAnonymous ? 'Guest (anonymous)' : user.email ?? 'Google') : 'Not signed in'],
             ['Photos', 'Private bucket, us-central1. Each photo is deleted automatically 30 days after upload.'],
             ['Measurements', 'Kept in your account until you delete them.'],
+            ['Routine', 'Your products, their dates and the days you tick them as used. Kept until you delete them.'],
             ['Face identification', 'None. Regions are found for measurement only; no identity template is computed.'],
             ['Consent', consent ? `Accepted ${fmtDate(consent.accepted_at)} (terms of ${/^\d{4}-\d{2}-\d{2}$/.test(consent.version) ? fmtDate(consent.version, { day: 'numeric', month: 'short', year: 'numeric' }) : consent.version})` : 'Not recorded on this device'],
             ['Mode', data.mode === 'demo' ? 'Demo: sample journey, nothing saved to a real account' : 'Live'],
