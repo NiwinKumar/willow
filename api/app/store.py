@@ -188,6 +188,7 @@ class FirestoreStore:
 
     def product_test_delete(self, uid: str, test_id: str) -> None:
         self._db().document(f"users/{uid}/product_tests/{test_id}").delete()
+
     def push_list(self, uid: str) -> list[tuple[str, Doc]]:
         return [(s.id, s.to_dict()) for s in self._db().collection(f"users/{uid}/push").stream()]
 

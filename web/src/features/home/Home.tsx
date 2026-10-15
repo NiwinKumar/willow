@@ -128,12 +128,10 @@ function HomeBody() {
   const topUp = (s: Session) => navigate(`/check-in?topup=${s.id}`, { state: { background: location } })
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
-  const lead = leadFor({ read, goals, demo, checkIn, openResult, topUp })
-  const heroLines = withTonight(heroLinesFor(read, goals, demo), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const closeUp = { wanted: goals.includes('pores_texture') || goals.includes('smoother'), doneToday: (data.series('cheek_macro')?.sessions ?? EMPTY).some((s) => counts(s) && dayOf(s.created_at) === day) }
   const placeChips = !demo && checkin && due ? dueChips(checkin, due, closeUp) : ['Face']
-  const lead = leadFor({ read, goals, demo, checkIn, openResult, placeChips })
-  const heroLines = heroLinesFor(read, goals, demo, due)
+  const lead = leadFor({ read, goals, demo, checkIn, openResult, topUp, placeChips })
+  const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
   const finding = demo ? null : nextStepOf(check.data, byId)
@@ -289,6 +287,7 @@ function leadFor({
   checkIn,
   openResult,
   topUp,
+  placeChips,
 }: {
   read: HomeRead
   goals: string[]
@@ -296,8 +295,8 @@ function leadFor({
   checkIn: (site?: Session['site'], mode?: CaptureMode) => void
   openResult: (s: Session) => void
   topUp: (s: Session) => void
+  placeChips: string[]
 }): Lead {
-function leadFor({ read, goals, demo, checkIn, openResult, placeChips }: { read: HomeRead; goals: string[]; demo: boolean; checkIn: (site?: Session['site'], mode?: CaptureMode) => void; openResult: (s: Session) => void; placeChips: string[] }): Lead {
   const baseMode = read.baseline?.capture_mode
   if (demo) {
     const s = read.lead
