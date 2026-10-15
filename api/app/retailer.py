@@ -35,16 +35,16 @@ Cohort = Literal["simulated", "mixed", "real"]
 Range = Literal["30d", "90d", "all"]
 RANGE_DAYS: dict[str, int | None] = {"30d": 30, "90d": 90, "all": None}
 
-# The app's 8 goals (users/{uid}.profile.goals), as the retailer page names them.
+# The app's 8 goals (users/{uid}.profile.goals), labelled as in web/src/lib/metrics.ts GOALS.
 GOAL_LABEL = {
     "dark_spots": "Dark spots",
-    "even_tone": "Even tone",
+    "even_tone": "Tone evenness",
     "redness": "Redness",
     "blemishes": "Blemishes",
-    "pores_texture": "Pores & texture",
-    "lines": "Fine lines",
+    "pores_texture": "Pores and texture",
+    "lines": "Lines",
     "under_eye": "Under-eye",
-    "oil_glow": "Oil & glow",
+    "oil_glow": "Shine and glow",
 }
 CATEGORY_LABEL = {
     "serum": "Serums",
