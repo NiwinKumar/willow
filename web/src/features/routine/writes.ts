@@ -2,11 +2,12 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 
 import { refreshRoutine, useOwner, useRoutine, useRoutineLog } from '../../data/hooks'
-import type { RoutineEntry } from '../../data/types'
+import type { RoutineEntry, RoutineSchedule } from '../../data/types'
 import { ApiError, api, localDay, type NewRoutineEntry } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { useAuth } from '../../lib/useAuth'
 import { entryName, slotWords } from './routineModel'
+import { alternatePair, scheduleWords } from './schedule'
 
 /**
  * Every routine write, each followed by refreshRoutine(uid) so Home, Routine, the check and the advisor's
@@ -80,7 +81,36 @@ export function useRoutineWrites() {
     [getIdToken, refresh],
   )
 
-  return { add, stop, remove, setSlots }
+  /** Every day (null), every other day from an anchor, or chosen weekdays. */
+  const setSchedule = useCallback(
+    async (e: RoutineEntry, schedule: RoutineSchedule | null) => {
+      await api.patchRoutine(await getIdToken(), e.id, { schedule })
+      await refresh()
+      toast(`${entryName(e)}: ${scheduleWords(schedule, !e.slots.includes('am')).toLowerCase()}`)
+    },
+    [getIdToken, refresh],
+  )
+
+  /** The routine check's "Alternate nights" fix: `tonight` is used today, `rests` tomorrow, then they swap. */
+  const alternate = useCallback(
+    async (tonight: RoutineEntry, rests: RoutineEntry) => {
+      const pair = alternatePair(localDay())
+      const token = await getIdToken()
+      await api.patchRoutine(token, tonight.id, { schedule: pair.tonight })
+      try {
+        await api.patchRoutine(token, rests.id, { schedule: pair.rests })
+      } catch (e) {
+        // Never leave one of the two alternating alone: put the first back as it was.
+        await api.patchRoutine(token, tonight.id, { schedule: tonight.schedule ?? null }).catch(() => undefined)
+        throw e
+      }
+      await refresh()
+      toast(`${entryName(tonight)} and ${entryName(rests)} now alternate nights. ${entryName(tonight)} is tonight.`)
+    },
+    [getIdToken, refresh],
+  )
+
+  return { add, stop, remove, setSlots, setSchedule, alternate }
 }
 
 /** Honest words for a failed write or read. */

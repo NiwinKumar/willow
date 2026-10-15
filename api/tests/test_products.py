@@ -223,7 +223,7 @@ def test_tidy_strips_list_punctuation():
     clean = label_scan.tidy(raw)
     assert clean.brand == "The Ordinary"
     assert clean.product_name == "Niacinamide 10% + Zinc 1%"
-    assert clean.inci == ["Aqua (Water)", "Chlorphenesin"]
+    assert [i.name for i in clean.inci] == ["Aqua (Water)", "Chlorphenesin"]
     assert clean.key_actives[0].name == "zinc pca"
 
 
@@ -286,3 +286,75 @@ def test_every_real_store_price_is_a_checked_amount_in_a_currency():
         catalog.StorePrice.model_validate({"amount": 5, "currency": "Rs", "checked": "2026-10-15"})
     with pytest.raises(ValueError):
         catalog.StorePrice.model_validate({"amount": 5, "currency": "INR", "checked": "2026-02-30"})
+
+
+def test_label_scan_reports_ingredient_confidence_and_a_failure_reason(client, fake, monkeypatch):
+    def fake_generate(prompt_id, contents, schema, **kw):
+        return schema(
+            brand="Some Brand",
+            product_name="Night Serum",
+            category="serum",
+            inci=[{"name": "Aqua", "confidence": "high"}, {"name": "Parfum", "confidence": "low"}],
+            confidence="high",
+            failure="glare",
+        )
+
+    monkeypatch.setattr(gemini, "generate_json", fake_generate)
+    res = client.post(
+        "/v1/label-scan", json={"images": [{"mime_type": "image/png", "data_base64": _png_b64()}]}
+    )
+    assert res.status_code == 200, res.text
+    scan = res.json()["scan"]
+    assert scan["inci"] == [
+        {"name": "Aqua", "confidence": "high"},
+        {"name": "Parfum", "confidence": "low"},
+    ]
+    assert scan["failure"] == "glare"
+    assert scan["confidence"] == "low"  # a reported problem is never high confidence
+
+
+def test_label_scan_model_keeps_plain_ingredient_strings_working():
+    old = label_scan.LabelScan(
+        brand="x", product_name="y", category="serum", inci=["Aqua", "Glycerin"], confidence="high"
+    )
+    assert [(i.name, i.confidence) for i in old.inci] == [("Aqua", "high"), ("Glycerin", "high")]
+    assert old.failure is None and old.confidence == "high"
+    shaky = label_scan.LabelScan(
+        brand="x",
+        product_name="y",
+        category="serum",
+        inci=["Aqua", {"name": "Parfum", "confidence": "low"}],
+        confidence="high",
+    )
+    assert shaky.confidence == "medium"  # one hard-to-read ingredient caps the overall reading
+    nothing = label_scan.LabelScan(
+        brand="Guess",
+        product_name="Guess",
+        category="other",
+        inci=["Aqua"],
+        confidence="low",
+        failure="no_label",
+    )
+    assert nothing.inci == [] and nothing.brand is None and nothing.unreadable
+    with pytest.raises(ValueError):
+        label_scan.LabelScan(
+            brand=None, product_name=None, category="other", confidence="low", failure="dark"
+        )
+
+
+def test_an_unreadable_label_photo_does_not_cost_a_scan(client, fake, monkeypatch):
+    from datetime import UTC, datetime
+
+    def blurry(prompt_id, contents, schema, **kw):
+        return schema(
+            brand=None, product_name=None, category="other", confidence="low", failure="blurry"
+        )
+
+    monkeypatch.setattr(gemini, "generate_json", blurry)
+    res = client.post(
+        "/v1/label-scan", json={"images": [{"mime_type": "image/png", "data_base64": _png_b64()}]}
+    )
+    assert res.status_code == 200
+    assert res.json()["scan"]["failure"] == "blurry" and res.json()["match"] is None
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage_incr("u_test", day, "label_scan", 0) == 0

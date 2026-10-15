@@ -145,6 +145,31 @@ export type RoutineEntry = {
   /** Days ticked as used, of the days it was in the routine in the last 2 weeks since the person started
    * ticking (GET /v1/routine only); null when they never ticked or it had no days in that window. */
   recent_use?: { days_used: number; of_days: number } | null
+  /** Which days it is used (null: every day). GET/PATCH /v1/routine. */
+  schedule?: RoutineSchedule | null
+  created_at?: string
+  /** Set on create and on every PATCH (stop, slots, schedule). */
+  updated_at?: string
+  /** The catalog packshot (catalog products only), joined by GET /v1/routine. */
+  image_url?: string | null
+  image_source?: string | null
+}
+
+/** Every day (null or daily), every other day counted from `anchor` (a use day), or chosen weekdays (0 = Monday). */
+export type RoutineSchedule = { kind: 'daily' | 'alternate' | 'days'; days?: number[] | null; anchor: string }
+
+/** A product tried on one forearm square, the other forearm's square left untouched (GET /v1/product-tests). */
+export type ProductTest = {
+  id: string
+  entry_id: string | null
+  product_id: string | null
+  name: string
+  site_pair: 'forearm'
+  started_at: string
+  length_days: number
+  ended_at: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 /** One day's routine use ticks (GET/PUT/DELETE /v1/routine/log): entry id -> slots ticked. */
@@ -168,7 +193,7 @@ export type Product = {
   price: { amount: number; currency: string }
   size: string
   region: string[]
-  stores: { store: string; url: string; region: string }[]
+  stores: { store: string; url: string; region: string; price?: StorePrice | null }[]
   source_url: string
   last_verified: string
   /** The brand's own packshot, linked where it is already published (never copied). */
@@ -176,3 +201,6 @@ export type Product = {
   /** The page that image appears on, for the credit line. */
   image_source?: string | null
 }
+
+/** A price read off one store's page on the day `checked` (YYYY-MM-DD); null when it was not found. Never estimated. */
+export type StorePrice = { amount: number; currency: string; checked: string }

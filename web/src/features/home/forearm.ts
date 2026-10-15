@@ -1,19 +1,41 @@
 /**
- * The product test, read for Home: day N since the treated-arm baseline, which days had a treated photo,
- * and a one-line standing of the latest treated photo against its matched control (same rules as the
- * product test page: each arm against its own band, the gap against the band for a difference).
+ * The product test, read for Home and Routine. With a product test (GET /v1/product-tests): "{product} on
+ * your forearm · day N of M", one dot per day of the plan (filled on days with a treated photo), and the
+ * standing of the latest treated photo against its matched control, given only after day 14 (before that it
+ * is "too early"). Without one (forearm photos from before product tests existed): day N since the treated
+ * baseline and one dot per day since then. Same rules as the product test page: each arm against its own
+ * band, the gap against the band for a difference.
  */
-import type { Session } from '../../data/types'
+import type { ProductTest, Session } from '../../data/types'
 import { baselineFor, matchControl } from '../../data/live'
 import { localDay } from '../../lib/api'
 import { parseDate } from '../../lib/format'
+import { planDots, testDay, VERDICT_AFTER_DAYS, type PlanDot } from '../routine/productTests'
 import { dayOf, daysSince, latest, usable } from './derive'
 
 const DOTS = 28
 
-export type ForearmRead = { day: number; dots: boolean[]; standing: { g: string; t: string } }
+export type ForearmRead = {
+  day: number
+  /** The plan's length when a product test is running, else null ("day N since the baseline"). */
+  of: number | null
+  /** What is on the treated square (product tests only). */
+  name: string | null
+  dots: PlanDot[]
+  standing: { g: string; t: string }
+}
 
-export function readForearm(treated: Session[], controls: Session[]): ForearmRead | null {
+export function readForearm(treated: Session[], controls: Session[], test: ProductTest | null = null): ForearmRead | null {
+  if (test) {
+    const d = testDay(test)
+    const since = treated.filter((s) => dayOf(s.created_at) >= test.started_at.slice(0, 10))
+    const standing = !since.some((s) => s.status === 'done')
+      ? { g: '·', t: 'Photograph both arms to set the starting point' }
+      : d.ready
+        ? standingOf(treated, controls)
+        : { g: '◌', t: `Too early: verdict after day ${VERDICT_AFTER_DAYS}` }
+    return { day: d.day, of: d.of, name: test.name, dots: planDots(test, treated), standing }
+  }
   const done = treated.filter((s) => s.status === 'done')
   if (!done.length) return null
   // The baseline of the latest measured treated photo (its own capture mode), as the product test page counts it.
@@ -24,15 +46,15 @@ export function readForearm(treated: Session[], controls: Session[]): ForearmRea
   const photoDays = new Set(done.map((s) => dayOf(s.created_at)))
   const span = Math.min(DOTS, day + 1)
   const start = parseDate(localDay())
-  const dots = Array.from({ length: span }, (_, i) => {
+  const dots = Array.from({ length: span }, (_, i): PlanDot => {
     const d = new Date(start)
     d.setDate(d.getDate() - (span - 1 - i))
-    return photoDays.has(localDay(d))
+    return photoDays.has(localDay(d)) ? 'photo' : 'past'
   })
-  return { day, dots, standing: standingOf(treated, controls) }
+  return { day, of: null, name: null, dots, standing: standingOf(treated, controls) }
 }
 
-function standingOf(treated: Session[], controls: Session[]): { g: string; t: string } {
+export function standingOf(treated: Session[], controls: Session[]): { g: string; t: string } {
   const t = latest(treated, usable)
   if (!t) return { g: '—', t: 'No measured treated photo yet' }
   if (t.is_baseline) return { g: '·', t: 'Baseline set; the next photo is compared with it' }

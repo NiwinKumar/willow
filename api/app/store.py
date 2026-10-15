@@ -38,6 +38,10 @@ class Store(Protocol):
     def user_merge(self, uid: str, fields: Doc) -> None: ...
     def users_list(self) -> list[tuple[str, Doc]]: ...
     def delete_user(self, uid: str) -> None: ...
+    def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def product_test_get(self, uid: str, test_id: str) -> Doc | None: ...
+    def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None: ...
+    def product_test_delete(self, uid: str, test_id: str) -> None: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -167,6 +171,20 @@ class FirestoreStore:
         db = self._db()
         db.recursive_delete(db.document(f"users/{uid}"))
 
+    def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]:
+        snaps = self._db().collection(f"users/{uid}/product_tests").stream()
+        return [(s.id, s.to_dict()) for s in snaps]
+
+    def product_test_get(self, uid: str, test_id: str) -> Doc | None:
+        snap = self._db().document(f"users/{uid}/product_tests/{test_id}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None:
+        self._db().document(f"users/{uid}/product_tests/{test_id}").set(doc)
+
+    def product_test_delete(self, uid: str, test_id: str) -> None:
+        self._db().document(f"users/{uid}/product_tests/{test_id}").delete()
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -176,6 +194,7 @@ class MemoryStore:
         self.routine_log: dict[tuple[str, str], Doc] = {}
         self.usage: dict[tuple[str, str, str], int] = {}
         self.users: dict[str, Doc] = {}
+        self.product_tests: dict[tuple[str, str], Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -256,6 +275,21 @@ class MemoryStore:
             for key in [k for k in table if k[0] == uid]:
                 del table[key]
         self.users.pop(uid, None)
+        for key in [k for k in self.product_tests if k[0] == uid]:
+            del self.product_tests[key]
+
+    def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(t, copy.deepcopy(d)) for (u, t), d in self.product_tests.items() if u == uid]
+
+    def product_test_get(self, uid: str, test_id: str) -> Doc | None:
+        doc = self.product_tests.get((uid, test_id))
+        return copy.deepcopy(doc) if doc is not None else None
+
+    def product_test_set(self, uid: str, test_id: str, doc: Doc) -> None:
+        self.product_tests[(uid, test_id)] = copy.deepcopy(doc)
+
+    def product_test_delete(self, uid: str, test_id: str) -> None:
+        self.product_tests.pop((uid, test_id), None)
 
 
 @lru_cache

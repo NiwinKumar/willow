@@ -4,7 +4,8 @@ import { useShell } from '../../components/shell/ShellContext'
 import { AITag } from '../../components/willow/AITag'
 import type { RoutineCheck } from '../../data/types'
 import type { QueryResult } from '../../lib/query'
-import { SEVERITY_STYLE, type Finding } from './routineModel'
+import { ProductImage } from './productUi'
+import { SEVERITY_STYLE, entryName, imageOf, type Finding } from './routineModel'
 
 const SKELETON = 'linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.08) 100%)'
 
@@ -12,9 +13,18 @@ const SKELETON = 'linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,
  * The dark compatibility-check card (design: "■ ROUTINE CHECK"). It runs by itself whenever the routine
  * changes (useRoutineCheck is keyed by the routine), so there is no "stale" state; "Run again" re-asks.
  */
-export function RoutineCheckCard({ check, findings, count, onFind }: { check: QueryResult<RoutineCheck> & { rerun: () => Promise<void> }; findings: Finding[]; count: number; onFind: (f: Finding) => void }) {
+export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }: { check: QueryResult<RoutineCheck> & { rerun: () => Promise<void> }; findings: Finding[]; count: number; onFind: (f: Finding) => void; onAlternate: (f: Finding) => Promise<void> }) {
   const shell = useShell()
   const [rerun, setRerun] = useState(false)
+  const [alternating, setAlternating] = useState<string | null>(null)
+  const alternate = async (f: Finding) => {
+    setAlternating(f.key)
+    try {
+      await onAlternate(f)
+    } finally {
+      setAlternating(null)
+    }
+  }
   const running = check.status === 'loading' || rerun
   const done = check.status === 'ready' && !rerun && check.data !== undefined
   const failed = check.status === 'error' && !rerun
@@ -92,7 +102,16 @@ export function RoutineCheckCard({ check, findings, count, onFind }: { check: Qu
                     {f.ai ? <AITag label="AI suggestion" className="text-ink" /> : <span className="rounded-pill border border-white/30 px-3 py-1.5 font-mono text-[11px]">FIXED RULE</span>}
                   </span>
                   <span className="text-[18px] leading-[1.3]">{f.title}</span>
-                  {f.products.length ? (
+                  {f.entries.length ? (
+                    <span className="flex flex-wrap gap-[5px]">
+                      {f.entries.map((e) => (
+                        <span key={e.id} className="flex items-center gap-1.5 rounded-pill bg-white/[.12] py-[3px] pr-2.5 pl-[3px] text-[12px]">
+                          <ProductImage product={imageOf(e)} size={22} decorative />
+                          {entryName(e)}
+                        </span>
+                      ))}
+                    </span>
+                  ) : f.products.length ? (
                     <span className="flex flex-wrap gap-[5px]">
                       {f.products.map((p) => (
                         <span key={p} className="rounded-pill bg-white/[.12] px-2.5 py-[5px] text-[12px]">
@@ -106,6 +125,11 @@ export function RoutineCheckCard({ check, findings, count, onFind }: { check: Qu
                     {f.find ? (
                       <button type="button" onClick={() => onFind(f)} className="min-h-11 rounded-pill bg-white px-4 text-[13px] text-ink">
                         Find one
+                      </button>
+                    ) : null}
+                    {f.alternate && f.entries.length === 2 ? (
+                      <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-11 rounded-pill bg-white px-4 text-[13px] text-ink disabled:opacity-60">
+                        {alternating === f.key ? 'Saving…' : 'Alternate these'}
                       </button>
                     ) : null}
                     <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-11 rounded-pill bg-white/[.16] px-4 text-[13px] transition-colors hover:bg-white/[.26]">

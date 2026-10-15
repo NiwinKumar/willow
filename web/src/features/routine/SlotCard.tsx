@@ -6,8 +6,9 @@ import type { RoutineEntry, Session } from '../../data/types'
 import { ApiError, localDay } from '../../lib/api'
 import { fmtDate, plural } from '../../lib/format'
 import { outcomeFor } from '../../lib/outcome'
-import { CategoryOrb } from './productUi'
-import { activeLabel, entryName, metaLine, OUTCOME_GLYPH } from './routineModel'
+import { ProductImage } from './productUi'
+import { activeLabel, entryName, imageOf, metaLine, OUTCOME_GLYPH } from './routineModel'
+import { dayNote, restsOn, scheduleWords } from './schedule'
 
 const THEME = {
   am: { name: 'Morning', when: 'this morning', bg: 'radial-gradient(90% 60% at 50% 0%, #FFF6D6 0%, var(--bg-surface) 60%)', fg: 'text-ink', card: 'rgba(255,255,255,.75)', track: 'var(--bg-sunken)', chip: 'var(--bg-canvas)', line: 'rgba(18,18,18,.18)', dark: false },
@@ -15,8 +16,9 @@ const THEME = {
 } as const
 
 /**
- * One slot of the routine (design: Morning light card, Evening dark card). The product's orb is its
- * "used today" tick, as on Home: full colour with ✓ when ticked, faded when not.
+ * One slot of the routine (design: Morning light card, Evening dark card). The product's photo (or its
+ * category orb) is its "used today" tick, as on Home: full colour with ✓ when ticked, faded when not, fainter
+ * still on a day its schedule rests it ("RESTS ☾").
  */
 export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen, onStop, onAdd }: { slot: 'am' | 'pm'; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; faceMeasured: boolean; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onAdd: () => void }) {
   const t = THEME[slot]
@@ -37,7 +39,7 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
       <div className="flex items-baseline justify-between gap-3 px-2 pt-1.5 pb-1">
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 className="text-[26px] font-light tracking-[-0.02em]">{t.name}</h2>
-          {entries.length ? <span className="text-[12px] opacity-75">Tap a circle when you use it</span> : null}
+          {entries.length ? <span className="text-[12px] opacity-75">Tap a product when you use it</span> : null}
         </div>
         <span className="font-dot text-[28px] font-extrabold" aria-label={`${entries.length} products`}>
           {String(entries.length).padStart(2, '0')}
@@ -55,6 +57,8 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
         // Until any face photo is measured, one page note says so instead of "Not measured yet" on every row.
         const showOutcome = faceMeasured || o.text !== 'Not measured yet'
         const name = entryName(e)
+        const rest = restsOn(e, today)
+        const note = dayNote(e, slot, today)
         return (
           <div key={e.id} className="flex items-center gap-3 rounded-[30px] p-3 sm:gap-4 sm:p-3.5" style={{ background: t.card, animation: 'wRise .45s both' }}>
             <button
@@ -62,16 +66,16 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
               aria-pressed={on}
               disabled={starts}
               onClick={() => void toggle(e, on)}
-              aria-label={starts ? `${name} starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}: ${name}` : `Mark as used ${t.when}: ${name}`}
-              title={starts ? `Starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}` : `Mark as used ${t.when}`}
+              aria-label={starts ? `${name} starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}: ${name}` : `Mark as used ${t.when}: ${name}${rest ? ' (it rests today)' : ''}`}
+              title={starts ? `Starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}` : rest ? 'Rests today on its schedule' : `Mark as used ${t.when}`}
               className="group relative grid size-16 shrink-0 place-items-center rounded-[22px] transition-transform hover:scale-[1.04] active:scale-95 sm:size-[84px] sm:rounded-[26px]"
               style={{ background: t.track }}
             >
               <span className="sm:hidden">
-                <CategoryOrb category={e.category} size={44} muted={!on} />
+                <ProductImage product={imageOf(e)} size={44} muted={!on} rest={rest} />
               </span>
               <span className="hidden sm:block">
-                <CategoryOrb category={e.category} size={56} muted={!on} />
+                <ProductImage product={imageOf(e)} size={56} muted={!on} rest={rest} />
               </span>
               <span
                 aria-hidden
@@ -92,6 +96,11 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
                     {activeLabel(a)}
                   </span>
                 ))}
+                {note ? (
+                  <span className="rounded-pill px-2.5 py-1 font-mono text-[11px] tracking-[.05em]" style={{ background: rest ? 'transparent' : t.chip, boxShadow: rest ? `inset 0 0 0 1px ${t.line}` : 'none' }} title={scheduleWords(e.schedule, !e.slots.includes('am'))}>
+                    {note}
+                  </span>
+                ) : null}
                 <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ background: t.chip }}>
                   {starts ? 'from' : 'since'} {fmtDate(e.started_at)}
                 </span>
