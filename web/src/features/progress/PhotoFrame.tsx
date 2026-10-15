@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import type { Session } from '../../data/types'
 import { photoSize, type Box } from './frame'
+import { useImageStatus } from './useImageStatus'
 
 /**
  * The person's own photo, framed (4:5). States: loading (shimmer), failed to load, no preview (RAW reference
@@ -10,10 +11,9 @@ import { photoSize, type Box } from './frame'
 export function PhotoFrame({ session, box, alt, missing, children, rounded = 'rounded-[32px]' }: { session: Session; box: Box; alt: string; missing: string; children?: ReactNode; rounded?: string }) {
   const url = session.preview?.url ?? null
   const size = photoSize(session)
-  const [loaded, setLoaded] = useState<string | null>(null)
-  const [failed, setFailed] = useState<string | null>(null)
-  const ready = url !== null && loaded === url
-  const broken = url !== null && failed === url
+  const status = useImageStatus(url)
+  const ready = status === 'ready'
+  const broken = status === 'failed'
   return (
     <div className={`relative aspect-[4/5] overflow-hidden squircle ${rounded}`} style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
       {url && !broken ? (
@@ -23,8 +23,6 @@ export function PhotoFrame({ session, box, alt, missing, children, rounded = 'ro
             width={size.width}
             height={size.height}
             preserveAspectRatio="xMidYMid slice"
-            onLoad={() => setLoaded(url)}
-            onError={() => setFailed(url)}
             className="transition-opacity duration-200"
             style={{ opacity: ready ? 1 : 0 }}
           />
