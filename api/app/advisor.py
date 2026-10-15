@@ -162,8 +162,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
         "routine": routine,
         "recent_window_days": routine_log.RECENT_DAYS,
         "note": "Every site is measured: the face, cheek and nose close-ups (pores and texture "
-        "come only from close-ups) and the forearm squares. Lines are not measured; say so "
-        "if asked.",
+        "come only from close-ups) and the forearm squares. Lines, shine, glow and blemishes "
+        "are always indicative (trends).",
     }
 
 
