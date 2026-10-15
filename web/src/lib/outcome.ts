@@ -1,5 +1,5 @@
 import type { MetricId, RoutineEntry, Session, Site } from '../data/types'
-import { CONCERN_METRICS } from '../mock/catalog'
+import { CONCERN_METRICS } from './catalog'
 import { parseDate } from './format'
 import { METRIC_META, fmtSigned, fmtValue } from './metrics'
 
