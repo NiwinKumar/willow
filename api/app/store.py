@@ -137,12 +137,13 @@ class FirestoreStore:
         from google.cloud.firestore_v1.field_path import FieldPath
 
         db = self._db()
-        batch = db.batch()
-        for day in days:
-            ref = db.document(f"users/{uid}/routine_log/{day}")
-            path = FieldPath("used", entry_id).to_api_repr()  # quoted: ids may hold "-"
-            batch.update(ref, {path: firestore.DELETE_FIELD})
-        if days:
+        path = FieldPath("used", entry_id).to_api_repr()  # quoted: ids may hold "-"
+        for start in range(0, len(days), 450):  # a batch holds at most 500 writes
+            batch = db.batch()
+            for day in days[start : start + 450]:
+                batch.update(
+                    db.document(f"users/{uid}/routine_log/{day}"), {path: firestore.DELETE_FIELD}
+                )
             batch.commit()
 
     def user_get(self, uid: str) -> Doc | None:

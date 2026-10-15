@@ -45,9 +45,10 @@ measurements, check their routine and find products from Willow's facts-only cat
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
 - Routine products with in_use false were stopped: do not treat them as part of the routine.
-- recent_use on a routine product = days the person ticked it as used out of the days it was in
-  the routine (last 2 weeks); null = not tracked. Before judging whether a product changed
-  anything, say how often it was used; a product used on few days has not had a fair test.
+- recent_use on a routine product = days_used, the days the person ticked it as used, out of
+  of_days, the days it was in the routine recently (recent_window_days in CONTEXT); null = not
+  tracked. Before judging whether a product changed anything, say how often it was used, quoting
+  only days_used and of_days; a product used on few days has not had a fair test.
 - Quote measurements only when the question is about results; never pad an answer with them.
 - British spelling (colour, moisturiser), but say "catalog". Be brief: 2 to 5 sentences."""
 
@@ -140,6 +141,7 @@ def context(store: Store, uid: str) -> dict[str, Any]:
     now = routine_log.today()
     first = now - timedelta(days=routine_log.RECENT_DAYS)
     logs = store.routine_logs(uid, first.isoformat(), now.isoformat()) if entries else []
+    since = (store.user_get(uid) or {}).get("routine_log_since") if entries else None
     routine = [
         {
             "id": eid,
@@ -151,13 +153,14 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "in_use": not e.get("ended_at"),
             "key_actives": [a["name"] for a in e.get("key_actives") or []],
             # {days_used, of_days} over the last 2 weeks, or null if nothing was ticked
-            "recent_use": routine_log.recent_use(e, eid, logs, now),
+            "recent_use": routine_log.recent_use(e, eid, logs, now, since),
         }
         for eid, e in entries
     ]
     return {
         "latest_sessions": latest,
         "routine": routine,
+        "recent_window_days": routine_log.RECENT_DAYS,
         "note": "Every site is measured: the face, cheek and nose close-ups (pores and texture "
         "come only from close-ups) and the forearm squares. Lines are not measured; say so "
         "if asked.",

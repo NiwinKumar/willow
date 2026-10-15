@@ -106,7 +106,7 @@ def test_recent_use_counts_the_persons_own_today_and_stops_at_the_stop_date(clie
 
 def test_default_range_is_the_last_two_weeks_and_ranges_are_bounded(client, fake):
     log = client.get("/v1/routine/log").json()
-    assert (log["from"], log["to"]) == (_day(-13), _day(1))
+    assert (log["from"], log["to"]) == (_day(-14), _day(1))  # two weeks for every time zone
     ok = client.get("/v1/routine/log", params={"from": _day(-91), "to": _day()})
     assert ok.status_code == 200  # 92 days
     long = client.get("/v1/routine/log", params={"from": _day(-92), "to": _day()})
@@ -131,3 +131,36 @@ def test_the_judge_routine_can_be_ticked_for_yesterday(client, fake):
     entry = client.get("/v1/routine").json()["entries"][0]
     slot = entry["slots"][0]
     assert client.put(f"/v1/routine/log/{_day(-1)}/{entry['id']}/{slot}").status_code == 200
+
+
+def test_a_gap_in_ticking_stays_a_gap(client, fake):
+    eid = _add(client, started=-25)
+    # ticked once long ago (written directly: the api only takes 30 days back), then today
+    fake.store.routine_log_mark("u_test", _day(-20), eid, "am", True)
+    fake.store.user_merge("u_test", {"routine_log_since": _day(-20)})
+    client.put(f"/v1/routine/log/{_day()}/{eid}/am")
+    [entry] = client.get("/v1/routine", params={"today": _day()}).json()["entries"]
+    assert entry["recent_use"] == {"days_used": 1, "of_days": 14}  # not "1 of 1"
+
+
+def test_first_tick_sets_since_and_odd_cases_give_no_count(client, fake):
+    eid = _add(client, started=-25)
+    client.patch(f"/v1/routine/{eid}", json={"ended_at": _day(-20)})  # stopped before the window
+    other = _add(client, name="Other", started=-5)
+    client.put(f"/v1/routine/log/{_day(-2)}/{other}/am")
+    assert fake.store.user_get("u_test")["routine_log_since"] == _day(-2)
+    client.put(f"/v1/routine/log/{_day(-4)}/{other}/am")
+    assert fake.store.user_get("u_test")["routine_log_since"] == _day(-4)  # moves back only
+    by_id = {
+        e["id"]: e
+        for e in client.get("/v1/routine", params={"today": "nonsense"}).json()["entries"]
+    }
+    assert by_id[eid]["recent_use"] is None  # no days in the window: never "0 of 0"
+    assert by_id[other]["recent_use"] == {"days_used": 2, "of_days": 5}  # bad ?today -> UTC day
+
+
+def test_removing_a_product_removes_ticks_older_than_the_edit_window(client, fake):
+    eid = _add(client, started=-60)
+    fake.store.routine_log_mark("u_test", _day(-40), eid, "am", True)
+    client.delete(f"/v1/routine/{eid}")
+    assert fake.store.routine_logs("u_test", _day(-60), _day(1))[0]["used"] == {}

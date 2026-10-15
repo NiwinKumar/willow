@@ -118,9 +118,13 @@ def routine_list(
     now = routine_log.local_today(today)
     first = now - timedelta(days=routine_log.RECENT_DAYS)
     logs = store.routine_logs(user.uid, first.isoformat(), now.isoformat()) if entries else []
+    since = (store.user_get(user.uid) or {}).get("routine_log_since") if entries else None
     return {
         "entries": [
-            {**_entry_view(eid, d), "recent_use": routine_log.recent_use(d, eid, logs, now)}
+            {
+                **_entry_view(eid, d),
+                "recent_use": routine_log.recent_use(d, eid, logs, now, since),
+            }
             for eid, d in entries
         ]
     }
@@ -141,7 +145,7 @@ def routine_log_list(
     start = (
         routine_log.parse_day(first, "from")
         if first
-        else utc_today - timedelta(days=routine_log.RECENT_DAYS - 1)
+        else utc_today - timedelta(days=routine_log.RECENT_DAYS)  # covers a day behind UTC
     )
     if start > end or (end - start).days >= routine_log.MAX_RANGE_DAYS:
         raise HTTPException(
@@ -160,6 +164,11 @@ def _mark(store: Store, uid: str, day: str, entry_id: str, slot: str, used: bool
     _check_entry_id(entry_id)
     if used:
         checked = routine_log.check_tick(day, store.routine_get(uid, entry_id), slot)
+        # the day the person started ticking: recent use counts from here (a later gap in
+        # ticking stays a gap, never "used every day")
+        since = (store.user_get(uid) or {}).get("routine_log_since")
+        if not since or checked.isoformat() < since:
+            store.user_merge(uid, {"routine_log_since": checked.isoformat()})
     else:
         checked = routine_log.check_untick(day, slot)
         [doc] = store.routine_logs(uid, checked.isoformat(), checked.isoformat()) or [
@@ -269,10 +278,9 @@ def routine_delete(
     _check_entry_id(entry_id)
     store.routine_delete(user.uid, entry_id)
     # a removed product's ticks go too (they would outlive the remove, and a reused id would
-    # inherit them); the log can only be written PAST_DAYS back, so that window covers them all
-    now = routine_log.today()
-    first = now - timedelta(days=routine_log.PAST_DAYS + 1)
-    logs = store.routine_logs(user.uid, first.isoformat(), (now + timedelta(days=1)).isoformat())
+    # inherit them): the whole log, since ticks age past the window they were written in
+    tomorrow = routine_log.today() + timedelta(days=1)
+    logs = store.routine_logs(user.uid, "0000-01-01", tomorrow.isoformat())
     days = [d["date"] for d in logs if entry_id in (d.get("used") or {})]
     store.routine_log_forget(user.uid, entry_id, days)
     return Response(status_code=204)

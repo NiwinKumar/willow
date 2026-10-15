@@ -51,11 +51,13 @@ def check_untick(day_text: str, slot: str) -> date:
 
 
 def local_today(text: str | None) -> date:
-    """The person's own calendar day, as the app sends it, kept within a day of UTC's."""
+    """The person's own calendar day, as the app sends it, kept within a day of UTC's; UTC's
+    own when it is missing or malformed (a bad hint never fails the routine list)."""
     now = today()
-    if not text:
+    try:
+        day = date.fromisoformat(text) if text else now
+    except ValueError:
         return now
-    day = parse_day(text, "today")
     return min(max(day, now - timedelta(days=1)), now + timedelta(days=1))
 
 
@@ -95,21 +97,27 @@ def ticked(doc: dict[str, Any], entry_id: str | None = None) -> bool:
 
 
 def recent_use(
-    entry: dict[str, Any], entry_id: str, logs: list[dict[str, Any]], now: date
+    entry: dict[str, Any],
+    entry_id: str,
+    logs: list[dict[str, Any]],
+    now: date,
+    since: str | None,
 ) -> dict[str, int] | None:
     """Days with any tick for this product, over the days it was in the routine within the last
-    RECENT_DAYS, counted from when the person started ticking (never "0 of 21 days" for days
-    before ticking existed). None when the person ticked nothing in the window."""
-    first_tick = min((d["date"] for d in logs if ticked(d)), default=None)
-    if first_tick is None:
+    RECENT_DAYS, counted from `since`, the day the person first ticked anything (never "0 of 21
+    days" for days before ticking existed; a gap in ticking stays a gap). None when the person
+    has never ticked, or the product had no days in the window."""
+    if not since:
         return None
-    first = max(now - timedelta(days=RECENT_DAYS - 1), date.fromisoformat(first_tick))
+    first = max(now - timedelta(days=RECENT_DAYS - 1), date.fromisoformat(since))
     if entry.get("started_at"):
         first = max(first, date.fromisoformat(entry["started_at"][:10]))
     last = now
     if entry.get("ended_at"):
         last = min(last, date.fromisoformat(entry["ended_at"][:10]))
-    of_days = max((last - first).days + 1, 0)
+    of_days = (last - first).days + 1
+    if of_days <= 0:  # stopped before the window, or starts after today
+        return None
     lo, hi = first.isoformat(), last.isoformat()
     used = sum(1 for d in logs if lo <= d["date"] <= hi and (d.get("used") or {}).get(entry_id))
     return {"days_used": used, "of_days": of_days}
