@@ -5,7 +5,7 @@ the per-person cap alone would not bound cost; the global cap does. Counters liv
 under users/{uid}/usage/{day} (the global one under the pseudo-user "_global").
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 
@@ -55,3 +55,27 @@ def refund(store: Store, uid: str, action: str) -> None:
     day = datetime.now(UTC).date().isoformat()
     store.usage_incr(uid, day, action, -1)
     store.usage_incr(GLOBAL_UID, day, action, -1)
+
+
+# What GET /v1/me/usage reports (the paid actions a person sees a count for).
+SHOWN = ("advisor", "routine_check", "label_scan", "retailer_ask")
+
+
+def usage(store: Store, uid: str, now: datetime | None = None) -> dict[str, dict[str, object]]:
+    """Today's (UTC) count per shown action, read without counting anything. An attempt refused
+    past the cap stays counted, so `used` is clamped to the cap."""
+    now = now or datetime.now(UTC)
+    day = now.date()
+    counts = store.usage_get(uid, day.isoformat())
+    resets = datetime(day.year, day.month, day.day, tzinfo=UTC) + timedelta(days=1)
+    out: dict[str, dict[str, object]] = {}
+    for action in SHOWN:
+        cap = CAPS[action][0]
+        raw = max(0, int(counts.get(action) or 0))
+        out[action] = {
+            "used": min(raw, cap),
+            "cap": cap,
+            "remaining": max(0, cap - raw),
+            "resets_at": resets.isoformat().replace("+00:00", "Z"),
+        }
+    return out
