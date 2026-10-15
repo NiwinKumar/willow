@@ -87,6 +87,25 @@ def product_rows() -> list[dict]:
     ]
 
 
+# The app's goals (users/{uid}.profile.goals, web/src/lib/metrics.ts GOALS) as the catalog concerns
+# the cohort and the retailer view group by. dryness_barrier has no goal (not measured).
+GOAL_CONCERNS = {
+    "dark_spots": ["dark_spots_pigmentation"],
+    "even_tone": ["uneven_tone"],
+    "redness": ["redness_sensitivity"],
+    "blemishes": ["acne_blemishes"],
+    "pores_texture": ["texture_pores"],
+    "lines": ["fine_lines"],
+    "under_eye": ["dark_circles"],
+    "oil_glow": ["oiliness_shine", "dullness"],
+}
+
+
+def goal_concerns(doc: dict) -> list[str]:
+    goals = ((doc or {}).get("profile") or {}).get("goals") or []
+    return list(dict.fromkeys(c for g in goals for c in GOAL_CONCERNS.get(g, [])))
+
+
 def real_rows(store) -> dict[str, list[dict]]:
     """Measured sessions and routines of people who opted in, under a one-way hash."""
     out: dict[str, list[dict]] = {"sessions_flat": [], "routine_flat": [], "routine_conflicts": []}
@@ -94,6 +113,7 @@ def real_rows(store) -> dict[str, list[dict]]:
         if not ((doc or {}).get("consent") or {}).get("aggregate_insights_opt_in"):
             continue
         uh = "real_" + hashlib.sha256(f"willow-real-{uid}".encode()).hexdigest()[:12]
+        goals = goal_concerns(doc)
         for _, d in store.sessions_list(uid):
             result = measured_result(d)
             base = d.get("compared_with") or {}
@@ -119,7 +139,7 @@ def real_rows(store) -> dict[str, list[dict]]:
                         "is_synthetic": False,
                         "region": "unknown",
                         "tone_band": tone or "unknown",
-                        "goals": [],
+                        "goals": goals,
                         "site": d["site"],
                         "session_ts": created.isoformat() if created else None,
                         "weeks_since_baseline": weeks,
