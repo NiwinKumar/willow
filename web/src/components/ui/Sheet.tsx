@@ -3,6 +3,14 @@ import { useEffect, useRef, type ReactNode } from 'react'
 
 import { IconButton } from './IconButton'
 
+/** After a sheet closes: if focus fell to <body>, return it to the opener (when it is still on the page). */
+function refocus(opener: HTMLElement | null) {
+  requestAnimationFrame(() => {
+    const a = document.activeElement
+    if (opener?.isConnected && (!a || a === document.body)) opener.focus({ preventScroll: true })
+  })
+}
+
 /**
  * Overlays on the native <dialog> (focus trap, Esc, inert page for free), drawn as the design draws them:
  *   modal  – centred, radius 40, scrim (confirmations, sign-out, change baseline)
@@ -12,12 +20,22 @@ import { IconButton } from './IconButton'
  */
 export function Sheet({ open, onClose, title, hideTitle, variant = 'bottom', size = 'md', children, footer, labelledBy }: { open: boolean; onClose: () => void; title: string; hideTitle?: boolean; variant?: 'modal' | 'bottom' | 'side'; size?: 'sm' | 'md' | 'lg'; children: ReactNode; footer?: ReactNode; labelledBy?: string }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const d = ref.current
     if (!d) return
-    if (open && !d.open) d.showModal()
-    if (!open && d.open) d.close()
+    if (open && !d.open) {
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      d.showModal()
+    }
+    if (!open && d.open) {
+      d.close()
+      refocus(opener.current)
+    }
   }, [open])
+  // close() hands focus back to the opener only when it can; a sheet unmounted while open (most callers render
+  // it only while needed) drops focus to <body>: give it back to the control that opened it.
+  useEffect(() => () => refocus(opener.current), [])
   const width = size === 'sm' ? 'sm:max-w-[440px]' : size === 'lg' ? 'sm:max-w-[980px]' : 'sm:max-w-[640px]'
   const shape =
     variant === 'side'

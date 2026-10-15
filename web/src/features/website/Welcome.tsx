@@ -6,6 +6,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } 
 import type { MetricGroup, Site } from '../../data/types'
 import { syncConsent } from '../../lib/consent'
 import { GOALS, METRIC_META } from '../../lib/metrics'
+import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
 import { useData } from '../../data/useData'
 import { useAuth } from '../../lib/useAuth'
@@ -140,7 +141,7 @@ function Consent() {
   return (
     <main className="relative mx-auto flex w-full max-w-[760px] animate-[wRiseLg_.6s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-5 pb-10">
       <div className="px-1 pb-2 pt-[clamp(20px,4vw,40px)]">
-        <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ CONSENT · VERSION {CONSENT_VERSION}</span>
+        <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ CONSENT · VERSION {fmtDate(CONSENT_VERSION, { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}</span>
         <h1 className="mt-3.5 mb-0 font-serif text-[clamp(44px,6vw,76px)] font-normal leading-[.95] tracking-[-0.01em]">Before your first photo</h1>
       </div>
       <div className="overflow-hidden rounded-[36px] backdrop-blur-[24px]" style={{ background: 'rgba(250,250,248,.82)', boxShadow: '0 30px 70px -40px rgba(0,0,0,.3)' }}>
@@ -253,7 +254,11 @@ function Goals() {
         return setError('Could not start a guest session. Check your connection and try again.')
       }
     }
-    navigate(target)
+    if (toCapture) {
+      // The first check-in draws over Home (not over onboarding), so its ✕ and the Back from its result land on Home.
+      navigate('/home', { replace: true })
+      navigate(target, { state: { background: { pathname: '/home', search: '', hash: '', state: null, key: 'welcome' } } })
+    } else navigate(target)
   }
 
   return (

@@ -21,12 +21,27 @@ export default function CheckInPicker({ open, onClose, preset, onStart }: { open
   const [site, setSite] = useState<Site>(preset?.site ?? 'face_full')
   const [mode, setMode] = useState<CaptureMode>(preset?.mode ?? 'uncalibrated')
 
+  const opener = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const d = ref.current
     if (!d) return
-    if (open && !d.open) d.showModal()
+    if (open && !d.open) {
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      d.showModal()
+    }
     if (!open && d.open) d.close()
   }, [open])
+  // The shell unmounts the picker on close, which drops focus to <body>: hand it back to the + / Check in button.
+  useEffect(
+    () => () => {
+      const o = opener.current
+      requestAnimationFrame(() => {
+        const a = document.activeElement
+        if (o?.isConnected && (!a || a === document.body)) o.focus({ preventScroll: true })
+      })
+    },
+    [],
+  )
 
   const live = data.mode === 'live'
   const known = live && data.status !== 'loading'

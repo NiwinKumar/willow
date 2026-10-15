@@ -2,7 +2,7 @@
  * Data seam. Demo mode serves the team's own measured journey (read-only); live mode reads the signed-in
  * person's sessions from the api. Screens never know which one they got. Nothing here is made up.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { api, type SessionView } from '../lib/api'
@@ -83,6 +83,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
       alive = false
     }
   }, [demo, uid, load, apply])
+
+  // Photo previews are signed URLs the api reissues with at least 2 h left (api/app/storage.py). A tab left
+  // open longer than an hour reads the sessions again when it is looked at, so photos never go stale.
+  const loadedAt = useRef(0)
+  useEffect(() => {
+    if (loaded.status === 'ready') loadedAt.current = Date.now()
+  }, [owned, loaded.status])
+  useEffect(() => {
+    if (demo || !uid) return
+    const STALE_MS = 60 * 60_000
+    const check = () => {
+      if (document.visibilityState === 'visible' && loadedAt.current && Date.now() - loadedAt.current > STALE_MS) void refresh()
+    }
+    document.addEventListener('visibilitychange', check)
+    const t = window.setInterval(check, 10 * 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', check)
+      window.clearInterval(t)
+    }
+  }, [demo, uid, refresh])
 
   // Demo mode reads the team's journey once per entry and holds it until demo mode is left.
   const [demoPick, setDemoPick] = useState<DemoPick | null>(() => (demo ? peekDemo() : null))

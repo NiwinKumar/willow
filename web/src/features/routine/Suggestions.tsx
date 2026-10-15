@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 
+import { baselineFor } from '../../data/live'
 import type { RoutineEntry, Session } from '../../data/types'
 import { fmtDate, plural } from '../../lib/format'
 import { METRIC_META, fmtSigned, unitOf } from '../../lib/metrics'
@@ -7,8 +8,6 @@ import { outcomeFor } from '../../lib/outcome'
 import { daysSince } from '../home/derive'
 import { CategoryOrb } from './productUi'
 import { entryName, type Finding } from './routineModel'
-
-const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
 
 /**
  * "Suggested today" (design: three aura cards), built only from what the api answered: a gap from the
@@ -23,9 +22,10 @@ export function Suggestions({ findings, entries, sessions, onFind }: { findings:
     .map((e) => ({ e, o: outcomeFor(e, sessions) }))
     .flatMap(({ e, o }) => {
       if (o.kind !== 'real') return []
-      const latest = sessions.filter((s) => s.site === o.site && usable(s)).at(-1)
-      const m = latest?.result?.metrics.find((x) => x.id === o.metric)
-      return latest && m && m.delta !== null ? [{ e, o, latest, m }] : []
+      // The session the outcome judged (not simply the newest photo, which may be within range again).
+      const latest = o.session
+      const m = latest.result?.metrics.find((x) => x.id === o.metric)
+      return m && m.delta !== null ? [{ e, o, latest, m }] : []
     })
     .slice(0, 3 - gaps.length)
   if (gaps.length + changes.length === 0) return null
@@ -107,7 +107,8 @@ export function ProductTestCard({ treated }: { treated: Session[] }) {
   const navigate = useNavigate()
   if (treated.length === 0) return null
   // Same day count as Home's tile: calendar days in the person's time zone since the treated baseline.
-  const base = treated.filter((s) => s.is_baseline).at(-1) ?? treated.find((s) => s.status === 'done') ?? treated[0]
+  const lt = treated.filter((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed).at(-1)
+  const base = (lt ? baselineFor(lt, treated) : null) ?? treated.filter((s) => s.is_baseline).at(-1) ?? treated.find((s) => s.status === 'done') ?? treated[0]
   const day = Math.max(0, daysSince(base.created_at))
   const after = treated.filter((s) => !s.is_baseline && s.created_at > base.created_at)
   const dots = treated.slice(-28)
@@ -119,7 +120,7 @@ export function ProductTestCard({ treated }: { treated: Session[] }) {
     >
       <div className="flex flex-[1_1_320px] flex-col gap-2">
         <span className="font-mono text-[12px] tracking-[.08em]">■ PRODUCT TEST · FOREARM</span>
-        <span className="text-[clamp(22px,2.4vw,28px)] tracking-[-0.01em] text-pretty">Treated square vs untouched square</span>
+        <span className="text-[clamp(22px,2.4vw,28px)] tracking-[-0.01em] text-pretty">Treated arm vs control arm</span>
         <span className="max-w-[460px] text-[14px] leading-[1.45] text-pretty">
           One square treated, one left untouched. {after.length ? `${plural(after.length, 'check-in', 'check-ins')} since the baseline; the test shows each verdict.` : 'Take a check-in after the baseline to compare the two squares.'}
         </span>

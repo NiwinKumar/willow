@@ -6,7 +6,7 @@
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { baselineState, photoSteps } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
-import { isCloseUp } from '../../lib/metrics'
+import { isCloseUp, SITE_LABEL } from '../../lib/metrics'
 
 export type Step = 'site' | 'guide' | 'camera' | 'review' | 'files' | 'processing' | 'samples'
 export const STEPS: Step[] = ['site', 'guide', 'camera', 'review', 'files', 'processing', 'samples']
@@ -27,13 +27,7 @@ export type Kind = 'face' | 'close' | 'arm'
 export const kindOf = (site: Site): Kind => (isArm(site) ? 'arm' : isCloseUp(site) ? 'close' : 'face')
 
 /** The design's names (APP drawer and CAP site cards). */
-export const SITE_NAME: Record<Site, string> = {
-  face_full: 'Face',
-  cheek_macro: 'Cheek close-up',
-  nose_macro: 'Nose close-up',
-  forearm_treated: 'Treated forearm',
-  forearm_control: 'Control forearm',
-}
+export const SITE_NAME = SITE_LABEL
 
 /** Small swatch in the picker rows (APP capVals). Hue is decoration, never data. */
 export const SITE_SWATCH: Record<Site, string> = {
@@ -177,7 +171,7 @@ export function modeFacts(mode: CaptureMode): { g: string; t: string }[] {
       ]
 }
 
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+export { plural } from '../../lib/format'
 export const siteLower = (site: Site) => SITE_NAME[site].toLowerCase()
 export const pad2 = (n: number) => String(n).padStart(2, '0')
 

@@ -1,5 +1,6 @@
 import type { SpotDiary, SpotStatus, SpotZone } from '../../lib/api'
 import { plural } from '../../lib/format'
+import { fmtDays } from '../progress/diaryText'
 
 /** Product test tile: day N since the treated-arm baseline, one dot per day (filled when a treated photo was taken). */
 export function ProductTestTile({ day, dots, standing, onOpen, className = '' }: { day: number; dots: boolean[]; standing: { g: string; t: string }; onOpen: () => void; className?: string }) {
@@ -61,7 +62,7 @@ export function SpotDiaryTile({ diary, onOpen, className = '' }: { diary: SpotDi
   const summary = parts.length ? parts.join(', ') : plural(tracks.length, 'mark followed', 'marks followed')
   const zones = [...diary.zones].filter((z) => z.appeared > 0).sort((a, b) => b.appeared - a.appeared).slice(0, 3)
   const max = zones[0]?.appeared ?? 0
-  const busiest = zones.length && (zones.length === 1 || zones[1].appeared < max) ? `${ZONE_LABEL[zones[0].zone]} gets new spots most often` : `Across ${plural(diary.sessions_used, 'check-in', 'check-ins')}, ${plural(diary.days_covered, 'day', 'days')}`
+  const busiest = zones.length && (zones.length === 1 || zones[1].appeared < max) ? `${ZONE_LABEL[zones[0].zone]} gets new spots most often` : `Across ${plural(diary.sessions_used, 'check-in', 'check-ins')}, ${fmtDays(diary.days_covered)}`
   return (
     <button
       type="button"

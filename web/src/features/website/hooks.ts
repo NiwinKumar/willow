@@ -38,7 +38,7 @@ export function useEntryActions(next: string | null = null) {
   return { pending, error, google: () => void run('google'), guest: () => void run('guest') }
 }
 
-export type Journey = { state: 'loading' } | { state: 'unavailable' } | { state: 'ready'; views: SessionView[]; checkIns: number; days: number; places: string }
+export type Journey = { state: 'loading' } | { state: 'unavailable'; reason: 'empty' | 'error' } | { state: 'ready'; views: SessionView[]; checkIns: number; days: number; places: string }
 
 /** The team's measured demo journey (GET /v1/demo/journey, shared with demo mode): is there one, and how long is it? */
 export function useJourney(): Journey {
@@ -47,7 +47,7 @@ export function useJourney(): Journey {
     let alive = true
     void pickDemo().then((p) => {
       if (!alive) return
-      if (p.source !== 'real' || !p.views.length) return setJourney({ state: 'unavailable' })
+      if (p.source !== 'real' || !p.views.length) return setJourney({ state: 'unavailable', reason: p.source === 'unavailable' ? p.reason : 'empty' })
       const dates = p.views.map((v) => v.session.created_at).sort()
       const sites = [...new Set(p.views.map((v) => v.session.site))]
       setJourney({
@@ -65,7 +65,12 @@ export function useJourney(): Journey {
   return journey
 }
 
-/** "6 check-ins over 4 days · Face · Forearm, treated" */
+/** Why the journey can't be opened, in the words the landing and the judge tour share. */
+export function journeyUnavailableLine(j: Extract<Journey, { state: 'unavailable' }>): string {
+  return j.reason === 'empty' ? 'Not available right now: the demo journey has no measured sessions yet.' : 'Not available right now: the journey could not be read. Try again in a moment.'
+}
+
+/** "6 check-ins over 4 days · Face · Treated forearm" */
 export function journeyLine(j: Extract<Journey, { state: 'ready' }>): string {
   return `${plural(j.checkIns, 'check-in', 'check-ins')} over ${plural(j.days, 'day', 'days')} · ${j.places}`
 }

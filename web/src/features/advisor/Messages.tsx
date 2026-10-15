@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react'
+import { memo } from 'react'
 import { toast } from 'sonner'
 
 import { AITag } from '../../components/willow/AITag'
@@ -26,7 +27,7 @@ function checkLine(r: AdvisorReply): string | null {
   return r.checks.products_from_tools > 0 ? `${nums} · ${plural(r.checks.products_from_tools, 'product', 'products')} from the catalog` : nums
 }
 
-export function UserBubble({ m }: { m: Extract<ChatMessage, { role: 'user' }> }) {
+export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessage, { role: 'user' }> }) {
   return (
     <div className="flex flex-col items-end gap-1">
       {m.context ? <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {m.context.toUpperCase()}</span> : null}
@@ -35,9 +36,10 @@ export function UserBubble({ m }: { m: Extract<ChatMessage, { role: 'user' }> })
       </div>
     </div>
   )
-}
+})
 
-export function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract<ChatMessage, { role: 'willow' }>; last: boolean; busy: boolean; capped: boolean; onAsk: (q: string) => void; onProduct: (p: Product) => void }) {
+// Memoised: while an answer appears (a store update every ~42 ms) only the answer being revealed redraws.
+export const Answer = memo(function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract<ChatMessage, { role: 'willow' }>; last: boolean; busy: boolean; capped: boolean; onAsk: (q: string) => void; onProduct: (p: Product) => void }) {
   const r = m.reply
   const revealing = m.shown < m.words.length
   const check = checkLine(r)
@@ -51,8 +53,8 @@ export function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract
           <span className="font-mono text-[10px] leading-[1.5] tracking-[.05em] text-ink-2">{provenance(r)}</span>
           {r.checks ? <AITag className="!min-h-5 !px-2 !text-[10px]" /> : null}
         </span>
-        {/* The visible words appear one by one; screen readers get the whole answer once it is shown. */}
-        <p aria-hidden={revealing} className="text-[14.5px] leading-[1.55] text-pretty">
+        {/* The visible words appear one by one; screen readers get the whole answer once, from the sr-only copy below. */}
+        <p aria-hidden className="text-[14.5px] leading-[1.55] text-pretty">
           {m.words.slice(0, m.shown).map((w, i) => (
             <span key={i} style={{ animation: 'wWord .5s ease-out both' }}>
               {w}{' '}
@@ -71,7 +73,8 @@ export function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract
         {!revealing ? (
           <div className="flex flex-col gap-3" style={{ animation: 'wRise .4s both' }}>
             <span className="flex flex-wrap items-center justify-between gap-2.5">
-              {check ? <span className="text-[12px] text-willow-700">{check}</span> : <span className="text-[12px] text-ink-2">Ask about one product or one measurement at a time.</span>}
+              {/* Without checks the api's own fallback already says how to ask; don't repeat it. */}
+              {check ? <span className="text-[12px] text-willow-700">{check}</span> : <span />}
               <button
                 type="button"
                 onClick={() => {
@@ -80,7 +83,7 @@ export function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract
                     () => toast('Couldn’t copy here'),
                   )
                 }}
-                className="min-h-[30px] rounded-pill bg-sunken px-3 text-[12px]"
+                className="hit44 min-h-[30px] rounded-pill bg-sunken px-3 text-[12px]"
               >
                 Copy
               </button>
@@ -110,7 +113,7 @@ export function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract
       {!revealing ? <span className="sr-only">{r.message}</span> : null}
     </div>
   )
-}
+})
 
 /** A product the advisor named (from reply.products: real catalog listings). Stores are links only. */
 function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
@@ -129,7 +132,7 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
       {p.stores.length ? (
         <span className="flex flex-wrap gap-1.5">
           {p.stores.map((s) => (
-            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`${s.store}, opens in new tab`} className="inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline">
+            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`${s.store}, opens in new tab`} className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline">
               {s.store} <ExternalLink size={12} strokeWidth={1.5} aria-hidden />
             </a>
           ))}
@@ -149,7 +152,7 @@ export function ErrorBubble({ m, busy }: { m: Extract<ChatMessage, { role: 'erro
         <span className="text-[13px]">{m.title}</span>
         <span className="text-[13px] text-ink-2">{m.body}</span>
         {m.question ? (
-          <button type="button" disabled={busy} onClick={() => retry(m.id)} className="min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse">
+          <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse">
             Try again
           </button>
         ) : null}

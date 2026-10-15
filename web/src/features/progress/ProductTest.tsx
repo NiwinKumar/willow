@@ -11,7 +11,7 @@ import { WillowLoader } from '../../components/willow/WillowLoader'
 import { matchControl } from '../../data/live'
 import type { CaptureMode, Metric, Session } from '../../data/types'
 import { useData } from '../../data/useData'
-import { fmtDate, fmtHours, parseDate } from '../../lib/format'
+import { fmtDate, fmtHours, parseDate, plural } from '../../lib/format'
 import { fmtSigned, fmtValue } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
 import { MODE_LABEL, baselineFor, dayOf, metricOf, sessionState } from './model'
@@ -113,7 +113,7 @@ export default function ProductTest() {
           <span className="text-[20px]">{name}</span>
           <span className="flex items-center gap-1.5 rounded-pill bg-white/14 px-3 py-[7px] text-[12px]">
             {kind ? <VerdictGlyph kind={kind} onDark /> : <VerdictGlyph kind="notCompared" onDark />}
-            {kind ? VERDICT_WORDS[kind].short : 'Missing'}
+            {kind ? VERDICT_WORDS[kind].label : session ? VERDICT_WORDS.notCompared.label : 'No photo'}
           </span>
         </span>
         <span className="flex flex-col items-center gap-1.5">
@@ -194,7 +194,7 @@ export default function ProductTest() {
           format={(v) => fmtValue(v, fm)}
           unit="°"
           caption="ITA° per check-in, treated and control arm"
-          summary={`ITA° over ${treated.length} check-ins. Treated: ${tv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}. Control: ${cv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}.`}
+          summary={`ITA° over ${plural(treated.length, 'check-in', 'check-ins')}. Treated: ${tv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}. Control: ${cv.map((v) => (v === null ? 'missing' : fmtValue(v, fm))).join(', ')}.`}
         />
         <div className="flex flex-wrap gap-[18px] text-[14px]">
           <span className="flex items-center gap-2">

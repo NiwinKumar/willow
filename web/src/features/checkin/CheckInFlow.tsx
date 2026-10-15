@@ -34,7 +34,8 @@ import { useUpload } from './useUpload'
 
 type Shot = { file: File; url: string }
 /** History state of each check-in entry: the page drawn behind, and how many steps deep this entry is. */
-type NavState = { background?: unknown; depth?: number } | null
+/** `prev`: the step a pushed step came from, so "Back to preparation" can go back instead of stacking the guide again. */
+type NavState = { background?: unknown; depth?: number; prev?: string | null } | null
 
 /**
  * The check-in (/check-in, over the page it was opened from): site → guide → camera → review → files →
@@ -91,7 +92,7 @@ export default function CheckInFlow() {
         if (v === null) q.delete(k)
         else q.set(k, v)
       }
-      navigate({ search: `?${q}` }, { replace: opts.replace, state: { ...nav, depth: opts.replace ? depth : depth + 1 } })
+      navigate({ search: `?${q}` }, { replace: opts.replace, state: { ...nav, depth: opts.replace ? depth : depth + 1, prev: opts.replace ? nav.prev : params.get('step') } })
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nav is derived from location.state
     [params, navigate, location.state, depth],
@@ -400,7 +401,7 @@ export default function CheckInFlow() {
         onShot={(file, url) => setShots((s) => (s.length >= n ? s : [...s, { file, url }]))}
         onRetakeLast={() => setShots((s) => s.slice(0, -1))}
         onReview={() => go({ step: 'review' })}
-        onBack={() => go({ step: 'guide' })}
+        onBack={() => (nav.prev === 'guide' ? navigate(-1) : go({ step: 'guide' }))}
         onFiles={() => go({ step: 'files' })}
       />
     )
@@ -500,7 +501,7 @@ function SignInGate({ onGuest, onGoogle }: { onGuest: () => Promise<void>; onGoo
     }
   }
   return (
-    <main className="mx-auto flex max-w-[560px] animate-rise flex-col items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="mx-auto flex max-w-[560px] animate-rise flex-col items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <h1 id="ck-title" tabIndex={-1} className="m-0 font-serif text-[clamp(31px,3vw,40px)] leading-[.95] font-normal outline-none">
         Sign in to check in
       </h1>
@@ -513,6 +514,6 @@ function SignInGate({ onGuest, onGoogle }: { onGuest: () => Promise<void>; onGoo
           Sign in with Google
         </Button>
       </div>
-    </main>
+    </div>
   )
 }

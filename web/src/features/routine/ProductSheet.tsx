@@ -10,7 +10,7 @@ import { useOwner, useRoutine } from '../../data/hooks'
 import type { Product, RoutineEntry } from '../../data/types'
 import { api } from '../../lib/api'
 import { CONCERN_LABEL } from '../../lib/catalog'
-import { fmtDate, fmtPrice } from '../../lib/format'
+import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { outcomeFor, type Outcome } from '../../lib/outcome'
 import { useQuery } from '../../lib/query'
 import { useOutcomes } from '../../lib/useOutcomes'
@@ -142,7 +142,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
           />
           {entry.recent_use ? (
             <span className="text-[13px] text-ink-2">
-              Used on {entry.recent_use.days_used} of {entry.recent_use.of_days} days lately (from your ticks).
+              Used on {entry.recent_use.days_used} of {plural(entry.recent_use.of_days, 'day', 'days')} lately (from your ticks).
             </span>
           ) : null}
           <div className="flex flex-wrap gap-2">

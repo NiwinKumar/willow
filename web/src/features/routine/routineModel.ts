@@ -32,7 +32,6 @@ export function orbGradient(category: string): string {
 }
 
 export const entryName = (e: Pick<RoutineEntry, 'custom_name' | 'brand'>) => e.custom_name || e.brand || 'Unnamed product'
-export const fullName = (e: Pick<RoutineEntry, 'custom_name' | 'brand'>) => [e.brand, e.custom_name].filter(Boolean).join(' ') || 'Unnamed product'
 export const activeLabel = (a: { name: string; pct: number | null }) => {
   const n = a.name.charAt(0).toUpperCase() + a.name.slice(1)
   return a.pct !== null ? `${n} ${a.pct}%` : n

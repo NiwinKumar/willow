@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useParams, type Location } from 'react-router-dom'
 import { Toaster } from 'sonner'
 
-import { AppShell } from './components/shell/AppShell'
 import { CheckInOverlay } from './components/shell/CheckInOverlay'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { buttonClass } from './components/ui/Button'
@@ -11,6 +10,8 @@ import { DataProvider } from './data/store'
 import { useAuth } from './lib/useAuth'
 import Landing from './features/website/Landing'
 
+// The landing page is the only eager screen: the app shell and every destination load on first visit.
+const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({ default: m.AppShell })))
 const SignIn = lazy(() => import('./features/website/SignIn'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))

@@ -51,6 +51,7 @@ function RunningNow() {
 export function ScienceSection({ className = '' }: { className?: string }) {
   return (
     <section id="science" className={`flex justify-center pt-[clamp(72px,10vw,140px)] ${className}`}>
+      <h2 className="sr-only">The science</h2>
       <div className="w-full max-w-[1080px] overflow-hidden rounded-[clamp(36px,5vw,56px)] bg-surface shadow-[0_40px_80px_-50px_rgba(0,0,0,.3)]">
         <div
           className="relative grid h-[clamp(300px,42vw,520px)] place-items-center overflow-hidden"

@@ -6,7 +6,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import type { Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
-import { fmtDate } from '../../lib/format'
+import { clockOf, fmtDate } from '../../lib/format'
 import { useAuth } from '../../lib/useAuth'
 import { usedFrames } from './model'
 
@@ -14,12 +14,13 @@ import { usedFrames } from './model'
  * "Make {day} your baseline?" (design confirm dialog): POST /v1/baselines/{site}, then every session is read
  * again (later sessions are compared with the new one). Works for RAW and Quick: each mode has its own.
  */
-export function BaselineDialog({ session, open, onClose }: { session: Session; open: boolean; onClose: () => void }) {
+/** `withTime`: the day has several check-ins, so the time says which one becomes the baseline. */
+export function BaselineDialog({ session, withTime = false, open, onClose }: { session: Session; withTime?: boolean; open: boolean; onClose: () => void }) {
   const data = useData()
   const { getIdToken } = useAuth()
   const [precedes, setPrecedes] = useState(false)
   const [saving, setSaving] = useState(false)
-  const day = fmtDate(session.created_at, { day: 'numeric', month: 'long' })
+  const day = `${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}${withTime ? `, ${clockOf(session.created_at)}` : ''}`
   const used = usedFrames(session)
   const close = () => {
     setPrecedes(false)

@@ -8,7 +8,7 @@ export type HeroLine = { g: string; t: string }
  * The sunrise greeting card: serif greeting, two or three glyph lines built from real verdicts, and the
  * blurred bloom. The design uses a photo of a flower; it is recreated here with CSS (no images in the repo).
  */
-export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today' }: { name: string; lines: HeroLine[]; onAsk?: () => void; askLabel?: string }) {
+export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today' }: { name: string | null; lines: HeroLine[]; onAsk?: () => void; askLabel?: string }) {
   // The greeting and date are read once per visit (they do not tick while the page is open).
   const [now] = useState(() => new Date())
   const hr = now.getHours()
@@ -34,9 +34,16 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today' }: {
       <span className="font-mono text-[11px] tracking-[.08em]">■ {date}</span>
       <div className="flex max-w-[560px] flex-col gap-4">
         <h1 className="m-0 font-serif text-[clamp(40px,3.8vw,58px)] leading-[.9] font-normal tracking-[-0.02em]">
-          {greet},
-          <br />
-          <span className="italic">{name}</span>
+          {/* A guest has no name to greet ("Good evening, there" read oddly). */}
+          {name ? (
+            <>
+              {greet},
+              <br />
+              <span className="italic">{name}</span>
+            </>
+          ) : (
+            `${greet}.`
+          )}
         </h1>
         {lines.length ? (
           <div className="flex flex-col gap-1">

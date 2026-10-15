@@ -1,10 +1,12 @@
+import { baselineFor } from '../data/live'
 import type { MetricId, RoutineEntry, Session, Site } from '../data/types'
 import { CONCERN_METRICS } from './catalog'
 import { parseDate } from './format'
-import { METRIC_META, fmtSigned, fmtValue } from './metrics'
+import { METRIC_META, fmtSigned, fmtValue, unitOf } from './metrics'
+import { VERDICT_WORDS } from './verdict'
 
 export type Outcome =
-  | { kind: 'real'; metric: MetricId; site: Site; text: string; detail: string }
+  | { kind: 'real'; metric: MetricId; site: Site; text: string; detail: string; session: Session; band: number | null }
   | { kind: 'none'; text: string; detail: string }
   | { kind: 'early'; text: string; detail: string }
   | { kind: 'unmeasured'; text: string; detail: string }
@@ -50,7 +52,7 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   if (checkIns < 2 || weeks < 2) {
     const since = weeks === 0 ? 'Started this week.' : `Started ${weeks} week${weeks === 1 ? '' : 's'} ago.`
     const need = checkIns < 2 ? `Willow needs at least two check-ins after the start date (${checkIns} so far).` : 'Most changes take at least two weeks to show.'
-    return { kind: 'early', text: 'Too early to tell', detail: `${since} ${need}` }
+    return { kind: 'early', text: VERDICT_WORDS.notEnough.label, detail: `${since} ${need}` }
   }
   const judged = new Set<MetricId>()
   for (const { t, site } of pairs) {
@@ -61,19 +63,26 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
     // baseline) or a failed photo is "not enough check-ins yet", never "inside your band"
     if (m && (m.verdict === 'within_noise' || m.verdict === 'real_change')) judged.add(t)
     if (m && m.verdict === 'real_change' && m.delta !== null) {
+      const latest = after[after.length - 1]
+      // The normal range is the baseline's mdc95 (the band the api judged against), not this session's own spread.
+      const band = baselineFor(latest, sessions.filter((s) => s.site === site))?.result?.metrics.find((x) => x.id === t)?.mdc95 ?? null
+      // Rounded as the result screen and its explanation round them: at this session's own precision.
+      const delta = `${fmtSigned(m.delta, m)}${unitOf(m) === '°' ? '°' : unitOf(m) === '%' ? ' pts' : unitOf(m) ? ` ${unitOf(m).trim()}` : ''}`
       return {
         kind: 'real',
         metric: t,
         site,
-        text: `Real change in ${METRIC_META[m.id].label.toLowerCase()}`,
-        detail: `Started ${weeks} weeks ago. Latest reading vs your baseline: ${METRIC_META[m.id].label.toLowerCase()} ${fmtSigned(m.delta, m)}, noise band ±${m.mdc95 !== null ? fmtValue(m.mdc95, m) : '–'}. The change may be linked to this product; other products or habits could also contribute.`,
+        session: latest,
+        band,
+        text: `${VERDICT_WORDS.changed.label}: ${METRIC_META[m.id].label.toLowerCase()}`,
+        detail: `Started ${weeks} weeks ago. Latest reading vs your baseline: ${METRIC_META[m.id].label.toLowerCase()} ${delta}${band !== null ? `, normal range ±${fmtValue(band, m)}` : ''}. The change may be linked to this product; other products or habits could also contribute.`,
       }
     }
   }
   // Name only what was judged: a target without two check-ins on its site is not "no change".
   if (judged.size === 0)
-    return { kind: 'early', text: 'Too early to tell', detail: 'Willow has no comparable check-ins for what this product targets yet: the measurements need a baseline and two check-ins after the start date.' }
+    return { kind: 'early', text: VERDICT_WORDS.notEnough.label, detail: 'Willow has no comparable check-ins for what this product targets yet: the measurements need a baseline and two check-ins after the start date.' }
   const open = targets.filter((t) => !judged.has(t))
   const rest = open.length ? ` ${names(open).charAt(0).toUpperCase() + names(open).slice(1)}: not enough check-ins yet.` : ''
-  return { kind: 'none', text: `No clear change yet (${weeks} wks)`, detail: `${names([...judged]).charAt(0).toUpperCase() + names([...judged]).slice(1)}: inside your noise band so far. Most effects take 4 to 8 weeks to exceed photo noise.${rest}` }
+  return { kind: 'none', text: `${VERDICT_WORDS.normal.label} so far (${weeks} wks)`, detail: `${names([...judged]).charAt(0).toUpperCase() + names([...judged]).slice(1)}: within your normal range so far. Most effects take 4 to 8 weeks to show beyond normal photo variation.${rest}` }
 }

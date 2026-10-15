@@ -4,12 +4,9 @@ import { Button } from '../../components/ui/Button'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { FACE_MAP } from '../../data/faceMap'
 import type { SpotDiary as Diary, SpotStatus, SpotTrack, SpotZone } from '../../lib/api'
-import { ORDER, STAGE_COLOUR, STATUS_SHAPE, ZONE_NAME, stageName, statusText } from './diaryText'
+import { ORDER, STAGE_COLOUR, STATUS_SHAPE, ZONE_NAME, fmtDays, isToday, stageName, statusText } from './diaryText'
 import { fmtDate } from '../../lib/format'
 import { useMediaQuery } from '../../lib/useMediaQuery'
-
-const nd = (n: number) => (n === 1 ? '1 day' : `${n} days`)
-const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString()
 
 function Shape({ status, size = 11, selected }: { status: SpotStatus; size?: number; selected?: boolean }) {
   const s = STATUS_SHAPE[status]
@@ -66,7 +63,7 @@ export function SpotDiary({
   const startsWhen =
     photoDays < 2 && sess.length >= 2 ? 'Spot diary starts tomorrow' : photoDays >= 2 && sess.length < 3 ? 'Spot diary starts with your next photo' : 'Spot diary starts on day 3'
 
-  const title = ready && d ? `Your spots over ${nd(Math.max(1, Math.round(d.days_covered)))}` : first ? 'Your spot diary' : 'Your spots'
+  const title = ready && d ? `Your spots over ${fmtDays(Math.max(1, d.days_covered))}` : first ? 'Your spot diary' : 'Your spots'
   const sub =
     ready && d && lastSess
       ? `${sess.length} photos, ${fmtDate(sess[0].created_at)} to ${fmtDate(lastSess.created_at)}. Names are AI-suggested.`
@@ -222,7 +219,7 @@ export function SpotDiary({
             <span className="px-1 text-[13px] leading-[1.45]">
               {zSel
                 ? zs?.typical_days_visible
-                  ? `Spots here usually stay visible about ${zs.typical_days_visible.at_least} to ${zs.typical_days_visible.at_most} days (from ${zs.typical_days_visible.from} that faded).`
+                  ? `Spots here usually stay visible ${fmtDays(zs.typical_days_visible.at_least) === fmtDays(zs.typical_days_visible.at_most) ? `about ${fmtDays(zs.typical_days_visible.at_most)}` : `between ${fmtDays(zs.typical_days_visible.at_least)} and ${fmtDays(zs.typical_days_visible.at_most)}`} (from ${zs.typical_days_visible.from} that faded).`
                   : 'How long spots last here shows after 3 have faded.'
                 : 'Pick an area to see its spots and how long they usually last.'}
             </span>

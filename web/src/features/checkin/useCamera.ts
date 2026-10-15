@@ -221,7 +221,8 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
       // A close-up shows one side of the face (often hair or background at an edge): only strong side light fails it.
       const even = closeUp ? ratio > 0.6 && ratio < 1.6 : ratio > 0.8 && ratio < 1.25
       const g: Gates = { light: mean > 0.32 && mean < 0.75 && clipped / N < 0.02, even, still: motion < 6 }
-      setGates(g)
+      // Same gates as last tick: keep the old object, so the camera view does not redraw five times a second.
+      setGates((p) => (p.light === g.light && p.even === g.even && p.still === g.still ? p : g))
       if (!g.still) movedSinceShot.current = true
       const now = performance.now()
       const settling = liveSince.current !== null && now - liveSince.current <= SETTLE_MS

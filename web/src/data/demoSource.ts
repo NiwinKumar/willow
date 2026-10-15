@@ -5,7 +5,8 @@
  */
 import { api, type SessionView } from '../lib/api'
 
-export type DemoPick = { source: 'real'; views: SessionView[] } | { source: 'unavailable'; views: null }
+/** `empty`: the api answered but the journey has no measured sessions; `error`: the api did not answer. */
+export type DemoPick = { source: 'real'; views: SessionView[] } | { source: 'unavailable'; views: null; reason: 'empty' | 'error' }
 
 /** Signed photo URLs last about an hour: a journey older than this is fetched again. */
 const FRESH_MS = 600_000
@@ -23,20 +24,25 @@ function fresh(): SessionView[] | null {
 export function pickDemo(): Promise<DemoPick> {
   if (held && pick) return Promise.resolve(pick)
   const views = fresh()
-  if (views) return Promise.resolve((pick = views.length ? { source: 'real', views } : { source: 'unavailable', views: null }))
+  if (views) return Promise.resolve((pick = views.length ? { source: 'real', views } : { source: 'unavailable', views: null, reason: 'empty' }))
   inflight ??= api
     .demoJourney()
     .then((r) => {
       journey = { views: r.sessions.filter((v) => v.session.status === 'done'), at: Date.now() }
-      return journey.views.length ? ({ source: 'real', views: journey.views } as const) : ({ source: 'unavailable', views: null } as const)
+      return journey.views.length ? ({ source: 'real', views: journey.views } as const) : ({ source: 'unavailable', views: null, reason: 'empty' } as const)
     })
-    .catch(() => ({ source: 'unavailable', views: null }) as const)
+    .catch(() => ({ source: 'unavailable', views: null, reason: 'error' }) as const)
     .then((p) => {
       inflight = null
       if (!held) pick = p
       return p
     })
   return inflight
+}
+
+/** Why the demo journey is unavailable (for honest copy), or null when it is not. */
+export function demoUnavailable(): 'empty' | 'error' | null {
+  return pick?.source === 'unavailable' ? pick.reason : null
 }
 
 /** The current pick, or null while undecided (or when the journey's photo links have gone stale). */

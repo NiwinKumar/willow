@@ -267,7 +267,7 @@ export default function SignIn() {
             {guest ? (
               <span className="flex min-h-10 items-center text-ink-2">You are using Willow as a guest.</span>
             ) : (
-              <button type="button" onClick={asGuest} disabled={pending !== null} className="min-h-10 text-[14px] underline">
+              <button type="button" onClick={asGuest} disabled={pending !== null} className="hit44 min-h-10 text-[14px] underline">
                 {pending === 'guest' ? 'Starting…' : 'Continue as guest'}
               </button>
             )}

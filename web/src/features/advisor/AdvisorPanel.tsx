@@ -24,7 +24,7 @@ const usable = (s: Session) => s.status === 'done' && s.measured !== false && Bo
 /** The api counts questions per UTC day: the local time that day ends, e.g. "05:30". */
 function resetTime(): string {
   const d = new Date()
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 /**
@@ -37,7 +37,7 @@ export default function AdvisorPanel({ seed, onClose }: { seed: AdvisorSeed | nu
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="relative z-[3] flex min-h-[52px] flex-none items-center gap-2.5 px-3.5 pt-3">
-        <button type="button" onClick={onClose} aria-label="Close advisor" title="Close · Esc" className="grid size-10 place-items-center rounded-[16px] bg-ink/5 transition-colors hover:bg-ink/10 squircle">
+        <button type="button" onClick={onClose} aria-label="Close advisor" title="Close · Esc" className="hit44 grid size-10 place-items-center rounded-[16px] bg-ink/5 transition-colors hover:bg-ink/10 squircle">
           <X size={16} strokeWidth={1.8} aria-hidden />
         </button>
         <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ ADVISOR</span>
@@ -64,9 +64,20 @@ function ContextChip() {
   const products = (routine.data ?? []).filter((e) => !e.ended_at).length
   const dots = ['var(--aura-coral)', 'var(--willow-400)', 'var(--aura-violet)']
   return (
-    <div className="relative ml-auto" onPointerEnter={(e) => e.pointerType === 'mouse' && setOpen(true)} onPointerLeave={(e) => e.pointerType === 'mouse' && setOpen(false)}>
+    <div
+      className="relative ml-auto"
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setOpen(true)}
+      onPointerLeave={(e) => e.pointerType === 'mouse' && setOpen(false)}
+      onKeyDown={(e) => {
+        // Esc closes this popover first (not the whole advisor panel behind it).
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation()
+          setOpen(false)
+        }
+      }}
+    >
       {/* Hover opens it for a mouse; a tap (which also fires enter) or a key toggles it. */}
-      <button type="button" onClick={(e) => setOpen((o) => ((e.nativeEvent as PointerEvent).pointerType === 'mouse' ? true : !o))} aria-expanded={open} className="flex min-h-10 items-center gap-2.5 rounded-pill bg-surface/80 px-3.5 text-[13px] shadow-[0_10px_30px_-18px_rgba(0,0,0,.3)] backdrop-blur-[14px]">
+      <button type="button" onClick={(e) => setOpen((o) => ((e.nativeEvent as PointerEvent).pointerType === 'mouse' ? true : !o))} aria-expanded={open} className="hit44 flex min-h-10 items-center gap-2.5 rounded-pill bg-surface/80 px-3.5 text-[13px] shadow-[0_10px_30px_-18px_rgba(0,0,0,.3)] backdrop-blur-[14px]">
         <span aria-hidden className="flex pl-[3px]">
           {dots.map((c) => (
             <span key={c} className="-ml-[3px] size-2.5 rounded-full shadow-[0_0_0_2px_var(--bg-surface)]" style={{ background: c }} />
@@ -178,7 +189,7 @@ function Chat({ seed }: { seed: AdvisorSeed | null }) {
               {status}
             </span>
           </div>
-          <button type="button" onClick={newChat} disabled={busy} className="min-h-9 rounded-pill border border-ink/12 bg-surface px-4 text-[13px]">
+          <button type="button" onClick={newChat} disabled={busy} className="hit44 min-h-9 rounded-pill border border-ink/12 bg-surface px-4 text-[13px]">
             New chat
           </button>
         </div>
@@ -203,11 +214,11 @@ function Chat({ seed }: { seed: AdvisorSeed | null }) {
             m.role === 'user' ? (
               <UserBubble key={m.id} m={m} />
             ) : m.role === 'willow' ? (
-              <Answer key={m.id} m={m} last={m === lastAnswer && m === last} busy={busy} capped={capped} onAsk={(q) => ask(q)} onProduct={setProduct} />
+              <Answer key={m.id} m={m} last={m === lastAnswer && m === last} busy={busy} capped={capped} onAsk={ask} onProduct={setProduct} />
             ) : m.role === 'error' ? (
               <ErrorBubble key={m.id} m={m} busy={busy} />
             ) : (
-              <p key={m.id} className="text-[12px] text-signal-ink">
+              <p key={m.id} className="text-[12px] text-ink-2">
                 ■ {m.text}
               </p>
             ),
@@ -317,7 +328,7 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           e.preventDefault()
           send()
         }}
-        className="flex items-center gap-2 rounded-pill border border-white/90 bg-white/[.82] p-1.5 shadow-[0_20px_40px_-24px_rgba(0,0,0,.35)] backdrop-blur-[20px]"
+        className="flex items-center gap-2 rounded-pill border border-white/90 bg-white/[.82] p-1.5 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus shadow-[0_20px_40px_-24px_rgba(0,0,0,.35)] backdrop-blur-[20px]"
       >
         <label htmlFor="ask-input" className="sr-only">
           Your question
@@ -342,7 +353,7 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
             aria-label={listening ? 'Stop dictation' : 'Dictate'}
             title={listening ? 'Stop dictation' : 'Dictate'}
             disabled={capped}
-            className="grid size-[38px] flex-none place-items-center rounded-full transition-colors"
+            className="hit44 grid size-[38px] flex-none place-items-center rounded-full transition-colors"
             style={{ background: listening ? 'var(--aura-coral)' : 'var(--bg-sunken)', color: listening ? '#fff' : 'var(--text-primary)', boxShadow: listening ? '0 0 0 6px rgba(255,107,74,.25)' : 'none' }}
           >
             <span aria-hidden className="flex h-[18px] items-center gap-[2.5px]">
@@ -353,11 +364,11 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           </button>
         ) : null}
         {thinking ? (
-          <button type="button" onClick={stopWaiting} aria-label="Stop waiting for this answer" title="Stop waiting (the question still counts)" className="grid size-[38px] flex-none place-items-center rounded-full bg-selected">
+          <button type="button" onClick={stopWaiting} aria-label="Stop waiting for this answer" title="Stop waiting (the question still counts)" className="hit44 grid size-[38px] flex-none place-items-center rounded-full bg-selected">
             <span aria-hidden className="size-3.5 rounded-[3px] bg-white" />
           </button>
         ) : (
-          <button type="submit" aria-label="Send" disabled={!draft.trim() || busy || capped} className="grid size-[38px] flex-none place-items-center rounded-full text-inverse transition-transform active:scale-[.92]" style={{ background: 'radial-gradient(circle at 35% 30%, var(--aura-ice), var(--aura-sky) 50%, #1B1F7A)' }}>
+          <button type="submit" aria-label="Send" disabled={!draft.trim() || busy || capped} className="hit44 grid size-[38px] flex-none place-items-center rounded-full text-inverse transition-transform active:scale-[.92]" style={{ background: 'radial-gradient(circle at 35% 30%, var(--aura-ice), var(--aura-sky) 50%, #1B1F7A)' }}>
             <ArrowUp size={16} strokeWidth={2} aria-hidden />
           </button>
         )}

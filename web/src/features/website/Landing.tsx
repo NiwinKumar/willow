@@ -11,7 +11,7 @@ import { useAuth } from '../../lib/useAuth'
 import { useSamples } from '../../lib/useSamples'
 import { HeroBloom, Lockup } from './Decor'
 import { FIRST_CHECKIN, isReturning } from './entry'
-import { journeyLine, useEntryActions, useJourney } from './hooks'
+import { journeyLine, journeyUnavailableLine, useEntryActions, useJourney } from './hooks'
 import { ScienceSection } from './ScienceSection'
 import { SectionRail } from './SectionRail'
 import { glide, SECTIONS, setupReveal } from './scroll'
@@ -86,12 +86,15 @@ export default function Landing() {
     <div className="min-h-dvh overflow-x-clip bg-canvas text-ink">
       <WillowIntro onDone={() => setIntroDone(true)} />
       <SectionRail ready={introDone} />
-      <Hero returning={returning} bloomRef={bloom} />
-      <WaysIn returning={returning} />
-      <How />
-      <ScienceSection className={`${pad} ${railRoom}`} />
-      <Limits />
-      <Fairness />
+      {/* One main landmark for the page; the privacy footer stays outside it (contentinfo). */}
+      <main>
+        <Hero returning={returning} bloomRef={bloom} />
+        <WaysIn returning={returning} />
+        <How />
+        <ScienceSection className={`${pad} ${railRoom}`} />
+        <Limits />
+        <Fairness />
+      </main>
       <Footer />
     </div>
   )
@@ -111,7 +114,8 @@ function Hero({ returning, bloomRef }: { returning: boolean; bloomRef: Ref<HTMLD
       <header className={`relative z-[2] flex flex-wrap items-center justify-between gap-4 py-[clamp(18px,3vw,32px)] ${pad}`}>
         <Lockup />
         <div className="flex items-center gap-[clamp(12px,2vw,24px)]">
-          <Link to="/retail" className="text-[15px] text-ink no-underline transition-opacity hover:opacity-60">
+          {/* With the longer "Open Willow →" the header would wrap on a phone; retailers still have the footer link there. */}
+          <Link to="/retail" className={`text-[15px] text-ink no-underline transition-opacity hover:opacity-60 ${returning ? 'max-[439px]:hidden' : ''}`}>
             For retailers
           </Link>
           <Link to={returning ? '/home' : '/signin'} className="cta-yellow rounded-pill px-6 py-[13px] text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
@@ -240,7 +244,7 @@ function WaysIn({ returning }: { returning: boolean }) {
                 ? `Our own photos, measured by the same engine as yours. ${journeyLine(journey)}.`
                 : journey.state === 'loading'
                   ? 'Checking the journey…'
-                  : 'Not available right now: the demo journey has no measured sessions yet.'
+                  : journeyUnavailableLine(journey)
             }
           />
         </button>
@@ -284,6 +288,8 @@ function WaysIn({ returning }: { returning: boolean }) {
 function How() {
   return (
     <section id="how" className={`pt-[clamp(72px,10vw,140px)] ${pad} ${railRoom}`}>
+      {/* The design draws no title here; screen readers still get one so the h3 cards sit under a section. */}
+      <h2 className="sr-only">How it works</h2>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-4">
         <div className="flex flex-col gap-14 rounded-[36px] bg-surface p-8 shadow-[0_30px_60px_-40px_rgba(0,0,0,.25)]">
           <span className="font-dot text-[64px] font-extrabold leading-none text-ink">01</span>
@@ -332,6 +338,7 @@ const LIMITS = [
 function Limits() {
   return (
     <section id="limits" className={`pt-[clamp(72px,10vw,140px)] ${pad} ${railRoom}`}>
+      <h2 className="sr-only">What is measured, and what is not</h2>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-px overflow-hidden rounded-[32px] bg-line">
         {LIMITS.map((l) => (
           <div key={l.tag} className="flex min-h-[200px] flex-col gap-3.5 bg-canvas p-7">

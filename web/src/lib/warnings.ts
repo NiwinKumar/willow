@@ -81,10 +81,3 @@ export function leftOutPhotos(r: AnalysisResult | null | undefined): string | nu
   const why = [...new Set(failed.flatMap((f) => f.reasons.map(word).filter(Boolean)))]
   return `${nums.length === 1 ? 'Photo' : 'Photos'} ${list} ${nums.length === 1 ? 'was' : 'were'} left out${why.length ? ` (${why.join(', ')})` : ''}.`
 }
-
-/** "5 photos, 2 used" when the quality check left some out; else "5 photos". */
-export function photosUsed(s: { n_frames: number; result?: AnalysisResult | null }): string {
-  const used = s.result?.quality.passed ? s.result.frames_used : null
-  const n = s.n_frames === 1 ? '1 photo' : `${s.n_frames} photos`
-  return used !== null && used !== undefined && used < s.n_frames ? `${n}, ${used} used` : n
-}

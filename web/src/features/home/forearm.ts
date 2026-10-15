@@ -16,7 +16,9 @@ export type ForearmRead = { day: number; dots: boolean[]; standing: { g: string;
 export function readForearm(treated: Session[], controls: Session[]): ForearmRead | null {
   const done = treated.filter((s) => s.status === 'done')
   if (!done.length) return null
-  const base = latest(treated, (s) => s.is_baseline) ?? done[0]
+  // The baseline of the latest measured treated photo (its own capture mode), as the product test page counts it.
+  const lt = latest(treated, usable)
+  const base = (lt ? baselineFor(lt, treated) : null) ?? latest(treated, (s) => s.is_baseline) ?? done[0]
   const day = Math.max(0, daysSince(base.created_at))
   // One dot per day since the baseline (the last 28 when longer), filled on days with a treated photo.
   const photoDays = new Set(done.map((s) => dayOf(s.created_at)))
