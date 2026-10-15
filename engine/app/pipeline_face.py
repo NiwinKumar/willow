@@ -254,7 +254,13 @@ def _frame(path: str) -> dict:
     # "spots" are pieces of the lines, and small round marks fail the line shape test anyway
     crop_face = dataclasses.replace(face, points=face.points - [box.x, box.y])
     big = [sp for sp in spots if 2 * sp.radius >= config.LINES_MARK_MIN_MM * px_per_mm]
-    lines_val, lines_extras = lines(lab, crop_face, face_skin, px_per_mm, [*blemishes, *big])
+    lines_val, lines_extras = lines(
+        lab,
+        crop_face,
+        _line_skin(lab, face_full & ~hand, zones.get("lower_face", np.zeros_like(face_skin))),
+        px_per_mm,
+        [*blemishes, *big],
+    )
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -475,6 +481,31 @@ def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.nd
         out = config.CROP_MIN_OUT_PX
         patch = cv2.resize(patch, (out, out), interpolation=cv2.INTER_CUBIC)
     return np.ascontiguousarray(patch)
+
+
+def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -> np.ndarray:
+    """Skin for the lines metric: the face outline minus eyes, lids and lips (`face_area`),
+    without hair (far darker AND greyer than this face's skin; below the nose, where a
+    beard or moustache grows, a little darker and greyer). Not face_skin: its stubble and
+    colour cuts take creases beside the mouth and shaded skin (Oct 15: a marionette zone
+    27% skin, one side none), the very places lines are. A crease is a shadow and keeps the
+    skin's colour (cut 0-0.4% of mouth zones on 4 lined faces, 17-33% on 2 bearded)."""
+    if not face_area.any():
+        return face_area
+    L = lab[..., 0]
+    chroma = np.hypot(lab[..., 1], lab[..., 2])
+    med_l, med_c = float(np.median(L[face_area])), float(np.median(chroma[face_area]))
+    hair = (L < med_l - config.LINES_HAIR_DARKER_L) & (chroma < config.LINES_HAIR_CHROMA * med_c)
+    beard = (L < med_l - config.LINES_BEARD_DARKER_L) & (chroma < config.LINES_BEARD_CHROMA * med_c)
+    # a beard: lines below the nose cannot be told from its hairs, so that part is left out.
+    # Judged by clear hair (the stricter test): bearded faces 25-29% of the lower face,
+    # 13 others 0-2.5% (Oct 15); the looser test also takes jaw shadow (up to 13%)
+    lower = face_area & lower_face
+    if lower.any() and (hair & lower).sum() > config.LINES_BEARD_FRAC * lower.sum():
+        hair |= lower_face
+    hair |= beard & lower_face  # moustache / stubble hairs on an otherwise clear lip
+    hair = cv2.dilate(hair.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    return face_area & ~hair
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:
