@@ -267,6 +267,11 @@ CLOSEUP_HAIR_CHROMA = 0.6
 CLOSEUP_NOSTRIL_L = 35.0
 CLOSEUP_CLIPPED_L = 97.0  # and this bright is clipped glare (lit skin is kept)
 CLOSEUP_MARK_EDGE_MM = 2.0  # marks this close to a region's edge are edge shadows
+# visible pores in a face photo (no close-up): enlarged pores only. Oct 15 synthetic pores
+# at L* 75 / 55 / 32: 0.25 mm counted within 7% from 8 px/mm (6 px/mm: 28-42% found), 0.35 mm
+# within 5% from 6 px/mm. Normal selfies are 8-17 px/mm
+FACE_PORE_MIN_PX_PER_MM = 8.0
+FACE_PORE_DIAMETER_MM = (0.2, 0.6)
 PORE_MARK_GAP_MM = 0.3  # pores this close to a blemish / dark spot edge are its edge
 PORE_EDGE_MM = 0.3  # ...or this close to the skin's edge (nostril rim, lid, hairline)
 PORE_CHAIN_MM = 1.0  # a pore with PORE_CHAIN_MIN+ neighbours this close, all in a line...
