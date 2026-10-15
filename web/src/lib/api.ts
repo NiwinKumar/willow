@@ -149,8 +149,19 @@ export type LabelScan = {
 }
 export type LabelScanResponse = { scan: LabelScan; match: { product_id: string; brand: string; name: string; score: number } | null }
 
+/** One block of a structured advisor answer (api advisor_blocks.py). Text uses the tiny inline markup
+ * (**bold**, ==highlight==, [product:ID], [metric:ID]); a widget names data the app draws itself. */
+export type AnswerBlock =
+  | { type: 'answer' | 'note'; text: string }
+  | { type: 'bullets'; items: string[] }
+  | { type: 'widget'; widget: { kind: 'metric_trend' | 'session_summary' | 'routine' | 'product' | 'spot_diary' | 'product_test'; params: Record<string, string | undefined> } }
+  | { type: 'products'; product_ids: string[] }
+
 export type AdvisorReply = {
+  /** Plain text of the answer (older api builds send only this). */
   message: string
+  /** The structured answer, answer first; absent from older api builds. */
+  blocks?: AnswerBlock[]
   product_ids: string[]
   products: Product[]
   follow_up_suggestions: string[]
@@ -180,6 +191,7 @@ export type StandardExplanation = { session_id: string; site: Site; capture_mode
 export type AdvisorStage =
   | { event: 'reading_context' }
   | { event: 'asking_gemini'; step: 'tools'; photos: number }
+  | { event: 'asking_gemini'; step: 'tool'; tool: 'search_catalog' | 'compare_products' | 'check_routine' | string }
   | { event: 'asking_gemini'; step: 'reply'; retrieval: string[] }
   | { event: 'checking_numbers' }
 

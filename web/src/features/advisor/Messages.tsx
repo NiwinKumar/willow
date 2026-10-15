@@ -1,41 +1,39 @@
-import { ExternalLink } from 'lucide-react'
-import { memo } from 'react'
+import { Copy, ExternalLink, Info, RotateCcw } from 'lucide-react'
+import { memo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
-import { AITag } from '../../components/willow/AITag'
 import { Disclaimer } from '../../components/willow/Disclaimer'
-import type { Product } from '../../data/types'
-import type { AdvisorReply } from '../../lib/api'
+import type { MetricId, Product } from '../../data/types'
+import type { AdvisorReply, AnswerBlock } from '../../lib/api'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { ProductImage } from '../routine/productUi'
 import { metaLine } from '../routine/routineModel'
 import { retry, type ChatMessage } from './chatStore'
+import { Markup, type MarkupLinks } from './markup'
+import { plainText } from './markupParse'
 import { AnswerOrb } from './Water'
+import { Widget, type WidgetLinks } from './widgets'
 
-/** "gemini-3.8-flash" -> "GEMINI 3.8 FLASH" for the provenance line. */
-const modelCaps = (id: string) => id.replace(/-/g, ' ').toUpperCase()
+/** "gemini-3.8-flash" -> "Gemini 3.8 Flash" for the info popover. */
+const modelName = (id: string) => id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
-/** Where an answer came from, from what the api says it did (checks, products, retrieval steps). */
-function provenance(r: AdvisorReply): string {
-  if (r.photos_refused) return 'WILLOW · PHOTO NOT READ · PRODUCT PHOTOS ONLY'
-  if (!r.checks) return 'WILLOW · NO ANSWER PASSED THE CHECKS'
-  const photos = r.checks.photos_read ?? 0
-  const catalog = r.products.length > 0 || r.retrieval.some((x) => /catalog|product/i.test(x))
-  return [modelCaps(r.checks.model), photos ? `READ ${photos} PHOTO${photos === 1 ? '' : 'S'}` : null, 'YOUR RESULTS', 'YOUR ROUTINE', catalog ? 'CATALOG' : null].filter(Boolean).join(' · ')
-}
-
-function checkLine(r: AdvisorReply): string | null {
-  if (!r.checks) return null
-  const nums = r.checks.numbers_checked > 0 ? `✓ ${plural(r.checks.numbers_checked, 'number', 'numbers')} checked against your results and the catalog` : '✓ No numbers quoted'
-  return r.checks.products_from_tools > 0 ? `${nums} · ${plural(r.checks.products_from_tools, 'product', 'products')} from the catalog` : nums
+/** Hover time on a message, e.g. "14:05 · 13 Oct". */
+function Stamp({ at, align }: { at: string; align: 'left' | 'right' }) {
+  const d = new Date(at)
+  if (Number.isNaN(d.getTime())) return null
+  return (
+    <time dateTime={at} className={`pointer-events-none px-1 text-[10.5px] text-ink-2 opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 ${align === 'right' ? 'self-end' : 'self-start'}`}>
+      {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · {fmtDate(at)}
+    </time>
+  )
 }
 
 export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessage, { role: 'user' }> }) {
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="group flex flex-col items-end gap-1">
       {m.context ? <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {m.context.toUpperCase()}</span> : null}
-      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13px] leading-[1.45] text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
+      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
         {m.photos?.length ? (
           <span className="flex flex-wrap justify-end gap-1.5">
             {m.photos.map((p) => (
@@ -49,83 +47,172 @@ export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessa
         ) : null}
         <span>{m.text}</span>
       </div>
+      <Stamp at={m.at} align="right" />
     </div>
   )
 })
 
-// Memoised: while an answer appears (a store update every ~42 ms) only the answer being revealed redraws.
-export const Answer = memo(function Answer({ m, last, busy, capped, onAsk, onProduct }: { m: Extract<ChatMessage, { role: 'willow' }>; last: boolean; busy: boolean; capped: boolean; onAsk: (q: string) => void; onProduct: (p: Product) => void }) {
-  const r = m.reply
-  const revealing = m.shown < m.words.length
-  const check = checkLine(r)
+/** "How this answer was made": what the api did and what its validator checked, in a popover. */
+function HowMade({ r }: { r: AdvisorReply }) {
+  const [open, setOpen] = useState(false)
+  const c = r.checks
+  const lines = [
+    ...r.retrieval,
+    ...(c
+      ? [
+          `Written by ${modelName(c.model)}`,
+          c.numbers_checked > 0 ? `${plural(c.numbers_checked, 'number', 'numbers')} checked against your results and the catalog` : 'No numbers quoted',
+          c.products_from_tools > 0 ? `${plural(c.products_from_tools, 'product', 'products')} from the catalog or your routine` : null,
+        ]
+      : [r.photos_refused ? 'The photo was not read: chat photos are for products only' : 'No answer passed the checks, so a fixed reply is shown']),
+  ].filter((x): x is string => Boolean(x))
   return (
-    <div className="flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }} aria-busy={revealing}>
+    <span
+      className="relative"
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setOpen(true)}
+      onPointerLeave={(e) => e.pointerType === 'mouse' && setOpen(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation()
+          setOpen(false)
+        }
+      }}
+    >
+      <button type="button" aria-label="How this answer was made" aria-expanded={open} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={(e) => setOpen((o) => ((e.nativeEvent as PointerEvent).pointerType === 'mouse' ? true : !o))} className="hit44 grid size-7 place-items-center rounded-full text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
+        <Info size={15} strokeWidth={1.7} aria-hidden />
+      </button>
+      {open ? (
+        <span role="tooltip" className="absolute right-0 bottom-full z-10 mb-1.5 flex w-[280px] flex-col gap-1.5 rounded-[18px] bg-surface/95 p-3.5 text-left text-[12px] leading-[1.45] text-[#3E3C38] shadow-[0_24px_50px_-20px_rgba(0,0,0,.35),inset_0_0_0_1px_rgba(18,18,18,.06)] backdrop-blur-[18px]" style={{ animation: 'wRise .2s both' }}>
+          <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ HOW THIS ANSWER WAS MADE</span>
+          {lines.map((x) => (
+            <span key={x}>✓ {x}</span>
+          ))}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onClick} className="hit44 grid size-7 place-items-center rounded-full text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
+      {children}
+    </button>
+  )
+}
+
+function TextBlock({ b, links }: { b: AnswerBlock; links: MarkupLinks }) {
+  if (b.type === 'answer') return <p className="m-0 text-[15.5px] leading-[1.5] text-pretty">{<Markup text={b.text} links={links} />}</p>
+  if (b.type === 'note')
+    return (
+      <p className="m-0 border-l-2 border-sky/40 pl-2.5 text-[13px] leading-[1.5] text-ink-2">
+        <Markup text={b.text} links={links} />
+      </p>
+    )
+  if (b.type === 'bullets')
+    return (
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {b.items.map((it) => (
+          <li key={it} className="flex gap-2.5 text-[14px] leading-[1.45]">
+            <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-sky" />
+            <span>
+              <Markup text={it} links={links} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
+  return null
+}
+
+export type AnswerActions = {
+  onAsk: (q: string) => void
+  onProduct: (p: Product) => void
+  onAdd: (p: Product) => void
+  onMetric: (id: MetricId) => void
+  go: (path: string) => void
+  onRegenerate: () => void
+}
+
+/** The answer's plain text for the clipboard: markup turned into names. */
+function copyText(blocks: AnswerBlock[], name: (id: string) => string | null): string {
+  return blocks
+    .flatMap((b) => (b.type === 'answer' || b.type === 'note' ? [plainText(b.text, name)] : b.type === 'bullets' ? b.items.map((i) => `• ${plainText(i, name)}`) : []))
+    .join('\n')
+}
+
+// Memoised: while an answer appears only the answer being revealed redraws.
+export const Answer = memo(function Answer({ m, last, busy, capped, actions }: { m: Extract<ChatMessage, { role: 'willow' }>; last: boolean; busy: boolean; capped: boolean; actions: AnswerActions }) {
+  const r = m.reply
+  const revealing = m.shown < m.blocks.length
+  const byId = new Map(r.products.map((p) => [p.product_id, p]))
+  const productName = (id: string) => byId.get(id)?.name ?? null
+  const links: MarkupLinks = {
+    productName,
+    onProduct: (id) => {
+      const p = byId.get(id)
+      if (p) actions.onProduct(p)
+    },
+    onMetric: actions.onMetric,
+  }
+  const widgetLinks: WidgetLinks = { go: actions.go, onProduct: actions.onProduct, onAdd: actions.onAdd, product: (id) => byId.get(id) ?? null }
+  return (
+    <div className="group flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }} aria-busy={revealing}>
       <span className="mt-1.5">
         <AnswerOrb />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5 rounded-[8px_32px_32px_32px] bg-surface p-4 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[10px] leading-[1.5] tracking-[.05em] text-ink-2">{provenance(r)}</span>
-          {r.checks ? <AITag className="!min-h-5 !px-2 !text-[10px]" /> : null}
-        </span>
-        {/* The visible words appear one by one; screen readers get the whole answer once, from the sr-only copy below. */}
-        <p aria-hidden className="text-[14.5px] leading-[1.55] text-pretty">
-          {m.words.slice(0, m.shown).map((w, i) => (
-            <span key={i} style={{ animation: 'wWord .5s ease-out both' }}>
-              {w}{' '}
-            </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-3 rounded-[8px_28px_28px_28px] bg-surface px-4 pt-3.5 pb-2 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
+          {/* Screen readers get each block once, as it appears; the reveal is only visual. */}
+          {m.blocks.slice(0, m.shown).map((b, i) => (
+            <div key={i} style={{ animation: 'advIn .55s cubic-bezier(.2,.7,.2,1) both' }}>
+              {b.type === 'widget' ? (
+                <Widget spec={b.widget} links={widgetLinks} />
+              ) : b.type === 'products' ? (
+                <div className="flex flex-col gap-2">
+                  {b.product_ids.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p)).map((p) => (
+                    <ProductCard key={p.product_id} p={p} onOpen={() => actions.onProduct(p)} />
+                  ))}
+                </div>
+              ) : (
+                <TextBlock b={b} links={links} />
+              )}
+            </div>
           ))}
-          {revealing ? <span aria-hidden className="inline-block h-[18px] w-[9px] rounded-[4px] bg-sky align-[-3px]" style={{ animation: 'wBlink 1s steps(2) infinite' }} /> : null}
-        </p>
-        {!revealing && r.products.length ? (
-          <div className="flex flex-col gap-2">
-            {r.products.map((p) => (
-              <ProductCard key={p.product_id} p={p} onOpen={() => onProduct(p)} />
-            ))}
-            <span className="text-[11.5px] text-ink-2">{r.products.some((p) => p.stores.some((s) => s.price)) ? 'From Willow’s catalog: ingredients, store links and the prices each store showed when checked. No reviews, no ads, no commissions.' : 'From Willow’s catalog: ingredients, one checked price and store links. No reviews, no ads, no commissions.'}</span>
-          </div>
-        ) : null}
-        {!revealing ? (
-          <div className="flex flex-col gap-3" style={{ animation: 'wRise .4s both' }}>
-            <span className="flex flex-wrap items-center justify-between gap-2.5">
-              {/* Without checks the api's own fallback already says how to ask; don't repeat it. */}
-              {check ? <span className="text-[12px] text-willow-700">{check}</span> : <span />}
-              <button
-                type="button"
+          {revealing ? <span aria-hidden className="h-3 w-16 rounded-full advShimmer" /> : null}
+          {!revealing ? (
+            <span className="-mr-1.5 flex items-center justify-end gap-0.5">
+              <HowMade r={r} />
+              {last && !busy && !capped ? (
+                <IconButton label="Regenerate this answer" onClick={actions.onRegenerate}>
+                  <RotateCcw size={14} strokeWidth={1.7} aria-hidden />
+                </IconButton>
+              ) : null}
+              <IconButton
+                label="Copy answer"
                 onClick={() => {
-                  void navigator.clipboard?.writeText(r.message).then(
-                    () => toast('Answer copied'),
+                  void navigator.clipboard?.writeText(copyText(m.blocks, productName) || r.message).then(
+                    () => toast('Copied'),
                     () => toast('Couldn’t copy here'),
                   )
                 }}
-                className="hit44 min-h-[30px] rounded-pill bg-sunken px-3 text-[12px]"
               >
-                Copy
-              </button>
+                <Copy size={14} strokeWidth={1.7} aria-hidden />
+              </IconButton>
             </span>
-            {r.retrieval.length ? (
-              <details className="text-[12px] text-ink-2">
-                <summary className="cursor-pointer py-1">How this answer was made</summary>
-                <ul className="mt-1 flex flex-col gap-0.5">
-                  {r.retrieval.map((x) => (
-                    <li key={x}>✓ {x}</li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-            {last && r.follow_up_suggestions.length ? (
-              <span className="flex flex-wrap gap-1.5">
-                {r.follow_up_suggestions.map((f, i) => (
-                  <button key={f} type="button" disabled={busy || capped} onClick={() => onAsk(f)} className="min-h-11 rounded-pill border border-ink/12 bg-white px-3.5 text-left text-[13px] transition-colors hover:bg-sunken" style={{ animation: `wRise .4s ${i * 80}ms both` }}>
-                    {f}
-                  </button>
-                ))}
-              </span>
-            ) : null}
-          </div>
+          ) : null}
+        </div>
+        {!revealing && last && r.follow_up_suggestions.length ? (
+          <span className="flex flex-wrap gap-1.5 pt-1.5">
+            {r.follow_up_suggestions.map((f, i) => (
+              <button key={f} type="button" disabled={busy || capped} onClick={() => actions.onAsk(f)} className="min-h-10 rounded-pill border border-ink/12 bg-white/90 px-3.5 text-left text-[13px] transition-colors hover:bg-sunken" style={{ animation: `wRise .4s ${i * 80}ms both` }}>
+                {f}
+              </button>
+            ))}
+          </span>
         ) : null}
+        <Stamp at={m.at} align="left" />
       </div>
-      {!revealing ? <span className="sr-only">{r.message}</span> : null}
     </div>
   )
 })

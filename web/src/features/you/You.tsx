@@ -450,7 +450,6 @@ function CaptureSetupCard() {
 function ServiceStatus() {
   const { status, failed, gaveUp } = useDemoStatus()
   const chips = status ? serviceChips(status, gaveUp).filter((c) => c.key !== 'catalog') : []
-  const live = status ? [status.gemini.status, status.storage.status].every(Boolean) : false
   return (
     <section aria-label="Service status" className="flex flex-wrap items-center gap-2.5 rounded-[36px] squircle bg-surface/70 px-6 py-5" aria-live="polite">
       <span className="mr-1.5 font-mono text-[12px] text-ink-2">■ SERVICE</span>
@@ -469,8 +468,7 @@ function ServiceStatus() {
       )}
       {status ? (
         <span className="text-caption text-ink-2">
-          Checked {new Date(status.checked_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-          {live ? ', each service asked live (kept for a minute).' : '. AI and storage show configuration only.'}
+          Checked live at {new Date(status.checked_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.
         </span>
       ) : null}
     </section>
