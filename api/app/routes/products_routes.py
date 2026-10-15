@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field, field_validator
 
-from app import advisor, catalog, gemini, label_scan, limits, routine_check
+from app import advisor, catalog, gemini, label_scan, limits, routine_check, routine_log
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store, iso
 
@@ -108,10 +108,101 @@ def _entry_view(entry_id: str, doc: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/routine")
 def routine_list(
-    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+    today: str | None = Query(default=None, description="the person's own day, YYYY-MM-DD"),
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
 ) -> dict[str, Any]:
     entries = sorted(store.routine_list(user.uid), key=lambda e: e[1].get("started_at") or "")
-    return {"entries": [_entry_view(eid, d) for eid, d in entries]}
+    # each product's recent use, from the person's ticks (Home's "routine today"), counted up to
+    # the person's own day (the app sends it; a day either side of UTC)
+    now = routine_log.local_today(today)
+    first = now - timedelta(days=routine_log.RECENT_DAYS)
+    logs = store.routine_logs(user.uid, first.isoformat(), now.isoformat()) if entries else []
+    since = (store.user_get(user.uid) or {}).get("routine_log_since") if entries else None
+    return {
+        "entries": [
+            {
+                **_entry_view(eid, d),
+                "recent_use": routine_log.recent_use(d, eid, logs, now, since),
+            }
+            for eid, d in entries
+        ]
+    }
+
+
+@router.get("/routine/log")
+def routine_log_list(
+    first: str | None = Query(default=None, alias="from"),
+    last: str | None = Query(default=None, alias="to"),
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Ticked routine use per day, oldest first (default: the last 14 days). Days with no ticks
+    are left out."""
+    utc_today = routine_log.today()
+    # default: the last 14 days, plus tomorrow's UTC date for anyone whose day is already there
+    end = routine_log.parse_day(last, "to") if last else utc_today + timedelta(days=1)
+    start = (
+        routine_log.parse_day(first, "from")
+        if first
+        else utc_today - timedelta(days=routine_log.RECENT_DAYS)  # covers a day behind UTC
+    )
+    if start > end or (end - start).days >= routine_log.MAX_RANGE_DAYS:
+        raise HTTPException(
+            422,
+            {
+                "code": "bad_request",
+                "message": f"from must be before to, at most {routine_log.MAX_RANGE_DAYS} days",
+            },
+        )
+    docs = store.routine_logs(user.uid, start.isoformat(), end.isoformat())
+    days = [v for v in (routine_log.day_view(d) for d in docs) if v["used"]]
+    return {"from": start.isoformat(), "to": end.isoformat(), "days": days}
+
+
+def _mark(store: Store, uid: str, day: str, entry_id: str, slot: str, used: bool) -> dict:
+    _check_entry_id(entry_id)
+    if used:
+        checked = routine_log.check_tick(day, store.routine_get(uid, entry_id), slot)
+        # the day the person started ticking: recent use counts from here (a later gap in
+        # ticking stays a gap, never "used every day")
+        since = (store.user_get(uid) or {}).get("routine_log_since")
+        if not since or checked.isoformat() < since:
+            store.user_merge(uid, {"routine_log_since": checked.isoformat()})
+    else:
+        checked = routine_log.check_untick(day, slot)
+        [doc] = store.routine_logs(uid, checked.isoformat(), checked.isoformat()) or [
+            {"date": checked.isoformat(), "used": {}}
+        ]
+        if slot not in ((doc.get("used") or {}).get(entry_id) or []):
+            return routine_log.day_view(doc)  # nothing to remove: no write
+    return routine_log.day_view(
+        store.routine_log_mark(uid, checked.isoformat(), entry_id, slot, used)
+    )
+
+
+@router.put("/routine/log/{day}/{entry_id}/{slot}")
+def routine_log_tick(
+    day: str,
+    entry_id: str,
+    slot: str,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Mark a routine product used on a day (am or pm). Idempotent; answers the day's ticks."""
+    return _mark(store, user.uid, day, entry_id, slot, True)
+
+
+@router.delete("/routine/log/{day}/{entry_id}/{slot}")
+def routine_log_untick(
+    day: str,
+    entry_id: str,
+    slot: str,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Undo a tick. Idempotent; answers the day's ticks."""
+    return _mark(store, user.uid, day, entry_id, slot, False)
 
 
 @router.post("/routine")
@@ -186,6 +277,12 @@ def routine_delete(
     """Remove an entry added by mistake. To stop using a product, PATCH ended_at instead."""
     _check_entry_id(entry_id)
     store.routine_delete(user.uid, entry_id)
+    # a removed product's ticks go too (they would outlive the remove, and a reused id would
+    # inherit them): the whole log, since ticks age past the window they were written in
+    tomorrow = routine_log.today() + timedelta(days=1)
+    logs = store.routine_logs(user.uid, "0000-01-01", tomorrow.isoformat())
+    days = [d["date"] for d in logs if entry_id in (d.get("used") or {})]
+    store.routine_log_forget(user.uid, entry_id, days)
     return Response(status_code=204)
 
 
