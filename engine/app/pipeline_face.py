@@ -1,5 +1,6 @@
 """face_full analysis (M2): landmarks -> ROIs + face skin mask -> Lab -> A-tier face metrics."""
 
+import dataclasses
 import json
 import logging
 import time
@@ -28,6 +29,7 @@ from app.landmarks import (
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.glow import glow
+from app.metrics.lines import lines
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
 from app.metrics.shine import shine
@@ -47,8 +49,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
     "shine": ("oil_glow", "Shine", "pct_area"),
     "glow": ("oil_glow", "Glow", "index"),
+    "lines": ("lines", "Lines", "index"),
 }
-ALWAYS_INDICATIVE = {"blemishes", "shine", "glow"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "glow", "lines"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -246,6 +249,18 @@ def _frame(path: str) -> dict:
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
     ]
     glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
+    # lines: landmarks in the crop's pixels. Blemishes and large dark marks (a bindi, a mole)
+    # are left out, their edges curve; small dark spots are not: on a lined face many
+    # "spots" are pieces of the lines, and small round marks fail the line shape test anyway
+    crop_face = dataclasses.replace(face, points=face.points - [box.x, box.y])
+    big = [sp for sp in spots if 2 * sp.radius >= config.LINES_MARK_MIN_MM * px_per_mm]
+    lines_val, lines_extras = lines(
+        lab,
+        crop_face,
+        _line_skin(lab, face_full & ~hand, zones.get("lower_face", np.zeros_like(face_skin))),
+        px_per_mm,
+        [*blemishes, *big],
+    )
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -257,6 +272,7 @@ def _frame(path: str) -> dict:
         "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
         "shine": shine_pct,
         "glow": glow_idx,
+        "lines": lines_val,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -269,6 +285,7 @@ def _frame(path: str) -> dict:
         else {},
         "shine": shine_extras,
         "glow": glow_extras,
+        "lines": lines_extras,
     }
     return {
         "values": values,
@@ -464,6 +481,31 @@ def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.nd
         out = config.CROP_MIN_OUT_PX
         patch = cv2.resize(patch, (out, out), interpolation=cv2.INTER_CUBIC)
     return np.ascontiguousarray(patch)
+
+
+def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -> np.ndarray:
+    """Skin for the lines metric: the face outline minus eyes, lids and lips (`face_area`),
+    without hair (far darker AND greyer than this face's skin; below the nose, where a
+    beard or moustache grows, a little darker and greyer). Not face_skin: its stubble and
+    colour cuts take creases beside the mouth and shaded skin (Oct 15: a marionette zone
+    27% skin, one side none), the very places lines are. A crease is a shadow and keeps the
+    skin's colour (cut 0-0.4% of mouth zones on 4 lined faces, 17-33% on 2 bearded)."""
+    if not face_area.any():
+        return face_area
+    L = lab[..., 0]
+    chroma = np.hypot(lab[..., 1], lab[..., 2])
+    med_l, med_c = float(np.median(L[face_area])), float(np.median(chroma[face_area]))
+    hair = (L < med_l - config.LINES_HAIR_DARKER_L) & (chroma < config.LINES_HAIR_CHROMA * med_c)
+    beard = (L < med_l - config.LINES_BEARD_DARKER_L) & (chroma < config.LINES_BEARD_CHROMA * med_c)
+    # a beard: lines below the nose cannot be told from its hairs, so that part is left out.
+    # Judged by clear hair (the stricter test): bearded faces 25-29% of the lower face,
+    # 13 others 0-2.5% (Oct 15); the looser test also takes jaw shadow (up to 13%)
+    lower = face_area & lower_face
+    if lower.any() and (hair & lower).sum() > config.LINES_BEARD_FRAC * lower.sum():
+        hair |= lower_face
+    hair |= beard & lower_face  # moustache / stubble hairs on an otherwise clear lip
+    hair = cv2.dilate(hair.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    return face_area & ~hair
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:
