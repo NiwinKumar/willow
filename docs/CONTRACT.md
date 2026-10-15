@@ -200,6 +200,12 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | POST | `/v1/label-scan` (Oct 15 additions) | `scan.inci` items are `{name, confidence: high\|low}` (plain strings still accepted from the model), `scan.failure: glare\|blurry\|no_label\|cut_off\|null`; a scan with a failure and nothing read is not counted against the daily cap |
 | GET/POST | `/v1/product-tests` | list (`{tests[]}`, running one first) / start `{entry_id?, product_id?, name?, length_days? (7-56, default 28), started_at?}`; 409 while another test runs |
 | PATCH/DELETE | `/v1/product-tests/{id}` | `{name?, length_days?, ended_at?}` (end, or null to resume) / remove a test (its forearm sessions stay) |
+| GET | `/v1/me/reminder.ics` | the check-in schedule (`profile.checkin`) as one weekly `VEVENT` (`RRULE BYDAY`, `DTSTART;TZID` + `VTIMEZONE`, `VALARM` at the time, link to `/home`); 404 without a schedule |
+| GET | `/v1/me/push/key` | `{enabled, public_key}`: the VAPID public key; `enabled: false` = no keys on the api, reminders by calendar only |
+| POST | `/v1/me/push` | a browser `PushSubscription.toJSON()` `{endpoint, keys: {p256dh, auth}}` -> `{id, enabled}`; idempotent; endpoint must be a browser push service (FCM, Mozilla, Apple, WNS); 503 `push_unavailable` without keys |
+| DELETE | `/v1/me/push` | `{endpoint}` forgets that device; no body forgets every device; 204 |
+| POST | `/v1/me/push/test` | test notification to every device of this person -> `{sent, removed, failed}`; 10 per day |
+| POST | `/v1/internal/reminders` | Cloud Scheduler only (OIDC token: audience `REMINDERS_AUDIENCE`, email `SCHEDULER_SERVICE_ACCOUNT`; no check with `AUTH_MODE=dev`), every 15 min: one push to each person whose check-in time (in the schedule's time zone, DST-safe) came in the last `REMINDER_WINDOW_MINUTES` on a scheduled day and who has no (non-failed) session that local day; one per person per day; 404/410 subscriptions removed -> `{enabled, due, sent, skipped, removed, failed}` |
 
 `SessionView` = `{session, result: AnalysisResult, labels: {candidate_id: label}, explanation: Explanation}`.
 
@@ -240,6 +246,10 @@ users/{uid}/routine/{entry_id}
 users/{uid}/product_tests/{test_id}
   entry_id | null, product_id | null, name, site_pair: forearm, started_at (YYYY-MM-DD),
   length_days (7-56), ended_at | null, created_at, updated_at
+users/{uid}/push/{sha256(endpoint)[:32]}
+  endpoint, keys: {p256dh, auth}, created_at, updated_at        (Web Push subscriptions, one per device)
+users/{uid}/reminders_sent/{YYYY-MM-DD}
+  day, at                                                       (created once per local day: reminder dedupe)
 products/{product_id}
   brand, name, category, concerns[], key_actives[{name, pct}], inci[],
   price: {amount, currency}, size, region[], image_url,
