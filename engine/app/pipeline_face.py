@@ -1,5 +1,6 @@
 """face_full analysis (M2): landmarks -> ROIs + face skin mask -> Lab -> A-tier face metrics."""
 
+import dataclasses
 import json
 import logging
 import time
@@ -28,6 +29,7 @@ from app.landmarks import (
 from app.metrics.blemish import find_blemishes
 from app.metrics.evenness import tone_evenness
 from app.metrics.glow import glow
+from app.metrics.lines import lines
 from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
 from app.metrics.shine import shine
@@ -47,8 +49,9 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "dark_circles": ("eye_area", "Dark circles", "delta_l_star"),
     "shine": ("oil_glow", "Shine", "pct_area"),
     "glow": ("oil_glow", "Glow", "index"),
+    "lines": ("lines", "Lines", "index"),
 }
-ALWAYS_INDICATIVE = {"blemishes", "shine", "glow"}  # docs/CONTRACT.md 2.5
+ALWAYS_INDICATIVE = {"blemishes", "shine", "glow", "lines"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
 
@@ -246,6 +249,12 @@ def _frame(path: str) -> dict:
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
     ]
     glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
+    # lines: landmarks in the crop's pixels. Blemishes and large dark marks (a bindi, a mole)
+    # are left out, their edges curve; small dark spots are not: on a lined face many
+    # "spots" are pieces of the lines, and small round marks fail the line shape test anyway
+    crop_face = dataclasses.replace(face, points=face.points - [box.x, box.y])
+    big = [sp for sp in spots if 2 * sp.radius >= config.LINES_MARK_MIN_MM * px_per_mm]
+    lines_val, lines_extras = lines(lab, crop_face, face_skin, px_per_mm, [*blemishes, *big])
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
@@ -257,6 +266,7 @@ def _frame(path: str) -> dict:
         "dark_circles": float(np.mean([c[0] for c in circles])) if circles else None,
         "shine": shine_pct,
         "glow": glow_idx,
+        "lines": lines_val,
     }
     extras = {
         "tone_ita": {"l_star": l_star, "b_star": b_star},
@@ -269,6 +279,7 @@ def _frame(path: str) -> dict:
         else {},
         "shine": shine_extras,
         "glow": glow_extras,
+        "lines": lines_extras,
     }
     return {
         "values": values,
