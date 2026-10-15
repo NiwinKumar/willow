@@ -1,0 +1,2 @@
+/* Keyframes the Routine design uses that the shared index.css does not have (prefixed: feature-local). */
+@keyframes rtScan { 0% { top: 14% } 100% { top: 82% } }

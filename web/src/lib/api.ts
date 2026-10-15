@@ -149,13 +149,13 @@ export type RetailerInsights = {
   tiles: { label: string; value: string; n: number; sub: string }[]
   // app_goal: the goal a person picks in the app that this finer retailer goal belongs to (null: none)
   needs: { goal: string; app_goal?: string | null; n: number; real: number; none: number; early: number }[]
-  products: { product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
+  products: { product_id: string; product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
   tone_bands: string[]
   brands: { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }[]
   gaps: { goal: string; app_goal?: string | null; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
   conflicts: { pair: string; share: number; fix: string; resolves: string[] }[]
   /** Every product with at least 10 people: outcome rate, people, median weeks to first real change. */
-  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null }>
+  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null; product: string; brand: string; concern: string; cont: number }>
 }
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
@@ -257,6 +257,8 @@ export const api = {
   setBaseline: (token: string, site: Site, sessionId: string) =>
     request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
+  /** The account as the api knows it: uid and the consent on record (null before any). */
+  me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null }>(token, '/v1/me'),
   catalogSearch: (token: string, params: { q?: string; concern?: string; category?: string; max_price?: number; currency?: string; limit?: number }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
     return request<{ products: Product[] }>(token, `/v1/catalog/search?${qs}`)
@@ -295,9 +297,12 @@ export const api = {
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */
-export function putSigned(target: UploadTarget, file: File, onProgress: (fraction: number) => void): Promise<void> {
+export function putSigned(target: UploadTarget, file: File, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('Upload cancelled'))
     const xhr = new XMLHttpRequest()
+    // Closing the check-in cancels the PUT in flight ("the rest are not sent").
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
     xhr.open('PUT', target.url)
     for (const [k, v] of Object.entries(target.headers)) xhr.setRequestHeader(k, v)
     // A stalled connection (or a phone that backgrounded the tab) must end in a Retry, never an

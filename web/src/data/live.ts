@@ -34,6 +34,7 @@ export function toSession(v: SessionView): Session {
     live: true,
     measured: v.session.measured,
     baseline_ref: v.session.baseline,
+    sample_id: v.session.sample_id ?? null,
   }
 }
 
@@ -53,16 +54,6 @@ export function sitesWithResults(series: Partial<Record<Site, SiteSeries>>): Sit
   return SITE_ORDER.filter((s) => series[s]?.sessions.some((x) => x.status === 'done'))
 }
 
-/**
- * True when the numbers are a sample, not a measurement: the api's fixture engine ("-fixture") or
- * the engine's placeholder for sites it does not analyse yet ("-placeholder", warnings say so).
- */
-export function isSampleEngine(s: Session | null | undefined): boolean {
-  const r = s?.result
-  if (!r) return false
-  return /-(fixture|placeholder)$/.test(r.engine_version) || (r.warnings ?? []).some((w) => w.startsWith('placeholder:'))
-}
-
 /** The baseline a session is compared with: its own baseline_ref (live), else the series' baseline. */
 export function baselineFor(session: Session | null, sessions: Session[]): Session | null {
   if (!session) return null
@@ -73,6 +64,12 @@ export function baselineFor(session: Session | null, sessions: Session[]): Sessi
   if (session.live && !session.is_baseline && session.baseline_ref === null && session.measured !== false) return null
   return sessions.find((s) => s.is_baseline && s.capture_mode === session.capture_mode) ?? sessions.find((s) => s.is_baseline) ?? null
 }
+
+/** An upload or analysis this old has stopped (the tab closed mid-upload, or the server restarted). */
+const STALL_MS = 30 * 60_000
+export const inFlight = (s: Pick<Session, 'status'>) => s.status === 'uploading' || s.status === 'processing'
+/** Still uploading or measuring after STALL_MS: nothing will change by waiting, so screens stop polling it. */
+export const stalled = (s: Pick<Session, 'status' | 'created_at'>) => inFlight(s) && Date.now() - Date.parse(s.created_at) > STALL_MS
 
 /** Live sessions the engine could not measure yet (the photos are kept, no numbers exist). */
 export function isUnmeasured(s: Session | null | undefined): boolean {
