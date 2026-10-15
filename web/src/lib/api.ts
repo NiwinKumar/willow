@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, Product, RoutineCheck, RoutineEntry } from '../data/types'
+import type { AnalysisResult, Explanation, Product, RoutineCheck, RoutineEntry, RoutineLogDay } from '../data/types'
 import { DEV_UID } from './devAuth'
 import type { LabelDetail } from './spotLabels'
 
@@ -264,6 +264,11 @@ export const api = {
   patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
+  /** Routine use ticks; `day` is the person's own calendar day (YYYY-MM-DD). Default range: last 14 days. */
+  routineLog: (token: string, range?: { from?: string; to?: string }) =>
+    request<{ from: string; to: string; days: RoutineLogDay[] }>(token, `/v1/routine/log${range ? `?${new URLSearchParams(range as Record<string, string>)}` : ''}`),
+  markUsed: (token: string, day: string, entryId: string, slot: 'am' | 'pm', used: boolean) =>
+    request<RoutineLogDay>(token, `/v1/routine/log/${day}/${entryId}/${slot}`, { method: used ? 'PUT' : 'DELETE' }),
   putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
