@@ -47,13 +47,6 @@ export const UNIT_LABEL: Record<Unit, string> = {
   delta_l_star: '',
 }
 
-export const VERDICT_LABEL: Record<Verdict, string> = {
-  real_change: 'Real change',
-  within_noise: 'Within normal photo variation',
-  no_baseline: 'First reading',
-  low_quality: 'Photo quality too low to compare',
-}
-
 /**
  * Sites the deployed engine measures today. Other sites are saved and marked "not measured yet"
  * (the api never shows the engine's placeholder numbers). Update when the engine adds a site.
@@ -63,22 +56,12 @@ export const MEASURED_SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro',
 /** Close-ups: size comes from the iris, so one eye stays in the photo, phone about 10 cm away. */
 export const isCloseUp = (site: Site) => site === 'cheek_macro' || site === 'nose_macro'
 
-/** "face, cheek and nose close-ups, and forearm": the measured places in one readable phrase. */
-export function measuredPlaces(): string {
-  const parts: string[] = []
-  if (MEASURED_SITES.includes('face_full')) parts.push('face')
-  const close = MEASURED_SITES.filter(isCloseUp).map((s) => (s === 'cheek_macro' ? 'cheek' : 'nose'))
-  if (close.length) parts.push(`${close.join(' and ')} close-up${close.length > 1 ? 's' : ''}`)
-  if (MEASURED_SITES.some((s) => s.startsWith('forearm'))) parts.push('forearm')
-  return parts.length > 2 ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}` : parts.join(' and ')
-}
-
 export const SITE_LABEL: Record<Site, string> = {
   face_full: 'Face',
   cheek_macro: 'Cheek close-up',
   nose_macro: 'Nose close-up',
-  forearm_treated: 'Forearm, treated',
-  forearm_control: 'Forearm, control',
+  forearm_treated: 'Treated forearm',
+  forearm_control: 'Control forearm',
 }
 
 /** Goals (docs/UX_SPEC.md screen 3) and the groups they pull to the top. */
@@ -114,13 +97,6 @@ export function fmtSigned(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): 
   // The sign follows the number as shown: −0.02 shown as 0.0 has no sign.
   if (Number(s) === 0) return s
   return v < 0 ? `−${s}` : `+${s}`
-}
-
-export function directionText(m: Metric): string {
-  const meta = METRIC_META[m.id]
-  if (m.direction === 'decrease') return meta.decrease
-  if (m.direction === 'increase') return meta.increase
-  return ''
 }
 
 /** Order groups by the user's goals, then by the default order. */

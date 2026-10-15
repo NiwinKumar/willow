@@ -1,5 +1,3 @@
-import '@fontsource-variable/atkinson-hyperlegible-next'
-import '@fontsource-variable/atkinson-hyperlegible-mono'
 import './index.css'
 
 import { StrictMode } from 'react'

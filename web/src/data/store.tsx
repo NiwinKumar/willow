@@ -1,18 +1,17 @@
 /**
- * Data seam. Demo mode serves the team's seeded journey (or the illustrative one); live mode reads the signed-in
- * person's sessions from the api. Screens never know which one they got.
+ * Data seam. Demo mode serves the team's own measured journey (read-only); live mode reads the signed-in
+ * person's sessions from the api. Screens never know which one they got. Nothing here is made up.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { api, type SessionView } from '../lib/api'
 import { syncConsent } from '../lib/consent'
 import { prefs } from '../lib/prefs'
 import { useAuth } from '../lib/useAuth'
-import { DEMO_SERIES, DEMO_SITES } from '../mock/series'
 import { DataContext, type DataState, type DataStatus } from './context'
 import { holdDemo, peekDemo, pickDemo, releaseDemo, type DemoPick } from './demoSource'
-import { groupBySite, sitesWithResults } from './live'
+import { groupBySite, sitesWithResults, toSession } from './live'
 import { DEMO_EVENT } from './useData'
 
 const noop = async () => {}
@@ -85,9 +84,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [demo, uid, load, apply])
 
-  // Demo mode prefers the seeded real journey (api /v1/demo/journey) and falls back to the illustration.
-  // The source is picked once per demo entry (waiting up to 1.5 s) and held until demo mode is left,
-  // so a report never swaps its data under the viewer.
+  // Photo previews are signed URLs the api reissues with at least 2 h left (api/app/storage.py). A tab left
+  // open longer than an hour reads the sessions again when it is looked at, so photos never go stale.
+  const loadedAt = useRef(0)
+  useEffect(() => {
+    if (loaded.status === 'ready') loadedAt.current = Date.now()
+  }, [owned, loaded.status])
+  useEffect(() => {
+    if (demo || !uid) return
+    const STALE_MS = 60 * 60_000
+    const check = () => {
+      if (document.visibilityState === 'visible' && loadedAt.current && Date.now() - loadedAt.current > STALE_MS) void refresh()
+    }
+    document.addEventListener('visibilitychange', check)
+    const t = window.setInterval(check, 10 * 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', check)
+      window.clearInterval(t)
+    }
+  }, [demo, uid, refresh])
+
+  // Demo mode reads the team's journey once per entry and holds it until demo mode is left.
   const [demoPick, setDemoPick] = useState<DemoPick | null>(() => (demo ? peekDemo() : null))
   const [pickedFor, setPickedFor] = useState(demo)
   if (pickedFor !== demo) {
@@ -97,9 +114,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!demo) return
     let alive = true
-    // A pick already made (the one the landing page described) is held at once; otherwise wait for one.
-    const now = peekDemo()
-    if (now) holdDemo(now)
     void pickDemo().then((p) => {
       if (!alive) return
       holdDemo(p)
@@ -111,6 +125,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [demo])
 
+  // Goals live on this device; held in state so saving them in You re-orders Home and results at once.
+  const [goalsLive, setGoalsLive] = useState(prefs.goals)
+  const [goalsDemo, setGoalsDemo] = useState(demoGoals)
+  const setGoals = useCallback(
+    (goals: string[]) => {
+      // The demo journey (this tab) orders by the same goals, so it gets a copy too.
+      try {
+        sessionStorage.setItem('willow.goals', JSON.stringify(goals))
+      } catch {
+        /* private mode */
+      }
+      setGoalsDemo(goals)
+      if (!demo) {
+        prefs.setGoals(goals)
+        setGoalsLive(goals)
+      }
+    },
+    [demo],
+  )
+  // A new person on this device (sign-in, sign-out) reads their own saved goals.
+  const [goalsUid, setGoalsUid] = useState(uid)
+  if (goalsUid !== uid) {
+    setGoalsUid(uid)
+    setGoalsLive(prefs.goals())
+  }
+
   const upsert = useCallback(
     (view: SessionView) => {
       setOwned((o) => (o.uid === uid ? { uid, views: [...o.views.filter((v) => v.session.id !== view.session.id), view] } : { uid, views: [view] }))
@@ -120,30 +160,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DataState>(() => {
     if (demo) {
-      const goals = demoGoals()
-      if (!demoPick) return { mode: 'demo', status: 'loading', sites: [], series: () => null, goals, refresh: noop, upsert: () => {} }
-      if (demoPick.source === 'real') {
-        const real = groupBySite(demoPick.views)
-        return { mode: 'demo', demoSource: 'real', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, goals, refresh: noop, upsert: () => {} }
-      }
-      return { mode: 'demo', demoSource: 'illustrative', status: 'ready', sites: DEMO_SITES, series: (site) => DEMO_SERIES[site] ?? null, goals, refresh: noop, upsert: () => {} }
+      const goals = goalsDemo
+      const empty = { mode: 'demo' as const, sites: [], series: () => null, all: [], goals, setGoals, refresh: noop, upsert: () => {} }
+      if (!demoPick) return { ...empty, status: 'loading' }
+      if (demoPick.source !== 'real') return { ...empty, status: 'error' }
+      const real = groupBySite(demoPick.views)
+      const all = demoPick.views.map(toSession).sort((a, b) => a.created_at.localeCompare(b.created_at))
+      return { mode: 'demo', status: 'ready', sites: sitesWithResults(real), series: (site) => real[site] ?? null, all, goals, setGoals, refresh: noop, upsert: () => {} }
     }
     const status: DataStatus = !uid ? 'idle' : loaded.uid === uid ? loaded.status : 'loading'
     const mine = owned.uid === uid ? owned.views : []
     const bySite = groupBySite(mine)
-    return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, goals: prefs.goals(), refresh, upsert }
-  }, [demo, demoPick, uid, loaded, owned, refresh, upsert])
+    const all = mine.map(toSession).sort((a, b) => a.created_at.localeCompare(b.created_at))
+    return { mode: 'live', status, sites: sitesWithResults(bySite), series: (site) => bySite[site] ?? null, all, goals: goalsLive, setGoals, refresh, upsert }
+  }, [demo, demoPick, uid, loaded, owned, refresh, upsert, goalsLive, goalsDemo, setGoals])
 
-  // Screens read demo data as always ready, so they wait here (at most 1.5 s) until the source is picked.
-  return (
-    <DataContext.Provider value={value}>
-      {demo && !demoPick ? (
-        <div className="flex min-h-dvh items-center justify-center" role="status" aria-live="polite">
-          <p className="text-[15px] text-text-2">Loading the sample journey…</p>
-        </div>
-      ) : (
-        children
-      )}
-    </DataContext.Provider>
-  )
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
