@@ -358,7 +358,11 @@ LINES_HAIR_DARKER_L = 15.0  # line skin: hair is this much darker than the face'
 LINES_HAIR_CHROMA = 0.6  # ...and under this x its median chroma (shaded skin keeps its colour)
 LINES_BEARD_DARKER_L = 8.0  # below the nose (beard, moustache): this much darker...
 LINES_BEARD_CHROMA = 0.75  # ...and under this x the median chroma
-LINES_BEARD_FRAC = 0.1  # that much of the lower face: a beard, no lines measured below the nose
+# that much of the lower face: a beard, no lines measured below the nose. 0.05 (was 0.1, Oct 15):
+# a stubbled laptop session read 0.064-0.102 photo to photo, so two photos measured the lips
+# and mouth-corner zones (a stubble edge read as a 3 mm/cm2 line) and three did not; clear
+# faces were 0-2.5%
+LINES_BEARD_FRAC = 0.05
 GLOW_MIN_MM2 = 100.0
 
 # Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's
