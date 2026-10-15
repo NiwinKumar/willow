@@ -25,7 +25,7 @@ from app.aggregate import summarize
 from app.color import linear_srgb_to_lab
 from app.decode import load_photo_srgb8
 from app.errors import EngineError
-from app.io import save_preview
+from app.io import save_png, save_preview
 from app.landmarks import EYE_OUTER, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
 from app.metrics.blemish import find_blemishes
 from app.metrics.pigment import find_spots, pigment_spots
@@ -33,6 +33,7 @@ from app.metrics.pores import find_pores, pores_per_cm2
 from app.metrics.redness import erythema_index
 from app.metrics.texture import texture
 from app.metrics.tone import ita_band, ita_degrees
+from app.overlay import redness_rgba, to_preview
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
 from app.pipeline_face import _candidates
 from app.quality import check_frame, laplacian_variance
@@ -234,6 +235,8 @@ def _no_face(srgb8: np.ndarray, site: str) -> dict:
         "enough_skin": False,
         "scale_from": "unknown",
         "px_per_mm": 0.0,
+        "redness_map": None,
+        "map_ms": 0.0,
     }
 
 
@@ -247,7 +250,9 @@ def _front_camera(path: str) -> bool:
     return "front" in (info.lens or "").lower() or not (info.camera or info.lens)
 
 
-def _frame(path: str, site: str) -> dict:
+def _frame(path: str, site: str, overlays: bool = False) -> dict:
+    """Everything measured on one close-up. overlays: also keep its a* on the preview grid
+    for the redness overlay (cheek_macro only: nose_macro has no redness metric)."""
     linear, srgb8 = _load(path)
     h, w = srgb8.shape[:2]
     face = _find_face(srgb8)
@@ -332,6 +337,11 @@ def _frame(path: str, site: str) -> dict:
         blemishes={},
         pores=pores_extras,
     )
+    t_map = time.perf_counter()
+    redness_map = None
+    if overlays and site == "cheek_macro" and enough:  # the redness metric's a* and skin
+        redness_map = to_preview(lab[..., 1], skin, (h, w), scale=(size[0] / w, size[1] / h))
+    map_ms = (time.perf_counter() - t_map) * 1000
     contours = cv2.findContours(skin.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[
         0
     ]
@@ -358,6 +368,8 @@ def _frame(path: str, site: str) -> dict:
         "enough_skin": enough,
         "scale_from": scale_from,
         "px_per_mm": px_full,
+        "redness_map": redness_map,
+        "map_ms": map_ms,
     }
 
 
@@ -369,8 +381,11 @@ def analyze_macro(
     baseline: dict | None = None,
     output_prefix: str | None = None,
     max_candidates: int = 40,
+    compute_overlays: bool = True,
 ) -> dict:
-    """Analyze 1-5 close-ups of the same patch of skin (site cheek_macro or nose_macro)."""
+    """Analyze 1-5 close-ups of the same patch of skin (site cheek_macro or nose_macro).
+    With output_prefix and compute_overlays, a cheek close-up's redness overlay is written
+    to overlays/redness.png (same photo and size as preview.jpg)."""
     if site not in MACRO_SITES:
         raise EngineError("bad_request", f"macro pipeline got site {site!r}")
     t0 = time.perf_counter()
@@ -378,10 +393,11 @@ def analyze_macro(
         mode = capture_mode_for(files)
     except ValueError as exc:
         raise EngineError("bad_request", str(exc)) from exc
+    draw = compute_overlays and bool(output_prefix)  # overlays need somewhere to go
 
     frames, per_frame = [], []
     for i, path in enumerate(files):
-        f = _frame(path, site)
+        f = _frame(path, site, overlays=draw)
         f["index"] = i
         frames.append(f)
         per_frame.append(
@@ -466,6 +482,14 @@ def analyze_macro(
     if ref and output_prefix:
         save_preview(ref["srgb8"], output_prefix)
     candidates = _candidates(good[0], output_prefix, max_candidates) if good else []
+    overlays, overlay_ms = [], sum(f["map_ms"] for f in frames)
+    if good and good[0]["redness_map"] is not None:
+        t_o = time.perf_counter()
+        rgba = redness_rgba(good[0]["redness_map"], good[0]["px_per_mm"])
+        if rgba is not None:
+            dest = f"{output_prefix.rstrip('/')}/overlays/redness.png"
+            overlays.append({"metric_id": "redness", "uri": save_png(rgba, dest)})
+        overlay_ms += (time.perf_counter() - t_o) * 1000
     qs = [f["quality"] for f in frames]
     result = {
         "schema_version": "1.0",
@@ -487,18 +511,22 @@ def analyze_macro(
         },
         "metrics": metrics,
         "candidates": candidates,
-        "overlays": [],
+        "overlays": overlays,
         "rois": [
             {"name": REGIONS[site], "polygon": np.round(outline, 1).tolist()}
             for outline in (ref["skin_outlines"] if ref is not None else [])
         ],
-        "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
+        "timings_ms": {
+            "total": round((time.perf_counter() - t0) * 1000, 1),
+            **({"overlay": round(overlay_ms, 1)} if draw else {}),
+        },
         "warnings": warnings,
     }
     if ref:
         result["image_size"] = {"width": int(ref["shape"][1]), "height": int(ref["shape"][0])}
     for f in frames:
         f.pop("srgb8", None)
+        f.pop("redness_map", None)
     validate(result, json.loads(SCHEMA.read_text()))
     return result
 

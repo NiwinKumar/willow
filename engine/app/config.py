@@ -280,6 +280,30 @@ PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
 PREVIEW_QUALITY = 85
 UPLOAD_WORKERS = 8  # parallel GCS transfers (frames in, crops out)
 
+# Redness overlay (overlays/redness.png, engine 0.3.4): where the camera sees more red than
+# this person's own skin median, on the skin the redness metric measures (face: cheeks and
+# nose; cheek close-up: its skin). Descriptive only: it moves no number. Drawn at the size of
+# preview.jpg, pixel for pixel. The ramp runs from the skin's own median a* (clear) to its
+# OVERLAY_HIGH_PCT percentile, but over at least OVERLAY_MIN_SPAN_A a* units, so an even
+# face's camera noise is not stretched into a full-strength map.
+OVERLAY_SMOOTH_MM = 1.0  # Gaussian sigma: pores and grain out, a 3 mm red patch stays
+OVERLAY_HIGH_PCT = 98.0
+OVERLAY_MIN_SPAN_A = 4.0
+OVERLAY_ALPHA = (0.0, 0.7)  # opacity at the median (skin left as it is) and at the top
+# ramp colours in CIELAB (L*, a*, b*), interpolated in Lab so lightness falls evenly. Rose to
+# deep red, never a pale wash: skin at its own median is left untouched (a light tint over
+# skin would read as "lighter"), opacity carries how much redder
+OVERLAY_RAMP_LAB = ((80.0, 28.0, 22.0), (62.0, 50.0, 30.0), (45.0, 62.0, 28.0))
+OVERLAY_PNG_COMPRESSION = 3  # zlib level: transparent areas compress well even at 3
+
+# quality.per_frame[].regions (engine 0.3.4): which face region explains a failed check.
+# A region is named when its own test fails (exposure: its pixels over CLIPPED_PCT_MAX /
+# DARK_PCT_MAX; blur: sharpness under the face threshold AND under REGION_BLUR_REL x the
+# median region's; hand: it covers REGION_HAND_FRAC of the region); "whole" when every
+# region fails it or none stands out.
+REGION_BLUR_REL = 0.4
+REGION_HAND_FRAC = 0.25
+
 # Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
 # test photos: at 0.2 confidence the only detections were a real hand and two specks a
 # few px across; specks are dropped by the size rule. A hand on the chin is cut from the

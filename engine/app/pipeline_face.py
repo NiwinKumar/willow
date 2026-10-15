@@ -14,7 +14,7 @@ from app.aggregate import summarize
 from app.align import residual_px, similarity, transform
 from app.color import linear_srgb_to_lab
 from app.errors import EngineError
-from app.io import save_jpegs, save_preview
+from app.io import save_jpegs, save_png, save_preview
 from app.landmarks import (
     Face,
     FaceNotFound,
@@ -34,8 +34,9 @@ from app.metrics.pigment import find_spots, pigment_spots
 from app.metrics.redness import erythema_index
 from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
+from app.overlay import redness_rgba, to_preview
 from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
-from app.quality import FrameQuality, check_frame
+from app.quality import FrameQuality, check_frame, region_reasons
 from app.roi import Box
 
 log = logging.getLogger("willow.face")
@@ -80,8 +81,9 @@ def _rois(face: Face, names: tuple[str, ...]) -> tuple[str, ...]:
     return names if face.view == "front" else face.cheeks
 
 
-def _frame(path: str) -> dict:
-    """Everything measured on one photo; raises FaceNotFound."""
+def _frame(path: str, overlays: bool = False) -> dict:
+    """Everything measured on one photo; raises FaceNotFound. overlays: also keep the
+    photo's a* on the preview grid for the redness overlay."""
     linear, srgb8 = _load(path)
     face = detect_face(srgb8)
     polys = face.roi_polygons()
@@ -96,9 +98,9 @@ def _frame(path: str) -> dict:
     # a hand resting on the face (chin, cheek) is skin but not face: cut it everywhere
     hands = detect_hands(srgb8, config.HAND_MIN_SPAN_EYES * face.eye_distance_px)
     hand = box.crop(hand_mask(srgb8.shape[:2], hands, config.HAND_MARGIN_MM * face.px_per_mm))
-    masks, covered = {}, False
+    masks, raw, covered = {}, {}, False
     for n, p in polys.items():
-        m = box.crop(polygon_mask(srgb8.shape[:2], p))
+        m = raw[n] = box.crop(polygon_mask(srgb8.shape[:2], p))
         if (m & ~hand).sum() >= 0.5 * m.sum():
             masks[n] = m & ~hand
         elif n in face.cheeks or n == "nose":
@@ -125,6 +127,12 @@ def _frame(path: str) -> dict:
     # colours as the phone captured them: users do not hold a white reference
     lin = box.crop(linear)
     lab = linear_srgb_to_lab(lin)
+    # where on the face each failed check is (says where, not whether: never fails a photo)
+    try:
+        regions = region_reasons(quality.reasons, raw, lin, box.crop(srgb8), face.px_per_mm, hand)
+    except (ValueError, IndexError, cv2.error) as exc:
+        log.warning("quality regions not attributed: %s", exc)
+        regions = []
 
     skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
     cheek_skin = np.logical_or.reduce([skin[c] for c in face.cheeks])
@@ -175,6 +183,14 @@ def _frame(path: str) -> dict:
     red_rois = _rois(face, REDNESS_ROIS)
     redness_a = float(np.mean([med(1, n) for n in red_rois]))
     red_skin = np.logical_or.reduce([roi_skin[n] for n in red_rois])
+    t_map = time.perf_counter()
+    # the redness metric's own a* and skin, on the preview grid (drawn for the reference photo)
+    redness_map = (
+        to_preview(lab[..., 1], red_skin, srgb8.shape[:2], origin=(box.x, box.y))
+        if overlays
+        else None
+    )
+    map_ms = (time.perf_counter() - t_map) * 1000
     evenness, _ = tone_evenness(
         {n: (lab[..., 0], lin[..., 0], roi_skin[n]) for n in _rois(face, EVENNESS_ROIS)}, px_per_mm
     )
@@ -300,6 +316,9 @@ def _frame(path: str) -> dict:
         "spots": spots,
         "box": box,
         "srgb8": srgb8,
+        "regions": regions,
+        "redness_map": redness_map,
+        "map_ms": map_ms,
     }
 
 
@@ -558,11 +577,13 @@ def analyze_face(
     baseline: dict | None = None,
     output_prefix: str | None = None,
     max_candidates: int = 40,
+    compute_overlays: bool = True,
 ) -> dict:
     """Analyze 1-5 front-on face photos of one session (site face_full).
 
     Blemish candidates (with crops when output_prefix is given) come from the first photo
-    that passed the quality checks.
+    that passed the quality checks. With output_prefix and compute_overlays, the redness
+    overlay of the reference photo is written to overlays/redness.png.
     """
     t0 = time.perf_counter()
     try:
@@ -572,11 +593,12 @@ def analyze_face(
     # "measured" needs a colour reference in the photo; faces never detect one (no card,
     # no white paper), so a RAW face is as indicative as a JPEG selfie
     confidence = "indicative"
+    draw = compute_overlays and bool(output_prefix)  # overlays need somewhere to go
 
     per_frame, frames, warnings = [], [], []
     for i, path in enumerate(files):
         try:
-            f = _frame(path)
+            f = _frame(path, overlays=draw)
         except FaceNotFound:
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
@@ -588,7 +610,9 @@ def analyze_face(
         f["index"] = i
         frames.append(f)
         q = f["quality"]
-        per_frame.append({"index": i, "passed": q.passed, "reasons": q.reasons})
+        per_frame.append(
+            {"index": i, "passed": q.passed, "reasons": q.reasons, "regions": f["regions"]}
+        )
     passed = [f for f in frames if f["quality"].passed]
     # one view per summary: front photos if any passed, else the side views (each measures
     # different skin, so they are not averaged together)
@@ -662,6 +686,14 @@ def analyze_face(
     ref = good[0] if good else (frames[0] if frames else None)
     if ref and output_prefix:  # the photo rois, candidate bboxes and image_size describe
         save_preview(ref["srgb8"], output_prefix)
+    overlays, overlay_ms = [], sum(f["map_ms"] for f in frames)
+    if good and good[0]["redness_map"] is not None:  # same photo as preview.jpg, same size
+        t_o = time.perf_counter()
+        rgba = redness_rgba(good[0]["redness_map"], good[0]["face"].px_per_mm)
+        if rgba is not None:
+            dest = f"{output_prefix.rstrip('/')}/overlays/redness.png"
+            overlays.append({"metric_id": "redness", "uri": save_png(rgba, dest)})
+        overlay_ms += (time.perf_counter() - t_o) * 1000
     candidates = []
     if good:
         mapped, align_warnings = _align(good[0], good[1:])
@@ -670,6 +702,7 @@ def analyze_face(
         candidates = _candidates(good[0], output_prefix, max_candidates, seen)
     for f in frames:
         f.pop("srgb8", None)  # free the full-size photos
+        f.pop("redness_map", None)
     qs = [f["quality"] for f in frames]
     result = {
         "schema_version": "1.0",
@@ -698,14 +731,17 @@ def analyze_face(
         },
         "metrics": metrics,
         "candidates": candidates,
-        "overlays": [],
+        "overlays": overlays,
         # ROIs of the first photo; cross-frame alignment comes with overlays
         "rois": (
             [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in ref["polygons"].items()]
             if ref
             else []
         ),
-        "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 1)},
+        "timings_ms": {
+            "total": round((time.perf_counter() - t0) * 1000, 1),
+            **({"overlay": round(overlay_ms, 1)} if draw else {}),
+        },
         "warnings": warnings,
     }
     if ref:
