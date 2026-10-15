@@ -3,7 +3,9 @@
 `session` also carries what the Lens needs and the engine does not produce: a signed preview URL
 (the engine's `{output_prefix}preview.jpg`, when present), signed overlay URLs, the hours since
 the baseline for the scrubber, the person's note and deviation flag, and whether the
-explanation came from Gemini or the template (`explanation_source`).
+explanation came from Gemini or the template (`explanation_source`), and the live analysis
+`stage`. Detail views (one session) also sign the person's own photos (`frame_urls`) and the
+engine's spot crops (`crop_urls`).
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -88,6 +90,39 @@ def wanted_urls(
     return names
 
 
+# Frames a browser can draw (DNG cannot be shown, so its entry in frame_urls is null).
+VIEWABLE_FRAMES = ("image/jpeg", "image/heic", "image/heif")
+FRAME_GLOBS = ("**/frame_*",)
+CROP_GLOBS = ("**/crops/*",)
+
+Media = tuple[list[str | None], dict[str, str]]
+
+
+def uploads_prefix(uid: str, sid: str) -> str:
+    return f"uploads/{uid}/{sid}/"
+
+
+def media_names(doc: dict[str, Any], uploaded: set[str], results: set[str]) -> Media:
+    """Object names for SessionView.session.frame_urls (one per frame, None for RAW or a frame not
+    in the bucket) and crop_urls ({candidate_id: tight crop}, crops that exist only). Detail views
+    only: a list of every session would sign dozens of crops each."""
+    frames: list[str | None] = []
+    for uri, ct in zip(doc.get("frame_uris") or [], doc.get("content_types") or [], strict=False):
+        name = storage.name_from_uri(uri)
+        frames.append(name if ct in VIEWABLE_FRAMES and name in uploaded else None)
+    crops: dict[str, str] = {}
+    for c in (measured_result(doc) or {}).get("candidates", []):
+        name = storage.name_from_uri(c.get("crop_uri") or "")
+        if name and name in results:
+            crops[c["id"]] = name
+    return frames, crops
+
+
+def media_urls(media: Media) -> list[str]:
+    frames, crops = media
+    return [n for n in frames if n] + list(crops.values())
+
+
 def session_view(
     uid: str,
     sid: str,
@@ -95,6 +130,7 @@ def session_view(
     *,
     baseline: dict[str, Any] | None,
     signed: dict[str, str],
+    media: Media | None = None,
 ) -> dict[str, Any]:
     result = measured_result(doc)
     measured = result is not None
@@ -166,6 +202,16 @@ def session_view(
             "sample_id": doc.get("sample_id"),
             # Gemini's spot labels with confidence and what it saw (AI-suggested, never measured).
             "label_details": (doc.get("label_details") or {}) if measured else {},
+            # Live analysis stage while processing (received -> engine -> explaining), else None.
+            "stage": doc.get("stage") if doc["status"] == "processing" else None,
+            **(
+                {
+                    "frame_urls": [signed.get(n) if n else None for n in media[0]],
+                    "crop_urls": {cid: signed[n] for cid, n in media[1].items() if n in signed},
+                }
+                if media is not None
+                else {}
+            ),
         },
         "result": result,
         "labels": doc.get("labels") or {},

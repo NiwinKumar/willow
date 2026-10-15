@@ -44,6 +44,13 @@ class CreateSessionResponse(BaseModel):
     expires_in_seconds: int
 
 
+class DuplicateOf(BaseModel):
+    """An uploaded frame byte-identical (GCS MD5) to a frame of another (or this) session."""
+
+    session_id: str
+    index: int
+
+
 class ObjectStatus(BaseModel):
     index: int
     object_uri: str
@@ -51,6 +58,7 @@ class ObjectStatus(BaseModel):
     size: int | None
     md5_base64: str | None
     content_type: str | None
+    duplicate_of: DuplicateOf | None = None
 
 
 class SessionObjectsResponse(BaseModel):
@@ -65,3 +73,30 @@ class PatchSessionRequest(BaseModel):
 
 class SetBaselineRequest(BaseModel):
     session_id: str = Field(pattern=r"^s_\d{8}_[0-9a-f]{8}$")  # never arbitrary text in a path
+
+
+MAX_FRAMES = 5  # AnalyzeRequest frames maxItems (schemas/analyze_request.schema.json)
+
+
+class AddFramesRequest(BaseModel):
+    """POST /v1/sessions/{id}/frames: more photos for a session (top-up, or an edit before analyze).
+    Content types are checked against the session's capture mode by the route."""
+
+    add: int = Field(ge=1, le=MAX_FRAMES)
+    content_types: list[str]
+
+    @model_validator(mode="after")
+    def _check(self) -> "AddFramesRequest":
+        if len(self.content_types) != self.add:
+            raise ValueError("content_types must have exactly `add` entries")
+        return self
+
+
+class AddFramesResponse(BaseModel):
+    session_id: str
+    n_frames: int
+    # Upload targets for the new frames only (index = the frame's 1-based place in the session).
+    upload_urls: list[UploadTarget]
+    expires_in_seconds: int
+    # Frames the engine left out of a measured session, dropped to make room (1-based, as before).
+    dropped: list[int]
