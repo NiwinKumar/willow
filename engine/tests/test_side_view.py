@@ -136,3 +136,18 @@ def test_side_colour_keeps_every_large_skin_piece_and_shine():
     assert keep[:, :130].mean() > 0.9 and keep[:, 170:].mean() > 0.9  # both pieces
     assert keep[25:55, 205:275].all()  # shine stays skin
     assert not keep[:, 145:155].any()  # hair does not
+
+
+def test_light_hair_beside_the_ear_is_still_hair():
+    rng = np.random.default_rng(1)
+    h, w, ppm = 300, 300, 5.0
+    lab = np.empty((h, w, 3), np.float32)
+    lab[...] = (70.0, 12.0, 16.0)
+    lab[..., 0] += rng.normal(0, 1.0, (h, w))
+    skin = np.ones((h, w), bool)
+    ear = np.zeros((h, w), bool)
+    ear[:, 200:] = True
+    # light brown hair: as light as the cheek, rough, greyer and yellower
+    lab[:, 230:, 0] = 70.0 + rng.normal(0, 6.0, (h, 70))
+    lab[:, 230:, 1:] = (4.0, 13.0)
+    assert edge_hair(lab, skin, ~ear, ppm, ear)[:, 240:].mean() > 0.8

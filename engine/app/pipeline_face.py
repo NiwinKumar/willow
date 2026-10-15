@@ -214,7 +214,12 @@ def _frame(path: str) -> dict:
     side_nose = np.zeros_like(face_skin)
     if face.view != "front":
         side_nose = box.crop(face.nose_mask(srgb8.shape[:2]))
-    lip_edge = _lip_guard(
+    # a turned face's lip landmarks run short of a pursed or turned lip (Oct 15: a "blemish"
+    # on the lower lip below them): side views keep a wider band around the lips
+    side_lips = np.zeros_like(face_skin)
+    if face.view != "front":
+        side_lips = box.crop(face.lip_band(srgb8.shape[:2], config.SIDE_LIP_GUARD_MM))
+    lip_edge = side_lips | _lip_guard(
         box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_LIP_GUARD_MM)),
         box.crop(face.lip_band(srgb8.shape[:2], config.BLEMISH_MOUSTACHE_GUARD_MM)),
         beard_skin,
@@ -232,8 +237,9 @@ def _frame(path: str) -> dict:
     )
     # dark spots over the whole face skin, away from shadow-prone areas and from spots
     # already counted as blemishes (a red-brown mark is one thing, not two)
-    spot_edge = box.crop(face.edge_guard(srgb8.shape[:2])) | spot_band
-    search = face_skin & ~spot_edge & ~box.crop(face.shadow_guard(srgb8.shape[:2]))
+    spot_edge = box.crop(face.edge_guard(srgb8.shape[:2])) | spot_band | side_lips
+    shadows = box.crop(face.shadow_guard(srgb8.shape[:2]))
+    search = face_skin & ~spot_edge & ~shadows
     # just inside the hairline, skin darkens toward the hair and fine hairs remain: a dark
     # spot there must stand out more (a real mark near the hairline still counts)
     strict = face.border_band(
@@ -244,6 +250,7 @@ def _frame(path: str) -> dict:
         sp
         for sp in find_spots(lab, face_skin, search, px_per_mm, strict=strict, outline=outline)
         if all(np.hypot(sp.x - b.x, sp.y - b.y) > gap for b in blemishes)
+        and not (face.view != "front" and _reaches(sp, shadows))
     ]
     glow_idx, glow_extras = glow(lab, lin, cheek_skin, px_per_mm)
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
@@ -464,6 +471,19 @@ def _centred_crop(srgb8: np.ndarray, cx: float, cy: float, size: float) -> np.nd
         out = config.CROP_MIN_OUT_PX
         patch = cv2.resize(patch, (out, out), interpolation=cv2.INTER_CUBIC)
     return np.ascontiguousarray(patch)
+
+
+def _reaches(spot, guard: np.ndarray) -> bool:
+    """A spot whose disk reaches SIDE_SPOT_GUARD_OVERLAP of the way into a shadow guard: on a
+    turned face a 10 mm "spot" centred just outside the nose guard was the shadow where the
+    nose meets the cheek (Oct 15)."""
+    h, w = guard.shape
+    r = max(int(spot.radius), 1)
+    x0, x1 = max(int(spot.x) - r, 0), min(int(spot.x) + r + 1, w)
+    y0, y1 = max(int(spot.y) - r, 0), min(int(spot.y) + r + 1, h)
+    yy, xx = np.ogrid[y0:y1, x0:x1]
+    disk = (yy - spot.y) ** 2 + (xx - spot.x) ** 2 <= r * r
+    return bool(disk.any()) and guard[y0:y1, x0:x1][disk].mean() > config.SIDE_SPOT_GUARD_OVERLAP
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:

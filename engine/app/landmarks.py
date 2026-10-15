@@ -259,6 +259,12 @@ class Face:
             hull = cv2.convexHull(self.points[NOSE_ALL].astype(np.float32)).reshape(-1, 2)
             guard |= polygon_mask(shape, hull)
         grown = cv2.dilate(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
+        if self.view != "front":  # and the fold from the nose wing to the mouth corner, whose
+            # shadow read as a 10 mm "spot" beside the nose (Oct 15)
+            width = max(round(2 * config.SIDE_FOLD_GUARD_MM * self.px_per_mm), 1)
+            for wing, corner in ((98, 61), (327, 291)):
+                a, b = (tuple(int(v) for v in self.points[i]) for i in (wing, corner))
+                cv2.line(grown, a, b, 1, width)
         return grown.astype(bool)
 
     def t_zone_mask(self, shape: tuple[int, int]) -> np.ndarray:
@@ -580,7 +586,7 @@ def edge_hair(
     ear_side: np.ndarray | None = None,
 ) -> np.ndarray:
     """Sideburns / temple hair on side views: rough (fine texture well above this
-    person's skin) AND greyer than the cheek AND darker than the skin, over a
+    person's skin) AND greyer than the cheek AND not lighter than it, over a
     SIDE_HAIR_WINDOW_MM window, in
     patches that touch the outer edge of the skin mask on the ear side and lie mostly on
     that side (`ear_side`; marks inside the cheek and bumpy forehead skin are rough too,
@@ -592,11 +598,12 @@ def edge_hair(
     chroma = cv2.blur(np.hypot(lab[..., 1], lab[..., 2]).astype(np.float32), (w, w))
     rough = tex > config.SIDE_HAIR_TEXTURE * float(np.median(tex[skin]))
     grey = chroma < config.SIDE_HAIR_CHROMA * float(np.median(chroma[ref]))
-    # and darker than the skin: shiny skin is rough and greyish too, but lighter (Oct 15:
-    # patches cut on 7 side views were 1-17 L* lighter than the skin; a real sideburn 13
-    # L* darker), and deep skin with acne marks and shine lost 14-31% of its skin this way
-    darker = cv2.blur(L, (w, w)) < float(np.median(L[skin])) - config.SIDE_HAIR_DARKER_L
-    hair = (skin & rough & grey & darker).astype(np.uint8)
+    # and not lighter than the cheek: shine on marked skin is rough and greyish too, but
+    # lighter (Oct 15, cut patches vs the cheek: shine on 6 faces +3.4 to +12.8 L*; light
+    # hair -2.2 and +0.1; a dark sideburn far below). Cutting shine took 14-31% of the skin
+    # of deep-skin side views
+    not_lighter = cv2.blur(L, (w, w)) < float(np.median(L[ref])) + config.SIDE_HAIR_MAX_LIGHTER_L
+    hair = (skin & rough & grey & not_lighter).astype(np.uint8)
     hair = cv2.morphologyEx(hair, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     outer = binary_fill_holes(skin).astype(np.uint8)
     # (borderValue 0: a mask that runs to the crop border has an edge there too)
