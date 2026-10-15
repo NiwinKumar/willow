@@ -1,7 +1,7 @@
 """lines (docs/METRICS.md C1): visible lines and folds in four zones of a face photo, each
 with the direction its lines run: forehead (across the face), glabella (frown lines, up
-the face), crow's feet (fanning out from the outer eye corner) and nasolabial folds (nose
-wing to mouth corner).
+the face), crow's feet (fanning out from the outer eye corner), nasolabial folds (nose
+wing to mouth corner), lip lines (above the upper lip and below the lower, across the lip edge) and marionette lines (mouth corner down toward the jaw).
 
 A line is a dark valley in L*: a Hessian ridge (larger curvature positive, much larger than
 the other) on L* divided by the skin's local mean, so the depth is a share of the skin's
@@ -10,7 +10,7 @@ cancels). Kept only where the valley runs in the zone's direction (skin texture,
 hair run every way), away from blemishes and dark spots, and in connected pieces at least
 LINES_MIN_LENGTH_MM long. Value = line length per skin area (mm per cm2), the mean over the
 zones measured; a zone is skipped when the expression that creases it is on (raised brows,
-squint, smile). Indicative: compare a person's own sessions taken in the same light."""
+smile, pursed lips). Indicative: compare a person's own sessions taken in the same light."""
 
 import dataclasses
 
@@ -22,7 +22,7 @@ from skimage.morphology import skeletonize
 from app import config
 from app.landmarks import Face, polygon_mask
 
-ZONES = ("forehead", "glabella", "crows_feet", "nasolabial")
+ZONES = ("forehead", "glabella", "crows_feet", "nasolabial", "lips", "marionette")
 # zone -> (MediaPipe expression scores that crease it, config limit). Not used, they read high
 # on neutral faces: browOuterUp 0.45-0.97 (Oct 14), eyeSquint 0.57-0.67 (Oct 15, 3 of 12)
 GATES = {
@@ -31,7 +31,14 @@ GATES = {
     "glabella": (("browDownLeft", "browDownRight"), "LINES_MAX_FROWN"),
     "crows_feet": (("mouthSmileLeft", "mouthSmileRight"), "LINES_MAX_EXPRESSION"),
     "nasolabial": (("mouthSmileLeft", "mouthSmileRight"), "LINES_MAX_EXPRESSION"),
+    # pursed lips crease them, but mouthPucker reads 0.54-0.97 on neutral mouths (Oct 15):
+    # only an open, rounded mouth (funnel) is gated
+    "lips": (("mouthFunnel",), "LINES_MAX_EXPRESSION"),
+    "marionette": (("mouthSmileLeft", "mouthSmileRight"), "LINES_MAX_EXPRESSION"),
 }
+UPPER_LIP_EDGE = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291]  # right corner -> left
+NOSE_BASE_ROW = [327, 326, 2, 97, 98]  # under the nose, left -> right
+LOWER_LIP_EDGE = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291]  # right corner -> left
 GLABELLA_BROWS = (107, 336, 285, 55)  # inner brow ends: upper R, upper L, lower L, lower R
 
 
@@ -40,8 +47,9 @@ def _unit(v: np.ndarray) -> np.ndarray:
 
 
 def zone_geometry(face: Face) -> dict[str, list[tuple]]:
-    """zone -> [(polygon, direction, above)]: direction ("axis", unit vector) or ("radial",
-    point); above None or (point, up vector), keeping only the up side of that line.
+    """zone -> [(polygon, direction, above, exclude)]: direction ("axis", unit vector) or ("radial",
+    point); above None or (point, up vector), keeping only the up side of that line;
+    exclude None or a polygon left out.
     Front views: every zone, both sides. Side views: the forehead and the visible side's
     crow's feet and fold."""
     p, mm = face.points, face.px_per_mm
@@ -52,7 +60,7 @@ def zone_geometry(face: Face) -> dict[str, list[tuple]]:
     # colour) above a line LINES_BROW_GAP_MM over the brow tops
     brow_line = p[[105, 334]].mean(axis=0) + up * config.LINES_BROW_GAP_MM * mm
     outline = dataclasses.replace(face, yaw=0.0).outline()
-    out["forehead"].append((outline, ("axis", across), (brow_line, up)))
+    out["forehead"].append((outline, ("axis", across), (brow_line, up), None))
     sides = {"front": ("right", "left"), "right": ("right",), "left": ("left",)}[face.view]
     if face.view == "front":  # between the inner brow ends and up onto the forehead (lower
         # down, the nose bridge's sides are vertical shadow edges)
@@ -61,7 +69,7 @@ def zone_geometry(face: Face) -> dict[str, list[tuple]]:
         glabella = np.array([ur + rise, ul + rise, ll, lr])
         centre = glabella.mean(axis=0)  # narrowed: the inner brow heads' hairs run upward
         glabella[:, 0] = centre[0] + (glabella[:, 0] - centre[0]) * config.LINES_GLABELLA_WIDTH
-        out["glabella"].append((glabella, ("axis", up), None))
+        out["glabella"].append((glabella, ("axis", up), None, None))
     for side in sides:
         inner, outer, wing, mouth = (133, 33, 98, 61) if side == "right" else (362, 263, 327, 291)
         axis = _unit(p[outer] - p[inner])
@@ -70,7 +78,7 @@ def zone_geometry(face: Face) -> dict[str, list[tuple]]:
         end = start + axis * config.LINES_CROW_LENGTH_MM * mm
         half = normal * config.LINES_CROW_HALF_HEIGHT_MM * mm
         crow = np.array([start - half, end - half, end + half, start + half])
-        out["crows_feet"].append((crow, ("radial", p[outer]), None))
+        out["crows_feet"].append((crow, ("radial", p[outer]), None, None))
         a = p[wing]
         along = _unit(p[mouth] - a)
         b = p[mouth] + along * config.LINES_FOLD_PAST_MOUTH_MM * mm
@@ -79,17 +87,46 @@ def zone_geometry(face: Face) -> dict[str, list[tuple]]:
             away = -away
         near, far = (d * mm for d in config.LINES_FOLD_BAND_MM)
         fold = np.array([a + away * near, a + away * far, b + away * far, b + away * near])
-        out["nasolabial"].append((fold, ("axis", along), None))
+        out["nasolabial"].append((fold, ("axis", along), None, None))
+        # marionette: from just outside the mouth corner, down toward the jaw
+        corner = p[mouth] + away * config.LINES_MARIONETTE_OUT_MM * mm
+        down = _unit(
+            -up * config.LINES_MARIONETTE_LENGTH_MM + away * config.LINES_MARIONETTE_OUT_MM
+        )
+        tip = corner + down * config.LINES_MARIONETTE_LENGTH_MM * mm
+        side_w = np.array([-down[1], down[0]]) * config.LINES_MARIONETTE_HALF_WIDTH_MM * mm
+        marionette = np.array([corner - side_w, tip - side_w, tip + side_w, corner + side_w])
+        out["marionette"].append((marionette, ("axis", down), None, None))
+    # lips: the skin above the upper lip (to under the nose) and a band below the lower lip;
+    # the chin's horizontal crease is left out by its direction.
+    if face.view == "front":
+        centre = p[[13, 14]].mean(axis=0)
+        lip_gap = up * config.LINES_LIP_GAP_MM * mm
+        upper = np.vstack([p[UPPER_LIP_EDGE] + lip_gap, p[NOSE_BASE_ROW] - lip_gap])
+        # the philtrum's groove and ridges run up the middle: left out
+        half = across * config.LINES_PHILTRUM_HALF_MM * mm
+        philtrum = np.array([p[0] - half, p[0] + half, p[2] + half, p[2] - half])
+        lower_edge = p[LOWER_LIP_EDGE] - lip_gap
+        lower = np.vstack([lower_edge, lower_edge[::-1] - up * config.LINES_LIP_BELOW_MM * mm])
+        # lip lines run across the lip edge, near-vertical at the middle and splaying toward
+        # the corners: fanning out from a point LINES_LIP_FAN_MM beyond the mouth
+        fan = up * config.LINES_LIP_FAN_MM * mm
+        out["lips"] += [
+            (upper, ("radial", centre - fan), None, philtrum),
+            (lower, ("radial", centre + fan), None, None),
+        ]
     return out
 
 
-def _valleys(rel: np.ndarray, px: float) -> tuple[np.ndarray, np.ndarray]:
+def _valleys(
+    rel: np.ndarray, px: float, sigmas_mm: tuple | None = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Per pixel: (depth, line direction in radians) of the strongest dark valley over
     LINES_SIGMAS_MM. Depth is the scale-normalised larger Hessian eigenvalue of `rel`
     (0 where the valley is not clearly elongated: a pore or bump curves both ways)."""
     depth = np.zeros(rel.shape, np.float32)
     theta = np.zeros(rel.shape, np.float32)
-    for s_mm in config.LINES_SIGMAS_MM:
+    for s_mm in sigmas_mm or config.LINES_SIGMAS_MM:
         s = s_mm * px
         lxx = ndimage.gaussian_filter(rel, s, order=(0, 2))
         lyy = ndimage.gaussian_filter(rel, s, order=(2, 0))
@@ -138,13 +175,21 @@ def find_lines(
     local = local / np.maximum(weight, 1e-6)
     rel = np.where(sk, L / np.maximum(local, 1.0), 1.0).astype(np.float32)
     depth, theta = _valleys(rel, px)
+    # lip lines are finer than other lines: their own (finer) scales
+    lip_depth, lip_theta = _valleys(rel, px, config.LINES_LIP_SIGMAS_MM)
     marks_mask = np.zeros(sk.shape, np.uint8)
     for m in marks:
         r = round(m.radius * scale + config.LINES_MARK_GAP_MM * px)
         cv2.circle(marks_mask, (round(m.x * scale), round(m.y * scale)), max(r, 1), 1, -1)
     edge = max(round(config.LINES_EDGE_MM * px), 1)
     inner = ndimage.binary_erosion(sk, iterations=edge)  # hair / feature edges are dark too
-    cand = (depth >= config.LINES_MIN_DEPTH) & inner & ~marks_mask.astype(bool)
+    keep_out = ~marks_mask.astype(bool) & inner
+    cand = (depth >= config.LINES_MIN_DEPTH) & keep_out
+    # the skin between lip and nose is narrow: a smaller edge margin, and a lower bar for
+    # its fainter lines (young faces stayed at 0 down to 0.018, Oct 15)
+    lip_edge = max(round(config.LINES_LIP_EDGE_MM * px), 1)
+    lip_inner = ndimage.binary_erosion(sk, iterations=lip_edge)
+    lip_cand = (lip_depth >= config.LINES_LIP_MIN_DEPTH) & lip_inner & ~marks_mask.astype(bool)
 
     small_face = dataclasses.replace(face, points=face.points * scale)
     brows = small_face.brow_guard(sk.shape)  # brow hairs (inner brow heads run upward)
@@ -156,10 +201,14 @@ def find_lines(
         if max((face.expression.get(e, 0.0) for e in scores), default=0.0) > getattr(config, limit):
             skipped.append(zone)
             continue
+        # lip lines are short (a few mm, lip edge to nose)
+        min_len = config.LINES_LIP_MIN_LENGTH_MM if zone == "lips" else config.LINES_MIN_LENGTH_MM
         zone_line = np.zeros(sk.shape, bool)
         lengths, area = [], 0
-        for poly, direction, above in parts:
+        for poly, direction, above, exclude in parts:
             region = polygon_mask(sk.shape, poly) & sk
+            if exclude is not None:
+                region &= ~polygon_mask(sk.shape, exclude)
             if above is not None:
                 (bx, by), (ux, uy) = above
                 region &= (xx - bx) * ux + (yy - by) * uy > 0
@@ -173,14 +222,15 @@ def find_lines(
                     region &= ~grey
             if region.sum() < config.LINES_MIN_ZONE_MM2 * px * px:
                 continue
-            line = cand & region & _direction_ok(theta, direction, sk.shape)
+            c, th = (lip_cand, lip_theta) if zone == "lips" else (cand, theta)
+            line = c & region & _direction_ok(th, direction, sk.shape)
             labels, n = ndimage.label(line, structure=np.ones((3, 3)))
             # each piece's length = its skeleton's pixels
             on_skel = labels[skeletonize(line)]
             per_piece = np.bincount(on_skel, minlength=n + 1)[1:] * config.LINES_SKELETON_PX / px
             area_mm2 = np.bincount(labels.ravel(), minlength=n + 1)[1:] / px**2
             width = area_mm2 / np.maximum(per_piece, 1e-6)  # a blob (lash, lid shadow) is wide
-            ok = (per_piece >= config.LINES_MIN_LENGTH_MM) & (width <= config.LINES_MAX_WIDTH_MM)
+            ok = (per_piece >= min_len) & (width <= config.LINES_MAX_WIDTH_MM)
             long = np.flatnonzero(ok) + 1
             keep = np.isin(labels, long)
             lengths += per_piece[long - 1].tolist()
