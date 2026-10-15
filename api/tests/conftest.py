@@ -127,3 +127,13 @@ def fake(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app, headers={"X-Dev-Uid": "u_test"})
+
+
+@pytest.fixture(autouse=True)
+def no_real_health_probes(monkeypatch: pytest.MonkeyPatch):
+    """/v1/demo/status never reaches Vertex, the bucket or BigQuery in tests: every live probe
+    answers at once; a test that needs a failing one replaces it."""
+    from app import demo
+
+    for name in ("probe_gemini", "probe_storage", "probe_bigquery"):
+        monkeypatch.setattr(demo, name, lambda: None)
