@@ -47,7 +47,7 @@ cd web && npm install && npm run dev
 ## Testing strategy
 - engine: synthetic arrays with known answers per metric; synthetic card for calibration; schema validation for every response; one golden real DNG test kept OUT of git (runs only if `data/golden/` exists).
 - api: pytest with `ENGINE_MODE=fixture` and a mocked Gemini client; schema validation of Gemini outputs; number-validator unit tests.
-- web: Vitest for utilities; one Playwright smoke test (landing -> demo journey -> report) if time.
+- web: `npm test` runs pure-function tests in `web/tests/*.test.ts` with Node's own runner (no extra dependency; Node strips the types), for example the "Looks soft" sharpness heuristic; one Playwright smoke test (landing -> demo journey -> report) if time.
 - Before each merge: `ruff check`, `pytest` / `npm run lint && npm run build`.
 
 ## End-to-end test (real pipeline, from a laptop)
