@@ -168,3 +168,13 @@ def test_line_skin_keeps_shaded_skin_and_cuts_hair_and_beards():
 
     lab[130:, 70:] = (15.0, 2.0, 2.0)  # a beard over most of the lower face
     assert not _line_skin(lab, area, lower)[120:].any()
+
+
+def test_one_lined_zone_is_not_averaged_away():
+    face = _face()
+    lab, skin = _skin(face, 60.0)
+    _forehead_lines(lab, face)  # forehead lines, every other zone smooth
+    value, extras = lines(lab, face, skin, PX_PER_MM, [])
+    zones = [v for k, v in extras.items() if k.endswith("_mm_per_cm2") and v is not None]
+    assert len(zones) >= 4
+    assert value == pytest.approx(extras["forehead_mm_per_cm2"] / config.LINES_TOP_ZONES, abs=0.02)

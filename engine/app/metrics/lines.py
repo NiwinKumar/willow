@@ -8,8 +8,8 @@ the other) on L* divided by the skin's local mean, so the depth is a share of th
 own lightness (the same crease reads the same on light and deep skin, and broad shading
 cancels). Kept only where the valley runs in the zone's direction (skin texture, pores and
 hair run every way), away from blemishes and dark spots, and in connected pieces at least
-LINES_MIN_LENGTH_MM long. Value = line length per skin area (mm per cm2), the mean over the
-zones measured; a zone is skipped when the expression that creases it is on (raised brows,
+LINES_MIN_LENGTH_MM long. Value = line length per skin area (mm per cm2), the mean of the
+LINES_TOP_ZONES most lined zones; a zone is skipped when the expression that creases it is on (raised brows,
 smile, pursed lips). Indicative: compare a person's own sessions taken in the same light."""
 
 import dataclasses
@@ -142,6 +142,17 @@ def _valleys(
     return depth, theta
 
 
+def zone_settings(zone: str) -> dict:
+    """The zone's detection settings: LINES_* defaults, overridden by LINES_ZONE_SETTINGS."""
+    base = {
+        "sigmas_mm": tuple(config.LINES_SIGMAS_MM),
+        "min_depth": config.LINES_MIN_DEPTH,
+        "edge_mm": config.LINES_EDGE_MM,
+        "min_length_mm": config.LINES_MIN_LENGTH_MM,
+    }
+    return base | config.LINES_ZONE_SETTINGS.get(zone, {})
+
+
 def _direction_ok(theta: np.ndarray, direction: tuple, shape: tuple[int, int]) -> np.ndarray:
     kind, v = direction
     if kind == "axis":
@@ -174,22 +185,24 @@ def find_lines(
     local = cv2.GaussianBlur(np.where(sk, L, 0).astype(np.float32), (0, 0), sigma)
     local = local / np.maximum(weight, 1e-6)
     rel = np.where(sk, L / np.maximum(local, 1.0), 1.0).astype(np.float32)
-    depth, theta = _valleys(rel, px)
-    # lip lines are finer than other lines: their own (finer) scales
-    lip_depth, lip_theta = _valleys(rel, px, config.LINES_LIP_SIGMAS_MM)
     marks_mask = np.zeros(sk.shape, np.uint8)
     for m in marks:
         r = round(m.radius * scale + config.LINES_MARK_GAP_MM * px)
         cv2.circle(marks_mask, (round(m.x * scale), round(m.y * scale)), max(r, 1), 1, -1)
-    edge = max(round(config.LINES_EDGE_MM * px), 1)
-    inner = ndimage.binary_erosion(sk, iterations=edge)  # hair / feature edges are dark too
-    keep_out = ~marks_mask.astype(bool) & inner
-    cand = (depth >= config.LINES_MIN_DEPTH) & keep_out
-    # the skin between lip and nose is narrow: a smaller edge margin, and a lower bar for
-    # its fainter lines (young faces stayed at 0 down to 0.018, Oct 15)
-    lip_edge = max(round(config.LINES_LIP_EDGE_MM * px), 1)
-    lip_inner = ndimage.binary_erosion(sk, iterations=lip_edge)
-    lip_cand = (lip_depth >= config.LINES_LIP_MIN_DEPTH) & lip_inner & ~marks_mask.astype(bool)
+    no_marks = ~marks_mask.astype(bool)
+    valleys, inners = {}, {}  # shared between zones with the same settings
+
+    def candidates(zone: str) -> tuple[np.ndarray, np.ndarray, float]:
+        """(line candidates, line direction, min length mm) with the zone's settings."""
+        st = zone_settings(zone)
+        if st["sigmas_mm"] not in valleys:
+            valleys[st["sigmas_mm"]] = _valleys(rel, px, st["sigmas_mm"])
+        if st["edge_mm"] not in inners:  # hair / feature edges are dark too
+            edge = max(round(st["edge_mm"] * px), 1)
+            inners[st["edge_mm"]] = ndimage.binary_erosion(sk, iterations=edge)
+        depth, theta = valleys[st["sigmas_mm"]]
+        cand = (depth >= st["min_depth"]) & inners[st["edge_mm"]] & no_marks
+        return cand, theta, st["min_length_mm"]
 
     small_face = dataclasses.replace(face, points=face.points * scale)
     brows = small_face.brow_guard(sk.shape)  # brow hairs (inner brow heads run upward)
@@ -201,8 +214,7 @@ def find_lines(
         if max((face.expression.get(e, 0.0) for e in scores), default=0.0) > getattr(config, limit):
             skipped.append(zone)
             continue
-        # lip lines are short (a few mm, lip edge to nose)
-        min_len = config.LINES_LIP_MIN_LENGTH_MM if zone == "lips" else config.LINES_MIN_LENGTH_MM
+        cand, theta, min_len = candidates(zone)
         zone_line = np.zeros(sk.shape, bool)
         lengths, area = [], 0
         for poly, direction, above, exclude in parts:
@@ -222,8 +234,7 @@ def find_lines(
                     region &= ~grey
             if region.sum() < config.LINES_MIN_ZONE_MM2 * px * px:
                 continue
-            c, th = (lip_cand, lip_theta) if zone == "lips" else (cand, theta)
-            line = c & region & _direction_ok(th, direction, sk.shape)
+            line = cand & region & _direction_ok(theta, direction, sk.shape)
             labels, n = ndimage.label(line, structure=np.ones((3, 3)))
             # each piece's length = its skeleton's pixels
             on_skel = labels[skeletonize(line)]
@@ -249,7 +260,9 @@ def find_lines(
 def lines(
     lab: np.ndarray, face: Face, skin: np.ndarray, px_per_mm: float, marks: list
 ) -> tuple[float | None, dict]:
-    """Value = mean line density (mm per cm2) over the zones measured; extras per zone."""
+    """Value = mean line density (mm per cm2) of the LINES_TOP_ZONES most lined zones
+    measured (an average over every zone hid one heavily lined area among smooth ones);
+    extras per zone."""
     if px_per_mm < config.LINES_MIN_PX_PER_MM:
         return None, {}
     _, density, skipped = find_lines(lab, face, skin, px_per_mm, marks)
@@ -258,4 +271,5 @@ def lines(
         f"{z}_mm_per_cm2": (round(v, 2) if v is not None else None) for z, v in density.items()
     }
     extras["skipped_for_expression"] = sorted(skipped)
-    return (float(np.mean(measured)) if measured else None), extras
+    top = sorted(measured)[-config.LINES_TOP_ZONES :]
+    return (float(np.mean(top)) if top else None), extras

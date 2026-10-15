@@ -304,7 +304,7 @@ SHINE_MIN_MM2 = 200.0  # T-zone skin needed for a value
 GLOW_TEXTURE_MM = 0.5
 GLOW_TEXTURE_WEIGHT = 5.0
 # lines (docs/METRICS.md C1): dark valleys in L* / local skin L*, in the direction each
-# zone's lines run, at least LINES_MIN_LENGTH_MM long; value = mm of line per cm2
+# zone's lines run, at least LINES_MIN_LENGTH_MM long; value = mm of line per cm2 (top zones)
 LINES_MIN_PX_PER_MM = 3.0  # a 1.2 mm crease is 3.6 px: below this, no value
 LINES_WORK_PX_PER_MM = 10.0  # analysed at this scale
 # prominent lines only (Harshini, Oct 15): fine lines come and go with the light. On 8 lined
@@ -335,11 +335,20 @@ LINES_MARIONETTE_LENGTH_MM = 18.0  # ...this far down toward the jaw...
 LINES_MARIONETTE_HALF_WIDTH_MM = 5.0  # ...this wide either side
 LINES_LIP_GAP_MM = 1.0  # lip zones start this far from the lip edge (and the nose base)
 LINES_LIP_BELOW_MM = 8.0  # band below the lower lip
-LINES_LIP_MIN_LENGTH_MM = 2.5  # lip lines are short
-LINES_LIP_SIGMAS_MM = (0.3, 0.6)  # and fine (~0.6-1.2 mm wide)
 LINES_PHILTRUM_HALF_MM = 5.0  # upper-lip strip either side of the midline left out
-LINES_LIP_MIN_DEPTH = 0.018  # lip lines are fainter (young faces 0 down to 0.018)
-LINES_LIP_EDGE_MM = 0.75  # narrow skin between lip and nose: smaller edge margin
+# per-zone overrides of LINES_SIGMAS_MM / MIN_DEPTH / EDGE_MM / MIN_LENGTH_MM.
+# Lips: short (lip edge to nose), fine lines on narrow skin; young faces stayed at 0 down
+# to depth 0.018 (Oct 15)
+# Forehead: lines run long and shallow; 0.02 and 3 mm tripled what was found on 10 lined
+# foreheads (median 0.9 -> 3.0), 10 young stayed <= 1.9 (Oct 15). Crow's feet: every
+# looser setting tried put young faces at 3-6 and made a 6-photo session noisy
+LINES_ZONE_SETTINGS = {
+    "lips": {"sigmas_mm": (0.3, 0.6), "min_depth": 0.018, "edge_mm": 0.75, "min_length_mm": 2.5},
+    "forehead": {"min_depth": 0.02, "min_length_mm": 3.0},
+}
+# value = mean of the most lined zones. Oct 15, 10 lined vs 10 young faces: mean of all
+# zones AUC 0.96, top 2 1.00 (lined >= 2.6, young <= 2.5), 6-photo session SD 0.04
+LINES_TOP_ZONES = 2
 LINES_LIP_FAN_MM = 25.0  # lip lines fan from this far beyond the mouth (vertical mid-lip)
 LINES_MAX_BROW_RAISE = 0.8  # browInnerUp: forehead skipped (raised brows crease it)
 LINES_MAX_EXPRESSION = 0.6  # smile: crow's feet and folds skipped
