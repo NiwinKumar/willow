@@ -257,6 +257,8 @@ export const api = {
   setBaseline: (token: string, site: Site, sessionId: string) =>
     request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
+  /** The account as the api knows it: uid and the consent on record (null before any). */
+  me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null }>(token, '/v1/me'),
   catalogSearch: (token: string, params: { q?: string; concern?: string; category?: string; max_price?: number; currency?: string; limit?: number }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
     return request<{ products: Product[] }>(token, `/v1/catalog/search?${qs}`)

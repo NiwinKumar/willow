@@ -1,19 +1,20 @@
 import { createContext } from 'react'
 
 import type { SessionView } from '../lib/api'
-import type { Site, SiteSeries } from './types'
+import type { Session, Site, SiteSeries } from './types'
 
 export type DataMode = 'demo' | 'live'
 export type DataStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export type DataState = {
   mode: DataMode
-  /** demo only: real analyses of the team's consented captures, or the illustrative journey. */
-  demoSource?: 'real' | 'illustrative'
-  /** live: idle until someone is signed in, then loading -> ready (or error). demo is always ready. */
+  /** live: idle until someone is signed in, then loading -> ready (or error). demo: loading -> ready, or
+   * error when the team's journey cannot be read (there is no made-up fallback). */
   status: DataStatus
   sites: Site[]
   series: (site: Site) => SiteSeries | null
+  /** Every session, oldest first, across sites. */
+  all: Session[]
   goals: string[]
   /** Re-read every session from the api (live) or do nothing (demo). */
   refresh: () => Promise<void>
