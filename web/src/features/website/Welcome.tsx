@@ -242,7 +242,7 @@ const GOAL_LOOK: Record<GoalId, { bg: string; fg: string }> = {
   oil_glow: { bg: 'radial-gradient(90% 80% at 50% 100%, #F2B53A 0%, #F6DE5C 40%, #F5F0DA 85%)', fg: '#2A2410' },
 }
 
-const PLACE: Record<Site, string> = { face_full: 'FACE', cheek_macro: 'CLOSE-UPS', nose_macro: 'CLOSE-UPS', forearm_treated: 'FOREARM', forearm_control: 'FOREARM' }
+const PLACE: Record<Site, string> = { face_full: 'FACE', cheek_macro: 'CLOSE-UP', nose_macro: 'CLOSE-UP', forearm_treated: 'ARM', forearm_control: 'ARM' }
 
 /** Where a goal's measurements come from, read off the metric table: "FACE · CLOSE-UPS". */
 function goalPlaces(metrics: MetricId[]): string {
