@@ -20,6 +20,7 @@ import { useAuth } from '../../lib/useAuth'
 import { useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
+import { RemindersCard } from './Reminders'
 
 /**
  * You (Willow App.dc.html, isProfile): who is signed in, goals, photo time, skin type and check-in days (the
@@ -75,6 +76,7 @@ export default function You() {
         {demo ? <DemoCard /> : <AccountCard />}
         <GoalsCard demo={demo} />
         {demo ? null : <CheckinCard />}
+        {demo ? null : <RemindersCard />}
         {demo ? null : <PrivacyCard />}
         <CaptureSetupCard />
       </div>

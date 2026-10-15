@@ -9,6 +9,8 @@
     "lint": "oxlint && tsc -b --noEmit",
     "preview": "vite preview",
     "test": "node --test tests/*.test.ts"
+    "test": "node --test scripts/*.test.mjs",
+    "preview": "vite preview"
   },
   "dependencies": {
     "firebase": "12.19.0",

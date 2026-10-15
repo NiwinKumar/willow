@@ -8,7 +8,7 @@ export type HeroLine = { g: string; t: string }
  * The sunrise greeting card: serif greeting, two or three glyph lines built from real verdicts, and the
  * blurred bloom. The design uses a photo of a flower; it is recreated here with CSS (no images in the repo).
  */
-export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today' }: { name: string | null; lines: HeroLine[]; onAsk?: () => void; askLabel?: string }) {
+export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', next }: { name: string | null; lines: HeroLine[]; onAsk?: () => void; askLabel?: string; next?: string | null }) {
   // The greeting and date are read once per visit (they do not tick while the page is open).
   const [now] = useState(() => new Date())
   const hr = now.getHours()
@@ -31,7 +31,11 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today' }: {
         className="absolute inset-0 -z-10 opacity-55 mix-blend-overlay"
         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E\")" }}
       />
-      <span className="font-mono text-[11px] tracking-[.08em]">■ {date}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="font-mono text-[11px] tracking-[.08em]">■ {date}</span>
+        {/* The check-in schedule: "Check-in due today", "2 days late", "Next check-in Sat 17 Oct". */}
+        {next ? <span className="rounded-pill bg-white/55 px-3 py-1.5 text-[12.5px] backdrop-blur-[10px]">{next}</span> : null}
+      </div>
       <div className="flex max-w-[560px] flex-col gap-4">
         <h1 className="m-0 font-serif text-[clamp(40px,3.8vw,58px)] leading-[.9] font-normal tracking-[-0.02em]">
           {/* A guest has no name to greet ("Good evening, there" read oddly). */}
