@@ -9,7 +9,7 @@ import { api } from '../../lib/api'
 import { identity } from '../../lib/identity'
 import { judge, JUDGE_STOPS, type JudgeStop } from '../../lib/judge'
 import { useAuth } from '../../lib/useAuth'
-import { useDemoStatus } from '../../lib/useDemoStatus'
+import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { useJudge } from '../../lib/useJudge'
 import { useSamples } from '../../lib/useSamples'
 import { backButton, SoftBackdrop } from './Decor'
@@ -132,23 +132,8 @@ export default function Judge() {
     bg: failed ? 'bg-coral text-white' : ready ? 'bg-selected text-inverse' : 'bg-surface text-ink',
   }
 
-  const engine = status.status?.engine
-  const services: { label: string; dot: string; note: string }[] = status.status
-    ? [
-        {
-          label: 'Measurement engine',
-          dot: engine?.status === 'ok' ? 'bg-willow-400' : engine?.status === 'waking' ? 'bg-apricot' : 'bg-coral',
-          note: engine?.status === 'ok' ? `${engine.version ?? ''}${engine.latency_ms !== undefined ? ` · ${engine.latency_ms} ms` : ''}` : engine?.status === 'waking' ? (status.gaveUp ? 'asleep · wakes on first run' : 'waking · about 35 s') : 'unreachable',
-        },
-        { label: 'Gemini', dot: 'bg-ink/25', note: status.status.gemini.model },
-        { label: 'Catalog', dot: 'bg-ink/25', note: `${status.status.catalog.products} products` },
-        {
-          label: 'Retail warehouse',
-          dot: status.status.bigquery.status === 'ok' ? 'bg-willow-400' : 'bg-coral',
-          note: status.status.bigquery.status === 'ok' ? `${status.status.bigquery.people ?? 0} people` : 'unavailable',
-        },
-      ]
-    : []
+  // Live checks from the api (engine, Gemini, storage, warehouse with latency; catalog size), never colour alone.
+  const services = status.status ? serviceChips(status.status, status.gaveUp).filter((c) => c.key !== 'api') : []
 
   const stops: { id: JudgeStop; title: string; tag: string; body: string; cta: string; disabled?: string; act: () => void }[] = [
     {
@@ -248,8 +233,8 @@ export default function Judge() {
             <span className="px-1.5 font-mono text-[11px] text-ink-2">■ SERVICE</span>
             {status.status ? (
               services.map((s) => (
-                <span key={s.label} className="flex items-center gap-2 rounded-pill bg-white px-3 py-2 text-[13px]">
-                  <span aria-hidden className={`size-2 rounded-full ${s.dot}`} />
+                <span key={s.key} className="flex items-center gap-2 rounded-pill bg-white px-3 py-2 text-[13px]">
+                  <span aria-hidden className="size-2 rounded-full" style={{ background: CHIP_DOT[s.state] }} />
                   {s.label} <span className="font-mono text-[11px] text-ink-2">{s.note}</span>
                 </span>
               ))

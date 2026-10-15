@@ -17,7 +17,7 @@ import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '
 import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
-import { useDemoStatus } from '../../lib/useDemoStatus'
+import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
 import { RemindersCard } from './Reminders'
@@ -446,31 +446,33 @@ function CaptureSetupCard() {
   )
 }
 
-/** Live where a live check exists (api, engine); configuration only for Gemini and storage, and said so. */
+/** Every service checked live by the api (cached a minute): state in words and latency, never colour alone. */
 function ServiceStatus() {
-  const { status, failed, waking, gaveUp } = useDemoStatus()
-  const ok = 'var(--willow-400)'
-  const quiet = 'var(--signal-noise)'
-  const chips: { label: string; dot: string; title?: string }[] = []
-  if (failed) chips.push({ label: 'Service status unavailable', dot: quiet })
-  else if (!status) chips.push({ label: 'Checking…', dot: quiet })
-  else {
-    const e = status.engine.status
-    chips.push({ label: 'Willow api', dot: status.api.status === 'ok' ? ok : quiet })
-    chips.push({ label: e === 'ok' ? 'Measurement engine' : waking ? (gaveUp ? 'Measurement engine · still waking' : 'Measurement engine · waking up') : 'Measurement engine · unreachable', dot: e === 'ok' ? ok : waking ? 'var(--aura-apricot)' : quiet })
-    chips.push({ label: `AI explanations · ${status.gemini.model}`, dot: quiet, title: 'Configuration only; not checked live' })
-    chips.push({ label: 'Storage · configured', dot: quiet, title: 'Configuration only; not checked live' })
-  }
+  const { status, failed, gaveUp } = useDemoStatus()
+  const chips = status ? serviceChips(status, gaveUp).filter((c) => c.key !== 'catalog') : []
+  const live = status ? [status.gemini.status, status.storage.status].every(Boolean) : false
   return (
     <section aria-label="Service status" className="flex flex-wrap items-center gap-2.5 rounded-[36px] squircle bg-surface/70 px-6 py-5" aria-live="polite">
       <span className="mr-1.5 font-mono text-[12px] text-ink-2">■ SERVICE</span>
-      {chips.map((c) => (
-        <span key={c.label} title={c.title} className="flex items-center gap-2 rounded-pill bg-white px-3.5 py-2 text-[13px]">
-          <span aria-hidden className="size-2 rounded-full" style={{ background: c.dot }} />
-          {c.label}
+      {failed ? (
+        <span className="text-[13px] text-ink-2">Service status unavailable</span>
+      ) : !status ? (
+        <span className="text-[13px] text-ink-2">Checking…</span>
+      ) : (
+        chips.map((c) => (
+          <span key={c.key} className="flex items-center gap-2 rounded-pill bg-white px-3.5 py-2 text-[13px]">
+            <span aria-hidden className="size-2 rounded-full" style={{ background: CHIP_DOT[c.state] }} />
+            {c.label}
+            {c.note ? <span className="font-mono text-[11px] text-ink-2">{c.note}</span> : null}
+          </span>
+        ))
+      )}
+      {status ? (
+        <span className="text-caption text-ink-2">
+          Checked {new Date(status.checked_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          {live ? ', each service asked live (kept for a minute).' : '. AI and storage show configuration only.'}
         </span>
-      ))}
-      {status ? <span className="text-caption text-ink-2">Checked {new Date(status.checked_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}. AI and storage show configuration only.</span> : null}
+      ) : null}
     </section>
   )
 }
