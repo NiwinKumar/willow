@@ -286,6 +286,8 @@ def test_every_real_store_price_is_a_checked_amount_in_a_currency():
         catalog.StorePrice.model_validate({"amount": 5, "currency": "Rs", "checked": "2026-10-15"})
     with pytest.raises(ValueError):
         catalog.StorePrice.model_validate({"amount": 5, "currency": "INR", "checked": "2026-02-30"})
+
+
 def test_label_scan_reports_ingredient_confidence_and_a_failure_reason(client, fake, monkeypatch):
     def fake_generate(prompt_id, contents, schema, **kw):
         return schema(
