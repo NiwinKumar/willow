@@ -16,9 +16,11 @@ export function metricSeries(all: Session[], mode: CaptureMode, id: MetricId, ba
     const why = !s.result?.quality.passed ? 'not usable' : m?.verdict === 'low_quality' ? 'quality too low' : m?.value === null ? 'not measured' : null
     return {
       value: m?.value ?? null,
+      // Each point reads as its own result card does (its own precision); the axis uses `format`.
+      text: m && m.value !== null ? fmtValue(m.value, m) : undefined,
       label: shortWhen(s, sessions).toUpperCase(),
       why,
-      name: new Date(s.created_at).toLocaleString(undefined, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      name: new Date(s.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
     }
   })
   const sample = metricOf(base, id) ?? sessions.map((s) => metricOf(s, id)).find(Boolean) ?? null

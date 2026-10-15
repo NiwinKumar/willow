@@ -14,7 +14,7 @@ import { localDay } from '../../lib/api'
 import { fmtDate, parseDate } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, orderedGroups, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
-import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, usableLine, usedFrames } from './model'
+import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, toneLast, usableLine, usedFrames } from './model'
 import { Page, Pills } from './parts'
 import { metricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
@@ -57,7 +57,7 @@ export default function Progress() {
     const ids = new Set<MetricId>()
     for (const s of chartable(sessions, mode)) for (const m of s.result?.metrics ?? []) ids.add(m.id)
     const groups = orderedGroups(data.goals)
-    return [...ids].sort((a, b) => groups.indexOf(METRIC_META[a].group) - groups.indexOf(METRIC_META[b].group))
+    return [...ids].sort((a, b) => groups.indexOf(METRIC_META[a].group) - groups.indexOf(METRIC_META[b].group) || toneLast(a) - toneLast(b))
   }, [sessions, mode, data.goals])
   const qMetric = params.get('metric')
   const metric: MetricId | null = qMetric && metricIds.includes(qMetric as MetricId) ? (qMetric as MetricId) : (metricIds[0] ?? null)
@@ -105,7 +105,7 @@ export default function Progress() {
     const st = dayStatus(s)
     const started = routineDays[d] ?? []
     const note = list.some((x) => x.note)
-    const when = parseDate(d).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+    const when = parseDate(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
     days[d] = {
       bg: DAY_BG[st],
       dots: [...(started.length ? ['var(--willow-500)'] : []), ...(note ? ['var(--text-primary)'] : [])],

@@ -3,25 +3,22 @@
  * range, back after a gap, active), what today's check-in is doing, and the sentences built from verdicts.
  * Pure functions over api data; every number and name comes from a session or a routine entry.
  */
-import type { Metric, MetricId, RoutineEntry, Session, Site } from '../../data/types'
-import { baselineFor, isUnmeasured } from '../../data/live'
+import type { Metric, MetricId, RoutineEntry, Session } from '../../data/types'
+import { baselineFor, inFlight, isUnmeasured, stalled } from '../../data/live'
 import { localDay } from '../../lib/api'
 import { parseDate } from '../../lib/format'
-import { METRIC_META, orderedGroups } from '../../lib/metrics'
+import { METRIC_META, orderedGroups, SITE_LABEL } from '../../lib/metrics'
 import { verdictKind, type VerdictKind } from '../../lib/verdict'
 
 /** Back after this many days without a face check-in (no cadence is stored, so Home uses one fixed rule). */
 export const GAP_DAYS = 14
-/** An upload or analysis this old has stopped (the tab closed mid-upload, or the server restarted). */
-const STALL_MS = 30 * 60_000
 /** A baseline needs this many usable photos for a normal range (api baselines.NOISE_BAND_FRAMES). */
 export const BAND_FRAMES = 3
 
 export const dayOf = (iso: string) => localDay(parseDate(iso))
 export const today = () => localDay()
 
-export const inFlight = (s: Session) => s.status === 'uploading' || s.status === 'processing'
-export const stalled = (s: Session) => inFlight(s) && Date.now() - Date.parse(s.created_at) > STALL_MS
+export { inFlight, stalled }
 /** Analysed, measured, and its photos passed the quality check: its numbers can be read. */
 export const usable = (s: Session) => s.status === 'done' && !isUnmeasured(s) && Boolean(s.result?.quality.passed)
 
@@ -209,13 +206,7 @@ export function metricAura(id: MetricId): string {
   return `radial-gradient(90% 75% at 50% 100%, ${a} 0%, ${b} 70%, #F2F1EE 95%)`
 }
 
-export const SITE_SHORT: Record<Site, string> = {
-  face_full: 'Face',
-  cheek_macro: 'Cheek close-up',
-  nose_macro: 'Nose close-up',
-  forearm_treated: 'Treated forearm',
-  forearm_control: 'Control forearm',
-}
+export const SITE_SHORT = SITE_LABEL
 
 /** "15 Oct", "Today", "Yesterday". */
 export function shortDay(iso: string): string {

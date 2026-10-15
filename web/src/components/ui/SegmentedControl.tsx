@@ -30,7 +30,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
           aria-checked={o.value === value}
           tabIndex={o.value === value ? 0 : -1}
           onClick={() => onChange(o.value)}
-          className={`relative z-[1] flex-1 rounded-pill px-3 whitespace-nowrap text-ink ${size === 'sm' ? 'min-h-8 text-[13px]' : 'min-h-9 text-[13px]'}`}
+          className={`hit44 relative z-[1] flex-1 rounded-pill px-3 whitespace-nowrap text-ink ${size === 'sm' ? 'min-h-8 text-[13px]' : 'min-h-9 text-[13px]'}`}
         >
           {o.label}
         </button>

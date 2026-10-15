@@ -43,8 +43,11 @@ def label_of(metric: dict[str, Any]) -> str:
 def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     label = label_of(metric)
     verdict = metric["verdict"]
-    delta, mdc = metric.get("delta"), metric.get("mdc95")
-    trend = " (trend only)" if metric["confidence"] == "indicative" else ""
+    # the numbers exactly as the app shows them, so the sentence matches the card above it
+    shown = shown_numbers(metric)
+    delta, mdc = shown["delta"], shown["mdc95"]
+    # the app's confidence word for these readings (web lib/verdict.ts confidenceOf)
+    trend = " (indicative)" if metric["confidence"] == "indicative" else ""
     quoted: list[str] = []
     if verdict == "no_baseline" and delta is not None:
         quoted = [_signed(delta)]

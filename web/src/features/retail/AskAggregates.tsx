@@ -92,7 +92,7 @@ export function AskAggregates({ d }: { d: Insights }) {
       <div aria-live="polite" className="flex flex-col gap-4">
         {thread.map((m) => (
           <div key={m.id} className="flex flex-col gap-4">
-            <div className="max-w-[min(80%,560px)] self-end rounded-[24px_24px_8px_24px] bg-white px-[18px] py-3 text-[15px] text-[#121212] animate-[wRise_.35s_both]">{m.q}</div>
+            <div className="max-w-[min(80%,560px)] self-end rounded-[24px_24px_8px_24px] bg-white px-[18px] py-3 text-[15px] text-inverse animate-[wRise_.35s_both]">{m.q}</div>
             {m.reply ? (
               <Answer d={d} reply={m.reply} reveal={revealing === m.id} onRevealed={() => setRevealing((r) => (r === m.id ? null : r))} followUps={m === last} onAsk={ask} disabled={busy || revealing !== null} />
             ) : m.error ? (
@@ -127,7 +127,7 @@ export function AskAggregates({ d }: { d: Insights }) {
           e.preventDefault()
           void ask(draft)
         }}
-        className="flex gap-2 rounded-pill border border-white/[.18] bg-white/10 p-1.5 [-webkit-backdrop-filter:blur(16px)] [backdrop-filter:blur(16px)]"
+        className="flex gap-2 rounded-pill border border-white/[.18] bg-white/10 p-1.5 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus [-webkit-backdrop-filter:blur(16px)] [backdrop-filter:blur(16px)]"
       >
         <label htmlFor="retail-ask" className="sr-only">Question about the aggregates</label>
         <input
@@ -140,7 +140,7 @@ export function AskAggregates({ d }: { d: Insights }) {
           placeholder="e.g. Which redness products work in the budget tier?"
           className="min-h-[52px] min-w-0 flex-1 border-0 bg-transparent px-[18px] text-[16px] text-white outline-none placeholder:text-[#8E93C0]"
         />
-        <button type="submit" aria-label="Ask" disabled={!canSend} className="grid size-[52px] flex-none place-items-center rounded-full border-0 bg-white text-[20px] text-[#121212]">
+        <button type="submit" aria-label="Ask" disabled={!canSend} className="grid size-[52px] flex-none place-items-center rounded-full border-0 bg-white text-[20px] text-inverse">
           ↑
         </button>
       </form>

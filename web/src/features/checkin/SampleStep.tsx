@@ -10,7 +10,7 @@ import { MonoEyebrow, SerifTitle } from './parts'
 export function SampleStep({ busy, error, onRun, onOwn }: { busy: string | null; error: string | null; onRun: (id: string) => void; onOwn: () => void }) {
   const samples = useSamples()
   return (
-    <main className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div>
         <MonoEyebrow>Sample run</MonoEyebrow>
         <div className="mt-3">
@@ -54,6 +54,6 @@ export function SampleStep({ busy, error, onRun, onOwn }: { busy: string | null;
           Take a selfie
         </button>
       </p>
-    </main>
+    </div>
   )
 }

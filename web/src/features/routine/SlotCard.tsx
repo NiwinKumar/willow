@@ -4,7 +4,7 @@ import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useSetRoutineUse } from '../../data/hooks'
 import type { RoutineEntry, Session } from '../../data/types'
 import { ApiError, localDay } from '../../lib/api'
-import { fmtDate } from '../../lib/format'
+import { fmtDate, plural } from '../../lib/format'
 import { outcomeFor } from '../../lib/outcome'
 import { CategoryOrb } from './productUi'
 import { activeLabel, entryName, metaLine, OUTCOME_GLYPH } from './routineModel'
@@ -83,7 +83,7 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
             </button>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="truncate text-[13px] opacity-75">{metaLine(e.brand, e.category)}</span>
-              <button type="button" onClick={() => onOpen(e)} className="text-left text-[17px] leading-[1.25] underline-offset-4 hover:underline sm:text-[18px]">
+              <button type="button" onClick={() => onOpen(e)} className="hit44 text-left text-[17px] leading-[1.25] underline-offset-4 hover:underline sm:text-[18px]">
                 {name}
               </button>
               <span className="flex flex-wrap gap-[5px]">
@@ -97,7 +97,7 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
                 </span>
                 {e.recent_use ? (
                   <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ background: t.chip }} title="From your ticks over the last two weeks">
-                    used {e.recent_use.days_used} of {e.recent_use.of_days} days
+                    used {e.recent_use.days_used} of {plural(e.recent_use.of_days, 'day', 'days')}
                   </span>
                 ) : null}
               </span>

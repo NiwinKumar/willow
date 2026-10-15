@@ -38,10 +38,12 @@ export default function You() {
   const demo = data.mode === 'demo'
   const goals = data.goals
   const done = data.all.filter((s) => s.status === 'done')
+  // Sessions take a few seconds to arrive on a cold load: no false zeros meanwhile.
+  const counting = data.status !== 'ready' && !data.all.length
   const stats = [
-    { k: 'Sessions', v: done.length },
+    { k: 'Sessions', v: counting ? '–' : done.length },
     { k: 'Goals', v: goals.length },
-    { k: 'Days tracked', v: new Set(data.all.map((s) => dayOf(s.created_at))).size },
+    { k: 'Days tracked', v: counting ? '–' : new Set(data.all.map((s) => dayOf(s.created_at))).size },
   ]
   return (
     <main className="relative mx-auto flex max-w-[1100px] flex-col gap-3.5" style={{ padding: '8px clamp(16px,4vw,40px) 24px' }}>
@@ -305,8 +307,9 @@ function PrivacyCard() {
         ] as [string, string][])
       : ([['Consent', 'Not recorded on this device or account']] as [string, string][])),
     ['On your account', me.status === 'loading' ? 'Checking…' : server ? `Saved · sharing ${server.aggregate_insights_opt_in ? 'on' : 'off'}` : me.status === 'error' ? 'Couldn’t check' : 'Not saved yet'],
-    ['Original photos', 'Deleted 30 days after upload'],
-    ['Measurements and previews', 'Kept until you delete them'],
+    // Same retention as the consent (Welcome): previews and spot close-ups live under results/, which the bucket deletes at 30 days.
+    ['Original photos and previews', 'Deleted 30 days after upload'],
+    ['Measurements', 'Kept until you delete them'],
     ['AI use', 'Explanations, spot labels, label reading, routine check, advisor'],
     ['Scope', 'Cosmetic appearance only'],
   ]
@@ -332,7 +335,7 @@ function PrivacyCard() {
       <details className="text-[14px] leading-[1.55]">
         <summary className="flex min-h-11 cursor-pointer items-center">{consent ? 'Read the consent you agreed to' : 'Read the consent'}</summary>
         <p className="mt-1.5 mb-0 text-[#3E3C38]">
-          Willow stores your original photos privately for 30 days, then deletes them. Measurements, verdicts, small previews and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers the advisor; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
+          Willow stores your original photos privately for 30 days, then deletes them, with their small previews and spot close-ups. Measurements, verdicts and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers the advisor; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
         </p>
       </details>
     </Panel>

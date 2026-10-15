@@ -11,6 +11,8 @@ export type TimelinePoint = {
   why?: string | null
   /** Longer name for the hidden data table ("14 Oct 2026, 13:59"). */
   name?: string
+  /** The value as that session's own screen writes it (its own precision); else `format(value)`. */
+  text?: string
 }
 
 const MONO = 'var(--font-mono)'
@@ -29,6 +31,7 @@ export function TimelineChart({
   band,
   markers = [],
   format,
+  bandValue,
   unit = '',
   highlight = null,
   glow = false,
@@ -42,6 +45,8 @@ export function TimelineChart({
   /** Routine changes at fractional session indices. */
   markers?: { at: number; label: string }[]
   format: (v: number) => string
+  /** The band as the screen around the chart writes it (a session's own precision); else `format(band)`. */
+  bandValue?: string
   /** Unit written above the y axis. */
   unit?: string
   /** The session on screen: a ring around its dot. */
@@ -95,7 +100,7 @@ export function TimelineChart({
         {base !== null ? (
           <>
             <text x={578} y={hasBand ? g.Y(base - band) + 16 : baseY + 20} textAnchor="end" fill={hasBand ? 'var(--aura-lilac)' : 'var(--action-primary)'} fontSize={10} fontFamily={MONO} letterSpacing=".04em">
-              {hasBand ? `NORMAL RANGE ±${format(band)}${unit === '°' ? '°' : unit ? ` ${unit.toUpperCase()}` : ''}` : 'NO NORMAL RANGE YET'}
+              {hasBand ? `NORMAL RANGE ±${bandValue ?? format(band)}${unit === '°' ? '°' : unit ? ` ${unit.toUpperCase()}` : ''}` : 'NO NORMAL RANGE YET'}
             </text>
             <line x1={64} x2={580} y1={baseY} y2={baseY} stroke="#fff" strokeOpacity={0.4} strokeDasharray="2 6" />
           </>
@@ -125,7 +130,7 @@ export function TimelineChart({
                 <>
                   <rect x={p.x - 30} y={p.y - 42} width={60} height={26} rx={13} fill="#fff" />
                   <text x={p.x} y={p.y - 24} textAnchor="middle" fontSize={12} fontFamily={MONO} fill="var(--text-primary)">
-                    {format(p.v)}
+                    {points[p.i].text ?? format(p.v)}
                   </text>
                 </>
               ) : null}
@@ -168,7 +173,7 @@ export function TimelineChart({
                 {p.name ?? p.label}
                 {i === baseIndex ? ' (baseline)' : ''}
               </th>
-              <td>{p.value === null ? `no reading${p.why ? `: ${p.why}` : ''}` : format(p.value)}</td>
+              <td>{p.value === null ? `no reading${p.why ? `: ${p.why}` : ''}` : (p.text ?? format(p.value))}</td>
             </tr>
           ))}
         </tbody>

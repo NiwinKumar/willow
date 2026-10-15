@@ -29,7 +29,7 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
   if (cam.phase !== 'live' && cam.phase !== 'done') {
     const blocked = cam.phase === 'denied' || cam.phase === 'unavailable' || cam.phase === 'ended'
     return (
-      <main className="flex min-h-full flex-col items-center bg-[#050505] px-2.5 pt-[max(10px,env(safe-area-inset-top))] pb-[max(6px,env(safe-area-inset-bottom))] text-white">
+      <div className="flex min-h-full flex-col items-center bg-[#050505] px-2.5 pt-[max(10px,env(safe-area-inset-top))] pb-[max(6px,env(safe-area-inset-bottom))] text-white">
         <div className="flex w-full max-w-[980px] items-center justify-between gap-3">
           <button type="button" onClick={onBack} aria-label="Back to preparation" className="grid size-[52px] place-items-center rounded-full bg-[#1C1C1C]">
             <ArrowLeft size={20} aria-hidden />
@@ -104,14 +104,14 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
             {first ? <li>{WHY_FIVE}</li> : null}
           </ul>
         </div>
-      </main>
+      </div>
     )
   }
 
   const guide = arm ? { w: '80%', h: '34%', r: '999px' } : close ? { w: '70%', h: '56%', r: '40px' } : { w: '58%', h: '66%', r: '50%' }
   const ok = cam.allPass || all
   return (
-    <main className="flex h-full flex-col items-center bg-[#050505] px-2.5 pt-[max(10px,env(safe-area-inset-top))] pb-[max(6px,env(safe-area-inset-bottom))] text-white">
+    <div className="flex h-full flex-col items-center bg-[#050505] px-2.5 pt-[max(10px,env(safe-area-inset-top))] pb-[max(6px,env(safe-area-inset-bottom))] text-white">
       <h1 id="ck-title" tabIndex={-1} className="sr-only">
         {name} camera
       </h1>
@@ -215,6 +215,6 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
           ) : null}
         </span>
       </div>
-    </main>
+    </div>
   )
 }

@@ -12,7 +12,7 @@ import { useOwner } from '../../data/hooks'
 import type { RoutineEntry, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
-import { fmtDate, parseDate } from '../../lib/format'
+import { clockOf, fmtDate, parseDate } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
@@ -48,9 +48,9 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
       <div className="flex min-w-0 items-center gap-3.5">
         <button type="button" onClick={back} className="flex min-h-11 items-center gap-2 rounded-pill bg-white/65 pr-[18px] pl-3.5 text-[14px] backdrop-blur-[12px] hover:bg-white">
           <span aria-hidden>←</span>
-          {date.toLocaleDateString(undefined, { month: 'long' })}
+          {date.toLocaleDateString('en-GB', { month: 'long' })}
         </button>
-        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">HISTORY / {date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}</span>
+        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">HISTORY / {date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}</span>
       </div>
       <div className="flex gap-1.5">
         <button type="button" onClick={() => prevDay && go(prevDay)} disabled={!prevDay} aria-label="Previous check-in day" className="min-h-11 rounded-pill bg-white/65 px-4 text-[13px] disabled:opacity-40">
@@ -103,7 +103,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
           <Pills
             label="Check-in on this day"
             tone="white"
-            options={list.map((s) => ({ value: s.id, label: `${new Date(s.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · ${MODE_LONG[s.capture_mode]}` }))}
+            options={list.map((s) => ({ value: s.id, label: `${clockOf(s.created_at)} · ${MODE_LONG[s.capture_mode]}` }))}
             value={session.id}
             onChange={(id) => setParams((p) => ({ ...Object.fromEntries(p), session: id }), { replace: true, state: location.state })}
           />
@@ -120,9 +120,9 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
               {session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''} · {usableLine(session).toUpperCase()}
             </span>
             <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,48px)] leading-[.9] font-normal tracking-[-0.01em]">
-              {date.toLocaleDateString(undefined, { weekday: 'long' })},
+              {date.toLocaleDateString('en-GB', { weekday: 'long' })},
               <br />
-              <span className="italic">{date.toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}</span>
+              <span className="italic">{date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</span>
             </h1>
             <div className="flex flex-wrap gap-1.5">
               {chips.map((ch) => (
@@ -154,7 +154,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
         {measured && ordered.length ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
             {ordered.map((m, i) => (
-              <MetricTile key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : st === 'compared' ? bandOf(baseline, m.id) : null} baselineDay={baseline ? fmtDate(baseline.created_at) : null} delay={i * 60} />
+              <MetricTile key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : st === 'compared' ? bandOf(baseline, m.id) : null} baselineDay={baseline ? (fmtDate(baseline.created_at) === fmtDate(session.created_at) ? `baseline, ${clockOf(baseline.created_at)}` : fmtDate(baseline.created_at)) : null} delay={i * 60} />
             ))}
           </div>
         ) : null}
@@ -180,7 +180,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
               ) : null}
               {data.mode === 'live' ? (
                 <Button variant="outline" disabled={!canBeBaseline(session)} onClick={() => setAsking(true)}>
-                  {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)} as baseline` : 'Not eligible as a baseline'}
+                  {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${others.length ? `, ${clockOf(session.created_at)}` : ''} as baseline` : 'Not eligible as a baseline'}
                 </Button>
               ) : null}
               <button
@@ -200,7 +200,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
         </div>
         <Disclaimer />
       </div>
-      <BaselineDialog session={session} open={asking} onClose={() => setAsking(false)} />
+      <BaselineDialog session={session} withTime={others.length > 0} open={asking} onClose={() => setAsking(false)} />
     </Page>
   )
 }

@@ -31,7 +31,7 @@ export function Pills<T extends string>({ label, options, value, onChange, tone 
             aria-checked={on}
             tabIndex={on || (value === null && o === options[0]) ? 0 : -1}
             onClick={() => onChange(o.value)}
-            className={`rounded-pill px-3.5 whitespace-nowrap transition-[background,color] duration-200 ${size === 'lg' ? 'min-h-11 px-[18px] text-[15px]' : 'min-h-10 text-[14px]'} ${
+            className={`hit44 rounded-pill px-3.5 whitespace-nowrap transition-[background,color] duration-200 ${size === 'lg' ? 'min-h-11 px-[18px] text-[15px]' : 'min-h-10 text-[14px]'} ${
               on ? (tone === 'ink' ? 'bg-selected text-inverse' : 'bg-white text-ink shadow-[0_1px_4px_rgba(0,0,0,.08)]') : 'text-ink'
             }`}
           >

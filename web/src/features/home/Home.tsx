@@ -8,12 +8,14 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
 import type { CaptureMode, RoutineEntry, RoutineCheck, Session } from '../../data/types'
+import { demoUnavailable } from '../../data/demoSource'
 import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
 import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
+import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, NextStepCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
 import { readForearm } from './forearm'
@@ -40,7 +42,11 @@ export default function Home() {
     return (
       <Frame>
         {data.mode === 'demo' ? (
-          <EmptyState title="The demo journey can't be read right now" body="It is our team's own measured check-ins, read from the live api. Try again in a moment, or leave the demo." action={
+          <EmptyState
+            {...(demoUnavailable() === 'empty'
+              ? { title: 'The demo journey has no check-ins yet', body: "It shows our team's own check-ins, measured by the live engine, and none have been measured yet. Your own check-ins are in your account." }
+              : { title: "The demo journey can't be read right now", body: "It is our team's own measured check-ins, read from the live api. Try again in a moment, or leave the demo." })}
+            action={
               <Button
                 variant="ink"
                 onClick={() => {
@@ -85,7 +91,9 @@ function HomeBody() {
   const { refresh } = data
   useEffect(() => {
     if (!running) return
-    const id = window.setInterval(() => void refresh(), POLL_MS)
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, POLL_MS)
     return () => window.clearInterval(id)
   }, [running, refresh])
 
@@ -210,7 +218,7 @@ function HomeBody() {
       <div className="@container grid grid-cols-12 items-stretch gap-3.5">
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <HeroCard
-            name={me.first}
+            name={me.guest ? null : me.first}
             lines={heroLines}
             onAsk={demo ? undefined : () => (read.person === 'new' || read.person === 'noBand' ? ask('How do I take a good face baseline?', 'Today') : ask('Explain today’s read: what changed and what should I do today?', 'Today'))}
           />
@@ -345,7 +353,9 @@ function doneLead(s: Session, goals: string[], eyebrow: string): Lead {
   }
   const { changed, normal, kinds } = splitVerdicts(s, goals)
   const notEnough = [...kinds.values()].filter((k) => k === 'notEnough').length
-  const chips = [changed.length ? `◆ ${changed.length} changed` : '', normal.length ? `○ ${normal.length} within range` : '', notEnough ? `◌ ${notEnough} not enough data` : ''].filter(Boolean)
+  // The same count words as the Result hero chips (lib/verdict.ts).
+  const count = (n: number, k: VerdictKind) => (n ? `${VERDICT_WORDS[k].glyph} ${n} ${VERDICT_WORDS[k].label.toLowerCase()}` : '')
+  const chips = [count(changed.length, 'changed'), count(normal.length, 'normal'), count(notEnough, 'notEnough')].filter(Boolean)
   const first = changed[0]
   const title = changed.length === 0 ? (normal.length ? 'Within your normal range' : 'Not enough data to compare yet') : changed.length === 1 ? `${METRIC_META[first.id].label} changed` : `${changed.length} measures changed`
   const u = first ? unitOf(first).trim() : ''
@@ -494,11 +504,13 @@ function weekOf(all: Session[], read: HomeRead, goals: string[]) {
   const fmt = (d: Date, month: boolean) => d.toLocaleDateString('en-GB', month ? { day: 'numeric', month: 'short' } : { day: 'numeric' }).toUpperCase()
   const sameMonth = days[0].getMonth() === days[6].getMonth()
   const range = sameMonth ? `${fmt(days[0], false)}–${fmt(days[6], true)}` : `${fmt(days[0], true)} – ${fmt(days[6], true)}`
+  const faceCount = done.filter((s) => s.site === 'face_full').length
   const face = latest(done, (s) => s.site === 'face_full' && usable(s) && !s.is_baseline)
   const sentence = face ? verdictSentence(face, goals) : null
   return {
     range,
-    summary: `${countWord(done.length)} check-in${done.length === 1 ? '' : 's'}.${sentence ? ` ${sentence}` : ''}`,
+    // Every place counts here; Progress (where "See progress" goes) shows one place, so say how many were the face.
+    summary: `${countWord(done.length)} check-in${done.length === 1 ? '' : 's'}${faceCount && faceCount < done.length ? `, ${faceCount} of your face` : ''}.${sentence ? ` ${sentence}` : ''}`,
     days: days.map((_, i) => ({ d: WEEKDAY[i], name: WEEKDAY_NAME[i], on: on.has(keys[i]), today: i === dow })),
   }
 }

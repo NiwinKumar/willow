@@ -106,10 +106,12 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
     }
   }
   const n = c.changed
+  // Ember means "Changed" only (DESIGN.md rule 3): with nothing changed the hero is the calm violet the
+  // day detail uses for a within-range day, not orange.
   return {
-    bg: G.orange,
-    shadow: 'rgba(255,106,0,.6)',
-    fg: '#1F0E04',
+    bg: n ? G.orange : G.violet,
+    shadow: n ? 'rgba(255,106,0,.6)' : 'rgba(107,76,255,.45)',
+    fg: n ? '#1F0E04' : '#16093A',
     eyebrow: `SINCE YOUR BASELINE${bDay ? ` · ${bDay}` : ''}`,
     kicker: 'Readings beyond your normal range',
     big: String(n),

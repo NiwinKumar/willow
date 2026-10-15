@@ -33,7 +33,7 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
   const cta = allUp ? 'All photos uploaded · measuring next' : failed && !busy ? `${failed} upload${failed === 1 ? '' : 's'} failed · retry to continue` : busy ? `Uploading ${done} of ${ok.length}…` : `Upload ${ok.length} photo${ok.length === 1 ? '' : 's'}`
 
   return (
-    <main className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <MonoEyebrow>{raw ? 'RAW · DNG originals only · up to 120 MB each' : 'Quick · JPEG, HEIC or HEIF · up to 120 MB each'}</MonoEyebrow>
@@ -202,6 +202,6 @@ export function FilesStep({ mode, n, first, upload, camera, onPick, onRemove, on
           {camera ? 'Start over with new photos' : 'Start over with different files'}
         </button>
       ) : null}
-    </main>
+    </div>
   )
 }

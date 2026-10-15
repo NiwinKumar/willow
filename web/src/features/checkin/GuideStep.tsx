@@ -50,7 +50,7 @@ export function GuideStep(props: {
       : `Your earlier ${modeName} photos for ${name.toLowerCase()} are saved. Matching their light, pose and distance keeps today’s reading comparable.`
 
   return (
-    <main className="relative mx-auto grid max-w-[1180px] animate-rise grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="relative mx-auto grid max-w-[1180px] animate-rise grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <section
         aria-labelledby="ck-title"
         className="relative flex min-h-[540px] flex-col justify-between gap-6 overflow-hidden rounded-xl p-[clamp(24px,4vw,40px)] text-inverse squircle"
@@ -202,6 +202,6 @@ export function GuideStep(props: {
         </div>
         <span className="px-1.5 text-[13px] text-ink-2">{raw ? 'The browser camera can’t take RAW photos. Use Lightroom, then upload the DNG files.' : 'Camera checks guide framing only. They don’t measure anything.'}</span>
       </section>
-    </main>
+    </div>
   )
 }

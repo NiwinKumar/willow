@@ -66,10 +66,13 @@ export function noBand(s: Session): boolean {
   return Boolean(!s.is_baseline && s.baseline_ref && !s.baseline_ref.has_noise_band)
 }
 
-/** Metrics in the order of the person's goals, then changed first within a group. */
+/** Skin tone is descriptive only: it never leads its group (Home orders it the same way). */
+export const toneLast = (id: MetricId) => (id === 'tone_ita' ? 1 : 0)
+
+/** Metrics in the order of the person's goals, then changed first within a group (skin tone last in its group). */
 export function orderMetrics(metrics: Metric[], goals: string[]): Metric[] {
   const groups = orderedGroups(goals)
-  return [...metrics].sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group) || VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict])
+  return [...metrics].sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group) || toneLast(a.id) - toneLast(b.id) || VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict])
 }
 
 /** Value with its unit, as written on cards ("3.1 %", "21.4°"). */
@@ -85,9 +88,13 @@ export function deltaText(m: Metric, d: number | null = m.delta): string {
   return `${fmtSigned(d, m)}${u === '°' ? '°' : u === '%' ? ' pts' : u ? ` ${u.trim()}` : ''}`
 }
 
+/**
+ * The baseline's band, rounded like this session's own numbers (lib/metrics decimalsFor on its own mdc95):
+ * the explanation quotes it that way too (api explain.decimals), so card and text never disagree.
+ */
 export function bandText(m: Metric, band: number): string {
   const u = unitOf(m)
-  return `±${fmtValue(band, { ...m, mdc95: band })}${u === '°' ? '°' : u === '%' ? ' pts' : u ? ` ${u.trim()}` : ''}`
+  return `±${fmtValue(band, m)}${u === '°' ? '°' : u === '%' ? ' pts' : u ? ` ${u.trim()}` : ''}`
 }
 
 /** The metric to put on the hero ruler: the first changed one in goal order, else the first with a change. */
@@ -176,7 +183,7 @@ export function currentBaseline(sessions: Session[], mode: CaptureMode): Session
 export function optionLabel(s: Session, all: Session[]): string {
   const day = dayOf(s)
   const same = all.filter((x) => dayOf(x) === day).length > 1
-  const when = new Date(s.created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', ...(same ? { hour: '2-digit', minute: '2-digit' } : {}) })
+  const when = new Date(s.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...(same ? { hour: '2-digit', minute: '2-digit' } : {}) })
   const st = sessionState(s)
   const tag = st === 'baseline' ? ' · baseline' : st === 'rejected' ? ' · not usable' : st === 'pending' ? ' · still measuring' : st === 'failed' ? ' · did not finish' : st === 'unmeasured' ? ' · not measured' : st === 'former' ? ' · earlier baseline' : ''
   return `${when}${tag}`
@@ -185,7 +192,7 @@ export function optionLabel(s: Session, all: Session[]): string {
 /** "14 Oct" or, when the series is short (the self-tanner run), "+24 h". */
 export function shortWhen(s: Session, all: Session[]): string {
   const day = fmtDate(s.created_at)
-  if (all.filter((x) => fmtDate(x.created_at) === day).length > 1) return new Date(s.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  if (all.filter((x) => fmtDate(x.created_at) === day).length > 1) return new Date(s.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   return day
 }
 
@@ -198,7 +205,7 @@ export function metricQuestion(m: Metric, s: Session, baseline: Session | null):
   const parts = [`My ${METRIC_META[m.id].label.toLowerCase()} on ${fmtDate(s.created_at, { day: 'numeric', month: 'long' })} read ${valueText(m)}`]
   if (m.delta !== null && !s.is_baseline) parts.push(`a change of ${deltaText(m)} since my baseline`)
   if (band !== null && !s.is_baseline) parts.push(`normal range ${bandText(m, band)}`)
-  return `${parts.join(', ')} (Willow says: ${kind === 'changed' ? 'changed' : kind === 'normal' ? 'within normal range' : kind === 'baseline' ? 'this is my baseline' : kind === 'notEnough' ? 'not enough data yet' : 'could not compare'}). What could explain this, and what should I keep the same next time?`
+  return `${parts.join(', ')} (Willow says: ${VERDICT_WORDS[kind].label.toLowerCase()}). What could explain this, and what should I keep the same next time?`
 }
 
 export function siteHasSpots(site: Site): boolean {

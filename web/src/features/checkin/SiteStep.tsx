@@ -15,7 +15,7 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
   const first = n === 5
   const [today] = useState(() => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase())
   return (
-    <main className="relative mx-auto flex max-w-[1180px] animate-rise flex-col gap-[22px] px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="relative mx-auto flex max-w-[1180px] animate-rise flex-col gap-[22px] px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <MonoEyebrow>New session · {today}</MonoEyebrow>
@@ -92,6 +92,6 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
           Continue <span aria-hidden>→</span>
         </button>
       </div>
-    </main>
+    </div>
   )
 }

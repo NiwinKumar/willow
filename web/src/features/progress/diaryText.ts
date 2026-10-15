@@ -26,7 +26,10 @@ export const STATUS_SHAPE: Record<SpotStatus, { border: string; bg: string; halo
 export const ORDER: SpotStatus[] = ['new', 'fading', 'still_there', 'gone', 'not_seen_last_time']
 
 const nd = (n: number) => (n === 1 ? '1 day' : `${n} days`)
-const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString()
+/** The api's day spans carry one decimal (0.1 = a couple of hours): whole days, or "under a day". */
+export const fmtDays = (n: number) => (n < 0.95 ? 'under a day' : nd(Math.round(n)))
+/** The timestamp falls on the person's own today (local time). */
+export const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString()
 
 export function stageName(o: { stage: string; label: string | null }): string {
   if (o.stage === 'clogged_pore' && /blackhead|open_comedone/i.test(o.label ?? '')) return 'Blackhead'
@@ -39,8 +42,13 @@ export function statusText(t: SpotTrack, d: Diary): string {
   const ls = d.sessions[t.last_seen_index]
   if (t.status === 'new') return `New · first seen ${ls && isToday(ls.created_at) ? 'today' : `on ${ls ? fmtDate(ls.created_at) : 'the last photo'}`}`
   const v = t.days_visible
-  if (t.status === 'gone') return v.at_most !== null ? `Faded · visible between ${v.at_least} and ${nd(v.at_most)}` : `Faded · visible at least ${nd(v.at_least)}`
-  return `${STATUS_SHAPE[t.status].word} · visible at least ${nd(v.at_least)}${t.there_from_start ? ', there from the first photo' : ''}`
+  if (t.status === 'gone') {
+    if (v.at_most === null) return `Faded · visible at least ${fmtDays(v.at_least)}`
+    const lo = fmtDays(v.at_least)
+    const hi = fmtDays(v.at_most)
+    return lo === hi ? `Faded · visible about ${hi}` : v.at_least < 0.95 ? `Faded · visible up to ${hi}` : `Faded · visible between ${Math.round(v.at_least)} and ${hi}`
+  }
+  return `${STATUS_SHAPE[t.status].word} · ${v.at_least < 0.95 ? 'visible for under a day so far' : `visible at least ${fmtDays(v.at_least)}`}${t.there_from_start ? ', there from the first photo' : ''}`
 }
 
 /**

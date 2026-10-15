@@ -56,7 +56,7 @@ export function Calendar({
   const first = new Date(y, m - 1, 1)
   const lead = (first.getDay() + 6) % 7
   const dim = new Date(y, m, 0).getDate()
-  const monthName = first.toLocaleDateString(undefined, { month: 'long' })
+  const monthName = first.toLocaleDateString('en-GB', { month: 'long' })
   const week = compact ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
   const cell = 'aspect-[4/3] min-h-[42px] rounded-[clamp(12px,1.6vw,18px)] p-[clamp(5px,.9vw,9px)] flex flex-col justify-between text-left'
   const dotRow = (list: string[] | undefined) => (

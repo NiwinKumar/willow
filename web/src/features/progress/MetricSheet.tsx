@@ -4,7 +4,7 @@ import { TimelineChart } from '../../components/charts'
 import { Sheet } from '../../components/ui/Sheet'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
-import { METRIC_META, unitOf } from '../../lib/metrics'
+import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, confidenceOf, verdictKind } from '../../lib/verdict'
 import { METRIC_LOOK } from './metricLook'
 import { bandOf, bandText, deltaText, metricOf, sessionState, valueText } from './model'
@@ -81,6 +81,8 @@ export function MetricSheet({ metric, session, baseline, sessions, onClose, onAs
               // The band drawn around the chart's baseline (a former baseline's chart uses today's baseline).
               band={series.band}
               format={series.format}
+              // The band label reads as the stats above it do (this check-in's precision).
+              bandValue={series.band !== null ? fmtValue(series.band, m) : undefined}
               unit={unit}
               highlight={highlight >= 0 ? highlight : null}
               summary={`${label} across ${series.points.length} check-ins${series.band !== null ? `, normal range ${bandText(m, series.band)} around the baseline` : ', no normal range yet'}. This check-in: ${valueText(m)}.`}

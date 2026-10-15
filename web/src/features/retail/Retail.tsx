@@ -58,7 +58,7 @@ export default function Retail() {
             are trying to change
           </h1>
           <p className="m-0 max-w-[420px] leading-normal text-ink-2">
-            Anonymised aggregates. Every rate shows its denominator. Groups below {MIN_GROUP} people are suppressed everywhere, including exports and answers.
+            Anonymized aggregates. Every rate shows its denominator. Groups below {MIN_GROUP} people are suppressed everywhere, including exports and answers.
           </p>
         </div>
 
@@ -298,7 +298,7 @@ function About({ d }: { d: Insights }) {
       k: 'COHORT',
       v:
         kind === 'real'
-          ? `${d.cohort.real} real people who opted in to anonymised sharing. Small, so many groups fall below the threshold.`
+          ? `${d.cohort.real} real people who opted in to anonymized sharing. Small, so many groups fall below the threshold.`
           : `${d.cohort.synthetic} synthetic people${d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ''}, each with one to three goals, a routine of real catalogue products and ${d.cohort.weeks} weekly readings; ${Math.round(d.cohort.dropout * 100)}% stopped early. Fixed seed (${d.cohort.seed}), so the numbers are reproducible.${d.cohort.real ? '' : ' No real customer is represented.'}`,
     },
     {

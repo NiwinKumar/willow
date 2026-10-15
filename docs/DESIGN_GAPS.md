@@ -75,7 +75,16 @@ This file lists both directions so they can be planned. Line-level notes per are
 - Retail: pores/texture *is* measured (dryness isn't); "Quick-photo readings are excluded" isn't enforced; "Still using wk 8" is "after week 4".
 - Verdict words: the app uses APP_PLAN's set everywhere — ◆ Changed · ○ Within normal range · · Baseline · ◌ Not enough data yet · — Could not compare.
 
-## 5. Decisions made during the build (revisit if wanted)
+## 5. Open items found in review
+
+- **First load is slow**: `GET /v1/sessions` signs every photo URL and took ~4 s (12 sessions) from a laptop against the
+  cloud services, ~10 s for a first Home paint; skeletons cover it. Worth measuring on Cloud Run and, if needed,
+  paginating the list or signing previews lazily (api work).
+- The landing's section rail dots are drawn 16 px tall (below the 44 px target rule) — a design fix.
+- The design closes the check-in sheet on a backdrop click; the app doesn't (it guards leaving during upload and
+  measuring, and Esc / ✕ ask first).
+
+## 6. Decisions made during the build (revisit if wanted)
 
 - One app shell with a real URL per destination (`/home /progress /progress/:day /result/:id /test /routine /you`, check-in at `/check-in` over the current page); old URLs redirect.
 - Demo mode shows only the team's real journey (no illustrative data anywhere); judge tour keeps 5 stops.

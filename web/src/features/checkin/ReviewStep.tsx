@@ -7,7 +7,7 @@ import { SerifTitle } from './parts'
  */
 export function ReviewStep({ shots, n, onRetake, onUpload }: { shots: { url: string }[]; n: number; onRetake: (i: number) => void; onUpload: () => void }) {
   return (
-    <main className="relative mx-auto flex max-w-[980px] animate-rise flex-col gap-[18px] px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="relative mx-auto flex max-w-[980px] animate-rise flex-col gap-[18px] px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <SerifTitle id="ck-title" size="md">
         Check your photos
       </SerifTitle>
@@ -28,6 +28,6 @@ export function ReviewStep({ shots, n, onRetake, onUpload }: { shots: { url: str
       <button type="button" onClick={onUpload} disabled={shots.length === 0} className="min-h-[60px] rounded-[24px] bg-selected text-[17px] text-inverse">
         Upload {shots.length === n ? n : shots.length} photos and analyse
       </button>
-    </main>
+    </div>
   )
 }

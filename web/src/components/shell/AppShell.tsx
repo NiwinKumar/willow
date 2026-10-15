@@ -189,7 +189,11 @@ function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; m
     }
     // Closing makes the panel inert, which may already have dropped focus to <body>.
     const a = document.activeElement
-    if (!a || a === document.body || el.contains(a)) back.current?.focus({ preventScroll: true })
+    if (!a || a === document.body || el.contains(a)) {
+      // The opener may be gone (an "Ask" inside a sheet that closed): fall back to the Advisor button.
+      const trigger = [...document.querySelectorAll<HTMLElement>('button[aria-label="Advisor"]')].find((b) => b.getClientRects().length > 0)
+      ;(back.current?.isConnected ? back.current : trigger)?.focus({ preventScroll: true })
+    }
   }, [open])
   const inset = phone ? 0 : 12
   return (

@@ -10,15 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@number-flow/react": "0.6.2",
     "firebase": "12.19.0",
     "lucide-react": "1.49.0",
     "motion": "13.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4",
-    "sonner": "2.0.8",
-    "vaul": "1.1.2"
+    "sonner": "2.0.8"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

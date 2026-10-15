@@ -169,15 +169,6 @@ function next() {
   if (q) ask(q.text, q.context)
 }
 
-/** Show the rest of the answer at once (the answer is already complete; only the animation stops). */
-export function showAll() {
-  const last = state.messages.at(-1)
-  if (state.phase !== 'revealing' || !last || last.role !== 'willow') return
-  window.clearInterval(revealTimer)
-  set({ messages: [...state.messages.slice(0, -1), { ...last, shown: last.words.length }], phase: 'idle' })
-  next()
-}
-
 /** Stop waiting for an answer. The server still finishes it, and it still counts. */
 export function stopWaiting() {
   if (state.phase !== 'thinking') return

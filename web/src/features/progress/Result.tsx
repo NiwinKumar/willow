@@ -7,7 +7,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { WillowLoader } from '../../components/willow/WillowLoader'
 import { useOwner, useSpots } from '../../data/hooks'
-import { SITE_ORDER } from '../../data/live'
+import { SITE_ORDER, stalled } from '../../data/live'
 import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import type { SpotTrack } from '../../lib/api'
@@ -60,16 +60,18 @@ export default function Result() {
   const state = session ? sessionState(session) : null
   const ordered = useMemo(() => orderMetrics(session?.result?.metrics ?? [], data.goals), [session, data.goals])
 
-  // Still measuring: read again every few seconds until the api answers (no made-up progress).
+  // Still measuring: read again every few seconds until the api answers (no made-up progress). A session
+  // stuck for 30 min will not move by waiting, so polling stops there.
   const pending = state === 'pending'
+  const polling = pending && session !== null && !stalled(session)
   const { refresh } = data
   useEffect(() => {
-    if (!pending) return
+    if (!polling) return
     const t = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
     }, 6000)
     return () => window.clearInterval(t)
-  }, [pending, refresh])
+  }, [polling, refresh])
 
   // A newer check-in of this site that did not finish measuring (photos saved): offer to try again.
   const unfinished = useMemo(() => {
@@ -323,7 +325,25 @@ export default function Result() {
     <Page label="Result">
       {header}
       {retry}
-      {st === 'pending' ? (
+      {st === 'pending' && stalled(session) ? (
+        // Home's "didn't finish" links here: waiting longer will not change this one (polling has stopped).
+        <StatusCard
+          eyebrow="DID NOT FINISH"
+          title="This check-in did not finish."
+          body={<>{session.status === 'uploading' ? 'The photos never finished uploading, so nothing was measured.' : 'Measuring stopped before a result came back. The photos are saved, so it can be measured again.'}</>}
+          action={
+            session.status === 'uploading' ? (
+              <Button variant="ink" size="lg" onClick={() => shell.startCheckIn(session.site, session.capture_mode)}>
+                Take a new check-in
+              </Button>
+            ) : (
+              <Button variant="ink" size="lg" onClick={() => navigate(`/check-in?session=${session.id}`, { state: { background: location } })}>
+                Measure again
+              </Button>
+            )
+          }
+        />
+      ) : st === 'pending' ? (
         <StatusCard
           busy
           eyebrow="STILL MEASURING"
@@ -410,7 +430,11 @@ export default function Result() {
         </Link>
       </p>
       <Disclaimer />
-      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)} />
+      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
+          // The sheet is a modal <dialog> (top layer): close it, or the advisor opens hidden behind it.
+          closeMetric()
+          shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)
+        }} />
       <TomorrowSheet open={tomorrow} onClose={() => setTomorrow(false)} />
     </Page>
   )

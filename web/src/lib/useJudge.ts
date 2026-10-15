@@ -11,7 +11,3 @@ export function useJudge() {
   }, [])
   return state
 }
-
-export function useJudgeOn(): boolean {
-  return useJudge().on
-}

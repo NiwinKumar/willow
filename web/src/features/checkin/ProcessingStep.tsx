@@ -189,7 +189,7 @@ export function ProcessingStep(props: {
   const slow = state.kind === 'running' && elapsed > 45
 
   return (
-    <main className="relative mx-auto grid min-h-[80%] max-w-[1040px] grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-center gap-6 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+    <div className="relative mx-auto grid min-h-[80%] max-w-[1040px] grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-center gap-6 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-col items-center gap-[22px] text-center">
         <Orb state={orb} />
         <div aria-live="polite" className="flex flex-col items-center gap-1.5">
@@ -298,6 +298,6 @@ export function ProcessingStep(props: {
           </button>
         ) : null}
       </div>
-    </main>
+    </div>
   )
 }

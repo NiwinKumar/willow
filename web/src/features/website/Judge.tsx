@@ -13,7 +13,7 @@ import { useDemoStatus } from '../../lib/useDemoStatus'
 import { useJudge } from '../../lib/useJudge'
 import { useSamples } from '../../lib/useSamples'
 import { backButton, SoftBackdrop } from './Decor'
-import { journeyLine, useJourney } from './hooks'
+import { journeyLine, journeyUnavailableLine, useJourney } from './hooks'
 
 const REPO = 'https://github.com/NiwinKumar/willow'
 const ADVISOR_QUESTION = 'Is my routine OK together, and which sunscreen under ₹1,000 would fit it?'
@@ -171,7 +171,7 @@ export default function Judge() {
           ? `Our own photos, measured by the live engine: baseline, noise band and history. ${journeyLine(journey)}.`
           : journey.state === 'loading'
             ? 'Checking the journey…'
-            : 'Not available right now: the demo journey has no measured sessions yet. The sample run in stop 01 shows the same pipeline on real photos.',
+            : `${journeyUnavailableLine(journey)} The sample run in stop 01 shows the same pipeline on real photos.`,
       cta: 'Open the journey',
       disabled: journey.state === 'ready' ? undefined : journey.state === 'loading' ? 'Checking' : 'Unavailable',
       act: () => go('proof', '/home?demo=1', true),
