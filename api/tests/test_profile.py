@@ -68,14 +68,14 @@ def test_delete_me_removes_the_profile(client, fake):
     assert client.get("/v1/me").json()["profile"] is None
 
 
-def test_export_carries_real_goals_as_catalog_concerns(client, fake):
+def test_export_carries_real_goals_and_skin_type(client, fake):
     from tests.test_analyze_flow import _create, _upload_all
 
     created = _create(client, n=1)
     _upload_all(fake, created)
     client.post(f"/v1/sessions/{created['session_id']}/analyze")
     client.put("/v1/me/consent", json={"version": "v", "aggregate_insights_opt_in": True})
-    client.put("/v1/me/profile", json={"goals": ["oil_glow", "dark_spots"]})
+    client.put("/v1/me/profile", json={"goals": ["oil_glow", "dark_spots"], "skin_type": "oily"})
     path = Path(__file__).resolve().parents[1] / "scripts" / "export_bq.py"
     spec = importlib.util.spec_from_file_location("export_bq", path)
     mod = importlib.util.module_from_spec(spec)
@@ -83,6 +83,5 @@ def test_export_carries_real_goals_as_catalog_concerns(client, fake):
 
     rows = mod.real_rows(fake.store)["sessions_flat"]
     assert rows
-    assert all(
-        r["goals"] == ["oiliness_shine", "dullness", "dark_spots_pigmentation"] for r in rows
-    )
+    # goal ids as the app stores them (retail reads ids and concerns alike), with skin type
+    assert all(r["goals"] == ["oil_glow", "dark_spots"] and r["skin_type"] == "oily" for r in rows)

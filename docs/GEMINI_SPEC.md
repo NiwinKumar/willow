@@ -63,6 +63,7 @@ Response schema: `{message: string, product_ids: string[], follow_up_suggestions
 ## 6. Ask the retailer data (added Oct 13)
 - Input: the same aggregates as `GET /v1/retailer/insights` (groups under 10 already suppressed, no rows) plus the question. Output schema `Answer {answer, chart?: {title, unit: percent|count|weeks, bars[2..8]: {label, value}}, follow_ups[]}`.
 - Validators: every number in the answer must be in the aggregates (a fraction may be written as a whole percent); every bar label must be a product, brand, goal, tile or routine issue in the aggregates; every bar value must be a number from them; banned words. One retry, then a fixed "could not answer" message. `POST /v1/retailer/ask` (sign-in, guest is fine; 20 a day).
+- Oct 15: the schema adds `refused: bool` (Gemini sets it for individual-level questions or data the aggregates don't hold; a refusal may not carry a chart). The question carries the page's filters (`cohort`, `range`) and is answered from those aggregates (months in words, no page plumbing). The api, not Gemini, adds `n` per percent bar and `source` (aggregate tables named in the chart or the answer); the fallback is `refused: true`.
 - Advisor tools `search_catalog` and `compare_products` now return `measured_outcomes` from the cohort (`product_outcomes`, labelled `synthetic_cohort`); the advisor may quote a rate as a whole percent with its n. Each advisor answer returns `checks {model, tool_calls, numbers_checked, products_from_tools}` and the web shows the steps and checks under the answer.
 
 ## Status (Oct 13)
