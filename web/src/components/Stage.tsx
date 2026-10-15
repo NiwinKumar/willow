@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AnalysisResult, MetricId, Session, Site } from '../data/types'
 import { METRIC_META } from '../lib/metrics'
 import { DUR, EASE_OUT } from '../lib/motion'
-import { METRIC_ROIS } from '../mock/series'
+import { roisFor } from '../mock/series'
 import { HIDDEN_RINGS, MOLE_NOTE, SPOT_NAME, type SpotLabel } from '../lib/spotLabels'
 import { Illustration } from './Illustration'
 
@@ -33,7 +33,8 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
   const [showBaseline, setShowBaseline] = useState(false)
   const holdTimer = useRef<number | null>(null)
   const flickerTimer = useRef<number | null>(null)
-  const activeRoiNames = metricId ? (METRIC_ROIS[metricId] ?? []) : []
+  const metricRois = roisFor(site)
+  const activeRoiNames = metricId ? (metricRois[metricId] ?? []) : []
   const shown = showBaseline && baseline ? baseline : session
   // Geometry follows the photo on screen: while flickering, the baseline photo has its own size,
   // regions and face position (selfies are never pixel-aligned).
@@ -129,15 +130,16 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
             ) : (
               <Illustration site={site} session={shown} />
             )}
-            {(blank || !photoReady ? [] : rois).map((r) => {
+            {(blank || !photoReady ? [] : rois).map((r, i) => {
               const active = activeRoiNames.includes(r.name)
               const points = r.polygon.map((p) => p.join(',')).join(' ')
               return (
-                <g key={r.name}>
+                // Close-ups send several outlines with the same name ("cheek"): key by position.
+                <g key={i}>
                   <AnimatePresence>
                     {layer && active ? (
                       <motion.polygon
-                        key={`mask-${r.name}`}
+                        key={`mask-${i}`}
                         points={points}
                         fill="var(--color-signal-500)"
                         stroke="var(--color-signal-700)"
@@ -160,7 +162,7 @@ export function Stage({ site, session, baseline, metricId, layer, onSelectMetric
                     className="cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation()
-                      const id = (Object.keys(METRIC_ROIS) as MetricId[]).find((k) => METRIC_ROIS[k]?.includes(r.name) && session?.result?.metrics.some((m) => m.id === k))
+                      const id = (Object.keys(metricRois) as MetricId[]).find((k) => metricRois[k]?.includes(r.name) && session?.result?.metrics.some((m) => m.id === k))
                       onSelectMetric?.(id ?? null)
                     }}
                   />

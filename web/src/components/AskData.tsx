@@ -93,7 +93,7 @@ export function AskData() {
               ) : null}
               {reply.checks ? (
                 <p className="mt-3 text-[12px] text-text-3">
-                  {reply.checks.numbers_checked} {reply.checks.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates{reply.checks.rejected_attempts ? `, ${reply.checks.rejected_attempts} draft rejected first` : ''} · {reply.checks.model.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  {reply.checks.numbers_checked} {reply.checks.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates{reply.checks.rejected_attempts ? `, after ${reply.checks.rejected_attempts} ${reply.checks.rejected_attempts === 1 ? 'draft was' : 'drafts were'} rejected` : ''} · {reply.checks.model.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                 </p>
               ) : null}
               {reply.follow_ups.length ? (

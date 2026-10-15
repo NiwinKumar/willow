@@ -32,10 +32,11 @@ export const UNIT_LABEL: Record<Unit, string> = {
   deg: '°',
   pct_area: '%',
   index: '',
-  a_star: 'a*',
+  // Colour-space units (a*, ΔL*) mean nothing to most people: the number stands alone.
+  a_star: '',
   count: '',
   per_cm2: '/cm²',
-  delta_l_star: 'ΔL*',
+  delta_l_star: '',
 }
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
@@ -49,7 +50,20 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
  * Sites the deployed engine measures today. Other sites are saved and marked "not measured yet"
  * (the api never shows the engine's placeholder numbers). Update when the engine adds a site.
  */
-export const MEASURED_SITES: Site[] = ['face_full', 'forearm_treated', 'forearm_control']
+export const MEASURED_SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+
+/** Close-ups: size comes from the iris, so one eye stays in the photo, phone about 10 cm away. */
+export const isCloseUp = (site: Site) => site === 'cheek_macro' || site === 'nose_macro'
+
+/** "face, cheek and nose close-ups, and forearm": the measured places in one readable phrase. */
+export function measuredPlaces(): string {
+  const parts: string[] = []
+  if (MEASURED_SITES.includes('face_full')) parts.push('face')
+  const close = MEASURED_SITES.filter(isCloseUp).map((s) => (s === 'cheek_macro' ? 'cheek' : 'nose'))
+  if (close.length) parts.push(`${close.join(' and ')} close-up${close.length > 1 ? 's' : ''}`)
+  if (MEASURED_SITES.some((s) => s.startsWith('forearm'))) parts.push('forearm')
+  return parts.length > 2 ? `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}` : parts.join(' and ')
+}
 
 export const SITE_LABEL: Record<Site, string> = {
   face_full: 'Face',
@@ -121,4 +135,18 @@ export const QUALITY_COPY: Record<string, { text: string; action: string }> = {
   face_not_found: { text: 'No face found. Full face, hair back, phone at arm’s length.', action: 'Retake one frame' },
   occlusion_suspected: { text: 'Something is covering the skin (hair, glasses, hand).', action: 'Retake one frame' },
   too_few_frames: { text: 'No photo passed the quality check, so nothing could be measured.', action: 'Retake the session' },
+}
+
+/** Close-ups fail differently: the face is mostly out of frame on purpose, and "covered" means too little skin. */
+const CLOSE_UP_COPY: Partial<Record<string, { text: string; action: string }>> = {
+  face_not_found: { text: 'Willow could not find your face to measure size. Keep your nose and at least one eye in the photo, phone about 10 cm away.', action: 'Retake one frame' },
+}
+
+/** QUALITY_COPY for this site: close-ups get their own wording for face and skin checks. */
+export function qualityCopy(reason: string, site?: Site | null): { text: string; action: string } | undefined {
+  if (site && isCloseUp(site)) {
+    if (reason === 'occlusion_suspected') return { text: `Too little ${site === 'nose_macro' ? 'nose' : 'cheek'} skin in view. Put it in the middle of the photo, with hair and hands out of the way.`, action: 'Retake one frame' }
+    if (CLOSE_UP_COPY[reason]) return CLOSE_UP_COPY[reason]
+  }
+  return QUALITY_COPY[reason]
 }

@@ -23,6 +23,10 @@ export function Settings() {
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // What deleting does depends on who is signed in, not on demo mode: the demo journey is never stored for you.
+  const deletes = user
+    ? `Removes your photos, results and ${user.isAnonymous ? 'guest account' : 'Willow account'} from the server. Minutes, not days. There is no undo.`
+    : 'You are not signed in, so nothing of yours is stored on the server. This clears the settings saved on this device.'
   async function deleteEverything() {
     setDeleting(true)
     let serverDone = false
@@ -124,7 +128,7 @@ export function Settings() {
 
       <section className="mt-4 rounded-(--radius-tile) border border-danger/40 bg-surface p-4">
         <h2 className="text-[17px] font-semibold">Delete my data</h2>
-        <p className="mt-1 text-[13px] text-text-2">Removes photos, results and your account. Minutes, not days. There is no undo.</p>
+        <p className="mt-1 text-[13px] text-text-2">{deletes}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" className="!min-h-11 !text-danger" onClick={() => setConfirm(true)}>Delete my data</Button>
           {user ? <Button variant="quiet" className="!min-h-11" onClick={() => (user.isAnonymous ? setConfirmSignOut(true) : void signOutUser())}>Sign out</Button> : null}
@@ -139,12 +143,12 @@ export function Settings() {
         </div>
       </Sheet>
       <Sheet open={confirm} onOpenChange={setConfirm} title="Delete everything?">
-        <p className="text-[15px] text-text-2">This removes photos, results and your account. There is no undo.</p>
+        <p className="text-[15px] text-text-2">{deletes}</p>
         <div className="mt-4 flex gap-2">
           <Button className="!bg-danger" disabled={deleting} onClick={() => void deleteEverything()}>{deleting ? 'Deleting…' : 'Delete'}</Button>
           <Button variant="secondary" onClick={() => setConfirm(false)}>Keep my data</Button>
         </div>
-        {data.mode === 'demo' ? <p className="mt-3 text-[12px] text-text-3">Demo: nothing is stored on the server, so this clears this device only.</p> : null}
+        {data.mode === 'demo' && user ? <p className="mt-3 text-[12px] text-text-3">The demo journey you are viewing is read-only and stays as it is; this deletes what is stored in your own account.</p> : null}
       </Sheet>
     </div>
   )

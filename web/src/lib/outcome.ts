@@ -1,50 +1,66 @@
-import type { MetricId, RoutineEntry, Session } from '../data/types'
+import type { MetricId, RoutineEntry, Session, Site } from '../data/types'
 import { CONCERN_METRICS } from '../mock/catalog'
 import { parseDate } from './format'
 import { METRIC_META, fmtSigned, fmtValue } from './metrics'
 
 export type Outcome =
-  | { kind: 'real'; metric: string; text: string; detail: string }
+  | { kind: 'real'; metric: MetricId; site: Site; text: string; detail: string }
   | { kind: 'none'; text: string; detail: string }
   | { kind: 'early'; text: string; detail: string }
   | { kind: 'unmeasured'; text: string; detail: string }
 
+/** Sites a face product can show up on: the full face and the two close-ups. */
+export const OUTCOME_SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro']
+
+const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
+const hasValue = (s: Session, t: MetricId) => (s.result?.metrics ?? []).some((m) => m.id === t && m.value !== null)
+const names = (ts: MetricId[]) => [...new Set(ts.map((t) => METRIC_META[t].label.toLowerCase()))].join(' and ')
+
 /**
  * Outcome chip for a routine product: the target metrics come from its concerns (docs/CATALOG_SPEC.md),
- * only sessions after the start date count, and the words follow the verdict ladder. Causation stays hedged.
+ * each read on the sites that measure it (pores and texture on close-ups), only sessions after the
+ * start date count, and the words follow the verdict ladder. Causation stays hedged.
+ * `sessions` are the face and close-up sessions, each carrying its site.
  */
 export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   if (entry.concerns.length === 0 && entry.source === 'label_scan' && !entry.product_id)
     return { kind: 'unmeasured', text: 'Concerns unknown', detail: 'This product is not in the catalog, so Willow does not know which measurements it targets.' }
-  const targets = entry.concerns.flatMap((c) => CONCERN_METRICS[c] ?? []) as MetricId[]
+  const targets = [...new Set(entry.concerns.flatMap((c) => CONCERN_METRICS[c] ?? []) as MetricId[])]
   if (targets.length === 0) return { kind: 'unmeasured', text: 'Not measured', detail: 'This product targets nothing Willow measures (cleansers and barrier creams, for example).' }
   // Only real measurements count: done, measured (not a placeholder), photo quality passed.
-  const measured = sessions.filter((s) => s.status === 'done' && s.measured !== false && s.result?.quality.passed)
-  if (measured.length === 0)
-    return { kind: 'unmeasured', text: 'Not measured yet', detail: 'No face photo has been measured yet. Take a face session to see whether this product changed anything.' }
-  // Only metrics some measured session actually has a value for: pores and texture come from
-  // close-ups, lines are not measured yet. Never call an unmeasured target "no change".
-  const measurable = new Set(measured.flatMap((s) => (s.result?.metrics ?? []).filter((m) => m.value !== null).map((m) => m.id)))
-  const checked = targets.filter((t) => measurable.has(t))
-  if (checked.length === 0) {
-    const names = [...new Set(targets.map((t) => METRIC_META[t].label.toLowerCase()))]
-    return { kind: 'unmeasured', text: 'Not measured yet', detail: `This product targets ${names.join(' and ')}, which Willow does not measure yet.` }
+  const measured = sessions.filter(usable)
+  const sitesOf = (t: MetricId) => METRIC_META[t].sites.filter((s) => OUTCOME_SITES.includes(s))
+  // A target is checked on a site once a measured session there has a value for it. Never call an
+  // unmeasured target "no change".
+  const pairs = targets.flatMap((t) => sitesOf(t).filter((site) => measured.some((s) => s.site === site && hasValue(s, t))).map((site) => ({ t, site })))
+  if (pairs.length === 0) {
+    const faceTargets = targets.filter((t) => sitesOf(t).includes('face_full'))
+    const closeUpTargets = targets.filter((t) => !sitesOf(t).includes('face_full') && sitesOf(t).length > 0)
+    const faceDone = measured.some((s) => s.site === 'face_full')
+    if (faceTargets.length && !faceDone)
+      return { kind: 'unmeasured', text: 'Not measured yet', detail: 'No face photo has been measured yet. Take a face session to see whether this product changed anything.' }
+    if (closeUpTargets.length)
+      return { kind: 'unmeasured', text: 'Not measured yet', detail: `This product targets ${names(closeUpTargets)}, which a cheek close-up measures. Take one to see whether this product changed anything.` }
+    return { kind: 'unmeasured', text: 'Not measured yet', detail: `This product targets ${names(targets)}, which Willow does not measure yet.` }
   }
   const start = parseDate(entry.started_at)
-  const after = measured.filter((s) => !s.is_baseline && new Date(s.created_at) >= start)
   const weeks = Math.max(0, Math.floor((Date.now() - start.getTime()) / (7 * 86_400_000)))
-  if (after.length < 2 || weeks < 2) {
+  const afterOn = (site: Site) => measured.filter((s) => s.site === site && !s.is_baseline && new Date(s.created_at) >= start)
+  const checkIns = Math.max(...pairs.map((p) => afterOn(p.site).length))
+  if (checkIns < 2 || weeks < 2) {
     const since = weeks === 0 ? 'Started this week.' : `Started ${weeks} week${weeks === 1 ? '' : 's'} ago.`
-    const need = after.length < 2 ? `Willow needs at least two check-ins after the start date (${after.length} so far).` : 'Most changes take at least two weeks to show.'
+    const need = checkIns < 2 ? `Willow needs at least two check-ins after the start date (${checkIns} so far).` : 'Most changes take at least two weeks to show.'
     return { kind: 'early', text: 'Too early to tell', detail: `${since} ${need}` }
   }
-  const latest = after[after.length - 1]
-  for (const t of checked) {
-    const m = latest.result?.metrics.find((x) => x.id === t)
+  for (const { t, site } of pairs) {
+    const after = afterOn(site)
+    if (after.length < 2) continue
+    const m = after[after.length - 1].result?.metrics.find((x) => x.id === t)
     if (m && m.verdict === 'real_change' && m.delta !== null) {
       return {
         kind: 'real',
         metric: t,
+        site,
         text: `Real change in ${METRIC_META[m.id].label.toLowerCase()}`,
         detail: `Started ${weeks} weeks ago. Latest reading vs your baseline: ${METRIC_META[m.id].label.toLowerCase()} ${fmtSigned(m.delta, m)}, noise threshold ${m.mdc95 !== null ? fmtValue(m.mdc95, m) : '–'}. The change may be linked to this product; other products or habits could also contribute.`,
       }
