@@ -128,6 +128,11 @@ def test_goal_ids_are_the_apps_eight_and_old_ids_map_onto_them():
         "dark_spots",
         "oil_glow",
     ]
+    # an export that wrote goals as catalog concerns (oil_glow -> oiliness_shine + dullness)
+    assert cohort.goals_of(["oiliness_shine", "dullness", "uneven_tone"]) == [
+        "oil_glow",
+        "even_tone",
+    ]
     for c, g in cohort.CONCERN_GOAL.items():
         assert g is None if c == "dryness_barrier" else g in cohort.GOALS
 
@@ -380,3 +385,15 @@ def test_bigquery_failure_after_expiry_serves_the_last_rows(monkeypatch):
 
     monkeypatch.setattr(retailer, "fetch", down)
     assert retailer.insights()["cohort"]["synthetic"] > 0
+
+
+def test_goal_labels_match_the_app():
+    """GOAL_LABEL uses the app's goal labels exactly (web/src/lib/metrics.ts GOALS)."""
+    import re
+    from pathlib import Path
+
+    web = (Path(__file__).resolve().parents[2] / "web/src/lib/metrics.ts").read_text()
+    found = dict(re.findall(r"\{ id: '([a-z_]+)', label: '([^']+)', metrics:", web))
+    if not found:
+        pytest.skip("metrics.ts still has the old 7 goals (the 8-goal branch is not merged)")
+    assert found == retailer.GOAL_LABEL
