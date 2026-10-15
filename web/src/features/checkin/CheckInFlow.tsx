@@ -14,6 +14,7 @@ import { leaveDemo, useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
 import { authErrorText } from '../../lib/authErrors'
 import { baselineState } from '../../lib/baselineGuide'
+import { fmtDate } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { prefs } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
@@ -29,7 +30,9 @@ import { ProcessingStep } from './ProcessingStep'
 import { ReviewStep } from './ReviewStep'
 import { SampleStep } from './SampleStep'
 import { SiteStep } from './SiteStep'
+import { planTopUp } from './topup'
 import { useAnalysis } from './useAnalysis'
+import { useSoft } from './useSoft'
 import { useUpload } from './useUpload'
 
 type Shot = { file: File; url: string }
@@ -47,6 +50,8 @@ type NavState = { background?: unknown; depth?: number; prev?: string | null } |
  *   ?n=                                        photo count, fixed for the whole attempt
  *   ?sample=<id> (or 1 for the list)           run hosted sample photos through the real pipeline
  *   ?session=<id>                              watch or resume measuring a session
+ *   ?topup=<id>                                add the missing photos to a baseline without a normal range,
+ *                                              then measure it again (topup.ts)
  */
 export default function CheckInFlow() {
   const location = useLocation()
@@ -69,6 +74,11 @@ export default function CheckInFlow() {
   const sampleId = sampleParam !== null && !sampleList ? sampleParam : null
   const capturing = !sessionParam && sampleParam === null
   const nParam = Number(params.get('n'))
+  const topupParam = capturing ? params.get('topup') : null
+  // The baseline being topped up, once planned (topup.ts): its date for the copy. Null until then.
+  const [topup, setTopup] = useState<{ id: string; date: string } | null>(null)
+  const [topupError, setTopupError] = useState<string | null>(null)
+  const topupStarted = useRef<string | null>(null)
 
   const [shots, setShots] = useState<Shot[]>([])
   const [note, setNote] = useState('')
@@ -101,6 +111,7 @@ export default function CheckInFlow() {
   const upload = useUpload({
     site,
     mode,
+    topup: topup?.id ?? null,
     onDone: (id) => {
       leaveDemo()
       uploaded.current = true
@@ -164,8 +175,38 @@ export default function CheckInFlow() {
   // Where a check-in starts: the site step without a place; the guide for a first session (or RAW before
   // the one-time Lightroom setup); otherwise straight to the camera (quick) or the files (RAW).
   const ready = !exiting && !needConsent && !!user && !inDemo
+
+  // A baseline top-up: read the session (it may be half-done from an earlier visit), then open the camera
+  // (quick) or the files (RAW) for just the missing photos. Already enough: measure; running: watch.
   useEffect(() => {
-    if (!ready) return
+    if (!ready || !topupParam || topupStarted.current === topupParam) return
+    topupStarted.current = topupParam
+    void (async () => {
+      try {
+        const plan = await planTopUp(await getIdToken(), topupParam)
+        if (plan.kind === 'refuse') return setTopupError(plan.why)
+        if (plan.kind !== 'add') {
+          setHeld(topupParam)
+          go({ topup: null, session: topupParam, step: 'processing' }, { replace: true })
+          return
+        }
+        const s = plan.view.session
+        setTopup({ id: s.id, date: fmtDate(s.created_at) })
+        // A reload keeps the step it was on (quick: camera, review or files; RAW: files).
+        const keep = s.capture_mode === 'calibrated_raw' ? ['files'] : ['camera', 'review', 'files']
+        const at = rawStep && keep.includes(rawStep) ? rawStep : keep[0]
+        go({ site: s.site, mode: s.capture_mode, n: String(plan.need), step: at }, { replace: true })
+      } catch (e) {
+        topupStarted.current = null
+        setTopupError(e instanceof ApiError ? e.message : 'Could not open this baseline. Check your connection and try again.')
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- planned once per top-up; the step is read at that moment
+  }, [ready, topupParam, getIdToken, go])
+
+  useEffect(() => {
+    // A top-up picks its own first step (above).
+    if (!ready || topupParam) return
     if (sampleParam !== null && !sessionParam) {
       if (step !== 'samples') go({ step: 'samples' }, { replace: true })
       return
@@ -183,7 +224,7 @@ export default function CheckInFlow() {
     const first = computedN === 5
     const initial: Step = first || (mode === 'calibrated_raw' && !prefs.lightroomDone()) ? 'guide' : mode === 'calibrated_raw' ? 'files' : 'camera'
     go({ step: initial, n: String(n ?? computedN) }, { replace: true })
-  }, [ready, sampleParam, sessionParam, step, capturing, siteParam, computedN, n, mode, go])
+  }, [ready, topupParam, sampleParam, sessionParam, step, capturing, siteParam, computedN, n, mode, go])
 
   // Back is held while photos upload or are measured (CAP holds processing), and steps that need state
   // they no longer have (a reload) fall back to one that works.
@@ -290,7 +331,8 @@ export default function CheckInFlow() {
     setHeld(null)
     uploaded.current = false
     handedOff.current = false
-    go({ session: null, sample: null, ...patch }, { replace: true })
+    setTopup(null)
+    go({ session: null, sample: null, topup: null, ...patch }, { replace: true })
   }
 
   /** A new check-in for the same place and mode as the session being watched (Result's "Try again" opens ?session= alone). */
@@ -309,7 +351,8 @@ export default function CheckInFlow() {
   const onPick = (picked: File[]) => {
     // A RAW set picked in quick mode is better than phone photos: it becomes a RAW check-in.
     const anyPhoto = usable(upload.rows).some((r) => r.contentType !== 'image/x-adobe-dng')
-    if (mode === 'uncalibrated' && picked.every(isDng) && !anyPhoto) {
+    // (not once the session exists, or for a top-up: their capture mode is fixed)
+    if (mode === 'uncalibrated' && picked.every(isDng) && !anyPhoto && !upload.locked && !topup) {
       const rawN = known ? neededFor(sessionsOf(site), 'calibrated_raw') : (n ?? 5)
       upload.setRows(addFiles(upload.rows, picked, 'calibrated_raw', rawN))
       go({ mode: 'calibrated_raw', n: String(rawN) }, { replace: true })
@@ -321,6 +364,23 @@ export default function CheckInFlow() {
   const dropThumb = (id: string) => {
     const r = upload.rows.find((x) => x.id === id)
     if (r?.thumb && !shots.some((s) => s.url === r.thumb)) URL.revokeObjectURL(r.thumb)
+  }
+  /** Remove a row (an uploaded one is deleted from the session too); `after` re-checks or adds a replacement. */
+  const removeRow = (id: string, after: Parameters<typeof upload.remove>[1]) => {
+    upload
+      .remove(id, after)
+      .then(() => dropThumb(id))
+      .catch((e: unknown) => toast.error(e instanceof ApiError ? e.message : 'Couldn’t remove that photo. Check your connection and try again.'))
+  }
+
+  // "Looks soft · consider retaking": camera shots on review, phone photos in the file list (never DNG).
+  const softShots = useSoft(shots.map((s) => ({ key: s.url, file: s.file, contentType: 'image/jpeg' })))
+  const softRows = useSoft(usable(upload.rows).filter((r) => !isDng(r.file)).map((r) => ({ key: r.id, file: r.file, contentType: r.contentType })))
+  /** "Duplicate of a photo from 12 Oct": the check-in the same photo was uploaded to. */
+  const dupLabel = (d: { session_id: string; index: number }) => {
+    if (d.session_id === (upload.sessionId ?? topup?.id)) return `Same photo as photo ${d.index} of this check-in`
+    const s = data.all.find((x) => x.id === d.session_id)
+    return s ? `Duplicate of a photo from ${fmtDate(s.created_at)}` : 'Duplicate of a photo from an earlier check-in'
   }
 
   // ---- render ----
@@ -339,11 +399,31 @@ export default function CheckInFlow() {
         }}
       />
     )
+  else if (topupParam && !topup && !held)
+    content = topupError ? (
+      <div className="mx-auto flex max-w-[560px] animate-rise flex-col items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
+        <h1 id="ck-title" tabIndex={-1} className="m-0 font-serif text-[clamp(31px,3vw,40px)] leading-[.95] font-normal outline-none">
+          This baseline can’t take more photos
+        </h1>
+        <p className="m-0 leading-normal text-[#3E3C38]">{topupError}</p>
+        <div className="flex flex-wrap gap-2.5">
+          <Button variant="ink" onClick={() => newAttempt({ site: null, n: null, step: null })}>
+            Start a new check-in
+          </Button>
+          <Button variant="glass" onClick={close}>
+            Close
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <WillowLoader inline label="Opening your baseline" />
+    )
   else if (inDemo || (capturing && (!known || !step))) content = <WillowLoader inline label="Loading your sessions" />
   else if (step === 'processing')
     content = (
       <ProcessingStep
         state={analysis.state}
+        stage={analysis.stage}
         site={analysis.meta?.site ?? siteParam}
         n={analysis.meta?.n_frames ?? (usable(upload.rows).length || n)}
         received={uploaded.current || sampleParam !== null || analysis.meta?.status === 'processing' || analysis.meta?.status === 'done'}
@@ -410,6 +490,7 @@ export default function CheckInFlow() {
       <ReviewStep
         shots={shots}
         n={n}
+        soft={softShots}
         onRetake={(i) => {
           setShots((s) => s.filter((_, j) => j !== i))
           go({ step: 'camera' })
@@ -429,15 +510,12 @@ export default function CheckInFlow() {
         first={n === 5}
         upload={upload}
         camera={shots.length > 0}
+        soft={softRows}
+        topup={topup ? { date: topup.date } : null}
+        dupLabel={dupLabel}
         onPick={onPick}
-        onRemove={(id) => {
-          dropThumb(id)
-          upload.setRows(recheck(upload.rows.filter((r) => r.id !== id), mode, n))
-        }}
-        onReplace={(id, file) => {
-          dropThumb(id)
-          upload.setRows(addFiles(upload.rows.filter((r) => r.id !== id), [file], mode, n))
-        }}
+        onRemove={(id) => removeRow(id, (rest) => recheck(rest, mode, n))}
+        onReplace={(id, file) => removeRow(id, (rest) => addFiles(rest, [file], mode, n))}
         onStartOver={() => {
           const camera = shots.length > 0
           upload.reset([])

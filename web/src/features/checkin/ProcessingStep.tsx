@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useReducedMotion } from 'motion/react'
 
-import type { Site } from '../../data/types'
-import type { SessionView } from '../../lib/api'
+import type { Quality, QualityRegion, Site } from '../../data/types'
+import type { AnalysisStage, SessionView } from '../../lib/api'
 import { qualityCopy } from '../../lib/metrics'
 import { failureReasons } from '../../lib/warnings'
-import { plural, siteLower } from './model'
+import { pad2, plural, siteLower } from './model'
 import { Orb, type OrbState } from './parts'
 import { outcomeOf } from './outcome'
 import type { AnalysisState } from './useAnalysis'
@@ -66,22 +66,59 @@ function resultLines(view: SessionView): [string, string, string, string] {
   return [quality, colour, measured, explained]
 }
 
-/** "Photo 1: no face found. Photo 2: too bright." from the engine's per-photo reasons. */
+/** Face regions the engine can name in a per-photo reason ("whole" names none). */
+const REGION_WORD: Record<QualityRegion, string | null> = {
+  forehead: 'forehead',
+  left_cheek: 'left cheek',
+  right_cheek: 'right cheek',
+  nose: 'nose',
+  chin: 'chin',
+  under_eyes: 'under the eyes',
+  whole: null,
+}
+
+type FrameQuality = NonNullable<Quality['per_frame']>[number]
+
+/** One photo's reasons in words, with the face region when the engine names one ("forehead too bright"). */
+function frameReasons(f: FrameQuality): string[] {
+  return [
+    ...new Set(
+      f.reasons.map((x) => {
+        const word = LEFT_OUT_WORD[x] ?? x
+        const where = [...new Set((f.regions ?? []).filter((r) => r.reason === x).map((r) => REGION_WORD[r.region]).filter((w): w is string => Boolean(w)))]
+        return where.length ? `${where.join(' and ')} ${word}` : word
+      }),
+    ),
+  ]
+}
+
+/** "Photo 1: no face found. Photo 2: forehead too bright." from the engine's per-photo reasons. */
 function perPhoto(view: SessionView): string | null {
   const frames = (view.result?.quality.per_frame ?? []).filter((f) => !f.passed && f.reasons.length)
   if (!frames.length) return null
-  return frames.map((f) => `Photo ${f.index + 1}: ${[...new Set(f.reasons.map((x) => LEFT_OUT_WORD[x] ?? x))].join(', ')}`).join('. ') + '.'
+  return frames.map((f) => `Photo ${f.index + 1}: ${frameReasons(f).join(', ')}`).join('. ') + '.'
+}
+
+/** The person's own photos the engine left out, from the signed frame URLs (JPEG/HEIC only). */
+function leftOutPhotos(view: SessionView): { n: number; url: string; why: string }[] {
+  const urls = view.session.frame_urls ?? []
+  return (view.result?.quality.per_frame ?? [])
+    .filter((f) => !f.passed && urls[f.index])
+    .map((f) => ({ n: f.index + 1, url: urls[f.index]!, why: frameReasons(f).join(', ') }))
 }
 
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
 /**
  * Step "processing" (CAP 08). Stages advance only on real events: "Upload received" when the photos are
- * stored (upload finished, sample copied, or the session read back), the engine stages when analyze
- * answers, each written from the result. While the one analyze call runs, nothing pretends to progress.
+ * stored (upload finished, sample copied, or the session read back); quality, colour and measuring
+ * together when the api's live stage says the engine answered ("explaining"); the explanation when
+ * analyze answers. Each is then written from the result. Nothing ticks on a timer.
  */
 export function ProcessingStep(props: {
   state: AnalysisState
+  /** The api's live analysis stage (polled every 2 s while analyze runs). */
+  stage: AnalysisStage | null
   site: Site | null
   n: number | null
   received: boolean
@@ -100,21 +137,30 @@ export function ProcessingStep(props: {
   // Reveal the answered stages one after another (real results, shown in order); instant with reduced motion.
   const [shown, setShown] = useState(0)
   const answered = state.kind === 'done'
+  const stage = state.kind === 'running' ? props.stage : null
+  // The engine answered while analyze was still running: its three stages already stand ticked.
+  // (per run: a retry starts its stages again)
+  const run = 'startedAt' in state ? state.startedAt : null
+  const [engineDoneIn, setEngineDoneIn] = useState<number | null>(null)
+  if (stage === 'explaining' && run !== null && engineDoneIn !== run) setEngineDoneIn(run)
+  const engineDone = run !== null && engineDoneIn === run
 
   useEffect(() => {
     if (state.kind !== 'running' && state.kind !== 'offline') return
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [state.kind])
+  const first = engineDone ? 3 : 0
   const [shownFor, setShownFor] = useState(answered)
   if (shownFor !== answered) {
     setShownFor(answered)
-    setShown(answered && reduce ? 4 : 0)
+    setShown(answered && reduce ? 4 : first)
   }
   useEffect(() => {
     if (!answered || reduce) return
-    const timers = [1, 2, 3, 4].map((i) => window.setTimeout(() => setShown(i), 260 * i))
+    const timers = [1, 2, 3, 4].filter((i) => i > first).map((i, k) => window.setTimeout(() => setShown(i), 260 * (k + 1)))
     return () => timers.forEach(clearTimeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `first` is read once, when the answer lands
   }, [answered, reduce])
 
   const startedAt = 'startedAt' in state ? state.startedAt : now
@@ -159,7 +205,20 @@ export function ProcessingStep(props: {
         return { name, detail: skipped ? 'Skipped' : lines[i], glyph: stopped ? '!' : skipped ? '·' : '✓', tone: stopped ? 'fail' : skipped ? 'wait' : 'done' }
       }
       if (failedRun && outcome !== 'missing' && i === 0) return { name, detail: outcome === 'offline' ? 'Paused · waiting for the connection' : 'Stopped · no result', glyph: '!', tone: 'fail' }
-      if ((outcome === 'run' || answered) && i === 0 && (received || state.kind === 'running')) return { name, detail: 'On the measurement engine now · every stage lands when it answers', glyph: '◌', tone: 'run' }
+      const live = outcome === 'run' || answered
+      if (live && engineDone) {
+        // The api says the engine answered: its three stages ran (their outcome lands with the result).
+        if (i < 3) return { name, detail: i === 0 ? 'Checked · the outcome lands with the result' : 'Done', glyph: '✓', tone: 'done' }
+        return { name, detail: 'Writing the explanation · every number is checked against your measurement', glyph: '◌', tone: 'run' }
+      }
+      if (live && i === 0 && (received || state.kind === 'running'))
+        return {
+          name,
+          detail: stage === 'engine' ? 'On the measurement engine now · quality, colour and measuring land together when it answers' : stage === 'received' ? 'Starting the measurement…' : 'On the measurement engine now · every stage lands when it answers',
+          glyph: '◌',
+          tone: 'run',
+        }
+      if (live && stage === 'engine' && (i === 1 || i === 2)) return { name, detail: 'On the engine · lands with the quality checks', glyph: '◌', tone: 'run' }
       return { name, detail: 'Waiting', glyph: '·', tone: 'wait' }
     }),
   ]
@@ -179,7 +238,7 @@ export function ProcessingStep(props: {
       ? {
           timeout: 'Analysis didn’t finish in time. Your photos are uploaded, so retrying won’t send them again.',
           limit: `${state.message || 'That is enough for today.'} Your photos are saved; try again tomorrow.`,
-          missing: 'Some photos never reached Willow, so there is nothing to measure yet. Photos can’t be added to this check-in later; start a new one.',
+          missing: 'Some photos never reached Willow, so there is nothing to measure yet. Take them again in a new check-in.',
           gone: 'It was deleted, so there is nothing to measure.',
           failed: (state.code && ERROR_COPY[state.code]) || 'Something went wrong while measuring. Your photos are safe; try again.',
         }[outcome as 'timeout' | 'limit' | 'missing' | 'gone' | 'failed']
@@ -227,6 +286,21 @@ export function ProcessingStep(props: {
         {outcome === 'rejected' && shown >= 4 ? (
           <div role="alert" className="mt-3 flex flex-col gap-2.5">
             <p className="m-0 leading-normal">{rejectedText}</p>
+            {view && leftOutPhotos(view).length ? (
+              <ul aria-label="Photos that were left out" className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2.5 p-0">
+                {leftOutPhotos(view).map((p) => (
+                  <li key={p.n} className="flex flex-col gap-1.5">
+                    <div className="relative aspect-[3/4] overflow-hidden rounded-[16px] bg-muted">
+                      <img src={p.url} alt={`Photo ${p.n}`} loading="lazy" className="size-full object-cover" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                      <span aria-hidden className="absolute top-2 left-2 font-dot text-[14px] text-white [text-shadow:0_1px_6px_rgba(0,0,0,.5)]">
+                        {pad2(p.n)}
+                      </span>
+                    </div>
+                    <span className="text-[12.5px] leading-[1.35] text-ink-2">{p.why || 'left out'}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {tips.length ? (
               <ul className="m-0 flex flex-col gap-1 rounded-[18px] bg-caution-bg py-3 pr-3 pl-7 text-[14px] leading-[1.45] text-caution">
                 {tips.map((t) => (

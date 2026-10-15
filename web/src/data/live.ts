@@ -35,6 +35,10 @@ export function toSession(v: SessionView): Session {
     measured: v.session.measured,
     baseline_ref: v.session.baseline,
     sample_id: v.session.sample_id ?? null,
+    stage: v.session.stage ?? null,
+    // only detail views (GET one session, analyze) carry these
+    ...(v.session.frame_urls ? { frame_urls: v.session.frame_urls } : {}),
+    ...(v.session.crop_urls ? { crop_urls: v.session.crop_urls } : {}),
   }
 }
 
