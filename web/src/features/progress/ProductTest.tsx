@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { ForearmChart } from '../../components/charts'
 import { useShell } from '../../components/shell/ShellContext'
@@ -14,6 +15,9 @@ import { useData } from '../../data/useData'
 import { fmtDate, fmtHours, parseDate, plural } from '../../lib/format'
 import { fmtSigned, fmtValue } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
+import { PlanDotMark } from '../home/Tiles'
+import { MAX_TEST_DAYS, MIN_TEST_DAYS, VERDICT_AFTER_DAYS, planDots, testDay, useProductTestWrites, useProductTests } from '../routine/productTests'
+import { StartTest } from '../routine/StartTest'
 import { MODE_LABEL, baselineFor, dayOf, metricOf, sessionState } from './model'
 import { Crumb, Page, Pills } from './parts'
 
@@ -72,6 +76,10 @@ export default function ProductTest() {
   const data = useData()
   const shell = useShell()
   const [params, setParams] = useSearchParams()
+  const tests = useProductTests()
+  const test = data.mode === 'live' ? tests.running : null
+  const testWrites = useProductTestWrites()
+  const [lengthBusy, setLengthBusy] = useState(false)
   const treatedAll = useMemo(() => data.series('forearm_treated')?.sessions ?? [], [data])
   const controlAll = useMemo(() => data.series('forearm_control')?.sessions ?? [], [data])
   const measured = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
@@ -105,19 +113,111 @@ export default function ProductTest() {
 
   const crumb = <Crumb to="/routine" back="Routine" here="Product test" />
   const photograph = () => shell.startCheckIn('forearm_treated', mode)
+  const td = test ? testDay(test) : null
+  const dots = test ? planDots(test, treatedAll) : []
+
+  const end = async () => {
+    if (!test) return
+    try {
+      await testWrites.end(test.id)
+    } catch {
+      toast("Couldn't end the test. Nothing changed; try again.")
+      return
+    }
+    toast(`Ended the test of ${test.name}. Its photos and readings stay.`, {
+      duration: 6000,
+      action: {
+        label: 'Undo',
+        onClick: () => void testWrites.patch(test.id, { ended_at: null }).catch(() => toast("Couldn't undo. The test stays ended.")),
+      },
+    })
+  }
+  const setLength = async (days: number) => {
+    if (!test || days === test.length_days) return
+    setLengthBusy(true)
+    try {
+      await testWrites.patch(test.id, { length_days: days })
+    } catch {
+      toast("Couldn't change the test's length. Try again.")
+    } finally {
+      setLengthBusy(false)
+    }
+  }
+
+  // The running test's plan: product, day N of M, one dot per day, verdict after day 14, length, end.
+  const plan =
+    test && td ? (
+      <section aria-label="Test plan" className="flex flex-wrap items-center gap-x-8 gap-y-4 rounded-[36px] p-[clamp(20px,3vw,28px)] text-willow-900 squircle" style={{ background: 'radial-gradient(120% 140% at 0% 0%, #B8E986 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #4FB866 0%, transparent 60%), #DDF3C9' }}>
+        <div className="flex flex-[1_1_300px] flex-col gap-2">
+          <span className="font-mono text-[12px] tracking-[.08em]">■ ON YOUR FOREARM · SINCE {fmtDate(test.started_at).toUpperCase()}</span>
+          <span className="text-[clamp(20px,2.2vw,26px)] tracking-[-0.01em]">{test.name}</span>
+          <span className="text-[14px] leading-[1.45]">{td.ready ? (td.complete ? 'The plan is complete. Keep photographing to follow it further, or end the test.' : 'Past day 14: each check-in below gets a verdict.') : `Too early for a verdict: Willow gives one after day ${VERDICT_AFTER_DAYS}. Keep photographing both arms together every few days.`}</span>
+          <span className="flex flex-wrap items-center gap-2 pt-1">
+            <label className="flex items-center gap-2 text-[13px]">
+              Length
+              <select value={test.length_days} disabled={lengthBusy} onChange={(e) => void setLength(Number(e.target.value))} className="min-h-11 rounded-pill bg-white/70 px-3 text-[14px] text-ink">
+                {Array.from({ length: (MAX_TEST_DAYS - MIN_TEST_DAYS) / 7 + 1 }, (_, i) => MIN_TEST_DAYS + i * 7).map((d) => (
+                  <option key={d} value={d}>
+                    {d} days
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button variant="outline" size="sm" className="min-h-11" onClick={() => void end()}>
+              End test
+            </Button>
+          </span>
+        </div>
+        <div className="flex flex-[0_1_280px] flex-col gap-2.5">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[15px]">Day</span>
+            <span className="font-dot text-[44px] leading-[.9]">{td.day}</span>
+            <span className="text-[15px]">of {td.of} days</span>
+          </span>
+          <span role="img" aria-label={`${plural(dots.filter((d) => d === 'photo').length, 'day', 'days')} with a treated photo out of ${td.of}`} className="grid gap-[5px]" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
+            {dots.map((d, i) => (
+              <PlanDotMark key={i} dot={d} />
+            ))}
+          </span>
+          <span className="text-[12px]">● treated photo · ○ to come · verdict after day {VERDICT_AFTER_DAYS}</span>
+        </div>
+      </section>
+    ) : null
+
   if (!current)
     return (
       <Page label="Product test">
         {crumb}
-        <EmptyState
-          title="No product test yet"
-          body="A product test compares a treated square of skin on one forearm with an untreated square on the other, photographed together. Start with a baseline of each square, before you apply the product."
-          action={
-            <Button variant="ink" size="lg" onClick={photograph}>
-              Photograph both arms
-            </Button>
-          }
-        />
+        {plan}
+        {test ? (
+          <EmptyState
+            title="Photograph both arms to start"
+            body="Take the first photos of both squares together before you apply the product: they are the starting point every later check-in is compared with."
+            action={
+              <Button variant="ink" size="lg" onClick={photograph}>
+                Photograph both arms
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <EmptyState
+              title="No product test yet"
+              body="A product test compares a treated square of skin on one forearm with an untreated square on the other, photographed together. Start with a baseline of each square, before you apply the product."
+            />
+            {data.mode === 'live' && tests.status === 'ready' ? (
+              <section aria-label="Start a product test" className="card flex max-w-[640px] flex-col gap-3 bg-surface p-[clamp(20px,3vw,28px)]">
+                <h2 className="m-0 text-[20px] font-normal">Start a test</h2>
+                <StartTest preset={{ name: params.get('start') === 'self-tanner' ? 'Self-tanner' : '' }} />
+                <span className="text-[13px] text-ink-2">To test a routine product, open it on the Routine page and choose “Start a forearm test”.</span>
+              </section>
+            ) : (
+              <Button variant="ink" size="lg" className="self-start" onClick={photograph}>
+                Photograph both arms
+              </Button>
+            )}
+          </>
+        )}
         <Disclaimer />
       </Page>
     )
@@ -131,6 +231,8 @@ export default function ProductTest() {
   const daysSince = (s: Session, base: Session) => Math.max(0, Math.round((parseDate(dayOf(s)).getTime() - parseDate(dayOf(base)).getTime()) / 86_400_000))
   const dayN = tBase ? daysSince(current, tBase) : 0
   const res = t && !isBase ? compare(t, c, tb, cb) : null
+  // A running test gives no verdict before day 14 (values are still shown).
+  const early = Boolean(td && !td.ready && !isBase)
   const fm: Pick<Metric, 'unit' | 'mdc95'> = { unit: t?.unit ?? (metricId === 'tone_ita' ? 'deg' : 'a_star'), mdc95: tb?.mdc95 ?? t?.mdc95 ?? 1 }
 
   // Chart: every treated check-in in this mode, with the control taken within 3 hours of it.
@@ -140,14 +242,14 @@ export default function ProductTest() {
   const labels = treated.map(when)
 
   const arm = (name: string, m: Metric | null, base: Metric | null, session: Session | null, bg: string, glow: string) => {
-    const kind: VerdictKind | null = m && session ? verdictKind(m, session) : null
+    const kind: VerdictKind | null = early && session ? 'notEnough' : m && session ? verdictKind(m, session) : null
     return (
       <div className="flex min-h-[320px] flex-col justify-between gap-[18px] rounded-[44px] p-[26px] text-white squircle" style={{ background: bg, boxShadow: `inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -30px 60px ${glow}, 0 40px 80px -50px rgba(0,0,0,.6)` }}>
         <span className="flex flex-wrap justify-between gap-2">
           <span className="text-[20px]">{name}</span>
           <span className="flex items-center gap-1.5 rounded-pill bg-white/14 px-3 py-[7px] text-[12px]">
             {kind ? <VerdictGlyph kind={kind} onDark /> : <VerdictGlyph kind="notCompared" onDark />}
-            {kind ? VERDICT_WORDS[kind].label : session ? VERDICT_WORDS.notCompared.label : 'No photo'}
+            {early && session ? 'Too early' : kind ? VERDICT_WORDS[kind].label : session ? VERDICT_WORDS.notCompared.label : 'No photo'}
           </span>
         </span>
         <span className="flex flex-col items-center gap-1.5">
@@ -163,6 +265,7 @@ export default function ProductTest() {
   }
 
   const copy = (() => {
+    if (early && td) return { h: `Too early for a verdict: day ${td.day} of ${td.of}.`, b: `Willow gives a verdict after day ${VERDICT_AFTER_DAYS}, once both arms have had time to show a difference. The changes so far are shown above as values only. Keep photographing both arms together every few days.` }
     if (isBase) return { h: 'Day 0: your starting point.', b: 'This is the treated arm’s baseline. Later check-ins of both arms are compared with their own baselines, then with each other.' }
     if (!res || !t) return { h: 'Not enough to compare yet.', b: `This check-in has no ${metricId === 'tone_ita' ? 'tone' : 'redness'} reading to compare.` }
     const tr = sdeg(t.delta, fm)
@@ -193,7 +296,7 @@ export default function ProductTest() {
       <div className="flex flex-wrap items-end justify-between gap-3 pt-[clamp(8px,2vw,24px)] pb-2">
         <div className="flex flex-col gap-2.5">
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">
-            ■ TREATED VS CONTROL · {MODE_LABEL[mode].toUpperCase()} · DAY {dayN} · {look.short}
+            ■ {test ? test.name.toUpperCase() : 'TREATED VS CONTROL'} · {MODE_LABEL[mode].toUpperCase()} · {td ? `DAY ${td.day} OF ${td.of}` : `DAY ${dayN}`} · {look.short}
           </span>
           <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Treated arm vs control arm</h1>
         </div>
@@ -209,6 +312,7 @@ export default function ProductTest() {
           {modes.length > 1 ? <Pills label="Capture mode" tone="white" options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} value={mode} onChange={(m) => setParam('mode', m)} /> : null}
         </div>
       </div>
+      {plan}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3.5">
         {arm('Treated forearm', t, tb, current, 'radial-gradient(80% 60% at 50% 0%, #F567B5 0%, #8E3A9E 40%, #2A0F36 80%)', 'rgba(245,103,181,.25)')}
         {arm('Control forearm', c, cb, control, 'radial-gradient(80% 60% at 50% 0%, #6E8BFF 0%, #2B3A9E 40%, #0B0F33 80%)', 'rgba(110,139,255,.25)')}
@@ -219,8 +323,8 @@ export default function ProductTest() {
             <span className="text-[15px] text-ink-2">{res?.band !== null && res?.band !== undefined ? `combined uncertainty ±${fmtValue(res.band, fm)}${look.unit}` : 'combined uncertainty —'}</span>
           </span>
           <span className="flex items-center gap-2 self-start rounded-pill bg-selected px-3.5 py-[9px] text-[14px] text-inverse">
-            <VerdictGlyph kind={res ? KIND[res.kind].glyph : 'baseline'} onDark />
-            {res ? KIND[res.kind].words : 'Baseline'}
+            <VerdictGlyph kind={early ? 'notEnough' : res ? KIND[res.kind].glyph : 'baseline'} onDark />
+            {early ? `Too early · after day ${VERDICT_AFTER_DAYS}` : res ? KIND[res.kind].words : 'Baseline'}
           </span>
         </div>
       </div>

@@ -18,6 +18,8 @@ import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, NextStepCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
+import { useProductTests } from '../routine/productTests'
+import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
 import { LeadCard, type Lead } from './LeadCard'
@@ -103,6 +105,7 @@ function HomeBody() {
   const setUse = useSetRoutineUse()
   const check = useRoutineCheck(entries)
   const spots = useSpots()
+  const tests = useProductTests()
   const byId = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e])), [entries])
 
   const day = today()
@@ -116,9 +119,9 @@ function HomeBody() {
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
   const lead = leadFor({ read, goals, demo, checkIn, openResult })
-  const heroLines = heroLinesFor(read, goals, demo)
+  const heroLines = withTonight(heroLinesFor(read, goals, demo), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const finding = demo ? null : nextStepOf(check.data, byId)
-  const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY)
+  const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
   const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
@@ -160,7 +163,7 @@ function HomeBody() {
   }
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
   if (finding) small.push({ key: 'next', node: (cls) => <NextStepCard className={cls} title={finding.title} body={finding.body} onRoutine={() => navigate('/routine')} onAsk={() => ask(finding.question, 'Routine check')} /> })
-  if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} day={forearm.day} dots={forearm.dots} standing={forearm.standing} onOpen={() => navigate('/test')} /> })
+  if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
   if (diary && latestFace) small.push({ key: 'spots', node: (cls) => <SpotDiaryTile className={cls} diary={diary} onOpen={() => navigate({ pathname: `/result/${latestFace.id}`, hash: '#spot-diary' })} /> })
   const spans = rowSpans(small.length)
 
@@ -425,6 +428,22 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean): HeroLine[
       { g: '→', t: 'One check-in today picks the trend back up.' },
     ]
   return [...fromLead.slice(0, 2), { g: '→', t: 'Check in today, by the same window light.' }]
+}
+
+/** "☾ Tonight is a glycolic night." when an every-other-night product is on tonight and another rests (from the schedules; no numbers). */
+function tonightLine(pm: RoutineEntry[]): HeroLine | null {
+  const on = pm.find((e) => e.schedule?.kind === 'alternate' && !restsOn(e))
+  if (!on || !pm.some((e) => restsOn(e))) return null
+  const name = shortName(on).toLowerCase()
+  return /\d/.test(name) ? null : { g: '☾', t: `Tonight is a ${name} night.` }
+}
+
+/** The tonight line goes last, in place of a "→" hint when the three lines are taken. */
+function withTonight(lines: HeroLine[], tonight: HeroLine | null): HeroLine[] {
+  if (!tonight) return lines
+  if (lines.length < 3) return [...lines, tonight]
+  const i = lines.findIndex((l) => l.g === '→')
+  return i === -1 ? lines : [...lines.slice(0, i), ...lines.slice(i + 1), tonight]
 }
 
 /** Next step: the routine check's first conflict, else its first gap (no other kinds exist). */

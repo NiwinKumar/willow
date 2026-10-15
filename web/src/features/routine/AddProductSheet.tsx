@@ -7,14 +7,14 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Sheet } from '../../components/ui/Sheet'
 import { AITag } from '../../components/willow/AITag'
 import type { Product } from '../../data/types'
-import { ApiError, api, localDay, type LabelScan, type NewRoutineEntry } from '../../lib/api'
+import { ApiError, api, localDay, type LabelScan, type LabelScanFailure, type NewRoutineEntry } from '../../lib/api'
 import { CATEGORY_LABEL, CONCERN_LABEL, categoryLabel } from '../../lib/catalog'
 import { fmtPrice } from '../../lib/format'
 import { toJpegBase64 } from '../../lib/image'
 import { sampleLabelFile } from '../../lib/sampleLabel'
 import { useAuth } from '../../lib/useAuth'
 import './routine.css'
-import { CategoryOrb } from './productUi'
+import { ProductImage } from './productUi'
 import { activeLabel } from './routineModel'
 import { failureText, useRoutineWrites } from './writes'
 
@@ -26,11 +26,24 @@ type Draft = {
   category: string
   key_actives: { name: string; pct: number | null }[]
   inci: string[]
+  /** Label scans: which ingredients were hard to read (same order as inci). */
+  inciLow?: boolean[]
   concerns: string[]
   source: 'catalog' | 'label_scan' | 'manual'
   /** Present when this draft came from a label photo (Gemini read it: AI-written). */
-  scan: { confidence: LabelScan['confidence']; matched: boolean } | null
+  scan: { confidence: LabelScan['confidence']; matched: boolean; failure?: LabelScanFailure | null } | null
 }
+
+/** Why a label photo could not be read, and what to do about it (the api's scan.failure). */
+const FAILURE_ADVICE: Record<LabelScanFailure, { what: string; retry: string }> = {
+  glare: { what: 'glare across the label', retry: 'Flatten it, tilt it away from the light and try again' },
+  blurry: { what: 'the photo is blurry', retry: 'Hold the phone steady, tap to focus on the ingredient list and try again' },
+  no_label: { what: 'no product label in the photo', retry: 'Point the camera at the ingredient list and try again' },
+  cut_off: { what: 'part of the ingredient list is outside the photo', retry: 'Fit the whole list in the frame and try again' },
+}
+
+/** Older api answers sent plain strings: those read as legible. */
+const ingredients = (scan: LabelScan) => scan.inci.map((i) => (typeof i === 'string' ? { name: i, confidence: 'high' as const } : i))
 
 export type AddPreset = { mode?: 'search' | 'scan'; slot?: 'am' | 'pm'; category?: string; q?: string; product?: Product }
 
@@ -289,7 +302,7 @@ function CatalogSearch({ initial, inRoutine, onPick, onScan, onManual }: { initi
                   className="flex w-full items-center gap-3.5 rounded-[24px] bg-sunken p-3 text-left transition-colors hover:bg-muted disabled:opacity-70"
                   style={{ animation: `wRise .35s ${Math.min(i, 10) * 40}ms both` }}
                 >
-                  <CategoryOrb category={p.category} size={50} />
+                  <ProductImage product={p} size={50} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-[13px] text-ink-2">
                       {p.brand} · {categoryLabel(p.category)}
@@ -325,20 +338,29 @@ function LabelScanner({ getIdToken, onRead, onSearch }: { getIdToken: () => Prom
       const res = await api.labelScan(token, images)
       if (res.match) {
         const product = await api.catalogProduct(token, res.match.product_id)
-        onRead(fromProduct(product, 'label_scan', { confidence: res.scan.confidence, matched: true }))
-      } else {
-        onRead({
-          product_id: null,
-          brand: res.scan.brand ?? '',
-          name: res.scan.product_name ?? '',
-          category: res.scan.category || 'other',
-          key_actives: res.scan.key_actives,
-          inci: res.scan.inci,
-          concerns: [],
-          source: 'label_scan',
-          scan: { confidence: res.scan.confidence, matched: false },
-        })
+        onRead(fromProduct(product, 'label_scan', { confidence: res.scan.confidence, matched: true, failure: res.scan.failure }))
+        return
       }
+      const items = ingredients(res.scan)
+      if (res.scan.failure && !items.length && !res.scan.brand && !res.scan.product_name) {
+        // Nothing usable came back: retake (the api did not count this scan).
+        const a = FAILURE_ADVICE[res.scan.failure]
+        setFailure(`The label wasn't readable: ${a.what}. ${a.retry}, or search instead. This photo wasn't counted against your scans.`)
+        setStatus('failed')
+        return
+      }
+      onRead({
+        product_id: null,
+        brand: res.scan.brand ?? '',
+        name: res.scan.product_name ?? '',
+        category: res.scan.category || 'other',
+        key_actives: res.scan.key_actives,
+        inci: items.map((i) => i.name),
+        inciLow: items.map((i) => i.confidence === 'low'),
+        concerns: [],
+        source: 'label_scan',
+        scan: { confidence: res.scan.confidence, matched: false, failure: res.scan.failure },
+      })
     } catch (e) {
       setFailure(scanError(e))
       setStatus('failed')
@@ -448,7 +470,8 @@ function Confirm({ draft, setDraft, when, setWhen, startedAt, setStartedAt, savi
       {draft.scan ? (
         <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
           <AITag label="AI-read" />
-          Label read with {draft.scan.confidence} confidence{draft.scan.confidence === 'low' ? ': parts were hard to read, so check the details against the bottle.' : '.'}
+          Label read with {draft.scan.confidence} confidence
+          {draft.scan.failure ? `: ${FAILURE_ADVICE[draft.scan.failure].what}, so check the details against the pack.` : draft.scan.confidence === 'low' ? ': parts were hard to read, so check the details against the pack.' : '.'}
         </span>
       ) : null}
       <div className="grid gap-2.5 sm:grid-cols-2">
@@ -478,12 +501,19 @@ function Confirm({ draft, setDraft, when, setWhen, startedAt, setStartedAt, savi
         <div className="flex flex-col gap-1.5">
           <span className="text-[14px] text-ink-2">{matched ? 'Ingredients · from catalog' : 'Ingredients · read from your label photo'}</span>
           <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-[16px] bg-canvas p-3">
-            {draft.inci.map((ing, i) => (
-              <span key={`${ing}-${i}`} className="rounded-pill bg-white px-2.5 py-1 text-[13px]">
-                {ing}
-              </span>
-            ))}
+            {draft.inci.map((ing, i) =>
+              !matched && draft.inciLow?.[i] ? (
+                <span key={`${ing}-${i}`} title="Read with low confidence" className="rounded-pill border-[1.5px] border-dashed border-ink/40 bg-white/60 px-2.5 py-1 text-[13px]">
+                  {ing}?<span className="sr-only"> (hard to read)</span>
+                </span>
+              ) : (
+                <span key={`${ing}-${i}`} className="rounded-pill bg-white px-2.5 py-1 text-[13px]">
+                  {ing}
+                </span>
+              ),
+            )}
           </div>
+          {!matched && draft.inciLow?.some(Boolean) ? <span className="text-[12px] text-ink-2">Dashed with “?” = read with low confidence. Check those against the pack.</span> : null}
         </div>
       ) : null}
       {draft.key_actives.length ? (

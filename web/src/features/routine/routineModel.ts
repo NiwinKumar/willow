@@ -1,4 +1,3 @@
-import { Cloud, Droplets, Eye, FlaskConical, GlassWater, Layers, Package, Pipette, Sun, Waves, type LucideIcon } from 'lucide-react'
 import { useMemo } from 'react'
 
 import type { RoutineCheck, RoutineEntry } from '../../data/types'
@@ -6,30 +5,11 @@ import { useData } from '../../data/useData'
 import { categoryLabel } from '../../lib/catalog'
 import { OUTCOME_SITES } from '../../lib/outcome'
 
-/**
- * Product visuals without product photos (docs/DESIGN.md rule 9, "Product category" icon table): the
- * design's colour orb, coloured by category (never by brand, never data), with the category's lucide icon.
- * Ember tones are left out on purpose: ember means "Changed" only.
- */
-const CATEGORY: Record<string, { icon: LucideIcon; c: [string, string, string] }> = {
-  cleanser: { icon: Droplets, c: ['#9CD3FF', '#3D7BFF', '#1A3E99'] },
-  toner: { icon: GlassWater, c: ['#D8B8FF', '#7A5CFF', '#3B2A99'] },
-  serum: { icon: Pipette, c: ['#B8E986', '#4FB866', '#1F6B3A'] },
-  treatment: { icon: FlaskConical, c: ['#8EE0C0', '#1E8C6C', '#0F3B3A'] },
-  exfoliant: { icon: Waves, c: ['#F7C6E4', '#C77DDB', '#5B2A86'] },
-  moisturizer: { icon: Cloud, c: ['#FFC2DF', '#F25FA8', '#8E2560'] },
-  sunscreen: { icon: Sun, c: ['#FFF4C9', '#F2B53A', '#8F5E08'] },
-  eye_care: { icon: Eye, c: ['#DCEBFF', '#8AA9E8', '#33508F'] },
-  mask: { icon: Layers, c: ['#E3F2C2', '#9DBF5A', '#4E6B1C'] },
-}
-const OTHER = { icon: Package, c: ['#F1F0EC', '#B8B5AE', '#5E5B56'] as [string, string, string] }
+// Product visuals: the packshot where the catalog has one, else the category orb (components/willow).
+export { categoryOf, orbGradient } from '../../components/willow/productVisual'
 
-export const categoryOf = (category: string) => CATEGORY[category] ?? OTHER
-
-export function orbGradient(category: string): string {
-  const [a, b, c] = categoryOf(category).c
-  return `radial-gradient(circle at 34% 28%, #FFFFFF 0%, ${a} 34%, ${b} 72%, ${c} 100%)`
-}
+/** What ProductImage needs to draw a routine entry. */
+export const imageOf = (e: Pick<RoutineEntry, 'image_url' | 'category' | 'custom_name' | 'brand'>) => ({ image_url: e.image_url ?? null, category: e.category, name: entryName(e) })
 
 export const entryName = (e: Pick<RoutineEntry, 'custom_name' | 'brand'>) => e.custom_name || e.brand || 'Unnamed product'
 export const activeLabel = (a: { name: string; pct: number | null }) => {
@@ -53,6 +33,10 @@ export type Finding = {
   ai: boolean
   title: string
   products: string[]
+  /** The routine entries it is about (their photos are drawn with the names). */
+  entries: RoutineEntry[]
+  /** A two-product conflict whose fix is to alternate nights: "Alternate these" sets both schedules. */
+  alternate?: boolean
   fix: string
   question: string
   /** Gap: what to search the catalog for. */
@@ -69,7 +53,8 @@ const CONFLICT_SEVERITY = { info: 'Low', caution: 'Moderate', avoid_same_routine
 
 export function findingsOf(check: RoutineCheck, entries: RoutineEntry[]): Finding[] {
   const byId = new Map(entries.map((e) => [e.id, e]))
-  const names = (ids: string[]) => ids.map((id) => byId.get(id)).filter((e): e is RoutineEntry => Boolean(e)).map(entryName)
+  const found = (ids: string[]) => ids.map((id) => byId.get(id)).filter((e): e is RoutineEntry => Boolean(e))
+  const names = (ids: string[]) => found(ids).map(entryName)
   const live = (ids: string[]) => ids.filter((id) => byId.has(id) && !byId.get(id)!.ended_at).length >= 2
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
   const conflicts = check.conflicts.filter((c) => live(c.products)).map<Finding>((c) => {
@@ -81,13 +66,15 @@ export function findingsOf(check: RoutineCheck, entries: RoutineEntry[]): Findin
       ai: c.source === 'model',
       title: c.issue,
       products: ns,
+      entries: found(c.products),
+      alternate: c.products.length === 2 && /alternat/i.test(c.suggestion),
       fix: c.suggestion,
       question: c.severity === 'info' ? `What should I know about using ${ns.join(' and ')} together?` : `Why should I keep ${ns.join(' and ')} apart?`,
     }
   })
   const duplicates = check.duplicates.filter((d) => live(d.products)).map<Finding>((d) => {
     const ns = names(d.products)
-    return { key: `d:${d.active}`, severity: 'Low', kind: 'Duplicate', ai: false, title: `${cap(d.active)} in ${ns.length} products`, products: ns, fix: d.note, question: `Do I need ${d.active} in both ${ns.join(' and ')}?` }
+    return { key: `d:${d.active}`, severity: 'Low', kind: 'Duplicate', ai: false, title: `${cap(d.active)} in ${ns.length} products`, products: ns, entries: found(d.products), fix: d.note, question: `Do I need ${d.active} in both ${ns.join(' and ')}?` }
   })
   const gaps = check.gaps.map<Finding>((g) => {
     const sun = /sunscreen|spf/i.test(`${g.need} ${g.suggestion}`)
@@ -98,6 +85,7 @@ export function findingsOf(check: RoutineCheck, entries: RoutineEntry[]): Findin
       ai: false,
       title: g.need,
       products: sun ? ['Morning routine'] : [],
+      entries: [],
       fix: `${g.why} ${g.suggestion}`.trim(),
       question: sun ? 'What sunscreen from the catalog fits my routine?' : `How do I fill this gap in my routine: ${g.need.toLowerCase()}?`,
       find: sun ? { category: 'sunscreen' } : { q: '' },

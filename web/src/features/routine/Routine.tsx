@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { toast } from 'sonner'
+
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { useRoutine, useRoutineCheck, useRoutineLog } from '../../data/hooks'
 import type { Product, RoutineEntry } from '../../data/types'
@@ -8,9 +10,11 @@ import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { fmtDate, plural } from '../../lib/format'
 import { AddProductSheet, type AddPreset } from './AddProductSheet'
-import { CategoryOrb } from './productUi'
+import { CategoryOrb, ProductImage } from './productUi'
 import { ProductSheet, type ProductTarget } from './ProductSheet'
-import { entryName, findingsOf, useOutcomeSessions, type Finding } from './routineModel'
+import { useProductTests } from './productTests'
+import { entryName, findingsOf, imageOf, useOutcomeSessions, type Finding } from './routineModel'
+import { addDays } from './schedule'
 import { RoutineCheckCard } from './RoutineCheckCard'
 import { SlotCard } from './SlotCard'
 import { ProductTestCard, Suggestions } from './Suggestions'
@@ -42,6 +46,10 @@ function LiveRoutine() {
   const today = localDay()
   const log = useRoutineLog()
   const ticks = log.data?.find((d) => d.date === today)?.used ?? {}
+  const yesterday = addDays(today, -1)
+  const lastNight = useRoutineLog(yesterday, yesterday)
+  const usedLastNight = (id: string) => Boolean(lastNight.data?.find((d) => d.date === yesterday)?.used[id]?.includes('pm'))
+  const tests = useProductTests()
   const sessions = useOutcomeSessions()
   const faceMeasured = sessions.some((s) => s.site === 'face_full' && s.status === 'done' && s.measured !== false && s.result?.quality.passed)
   const writes = useRoutineWrites()
@@ -62,9 +70,24 @@ function LiveRoutine() {
   const failed = routine.status === 'error'
   const inRoutine = useMemo(() => new Set(current.map((e) => e.product_id).filter((x): x is string => Boolean(x))), [current])
   const both = am.length > 0 && pm.length > 0
-  const meta = loading ? 'Loading…' : failed ? 'Not loaded' : current.length === 0 ? 'No products yet' : `${plural(current.length, 'product', 'products')} · ${both ? 'morning and evening' : am.length ? 'morning only' : 'evening only'}`
+  // "last changed": the newest add, stop, slot or schedule change (updated_at; created_at for older entries).
+  const changed = entries.map((e) => e.updated_at ?? e.created_at ?? e.started_at).sort().at(-1)
+  const meta = loading ? 'Loading…' : failed ? 'Not loaded' : current.length === 0 ? 'No products yet' : `${plural(current.length, 'product', 'products')} · ${both ? 'morning and evening' : am.length ? 'morning only' : 'evening only'}${changed ? ` · last changed ${fmtDate(changed)}` : ''}`
   const find = (f: Finding) => setAdd({ mode: 'search', ...f.find, slot: f.find?.category === 'sunscreen' ? 'am' : undefined })
   const treated = data.series('forearm_treated')?.sessions ?? []
+  const controls = data.series('forearm_control')?.sessions ?? []
+  const alternate = async (on: RoutineEntry, off: RoutineEntry) => {
+    try {
+      await writes.alternate(on, off)
+    } catch {
+      toast(`Couldn't set ${entryName(on)} and ${entryName(off)} to alternate. Nothing changed; try again.`)
+    }
+  }
+  // From the check card: the product not used last night goes tonight.
+  const alternateFinding = async (f: Finding) => {
+    const [a, b] = f.entries
+    await (usedLastNight(b.id) && !usedLastNight(a.id) ? alternate(a, b) : alternate(b, a))
+  }
 
   return (
     <main className="relative mx-auto flex max-w-[1320px] flex-col gap-[18px] px-[clamp(16px,4vw,40px)] pt-2">
@@ -81,8 +104,8 @@ function LiveRoutine() {
         </button>
       </div>
 
-      {!loading && !failed ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} /> : null}
-      {!loading && !failed && current.length ? <Suggestions findings={findings} entries={current} sessions={sessions} onFind={find} /> : null}
+      {!loading && !failed ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
+      {!loading && !failed && current.length ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : null}
 
       {loading ? (
         <div role="status" aria-label="Loading routine" className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,460px),1fr))' }}>
@@ -170,7 +193,7 @@ function LiveRoutine() {
           <ul className="flex flex-col pb-3">
             {stopped.map((e) => (
               <li key={e.id} className="flex items-center gap-3 border-t border-line py-2.5">
-                <CategoryOrb category={e.category} size={36} muted />
+                <ProductImage product={imageOf(e)} size={36} muted />
                 <button type="button" onClick={() => setInfo({ entry: e })} className="flex min-w-0 flex-1 flex-col text-left">
                   <span className="truncate text-[15px]">{entryName(e)}</span>
                   <span className="text-[12px] text-ink-2">
@@ -184,7 +207,7 @@ function LiveRoutine() {
         </details>
       ) : null}
 
-      <ProductTestCard treated={treated} />
+      {tests.status === 'ready' || treated.length ? <ProductTestCard treated={treated} controls={controls} test={tests.running} /> : null}
       <Disclaimer className="mx-2" />
       <div className="h-[clamp(40px,8vw,120px)]" />
 
