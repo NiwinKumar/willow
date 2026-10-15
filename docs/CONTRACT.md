@@ -191,6 +191,10 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | GET | `/v1/retailer/insights` | aggregate JSON for the in-app retailer view (BigQuery) |
 | GET | `/v1/me` | `{uid, consent, profile}`; `consent` and `profile` are null until saved |
 | PUT | `/v1/me/profile` | partial update of `users/{uid}.profile` (fields left out keep their value, `null` clears one) -> `{profile}`; 422 on an unknown field or value |
+| PATCH | `/v1/routine/{id}` | `{ended_at?, slots?, schedule?}`; `schedule` = `{kind: daily\|alternate\|days, days?: int[] (0=Mon), anchor: YYYY-MM-DD}` or null (every day); stamps `updated_at`. GET `/v1/routine` entries also carry `schedule`, `updated_at`, and the catalog `image_url` / `image_source` (null for own products) |
+| POST | `/v1/label-scan` (Oct 15 additions) | `scan.inci` items are `{name, confidence: high\|low}` (plain strings still accepted from the model), `scan.failure: glare\|blurry\|no_label\|cut_off\|null`; a scan with a failure and nothing read is not counted against the daily cap |
+| GET/POST | `/v1/product-tests` | list (`{tests[]}`, running one first) / start `{entry_id?, product_id?, name?, length_days? (7-56, default 28), started_at?}`; 409 while another test runs |
+| PATCH/DELETE | `/v1/product-tests/{id}` | `{name?, length_days?, ended_at?}` (end, or null to resume) / remove a test (its forearm sessions stay) |
 
 `SessionView` = `{session, result: AnalysisResult, labels: {candidate_id: label}, explanation: Explanation}`.
 
@@ -223,6 +227,11 @@ users/{uid}/baselines/{site}
 users/{uid}/routine/{entry_id}
   product_id | null, custom_name, brand, inci[], key_actives[], started_at, ended_at,
   applied_sites[], source: catalog|label_scan|manual
+  schedule: {kind: daily|alternate|days, days?: int[] (0=Mon..6=Sun), anchor: YYYY-MM-DD} | null
+    (alternate = every other day from anchor; null = every day), created_at, updated_at
+users/{uid}/product_tests/{test_id}
+  entry_id | null, product_id | null, name, site_pair: forearm, started_at (YYYY-MM-DD),
+  length_days (7-56), ended_at | null, created_at, updated_at
 products/{product_id}
   brand, name, category, concerns[], key_actives[{name, pct}], inci[],
   price: {amount, currency}, size, region[], image_url,

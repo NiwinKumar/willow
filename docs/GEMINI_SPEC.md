@@ -27,7 +27,7 @@
 
 ## 3. Label scan
 - Input: product photo(s) (front and/or back).
-- Output: `{brand, product_name, category: enum(CATALOG_SPEC), inci: string[], key_actives: [{name, pct: number|null}], claims_on_pack: string[], confidence}`.
+- Output: `{brand, product_name, category: enum(CATALOG_SPEC), inci: [{name, confidence: high|low}], key_actives: [{name, pct: number|null}], claims_on_pack: string[], confidence, failure: glare|blurry|no_label|cut_off|null}` (Oct 15: per-ingredient legibility and a failure reason; plain `inci` strings still validate as legible items). Validator: a failure caps `confidence` at low, any low-confidence ingredient caps it at medium, `no_label` drops everything read; a failure with nothing read is refunded so the retake is free. The web draws low-confidence ingredients as dashed chips with "?" and gives retry advice per failure reason.
 - Then match against catalog (brand + name fuzzy match); if matched, link `product_id`; else store as custom routine entry.
 - api: `POST /v1/label-scan` with `{images: [{mime_type, data_base64}]}` (1-2 images, the web downsizes to a JPEG first) returns `{scan, match}` and saves nothing; the web shows a confirm/edit step, then `POST /v1/routine`. Trailing punctuation from printed lists is stripped; active names are lower-cased.
 

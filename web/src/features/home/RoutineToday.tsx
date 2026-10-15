@@ -1,4 +1,7 @@
+import { ProductImage } from '../../components/willow/ProductImage'
 import type { RoutineEntry } from '../../data/types'
+import { imageOf } from '../routine/routineModel'
+import { dayNote, restsOn } from '../routine/schedule'
 import { orbColours, shortName } from './derive'
 import { HomeCard } from './cards'
 import { Pill } from './parts'
@@ -25,9 +28,10 @@ const PANEL: Record<Slot, { name: string; bg: string; fg: string; line: string; 
 }
 
 /**
- * Routine today: the products in today's morning and evening routine as orbs. Tapping one ticks it as used
- * today (saved to the api, optimistic). A dashed Sunscreen slot appears only when the routine check found
- * that gap; the conflict chip is the check's first finding.
+ * Routine today: the products in today's morning and evening routine, as their photos (or orbs for products
+ * without one). Tapping one ticks it as used today (saved to the api, optimistic). A product its schedule
+ * rests today is drawn fainter with "RESTS ☾" and is not counted as due. A dashed Sunscreen slot appears only
+ * when the routine check found that gap; the conflict chip is the check's first finding.
  */
 export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflict, onRoutine, className }: {
   am: RoutineEntry[]
@@ -58,12 +62,14 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           const list = slot === 'am' ? am : pm
           const p = PANEL[slot]
           const ticked = list.filter((e) => used(e.id, slot)).length
+          // Due today: everything not resting on its schedule (a resting product used anyway counts too).
+          const due = list.filter((e) => !restsOn(e) || used(e.id, slot)).length
           return (
             <div key={slot} className={`relative flex min-w-0 flex-[1_1_250px] flex-col gap-2.5 overflow-hidden rounded-[24px] squircle px-3.5 pt-3.5 pb-3 ${p.fg}`} style={{ background: p.bg }}>
               <div className="flex items-baseline justify-between">
                 <span className="font-mono text-[10.5px] tracking-[.08em]">■ {p.name}</span>
-                <span className="font-dot text-[17px]" aria-label={`${ticked} of ${list.length} used today`}>
-                  {ticked}/{list.length}
+                <span className="font-dot text-[17px]" aria-label={`${ticked} of ${due} used today`}>
+                  {ticked}/{due}
                 </span>
               </div>
               {list.length === 0 && !(slot === 'am' && missingSunscreen) ? (
@@ -74,7 +80,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                 <div className="relative flex flex-wrap justify-between gap-x-1 gap-y-3">
                   <span aria-hidden className="absolute top-[22px] right-[34px] left-[34px] h-[1.5px]" style={{ background: p.line }} />
                   {list.map((e) => (
-                    <Orb key={e.id} entry={e} on={used(e.id, slot)} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
+                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
                     <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex min-w-0 flex-[0_1_68px] flex-col items-center gap-1.5 p-0 text-inherit">
@@ -95,30 +101,42 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   )
 }
 
-function Orb({ entry, on, ring, badgeRing, onToggle }: { entry: RoutineEntry; on: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
+function Orb({ entry, slot, on, ring, badgeRing, onToggle }: { entry: RoutineEntry; slot: Slot; on: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
   const [c0, c1, c2] = orbColours(entry)
   const full = [entry.custom_name, entry.brand].filter(Boolean).join(' · ')
+  const rest = restsOn(entry)
+  const note = dayNote(entry, slot)
   return (
     <button
       type="button"
       onClick={() => onToggle(!on)}
       aria-pressed={on}
-      aria-label={`${on ? 'Used today' : 'Mark used today'}: ${full}`}
+      aria-label={`${on ? 'Used today' : 'Mark used today'}: ${full}${rest && !on ? ' (rests today)' : ''}`}
       title={full}
       className="group relative flex min-w-0 flex-[0_1_68px] flex-col items-center gap-1.5 p-0 text-inherit"
     >
       <span
         aria-hidden
-        className="relative size-11 rounded-full transition-[opacity,filter,box-shadow,scale] duration-[350ms] ease-bounce group-hover:scale-[1.08] group-active:scale-[.92]"
-        style={{
-          background: `radial-gradient(circle at 34% 28%, #FFFFFF 0%, ${c0} 34%, ${c1} 72%, ${c2} 100%)`,
-          opacity: on ? 1 : 0.55,
-          filter: on ? 'none' : 'saturate(.35)',
-          boxShadow: on ? `0 12px 22px -8px ${c1}` : 'none',
-          outline: `1.5px solid ${on ? ring : 'transparent'}`,
-          outlineOffset: 3,
-        }}
+        className="relative size-11 rounded-full transition-[box-shadow,scale] duration-[350ms] ease-bounce group-hover:scale-[1.08] group-active:scale-[.92]"
+        style={{ outline: `1.5px solid ${on ? ring : 'transparent'}`, outlineOffset: 3 }}
       >
+        <ProductImage
+          product={imageOf(entry)}
+          size={44}
+          muted={!on}
+          rest={rest}
+          fallback={
+            <span
+              className="block size-11 rounded-full transition-[opacity,filter,box-shadow] duration-[350ms]"
+              style={{
+                background: `radial-gradient(circle at 34% 28%, #FFFFFF 0%, ${c0} 34%, ${c1} 72%, ${c2} 100%)`,
+                opacity: on ? 1 : rest ? 0.32 : 0.55,
+                filter: on ? 'none' : 'saturate(.35)',
+                boxShadow: on ? `0 12px 22px -8px ${c1}` : 'none',
+              }}
+            />
+          }
+        />
         <span
           className="absolute -right-1 -bottom-1 grid size-[18px] place-items-center rounded-full bg-selected text-[9px] text-inverse transition-[opacity,scale] duration-[400ms] ease-bounce"
           style={{ boxShadow: `0 0 0 2px ${badgeRing}`, opacity: on ? 1 : 0, scale: on ? '1' : '.4' }}
@@ -127,6 +145,7 @@ function Orb({ entry, on, ring, badgeRing, onToggle }: { entry: RoutineEntry; on
         </span>
       </span>
       <span className="line-clamp-2 text-center text-[11.5px] leading-[1.2]">{shortName(entry)}</span>
+      {note ? <span className="min-h-[11px] font-mono text-[9.5px] tracking-[.05em] opacity-75">{note}</span> : null}
     </button>
   )
 }

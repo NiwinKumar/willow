@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, Product, RoutineCheck, RoutineEntry, RoutineLogDay } from '../data/types'
+import type { AnalysisResult, Explanation, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule } from '../data/types'
 import { DEV_UID } from './devAuth'
 import type { LabelDetail } from './spotLabels'
 
@@ -127,14 +127,19 @@ export type SpotDiary = {
   sessions_not_mapped: number
 }
 
+/** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */
+export type ScannedIngredient = string | { name: string; confidence: 'high' | 'low' }
+export type LabelScanFailure = 'glare' | 'blurry' | 'no_label' | 'cut_off'
 export type LabelScan = {
   brand: string | null
   product_name: string | null
   category: string
-  inci: string[]
+  inci: ScannedIngredient[]
   key_actives: { name: string; pct: number | null }[]
   claims_on_pack: string[]
   confidence: 'low' | 'medium' | 'high'
+  /** Why the label could not be read fully (null or missing: it could). */
+  failure?: LabelScanFailure | null
 }
 export type LabelScanResponse = { scan: LabelScan; match: { product_id: string; brand: string; name: string; score: number } | null }
 
@@ -289,7 +294,7 @@ export const api = {
   // `today`: the person's own calendar day, so recent use counts their days, not the server's
   routine: (token: string) => request<{ entries: RoutineEntry[] }>(token, `/v1/routine?today=${localDay()}`),
   addRoutine: (token: string, entry: NewRoutineEntry) => request<RoutineEntry>(token, '/v1/routine', { method: 'POST', ...json(entry) }),
-  patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
+  patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[]; schedule?: RoutineSchedule | null }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
   /** Routine use ticks; days are the person's own calendar days (YYYY-MM-DD, see localDay). Default range: last 14 days. */
@@ -316,6 +321,13 @@ export const api = {
   judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }),
   advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[]) =>
     request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json({ messages }) }),
+  /** Product tests (forearm): the running one first. */
+  productTests: (token: string) => request<{ tests: ProductTest[] }>(token, '/v1/product-tests'),
+  startProductTest: (token: string, body: { entry_id?: string; product_id?: string; name?: string; length_days?: number; started_at?: string }) =>
+    request<ProductTest>(token, '/v1/product-tests', { method: 'POST', ...json(body) }),
+  patchProductTest: (token: string, id: string, body: { name?: string; length_days?: number; ended_at?: string | null }) =>
+    request<ProductTest>(token, `/v1/product-tests/${id}`, { method: 'PATCH', ...json(body) }),
+  deleteProductTest: (token: string, id: string) => request<void>(token, `/v1/product-tests/${id}`, { method: 'DELETE' }),
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */

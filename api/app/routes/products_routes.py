@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app import advisor, catalog, gemini, label_scan, limits, routine_check, routine_log
 from app.auth import AuthUser, current_user
+from app.schedule import Schedule
 from app.store import Store, get_store, iso
 
 router = APIRouter(prefix="/v1", tags=["catalog", "label-scan", "routine"])
@@ -56,7 +57,7 @@ def post_label_scan(
     """Read a product label. Nothing is saved: the person confirms, then POSTs /v1/routine."""
     limits.take(store, user.uid, "label_scan")
     try:
-        return label_scan.scan(body.images)
+        read = label_scan.scan(body.images)
     except label_scan.BadImage as exc:
         limits.refund(store, user.uid, "label_scan")
         raise HTTPException(
@@ -68,6 +69,11 @@ def post_label_scan(
         raise HTTPException(
             502, {"code": "label_scan_failed", "message": "Could not read the label. Try again."}
         ) from exc
+    if read.scan.unreadable:
+        # Glare, blur, no label or a cut-off list with nothing read: the photo needs retaking, and
+        # a retake should not cost another scan. `scan.failure` says which, for the retry advice.
+        limits.refund(store, user.uid, "label_scan")
+    return read
 
 
 class KeyActive(BaseModel):
@@ -87,6 +93,8 @@ class RoutineEntryIn(BaseModel):
     applied_sites: list[str] = Field(default_factory=list)
     started_at: date | None = None
     source: Literal["catalog", "label_scan", "manual"] = "manual"
+    # null: every day (app/schedule.py)
+    schedule: Schedule | None = None
 
     @field_validator("started_at")
     @classmethod
@@ -100,10 +108,20 @@ class RoutineEntryIn(BaseModel):
 class RoutineEntryPatch(BaseModel):
     ended_at: date | None = None
     slots: list[Literal["am", "pm"]] | None = None
+    # null: back to every day
+    schedule: Schedule | None = None
 
 
 def _entry_view(entry_id: str, doc: dict[str, Any]) -> dict[str, Any]:
-    return {"id": entry_id, **{k: iso(v) if isinstance(v, datetime) else v for k, v in doc.items()}}
+    view = {"id": entry_id, **{k: iso(v) if isinstance(v, datetime) else v for k, v in doc.items()}}
+    view.setdefault("schedule", None)
+    view.setdefault("updated_at", view.get("created_at"))
+    # The catalog packshot, linked where the brand already publishes it (never copied), so the
+    # routine shows product photos without a second request per product.
+    product = catalog.by_id(doc["product_id"]) if doc.get("product_id") else None
+    view["image_url"] = product.get("image_url") if product else None
+    view["image_source"] = product.get("image_source") if product else None
+    return view
 
 
 @router.get("/routine")
@@ -237,6 +255,7 @@ def add_routine_entry(
     doc["started_at"] = doc["started_at"] or datetime.now(UTC).date().isoformat()
     doc["ended_at"] = None
     doc["created_at"] = datetime.now(UTC)
+    doc["updated_at"] = doc["created_at"]
     entry_id = entry_id or f"r_{secrets.token_hex(4)}"
     store.routine_set(uid, entry_id, doc)
     return entry_id, doc
@@ -249,12 +268,14 @@ def routine_patch(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """Stop a product (ended_at) or move it between AM and PM. History is kept for the charts."""
+    """Stop a product (ended_at), move it between AM and PM, or change its schedule (every day,
+    every other day from an anchor, chosen weekdays). History is kept for the charts."""
     _check_entry_id(entry_id)
     doc = store.routine_get(user.uid, entry_id)
     if doc is None:
         raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
     doc.update(body.model_dump(mode="json", exclude_unset=True))
+    doc["updated_at"] = datetime.now(UTC)
     store.routine_set(user.uid, entry_id, doc)
     return _entry_view(entry_id, doc)
 
