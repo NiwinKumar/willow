@@ -213,6 +213,7 @@ class FirestoreStore:
         except (AlreadyExists, Conflict):
             return False
         return True
+
     def usage_get(self, uid: str, day: str) -> Doc:
         snap = self._db().document(f"users/{uid}/usage/{day}").get()
         return (snap.to_dict() or {}) if snap.exists else {}
