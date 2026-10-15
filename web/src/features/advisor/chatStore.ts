@@ -4,22 +4,23 @@
  *
  * The api answers in 10 to 30 s (api/app/advisor.py: tool loop, then a validated reply). The streaming route
  * sends honest progress events while it works (reading the context, asking Gemini, checking numbers) and the
- * checked reply at the end, never partial text; the client then reveals the finished text word by word (all
- * at once under reduced motion). If the stream can't be used, the plain endpoint answers the same question.
+ * checked reply at the end, never partial text; the client then reveals the finished answer block by block
+ * (all at once under reduced motion). If the stream can't be used, the plain endpoint answers the same question.
  * The conversation is stored on the account (newest 200 turns): it loads when the panel first opens for a
  * person, and "New chat" deletes it. "Stop waiting" only stops waiting: the api finishes, and it counts.
  */
 import { useSyncExternalStore } from 'react'
 
-import { ApiError, StreamUnavailable, api, type AdvisorHistoryMessage, type AdvisorReply, type AdvisorStage, type ChatImage, type StandardExplanation, type UsageCount } from '../../lib/api'
+import { ApiError, StreamUnavailable, api, type AdvisorHistoryMessage, type AdvisorReply, type AdvisorStage, type AnswerBlock, type ChatImage, type StandardExplanation, type UsageCount } from '../../lib/api'
 
 /** A photo attached to a question: what is sent, plus a local thumbnail for this tab only (never stored). */
 export type Attachment = ChatImage & { name: string; meta: string; thumb: string }
 
 export type ChatMessage =
   /** photos: attached on this tab (kept so "Try again" can resend them); photoCount: from the stored history. */
-  | { id: number; role: 'user'; text: string; context?: string; photos?: Attachment[]; photoCount?: number }
-  | { id: number; role: 'willow'; reply: AdvisorReply; words: string[]; shown: number }
+  | { id: number; role: 'user'; text: string; context?: string; photos?: Attachment[]; photoCount?: number; at: string }
+  /** blocks: the answer's blocks (one answer block from an older api); shown: how many are revealed so far. */
+  | { id: number; role: 'willow'; reply: AdvisorReply; blocks: AnswerBlock[]; shown: number; at: string }
   | { id: number; role: 'error'; title: string; body: string; question: string | null }
   | { id: number; role: 'note'; text: string }
   /** AI unavailable: the latest session's pre-written explanation (no Gemini, no new analysis). */
@@ -94,7 +95,7 @@ export function resetChat() {
   capDay = ''
   abort?.abort()
   abort = null
-  window.clearInterval(revealTimer)
+  window.clearTimeout(revealTimer)
   set(EMPTY)
 }
 
@@ -114,10 +115,15 @@ export async function refreshUsage() {
 }
 
 function fromHistory(m: AdvisorHistoryMessage): ChatMessage {
-  if (m.role === 'user') return { id: nextId++, role: 'user', text: m.text, photoCount: m.photos || undefined }
+  if (m.role === 'user') return { id: nextId++, role: 'user', text: m.text, photoCount: m.photos || undefined, at: m.created_at }
   const reply: AdvisorReply = { ...m.reply, remaining_today: state.remaining ?? 0 }
-  const words = reply.message.split(/\s+/).filter(Boolean)
-  return { id: nextId++, role: 'willow', reply, words, shown: words.length }
+  const blocks = blocksOf(reply)
+  return { id: nextId++, role: 'willow', reply, blocks, shown: blocks.length, at: m.created_at }
+}
+
+/** The answer's blocks; an older api's plain message is one answer block. */
+export function blocksOf(reply: AdvisorReply): AnswerBlock[] {
+  return reply.blocks?.length ? reply.blocks : [{ type: 'answer', text: reply.message }]
 }
 
 async function loadHistory(uid: string) {
@@ -164,7 +170,7 @@ export function ask(text: string, context?: string, images: Attachment[] = []) {
     if (!queued.some((x) => x.text === q)) queued.push({ text: q, context, images })
     return
   }
-  const user: ChatMessage = { id: nextId++, role: 'user', text: q, context, photos: images.length ? images : undefined }
+  const user: ChatMessage = { id: nextId++, role: 'user', text: q, context, photos: images.length ? images : undefined, at: new Date().toISOString() }
   // History the api understands: our questions and the answers that were shown, newest 20, ending with ours.
   const history = [...state.messages, user]
     .flatMap((m): { role: 'user' | 'willow'; text: string }[] => (m.role === 'user' ? [{ role: 'user', text: m.text }] : m.role === 'willow' ? [{ role: 'willow', text: m.reply.message.slice(0, 1000) }] : []))
@@ -220,28 +226,30 @@ export function ask(text: string, context?: string, images: Attachment[] = []) {
 
 function reveal(reply: AdvisorReply) {
   request = 0
-  const words = reply.message.split(/\s+/).filter(Boolean)
-  const msg: ChatMessage = { id: nextId++, role: 'willow', reply, words, shown: reduceMotion() ? words.length : 0 }
+  const blocks = blocksOf(reply)
+  const msg: ChatMessage = { id: nextId++, role: 'willow', reply, blocks, shown: reduceMotion() ? blocks.length : 1, at: new Date().toISOString() }
   const capped = reply.remaining_today <= 0
   if (capped) capDay = utcDay()
   const usage = state.usage ? { ...state.usage, remaining: reply.remaining_today, used: Math.min(state.usage.cap, state.usage.cap - reply.remaining_today) } : null
-  set({ messages: [...state.messages, msg], phase: msg.shown >= words.length ? 'idle' : 'revealing', thinkingSince: null, stages: [], aiDown: false, remaining: reply.remaining_today, usage, capMessage: capped ? 'That is all of today’s questions.' : state.capMessage })
+  set({ messages: [...state.messages, msg], phase: msg.shown >= blocks.length ? 'idle' : 'revealing', thinkingSince: null, stages: [], aiDown: false, remaining: reply.remaining_today, usage, capMessage: capped ? 'That is all of today’s questions.' : state.capMessage })
   if (!state.usage) void refreshUsage()
-  if (msg.shown >= words.length) return next()
-  const start = Date.now()
-  window.clearInterval(revealTimer)
-  revealTimer = window.setInterval(() => {
-    const last = state.messages.at(-1)
-    if (!last || last.id !== msg.id || last.role !== 'willow') return window.clearInterval(revealTimer)
-    // At least one word a tick, about one every 55 ms (the design's pace), whatever the frame rate.
-    const shown = Math.min(words.length, Math.max(last.shown + 1, Math.floor((Date.now() - start) / 55)))
-    const done = shown >= words.length
-    set({ messages: [...state.messages.slice(0, -1), { ...last, shown }], phase: done ? 'idle' : 'revealing' })
-    if (done) {
-      window.clearInterval(revealTimer)
-      next()
-    }
-  }, 42)
+  if (msg.shown >= blocks.length) return next()
+  // One block after another, each given time in proportion to what it says (the checked answer is already
+  // complete: this is only how it appears).
+  const step = (shown: number) => {
+    const prev = blocks[shown - 1]
+    const chars = prev.type === 'bullets' ? prev.items.join(' ').length : prev.type === 'answer' || prev.type === 'note' ? prev.text.length : 60
+    revealTimer = window.setTimeout(() => {
+      const last = state.messages.at(-1)
+      if (!last || last.id !== msg.id || last.role !== 'willow') return
+      const done = shown + 1 >= blocks.length
+      set({ messages: [...state.messages.slice(0, -1), { ...last, shown: shown + 1 }], phase: done ? 'idle' : 'revealing' })
+      if (done) next()
+      else step(shown + 1)
+    }, Math.min(900, Math.max(260, chars * 9)))
+  }
+  window.clearTimeout(revealTimer)
+  step(1)
 }
 
 function next() {
@@ -281,7 +289,7 @@ export function retry(messageId: number) {
 /** Start again: this tab's chat and the stored conversation on the account are both cleared. */
 export function newChat() {
   if (state.phase !== 'idle') return
-  window.clearInterval(revealTimer)
+  window.clearTimeout(revealTimer)
   queued = []
   set({ messages: [], aiDown: false })
   const who = owner
@@ -293,4 +301,14 @@ export function newChat() {
       if (who === owner) set({ messages: [{ id: nextId++, role: 'note', text: 'The saved conversation couldn’t be cleared just now; it may come back next time you open the advisor.' }, ...state.messages] })
     }
   })()
+}
+
+/** Ask the last question again for a fresh answer (it counts as a question). */
+export function regenerate() {
+  const i = state.messages.length - 1
+  const last = state.messages[i]
+  const prev = state.messages[i - 1]
+  if (state.phase !== 'idle' || last?.role !== 'willow' || prev?.role !== 'user' || state.capMessage) return
+  set({ messages: state.messages.slice(0, i - 1) })
+  ask(prev.text, prev.context, prev.photos)
 }
