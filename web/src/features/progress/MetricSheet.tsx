@@ -78,11 +78,12 @@ export function MetricSheet({ metric, session, baseline, sessions, onClose, onAs
             <TimelineChart
               points={series.points}
               baseIndex={series.baseIndex}
-              band={band}
+              // The band drawn around the chart's baseline (a former baseline's chart uses today's baseline).
+              band={series.band}
               format={series.format}
               unit={unit}
               highlight={highlight >= 0 ? highlight : null}
-              summary={`${label} across ${series.points.length} check-ins${band !== null ? `, normal range ${bandText(m, band)} around the baseline` : ', no normal range yet'}. This check-in: ${valueText(m)}.`}
+              summary={`${label} across ${series.points.length} check-ins${series.band !== null ? `, normal range ${bandText(m, series.band)} around the baseline` : ', no normal range yet'}. This check-in: ${valueText(m)}.`}
               caption={`${label} by check-in`}
             />
           </div>

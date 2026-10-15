@@ -4,7 +4,7 @@ import { ApiError, api, type RetailerAnswer } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { SimBadge } from './Sections'
-import { chartSources, cohortKind, lookupLabel, type Insights } from './data'
+import { chartSources, cohortKind, lookupLabel, MIN_GROUP, type Insights } from './data'
 
 /** Questions the aggregates can answer (needs, outcomes, gaps, conflicts, lift). */
 const SUGGESTIONS = ['Which products work best for dark spots?', 'Where are we missing affordable options?', 'Which routine problems are most common?', 'How do outcomes compare with non-users?']
@@ -175,7 +175,7 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
   const tag = checked ? `GEMINI · GROUNDED IN AGGREGATES · ${kind === 'real' ? 'REAL' : kind === 'mixed' ? 'MIXED' : 'SIMULATED'}` : 'NO NUMBERS RETURNED'
   const sources = chartSources(d, chart)
   const prov = checked
-    ? `SOURCE ${sources.length ? sources.join(' · ') : 'retailer aggregates'} · n≥10 · VALIDATOR: ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} found in the aggregates ✓${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model.toUpperCase()}`
+    ? `SOURCE ${sources.length ? sources.join(' · ') : 'retailer aggregates'} · n≥${MIN_GROUP} · VALIDATOR: ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} found in the aggregates ✓${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model.toUpperCase()}`
     : 'VALIDATOR: no draft used only numbers from the aggregates · no numbers returned'
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-3.5 animate-[wRise_.4s_both]" aria-busy={!done}>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { CaptureMode, Site } from '../../data/types'
@@ -41,10 +41,16 @@ export function AppShell() {
   const [params, setParams] = useSearchParams()
   const wide = useMediaQuery('(min-width: 900px)')
   const roomy = useMediaQuery('(min-width: 1280px)')
+  const phone = useMediaQuery('(max-width: 639px)')
   const [collapsed, setCollapsed] = useState(prefs.sidebarCollapsed)
   const [checkIn, setCheckIn] = useState<{ open: boolean; preset?: { site?: Site; mode?: CaptureMode } }>({ open: false })
   const [advisor, setAdvisor] = useState<{ open: boolean; ever: boolean; seed: AdvisorSeed | null }>({ open: false, ever: false, seed: null })
   const current = destinationOf(location.pathname)
+
+  // A new page starts at the top (a #anchor such as #spot-diary scrolls itself); query changes keep the scroll.
+  useEffect(() => {
+    if (!window.location.hash) window.scrollTo({ top: 0 })
+  }, [location.pathname])
   const me = identity(user)
 
   const openAdvisor = useCallback((text?: string, context?: string) => {
@@ -82,8 +88,9 @@ export function AppShell() {
   // N opens Check in (as drawn on the sidebar); Esc closes the advisor.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
-      if ((e.key === 'n' || e.key === 'N') && data.mode === 'live' && !checkIn.open && !window.location.pathname.startsWith('/check-in')) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Esc closes the advisor even from its own question field; N never fires while typing.
+      if ((e.key === 'n' || e.key === 'N') && !typing(e.target) && data.mode === 'live' && !checkIn.open && !window.location.pathname.startsWith('/check-in')) {
         e.preventDefault()
         setCheckIn({ open: true })
       }
@@ -113,10 +120,16 @@ export function AppShell() {
   }
 
   const panelOpen = advisor.open && wide && roomy
+  // On phones the advisor covers the whole screen: the app behind it takes no focus or clicks.
+  const covered = advisor.open && phone
+  // The design pads the page around the sidebar (12px gutter + sidebar + 24px) and, when the advisor panel
+  // fits beside the content (≥1280px), around the panel too.
+  const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   return (
     <ShellContext.Provider value={api}>
-      <div className="relative min-h-dvh overflow-x-clip pb-[140px] lg:pb-10">
+      <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-10" style={pad}>
         <CanvasBlobs />
+        <div inert={covered || undefined}>
         <ModeBanner />
         {wide ? (
           <Sidebar
@@ -135,11 +148,12 @@ export function AppShell() {
         ) : (
           <Header current={current} name={me.short} initials={me.initials} />
         )}
-        <div className="relative z-[1] transition-[padding] duration-[450ms] ease-spring" style={{ paddingLeft: wide ? (collapsed ? 89 : 236) : 0, paddingRight: panelOpen ? 464 : 0 }}>
+        <div className="relative z-[1]">
           <Outlet />
         </div>
         {wide ? null : <Dock current={current} onCheckIn={() => setCheckIn({ open: true })} onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())} advisorOpen={advisor.open} />}
-        <AdvisorHost open={advisor.open} mounted={advisor.ever} wide={wide} onClose={closeAdvisor} seed={advisor.seed} />
+        </div>
+        <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} />
         {checkIn.open ? (
           <Suspense fallback={null}>
             <CheckInPicker open onClose={() => setCheckIn({ open: false })} preset={checkIn.preset} onStart={startCheckIn} />
@@ -150,28 +164,58 @@ export function AppShell() {
   )
 }
 
-/** The advisor's glass panel: right side on wide screens, full screen on phones. Mounted on first open, then kept. */
-function AdvisorHost({ open, mounted, wide, onClose, seed }: { open: boolean; mounted: boolean; wide: boolean; onClose: () => void; seed: AdvisorSeed | null }) {
-  const inset = wide ? 12 : 0
+/**
+ * The advisor's glass panel: a floating right panel from 640px, full screen on phones (as drawn). Mounted on
+ * first open, then kept. It slides fully out when closed and stays visible until the slide has finished.
+ * Focus moves into it on open and back to where it was on close.
+ */
+function AdvisorHost({ open, mounted, phone, onClose, seed }: { open: boolean; mounted: boolean; phone: boolean; onClose: () => void; seed: AdvisorSeed | null }) {
+  const panel = useRef<HTMLDivElement>(null)
+  const back = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    const el = panel.current
+    if (!el) return
+    if (open) {
+      back.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      // The panel content may still be loading (first open): focus the panel now and its composer once it is there.
+      el.focus({ preventScroll: true })
+      let tries = 0
+      const t = window.setInterval(() => {
+        const input = el.querySelector<HTMLElement>('textarea, input')
+        if (input && el.contains(document.activeElement)) input.focus({ preventScroll: true })
+        if (input || ++tries > 20) window.clearInterval(t)
+      }, 80)
+      return () => window.clearInterval(t)
+    }
+    // Closing makes the panel inert, which may already have dropped focus to <body>.
+    const a = document.activeElement
+    if (!a || a === document.body || el.contains(a)) back.current?.focus({ preventScroll: true })
+  }, [open])
+  const inset = phone ? 0 : 12
   return (
     <div
+      ref={panel}
       role="dialog"
       aria-label="Advisor"
+      aria-modal={phone || undefined}
       aria-hidden={!open}
       inert={!open}
-      className="fixed z-[45] flex flex-col overflow-hidden squircle backdrop-blur-[28px] backdrop-saturate-[1.5] transition-[translate,opacity] duration-[450ms] ease-spring"
+      tabIndex={-1}
+      className="fixed z-[45] flex flex-col overflow-hidden squircle outline-none backdrop-blur-[28px] backdrop-saturate-[1.5]"
       style={{
         top: inset,
         right: inset,
         bottom: inset,
-        width: wide ? 'min(440px, calc(100vw - 24px))' : '100vw',
-        borderRadius: wide ? 32 : 0,
+        width: phone ? '100vw' : 'min(440px, calc(100vw - 24px))',
+        borderRadius: phone ? 0 : 32,
         background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.92)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.75), 0 40px 80px -30px rgba(0,0,0,.4)',
-        translate: open ? '0 0' : wide ? '24px 0' : '0 40px',
+        translate: open ? '0 0' : phone ? '0 40px' : 'calc(100% + 24px) 0',
         opacity: open ? 1 : 0,
         visibility: open ? 'visible' : 'hidden',
         pointerEvents: open ? 'auto' : 'none',
+        // Hidden only after the slide out, so closing animates too.
+        transition: open ? 'translate .5s var(--ease-spring), opacity .3s ease, visibility 0s' : 'translate .45s var(--ease-spring), opacity .3s ease, visibility 0s linear .45s',
       }}
     >
       {mounted ? (

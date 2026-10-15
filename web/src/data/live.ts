@@ -34,6 +34,7 @@ export function toSession(v: SessionView): Session {
     live: true,
     measured: v.session.measured,
     baseline_ref: v.session.baseline,
+    sample_id: v.session.sample_id ?? null,
   }
 }
 

@@ -43,7 +43,13 @@ export function statusText(t: SpotTrack, d: Diary): string {
   return `${STATUS_SHAPE[t.status].word} · visible at least ${nd(v.at_least)}${t.there_from_start ? ', there from the first photo' : ''}`
 }
 
-/** Tag on the photo: "New" on its first sighting, else "Here since day N". */
-export function tagText(t: SpotTrack, sessionIndex: number): string {
-  return sessionIndex === t.first_seen_index ? 'New' : `Here since day ${t.first_seen_index + 1}${t.status === 'fading' ? ' · fading' : ''}`
+/**
+ * Tag on the photo: "New" on its first sighting, else "Here since 14 Oct". The date, not "day N": the diary
+ * can hold several photos a day, so a photo's place in the list is not a day count.
+ */
+export function tagText(t: SpotTrack, sessionIndex: number, d: Diary): string {
+  if (sessionIndex === t.first_seen_index && !t.there_from_start) return 'New'
+  const first = d.sessions[t.first_seen_index]
+  const since = t.there_from_start ? 'Here from the first photo' : first ? `Here since ${fmtDate(first.created_at)}` : 'Seen before'
+  return `${since}${t.status === 'fading' ? ' · fading' : ''}`
 }

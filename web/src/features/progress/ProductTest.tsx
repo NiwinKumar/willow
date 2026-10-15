@@ -11,10 +11,10 @@ import { WillowLoader } from '../../components/willow/WillowLoader'
 import { matchControl } from '../../data/live'
 import type { CaptureMode, Metric, Session } from '../../data/types'
 import { useData } from '../../data/useData'
-import { fmtDate, fmtHours } from '../../lib/format'
+import { fmtDate, fmtHours, parseDate } from '../../lib/format'
 import { fmtSigned, fmtValue } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
-import { MODE_LABEL, baselineFor, metricOf, sessionState } from './model'
+import { MODE_LABEL, baselineFor, dayOf, metricOf, sessionState } from './model'
 import { Crumb, Page, Pills } from './parts'
 
 const isMode = (v: string | null): v is CaptureMode => v === 'calibrated_raw' || v === 'uncalibrated'
@@ -93,12 +93,14 @@ export default function ProductTest() {
   const tb = metricOf(tBase, 'tone_ita')
   const cb = metricOf(cBase, 'tone_ita')
   const isBase = sessionState(current) === 'baseline'
-  const dayN = tBase ? Math.max(0, Math.floor((new Date(current.created_at).getTime() - new Date(tBase.created_at).getTime()) / 86_400_000)) : 0
+  // Calendar days in the person's own time zone: a baseline at 21:00 and a check-in at 08:00 next morning is day 1.
+  const daysSince = (s: Session, base: Session) => Math.max(0, Math.round((parseDate(dayOf(s)).getTime() - parseDate(dayOf(base)).getTime()) / 86_400_000))
+  const dayN = tBase ? daysSince(current, tBase) : 0
   const res = t && !isBase ? compare(t, c, tb, cb) : null
   const fm: Pick<Metric, 'unit' | 'mdc95'> = { unit: 'deg', mdc95: tb?.mdc95 ?? t?.mdc95 ?? 1 }
 
   // Chart: every treated check-in in this mode, with the control taken within 3 hours of it.
-  const when = (s: Session) => (s.hours_since_baseline !== undefined ? fmtHours(s.hours_since_baseline).replace('Baseline', 'BASE').toUpperCase() : tBase ? `DAY ${Math.max(0, Math.floor((new Date(s.created_at).getTime() - new Date(tBase.created_at).getTime()) / 86_400_000))}` : fmtDate(s.created_at).toUpperCase())
+  const when = (s: Session) => (s.hours_since_baseline !== undefined ? fmtHours(s.hours_since_baseline).replace('Baseline', 'BASE').toUpperCase() : tBase ? `DAY ${daysSince(s, tBase)}` : fmtDate(s.created_at).toUpperCase())
   const tv = treated.map((s) => metricOf(s, 'tone_ita')?.value ?? null)
   const cv = treated.map((s) => metricOf(matchControl(s, controlAll), 'tone_ita')?.value ?? null)
   const labels = treated.map(when)

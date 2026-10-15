@@ -32,7 +32,8 @@ const listeners = new Set<() => void>()
 let nextId = 1
 let request = 0 // the request whose answer we are waiting for; 0 = not waiting
 let revealTimer = 0
-let queued: { text: string; context?: string } | null = null
+// Questions asked while an answer is on its way (from Home, Routine or a result), in order; none is dropped.
+let queued: { text: string; context?: string }[] = []
 let tokenFn: (() => Promise<string>) | null = null
 let lastSeed: unknown = null
 let capDay = ''
@@ -53,9 +54,25 @@ export function useChat(): ChatState {
   )
 }
 
-/** The panel hands over how to get a token (it can change after sign-in). */
-export function setTokenSource(fn: () => Promise<string>) {
+/** Whose chat this is: a different person signed in on this tab (sign-out, Google switch, delete) starts empty. */
+let owner: string | null = null
+
+/** The panel hands over how to get a token (it can change after sign-in) and whose chat it is. */
+export function setTokenSource(fn: () => Promise<string>, uid: string | null) {
   tokenFn = fn
+  if (uid !== owner) {
+    owner = uid
+    resetChat()
+  }
+}
+
+/** Forget the conversation entirely (sign-out, delete my data): an answer still on its way is dropped. */
+export function resetChat() {
+  request = 0
+  queued = []
+  capDay = ''
+  window.clearInterval(revealTimer)
+  set({ messages: [], phase: 'idle', remaining: null, capMessage: null, thinkingSince: null })
 }
 
 /** A shell seed is asked once, even if the panel remounts with the same seed object. */
@@ -78,14 +95,14 @@ function errorFor(e: unknown): { title: string; body: string; retry: boolean } {
   return { title: 'Willow couldn’t be reached.', body: 'Check your connection. If the question reached the advisor before the connection dropped, it may have counted.', retry: true }
 }
 
-/** Ask a question. While an answer is on its way, the newest ask waits its turn (one at a time). */
+/** Ask a question. While an answer is on its way, later asks wait their turn (one at a time, in order). */
 export function ask(text: string, context?: string) {
   const q = text.trim().slice(0, 1000)
   // The api's daily limit resets with the UTC day: a new day lifts the lock.
   if (state.capMessage && capDay !== utcDay()) set({ capMessage: null, remaining: null })
   if (!q || state.capMessage) return
   if (state.phase !== 'idle') {
-    queued = { text: q, context }
+    if (!queued.some((x) => x.text === q)) queued.push({ text: q, context })
     return
   }
   const user: ChatMessage = { id: nextId++, role: 'user', text: q, context }
@@ -94,11 +111,13 @@ export function ask(text: string, context?: string) {
     .flatMap((m): { role: 'user' | 'willow'; text: string }[] => (m.role === 'user' ? [{ role: 'user', text: m.text }] : m.role === 'willow' ? [{ role: 'willow', text: m.reply.message.slice(0, 1000) }] : []))
     .slice(-20)
   const mine = ++request
+  const who = owner
   set({ messages: [...state.messages, user], phase: 'thinking', thinkingSince: Date.now() })
   void (async () => {
     try {
       if (!tokenFn) throw new Error('not signed in')
       const reply = await api.advisorChat(await tokenFn(), history)
+      if (who !== owner) return // asked by the person before (signed out since)
       // Stopped waiting: the answer still counted, so keep its usage, not its text.
       if (mine !== request) {
         set({ remaining: reply.remaining_today })
@@ -110,6 +129,7 @@ export function ask(text: string, context?: string) {
       request = 0
       if (e instanceof ApiError && e.status === 429 && e.code === 'daily_limit') {
         capDay = utcDay()
+        queued = []
         set({ phase: 'idle', thinkingSince: null, remaining: 0, capMessage: e.message })
         return
       }
@@ -145,8 +165,7 @@ function reveal(reply: AdvisorReply) {
 }
 
 function next() {
-  const q = queued
-  queued = null
+  const q = queued.shift()
   if (q) ask(q.text, q.context)
 }
 
@@ -163,7 +182,7 @@ export function showAll() {
 export function stopWaiting() {
   if (state.phase !== 'thinking') return
   request = 0
-  queued = null
+  queued = []
   set({
     phase: 'idle',
     thinkingSince: null,
@@ -186,6 +205,6 @@ export function retry(errorId: number) {
 export function newChat() {
   if (state.phase !== 'idle') return
   window.clearInterval(revealTimer)
-  queued = null
+  queued = []
   set({ messages: [] })
 }

@@ -95,7 +95,7 @@ export function TimelineChart({
         {base !== null ? (
           <>
             <text x={578} y={hasBand ? g.Y(base - band) + 16 : baseY + 20} textAnchor="end" fill={hasBand ? 'var(--aura-lilac)' : 'var(--action-primary)'} fontSize={10} fontFamily={MONO} letterSpacing=".04em">
-              {hasBand ? `NORMAL RANGE ±${format(band)}` : 'NO NORMAL RANGE YET'}
+              {hasBand ? `NORMAL RANGE ±${format(band)}${unit === '°' ? '°' : unit ? ` ${unit.toUpperCase()}` : ''}` : 'NO NORMAL RANGE YET'}
             </text>
             <line x1={64} x2={580} y1={baseY} y2={baseY} stroke="#fff" strokeOpacity={0.4} strokeDasharray="2 6" />
           </>

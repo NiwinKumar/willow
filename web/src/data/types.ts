@@ -123,6 +123,8 @@ export type Session = {
   measured?: boolean | null
   /** Live: the baseline this session is compared with (same site and capture mode). */
   baseline_ref?: { session_id: string; frames: number | null; has_noise_band: boolean } | null
+  /** Live: the hosted sample these photos were copied from (judge sample runs), else null. */
+  sample_id?: string | null
 }
 
 export type SiteSeries = { site: Site; sessions: Session[] }

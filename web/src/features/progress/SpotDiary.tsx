@@ -61,6 +61,10 @@ export function SpotDiary({
   const cols = sess.slice(-(phone ? 4 : 6))
   const lastSess = sess[sess.length - 1]
   const doneToday = Boolean(lastSess && isToday(lastSess.created_at))
+  // The api starts the diary at 3 usable photos over 2 or more days (enough_data); say what is still missing.
+  const photoDays = new Set(sess.map((x) => new Date(x.created_at).toDateString())).size
+  const startsWhen =
+    photoDays < 2 && sess.length >= 2 ? 'Spot diary starts tomorrow' : photoDays >= 2 && sess.length < 3 ? 'Spot diary starts with your next photo' : 'Spot diary starts on day 3'
 
   const title = ready && d ? `Your spots over ${nd(Math.max(1, Math.round(d.days_covered)))}` : first ? 'Your spot diary' : 'Your spots'
   const sub =
@@ -132,7 +136,7 @@ export function SpotDiary({
           }}
         >
           <div className="flex flex-col items-start gap-4">
-            <h3 className="m-0 font-serif text-[clamp(25px,2.86vw,36px)] leading-[.95] font-normal">Spot diary starts on day 3</h3>
+            <h3 className="m-0 font-serif text-[clamp(25px,2.86vw,36px)] leading-[.95] font-normal">{startsWhen}</h3>
             <p className="m-0 max-w-[440px] text-[16px] leading-[1.55]">Take a face photo each day in the same place and light. From the third photo on a second day, Willow shows which spots are new, which are fading and which have gone.</p>
             {doneToday ? (
               <span className="flex min-h-[52px] items-center rounded-pill bg-white/60 px-6 text-[15px] text-ink-2">✓ Done for today</span>
