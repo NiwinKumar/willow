@@ -26,7 +26,7 @@ function outcomes(view: SessionView): string[] {
   const r = view.result
   const n = view.session.n_frames
   if (view.session.measured === false || !r) {
-    return [`${n} ${n === 1 ? 'photo' : 'photos'} received and saved`, `${SITE_LABEL[view.session.site]} is not measured yet`, 'Nothing measured, so no numbers', 'Nothing to explain']
+    return [`${n} ${n === 1 ? 'photo' : 'photos'} received and saved`, `${SITE_LABEL[view.session.site]} was not measured this time`, 'Nothing measured, so no numbers', 'Nothing to explain']
   }
   const q = r.quality
   const quality = q.passed ? `${r.frames_used} of ${n} ${n === 1 ? 'photo' : 'photos'} passed the quality check` : (failureReasons(r)[0] ?? 'Photo quality too low to compare')
@@ -36,7 +36,9 @@ function outcomes(view: SessionView): string[] {
     r.capture_mode === 'uncalibrated'
       ? 'Phone photo, no colour reference: results are a trend'
       : q.card_detected
-        ? `Colour card found${q.card_delta_e_mean != null ? `, ΔE ${q.card_delta_e_mean.toFixed(1)}` : ''}`
+        ? q.reasons.includes('card_delta_e_high')
+          ? 'Colour card found, but its colours read off'
+          : 'Colour card found and its colours checked'
         : paper
           ? 'Colours corrected with the white paper'
           : 'No colour reference found: colours not corrected'
@@ -62,9 +64,9 @@ function outcomes(view: SessionView): string[] {
 async function analyzeOnce(token: string, sessionId: string): Promise<SessionView> {
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
   let current = await api.getSession(token, sessionId)
-  // Up to ~5.5 min: a run in another tab (or before a reload) gets the api's full window
-  // (STALE_PROCESSING is 5 min) before this one may start it again.
-  for (let i = 0; current.session.status === 'processing' && i < 110; i++) {
+  // Up to ~6.3 min: a run in another tab (or before a reload) gets the api's full window
+  // (STALE_PROCESSING is 6 min) before this one may start it again.
+  for (let i = 0; current.session.status === 'processing' && i < 125; i++) {
     await wait(3000)
     current = await api.getSession(token, sessionId)
   }
@@ -118,7 +120,7 @@ export function Processing() {
     if (!scripted) return
     const timers = LABELS.map((_, i) => window.setTimeout(() => setDone(i + 1), step * (i + 1)))
     const finish = window.setTimeout(() => {
-      if (demoSeries) navigate(`/s/${site}?demo=1&t=${demoLast}&layer=1${site === 'face_full' ? '&m=pigment_spots' : '&m=tone_ita'}`, { replace: true })
+      if (demoSeries) navigate(`/s/${site}?demo=1&t=${demoLast}&layer=1${site === 'face_full' ? '&m=pigment_spots' : '&m=tone_ita'}`, { replace: true, state: { fromProcessing: true } })
     }, step * (LABELS.length + 1))
     return () => {
       timers.forEach(clearTimeout)
@@ -176,7 +178,7 @@ export function Processing() {
     const t = window.setTimeout(() => {
       const series = data.series(site)
       const index = series ? series.sessions.filter((s) => s.status === 'done').findIndex((s) => s.id === view.session.id) : -1
-      navigate(`/s/${view.session.site}${index >= 0 ? `?t=${index}` : ''}`, { replace: true })
+      navigate(`/s/${view.session.site}${index >= 0 ? `?t=${index}` : ''}`, { replace: true, state: { fromProcessing: true } })
     }, reduce ? 200 : 700)
     return () => clearTimeout(t)
   }, [scripted, view, done, data, site, navigate, reduce])
@@ -239,7 +241,7 @@ export function Processing() {
         {unmeasured && done >= LABELS.length ? (
           <div className="mt-6 space-y-3">
             <p className="text-[15px] text-text-2">
-              Willow measures face and forearm photos today. {SITE_LABEL[view!.session.site]} measurement is still being built, so this session has no numbers. Your photos are kept and can be measured when it is ready.
+              {SITE_LABEL[view!.session.site]} photos were not measured this time, so this session has no numbers. Your photos are kept and can be measured later.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => navigate('/capture?site=face_full&mode=quick')}>Take a face photo</Button>
@@ -264,6 +266,16 @@ export function Processing() {
                   Try again
                 </Button>
               )}
+            </div>
+          </div>
+        ) : null}
+        {scripted && !demoSeries && done >= LABELS.length ? (
+          // The sample journey has no session for this place: never leave the replay stuck here.
+          <div className="mt-6 space-y-3">
+            <p className="text-[15px] text-text-2">The sample journey has no {SITE_LABEL[site]?.toLowerCase() ?? 'photos for this place'} sessions to open.</p>
+            <div className="flex flex-wrap gap-3">
+              {data.mode === 'demo' && data.sites.length ? <Button onClick={() => navigate(`/s/${data.sites[0]}?demo=1`, { replace: true })}>See the sample journey</Button> : null}
+              <Button variant={data.mode === 'demo' && data.sites.length ? 'secondary' : 'primary'} onClick={() => navigate('/capture?site=face_full&mode=quick')}>Take your own photo</Button>
             </div>
           </div>
         ) : null}

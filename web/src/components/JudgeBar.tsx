@@ -3,12 +3,14 @@ import { Link, useLocation } from 'react-router-dom'
 
 import { useData } from '../data/useData'
 import { JUDGE_STOPS } from '../lib/judge'
+import { useAuth } from '../lib/useAuth'
 import { useJudge } from '../lib/useJudge'
 
 /** While the judge tour is on, a slim bar back to the stops (replaces the demo bar). */
 export function JudgeBar() {
   const tour = useJudge()
   const data = useData()
+  const { user } = useAuth()
   const { pathname } = useLocation()
   if (!tour.on || pathname === '/judge') return null
   return (
@@ -17,7 +19,7 @@ export function JudgeBar() {
         <ArrowLeft size={16} aria-hidden /> Judge tour
       </Link>
       <span className="truncate text-right">
-        {data.mode === 'demo' ? (data.demoSource === 'real' ? "Our team's measured test · " : 'Illustrative sample journey · ') : 'Live, in your guest account · '}
+        {data.mode === 'demo' ? (data.demoSource === 'real' ? "Our team's measured test · " : 'Illustrative sample journey · ') : user && !user.isAnonymous ? 'Live, in your Google account · ' : 'Live, in your guest account · '}
         {tour.seen.length} of {JUDGE_STOPS.length} stops
       </span>
     </div>

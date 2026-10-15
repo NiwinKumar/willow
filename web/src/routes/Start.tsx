@@ -19,7 +19,7 @@ const cards = [
     icon: FlaskConical,
     title: 'How we measure',
     body: 'Classical image analysis measures colour, spots, redness and texture against your own earlier photos. An AI assistant explains results and only repeats numbers we measured. It never guesses a skin age, score or diagnosis.',
-    more: 'Every number comes from computer vision on your own photos: on the forearm a white reference (plain paper or a colour card) corrects the colour of the light, pen dots or face landmarks pick the regions, and five reference photos give your personal noise band. Phone and face photos use the camera’s own colour, so they are shown as trends. Gemini writes the explanation from those numbers; any digit it invents is rejected before you see it.',
+    more: 'Every number comes from computer vision on your own photos: on the forearm a white reference (plain paper or a colour card) corrects the colour of the light, pen dots or face landmarks pick the regions, and a baseline of five photos (at least three must pass) gives your personal noise band. Phone and face photos use the camera’s own colour, so they are shown as trends. Gemini writes the explanation from those numbers; any digit it invents is rejected before you see it.',
   },
   {
     id: 'medical',

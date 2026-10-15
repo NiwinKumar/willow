@@ -32,8 +32,16 @@ def _signed(x: float | int) -> str:
     return s if s.startswith("-") or s == "0" else f"+{s}"
 
 
+# The app's names where they differ from the engine's labels (web/src/lib/metrics.ts)
+APP_LABEL = {"dark_circles": "Under-eye", "tone_ita": "Skin tone (ITA°)"}
+
+
+def label_of(metric: dict[str, Any]) -> str:
+    return APP_LABEL.get(metric["id"], metric["label"])
+
+
 def item(metric: dict[str, Any]) -> dict[str, Any]:
-    label = metric["label"]
+    label = label_of(metric)
     verdict = metric["verdict"]
     delta, mdc = metric.get("delta"), metric.get("mdc95")
     trend = " (trend only)" if metric["confidence"] == "indicative" else ""
@@ -51,7 +59,7 @@ def item(metric: dict[str, Any]) -> dict[str, Any]:
     elif delta is not None and mdc is not None:
         quoted = [_signed(delta), _num(mdc)]
         words = "a real change" if verdict == "real_change" else "within normal photo variation"
-        summary = f"{label}: {words}{trend} (change {quoted[0]}, noise threshold {quoted[1]})."
+        summary = f"{label}: {words}{trend} (change {quoted[0]}, noise band ±{quoted[1]})."
     elif delta is not None:
         quoted = [_signed(delta)]
         summary = f"{label}: no clear change yet{trend} (change {quoted[0]})."
@@ -65,6 +73,10 @@ RETAKE = {
     "straight into the camera.",
     "forearm_treated": "Retake with all four pen dots in view and white paper beside the arm.",
     "forearm_control": "Retake with all four pen dots in view and white paper beside the arm.",
+    "cheek_macro": "Retake with the phone about 10 cm from your cheek, one eye still in the photo, "
+    "facing a window or lamp.",
+    "nose_macro": "Retake with the phone about 10 cm from your nose, one eye still in the photo, "
+    "facing a window or lamp.",
 }
 RETAKE_DEFAULT = "Retake in the same light, holding the phone steady."
 
@@ -126,14 +138,15 @@ def _claims_change(text: str) -> bool:
 INSTRUCTIONS = """Explain one skin-measurement session to the person, in plain calm words.
 Rules:
 - Use only the metrics given. Quote numbers exactly as given (value, delta, mdc95, days); never
-  compute new numbers, percentages or estimates.
+  compute new numbers, percentages or estimates. Never quote dates or photo numbers ("photo 3").
 - verdict real_change: say it changed beyond normal photo variation, with the delta and the noise
-  threshold (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
+  band (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
   shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
   this is the first reading. low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
-- With frames_used of 2 or more, blemishes and dark spots count only marks seen in at least two
-  of the photos (one photo's grain or a stray hair does not count); say so if the count is low.
+- Face sessions (site face_full) with frames_used of 2 or more: blemishes and dark spots count
+  only marks seen in at least two of the photos; say so if the count is low. Close-ups (cheek_macro,
+  nose_macro) average each photo's own count. Pores and texture come only from close-ups.
 - Never attribute causation with certainty; at most "may be linked to" a routine product, and only
   if it started before this session.
 - Skin tone (tone_ita) is descriptive: never better or worse, never lighter or darker as a goal.
@@ -225,7 +238,7 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
         "metrics": [
             {
                 "id": m["id"],
-                "label": m["label"],
+                "label": label_of(m),
                 "verdict": m["verdict"],
                 "direction": m["direction"],
                 "confidence": m["confidence"],
@@ -239,9 +252,50 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
     }
 
 
+# Direction words: an item may not contradict the measured direction (an "increase" for a
+# delta that went down). "more" / "less" are left out: "more even" is not a direction claim.
+UP_WORDS = re.compile(r"\b(increas\w*|rose|risen|higher|went up|up by|gone up)\b", re.I)
+DOWN_WORDS = re.compile(
+    r"\b(decreas\w*|fell|fallen|lower|went down|down by|gone down|dropped|drop of)\b", re.I
+)
+SIGNED = re.compile(r"(?<![\d\w])([+\-−])\s?(\d+(?:[.,]\d+)?)")  # not a range: "1-2 weeks"
+# Comparisons and scale explanations are not direction claims: "lower than the noise band",
+# "the band is higher than the change", "lower values mean smoother skin".
+COMPARATIVE = re.compile(r"\b(higher|lower)\s+(than|is|means?|values?|numbers?|scores?)\b", re.I)
+
+
+def _allowed(data: dict[str, Any]) -> set[str]:
+    """Numbers Gemini may quote: the metrics' own, the photo count, the days since the
+    baseline and product names ("Retinol 0.3%"). Never dates: "2026-10-01" would let 10, 1
+    and 2026 through as made-up day counts."""
+    out = numbers.collect(data["metrics"]) | numbers.collect(data.get("frames_used"))
+    out |= numbers.collect(data.get("days_since_baseline"))
+    for r in data.get("routine") or []:
+        out |= numbers.in_text(r.get("product") or "")
+    return out
+
+
+def _direction_problem(summary: str, metric: dict[str, Any]) -> str | None:
+    """A delta quoted with the wrong sign, or words that contradict the measured direction."""
+    delta = metric.get("delta")
+    if not delta:
+        return None
+    shown = numbers.collect(abs(float(delta)))
+    for sign, digits in SIGNED.findall(summary):
+        quoted_negative = sign in "-−"
+        if digits.replace(",", ".") in shown and quoted_negative != (float(delta) < 0):
+            return f"wrong sign for {metric['id']}: {summary}"
+    plain = COMPARATIVE.sub(" ", summary)
+    up, down = UP_WORDS.search(plain), DOWN_WORDS.search(plain)
+    if (float(delta) < 0 and up and not down) or (float(delta) > 0 and down and not up):
+        return f"direction contradicts the delta for {metric['id']}: {summary}"
+    return None
+
+
 def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
-    allowed = numbers.collect(data)
+    allowed = _allowed(data)
     verdicts = {m["id"]: m["verdict"] for m in data["metrics"]}
+    by_id = {m["id"]: m for m in data["metrics"]}
     found = []
     texts = [exp.headline, *exp.next_steps, *(i.summary for i in exp.items)]
     for text in texts:
@@ -254,6 +308,8 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"unknown metric {item.metric_id}")
         elif verdicts[item.metric_id] != "real_change" and _claims_change(item.summary):
             found.append(f"change language for {item.metric_id} ({verdicts[item.metric_id]})")
+        elif issue := _direction_problem(item.summary, by_id[item.metric_id]):
+            found.append(issue)
     if not any(v == "real_change" for v in verdicts.values()) and _claims_change(exp.headline):
         found.append("change language in headline")
     return found
@@ -278,7 +334,9 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
                 instructions=INSTRUCTIONS,
                 temperature=0.3,
                 max_output_tokens=4096,
-                attempts=2,  # a pause and one more try on a rate limit or a slow answer
+                # the loop is the retry (GEMINI_SPEC: retry once): two calls at most, so with
+                # the engine the analysis stays well inside Cloud Run's 300 s
+                attempts=1,
                 timeout_ms=35_000,
             )
         except gemini.GeminiError:

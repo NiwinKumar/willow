@@ -238,10 +238,13 @@ def _no_face(srgb8: np.ndarray, site: str) -> dict:
 
 
 def _front_camera(path: str) -> bool:
-    """A selfie-camera photo (from its lens EXIF): it cannot be a macro shot."""
+    """A photo that cannot be a macro shot: a selfie camera (lens EXIF), or no camera EXIF at
+    all (the web app's camera saves a canvas JPEG, always the front camera). Only a camera
+    photo with its EXIF, or a DNG, may fall back to the assumed macro scale."""
     if Path(path).suffix.lower() == ".dng":
         return False
-    return "front" in (load_photo_srgb8(path)[1].lens or "").lower()  # already decoded once
+    info = load_photo_srgb8(path)[1]  # already decoded once
+    return "front" in (info.lens or "").lower() or not (info.camera or info.lens)
 
 
 def _frame(path: str, site: str) -> dict:
@@ -418,7 +421,8 @@ def analyze_macro(
         # indicative; pores and texture are measured when the mm scale is (the iris, or a
         # calibrated close-up), and texture drops to indicative when its noise band is over
         # 25% of its value
-        measured = metric_id in SCALE_METRICS and bool(have) and _scale_known(have[0])
+        # every photo's scale known: a mix (one with an eye in view, one without) is a trend
+        measured = metric_id in SCALE_METRICS and bool(have) and all(map(_scale_known, have))
         if metric_id == "texture" and summary["mdc95"] is not None and summary["value"]:
             measured &= summary["mdc95"] <= config.TEXTURE_MAX_MDC_FRAC * abs(summary["value"])
         metrics.append(

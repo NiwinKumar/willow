@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
-
-import { api, type DemoStatus } from '../lib/api'
+import { type DemoStatus } from '../lib/api'
+import { useDemoStatus } from '../lib/useDemoStatus'
 
 /** checked: pinged live by the api; otherwise only its configuration is shown. */
 type Row = { name: string; where: string; detail: string; ok: boolean | null; checked: boolean }
 
-function rows(s: DemoStatus | null): Row[] {
+function rows(s: DemoStatus | null, gaveUp: boolean): Row[] {
   const pending = s === null
   return [
     { name: 'Web app', where: 'Firebase Hosting + Firebase Auth', detail: 'you are on it', ok: true, checked: true },
@@ -17,7 +16,9 @@ function rows(s: DemoStatus | null): Row[] {
         s?.engine.status === 'ok'
           ? `v${s.engine.version}${s.engine.latency_ms ? (s.engine.latency_ms > 3000 ? ` · answered in ${Math.round(s.engine.latency_ms / 1000)} s (it was waking up)` : ` · answered in ${s.engine.latency_ms} ms`) : ''}`
           : s?.engine.status === 'waking'
-            ? 'waking up (it sleeps when idle); ready in a few seconds'
+            ? gaveUp
+              ? 'still waking up (it sleeps when idle); it starts on the first measurement'
+              : 'waking up (it sleeps when idle); checking again in a few seconds'
             : s
               ? 'not answering right now'
               : '',
@@ -40,22 +41,12 @@ function rows(s: DemoStatus | null): Row[] {
 
 /** Live check of every service behind the demo, from /v1/demo/status (cached a minute by the api). */
 export function SystemStatus() {
-  const [status, setStatus] = useState<DemoStatus | null>(null)
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    let alive = true
-    api
-      .demoStatus()
-      .then((s) => alive && setStatus(s))
-      .catch(() => alive && setFailed(true))
-    return () => {
-      alive = false
-    }
-  }, [])
+  // While the engine wakes, the status is asked again every 12 s (at most 4 times).
+  const { status, failed, waking, gaveUp } = useDemoStatus()
   return (
     <div>
       <ul className="divide-y divide-border border-y border-border" aria-busy={!status && !failed}>
-        {rows(status).map((r) => (
+        {rows(status, gaveUp).map((r) => (
           <li key={r.name} className="flex items-start gap-3 py-2.5">
             <span
               aria-hidden
@@ -68,7 +59,7 @@ export function SystemStatus() {
               </span>
               {r.detail ? <span className="block font-mono text-[12px] text-text-2">{r.detail}</span> : null}
             </span>
-            <span className="sr-only">{r.ok === null ? (failed ? 'status unknown' : 'checking') : r.ok ? 'running' : 'not responding'}</span>
+            <span className="sr-only">{r.ok === null ? (failed ? 'status unknown' : r.name === 'Measurement engine' && waking ? (gaveUp ? 'still waking up' : 'waking up, checking again') : 'checking') : r.ok ? 'running' : 'not responding'}</span>
           </li>
         ))}
       </ul>

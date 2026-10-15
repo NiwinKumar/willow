@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -7,6 +7,8 @@ import { Button } from '../components/Button'
 import { Chip } from '../components/Chip'
 import { Scrubber } from '../components/Scrubber'
 import { Stage } from '../components/Stage'
+import { peekDemo, pickDemo, subscribeDemo } from '../data/demoSource'
+import { groupBySite, sitesWithResults } from '../data/live'
 import { enterDemo, leaveDemo } from '../data/useData'
 import { authErrorText } from '../lib/authErrors'
 import { useAuth } from '../lib/useAuth'
@@ -14,8 +16,9 @@ import { fmtSigned, fmtValue } from '../lib/metrics'
 import { DEMO_SERIES } from '../mock/series'
 import { prefetchRoutes } from './lazy'
 
+const SAMPLE_TO = '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1'
 const entries = [
-  { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', eta: '~1 min', to: '/s/forearm_treated?demo=1&t=3&m=tone_ita&layer=1', demo: true },
+  { title: 'Explore a sample journey', sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Read-only.', eta: '~1 min', to: SAMPLE_TO, demo: true },
   { title: 'Run the pipeline on sample photos', sub: 'Real RAW photos, measured live in a guest account of your own.', eta: '~40 s', to: '/capture?sample=1', demo: false },
   { title: 'Measure your own skin', sub: 'A selfie, or a forearm with a phone or RAW photo. Your own baseline, really measured.', eta: '~2 min', to: '/capture?site=face_full&mode=quick', demo: false },
 ]
@@ -28,6 +31,16 @@ export function Landing() {
   const [i, setI] = useState(3)
   const [touched, setTouched] = useState(false)
   useEffect(() => prefetchRoutes(['Judge', 'Report', 'Capture', 'QuickCapture']), [])
+  // The sample entry says which journey it opens: the same pick demo mode will show.
+  const pick = useSyncExternalStore(subscribeDemo, peekDemo)
+  useEffect(() => void pickDemo(), [])
+  const realSites = useMemo(() => (pick?.source === 'real' ? sitesWithResults(groupBySite(pick.views)) : []), [pick])
+  const sample =
+    pick?.source === 'real'
+      ? { sub: "Our team's own photos, measured by the same engine as yours. Real data, read-only.", to: realSites.includes('forearm_treated') ? SAMPLE_TO : realSites[0] ? `/s/${realSites[0]}?demo=1` : SAMPLE_TO }
+      : pick?.source === 'illustrative'
+        ? { sub: 'A 4-day self-tanner split-arm test and a six-week face journey. Illustrative data, read-only.', to: SAMPLE_TO }
+        : null
   const session = series.sessions[i]
   const baseline = series.sessions[0]
   const tone = session.result!.metrics.find((m) => m.id === 'tone_ita')!
@@ -88,12 +101,12 @@ export function Landing() {
           <Link to="/judge" className="mt-6 flex min-h-11 items-center justify-between gap-3 rounded-(--radius-control) bg-text px-4 py-3 text-surface transition-opacity hover:opacity-90">
             <span>
               <span className="block text-[15px] font-semibold">Judging Willow? Take the guided tour</span>
-              <span className="block text-[13px] opacity-80">Five stops, all on live services. No sign-in.</span>
+              <span className="block text-[13px] opacity-80">Five stops: four run live, one replays a finished test. No sign-in.</span>
             </span>
             <span className="shrink-0 whitespace-nowrap font-mono text-[13px] opacity-80">~4 min</span>
           </Link>
           <div className="mt-3 flex flex-col gap-3">
-            {entries.map((e) => (
+            {entries.map((x) => (x.demo && sample ? { ...x, ...sample } : x)).map((e) => (
               <Button key={e.title} variant="secondary" className="flex-col items-start !py-3 text-left" onClick={() => go(e.to, e.demo)}>
                 <span className="flex w-full items-center justify-between">
                   <span className="font-semibold">{e.title}</span>
@@ -124,7 +137,7 @@ export function Landing() {
       </section>
 
       <p className="mt-12 text-[12px] text-text-3">
-        Cosmetic appearance tracking, not a medical device or diagnosis. Built on Firebase, Firestore, Cloud Run and Gemini on Vertex AI.
+        Cosmetic appearance tracking, not a medical device or diagnosis. Built on Firebase, Firestore, Cloud Run, BigQuery and Gemini on Vertex AI.
       </p>
     </div>
   )

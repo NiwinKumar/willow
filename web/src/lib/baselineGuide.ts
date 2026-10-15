@@ -9,6 +9,11 @@ import type { CaptureMode, Session, Site } from '../data/types'
 /** The sites a person should set a baseline for: the face, and both forearm squares for a product test. */
 export const BASELINE_SITES: Site[] = ['face_full', 'forearm_treated', 'forearm_control']
 
+/** Pores and texture are read only on a close-up: the "smoother" goal adds a cheek close-up baseline. */
+export function baselineSites(goals: string[]): Site[] {
+  return goals.includes('smoother') ? ['face_full', 'cheek_macro', 'forearm_treated', 'forearm_control'] : BASELINE_SITES
+}
+
 export type BaselineState = { state: 'set'; session: Session } | { state: 'saved' } | { state: 'none' }
 
 /** Whether a site has its baseline in this mode: set, saved but not measured yet (becomes the baseline once measured), or none. */
@@ -45,8 +50,8 @@ export function photoSteps(site: Site, mode: CaptureMode): { same: string; betwe
       }
     case 'macro':
       return {
-        same: 'Cone touching the skin on the same spot every time. A freckle or a pen dot helps you find it.',
-        between: 'Lift the cone off and set it back on the same spot.',
+        same: 'Phone about 10 cm (a hand’s width) from your face, the same side in the middle every time, with one eye still in the photo: Willow measures size from your iris. Face the light.',
+        between: 'Lower the phone and look away, then line up the same view again.',
       }
   }
 }
@@ -55,6 +60,6 @@ export const DONT_VARY = 'Keep the angle, distance and light the same on purpose
 export const WHY_FIVE = 'Willow compares the 5 photos to learn how much your photos differ on their own. Later, only a change bigger than that is called real.'
 
 /** Places still without a baseline in this mode, for a short nudge on the report. */
-export function missingBaselines(series: (site: Site) => { sessions: Session[] } | null, mode: CaptureMode): Site[] {
-  return BASELINE_SITES.filter((site) => baselineState(series(site)?.sessions ?? [], mode).state === 'none')
+export function missingBaselines(series: (site: Site) => { sessions: Session[] } | null, mode: CaptureMode, goals: string[] = []): Site[] {
+  return baselineSites(goals).filter((site) => baselineState(series(site)?.sessions ?? [], mode).state === 'none')
 }

@@ -50,7 +50,9 @@ def _macro(
         band = np.abs((yy - h * 0.3) - 0.2 * (xx - w * 0.2)) <= 0.03 * ppm
         lab[band & (xx > 0.2 * w) & (xx < 0.8 * w), 0] -= 20
     rgb = (np.clip(lab2rgb(lab), 0, 1) * 255 + 0.5).astype(np.uint8)
-    Image.fromarray(rgb).save(path, quality=97)
+    exif = Image.Exif()
+    exif[0x0110] = "iPhone 17 Pro"  # a camera photo: only these may use the assumed macro scale
+    Image.fromarray(rgb).save(path, quality=97, exif=exif)
     return n / area_cm2
 
 
@@ -168,3 +170,14 @@ def test_marks_at_the_region_edge_or_overlapping_are_cleaned():
     ]
     kept = _clean_marks(marks, skin, 10.0)
     assert [(m.x, m.y) for m in kept] == [(250, 250), (350, 350)]
+
+
+def test_a_web_camera_close_up_without_a_face_is_not_measured(tmp_path):
+    # the web app saves a canvas JPEG (no EXIF), always from the front camera: with no face in
+    # view there is no scale and no region, so nothing is measured (never a guessed 30 mm field)
+    _macro(tmp_path / "c.jpg")
+    Image.open(tmp_path / "c.jpg").save(tmp_path / "web.jpg", quality=97)  # EXIF dropped
+    r = analyze_macro([str(tmp_path / "web.jpg")], "cheek_macro")
+    assert r["quality"]["passed"] is False
+    assert "face_not_found" in r["quality"]["reasons"]
+    assert all(m["value"] is None for m in r["metrics"])

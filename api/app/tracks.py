@@ -13,6 +13,7 @@ Detection flickers between photos, so the rules are deliberately slow to conclud
   and a typical duration for a zone needs TRACK_MIN_FOR_TYPICAL marks that have faded.
 """
 
+from collections import Counter
 from datetime import datetime
 from statistics import median
 from typing import Any
@@ -101,12 +102,9 @@ def usable(result: dict[str, Any] | None) -> bool:
         return False
     if not (result.get("quality") or {}).get("passed") or not is_front(result):
         return False
-    cands = result.get("candidates") or []
-    # a session with no marks at all is still evidence that earlier ones are gone, but only
-    # from an engine that would have placed them
-    return any("face_x_mm" in (c.get("features") or {}) for c in cands) or (
-        not cands and _engine_at_least(result.get("engine_version"), (0, 3, 1))
-    )
+    # engine 0.3.1+ places every mark it can on the face map; a session with no marks (or
+    # only marks off the mesh) is still evidence that earlier ones are gone
+    return _engine_at_least(result.get("engine_version"), (0, 3, 1))
 
 
 def _engine_at_least(version: str | None, want: tuple[int, int, int]) -> bool:
@@ -209,10 +207,12 @@ def _summary(i: int, t: dict[str, Any], sessions: list[dict[str, Any]]) -> dict[
         gone_at = sessions[t["first_missing_index"]]["created_at"]
         visible = {"at_least": days(at[-1], t_first), "at_most": days(gone_at, t_first)}
     else:
-        visible = {"at_least": days(sessions[latest]["created_at"], t_first), "at_most": None}
+        # last seen, not the latest session: a spot missed last time is not "still" visible
+        visible = {"at_least": days(at[-1], t_first), "at_most": None}
     return {
         "id": f"t_{i + 1:03d}",
-        "zone": max(set(zones), key=zones.count) if zones else None,
+        # most sightings; a tie goes to the latest (the same answer on every server)
+        "zone": Counter(reversed(zones)).most_common(1)[0][0] if zones else None,
         "x_mm": round(x, 1),
         "y_mm": round(y, 1),
         "status": status,
