@@ -56,6 +56,7 @@ MIN_SD = {
     "dark_circles": 0.3,  # delta L*
     "shine": 0.02,  # % of T-zone (Oct 14: SD 0.017-0.023 on two sessions)
     "glow": 1.0,  # index (Oct 14: SD 1.8-2.7, mostly lighting)
+    "lines": 0.3,  # mm per cm2 (Oct 15: SD 0.27 on a 6-photo session of a young face)
     "pores": 2.0,  # per cm2 (one or two pores more or less in a ~1 cm2 field)
     "texture": 0.05,  # index
 }
@@ -302,6 +303,32 @@ SHINE_MIN_MM2 = 200.0  # T-zone skin needed for a value
 # Provisional weights: a 1 L* texture drop counts like a 5 L* brightness rise.
 GLOW_TEXTURE_MM = 0.5
 GLOW_TEXTURE_WEIGHT = 5.0
+# lines (docs/METRICS.md C1): dark valleys in L* / local skin L*, in the direction each
+# zone's lines run, at least LINES_MIN_LENGTH_MM long; value = mm of line per cm2
+LINES_MIN_PX_PER_MM = 4.0  # a 0.5 mm crease is 2 px: below this, no value
+LINES_WORK_PX_PER_MM = 10.0  # analysed at this scale
+LINES_SIGMAS_MM = (0.3, 0.6, 1.0)  # valley widths ~0.6-2 mm (fine lines to folds)
+LINES_BACKGROUND_MM = 3.0  # local skin lightness the depth is relative to
+LINES_MIN_DEPTH = 0.02  # scale-normalised curvature of L*/local L* (about 2% darker)
+LINES_MIN_ANISOTROPY = 2.0  # across-curvature this many x the along one (pores curve both)
+LINES_ANGLE_TOL_DEG = 25.0  # off the zone's direction by more: texture, hair
+LINES_MIN_LENGTH_MM = 3.0
+LINES_MAX_WIDTH_MM = 1.5  # mean width of a piece (area / length): wider is a blob
+LINES_SKELETON_PX = 1.15  # mean length of one skeleton pixel (straight 1, diagonal 1.41)
+LINES_EDGE_MM = 1.5  # left out along the skin's edge (hair, brow, lid edges)
+LINES_MARK_GAP_MM = 1.0  # and around blemishes and dark marks at least LINES_MARK_MIN_MM across
+LINES_MARK_MIN_MM = 2.0
+LINES_MIN_ZONE_MM2 = 30.0
+LINES_BROW_GAP_MM = 3.0  # forehead starts this far above the brows
+LINES_GLABELLA_RISE_MM = 8.0  # frown-line zone: inner brow ends up this far
+LINES_GLABELLA_WIDTH = 0.6  # share of the gap between the inner brow ends
+LINES_CROW_GAP_MM = 4.0  # crow's feet zone: from this far past the outer eye corner...
+LINES_CROW_LENGTH_MM = 10.0  # ...this far out...
+LINES_CROW_HALF_HEIGHT_MM = 8.0  # ...this far above and below the eye's axis
+LINES_FOLD_BAND_MM = (-2.0, 9.0)  # nasolabial zone: this far from the nose-wing-to-mouth line
+LINES_FOLD_PAST_MOUTH_MM = 5.0  # and past the mouth corner
+LINES_MAX_BROW_RAISE = 0.8  # browInnerUp: forehead skipped (raised brows crease it)
+LINES_MAX_EXPRESSION = 0.6  # squint / smile / frown: that zone skipped
 GLOW_MIN_MM2 = 100.0
 
 # Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's
