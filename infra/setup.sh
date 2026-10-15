@@ -83,3 +83,49 @@ echo "  4. Then: firebase use ${PROJECT_ID} && firebase deploy --only firestore:
 echo ">> After the engine is deployed (Thu), allow api to invoke it:"
 echo "  gcloud run services add-iam-policy-binding willow-engine --region=$REGION --member=serviceAccount:${API_SA} --role=roles/run.invoker"
 echo "Done."
+
+# ---- Check-in reminders: Web Push keys + Cloud Scheduler (Oct 15, api/app/reminders.py) ----
+# Not run by this script: copy the block into a shell from the repo root once willow-api exists.
+# Every step is safe to re-run (existing keys, accounts, bindings and the job are kept or updated).
+# Without it the api keeps working with push off (reminders by calendar only).
+#
+# PROJECT_ID=willow-511508; REGION=us-central1
+# API_URL="$(gcloud run services describe willow-api --region=$REGION --format='value(status.url)')"
+# API_SA="sa-api@${PROJECT_ID}.iam.gserviceaccount.com"
+# SCHED_SA="sa-scheduler@${PROJECT_ID}.iam.gserviceaccount.com"
+# gcloud services enable secretmanager.googleapis.com cloudscheduler.googleapis.com
+#
+# # 1. VAPID key pair, generated locally (never written to the repo), stored only in Secret Manager.
+# if ! gcloud secrets describe willow-vapid-private >/dev/null 2>&1; then
+#   KEYS="$(cd api && uv run python -c 'import base64; from cryptography.hazmat.primitives import serialization as s; from cryptography.hazmat.primitives.asymmetric import ec; k = ec.generate_private_key(ec.SECP256R1()); b = lambda x: base64.urlsafe_b64encode(x).rstrip(b"=").decode(); print(b(k.private_numbers().private_value.to_bytes(32, "big"))); print(b(k.public_key().public_bytes(s.Encoding.X962, s.PublicFormat.UncompressedPoint)))')"
+#   printf %s "$(sed -n 1p <<<"$KEYS")" | gcloud secrets create willow-vapid-private --replication-policy=user-managed --locations="$REGION" --data-file=-
+#   printf %s "$(sed -n 2p <<<"$KEYS")" | gcloud secrets create willow-vapid-public --replication-policy=user-managed --locations="$REGION" --data-file=-
+#   unset KEYS
+# fi
+#
+# # 2. The api reads both secrets.
+# for S in willow-vapid-private willow-vapid-public; do
+#   gcloud secrets add-iam-policy-binding "$S" --member="serviceAccount:${API_SA}" --role=roles/secretmanager.secretAccessor
+# done
+#
+# # 3. Mount them on willow-api (VAPID_SUBJECT and REMINDERS_AUDIENCE are in infra/api-env.yaml).
+# gcloud run services update willow-api --region="$REGION" \
+#   --update-secrets=VAPID_PRIVATE_KEY=willow-vapid-private:latest,VAPID_PUBLIC_KEY=willow-vapid-public:latest
+#
+# # 4. A service account for the scheduler, allowed to invoke willow-api.
+# gcloud iam service-accounts describe "$SCHED_SA" >/dev/null 2>&1 || \
+#   gcloud iam service-accounts create sa-scheduler --display-name="Willow reminder scheduler"
+# gcloud run services add-iam-policy-binding willow-api --region="$REGION" \
+#   --member="serviceAccount:${SCHED_SA}" --role=roles/run.invoker
+#
+# # 5. Every 15 minutes, POST /v1/internal/reminders with an OIDC token for that account. The api checks
+# #    the token's audience (REMINDERS_AUDIENCE) and email (SCHEDULER_SERVICE_ACCOUNT, default sa-scheduler).
+# JOB_ARGS=(--location="$REGION" --schedule="*/15 * * * *" --time-zone=Etc/UTC
+#   --uri="${API_URL}/v1/internal/reminders" --http-method=POST
+#   --oidc-service-account-email="$SCHED_SA" --oidc-token-audience="${API_URL}/v1/internal/reminders"
+#   --attempt-deadline=120s)
+# gcloud scheduler jobs create http willow-reminders "${JOB_ARGS[@]}" 2>/dev/null || \
+#   gcloud scheduler jobs update http willow-reminders "${JOB_ARGS[@]}"
+#
+# # Check: run it now and read the api's answer in the logs ("reminders run: {...}").
+# gcloud scheduler jobs run willow-reminders --location="$REGION"

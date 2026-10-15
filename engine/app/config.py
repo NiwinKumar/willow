@@ -56,6 +56,7 @@ MIN_SD = {
     "dark_circles": 0.3,  # delta L*
     "shine": 0.02,  # % of T-zone (Oct 14: SD 0.017-0.023 on two sessions)
     "glow": 1.0,  # index (Oct 14: SD 1.8-2.7, mostly lighting)
+    "lines": 0.3,  # mm per cm2 (Oct 15: SD 0.27 on a 6-photo session of a young face)
     "pores": 2.0,  # per cm2 (one or two pores more or less in a ~1 cm2 field)
     "texture": 0.05,  # index
 }
@@ -284,6 +285,30 @@ PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
 PREVIEW_QUALITY = 85
 UPLOAD_WORKERS = 8  # parallel GCS transfers (frames in, crops out)
 
+# Redness overlay (overlays/redness.png, engine 0.3.4): where the camera sees more red than
+# this person's own skin median, on the skin the redness metric measures (face: cheeks and
+# nose; cheek close-up: its skin). Descriptive only: it moves no number. Drawn at the size of
+# preview.jpg, pixel for pixel. The ramp runs from the skin's own median a* (clear) to its
+# OVERLAY_HIGH_PCT percentile, but over at least OVERLAY_MIN_SPAN_A a* units, so an even
+# face's camera noise is not stretched into a full-strength map.
+OVERLAY_SMOOTH_MM = 1.0  # Gaussian sigma: pores and grain out, a 3 mm red patch stays
+OVERLAY_HIGH_PCT = 98.0
+OVERLAY_MIN_SPAN_A = 4.0
+OVERLAY_ALPHA = (0.0, 0.7)  # opacity at the median (skin left as it is) and at the top
+# ramp colours in CIELAB (L*, a*, b*), interpolated in Lab so lightness falls evenly. Rose to
+# deep red, never a pale wash: skin at its own median is left untouched (a light tint over
+# skin would read as "lighter"), opacity carries how much redder
+OVERLAY_RAMP_LAB = ((80.0, 28.0, 22.0), (62.0, 50.0, 30.0), (45.0, 62.0, 28.0))
+OVERLAY_PNG_COMPRESSION = 3  # zlib level: transparent areas compress well even at 3
+
+# quality.per_frame[].regions (engine 0.3.4): which face region explains a failed check.
+# A region is named when its own test fails (exposure: its pixels over CLIPPED_PCT_MAX /
+# DARK_PCT_MAX; blur: sharpness under the face threshold AND under REGION_BLUR_REL x the
+# median region's; hand: it covers REGION_HAND_FRAC of the region); "whole" when every
+# region fails it or none stands out.
+REGION_BLUR_REL = 0.4
+REGION_HAND_FRAC = 0.25
+
 # Hands on the face (MediaPipe hand landmarker; models/hand_landmarker.task). Oct 14 on 48
 # test photos: at 0.2 confidence the only detections were a real hand and two specks a
 # few px across; specks are dropped by the size rule. A hand on the chin is cut from the
@@ -307,6 +332,66 @@ SHINE_MIN_MM2 = 200.0  # T-zone skin needed for a value
 # Provisional weights: a 1 L* texture drop counts like a 5 L* brightness rise.
 GLOW_TEXTURE_MM = 0.5
 GLOW_TEXTURE_WEIGHT = 5.0
+# lines (docs/METRICS.md C1): dark valleys in L* / local skin L*, in the direction each
+# zone's lines run, at least LINES_MIN_LENGTH_MM long; value = mm of line per cm2 (top zones)
+LINES_MIN_PX_PER_MM = 3.0  # a 1.2 mm crease is 3.6 px: below this, no value
+LINES_WORK_PX_PER_MM = 10.0  # analysed at this scale
+# prominent lines only (Harshini, Oct 15): fine lines come and go with the light. On 8 lined
+# and 8 young faces, dropping the 0.3 mm scale and asking 2.5% depth and 5 mm length took
+# every young face (and a 6-photo young session) to 0; lined faces 0-9.7
+LINES_SIGMAS_MM = (0.6, 1.0)  # valley widths ~1.2-2 mm (deep lines to folds)
+LINES_BACKGROUND_MM = 3.0  # local skin lightness the depth is relative to
+LINES_MIN_DEPTH = 0.025  # scale-normalised curvature of L*/local L* (about 2.5% darker)
+LINES_MIN_ANISOTROPY = 2.0  # across-curvature this many x the along one (pores curve both)
+LINES_ANGLE_TOL_DEG = 25.0  # off the zone's direction by more: texture, hair
+LINES_MIN_LENGTH_MM = 5.0
+LINES_MAX_WIDTH_MM = 1.5  # mean width of a piece (area / length): wider is a blob
+LINES_SKELETON_PX = 1.15  # mean length of one skeleton pixel (straight 1, diagonal 1.41)
+LINES_EDGE_MM = 1.5  # left out along the skin's edge (hair, brow, lid edges)
+LINES_MARK_GAP_MM = 1.0  # and around blemishes and dark marks at least LINES_MARK_MIN_MM across
+LINES_MARK_MIN_MM = 2.0
+LINES_MIN_ZONE_MM2 = 30.0
+LINES_BROW_GAP_MM = 3.0  # forehead starts this far above the brows
+LINES_GLABELLA_RISE_MM = 8.0  # frown-line zone: inner brow ends up this far
+LINES_GLABELLA_WIDTH = 0.6  # share of the gap between the inner brow ends
+LINES_CROW_GAP_MM = 4.0  # crow's feet zone: from this far past the outer eye corner...
+LINES_CROW_LENGTH_MM = 10.0  # ...this far out...
+LINES_CROW_HALF_HEIGHT_MM = 8.0  # ...this far above and below the eye's axis
+LINES_FOLD_BAND_MM = (-2.0, 9.0)  # nasolabial zone: this far from the nose-wing-to-mouth line
+LINES_FOLD_PAST_MOUTH_MM = 5.0  # and past the mouth corner
+LINES_MARIONETTE_OUT_MM = 2.0  # marionette zone: from this far outside the mouth corner...
+LINES_MARIONETTE_LENGTH_MM = 18.0  # ...this far down toward the jaw...
+LINES_MARIONETTE_HALF_WIDTH_MM = 5.0  # ...this wide either side
+LINES_LIP_GAP_MM = 1.0  # lip zones start this far from the lip edge (and the nose base)
+LINES_LIP_BELOW_MM = 8.0  # band below the lower lip
+LINES_PHILTRUM_HALF_MM = 5.0  # upper-lip strip either side of the midline left out
+# per-zone overrides of LINES_SIGMAS_MM / MIN_DEPTH / EDGE_MM / MIN_LENGTH_MM.
+# Lips: short (lip edge to nose), fine lines on narrow skin; young faces stayed at 0 down
+# to depth 0.018 (Oct 15)
+# Forehead: lines run long and shallow; 0.02 and 3 mm tripled what was found on 10 lined
+# foreheads (median 0.9 -> 3.0), 10 young stayed <= 1.9 (Oct 15). Crow's feet: every
+# looser setting tried put young faces at 3-6 and made a 6-photo session noisy
+LINES_ZONE_SETTINGS = {
+    "lips": {"sigmas_mm": (0.3, 0.6), "min_depth": 0.018, "edge_mm": 0.75, "min_length_mm": 2.5},
+    "forehead": {"min_depth": 0.02, "min_length_mm": 3.0},
+}
+# value = mean of the most lined zones. Oct 15, 10 lined vs 10 young faces: mean of all
+# zones AUC 0.96, top 2 1.00 (lined >= 2.6, young <= 2.5), 6-photo session SD 0.04
+LINES_TOP_ZONES = 2
+LINES_LIP_FAN_MM = 25.0  # lip lines fan from this far beyond the mouth (vertical mid-lip)
+LINES_MAX_BROW_RAISE = 0.8  # browInnerUp: forehead skipped (raised brows crease it)
+LINES_MAX_EXPRESSION = 0.6  # smile: crow's feet and folds skipped
+LINES_MAX_FROWN = 0.8  # brows down: glabella skipped
+LINES_GREY_HAIR_CHROMA = 0.5  # forehead pixels under this x the zone's median chroma: grey hair
+LINES_HAIR_DARKER_L = 15.0  # line skin: hair is this much darker than the face's median L*...
+LINES_HAIR_CHROMA = 0.6  # ...and under this x its median chroma (shaded skin keeps its colour)
+LINES_BEARD_DARKER_L = 8.0  # below the nose (beard, moustache): this much darker...
+LINES_BEARD_CHROMA = 0.75  # ...and under this x the median chroma
+# that much of the lower face: a beard, no lines measured below the nose. 0.05 (was 0.1, Oct 15):
+# a stubbled laptop session read 0.064-0.102 photo to photo, so two photos measured the lips
+# and mouth-corner zones (a stubble edge read as a 3 mm/cm2 line) and three did not; clear
+# faces were 0-2.5%
+LINES_BEARD_FRAC = 0.05
 GLOW_MIN_MM2 = 100.0
 
 # Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's

@@ -20,8 +20,10 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | GET | `/v1/sessions/{id}` | One `SessionView`, with signed overlay URLs |
 | PATCH | `/v1/sessions/{id}` | `{note?, deviation?}` |
 | POST | `/v1/sessions/{id}/upload-urls` | Fresh signed PUT URLs for a retry |
-| GET | `/v1/sessions/{id}/objects` | Size and MD5 of each uploaded frame |
-| POST | `/v1/sessions/{id}/analyze` | Checks frames are uploaded, calls the engine with the stored baseline, saves the result and a template explanation, sets the auto baseline |
+| GET | `/v1/sessions/{id}/objects` | Size and MD5 of each uploaded frame, and `duplicate_of` (same MD5 as a frame of an earlier session) |
+| POST | `/v1/sessions/{id}/frames` | Add photos: an edit before analyze, or a baseline top-up (status back to `uploading`) |
+| DELETE | `/v1/sessions/{id}/frames/{index}` | Remove a photo before analyze |
+| POST | `/v1/sessions/{id}/analyze` | Checks frames are uploaded, calls the engine with the stored baseline, saves the result and a template explanation, sets the auto baseline; writes `stage` as it goes; `?force=1` measures a done session again |
 | GET | `/v1/timeline?site=` | Per-metric series |
 | POST | `/v1/baselines/{site}` | `{session_id}`: pick the baseline by hand |
 | GET | `/v1/me` | The person's stored consent |
