@@ -55,12 +55,9 @@ def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     elif verdict == "no_baseline" and first_reading:
         summary = f"{label}: first reading. Future photos are compared to it."
     elif verdict == "no_baseline":
-        # a later session: the baseline predates this measurement (lines, Oct 15); this one
-        # becomes its baseline (baselines.adopt_new_metrics)
-        summary = (
-            f"{label}: not in your baseline yet, so not compared this time. "
-            "From your next photos it will be."
-        )
+        # a later session that could not compare this one (a measurement newer than the
+        # baseline, a side view, counts from a different photo count): never "first reading"
+        summary = f"{label}: not compared with your baseline this time."
     elif verdict == "low_quality":
         summary = f"{label}: photo quality too low to compare this time."
     elif delta is not None and mdc is not None:
@@ -153,8 +150,8 @@ Rules:
   band (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
   shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
   this is the first reading, but only when is_baseline is true; on a later session it means
-  this measurement is not in the baseline yet (it started after the baseline was taken) and
-  will be compared from the next session. low_quality: the photo could not be compared.
+  this one could not be compared with the baseline this time (say so, never "first").
+  low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
 - Face sessions (site face_full) with frames_used of 2 or more: blemishes and dark spots count
   only marks seen in at least two of the photos; say so if the count is low. Close-ups (cheek_macro,

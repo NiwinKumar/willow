@@ -499,7 +499,9 @@ def _session_lines(good: list[dict]) -> None:
     for z in zones:
         vals = [f["extras"]["lines"].get(z) for f in frames]
         vals = [v for v in vals if v is not None]
-        if vals:
+        # measured in at least half the photos: a zone seen once (skipped for expression or
+        # cut as beard in the rest) cannot lead the session
+        if vals and 2 * len(vals) >= len(frames):
             medians[z] = float(np.median(vals))
     top = sorted(medians, key=lambda z: (-medians[z], z))[: config.LINES_TOP_ZONES]
     skipped = sorted(
