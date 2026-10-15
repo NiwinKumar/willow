@@ -91,8 +91,8 @@ PUBLIC_MESSAGES = {
     "engine_timeout": "The measurement took too long. Your photos are safe; try again.",
     "engine_unreachable": "The measurement service did not answer. Your photos are safe; try "
     "again.",
-    "frame_unreadable": "One of the files could not be read. Check that it is the original DNG "
-    "or JPEG.",
+    "frame_unreadable": "One of the files could not be read. Check that it is the original DNG, "
+    "JPEG or HEIC.",
     "unsupported_format": "One of the files is in a format Willow cannot read.",
 }
 

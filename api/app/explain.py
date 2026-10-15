@@ -32,8 +32,16 @@ def _signed(x: float | int) -> str:
     return s if s.startswith("-") or s == "0" else f"+{s}"
 
 
+# The app's names where they differ from the engine's labels (web/src/lib/metrics.ts)
+APP_LABEL = {"dark_circles": "Under-eye", "tone_ita": "Skin tone (ITA°)"}
+
+
+def label_of(metric: dict[str, Any]) -> str:
+    return APP_LABEL.get(metric["id"], metric["label"])
+
+
 def item(metric: dict[str, Any]) -> dict[str, Any]:
-    label = metric["label"]
+    label = label_of(metric)
     verdict = metric["verdict"]
     delta, mdc = metric.get("delta"), metric.get("mdc95")
     trend = " (trend only)" if metric["confidence"] == "indicative" else ""
@@ -51,7 +59,7 @@ def item(metric: dict[str, Any]) -> dict[str, Any]:
     elif delta is not None and mdc is not None:
         quoted = [_signed(delta), _num(mdc)]
         words = "a real change" if verdict == "real_change" else "within normal photo variation"
-        summary = f"{label}: {words}{trend} (change {quoted[0]}, noise threshold {quoted[1]})."
+        summary = f"{label}: {words}{trend} (change {quoted[0]}, noise band ±{quoted[1]})."
     elif delta is not None:
         quoted = [_signed(delta)]
         summary = f"{label}: no clear change yet{trend} (change {quoted[0]})."
@@ -130,9 +138,9 @@ def _claims_change(text: str) -> bool:
 INSTRUCTIONS = """Explain one skin-measurement session to the person, in plain calm words.
 Rules:
 - Use only the metrics given. Quote numbers exactly as given (value, delta, mdc95, days); never
-  compute new numbers, percentages or estimates.
+  compute new numbers, percentages or estimates. Never quote dates or photo numbers ("photo 3").
 - verdict real_change: say it changed beyond normal photo variation, with the delta and the noise
-  threshold (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
+  band (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
   shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
   this is the first reading. low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
@@ -230,7 +238,7 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
         "metrics": [
             {
                 "id": m["id"],
-                "label": m["label"],
+                "label": label_of(m),
                 "verdict": m["verdict"],
                 "direction": m["direction"],
                 "confidence": m["confidence"],
@@ -250,7 +258,10 @@ UP_WORDS = re.compile(r"\b(increas\w*|rose|risen|higher|went up|up by|gone up)\b
 DOWN_WORDS = re.compile(
     r"\b(decreas\w*|fell|fallen|lower|went down|down by|gone down|dropped|drop of)\b", re.I
 )
-SIGNED = re.compile(r"([+\-−])\s?(\d+(?:[.,]\d+)?)")
+SIGNED = re.compile(r"(?<![\d\w])([+\-−])\s?(\d+(?:[.,]\d+)?)")  # not a range: "1-2 weeks"
+# Comparisons and scale explanations are not direction claims: "lower than the noise band",
+# "the band is higher than the change", "lower values mean smoother skin".
+COMPARATIVE = re.compile(r"\b(higher|lower)\s+(than|is|means?|values?|numbers?|scores?)\b", re.I)
 
 
 def _allowed(data: dict[str, Any]) -> set[str]:
@@ -274,7 +285,8 @@ def _direction_problem(summary: str, metric: dict[str, Any]) -> str | None:
         quoted_negative = sign in "-−"
         if digits.replace(",", ".") in shown and quoted_negative != (float(delta) < 0):
             return f"wrong sign for {metric['id']}: {summary}"
-    up, down = UP_WORDS.search(summary), DOWN_WORDS.search(summary)
+    plain = COMPARATIVE.sub(" ", summary)
+    up, down = UP_WORDS.search(plain), DOWN_WORDS.search(plain)
     if (float(delta) < 0 and up and not down) or (float(delta) > 0 and down and not up):
         return f"direction contradicts the delta for {metric['id']}: {summary}"
     return None

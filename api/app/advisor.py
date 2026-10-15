@@ -147,7 +147,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
         "latest_sessions": latest,
         "routine": routine,
         "note": "Every site is measured: the face, cheek and nose close-ups (pores and texture "
-        "come only from close-ups) and the forearm squares.",
+        "come only from close-ups) and the forearm squares. Lines are not measured; say so "
+        "if asked.",
     }
 
 
@@ -245,7 +246,10 @@ def _generate(contents: list[types.Content], config: types.GenerateContentConfig
                 type(exc).__name__,
                 str(exc)[:300],
             )
-            if attempt == 2:
+            # only a rate limit or an overloaded model is worth a second try; a timeout already
+            # used its 25 s, and the turn has a budget
+            busy = any(code in str(exc) for code in ("429", "503", "RESOURCE_EXHAUSTED"))
+            if attempt == 2 or not busy:
                 raise
             time.sleep(1.5)
     raise AssertionError("unreachable")
@@ -293,6 +297,9 @@ def chat(messages: list[dict[str, str]], store: Store, uid: str) -> dict[str, An
             product_ids |= {p["product_id"] for p in out.get("products", [])}
             parts.append(types.Part.from_function_response(name=call.name, response=out))
         contents.append(types.Content(role="user", parts=parts))
+        # One round of tools (Gemini asks for several at once when it needs them): another
+        # round would mostly write a prose answer that is thrown away for the checked JSON one.
+        break
     log.info(
         json.dumps(
             {

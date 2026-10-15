@@ -176,11 +176,13 @@ def remeasure(
             continue
         try:
             doc = run(store, bucket, uid, sid, d)
-        except engine.EngineError as exc:
+        except Exception as exc:  # engine, Firestore, labeller: never leave it "processing"
             # a re-run that fails leaves the session as it was (still on the timeline), not
             # "failed": the old result is the person's, the failure is ours
             store.session_update(uid, sid, {"status": d.get("status"), "error": d.get("error")})
-            lines.append(f"{label}: failed, left as it was ({exc.code}: {exc.message})")
+            engine_error = isinstance(exc, engine.EngineError)
+            detail = f"{exc.code}: {exc.message}" if engine_error else repr(exc)
+            lines.append(f"{label}: failed, left as it was ({detail[:200]})")
             continue
         state = "measured" if doc.get("measured") else "still not measured"
         lines.append(f"{label}: {state}{', now the baseline' if doc.get('is_baseline') else ''}")

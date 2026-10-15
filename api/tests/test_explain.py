@@ -57,7 +57,7 @@ def test_trend_wording_for_indicative_metrics():
         "mdc95": 1.9,
     }
     assert explain.item(m)["summary"] == (
-        "Shine: within normal photo variation (trend only) (change +0.4, noise threshold 1.9)."
+        "Shine: within normal photo variation (trend only) (change +0.4, noise band ±1.9)."
     )
 
 
@@ -273,3 +273,15 @@ def test_the_right_sign_and_direction_pass():
     assert explain.problems(ok, data) == []
     named = _exp("Redness is 13.4 a*, no clear change yet while using Minimalist Retinol 0.3%.")
     assert explain.problems(named, data) == []
+
+
+def test_comparisons_and_ranges_are_not_direction_claims():
+    data = _data(0.8)
+    for ok in (
+        "Redness changed by 0.8 a*, lower than the noise band of 2.5, so no clear change yet.",
+        "Redness: no clear change yet (+0.8); lower values mean calmer skin.",
+        "Redness rose by +0.8, within normal photo variation. Check again in 1-2 weeks.",
+    ):
+        assert not [
+            i for i in explain.problems(_exp(ok), data) if "sign" in i or "direction" in i
+        ], ok

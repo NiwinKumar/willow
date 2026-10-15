@@ -52,9 +52,11 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
     const need = checkIns < 2 ? `Willow needs at least two check-ins after the start date (${checkIns} so far).` : 'Most changes take at least two weeks to show.'
     return { kind: 'early', text: 'Too early to tell', detail: `${since} ${need}` }
   }
+  const judged = new Set<MetricId>()
   for (const { t, site } of pairs) {
     const after = afterOn(site)
     if (after.length < 2) continue
+    judged.add(t)
     const m = after[after.length - 1].result?.metrics.find((x) => x.id === t)
     if (m && m.verdict === 'real_change' && m.delta !== null) {
       return {
@@ -62,9 +64,12 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
         metric: t,
         site,
         text: `Real change in ${METRIC_META[m.id].label.toLowerCase()}`,
-        detail: `Started ${weeks} weeks ago. Latest reading vs your baseline: ${METRIC_META[m.id].label.toLowerCase()} ${fmtSigned(m.delta, m)}, noise threshold ${m.mdc95 !== null ? fmtValue(m.mdc95, m) : '–'}. The change may be linked to this product; other products or habits could also contribute.`,
+        detail: `Started ${weeks} weeks ago. Latest reading vs your baseline: ${METRIC_META[m.id].label.toLowerCase()} ${fmtSigned(m.delta, m)}, noise band ±${m.mdc95 !== null ? fmtValue(m.mdc95, m) : '–'}. The change may be linked to this product; other products or habits could also contribute.`,
       }
     }
   }
-  return { kind: 'none', text: `No clear change yet (${weeks} wks)`, detail: `The metrics this product targets are inside your noise band so far. Most effects take 4 to 8 weeks to exceed photo noise.` }
+  // Name only what was judged: a target without two check-ins on its site is not "no change".
+  const open = targets.filter((t) => !judged.has(t))
+  const rest = open.length ? ` ${names(open).charAt(0).toUpperCase() + names(open).slice(1)}: not enough check-ins yet.` : ''
+  return { kind: 'none', text: `No clear change yet (${weeks} wks)`, detail: `${names([...judged]).charAt(0).toUpperCase() + names([...judged]).slice(1)}: inside your noise band so far. Most effects take 4 to 8 weeks to exceed photo noise.${rest}` }
 }

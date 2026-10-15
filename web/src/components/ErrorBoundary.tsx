@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
             Reload
           </button>
           {/* A full load, not a router link: the app's state starts fresh. */}
-          <a href="/" className="inline-flex min-h-11 items-center rounded-(--radius-control) border border-border bg-surface px-4 text-[15px] font-medium hover:bg-surface-2">
+          <a href="/" onClick={() => { try { sessionStorage.removeItem('willow.demo') } catch { /* storage blocked */ } }} className="inline-flex min-h-11 items-center rounded-(--radius-control) border border-border bg-surface px-4 text-[15px] font-medium hover:bg-surface-2">
             Go to the start
           </a>
         </div>

@@ -1,14 +1,15 @@
-import { useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 /** Live match of a CSS media query, so a layout mounts one tree per breakpoint (unique ids, one chart). */
 export function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (on) => {
+  // stable per query, so React does not re-subscribe on every render
+  const subscribe = useCallback(
+    (on: () => void) => {
       const mq = window.matchMedia(query)
       mq.addEventListener('change', on)
       return () => mq.removeEventListener('change', on)
     },
-    () => window.matchMedia(query).matches,
-    () => false,
+    [query],
   )
+  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => false)
 }

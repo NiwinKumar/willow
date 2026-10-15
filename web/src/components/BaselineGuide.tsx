@@ -40,7 +40,7 @@ export function BaselineChecklist({ mode, current, onPick }: { mode: CaptureMode
     <section aria-labelledby="baselines">
       <h2 id="baselines" className="text-[17px] font-semibold">Your baselines{quick ? ' (phone photos)' : ''}</h2>
       <p className="mt-1 text-[13px] text-text-2">
-        Set one for each place you track. For a product test, set both forearms before you start using the product.{data.goals.includes('smoother') ? ' Pores and texture are measured on the cheek close-up.' : ''}
+        Set one for each place you track. For a product test, set both forearms before you start using the product.{data.goals.includes('smoother') ? ' Pores and texture are measured on the cheek close-up (pores on the nose close-up too).' : ''}
       </p>
       <ul className="mt-3 divide-y divide-border border-y border-border">
         {baselineSites(data.goals).map((site) => {

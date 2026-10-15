@@ -137,7 +137,7 @@ export function Landing() {
       </section>
 
       <p className="mt-12 text-[12px] text-text-3">
-        Cosmetic appearance tracking, not a medical device or diagnosis. Built on Firebase, Firestore, Cloud Run and Gemini on Vertex AI.
+        Cosmetic appearance tracking, not a medical device or diagnosis. Built on Firebase, Firestore, Cloud Run, BigQuery and Gemini on Vertex AI.
       </p>
     </div>
   )
