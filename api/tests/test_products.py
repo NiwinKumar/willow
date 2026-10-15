@@ -1,6 +1,8 @@
 import base64
 import csv
 import importlib.util
+import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -19,7 +21,15 @@ CATALOG = (
         "price": {"amount": 590, "currency": "INR"},
         "size": "30 ml",
         "region": ["IN", "GLOBAL"],
-        "stores": [{"store": "Nykaa", "url": "https://www.nykaa.com/x", "region": "IN"}],
+        "stores": [
+            {
+                "store": "Nykaa",
+                "url": "https://www.nykaa.com/x",
+                "region": "IN",
+                "price": {"amount": 590, "currency": "INR", "checked": "2026-10-15"},
+            },
+            {"store": "Ulta", "url": "https://www.ulta.com/x", "region": "US", "price": None},
+        ],
         "source_url": "https://theordinary.com/x",
         "last_verified": "2026-10-13",
     },
@@ -34,7 +44,14 @@ CATALOG = (
         "price": {"amount": 545, "currency": "INR"},
         "size": "30 ml",
         "region": ["IN"],
-        "stores": [{"store": "Brand site", "url": "https://beminimalist.co/x", "region": "IN"}],
+        "stores": [
+            {
+                "store": "Brand site",
+                "url": "https://beminimalist.co/x",
+                "region": "IN",
+                "price": {"amount": 545.5, "currency": "INR", "checked": "2026-10-15"},
+            }
+        ],
         "source_url": "https://beminimalist.co/x",
         "last_verified": "2026-10-13",
     },
@@ -181,6 +198,11 @@ def test_import_script_round_trips_the_sheet(tmp_path, monkeypatch):
         assert mod.validate(parsed) == []
     broken = dict(back[0], category="perfume", stores=[])
     assert mod.validate(broken) == ["category 'perfume'", "no store links"]
+    bad_price = dict(
+        back[0],
+        stores=[dict(back[0]["stores"][0], price={"amount": 0, "currency": "rs", "checked": "x"})],
+    )
+    assert mod.validate(bad_price) == ["store price 'Nykaa' (amount > 0, ISO currency, YYYY-MM-DD)"]
     linked = dict(back[0], image_url="https://brand.example/p.jpg", image_source=None)
     assert mod.validate(linked) == ["image_source (the page the image is shown on)"]
     assert (
@@ -201,7 +223,7 @@ def test_tidy_strips_list_punctuation():
     clean = label_scan.tidy(raw)
     assert clean.brand == "The Ordinary"
     assert clean.product_name == "Niacinamide 10% + Zinc 1%"
-    assert clean.inci == ["Aqua (Water)", "Chlorphenesin"]
+    assert [i.name for i in clean.inci] == ["Aqua (Water)", "Chlorphenesin"]
     assert clean.key_actives[0].name == "zinc pca"
 
 
@@ -235,3 +257,104 @@ def test_browsing_the_catalog_lists_every_currency(client, fake):
     found = client.get("/v1/catalog/search", params={"limit": 60}).json()["products"]
     names = [f"{p['brand']} {p['name']}".lower() for p in found]
     assert names == sorted(names)
+
+
+def test_store_prices_come_back_from_search_and_product(client, fake):
+    found = client.get("/v1/catalog/search", params={"q": "niacinamide"}).json()["products"][0]
+    nykaa = {"amount": 590, "currency": "INR", "checked": "2026-10-15"}
+    assert found["stores"][0]["price"] == nykaa
+    assert found["stores"][1]["price"] is None
+    one = client.get("/v1/catalog/minimalist-salicylic-acid-2-face-serum").json()
+    assert one["stores"][0]["price"]["amount"] == 545.5
+
+
+def test_every_real_store_price_is_a_checked_amount_in_a_currency():
+    """The bundled catalog: each store price is real (> 0, ISO currency, a date) or null."""
+    real = json.loads(catalog.CATALOG_PATH.read_text())  # not the small fixture catalog
+    stores = [s for p in real for s in p["stores"]]
+    assert stores and all("price" in s for s in stores)
+    priced = [s["price"] for s in stores if s["price"] is not None]
+    assert priced
+    for price in priced:
+        catalog.StorePrice.model_validate(price)
+        assert price["amount"] > 0
+        assert len(price["currency"]) == 3 and price["currency"].isupper()
+        date.fromisoformat(price["checked"])
+    with pytest.raises(ValueError):
+        catalog.StorePrice.model_validate({"amount": 0, "currency": "INR", "checked": "2026-10-15"})
+    with pytest.raises(ValueError):
+        catalog.StorePrice.model_validate({"amount": 5, "currency": "Rs", "checked": "2026-10-15"})
+    with pytest.raises(ValueError):
+        catalog.StorePrice.model_validate({"amount": 5, "currency": "INR", "checked": "2026-02-30"})
+
+
+def test_label_scan_reports_ingredient_confidence_and_a_failure_reason(client, fake, monkeypatch):
+    def fake_generate(prompt_id, contents, schema, **kw):
+        return schema(
+            brand="Some Brand",
+            product_name="Night Serum",
+            category="serum",
+            inci=[{"name": "Aqua", "confidence": "high"}, {"name": "Parfum", "confidence": "low"}],
+            confidence="high",
+            failure="glare",
+        )
+
+    monkeypatch.setattr(gemini, "generate_json", fake_generate)
+    res = client.post(
+        "/v1/label-scan", json={"images": [{"mime_type": "image/png", "data_base64": _png_b64()}]}
+    )
+    assert res.status_code == 200, res.text
+    scan = res.json()["scan"]
+    assert scan["inci"] == [
+        {"name": "Aqua", "confidence": "high"},
+        {"name": "Parfum", "confidence": "low"},
+    ]
+    assert scan["failure"] == "glare"
+    assert scan["confidence"] == "low"  # a reported problem is never high confidence
+
+
+def test_label_scan_model_keeps_plain_ingredient_strings_working():
+    old = label_scan.LabelScan(
+        brand="x", product_name="y", category="serum", inci=["Aqua", "Glycerin"], confidence="high"
+    )
+    assert [(i.name, i.confidence) for i in old.inci] == [("Aqua", "high"), ("Glycerin", "high")]
+    assert old.failure is None and old.confidence == "high"
+    shaky = label_scan.LabelScan(
+        brand="x",
+        product_name="y",
+        category="serum",
+        inci=["Aqua", {"name": "Parfum", "confidence": "low"}],
+        confidence="high",
+    )
+    assert shaky.confidence == "medium"  # one hard-to-read ingredient caps the overall reading
+    nothing = label_scan.LabelScan(
+        brand="Guess",
+        product_name="Guess",
+        category="other",
+        inci=["Aqua"],
+        confidence="low",
+        failure="no_label",
+    )
+    assert nothing.inci == [] and nothing.brand is None and nothing.unreadable
+    with pytest.raises(ValueError):
+        label_scan.LabelScan(
+            brand=None, product_name=None, category="other", confidence="low", failure="dark"
+        )
+
+
+def test_an_unreadable_label_photo_does_not_cost_a_scan(client, fake, monkeypatch):
+    from datetime import UTC, datetime
+
+    def blurry(prompt_id, contents, schema, **kw):
+        return schema(
+            brand=None, product_name=None, category="other", confidence="low", failure="blurry"
+        )
+
+    monkeypatch.setattr(gemini, "generate_json", blurry)
+    res = client.post(
+        "/v1/label-scan", json={"images": [{"mime_type": "image/png", "data_base64": _png_b64()}]}
+    )
+    assert res.status_code == 200
+    assert res.json()["scan"]["failure"] == "blurry" and res.json()["match"] is None
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage_incr("u_test", day, "label_scan", 0) == 0

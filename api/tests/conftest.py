@@ -24,9 +24,16 @@ class FakeCloud:
     def docs(self) -> dict:
         return self.store.sessions
 
-    def put(self, name: str, size: int = 1000, content_type: str = "image/x-adobe-dng") -> None:
+    def put(
+        self,
+        name: str,
+        size: int = 1000,
+        content_type: str = "image/x-adobe-dng",
+        md5: str | None = None,
+    ) -> None:
+        # each object its own MD5 unless a test says otherwise (duplicate checks compare them)
         self.blobs[name] = storage.ObjectInfo(
-            storage.object_uri(name), True, size, "md5==", content_type
+            storage.object_uri(name), True, size, md5 or f"md5:{name}", content_type
         )
 
 
@@ -104,6 +111,14 @@ def fake(monkeypatch: pytest.MonkeyPatch):
         return len(gone)
 
     monkeypatch.setattr(storage, "delete_prefix", delete_prefix)
+    monkeypatch.setattr(storage, "delete_object", lambda name: cloud.blobs.pop(name, None))
+    monkeypatch.setattr(
+        storage,
+        "list_md5s",
+        lambda prefix: {
+            n: b.md5_base64 for n, b in cloud.blobs.items() if n.startswith(prefix) and b.md5_base64
+        },
+    )
     app.dependency_overrides[get_store] = lambda: cloud.store
     yield cloud
     app.dependency_overrides.pop(get_store, None)
@@ -112,3 +127,13 @@ def fake(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app, headers={"X-Dev-Uid": "u_test"})
+
+
+@pytest.fixture(autouse=True)
+def no_real_health_probes(monkeypatch: pytest.MonkeyPatch):
+    """/v1/demo/status never reaches Vertex, the bucket or BigQuery in tests: every live probe
+    answers at once; a test that needs a failing one replaces it."""
+    from app import demo
+
+    for name in ("probe_gemini", "probe_storage", "probe_bigquery"):
+        monkeypatch.setattr(demo, name, lambda: None)

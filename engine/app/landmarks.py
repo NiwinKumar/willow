@@ -6,7 +6,7 @@ stays on skin when the landmarks are a few pixels off.
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -136,6 +136,8 @@ class Face:
     yaw: float
     pitch: float
     roll: float
+    # MediaPipe expression scores 0-1 (e.g. mouthSmileLeft, eyeSquintRight); empty if unknown
+    expression: dict[str, float] = field(default_factory=dict)
 
     @property
     def eye_distance_px(self) -> float:
@@ -387,6 +389,7 @@ def _landmarker():
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
         num_faces=1,
         output_facial_transformation_matrixes=True,
+        output_face_blendshapes=True,  # expression scores, for the lines metric's gate
     )
     return mp.tasks.vision.FaceLandmarker.create_from_options(options)
 
@@ -455,7 +458,12 @@ def detect_face(srgb8: np.ndarray) -> Face:
     lm = result.face_landmarks[0]
     points = np.array([[p.x * w, p.y * h] for p in lm], dtype=np.float64)  # back to full res
     yaw, pitch, roll = _euler_degrees(result.facial_transformation_matrixes[0])
-    return Face(points=points, yaw=yaw, pitch=pitch, roll=roll)
+    expression = (
+        {c.category_name: float(c.score) for c in result.face_blendshapes[0]}
+        if result.face_blendshapes
+        else {}
+    )
+    return Face(points=points, yaw=yaw, pitch=pitch, roll=roll, expression=expression)
 
 
 def polygon_mask(shape: tuple[int, int], polygon: np.ndarray) -> np.ndarray:

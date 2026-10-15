@@ -30,7 +30,16 @@
           "type": "array",
           "items": {
             "type": "object", "additionalProperties": false, "required": ["index", "passed", "reasons"],
-            "properties": {"index": {"type": "integer"}, "passed": {"type": "boolean"}, "reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}}}
+            "properties": {
+              "index": {"type": "integer"}, "passed": {"type": "boolean"}, "reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}},
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "object", "additionalProperties": false, "required": ["reason", "region"],
+                  "properties": {"reason": {"$ref": "#/$defs/reason"}, "region": {"$ref": "#/$defs/quality_region"}}
+                }
+              }
+            }
           }
         },
         "reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}}
@@ -64,6 +73,7 @@
   },
   "$defs": {
     "reason": {"enum": ["card_not_found", "card_delta_e_high", "blurry", "overexposed", "underexposed", "pose_out_of_range", "face_not_found", "occlusion_suspected", "too_few_frames"]},
+    "quality_region": {"enum": ["forehead", "left_cheek", "right_cheek", "nose", "chin", "under_eyes", "whole"]},
     "metric_id": {"enum": ["tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes", "pores", "texture", "lines", "dark_circles", "shine", "glow"]},
     "metric": {
       "type": "object", "additionalProperties": false,

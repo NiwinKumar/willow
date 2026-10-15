@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, Product, RoutineCheck, RoutineEntry, RoutineLogDay } from '../data/types'
+import type { AnalysisResult, Explanation, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule } from '../data/types'
 import { DEV_UID } from './devAuth'
 import type { LabelDetail } from './spotLabels'
 
@@ -18,7 +18,13 @@ export type ObjectStatus = {
   size: number | null
   md5_base64: string | null
   content_type: string | null
+  /** A byte-identical frame of the person's earliest other session (or an earlier frame of this one). */
+  duplicate_of?: { session_id: string; index: number } | null
 }
+/** POST /v1/sessions/{id}/frames: targets for the new frames only; `dropped`: left-out frames removed (1-based). */
+export type AddFramesResponse = { session_id: string; n_frames: number; upload_urls: UploadTarget[]; expires_in_seconds: number; dropped: number[] }
+/** Live analysis stage while a session is processing (api analysis.run). */
+export type AnalysisStage = 'received' | 'engine' | 'explaining'
 
 /** SessionView as the api returns it: {session, result, labels, explanation}. */
 export type SessionView = {
@@ -44,6 +50,12 @@ export type SessionView = {
     /** Judge mode: the hosted sample these photos were copied from. */
     sample_id?: string | null
     label_details?: Record<string, LabelDetail>
+    /** Live analysis stage while processing, else null. */
+    stage?: AnalysisStage | null
+    /** Detail views only: signed GET per uploaded frame (null for DNG or a missing photo). */
+    frame_urls?: (string | null)[]
+    /** Detail views only: signed tight crop per candidate id (crops that exist). */
+    crop_urls?: Record<string, string>
   }
   result: AnalysisResult | null
   labels: Record<string, string>
@@ -121,52 +133,131 @@ export type SpotDiary = {
   sessions_not_mapped: number
 }
 
+/** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */
+export type ScannedIngredient = string | { name: string; confidence: 'high' | 'low' }
+export type LabelScanFailure = 'glare' | 'blurry' | 'no_label' | 'cut_off'
 export type LabelScan = {
   brand: string | null
   product_name: string | null
   category: string
-  inci: string[]
+  inci: ScannedIngredient[]
   key_actives: { name: string; pct: number | null }[]
   claims_on_pack: string[]
   confidence: 'low' | 'medium' | 'high'
+  /** Why the label could not be read fully (null or missing: it could). */
+  failure?: LabelScanFailure | null
 }
 export type LabelScanResponse = { scan: LabelScan; match: { product_id: string; brand: string; name: string; score: number } | null }
 
+/** One block of a structured advisor answer (api advisor_blocks.py). Text uses the tiny inline markup
+ * (**bold**, ==highlight==, [product:ID], [metric:ID]); a widget names data the app draws itself. */
+export type AnswerBlock =
+  | { type: 'answer' | 'note'; text: string }
+  | { type: 'bullets'; items: string[] }
+  | { type: 'widget'; widget: { kind: 'metric_trend' | 'session_summary' | 'routine' | 'product' | 'spot_diary' | 'product_test'; params: Record<string, string | undefined> } }
+  | { type: 'products'; product_ids: string[] }
+
 export type AdvisorReply = {
+  /** Plain text of the answer (older api builds send only this). */
   message: string
+  /** The structured answer, answer first; absent from older api builds. */
+  blocks?: AnswerBlock[]
   product_ids: string[]
   products: Product[]
   follow_up_suggestions: string[]
   retrieval: string[]
-  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number }
+  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number; photos_read?: number }
+  /** A photo of skin or a face was attached: never answered (chat photos are for products only). */
+  photos_refused?: boolean
   remaining_today: number
 }
 
+/** One paid action's count today (GET /v1/me/usage); caps reset at UTC midnight (`resets_at`). */
+export type UsageCount = { used: number; cap: number; remaining: number; resets_at: string }
+export type Usage = { advisor: UsageCount; routine_check: UsageCount; label_scan: UsageCount; retailer_ask?: UsageCount }
+
+/** A product or label photo sent with an advisor question (JPEG after downscaling). */
+export type ChatImage = { mime_type: 'image/jpeg' | 'image/png' | 'image/webp'; data_base64: string }
+
+/** A stored advisor turn (GET /v1/advisor/history), oldest first. Photos are never stored, only their count. */
+export type AdvisorHistoryMessage =
+  | { id: string; role: 'user'; text: string; created_at: string; photos: number }
+  | { id: string; role: 'willow'; text: string; created_at: string; reply: Omit<AdvisorReply, 'remaining_today'> }
+
+/** The latest measured session's pre-written explanation, sent with a 502 advisor_unavailable. */
+export type StandardExplanation = { session_id: string; site: Site; capture_mode: CaptureMode | null; created_at: string; explanation: Explanation }
+
+/** Progress events of POST /v1/advisor/chat/stream, in the order the api works. */
+export type AdvisorStage =
+  | { event: 'reading_context' }
+  | { event: 'asking_gemini'; step: 'tools'; photos: number }
+  | { event: 'asking_gemini'; step: 'tool'; tool: 'search_catalog' | 'compare_products' | 'check_routine' | string }
+  | { event: 'asking_gemini'; step: 'reply'; retrieval: string[] }
+  | { event: 'checking_numbers' }
+
 type RetailerCell = { value: number | null; n: number; suppressed: boolean }
-type TierStat = { options: number; rate: number | null }
+/** n: users of that tier's products at week 8 (null under 10). */
+type TierStat = { options: number; rate: number | null; n?: number | null }
+/** Retailer filters (GET /v1/retailer/insights?cohort=&range=); defaults mixed + all. */
+export type RetailerCohort = 'simulated' | 'mixed' | 'real'
+export type RetailerRange = '30d' | '90d' | 'all'
+/** A group's k of n (n ≥ 10; null when the group is under 10). */
+type RetailerBase = { k: number; n: number; rate: number } | null
+export type RetailerFlow = { goal: string; goal_id: string; n: number; weeks: number[]; changed: number[]; using: number[]; rate: number; median_weeks: number | null; base: RetailerBase }
+export type RetailerBrand = { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }
 export type RetailerInsights = {
   cohort: { synthetic: number; real: number; weeks: number; dropout: number; seed: number }
+  /** Fewer than 10 people in the filter: only the head count is sent. */
+  empty?: boolean
+  filters?: { cohort: RetailerCohort; range: RetailerRange; since: string | null; today: string }
   tiles: { label: string; value: string; n: number; sub: string }[]
-  // app_goal: the goal a person picks in the app that this finer retailer goal belongs to (null: none)
-  needs: { goal: string; app_goal?: string | null; n: number; real: number; none: number; early: number }[]
-  products: { product: string; brand: string; concern: string; n: number; cells: RetailerCell[]; rate: number; lift: number | null; weeks: number | null; cont: number }[]
+  // goal_id: one of the app's 8 goals; weeks: median weeks to a real change (null when under 10 changed)
+  needs: { goal: string; goal_id?: string; app_goal?: string | null; n: number; real: number; none: number; early: number; weeks?: number | null; weeks_n?: number | null }[]
+  /** Goal demand per month ('YYYY-MM'): people with a reading that month; counts under 10 are null. */
+  needs_by_month?: { months: string[]; people: (number | null)[]; goals: { goal: string; goal_id: string; counts: (number | null)[]; share_of_peak: (number | null)[] }[] }
+  kpis?: {
+    catalog: { products: number; with_outcomes: number; below_min: number; unused: number; not_measured: number } | null
+    continuation_wk8: RetailerBase
+  }
+  products: { product_id: string; product: string; brand: string; concern: string; category?: string; goal_ids?: string[]; n: number; cells: RetailerCell[]; cells_skin?: RetailerCell[]; rate: number; lift: number | null; base?: RetailerBase; weeks: number | null; cont: number; cont8?: number }[]
   tone_bands: string[]
-  brands: { brand: string; n: number; rate: number; lo: number; hi: number; cont: number }[]
-  gaps: { goal: string; app_goal?: string | null; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
-  conflicts: { pair: string; share: number; fix: string; resolves: string[] }[]
+  skin_types?: string[]
+  brands: RetailerBrand[]
+  brands_hidden?: number
+  categories?: { category: string; label: string; flows: RetailerFlow[]; brands: RetailerBrand[]; brands_hidden: number }[]
+  gaps: { goal: string; goal_id?: string; app_goal?: string | null; budget: TierStat; mid: TierStat; premium: TierStat; action: string }[]
+  conflicts: { kind?: string; pair: string; n?: number; share: number; fix: string; resolves: string[] }[]
+  routines_checked?: number
   /** Every product with at least 10 people: outcome rate, people, median weeks to first real change. */
-  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null }>
+  product_outcomes?: Record<string, { n: number; rate: number; weeks: number | null; product: string; brand: string; concern: string; cont: number; category?: string; cont8?: number; lift?: number | null }>
 }
 
 export type NewRoutineEntry = Partial<Omit<RoutineEntry, 'id' | 'ended_at'>> & { source: RoutineEntry['source'] }
 
+/** users/{uid}.profile (api me_routes.py): goals are lib/metrics GoalId values; days 0 = Monday. */
+export type PhotoTime = 'morning' | 'midday' | 'evening'
+export type SkinType = 'oily' | 'combination' | 'dry' | 'normal' | 'sensitive'
+export type CheckinSchedule = { days: number[]; time: string; tz: string }
+export type Profile = {
+  goals: string[]
+  photo_time: PhotoTime | null
+  display_name: string | null
+  skin_type: SkinType | null
+  checkin: CheckinSchedule | null
+  updated_at: string | null
+}
+export type ProfilePatch = Partial<Omit<Profile, 'updated_at'>>
+
 export class ApiError extends Error {
   status: number
   code: string | null
-  constructor(status: number, message: string, code: string | null = null) {
+  /** The api's whole `detail` object, for errors that carry more than code and message. */
+  detail: Record<string, unknown> | null
+  constructor(status: number, message: string, code: string | null = null, detail: Record<string, unknown> | null = null) {
     super(message)
     this.status = status
     this.code = code
+    this.detail = detail
   }
 }
 
@@ -184,16 +275,18 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
     const text = await res.text()
     let code: string | null = null
     let message = text
+    let full: Record<string, unknown> | null = null
     try {
       const detail = (JSON.parse(text) as { detail?: { code?: string; message?: string } }).detail
       if (detail && typeof detail === 'object') {
         code = detail.code ?? null
         message = detail.message ?? text
+        full = detail as Record<string, unknown>
       }
     } catch {
       /* not JSON */
     }
-    throw new ApiError(res.status, message, code)
+    throw new ApiError(res.status, message, code, full)
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
@@ -204,7 +297,12 @@ const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
 /** Gemini's answer over the retailer aggregates (api retailer_ask.py); every number checked. */
 export type RetailerAnswer = {
   answer: string
-  chart: { title: string; unit: 'percent' | 'count' | 'weeks'; bars: { label: string; value: number }[] } | null
+  /** No numbers given: individual-level or unavailable data, or no draft passed the checks. */
+  refused?: boolean
+  /** n: the group a percent bar's rate is of (null for counts, weeks, or labels without one). */
+  chart: { title: string; unit: 'percent' | 'count' | 'weeks'; bars: { label: string; value: number; n?: number | null }[] } | null
+  /** The aggregate tables the answer drew on (product_outcomes, needs, brands, …). */
+  source?: string[]
   follow_ups: string[]
   checks: { model: string; numbers_checked: number; rejected_attempts: number } | null
 }
@@ -213,14 +311,16 @@ export type RetailerAnswer = {
 export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number }
 
 /** waking: the engine sleeps when idle; it was still starting when checked (about 35 s). */
-type ServiceState = { status: 'ok' | 'waking' | 'unreachable' | 'unavailable'; error?: string }
+type ServiceState = { status: 'ok' | 'waking' | 'unreachable' | 'unavailable' | 'degraded'; error?: string }
+/** A live check (cached 60 s by the api): degraded = answered slowly, busy, or only partly. Optional: older api builds sent configuration only. */
+export type LiveCheck = { status?: 'ok' | 'degraded' | 'unreachable'; latency_ms?: number | null; reason?: 'slow' | 'busy' }
 export type DemoStatus = {
   api: ServiceState & { version: string; runtime: string }
   engine: ServiceState & { version?: string; mode: string; latency_ms?: number }
-  gemini: { model: string; endpoint: string }
-  bigquery: ServiceState & { dataset?: string; people?: number; synthetic?: number }
+  gemini: LiveCheck & { model: string; endpoint: string }
+  bigquery: ServiceState & { dataset?: string; people?: number; synthetic?: number; latency_ms?: number | null; reason?: 'slow' | 'busy' }
   catalog: { products: number }
-  storage: { bucket: string }
+  storage: LiveCheck & { bucket: string }
   checked_at: string
 }
 
@@ -237,8 +337,9 @@ export function localDay(d: Date = new Date()): string {
 
 export const api = {
   /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
-  retailerInsights: async () => {
-    const res = await fetch(`${API_URL}/v1/retailer/insights`)
+  retailerInsights: async (filters?: { cohort: RetailerCohort; range: RetailerRange }) => {
+    const qs = filters ? `?${new URLSearchParams(filters).toString()}` : ''
+    const res = await fetch(`${API_URL}/v1/retailer/insights${qs}`)
     if (!res.ok) throw new ApiError(res.status, 'insights unavailable')
     return (await res.json()) as RetailerInsights
   },
@@ -253,10 +354,20 @@ export const api = {
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
   patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
-  analyze: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}/analyze`, { method: 'POST' }),
+  /** `force`: measure a done session again with every frame (counts as an analysis). */
+  analyze: (token: string, sessionId: string, force = false) =>
+    request<SessionView>(token, `/v1/sessions/${sessionId}/analyze${force ? '?force=1' : ''}`, { method: 'POST' }),
+  /** More photos for a session (an edit before analyze, or a baseline top-up). */
+  addFrames: (token: string, sessionId: string, body: { add: number; content_types: string[] }) =>
+    request<AddFramesResponse>(token, `/v1/sessions/${sessionId}/frames`, { method: 'POST', ...json(body) }),
+  /** Remove photo `index` (1-based) before analyze; answers fresh upload links for every frame. */
+  deleteFrame: (token: string, sessionId: string, index: number) =>
+    request<CreateSessionResponse>(token, `/v1/sessions/${sessionId}/frames/${index}`, { method: 'DELETE' }),
   setBaseline: (token: string, site: Site, sessionId: string) =>
     request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
+  /** The account as the api knows it: uid, the consent and the profile on record (each null before any). */
+  me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null; profile: Profile | null }>(token, '/v1/me'),
   catalogSearch: (token: string, params: { q?: string; concern?: string; category?: string; max_price?: number; currency?: string; limit?: number }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
     return request<{ products: Product[] }>(token, `/v1/catalog/search?${qs}`)
@@ -267,7 +378,7 @@ export const api = {
   // `today`: the person's own calendar day, so recent use counts their days, not the server's
   routine: (token: string) => request<{ entries: RoutineEntry[] }>(token, `/v1/routine?today=${localDay()}`),
   addRoutine: (token: string, entry: NewRoutineEntry) => request<RoutineEntry>(token, '/v1/routine', { method: 'POST', ...json(entry) }),
-  patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[] }) =>
+  patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[]; schedule?: RoutineSchedule | null }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
   /** Routine use ticks; days are the person's own calendar days (YYYY-MM-DD, see localDay). Default range: last 14 days. */
@@ -281,8 +392,11 @@ export const api = {
     request<RoutineLogDay>(token, `/v1/routine/log/${day}/${entryId}/${slot}`, { method: used ? 'PUT' : 'DELETE' }),
   putConsent: (token: string, body: { version: string; aggregate_insights_opt_in: boolean }) =>
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
+  /** Partial: only the fields sent change; null clears one. */
+  putProfile: (token: string, patch: ProfilePatch) => request<{ profile: Profile }>(token, '/v1/me/profile', { method: 'PUT', ...json(patch) }),
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
-  retailerAsk: (token: string, question: string) => request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question }) }),
+  retailerAsk: (token: string, question: string, filters?: { cohort: RetailerCohort; range: RetailerRange }) =>
+    request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question, ...filters }) }),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
@@ -290,14 +404,108 @@ export const api = {
   startSample: (token: string, sampleId: string) =>
     request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }),
   judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }),
-  advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[]) =>
-    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json({ messages }) }),
+  advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) =>
+    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json(images.length ? { messages, images } : { messages }) }),
+  /** Product tests (forearm): the running one first. */
+  productTests: (token: string) => request<{ tests: ProductTest[] }>(token, '/v1/product-tests'),
+  startProductTest: (token: string, body: { entry_id?: string; product_id?: string; name?: string; length_days?: number; started_at?: string }) =>
+    request<ProductTest>(token, '/v1/product-tests', { method: 'POST', ...json(body) }),
+  patchProductTest: (token: string, id: string, body: { name?: string; length_days?: number; ended_at?: string | null }) =>
+    request<ProductTest>(token, `/v1/product-tests/${id}`, { method: 'PATCH', ...json(body) }),
+  deleteProductTest: (token: string, id: string) => request<void>(token, `/v1/product-tests/${id}`, { method: 'DELETE' }),
+  /** Check-in reminders (api routes/reminders_routes.py): the schedule as a calendar file, and Web Push. */
+  reminderIcs: async (token: string): Promise<Blob> => {
+    const res = await fetch(`${API_URL}/v1/me/reminder.ics`, { headers: { Authorization: `Bearer ${token}`, ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) } })
+    if (!res.ok) throw new ApiError(res.status, 'calendar file unavailable')
+    return res.blob()
+  },
+  /** enabled false: the api has no VAPID keys, so reminders are by calendar only. */
+  pushKey: (token: string) => request<{ enabled: boolean; public_key: string | null }>(token, '/v1/me/push/key'),
+  pushSubscribe: (token: string, subscription: PushSubscriptionJSON) => request<{ id: string; enabled: boolean }>(token, '/v1/me/push', { method: 'POST', ...json(subscription) }),
+  pushUnsubscribe: (token: string, endpoint: string) => request<void>(token, '/v1/me/push', { method: 'DELETE', ...json({ endpoint }) }),
+  pushTest: (token: string) => request<{ sent: number; removed: number; failed: number }>(token, '/v1/me/push/test', { method: 'POST' }),
+  /** Today's counts for the paid actions (read without counting). */
+  usage: (token: string) => request<Usage>(token, '/v1/me/usage'),
+  advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
+  clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
+  advisorChatStream,
+}
+
+/** The stream could not be used at all (old api, a proxy, no readable body): nothing was sent or counted. */
+export class StreamUnavailable extends Error {}
+
+/**
+ * POST /v1/advisor/chat/stream: progress events as the api really works, then the checked reply (never partial
+ * text). Errors before any work (422, 429) are plain HTTP errors (ApiError); a failure during the turn arrives as
+ * an `error` event and is thrown as ApiError with its detail. StreamUnavailable means "use the plain endpoint".
+ */
+async function advisorChatStream(token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[], onStage: (s: AdvisorStage) => void, signal?: AbortSignal): Promise<AdvisorReply> {
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}/v1/advisor/chat/stream`, {
+      method: 'POST',
+      signal,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) },
+      body: JSON.stringify(images.length ? { messages, images } : { messages }),
+    })
+  } catch (e) {
+    if (signal?.aborted) throw e
+    // Never reached the api (offline, CORS on an old build): nothing counted, the plain endpoint may still work.
+    throw new StreamUnavailable(String(e))
+  }
+  if (res.status === 404 || res.status === 405) throw new StreamUnavailable(`stream route ${res.status}`)
+  if (!res.ok) {
+    const text = await res.text()
+    let detail: Record<string, unknown> | null = null
+    try {
+      const d = (JSON.parse(text) as { detail?: unknown }).detail
+      if (d && typeof d === 'object') detail = d as Record<string, unknown>
+    } catch {
+      /* not JSON */
+    }
+    throw new ApiError(res.status, typeof detail?.message === 'string' ? detail.message : text, typeof detail?.code === 'string' ? detail.code : null, detail)
+  }
+  if (!res.body || !(res.headers.get('content-type') ?? '').includes('text/event-stream')) throw new StreamUnavailable('no event stream')
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += value
+    let cut: number
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, cut)
+      buffer = buffer.slice(cut + 2)
+      let event = 'message'
+      let data = ''
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event: ')) event = line.slice(7)
+        else if (line.startsWith('data: ')) data += line.slice(6)
+      }
+      if (!data) continue // a keep-alive comment
+      const payload = JSON.parse(data) as Record<string, unknown>
+      if (event === 'done') {
+        void reader.cancel()
+        return payload.reply as AdvisorReply
+      }
+      if (event === 'error') {
+        void reader.cancel()
+        throw new ApiError(Number(payload.status) || 500, String(payload.message ?? 'The advisor is unavailable right now.'), typeof payload.code === 'string' ? payload.code : null, payload)
+      }
+      onStage({ event, ...payload } as AdvisorStage)
+    }
+  }
+  // The connection closed mid-answer: the question reached the api, so it may have counted.
+  throw new Error('The connection closed before the answer arrived.')
 }
 
 /** PUT one file to a V4 signed URL with progress. The File object streams from disk; never read it in JS. */
-export function putSigned(target: UploadTarget, file: File, onProgress: (fraction: number) => void): Promise<void> {
+export function putSigned(target: UploadTarget, file: File, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('Upload cancelled'))
     const xhr = new XMLHttpRequest()
+    // Closing the check-in cancels the PUT in flight ("the rest are not sent").
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
     xhr.open('PUT', target.url)
     for (const [k, v] of Object.entries(target.headers)) xhr.setRequestHeader(k, v)
     // A stalled connection (or a phone that backgrounded the tab) must end in a Retry, never an
