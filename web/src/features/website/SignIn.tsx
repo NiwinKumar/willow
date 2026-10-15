@@ -3,6 +3,7 @@ import './website.css'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { api } from '../../lib/api'
 import { authErrorText } from '../../lib/authErrors'
 import { nextPath } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
@@ -41,6 +42,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [showPw, setShowPw] = useState(false)
+  const [agreeTerms, setAgreeTerms] = useState(false)
   const [tried, setTried] = useState(false)
   const [pending, setPending] = useState<null | 'google' | 'email' | 'guest' | 'reset'>(null)
   const [error, setError] = useState<string | null>(null)
@@ -102,7 +104,13 @@ export default function SignIn() {
     if (up && !name.trim()) return setError('Add your name.')
     if (!emailOk) return setError('That email address doesn’t look right.')
     if (pw.length < 8) return setError('Passwords need at least 8 characters.')
-    void run('email', () => (up ? createAccount(name, email.trim(), pw) : signInWithEmail(email.trim(), pw)), (err) => emailErrorText(err, mode))
+    if (up && !agreeTerms) return setError('Agree to the terms to create an account.')
+    const signUp = async () => {
+      await createAccount(name, email.trim(), pw)
+      // The name also goes on the account's profile (users/{uid}.profile.display_name); a miss is filled on the next sign-in.
+      await api.putProfile(await getIdToken(), { display_name: name.trim().slice(0, 60) }).catch(() => undefined)
+    }
+    void run('email', () => (up ? signUp() : signInWithEmail(email.trim(), pw)), (err) => emailErrorText(err, mode))
   }
 
   const forgot = async () => {
@@ -244,7 +252,16 @@ export default function SignIn() {
                 <span id="pw-hint" className="text-[12px] text-ink-2" aria-live="polite">
                   {!pw.length ? 'Use 8 or more characters.' : pw.length < 8 ? `${8 - pw.length} more character${8 - pw.length === 1 ? '' : 's'} needed` : HINT[score]}
                 </span>
-                <span className="text-[13px] leading-[1.45] text-ink-2">Photo consent comes next, separately.</span>
+                <label className="mt-1 flex cursor-pointer items-start gap-2.5 text-[14px] leading-[1.45] text-ink">
+                  <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} aria-invalid={tried && !agreeTerms} className="m-0 mt-px size-5 flex-none accent-[var(--action-selected)]" />
+                  <span>
+                    I agree to the{' '}
+                    <Link to="/terms" target="_blank" rel="noopener" className="text-ink underline underline-offset-2">
+                      terms and privacy notice
+                    </Link>
+                    . Photo consent comes next, separately.
+                  </span>
+                </label>
               </div>
             ) : null}
             {resetFor ? (

@@ -15,6 +15,7 @@ const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({
 const SignIn = lazy(() => import('./features/website/SignIn'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
+const Terms = lazy(() => import('./features/website/Terms'))
 const Retail = lazy(() => import('./features/retail/Retail'))
 const Home = lazy(() => import('./features/home/Home'))
 const Progress = lazy(() => import('./features/progress/Progress'))
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/welcome/:step" element={<Welcome />} />
             <Route path="/judge" element={<Judge />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/retail" element={<Retail />} />
             <Route element={<AppShell />}>
               <Route path="/home" element={<Page><Home /></Page>} />
@@ -65,6 +67,7 @@ export default function App() {
             <Route path="/settings" element={<Navigate to="/you" replace />} />
             <Route path="/advisor" element={<Navigate to="/home?advisor=1" replace />} />
             <Route path="/retailer" element={<Navigate to="/retail" replace />} />
+            <Route path="/privacy" element={<Navigate to="/terms" replace />} />
             <Route path="/start" element={<Navigate to="/welcome" replace />} />
             <Route path="/goals" element={<Navigate to="/welcome/goals" replace />} />
             <Route path="*" element={<NotFound />} />
@@ -130,6 +133,7 @@ function NotFound() {
 const TITLES: [RegExp, string][] = [
   [/^\/science/, 'Science and limits'],
   [/^\/judge/, 'Judge tour'],
+  [/^\/terms/, 'Terms and privacy'],
   [/^\/signin/, 'Sign in'],
   [/^\/welcome/, 'Getting started'],
   [/^\/retail/, 'Retailer insights'],
