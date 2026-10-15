@@ -44,6 +44,12 @@ export type SessionView = {
     /** Judge mode: the hosted sample these photos were copied from. */
     sample_id?: string | null
     label_details?: Record<string, LabelDetail>
+    /** GET /v1/sessions/{id} only: a signed GET per uploaded frame (null for RAW or a missing file). */
+    frame_urls?: (string | null)[]
+    /** GET /v1/sessions/{id} only: signed tight crops of the spot candidates, by candidate id. */
+    crop_urls?: Record<string, string>
+    /** Live analysis stage while processing, else null. */
+    stage?: 'received' | 'engine' | 'explaining' | null
   }
   result: AnalysisResult | null
   labels: Record<string, string>
