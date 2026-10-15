@@ -85,7 +85,7 @@ export function GuideStep(props: {
       </section>
 
       <section className="flex flex-col gap-3.5">
-        {site === 'face_full' && goals.includes('smoother') ? (
+        {site === 'face_full' && goals.includes('pores_texture') ? (
           <p className="m-0 rounded-[24px] bg-surface/80 px-5 py-4 text-[14px] leading-[1.45] text-[#3E3C38]">
             Tracking texture and pores? They are measured on the cheek close-up (pores on the nose close-up too), not the full face.{' '}
             <button type="button" onClick={() => props.onSite('cheek_macro')} className="min-h-11 font-medium text-ink underline underline-offset-4">

@@ -11,7 +11,9 @@ import { api } from '../../lib/api'
 import { authErrorText } from '../../lib/authErrors'
 import { syncConsent } from '../../lib/consent'
 import { identity } from '../../lib/identity'
-import { GOALS } from '../../lib/metrics'
+import type { PhotoTime, ProfilePatch } from '../../lib/api'
+import { GOALS, MAX_GOALS } from '../../lib/metrics'
+import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
@@ -19,17 +21,11 @@ import { useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
 
-const MAX_GOALS = 3
-const TIMES = [
-  { value: 'morning', label: 'Morning' },
-  { value: 'midday', label: 'Midday' },
-  { value: 'evening', label: 'Evening' },
-]
-
 /**
- * You (Willow App.dc.html, isProfile): who is signed in, goals and photo time, the privacy receipt with the
+ * You (Willow App.dc.html, isProfile): who is signed in, goals, photo time, skin type and check-in days (the
+ * account's profile, lib/profile), the privacy receipt with the
  * sharing switch, capture setup, service status, delete my data, sign out. Everything shown is the
- * person's own: Firebase for the account, the api for consent, sessions and routine, this device for prefs.
+ * person’s own: Firebase for the account, the api for consent, profile, sessions and routine, this device for the rest.
  */
 export default function You() {
   const data = useData()
@@ -77,7 +73,8 @@ export default function You() {
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-3.5">
         {demo ? <DemoCard /> : <AccountCard />}
-        <GoalsCard goals={goals} setGoals={data.setGoals} demo={demo} />
+        <GoalsCard demo={demo} />
+        {demo ? null : <CheckinCard />}
         {demo ? null : <PrivacyCard />}
         <CaptureSetupCard />
       </div>
@@ -211,14 +208,21 @@ function AccountCard() {
   )
 }
 
-function GoalsCard({ goals, setGoals, demo }: { goals: string[]; setGoals: (g: string[]) => void; demo: boolean }) {
+const chip = (on: boolean) => `min-h-11 rounded-pill px-4 text-[14px] transition-colors duration-200 ${on ? 'bg-selected text-inverse' : 'bg-white text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]'}`
+const offline = 'Saved on this device; your account updates when you are back online.'
+
+function GoalsCard({ demo }: { demo: boolean }) {
+  const { goals, setGoals, profile, saveProfile } = useData()
   const [hint, setHint] = useState(false)
-  const [time, setTime] = useState(() => prefs.photoTime() ?? '')
   const save = (next: string[]) => {
     setGoals(next)
     setHint(false)
     toast('Goals saved · results reordered')
   }
+  const saveOne = (patch: ProfilePatch, done: string) =>
+    saveProfile(patch)
+      .then(() => toast(done))
+      .catch(() => toast.error(offline))
   return (
     <Panel
       label="Goals and preferences"
@@ -234,13 +238,7 @@ function GoalsCard({ goals, setGoals, demo }: { goals: string[]; setGoals: (g: s
         {GOALS.map((g) => {
           const on = goals.includes(g.id)
           return (
-            <button
-              key={g.id}
-              type="button"
-              aria-pressed={on}
-              onClick={() => (on ? save(goals.filter((x) => x !== g.id)) : goals.length >= MAX_GOALS ? setHint(true) : save([...goals, g.id]))}
-              className={`min-h-11 rounded-pill px-4 text-[14px] transition-colors duration-200 ${on ? 'bg-selected text-inverse' : 'bg-white text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]'}`}
-            >
+            <button key={g.id} type="button" aria-pressed={on} onClick={() => (on ? save(goals.filter((x) => x !== g.id)) : goals.length >= MAX_GOALS ? setHint(true) : save([...goals, g.id]))} className={chip(on)}>
               {on ? '✓ ' : ''}
               {g.label}
             </button>
@@ -253,19 +251,82 @@ function GoalsCard({ goals, setGoals, demo }: { goals: string[]; setGoals: (g: s
         </span>
       ) : null}
       <span className="text-[13px] text-ink-2">Goals put their measures first in your results{demo ? ', the demo journey included' : ''}.</span>
-      <span className="text-[14px] text-ink-2">Usual photo time</span>
-      <SegmentedControl
-        label="Usual photo time"
-        className="self-start"
-        options={TIMES}
-        value={time}
-        onChange={(v) => {
-          setTime(v)
-          prefs.setPhotoTime(v)
-          toast(`Usual photo time: ${v}`)
-        }}
-      />
-      <span className="text-[13px] text-ink-2">The same time of day keeps the light comparable.</span>
+      {demo ? null : (
+        <>
+          <span className="text-[14px] text-ink-2">Usual photo time</span>
+          <SegmentedControl
+            label="Usual photo time"
+            className="self-start"
+            options={PHOTO_TIMES.map((t) => ({ value: t.id as string, label: t.label }))}
+            value={profile.photo_time ?? ''}
+            onChange={(v) => void saveOne({ photo_time: v as PhotoTime }, `Usual photo time: ${v}`)}
+          />
+          <span className="text-[13px] text-ink-2">The same time of day keeps the light comparable.</span>
+          <span id="skin-type-label" className="text-[14px] text-ink-2">
+            Skin type · optional
+          </span>
+          <div role="radiogroup" aria-labelledby="skin-type-label" className="flex flex-wrap gap-1.5">
+            {[...SKIN_TYPES, { id: null, label: 'Prefer not to say' }].map((t) => (
+              <button key={t.label} type="button" role="radio" aria-checked={profile.skin_type === t.id} onClick={() => void saveOne({ skin_type: t.id }, t.id ? `Skin type: ${t.label.toLowerCase()}` : 'Skin type cleared')} className={chip(profile.skin_type === t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-[13px] text-ink-2">It never changes a measurement.</span>
+        </>
+      )}
+    </Panel>
+  )
+}
+
+/** "Your check-in days": weekdays and a time in this browser's time zone, saved to the account (profile.checkin). */
+function CheckinCard() {
+  const { profile, saveProfile } = useData()
+  const saved = profile.checkin
+  const days = saved?.days ?? []
+  const [time, setTime] = useState(() => saved?.time ?? PHOTO_TIME_CLOCK[profile.photo_time ?? 'evening'])
+  const [savedTime, setSavedTime] = useState(saved?.time)
+  // The account's schedule can arrive after this card first draws (sign-in on a new device).
+  if (saved?.time !== savedTime) {
+    setSavedTime(saved?.time)
+    if (saved?.time) setTime(saved.time)
+  }
+  const tz = saved?.tz ?? browserTz()
+  const save = (nextDays: number[], nextTime: string, done: string) =>
+    saveProfile({ checkin: nextDays.length ? { days: [...nextDays].sort(), time: nextTime, tz: browserTz() } : null })
+      .then(() => toast(done))
+      .catch(() => toast.error(offline))
+  const names = days.map((d) => WEEKDAYS[d])
+  return (
+    <Panel label="Your check-in days" eyebrow="CHECK-IN DAYS" aside={<span className="font-dot text-[18px]">{days.length}/7</span>}>
+      <span className="text-[20px]">{days.length ? `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} at ${time}` : 'No check-in days set'}</span>
+      <div role="group" aria-label="Check-in days" className="flex flex-wrap gap-1.5">
+        {WEEKDAYS.map((d, i) => {
+          const on = days.includes(i)
+          const next = on ? days.filter((x) => x !== i) : [...days, i]
+          return (
+            <button key={d} type="button" aria-pressed={on} onClick={() => void save(next, time, next.length ? 'Check-in days saved' : 'Check-in days cleared')} className={`${chip(on)} min-w-[56px]`}>
+              {d}
+            </button>
+          )
+        })}
+      </div>
+      <label className="flex flex-wrap items-center gap-3 text-[14px] text-ink-2">
+        Time
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          onBlur={() => {
+            if (days.length && /^\d{2}:\d{2}$/.test(time) && time !== saved?.time) void save(days, time, `Check-in time: ${time}`)
+          }}
+          className="min-h-11 rounded-pill bg-white px-4 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]"
+        />
+      </label>
+      <span className="text-[13px] text-ink-2">
+        Saved to your account. Times are in {tz}
+        {saved && saved.tz !== browserTz() ? `; this browser is in ${browserTz()}, and the next change uses it` : ', this browser’s time zone'}. Once a week is enough; the same day and time keeps photos comparable.
+      </span>
     </Panel>
   )
 }

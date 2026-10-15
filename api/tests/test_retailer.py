@@ -91,6 +91,7 @@ def test_every_retailer_goal_names_a_real_app_goal():
     from app import retailer
 
     web = (Path(__file__).resolve().parents[2] / "web/src/lib/metrics.ts").read_text()
-    app_labels = set(re.findall(r"label: '([^']+)', groups:", web))
+    app_labels = set(re.findall(r"label: '([^']+)', metrics:", web))
     assert set(retailer.APP_GOAL) == set(retailer.GOAL_LABEL)
-    assert {g for g in retailer.APP_GOAL.values() if g} <= app_labels
+    assert len(app_labels) == 8
+    assert {g for g in retailer.APP_GOAL.values() if g} == app_labels
