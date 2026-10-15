@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app import gemini, numbers
+from app import gemini, numbers, schedule
 from app.explain import BANNED
 
 Entry = dict[str, Any]
@@ -79,6 +79,12 @@ def _shared_slot(a: Entry, b: Entry) -> bool:
     return bool(set(a.get("slots") or []) & set(b.get("slots") or []))
 
 
+def _same_routine(a: Entry, b: Entry) -> bool:
+    """Same slot on at least one day: products set to alternate nights (or on different chosen
+    weekdays) never meet, so a pair rule does not apply to them."""
+    return _shared_slot(a, b) and schedule.share_a_day(a.get("schedule"), b.get("schedule"))
+
+
 def _name(e: Entry) -> str:
     return f"{e.get('brand', '')} {e.get('custom_name', '')}".strip()
 
@@ -87,10 +93,18 @@ def rule_findings(entries: list[Entry]) -> dict[str, Any]:
     active = [e for e in entries if not e.get("ended_at")]
     cls = {e["id"]: classes_of(e) for e in active}
     conflicts: list[dict[str, Any]] = []
+    apart = False  # a pair the rules would flag, kept apart by its schedules
 
     def pair_rule(x: set[str], y: set[str], issue: str, suggestion: str, severity: str) -> None:
+        nonlocal apart
         for a, b in combinations(active, 2):
             if not _shared_slot(a, b):
+                continue
+            if not _same_routine(a, b):
+                hit = (cls[a["id"]] & x and cls[b["id"]] & y) or (
+                    cls[b["id"]] & x and cls[a["id"]] & y
+                )
+                apart = apart or bool(hit)
                 continue
             for p, q in ((a, b), (b, a)):
                 if cls[p["id"]] & x and cls[q["id"]] & y:
@@ -177,6 +191,8 @@ def rule_findings(entries: list[Entry]) -> dict[str, Any]:
         "laa" in cls[e["id"]] for e in active
     ):
         notes.append("Niacinamide and vitamin C are fine together; that pairing is not flagged.")
+    if apart:
+        notes.append("Products set to alternate days are not flagged as used together.")
     return {"conflicts": conflicts, "duplicates": duplicates, "gaps": gaps, "notes": notes}
 
 
@@ -195,7 +211,8 @@ class ModelAdditions(BaseModel):
 INSTRUCTIONS = """You review a skincare routine for cosmetic compatibility.
 The rule-based findings below are already final; do not repeat or contradict them.
 Add only other well-known cosmetic interactions you are confident about (for example two
-strong actives that destabilise each other), or say nothing. Never flag niacinamide with
+strong actives that destabilise each other), or say nothing. Products on alternate days or on
+different weekdays are never used together; do not flag them as a pair. Never flag niacinamide with
 vitamin C. In "products" lists use the ids given; in any sentence name products by brand and
 name, never by id. No percentages or other numbers unless they appear in the input. Calm,
 plain, cosmetic language; no medical claims. British spelling (moisturiser, colour)."""
@@ -231,7 +248,8 @@ def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
     if not use_model or len(active) < 2:
         return result
     listing = "\n".join(
-        f"- id {e['id']}: {_name(e)} ({', '.join(e.get('slots') or []) or 'no time set'}); "
+        f"- id {e['id']}: {_name(e)} ({', '.join(e.get('slots') or []) or 'no time set'}, "
+        f"{schedule.words(e.get('schedule'))}); "
         f"actives: {', '.join(a['name'] for a in e.get('key_actives') or []) or 'not listed'}; "
         f"ingredients: {', '.join((e.get('inci') or [])[:INCI_DEPTH])}"
         for e in active

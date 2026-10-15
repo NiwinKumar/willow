@@ -12,6 +12,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app import schedule
+
 SLOTS = ("am", "pm")
 PAST_DAYS = 30  # ticks can be added or removed this far back (a forgotten evening, a weekend)
 MAX_RANGE_DAYS = 92  # one read covers about a quarter
@@ -115,9 +117,20 @@ def recent_use(
     last = now
     if entry.get("ended_at"):
         last = min(last, date.fromisoformat(entry["ended_at"][:10]))
-    of_days = (last - first).days + 1
-    if of_days <= 0:  # stopped before the window, or starts after today
+    if (last - first).days < 0:  # stopped before the window, or starts after today
         return None
     lo, hi = first.isoformat(), last.isoformat()
-    used = sum(1 for d in logs if lo <= d["date"] <= hi and (d.get("used") or {}).get(entry_id))
-    return {"days_used": used, "of_days": of_days}
+    used_days = {
+        d["date"] for d in logs if lo <= d["date"] <= hi and (d.get("used") or {}).get(entry_id)
+    }
+    # A day the schedule rests the product (every other night, chosen days) is not a missed day;
+    # a tick on a rest day still counts as a day used.
+    days = (first + timedelta(days=i) for i in range((last - first).days + 1))
+    of_days = sum(
+        1
+        for d in days
+        if schedule.applies_on(entry.get("schedule"), d) or d.isoformat() in used_days
+    )
+    if of_days == 0:
+        return None
+    return {"days_used": len(used_days), "of_days": of_days}
