@@ -305,7 +305,7 @@ GLOW_TEXTURE_MM = 0.5
 GLOW_TEXTURE_WEIGHT = 5.0
 # lines (docs/METRICS.md C1): dark valleys in L* / local skin L*, in the direction each
 # zone's lines run, at least LINES_MIN_LENGTH_MM long; value = mm of line per cm2
-LINES_MIN_PX_PER_MM = 4.0  # a 0.5 mm crease is 2 px: below this, no value
+LINES_MIN_PX_PER_MM = 3.0  # a 1 mm crease is 3 px: below this, no value
 LINES_WORK_PX_PER_MM = 10.0  # analysed at this scale
 LINES_SIGMAS_MM = (0.3, 0.6, 1.0)  # valley widths ~0.6-2 mm (fine lines to folds)
 LINES_BACKGROUND_MM = 3.0  # local skin lightness the depth is relative to
@@ -328,7 +328,9 @@ LINES_CROW_HALF_HEIGHT_MM = 8.0  # ...this far above and below the eye's axis
 LINES_FOLD_BAND_MM = (-2.0, 9.0)  # nasolabial zone: this far from the nose-wing-to-mouth line
 LINES_FOLD_PAST_MOUTH_MM = 5.0  # and past the mouth corner
 LINES_MAX_BROW_RAISE = 0.8  # browInnerUp: forehead skipped (raised brows crease it)
-LINES_MAX_EXPRESSION = 0.6  # squint / smile / frown: that zone skipped
+LINES_MAX_EXPRESSION = 0.6  # smile: crow's feet and folds skipped
+LINES_MAX_FROWN = 0.8  # brows down: glabella skipped
+LINES_GREY_HAIR_CHROMA = 0.5  # forehead pixels under this x the zone's median chroma: grey hair
 GLOW_MIN_MM2 = 100.0
 
 # Face map (app/facemap.py, docs/METRICS.md "Face map"): each mark's position on MediaPipe's

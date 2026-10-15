@@ -113,4 +113,4 @@ def test_raised_brows_skip_the_forehead():
 def test_too_small_a_face_gives_no_value():
     face = _face()
     lab, skin = _skin(face, 60.0)
-    assert lines(lab, face, skin, 3.0, []) == (None, {})
+    assert lines(lab, face, skin, 2.5, []) == (None, {})  # under LINES_MIN_PX_PER_MM
