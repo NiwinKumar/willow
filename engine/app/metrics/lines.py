@@ -23,13 +23,14 @@ from app import config
 from app.landmarks import Face, polygon_mask
 
 ZONES = ("forehead", "glabella", "crows_feet", "nasolabial")
-# zone -> MediaPipe expression scores that crease it. browOuterUp is not used: it reads
-# 0.45-0.97 on neutral selfies (Oct 14).
+# zone -> (MediaPipe expression scores that crease it, config limit). Not used, they read high
+# on neutral faces: browOuterUp 0.45-0.97 (Oct 14), eyeSquint 0.57-0.67 (Oct 15, 3 of 12)
 GATES = {
-    "forehead": ("browInnerUp",),
-    "glabella": ("browDownLeft", "browDownRight"),
-    "crows_feet": ("eyeSquintLeft", "eyeSquintRight", "mouthSmileLeft", "mouthSmileRight"),
-    "nasolabial": ("mouthSmileLeft", "mouthSmileRight"),
+    "forehead": (("browInnerUp",), "LINES_MAX_BROW_RAISE"),
+    # deep frown lines themselves read as brows down (0.61-0.64 on a neutral lined face)
+    "glabella": (("browDownLeft", "browDownRight"), "LINES_MAX_FROWN"),
+    "crows_feet": (("mouthSmileLeft", "mouthSmileRight"), "LINES_MAX_EXPRESSION"),
+    "nasolabial": (("mouthSmileLeft", "mouthSmileRight"), "LINES_MAX_EXPRESSION"),
 }
 GLABELLA_BROWS = (107, 336, 285, 55)  # inner brow ends: upper R, upper L, lower L, lower R
 
@@ -125,6 +126,9 @@ def find_lines(
     scale = min(config.LINES_WORK_PX_PER_MM / px_per_mm, 1.0)
     size = (max(round(w * scale), 1), max(round(h * scale), 1))
     L = cv2.resize(lab[..., 0].astype(np.float32), size, interpolation=cv2.INTER_AREA)
+    chroma = cv2.resize(
+        np.hypot(lab[..., 1], lab[..., 2]).astype(np.float32), size, interpolation=cv2.INTER_AREA
+    )
     sk = cv2.resize(skin.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) > 0
     px = px_per_mm * scale
     # L* over the skin's local mean: a crease's depth as a share of the skin's lightness
@@ -148,9 +152,8 @@ def find_lines(
     yy, xx = np.mgrid[: sk.shape[0], : sk.shape[1]].astype(np.float32)
     masks, density, skipped = {}, {}, []
     for zone, parts in zone_geometry(small_face).items():
-        if max((face.expression.get(e, 0.0) for e in GATES[zone]), default=0.0) > getattr(
-            config, "LINES_MAX_BROW_RAISE" if zone == "forehead" else "LINES_MAX_EXPRESSION"
-        ):
+        scores, limit = GATES[zone]
+        if max((face.expression.get(e, 0.0) for e in scores), default=0.0) > getattr(config, limit):
             skipped.append(zone)
             continue
         zone_line = np.zeros(sk.shape, bool)
@@ -162,6 +165,12 @@ def find_lines(
                 region &= (xx - bx) * ux + (yy - by) * uy > 0
             if zone in ("glabella", "forehead"):
                 region &= ~brows & ~hairline
+                # grey / white hair over the forehead (the skin cut takes dark hair only):
+                # far greyer than this skin; a crease is a shadow and keeps the skin's colour
+                if region.any():
+                    grey = chroma < config.LINES_GREY_HAIR_CHROMA * float(np.median(chroma[region]))
+                    grey = cv2.dilate(grey.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+                    region &= ~grey
             if region.sum() < config.LINES_MIN_ZONE_MM2 * px * px:
                 continue
             line = cand & region & _direction_ok(theta, direction, sk.shape)
