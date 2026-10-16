@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '../../components/ui/Button'
@@ -120,14 +120,47 @@ export function SponsoredCard({ inRoutine, onView }: { inRoutine: ReadonlySet<st
   const lines = whyLines(item, goalLabel)
 
   return (
-    <section ref={ref} aria-labelledby="sponsored-h" className="card flex w-full max-w-[640px] flex-col gap-3.5 p-5">
+    <SponsoredCardView ref={ref} item={item} onWhy={() => setWhy(true)} onView={view} onHide={() => void hide()}>
+      <Sheet open={why} onClose={() => setWhy(false)} title="Why am I seeing this?" variant="modal" size="sm">
+        <div className="flex flex-col gap-3 text-[15px] leading-[1.5]">
+          <WhySeeing brand={item.brand} lines={lines} />
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button variant="ink" size="sm" onClick={() => setWhy(false)}>
+              Got it
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void hide()}>
+              Hide sponsored
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+    </SponsoredCardView>
+  )
+}
+
+/**
+ * The card as shoppers see it, without data fetching or events: Routine renders it live (above), and Willow
+ * Proof's Promote screen renders the same component as its campaign preview, so the two never drift apart.
+ * `children` sits inside the card's section (Routine's "Why am I seeing this?" sheet).
+ */
+export function SponsoredCardView({ item, onWhy, onView, onHide, ref, headingId = 'sponsored-h', children }: {
+  item: Pick<SponsoredItem, 'product' | 'brand' | 'image_url' | 'category' | 'evidence' | 'cohort_label'>
+  onWhy: () => void
+  onView: () => void
+  onHide: () => void
+  ref?: Ref<HTMLElement>
+  headingId?: string
+  children?: ReactNode
+}) {
+  return (
+    <section ref={ref} aria-labelledby={headingId} className="card flex w-full max-w-[640px] flex-col gap-3.5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {/* the disclosure leads the card: "Sponsored" in text, outlined so it reads before anything else */}
-        <h2 id="sponsored-h" aria-label={SPONSORED_EYEBROW} className="m-0 flex items-center gap-2 font-mono text-[12px] font-normal tracking-[.06em] text-ink">
+        <h2 id={headingId} aria-label={SPONSORED_EYEBROW} className="m-0 flex items-center gap-2 font-mono text-[12px] font-normal tracking-[.06em] text-ink">
           <span className="rounded-pill px-2.5 py-1 shadow-[inset_0_0_0_1px_var(--line-strong)]">{SPONSORED_EYEBROW.split(' · ')[0]}</span>
           <span className="text-ink-2">{SPONSORED_EYEBROW.split(' · ')[1]}</span>
         </h2>
-        <button type="button" onClick={() => setWhy(true)} className="min-h-9 text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink">
+        <button type="button" onClick={onWhy} className="min-h-9 text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink">
           Why am I seeing this?
         </button>
       </div>
@@ -141,37 +174,33 @@ export function SponsoredCard({ inRoutine, onView }: { inRoutine: ReadonlySet<st
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="ink" size="sm" onClick={view}>
+        <Button variant="ink" size="sm" onClick={onView}>
           View product
         </Button>
-        <Button variant="outline" size="sm" onClick={() => void hide()}>
+        <Button variant="outline" size="sm" onClick={onHide}>
           Hide sponsored
         </Button>
       </div>
-
-      <Sheet open={why} onClose={() => setWhy(false)} title="Why am I seeing this?" variant="modal" size="sm">
-        <div className="flex flex-col gap-3 text-[15px] leading-[1.5]">
-          <p className="m-0">This product is sponsored by {item.brand}. It matched your profile:</p>
-          {lines.matched.length ? (
-            <ul className="m-0 flex list-none flex-col gap-1 p-0">
-              {lines.matched.map((l) => (
-                <li key={l} className="rounded-[14px] bg-sunken px-3.5 py-2 text-[14px]">
-                  {l}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <p className="m-0 text-[14px] text-ink-2">{lines.disclosure}</p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button variant="ink" size="sm" onClick={() => setWhy(false)}>
-              Got it
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => void hide()}>
-              Hide sponsored
-            </Button>
-          </div>
-        </div>
-      </Sheet>
+      {children}
     </section>
+  )
+}
+
+/** "Why am I seeing this?": who sponsors it, what matched the person's profile, and the disclosure. */
+export function WhySeeing({ brand, lines }: { brand: string; lines: { matched: string[]; disclosure: string } }) {
+  return (
+    <>
+      <p className="m-0">This product is sponsored by {brand}. It matched your profile:</p>
+      {lines.matched.length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {lines.matched.map((l) => (
+            <li key={l} className="rounded-[14px] bg-sunken px-3.5 py-2 text-[14px]">
+              {l}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="m-0 text-[14px] text-ink-2">{lines.disclosure}</p>
+    </>
   )
 }
