@@ -147,7 +147,7 @@ export default function Judge() {
         : setup === 'failed'
           ? 'The api did not answer; it may still be waking up. Retry in a moment.'
           : 'Creating a guest account for this browser',
-    bg: failed ? 'bg-coral text-white' : ready ? 'bg-selected text-inverse' : 'bg-surface text-ink',
+    bg: failed ? 'bg-coral text-ink' : ready ? 'bg-selected text-inverse' : 'bg-surface text-ink',
   }
 
   // Live checks from the api (engine, Gemini, storage, warehouse with latency; catalog size), never colour alone.

@@ -18,6 +18,16 @@
     <meta property="og:description" content="Calibrated skin measurements from phone photos, a personal noise band, and Gemini that explains without inventing numbers." />
     <meta property="og:type" content="website" />
     <title>Willow</title>
+    <style>html.proof-boot-dark,html.proof-boot-dark body{background:#0a0a0a;color-scheme:dark}</style>
+    <script>
+      // Willow Proof in its dark theme: paint the page dark before the app loads (no white flash on refresh).
+      try {
+        if (location.pathname.indexOf('/retail') === 0) {
+          var t = localStorage.getItem('willow.proof.theme')
+          if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('proof-boot-dark')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

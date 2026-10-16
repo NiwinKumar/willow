@@ -199,8 +199,8 @@ export function WillowLoader({ label = 'Loading', inline = false }: { label?: st
     )
   // Fades in after a beat, so a page that opens quickly never flashes white.
   return (
-    <div role="status" aria-live="polite" className="fixed inset-0 z-[10001] grid animate-[wFadeIn_.3s_ease_.25s_both] place-items-center bg-white">
-      <canvas ref={canvas} width={S} height={S} aria-hidden className="size-[min(58vw,250px)]" />
+    <div role="status" aria-live="polite" className="fixed inset-0 z-[10001] grid animate-[wFadeIn_.3s_ease_.25s_both] place-items-center bg-white [.proof-boot-dark_&]:bg-[#0a0a0a]">
+      <canvas ref={canvas} width={S} height={S} aria-hidden className="size-[min(58vw,250px)] [.proof-boot-dark_&]:invisible" />
       <span className="sr-only">{label}</span>
     </div>
   )
