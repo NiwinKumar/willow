@@ -92,7 +92,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
             Still using at week 8 →
           </text>
           <text x={12} y={m.t + (H - m.t - m.b) / 2} textAnchor="middle" transform={`rotate(-90 12 ${m.t + (H - m.t - m.b) / 2})`} className="fill-[var(--text-secondary)] text-[11px]">
-            Real change by week 8 →
+            Visible change by week 8 →
           </text>
           {/* median guides */}
           {mx !== null ? <line x1={X(mx)} x2={X(mx)} y1={m.t} y2={H - m.b} stroke="var(--text-secondary)" strokeOpacity={0.5} strokeDasharray="3 4" /> : null}
@@ -105,7 +105,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
           {/* whiskers */}
           {order.map((p) =>
             p.lo !== null && p.lo !== undefined && p.hi !== null && p.hi !== undefined ? (
-              <line key={`w${p.id}`} x1={X(p.cont)} x2={X(p.cont)} y1={Y(p.lo)} y2={Y(p.hi)} stroke="var(--text-primary)" strokeOpacity={p.emphasis || p.id === hot ? 0.7 : 0.22} strokeWidth={p.emphasis || p.id === hot ? 2 : 1.5} strokeLinecap="round" />
+              <line key={`w${p.id}`} x1={X(p.cont)} x2={X(p.cont)} y1={Y(p.lo)} y2={Y(p.hi)} stroke={p.emphasis ? 'var(--proof-leaf)' : 'var(--text-primary)'} strokeOpacity={p.emphasis || p.id === hot ? 0.7 : 0.22} strokeWidth={p.emphasis || p.id === hot ? 2 : 1.5} strokeLinecap="round" />
             ) : null,
           )}
           {/* bubbles */}
@@ -120,7 +120,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
                 r={R(p.users)}
                 role={onSelect ? 'button' : 'img'}
                 tabIndex={0}
-                aria-label={`${p.label}: real change ${pct(p.rate)}${ci ? ` (95% interval ${ci})` : ''}${p.n ? `, n=${int(p.n)}` : ''}; still using at week 8 ${pct(p.cont)}; ${int(p.users)} people`}
+                aria-label={`${p.label}: visible change ${pct(p.rate)}${ci ? ` (95% interval ${ci})` : ''}${p.n ? `, n=${int(p.n)}` : ''}; still using at week 8 ${pct(p.cont)}; ${int(p.users)} people`}
                 onPointerEnter={() => setHot(p.id)}
                 onFocus={() => setHot(p.id)}
                 onBlur={() => setHot((h) => (h === p.id ? null : h))}
@@ -131,10 +131,10 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
                     onSelect(p.id)
                   }
                 }}
-                fill="var(--text-primary)"
-                fillOpacity={on ? 0.95 : 0.2}
-                stroke={on ? 'var(--bg-surface)' : 'var(--text-primary)'}
-                strokeOpacity={on ? 1 : 0.55}
+                fill={p.emphasis ? 'var(--proof-leaf)' : on ? 'var(--text-primary)' : 'var(--pf-base)'}
+                fillOpacity={p.emphasis ? 0.9 : on ? 0.8 : 0.35}
+                stroke={on ? 'var(--bg-surface)' : 'var(--pf-base)'}
+                strokeOpacity={on ? 1 : 0.9}
                 strokeWidth={on ? 2 : 1}
                 className={`${onSelect ? 'cursor-pointer' : ''} outline-none focus-visible:stroke-[var(--focus-ring)] focus-visible:[stroke-width:3]`}
               />
@@ -167,7 +167,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
           <thead>
             <tr className="text-ink-2">
               <th scope="col" className="h-8 pr-2 text-left font-normal">Name</th>
-              <th scope="col" className="px-2 text-right font-normal">Real change</th>
+              <th scope="col" className="px-2 text-right font-normal">Visible change</th>
               <th scope="col" className="px-2 text-right font-normal">95% interval</th>
               <th scope="col" className="px-2 text-right font-normal">Still using</th>
               <th scope="col" className="pl-2 text-right font-normal">People</th>
