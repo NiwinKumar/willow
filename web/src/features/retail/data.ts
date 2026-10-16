@@ -1,11 +1,12 @@
-import { toast } from 'sonner'
-
-import type { RetailerCohort, RetailerInsights, RetailerRange } from '../../lib/api'
+import type { RetailerInsights } from '../../lib/api'
+import { RANGES } from './state'
+import { cohortKind, type CohortKind } from './ui/cohort'
+import { downloadCsv, MIN_GROUP, type CsvValue } from './ui/format'
 
 /**
- * Helpers for the retailer page over GET /v1/retailer/insights (api/app/retailer.py). Every number on the
- * page comes from that response or is derived here from it; nothing is invented. Groups under 10 people are
- * suppressed by the api (null counts, suppressed cells), never here.
+ * Helpers over GET /v1/retailer/insights (api/app/retailer.py). Every number on screen comes from that
+ * response or is derived here from it; nothing is invented. Groups under 10 people are suppressed by the api
+ * (null counts, suppressed cells), never here.
  */
 
 export type Insights = RetailerInsights
@@ -19,51 +20,16 @@ export type Tier = 'budget' | 'mid' | 'premium'
 export const TIERS: Tier[] = ['budget', 'mid', 'premium']
 export const TIER_LABEL: Record<Tier, string> = { budget: 'Budget', mid: 'Mid', premium: 'Premium' }
 
-/** Any group under 10 people is suppressed (retailer.py MIN_GROUP). */
-export const MIN_GROUP = 10
+export { MIN_GROUP }
 
 /** The same suppressed aggregates as a shareable Data Studio report (api/scripts/publish_looker.py). */
 export const DATA_STUDIO = 'https://datastudio.google.com/reporting/5147af6b-c268-470a-a420-2277dfcfe7df'
-
-export type CohortKind = 'simulated' | 'mixed' | 'real'
-export type Filters = { cohort: RetailerCohort; range: RetailerRange }
-/** The api's defaults: every row, all time (what the page showed before filters). */
-export const DEFAULT_FILTERS: Filters = { cohort: 'mixed', range: 'all' }
-
-export const RANGES: { value: RetailerRange; label: string; caps: string }[] = [
-  { value: '30d', label: '30 days', caps: 'LAST 30 DAYS' },
-  { value: '90d', label: '90 days', caps: 'LAST 90 DAYS' },
-  { value: 'all', label: 'All time', caps: 'ALL TIME' },
-]
-export const COHORTS: { value: RetailerCohort; label: string }[] = [
-  { value: 'simulated', label: 'Simulated' },
-  { value: 'mixed', label: 'Mixed' },
-  { value: 'real', label: 'Real only' },
-]
-
-/** What the aggregates on screen describe (the rows the filter kept), for the banner, badges and exports. */
-export function cohortKind(c: Insights['cohort']): CohortKind {
-  if (c.real === 0) return 'simulated'
-  if (c.synthetic === 0) return 'real'
-  return 'mixed'
-}
 
 export const totalUsers = (c: Insights['cohort']) => c.synthetic + c.real
 
 export function outcomes(d: Insights): (Outcome & { product_id: string })[] {
   return Object.entries(d.product_outcomes ?? {}).map(([product_id, o]) => ({ ...o, product_id }))
 }
-
-/** Fractions arrive with 2 decimals; the page shows whole percents. */
-export const pct = (v: number) => `${Math.round(v * 100)}%`
-
-/** Signed points with a true minus sign (docs/DESIGN.md number formatting). */
-export function signedPts(v: number): string {
-  const p = Math.round(v * 100)
-  return `${p > 0 ? '+' : p < 0 ? '−' : '±'}${Math.abs(p)} pts`
-}
-
-export const weeksLabel = (w: number | null | undefined) => (w === null || w === undefined ? '—' : `${w} wk`)
 
 /** "2026-09" → "September" (or "Sep" short), from the api's month keys. */
 export function monthLabel(key: string, short = false): string {
@@ -104,34 +70,20 @@ const COHORT_LINE: Record<CohortKind, string> = {
   real: 'REAL CONSENTED USERS',
 }
 
-/**
- * Client-side CSV with the design's header comment, plus the cohort counts, the filter and the disclaimer
- * (docs/DESIGN.md rule 13: a disclaimer on every retail export). Suppressed groups export as "suppressed".
- */
-export function exportCsv(name: string, d: Insights, header: string[], rows: (string | number | null | undefined)[][]) {
+/** The "# " header lines of every Willow Proof export: cohort counts, filter, suppression and the disclaimer. */
+export function csvMeta(d: Pick<Insights, 'cohort' | 'filters'>, extra?: string): string[] {
   const kind = cohortKind(d.cohort)
-  const esc = (v: string | number | null | undefined) => {
-    const t = v === null || v === undefined ? '' : String(v)
-    return /[",\n#]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
-  }
   const range = RANGES.find((r) => r.value === d.filters?.range)?.caps ?? 'ALL TIME'
-  const body = [
-    `# Willow aggregate export · ${COHORT_LINE[kind]} · ${d.cohort.synthetic} simulated + ${d.cohort.real} real users · ${range}${d.filters ? ` to ${d.filters.today}` : ''} · groups under ${MIN_GROUP} suppressed`,
-    '# Cosmetic outcome associations from photos, not proof of effect. Not a medical assessment.',
-    header.map(esc).join(','),
-    ...rows.map((r) => r.map(esc).join(',')),
-  ].join('\n')
-  const file = `willow-${name}-${kind}.csv`
-  try {
-    const url = URL.createObjectURL(new Blob([body], { type: 'text/csv' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = file
-    a.click()
-    // Revoking at once can cancel the download in some browsers; give it a moment to start.
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-    toast(`Exported ${file} · ${rows.length} ${rows.length === 1 ? 'row' : 'rows'}`)
-  } catch {
-    toast('The export could not be created in this browser.')
-  }
+  return [
+    `Willow Proof aggregate export · ${COHORT_LINE[kind]} · ${d.cohort.synthetic} simulated + ${d.cohort.real} real users · ${range}${d.filters ? ` to ${d.filters.today}` : ''} · groups under ${MIN_GROUP} suppressed${extra ? ` · ${extra}` : ''}`,
+    'Cosmetic outcome associations from photos, not proof of effect. Not a medical assessment.',
+  ]
+}
+
+/** File name for an export: willow-proof-<name>-<cohort kind>.csv. */
+export const csvName = (name: string, d: Pick<Insights, 'cohort'>) => `willow-proof-${name}-${cohortKind(d.cohort)}.csv`
+
+/** A one-off export outside a DataTable (charts' data). */
+export function exportCsv(name: string, d: Insights, header: string[], rows: CsvValue[][]) {
+  downloadCsv(csvName(name, d), csvMeta(d), header, rows)
 }

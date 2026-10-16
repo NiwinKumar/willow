@@ -1,15 +1,14 @@
+import { ArrowUp } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { ApiError, api, type RetailerAnswer } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
 import { useMediaQuery } from '../../lib/useMediaQuery'
-import { SimBadge } from './Sections'
-import { cohortKind, MIN_GROUP, type Filters, type Insights } from './data'
+import type { Filters, Insights } from './types'
+import { cohortKind, MIN_GROUP, SimBadge } from './ui'
 
-/** The design's starters: each one is answerable from the aggregates (the last is refused: no individuals). */
+/** Starters: each one is answerable from the aggregates (the last is refused: no individuals). */
 const SUGGESTIONS = ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How do outcomes compare with non-users?', 'Which users changed the most?']
-
-const BAR_COLOURS = ['var(--aura-pink)', 'var(--aura-coral)', 'var(--willow-400)', 'var(--aura-sky)', 'var(--aura-violet)', 'var(--aura-apricot)', 'var(--aura-ice)', 'var(--aura-lilac)']
 
 /** The api checks 3 to 300 characters (retailer_routes.py AskRequest); the form does too, so no 422. */
 const MIN_Q = 3
@@ -25,16 +24,19 @@ const UNIT: Record<NonNullable<RetailerAnswer['chart']>['unit'], (v: number) => 
 
 function errorOf(e: unknown): Turn['error'] {
   if (e instanceof ApiError) {
-    if (e.status === 429) return { title: e.code === 'busy' ? 'BUSY TODAY' : 'DAILY LIMIT', message: e.message }
-    if (e.status === 401 || e.status === 403) return { title: 'NOT SIGNED IN', message: 'Asking needs a guest sign-in, which did not work. Reload the page and try again.' }
-    if (e.status === 503) return { title: 'SERVICE UNAVAILABLE', message: `${e.message} The dashboard above is unaffected.` }
-    return { title: 'NO ANSWER', message: e.message || 'Could not get an answer. Try again.' }
+    if (e.status === 429) return { title: e.code === 'busy' ? 'Busy today' : 'Daily limit reached', message: e.message }
+    if (e.status === 401 || e.status === 403) return { title: 'Not signed in', message: 'Asking needs a guest sign-in, which did not work. Reload the page and try again.' }
+    if (e.status === 503) return { title: 'Service unavailable', message: `${e.message} The dashboard is unaffected.` }
+    return { title: 'No answer', message: e.message || 'Could not get an answer. Try again.' }
   }
-  return { title: 'NO ANSWER', message: 'Could not reach Willow. Check the connection and try again.' }
+  return { title: 'No answer', message: 'Could not reach Willow. Check the connection and try again.' }
 }
 
-/** "Ask the aggregates": Gemini answers from the same aggregates as the page, and the api checks every number. */
-export function AskAggregates({ d, filters }: { d: Insights; filters: Filters }) {
+/**
+ * "Ask the aggregates", inside the Ask side panel: Gemini answers from the same aggregates and filters as the
+ * screen, and the api checks every number against them (GEMINI_SPEC section 6). Guest sign-in on first ask.
+ */
+export function AskAggregates({ d, filters }: { d: Insights | null; filters: Filters }) {
   const { user, continueAsGuest, getIdToken } = useAuth()
   const [thread, setThread] = useState<Turn[]>([])
   const [draft, setDraft] = useState('')
@@ -43,6 +45,7 @@ export function AskAggregates({ d, filters }: { d: Insights; filters: Filters })
   // Only the newest answer reveals word by word; it finishes before follow-ups appear.
   const [revealing, setRevealing] = useState<number | null>(null)
   const nextId = useRef(0)
+  const end = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!busy) return
@@ -53,17 +56,19 @@ export function AskAggregates({ d, filters }: { d: Insights; filters: Filters })
       setSlow(false)
     }
   }, [busy])
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'nearest' })
+  }, [thread.length, busy])
 
   const ask = async (text: string) => {
     const q = text.trim()
-    if (q.length < MIN_Q || busy || revealing !== null) return
+    if (q.length < MIN_Q || busy || revealing !== null || !d) return
     const id = nextId.current++
     setThread((t) => [...t, { id, q }])
     setDraft('')
     setBusy(true)
     try {
       if (!user) await continueAsGuest()
-      // The same filters as the page, so the answer reads the aggregates on screen.
       const reply = await api.retailerAsk(await getIdToken(), q, filters)
       setThread((t) => t.map((m) => (m.id === id ? { ...m, reply } : m)))
       setRevealing(id)
@@ -75,78 +80,79 @@ export function AskAggregates({ d, filters }: { d: Insights; filters: Filters })
   }
 
   const last = thread.at(-1)
-  const canSend = draft.trim().length >= MIN_Q && !busy && revealing === null
+  const canSend = draft.trim().length >= MIN_Q && !busy && revealing === null && Boolean(d)
   return (
-    <section
-      id="ask"
-      aria-labelledby="ask-h"
-      className="retail-anchor relative flex flex-col gap-[18px] overflow-hidden rounded-[44px] p-[clamp(22px,3.4vw,40px)]"
-      style={{ background: 'radial-gradient(70% 70% at 50% 110%, #2B6BFF 0%, #0F2A8A 35%, #050816 75%)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -40px 80px rgba(80,140,255,.35)' }}
-    >
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h2 id="ask-h" className="m-0 text-[clamp(30px,4vw,52px)] font-light leading-none tracking-[-0.03em]">Ask the aggregates</h2>
-        <span className="max-w-[420px] text-[14px] leading-normal text-[#C9CFFF]">
-          Gemini answers from the aggregates on this page only (same filters), with suppression applied. Any number it writes that is not in them is rejected. Individual people can’t be looked up.
-        </span>
-      </div>
+    <div className="flex h-full flex-col gap-4">
+      <p className="m-0 text-proof-body text-ink-2">
+        Gemini answers from the aggregates on screen only (same filters), with suppression applied. Any number it writes that is not in them is rejected. Individual people can’t be looked up.
+      </p>
 
       <div aria-live="polite" className="flex flex-col gap-4">
         {thread.map((m) => (
-          <div key={m.id} className="flex flex-col gap-4">
-            <div className="max-w-[min(80%,560px)] self-end rounded-[24px_24px_8px_24px] bg-white px-[18px] py-3 text-[15px] text-inverse animate-[wRise_.35s_both]">{m.q}</div>
-            {m.reply ? (
+          <div key={m.id} className="flex flex-col gap-3">
+            <div className="max-w-[88%] self-end rounded-[14px_14px_4px_14px] bg-selected px-3.5 py-2 text-proof-body text-inverse">{m.q}</div>
+            {m.reply && d ? (
               <Answer d={d} reply={m.reply} reveal={revealing === m.id} onRevealed={() => setRevealing((r) => (r === m.id ? null : r))} followUps={m === last} onAsk={ask} disabled={busy || revealing !== null} />
             ) : m.error ? (
-              <ErrorAnswer error={m.error} />
+              <div role="alert" className="flex flex-col gap-1 rounded-sm border border-line bg-sunken p-3.5">
+                <span className="text-proof-small font-medium text-ink">{m.error.title} · no numbers returned</span>
+                <span className="text-proof-body text-ink-2">{m.error.message}</span>
+              </div>
             ) : null}
           </div>
         ))}
         {busy ? (
-          <div role="status" className="flex items-center gap-3 self-start rounded-pill bg-glass px-[18px] py-3.5">
+          <div role="status" className="flex items-center gap-2.5 self-start rounded-pill bg-sunken px-3.5 py-2">
             <span aria-hidden className="flex gap-1">
               {[0, 0.15, 0.3].map((delay) => (
-                <span key={delay} className="size-[7px] rounded-full bg-ice animate-[wBounce_1.1s_infinite]" style={{ animationDelay: `${delay}s` }} />
+                <span key={delay} className="size-1.5 rounded-full bg-ink-2 animate-[wBounce_1.1s_infinite]" style={{ animationDelay: `${delay}s` }} />
               ))}
             </span>
-            <span className="text-[14px] text-[#C9CFFF]">{slow ? 'Still reading: an answer can take up to a minute.' : 'Reading the aggregates…'}</span>
+            <span className="text-proof-small text-ink-2">{slow ? 'Still reading: an answer can take up to a minute.' : 'Reading the aggregates…'}</span>
           </div>
         ) : null}
+        <div ref={end} />
       </div>
 
       {thread.length === 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {SUGGESTIONS.map((t, i) => (
-            <button key={t} type="button" onClick={() => void ask(t)} className="min-h-[46px] rounded-pill border border-white/20 bg-white/[.06] px-[18px] text-[14px] text-white transition-[background] duration-200 animate-[wRise_.4s_both] hover:bg-white/[.14]" style={{ animationDelay: `${i * 70}ms` }}>
+        <div className="flex flex-col gap-1.5">
+          <span className="eyebrow">■ Try</span>
+          {SUGGESTIONS.map((t) => (
+            <button key={t} type="button" disabled={!d} onClick={() => void ask(t)} className="min-h-9 rounded-xs border border-line px-3 py-1.5 text-left text-proof-body text-ink transition-colors hover:bg-glass">
               {t}
             </button>
           ))}
         </div>
       ) : null}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void ask(draft)
-        }}
-        className="flex gap-2 rounded-pill border border-white/[.18] bg-white/10 p-1.5 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus [-webkit-backdrop-filter:blur(16px)] [backdrop-filter:blur(16px)]"
-      >
-        <label htmlFor="retail-ask" className="sr-only">Question about the aggregates</label>
-        <input
-          id="retail-ask"
-          type="text"
-          autoComplete="off"
-          value={draft}
-          maxLength={MAX_Q}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="e.g. Which redness products work in the budget tier?"
-          className="min-h-[52px] min-w-0 flex-1 border-0 bg-transparent px-[18px] text-[16px] text-white outline-none placeholder:text-[#8E93C0]"
-        />
-        <button type="submit" aria-label="Ask" disabled={!canSend} className="grid size-[52px] flex-none place-items-center rounded-full border-0 bg-white text-[20px] text-inverse">
-          ↑
-        </button>
-      </form>
-      <span className="text-[12px] text-[#9CA5E0]">Each question is answered on its own; follow-ups don’t see the earlier answer. Up to 20 questions a day.</span>
-    </section>
+      <div className="mt-auto flex flex-col gap-2 pt-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void ask(draft)
+          }}
+          className="flex items-center gap-1.5 rounded-sm border border-line-strong bg-sunken p-1 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus"
+        >
+          <label htmlFor="retail-ask" className="sr-only">
+            Question about the aggregates
+          </label>
+          <input
+            id="retail-ask"
+            type="text"
+            autoComplete="off"
+            value={draft}
+            maxLength={MAX_Q}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={d ? 'Ask about these aggregates' : 'Waiting for the aggregates…'}
+            className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2.5 text-[16px] text-ink outline-none placeholder:text-ink-2 sm:text-proof-body"
+          />
+          <button type="submit" aria-label="Ask" disabled={!canSend} className="grid size-9 flex-none place-items-center rounded-xs border-0 bg-selected text-inverse">
+            <ArrowUp size={16} strokeWidth={1.8} aria-hidden />
+          </button>
+        </form>
+        <span className="text-[11px] text-ink-2">Each question is answered on its own; follow-ups don’t see the earlier answer. Up to 20 questions a day.</span>
+      </div>
+    </div>
   )
 }
 
@@ -159,65 +165,50 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
   useEffect(() => {
     revealed.current = onRevealed
   })
-
   useEffect(() => {
     if (done) {
       revealed.current()
       return
     }
-    // The full answer has already arrived; this only paces how it appears (50 ms a word, as designed).
-    const t = window.setInterval(() => setShown((n) => n + 1), 50)
+    // The full answer has already arrived; this only paces how it appears (30 ms a word, docs/DESIGN.md).
+    const t = window.setInterval(() => setShown((n) => n + 1), 30)
     return () => window.clearInterval(t)
   }, [done])
 
   const kind = cohortKind(d.cohort)
   const checked = reply.checks
-  // refused: no numbers given (individual-level or unavailable data, or no draft passed the checks).
   const refused = reply.refused ?? !checked
   const chart = refused ? null : reply.chart
-  const tag = refused ? 'NO NUMBERS RETURNED' : `GEMINI · GROUNDED IN AGGREGATES · ${kind === 'real' ? 'REAL' : kind === 'mixed' ? 'MIXED' : 'SIMULATED'}`
   const sources = reply.source ?? []
   const prov = !checked
-    ? 'VALIDATOR: no draft used only numbers from the aggregates · no numbers returned'
+    ? 'Validator: no draft used only numbers from the aggregates · no numbers returned'
     : refused
-      ? `POLICY · aggregates only · n≥${MIN_GROUP} · ${checked.model.toUpperCase()}`
-      : `SOURCE ${sources.length ? sources.join(' · ') : 'retailer aggregates'} · n≥${MIN_GROUP} · VALIDATOR: ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} found in the aggregates ✓${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model.toUpperCase()}`
+      ? `Policy · aggregates only · n≥${MIN_GROUP} · ${checked.model}`
+      : `Source ${sources.length ? sources.join(', ') : 'retailer aggregates'} · n≥${MIN_GROUP} · ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model}`
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-3.5 animate-[wRise_.4s_both]" aria-busy={!done}>
-      <div className="flex flex-col gap-3 rounded-[32px] border border-white/[.12] bg-glass p-[22px] [-webkit-backdrop-filter:blur(14px)] [backdrop-filter:blur(14px)]">
-        <span className="font-mono text-[11px] tracking-[.04em] text-[#9CA5E0]">{tag}</span>
-        <p className="m-0 text-[18px] font-light leading-normal">
+    <div className="flex flex-col gap-3" aria-busy={!done}>
+      <div className="flex flex-col gap-2 rounded-sm border border-line bg-sunken p-3.5">
+        <span className="eyebrow">{refused ? '■ No numbers returned' : `■ Gemini · grounded in aggregates · ${kind}`}</span>
+        <p className="m-0 text-proof-answer text-ink">
           <span className="sr-only">{reply.answer}</span>
           <span aria-hidden>
             {words.slice(0, shown).map((w, i) => (
-              <span key={i} className="animate-[wWord_.5s_ease-out_both]">{w} </span>
+              <span key={i} className="animate-[wWord_.4s_ease-out_both]">
+                {w}{' '}
+              </span>
             ))}
-            {!done ? <span className="inline-block h-[18px] w-[9px] rounded-[4px] bg-ice align-[-3px] animate-[wBlink_1s_steps(2)_infinite]" /> : null}
           </span>
         </p>
-        {done ? (
-          <>
-            <span className="font-mono text-[11px] leading-relaxed tracking-[.03em] text-[#9CA5E0] animate-[wRise_.35s_both]">{prov}</span>
-            {followUps && reply.follow_ups.length ? (
-              <span className="flex flex-wrap gap-1.5 animate-[wRise_.4s_both]">
-                {reply.follow_ups.map((f) => (
-                  <button key={f} type="button" disabled={disabled} onClick={() => onAsk(f)} className="min-h-[42px] rounded-pill border border-white/[.22] bg-white/[.06] px-3.5 text-left text-[13px] text-white">
-                    {f}
-                  </button>
-                ))}
-              </span>
-            ) : null}
-          </>
-        ) : null}
+        {done ? <span className="font-mono text-[11px] leading-relaxed text-ink-2">{prov}</span> : null}
       </div>
-      {chart && done ? (
-        <AnswerChart d={d} chart={chart} />
-      ) : refused && done ? (
-        <div className="flex flex-col justify-center gap-2 rounded-[32px] border border-dashed border-white/20 bg-black/60 p-[22px] animate-[wRise_.45s_both]">
-          <span className="font-dot text-[40px] text-ink-3">—</span>
-          <span className="text-[14px] leading-normal text-ink-2">
-            {checked ? 'No chart: this question asks for individual-level data, or data the aggregates don’t hold.' : 'No chart: the answer could not be checked against the aggregates, so no number is shown.'}
-          </span>
+      {chart && done ? <AnswerChart d={d} chart={chart} /> : null}
+      {done && followUps && reply.follow_ups.length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {reply.follow_ups.map((f) => (
+            <button key={f} type="button" disabled={disabled} onClick={() => onAsk(f)} className="min-h-8 rounded-xs border border-line px-2.5 py-1 text-left text-proof-small text-ink hover:bg-glass">
+              {f}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
@@ -226,39 +217,30 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
 
 function AnswerChart({ d, chart }: { d: Insights; chart: NonNullable<RetailerAnswer['chart']> }) {
   const max = Math.max(...chart.bars.map((b) => Math.abs(b.value)), 1)
-  // n per percent bar comes from the api (the group the rate is of; null when the label has none).
   const bars = chart.bars.map((b) => ({ ...b, n: chart.unit === 'percent' ? (b.n ?? null) : null }))
-  const axis = chart.unit === 'percent' ? `% OF PEOPLE${bars.some((b) => b.n !== null) ? ' · n PER BAR' : ''} · 0–${max}%` : chart.unit === 'weeks' ? `WEEKS · 0–${max}` : `COUNT · 0–${max}`
+  const axis = chart.unit === 'percent' ? `% of people${bars.some((b) => b.n !== null) ? ' · n per bar' : ''} · 0–${max}%` : chart.unit === 'weeks' ? `Weeks · 0–${max}` : `Count · 0–${max}`
   const alt = `${chart.title}: ${bars.map((b) => `${b.label} ${UNIT[chart.unit](b.value)}${b.n !== null ? `, n=${b.n}` : ''}`).join('; ')}`
   return (
-    <div role="img" aria-label={alt} className="flex flex-col gap-3 rounded-[32px] bg-[#050505] p-[22px] animate-[wRise_.45s_both]">
+    <div role="img" aria-label={alt} className="flex flex-col gap-2.5 rounded-sm border border-line p-3.5">
       <span className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[14px] text-ink-2">{chart.title}</span>
-        <SimBadge d={d} />
+        <span className="text-proof-small text-ink">{chart.title}</span>
+        <SimBadge cohort={d.cohort} />
       </span>
-      <div className="flex flex-col gap-2.5">
-        {bars.map((b, i) => (
-          <div key={`${b.label}-${i}`} className="flex flex-col gap-[5px]">
-            <span className="flex justify-between gap-2.5 text-[13px]">
-              <span className="min-w-0">{b.label}</span>
-              <span className="whitespace-nowrap font-mono">{UNIT[chart.unit](b.value)}{b.n !== null ? ` · n=${b.n}` : ''}</span>
+      {bars.map((b, i) => (
+        <div key={`${b.label}-${i}`} className="flex flex-col gap-1">
+          <span className="flex justify-between gap-2.5 text-proof-small">
+            <span className="min-w-0 text-ink">{b.label}</span>
+            <span className="whitespace-nowrap font-mono text-ink tnum">
+              {UNIT[chart.unit](b.value)}
+              {b.n !== null ? <span className="text-ink-2"> · n={b.n}</span> : null}
             </span>
-            <span className="block h-[26px] origin-left rounded-pill animate-[wGrowX_.8s_cubic-bezier(.2,.7,.2,1)_both]" style={{ width: `${(Math.abs(b.value) / max) * 100}%`, background: BAR_COLOURS[i % BAR_COLOURS.length], animationDelay: `${i * 90}ms` }} />
-          </div>
-        ))}
-      </div>
+          </span>
+          <span className="block h-1.5 rounded-pill bg-muted">
+            <span className="block h-full origin-left rounded-pill bg-ink/80 animate-[wGrowX_.6s_var(--ease-standard)_both]" style={{ width: `${(Math.abs(b.value) / max) * 100}%` }} />
+          </span>
+        </div>
+      ))}
       <span className="font-mono text-[11px] text-ink-2">{axis}</span>
-    </div>
-  )
-}
-
-function ErrorAnswer({ error }: { error: NonNullable<Turn['error']> }) {
-  return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-3.5 animate-[wRise_.4s_both]">
-      <div role="alert" className="flex flex-col gap-3 rounded-[32px] border border-white/[.12] bg-glass p-[22px]">
-        <span className="font-mono text-[11px] tracking-[.04em] text-[#9CA5E0]">{error.title} · NO NUMBERS RETURNED</span>
-        <p className="m-0 text-[18px] font-light leading-normal">{error.message}</p>
-      </div>
     </div>
   )
 }

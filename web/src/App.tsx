@@ -49,7 +49,7 @@ export default function App() {
             <Route path="/welcome/:step" element={<Welcome />} />
             <Route path="/judge" element={<Judge />} />
             <Route path="/terms" element={<Terms />} />
-            <Route path="/retail" element={<Retail />} />
+            <Route path="/retail/*" element={<Retail />} />
             <Route element={<AppShell />}>
               <Route path="/home" element={<Page><Home /></Page>} />
               <Route path="/progress" element={<Page><Progress /></Page>} />
@@ -136,7 +136,6 @@ const TITLES: [RegExp, string][] = [
   [/^\/terms/, 'Terms and privacy'],
   [/^\/signin/, 'Sign in'],
   [/^\/welcome/, 'Getting started'],
-  [/^\/retail/, 'Retailer insights'],
   [/^\/home/, 'Home'],
   [/^\/progress/, 'Progress'],
   [/^\/result/, 'Result'],
@@ -150,6 +149,8 @@ const TITLES: [RegExp, string][] = [
 function PageTitle() {
   const { pathname } = useLocation()
   useEffect(() => {
+    // Willow Proof names its own tabs ("Willow Proof · <Section>", features/retail/Retail.tsx).
+    if (pathname.startsWith('/retail')) return
     const t = TITLES.find(([re]) => re.test(pathname))?.[1]
     document.title = t ? `${t} · Willow` : 'Willow: did your serum actually work?'
   }, [pathname])

@@ -452,6 +452,10 @@ ASSUMPTION: the long label is canonical (reports, metric rows, tooltips). The sh
 - Small groups: any group with n<10 shows “—” and “n<10, hidden” in caption; aggregates exclude nothing silently — footnote counts hidden groups.
 - Every retail chart carries a “SIMULATED” synthetic badge when cohort ≠ real.
 
+### Willow Proof (retail sub-brand)
+
+The retail dashboard is branded **Willow Proof** (“Retail intelligence by Willow”). Its mark, lockups, clear space, minimum sizes, Proof tokens (`--proof-*`, all Willow tokens or tints), dense type scale (`text-proof-*`) and do/don't live in `docs/RETAIL_BRAND.md`; this document stays the source for every shared token. Proof is always on the dark theme; ember keeps its one meaning (real change) and leaf is the only Proof accent.
+
 ## Components
 
 | Component | File | Props | Variants / anatomy | States | Accessibility | Don’t |

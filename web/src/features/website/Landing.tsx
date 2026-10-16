@@ -9,6 +9,7 @@ import { identity } from '../../lib/identity'
 import { JUDGE_STOPS } from '../../lib/judge'
 import { useAuth } from '../../lib/useAuth'
 import { useSamples } from '../../lib/useSamples'
+import { ProofLockup } from '../retail/brand'
 import { HeroBloom, Lockup } from './Decor'
 import { FIRST_CHECKIN, isReturning } from './entry'
 import { journeyLine, journeyUnavailableLine, useEntryActions, useJourney } from './hooks'
@@ -114,9 +115,9 @@ function Hero({ returning, bloomRef }: { returning: boolean; bloomRef: Ref<HTMLD
       <header className={`relative z-[2] flex flex-wrap items-center justify-between gap-4 py-[clamp(18px,3vw,32px)] ${pad}`}>
         <Lockup />
         <div className="flex items-center gap-[clamp(12px,2vw,24px)]">
-          {/* With the longer "Open Willow →" the header would wrap on a phone; retailers still have the footer link there. */}
+          {/* With the longer "Open Willow →" the header would wrap on a phone; business visitors still have the footer link there. */}
           <Link to="/retail" className={`text-[15px] text-ink no-underline transition-opacity hover:opacity-60 ${returning ? 'max-[439px]:hidden' : ''}`}>
-            For retailers
+            For business
           </Link>
           <Link to={returning ? '/home' : '/signin'} className="cta-yellow rounded-pill px-6 py-[13px] text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
             {returning ? 'Open Willow →' : 'Sign in'}
@@ -408,9 +409,8 @@ const FOOTER: { title: string; links: FooterLink[] }[] = [
     ],
   },
   {
-    title: 'RETAILERS',
+    title: 'FOR BUSINESS',
     links: [
-      { label: 'Retail insights', to: '/retail' },
       { label: 'Fairness approach', to: 'fairness', anchor: true },
     ],
   },
@@ -426,6 +426,11 @@ function Footer() {
         {FOOTER.map((c) => (
           <div key={c.title} className="flex flex-col gap-2.5">
             <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {c.title}</span>
+            {c.title === 'FOR BUSINESS' ? (
+              <Link to="/retail" aria-label="Willow Proof, retail intelligence by Willow" className="mb-1 rounded-xs no-underline transition-opacity hover:opacity-70">
+                <ProofLockup size={24} descriptor />
+              </Link>
+            ) : null}
             {c.links.map((l) =>
               l.anchor ? (
                 <Anchor key={l.label} to={l.to} className="text-[15px] no-underline transition-colors hover:text-ink-2">

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Willow Proof</title>
+  <defs>
+    <clipPath id="c"><rect width="32" height="32" rx="9"/></clipPath>
+    <linearGradient id="l" x1="13" y1="23" x2="25" y2="7" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#86C5B0"/>
+      <stop offset="1" stop-color="#B8E986"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="32" height="32" fill="#0F3B3A"/>
+    <rect x="0" y="17" width="32" height="6" fill="#fff" fill-opacity=".13"/>
+    <g stroke="#fff" stroke-opacity=".3" stroke-width=".6" stroke-dasharray="1.4 1.4">
+      <line x1="0" y1="17.3" x2="32" y2="17.3"/>
+      <line x1="0" y1="22.7" x2="32" y2="22.7"/>
+    </g>
+    <path d="M8.3 18.4 L12.9 22.6" stroke="#86C5B0" stroke-width="2.7" stroke-linecap="round" fill="none"/>
+    <path d="M12.2 23.2 C13.5 17.2 18.4 10.4 25.6 6.6 C23.7 13.2 19 19.4 13.6 23.6 C13.1 23.9 12.4 23.8 12.2 23.2 Z" fill="url(#l)"/>
+    <path d="M13.2 22.6 C16.4 17.4 20.2 12.2 24.6 7.8" stroke="#0F3B3A" stroke-opacity=".45" stroke-width=".55" fill="none" stroke-linecap="round"/>
+    <rect x=".5" y=".5" width="31" height="31" rx="8.5" fill="none" stroke="#fff" stroke-opacity=".1"/>
+  </g>
+</svg>

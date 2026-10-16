@@ -545,7 +545,7 @@ def test_incrementality_lift_and_ci():
     ]
     inc = campaigns.incrementality(members)
     assert inc["exposed"] == {"n": 40, "added": 12, "rate": 0.3}
-    assert inc["holdout"] == {"n": 20, "added": None, "rate": 0.1}  # 2 people: suppressed
+    assert inc["holdout"] == {"n": 20, "added": 2, "rate": 0.1}  # a rate of a group of 20
     # 0.3 - 0.1 +- 1.96 * sqrt(.3*.7/40 + .1*.9/20) = 0.2 +- 0.1935
     assert inc["lift"] == 0.2 and inc["lift_lo"] == 0.01 and inc["lift_hi"] == 0.39
     assert campaigns.incrementality(members[:40] + members[40:49]) is None  # 9 held out
