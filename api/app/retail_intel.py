@@ -664,6 +664,26 @@ def product_view(f: Facts, pid: str) -> dict[str, Any] | None:
             if k >= MIN and q in products
         ]
 
+    # The same flows by brand (people, >= 10), which fill better than single products; the
+    # product's own brand is "Same brand, other product".
+    def brand_of(q: str) -> str:
+        return products[q]["brand"] if q in products else "Other"
+
+    to_b = Counter(b for _, b in {(uh, brand_of(b)) for uh, a, b in f.switches if a == pid})
+    from_b = Counter(b for _, b in {(uh, brand_of(a)) for uh, a, b in f.switches if b == pid})
+
+    def brand_flow(c: Counter) -> list[dict[str, Any]]:
+        return [
+            {
+                "brand": b,
+                "label": "Same brand, other product" if b == p["brand"] else b,
+                "same_brand": b == p["brand"],
+                "n": k,
+            }
+            for b, k in sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))
+            if k >= MIN
+        ]
+
     checked = [uh for uh in members if uh in f.kinds]
     kinds = Counter(k for uh in checked for k in f.kinds[uh])
     conflicts = (
@@ -696,7 +716,13 @@ def product_view(f: Facts, pid: str) -> dict[str, Any] | None:
         "segments": _segments(f, pid),
         "competitors": {"rows": comp, "rank": rank, "of": len(comp), "note": COMPARE_NOTE},
         "co_used": co_used,
-        "switching": {"stopped": retailer._count(stopped), "to": flow(to), "from": flow(frm)},
+        "switching": {
+            "stopped": retailer._count(stopped),
+            "to": flow(to),
+            "from": flow(frm),
+            "to_brands": brand_flow(to_b),
+            "from_brands": brand_flow(from_b),
+        },
         "conflicts": conflicts,
         "evidence": _evidence(f, pid),
         "evidence_caveat": CAVEAT,

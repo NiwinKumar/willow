@@ -12,8 +12,11 @@ plainly (the retailer page's "About this data" panel repeats it):
 - Routine: 2 to 5 real catalog products that target those goals, plus a sunscreen for about 60%
   of people. About 3 in 10 product uses stop at some week between 2 and 10.
 - Switching: about half the time a product use stops, the person starts a different catalog
-  product in the same category for the same goal 0 to 2 weeks later (it has its own effect, and
-  about 3 in 10 of these stop again 2 to 8 weeks after they start).
+  product in the same category for the same goal (any product in the category when it has no
+  other one for that goal, as for most sunscreens) 0 to 2 weeks later (it has its own effect, and
+  about 3 in 10 of these stop again 2 to 8 weeks after they start). Switchers lean strongly
+  toward category products that work for others and are popular: the choice is weighted by
+  ((1 + effect) * (1 + share of people already using it)) ** SWITCH_PULL.
 - Product effect: a per-product drift towards the desired direction on the metrics its concerns
   map to (CATALOG_SPEC), growing to full size 6 weeks after the person starts it, between 0.2 and
   1.1 times the metric's MDC95; about 3 in 10 products have no effect. Effect sizes are invented:
@@ -60,6 +63,11 @@ SKIN_EFFECT = {
 }
 SKIN_SPREAD = (0.85, 1.15)  # random spread per product x skin type
 SWITCH_SHARE = 0.5  # of stopped product uses, the share followed by another product
+# How strongly switchers lean toward category products that work for others and are popular
+# (an invented assumption): weight = ((1 + effect) * (1 + share already using it)) ** PULL.
+# Strong on purpose: with about 15 switches per stopped product, a weaker pull spreads them
+# below the 10-person threshold of the switching views.
+SWITCH_PULL = 16
 CONCERN_METRICS = {
     "acne_blemishes": ["blemishes", "redness"],
     "dark_spots_pigmentation": ["pigment_spots"],
@@ -276,6 +284,8 @@ def generate(
         for s, k in skin_effect(p).items()
     }
     switch_rng = random.Random(SEED + 2)
+    using: dict[str, int] = dict.fromkeys(effect, 0)  # people so far with it in their routine
+    seen = 0
 
     def pick_goal(month: int, taken: list[str]) -> str:
         weights = MONTH_WEIGHTS[min(max(month, 8), 10)]
@@ -338,19 +348,37 @@ def generate(
             if not switching or not go or w <= started:
                 continue
             want = set(product_goals(p)) & set(all_goals) or set(product_goals(p))
-            options = [
+            free = [
                 q
                 for q in products
                 if q["category"] == p["category"]
                 and q["product_id"] not in picks
                 and q["product_id"] not in swaps
-                and (not want or want & set(product_goals(q)))
             ]
+            # same goal; when the category has no other product for it (most sunscreens), any
+            options = [q for q in free if want & set(product_goals(q))] or free
             if options:
-                q = options[int(which * len(options))]
+                # Switchers lean toward category products that work for others: weight =
+                # ((1 + effect) * (1 + share of people already using it)) ** SWITCH_PULL,
+                # picked with the `which` draw (so the number of draws stays fixed).
+                weights = [
+                    ((1 + effect[o["product_id"]]) * (1 + using[o["product_id"]] / max(seen, 1)))
+                    ** SWITCH_PULL
+                    for o in options
+                ]
+                mark, q = which * sum(weights), options[-1]
+                for o, wt in zip(options, weights, strict=True):
+                    if mark < wt:
+                        q = o
+                        break
+                    mark -= wt
                 begin = w + lag
                 stop = begin + stop_after if stops_too else None
                 swaps[q["product_id"]] = (q, begin, stop, slots_q)
+        # Popularity for later switchers: everyone generated so far, whatever `today` is.
+        seen += 1
+        for pid in picks:
+            using[pid] += 1
 
         # Everything above is drawn whatever `today` is; below, only what has happened by now.
         weeks = [

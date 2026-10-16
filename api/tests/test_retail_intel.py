@@ -199,6 +199,34 @@ def test_switching_co_use_and_conflicts():
     assert retail_intel.brand_view(f, "Dot & Key")["switching"]["lost"][0]["brand"] == (
         "La Roche-Posay"
     )
+    lrp_to = {"brand": "La Roche-Posay", "label": "La Roche-Posay", "same_brand": False, "n": 12}
+    assert d["switching"]["to_brands"] == [lrp_to] and d["switching"]["from_brands"] == []
+
+
+def test_brand_flows_fill_better_and_label_the_own_brand():
+    tord = "the-ordinary-niacinamide-10-zinc-1"
+    same = "the-ordinary-alpha-arbutin-2-ha"  # another The Ordinary serum
+    m_nia, m_aa = "minimalist-niacinamide-10-face-serum", "minimalist-alpha-arbutin-2-face-serum"
+    routine = (
+        [_use(i, tord, stopped=3) for i in range(26)]
+        + [_use(i, m_nia, started=3) for i in range(6)]  # 6 people: under 10 as a product
+        + [_use(i, m_aa, started=4) for i in range(6, 11)]  # 5 people
+        + [_use(i, m_aa, started=5) for i in range(3)]  # u00-u02 take both Minimalist serums
+        + [_use(i, same, started=4) for i in range(11, 23)]  # 12 people, same brand
+    )
+    f = _f([_user(i, goals=["blemishes"]) for i in range(26)], routine=routine)
+    s = retail_intel.product_view(f, tord)["switching"]
+    assert [r["product_id"] for r in s["to"]] == [same]  # each Minimalist serum under 10
+    assert s["to_brands"] == [
+        {
+            "brand": "The Ordinary",
+            "label": "Same brand, other product",
+            "same_brand": True,
+            "n": 12,
+        },
+        {"brand": "Minimalist", "label": "Minimalist", "same_brand": False, "n": 11},
+    ]  # Minimalist: 6 + 8 switch rows, 11 people (a person counts once per brand)
+    assert s["stopped"] == 26
 
 
 def test_scoreboard_on_the_synthetic_cohort():
@@ -448,6 +476,29 @@ def test_existing_draws_are_unchanged_and_replacements_are_added():
     assert len(_facts().switches) > 200
     products = {p["product_id"]: p for p in catalog.products()}
     assert all(products[a]["category"] == products[b]["category"] for _, a, b in _facts().switches)
+
+
+def test_switchers_concentrate_enough_for_the_switching_views():
+    f = _facts()
+    big = [
+        pid
+        for pid in retail_intel._catalog()[0]
+        if sum(1 for uh in f.users_of.get(pid, []) if f.rows_of[(uh, pid)]["stopped_week"]) >= 30
+    ]
+    views = {pid: retail_intel.product_view(f, pid)["switching"] for pid in big}
+    assert len(big) >= 6
+    assert sum(1 for s in views.values() if s["to"]) * 2 > len(big)  # most show a `to` row
+    assert sum(1 for s in views.values() if s["to_brands"]) >= sum(
+        1 for s in views.values() if s["to"]
+    )
+    # switches concentrate: in each busy category the most chosen product takes 10 or more
+    products = retail_intel._catalog()[0]
+    landed = Counter(b for _, _, b in f.switches)
+    for cat in {p["category"] for p in products.values()}:
+        ids = [pid for pid, p in products.items() if p["category"] == cat]
+        if sum(landed[pid] for pid in ids) >= 30:
+            top = max(ids, key=lambda pid: landed[pid])
+            assert landed[top] >= 10
 
 
 def test_skin_type_changes_effect_size():
