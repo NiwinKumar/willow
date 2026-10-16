@@ -165,14 +165,16 @@ export function DataTable<T>({
       {toolbar || csv || heading || columnsKey ? (
         <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3">
           {heading ? <div className="flex min-w-0 flex-wrap items-center gap-2">{heading}</div> : null}
-          <div className={`flex min-w-0 flex-wrap items-center gap-2 ${heading ? 'ml-auto' : ''}`}>{toolbar}</div>
-          {columnsKey ? <ColumnsMenu columns={allColumns} hidden={hidden} onToggle={toggleColumn} /> : null}
-          {csv ? (
-            <ToolButton onClick={exportCsv} label={`Export ${caption} as CSV`}>
-              <Download size={15} strokeWidth={1.6} aria-hidden />
-              Export
-            </ToolButton>
-          ) : null}
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+            {toolbar}
+            {columnsKey ? <ColumnsMenu columns={allColumns} hidden={hidden} onToggle={toggleColumn} /> : null}
+            {csv ? (
+              <ToolButton onClick={exportCsv} label={`Export ${caption} as CSV`}>
+                <Download size={15} strokeWidth={1.6} aria-hidden />
+                Export
+              </ToolButton>
+            ) : null}
+          </div>
         </div>
       ) : null}
       <div className="relative overflow-auto overscroll-x-contain border-t border-line" style={{ maxHeight }}>

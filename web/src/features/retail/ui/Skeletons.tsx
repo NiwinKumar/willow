@@ -1,9 +1,10 @@
+import type { CSSProperties } from 'react'
 /**
  * Loading placeholders drawn to the final layout's sizes (no layout shift when data lands). Dark shimmer,
  * static under reduced motion. The region that is loading carries role="status" / aria-busy, not these.
  */
-export function Bone({ className = '' }: { className?: string }) {
-  return <span aria-hidden className={`retail-shimmer block rounded-xs ${className}`} />
+export function Bone({ className = '', style }: { className?: string; style?: CSSProperties }) {
+  return <span aria-hidden style={style} className={`retail-shimmer block rounded-ctl ${className}`} />
 }
 
 /** Matches KpiStrip: one surface, `n` cells. */
