@@ -100,6 +100,11 @@ function Shell() {
   useEffect(() => {
     document.title = `${section.label} · Willow Proof`
   }, [section.label])
+  // A new page starts at the top (filters and tabs change the query string, not the path, so they keep it).
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
+    if (!window.location.hash) window.scrollTo(0, 0)
+  }, [pathname])
   // Focus never lands under the sticky header.
   useLayoutEffect(() => {
     const el = head.current
@@ -251,7 +256,7 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
         : `${int(d.cohort.synthetic)} simulated people, generated from measured photo noise. Not real customers.`
   return (
     <div ref={box} className="relative">
-      <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)} className="hit44 inline-flex h-9 items-center gap-2 rounded-ctl border border-line bg-surface px-3 text-proof-small text-ink hover:border-line-strong hover:bg-pf-hover">
+      <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)} className="hit44 inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-ctl border border-line bg-surface px-3 text-proof-small text-ink hover:border-line-strong hover:bg-pf-hover">
         <span aria-hidden className={`size-1.5 rounded-full ${kind === 'real' ? 'bg-proof-leaf' : 'bg-pf-amber'}`} />
         <span className="hidden sm:inline">{data}</span>
         <span aria-hidden className="hidden text-ink-3 sm:inline">/</span>

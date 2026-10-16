@@ -20,7 +20,7 @@ export function Sparkbars({ days, label, height = 36 }: { days: SparkDay[]; labe
   }
   return (
     <div className="flex flex-col gap-1.5">
-      <p aria-live="polite" className="m-0 truncate font-mono text-[11px] text-ink-2 tnum">
+      <p aria-live="polite" className="m-0 truncate text-proof-label text-ink-2 tnum">
         <span className="text-ink">{shown.label}</span> · {shown.detail}
       </p>
       <div
@@ -44,7 +44,7 @@ export function Sparkbars({ days, label, height = 36 }: { days: SparkDay[]; labe
         })}
       </div>
       {days.length > 1 ? (
-        <div aria-hidden className="flex justify-between font-mono text-[10px] text-ink-2 tnum">
+        <div aria-hidden className="flex justify-between text-proof-label text-ink-2 tnum">
           <span>{days[0].label}</span>
           <span>{days.at(-1)!.label}</span>
         </div>

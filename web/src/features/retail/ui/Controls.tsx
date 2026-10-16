@@ -17,9 +17,15 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
     ref.current?.querySelector<HTMLElement>(`[data-tab="${next.id}"]`)?.focus()
     onChange(next.id)
   }
-  // Keep the selected tab in view when the row scrolls (phones, deep links to a late tab).
+  // Keep the selected tab in view when the row scrolls (phones, deep links to a late tab). Scrolls the row
+  // only: scrollIntoView would also move the page to the tab row on load.
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>(`[data-tab="${value}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const row = ref.current
+    const tab = row?.querySelector<HTMLElement>(`[data-tab="${value}"]`)
+    if (!row || !tab || row.scrollWidth <= row.clientWidth) return
+    const left = tab.getBoundingClientRect().left - row.getBoundingClientRect().left + row.scrollLeft
+    if (left < row.scrollLeft) row.scrollLeft = left
+    else if (left + tab.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = left + tab.offsetWidth - row.clientWidth
   }, [value])
   return (
     <div ref={ref} role="tablist" aria-label={label} onKeyDown={move} className="no-scrollbar flex max-w-full gap-6 overflow-x-auto border-b border-line">

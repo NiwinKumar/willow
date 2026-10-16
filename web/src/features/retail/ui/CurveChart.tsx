@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { pct } from './format'
 
@@ -22,6 +22,7 @@ export type CurveSeries = {
  */
 export function CurveChart({ weeks, series, height = 200, title }: { weeks: number[]; series: CurveSeries[]; height?: number; title: string }) {
   const box = useRef<HTMLDivElement>(null)
+  const gid = useId().replace(/:/g, '')
   const [w, setW] = useState(560)
   useLayoutEffect(() => {
     const el = box.current
@@ -30,7 +31,7 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const pad = { l: 36, r: 108, t: 10, b: 26 }
+  const pad = { l: 40, r: 116, t: 12, b: 28 }
   const iw = w - pad.l - pad.r
   const ih = height - pad.t - pad.b
   const peak = Math.max(0.1, ...series.flatMap((s) => s.values.filter((v): v is number => v !== null)))
@@ -57,6 +58,17 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
     })
     return d
   }
+  // A soft area under the accent series (its first unbroken run), Geist-chart style.
+  const areaOf = (vals: (number | null)[]) => {
+    const pts = vals.map((v, i) => (v === null ? null : ([x(i), y(v)] as const)))
+    const first = pts.findIndex((q) => q !== null)
+    if (first < 0) return ''
+    let end = first
+    while (end + 1 < pts.length && pts[end + 1] !== null) end++
+    let d = `M${pts[first]![0]},${pad.t + ih}V${pts[first]![1]}`
+    for (let i = first + 1; i <= end; i++) d += `H${pts[i]![0]}V${pts[i]![1]}`
+    return `${d}V${pad.t + ih}Z`
+  }
   // Direct labels at the last value, pushed apart when they would overlap.
   const ends = series
     .map((s) => {
@@ -74,15 +86,27 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
           {grid.map((g) => (
             <g key={g}>
               <line x1={pad.l} x2={pad.l + iw} y1={y(g)} y2={y(g)} stroke="var(--line-subtle)" />
-              <text x={pad.l - 8} y={y(g) + 4} textAnchor="end" fontSize={11} fontFamily="var(--font-mono)" fill="var(--text-secondary)">
+              <text x={pad.l - 10} y={y(g) + 4} textAnchor="end" fontSize={12} fill="var(--text-secondary)" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {pct(g)}
               </text>
             </g>
           ))}
           <line x1={pad.l} x2={pad.l + iw} y1={pad.t + ih} y2={pad.t + ih} stroke="var(--line-strong)" />
+          <defs>
+            <linearGradient id={`area-${gid}`} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--signal-change)" stopOpacity={0.18} />
+              <stop offset="100%" stopColor="var(--signal-change)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {series
+            .filter((s) => s.tone === 'signal' && !s.dash)
+            .slice(0, 1)
+            .map((s) => (
+              <path key={`a-${s.id}`} d={areaOf(s.values)} fill={`url(#area-${gid})`} />
+            ))}
           {weeks.map((wk, i) => (
-            <text key={wk} x={x(i)} y={height - 8} textAnchor="middle" fontSize={11} fontFamily="var(--font-mono)" fill="var(--text-secondary)">
-              {i === 0 ? `WK ${wk}` : wk}
+            <text key={wk} x={x(i)} y={height - 8} textAnchor="middle" fontSize={12} fill="var(--text-secondary)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {i === weeks.length - 1 ? `Week ${wk}` : wk}
             </text>
           ))}
           {series.map((s) => (
@@ -90,20 +114,20 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
               key={s.id}
               d={pathOf(s.values)}
               fill="none"
-              stroke={s.tone === 'signal' ? 'var(--signal-change)' : 'var(--text-secondary)'}
-              strokeWidth={s.tone === 'signal' ? 2 : 1.5}
+              stroke={s.tone === 'signal' ? 'var(--signal-change)' : 'var(--pf-base, var(--text-secondary))'}
+              strokeWidth={s.tone === 'signal' ? 2.25 : 1.75}
               strokeDasharray={s.dash ?? (s.tone === 'muted' ? '4 3' : undefined)}
               strokeLinejoin="round"
             />
           ))}
           {ends.map(({ s, i, ly }) => (
             <g key={s.id}>
-              <circle cx={x(i)} cy={y(s.values[i]!)} r={3.5} fill={s.tone === 'signal' ? 'var(--signal-change)' : 'var(--text-secondary)'} stroke="var(--bg-surface)" strokeWidth={1.5} />
-              <text x={x(i) + 10} y={ly + 4} fontSize={12} fill="var(--text-primary)">
-                {s.label} <tspan fontFamily="var(--font-mono)">{pct(s.values[i])}</tspan>
+              <circle cx={x(i)} cy={y(s.values[i]!)} r={3.5} fill={s.tone === 'signal' ? 'var(--signal-change)' : 'var(--pf-base, var(--text-secondary))'} stroke="var(--bg-surface)" strokeWidth={2} />
+              <text x={x(i) + 12} y={ly + 4} fontSize={13} fill="var(--text-primary)">
+                {s.label} <tspan fontWeight={600}>{pct(s.values[i])}</tspan>
               </text>
               {s.n ? (
-                <text x={x(i) + 10} y={ly + 17} fontSize={10.5} fontFamily="var(--font-mono)" fill="var(--text-secondary)">
+                <text x={x(i) + 12} y={ly + 19} fontSize={12} fill="var(--text-secondary)">
                   n={s.n}
                 </text>
               ) : null}
