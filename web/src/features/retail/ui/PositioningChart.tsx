@@ -6,7 +6,7 @@ import { niceDomain } from './insight'
 export type PositionPoint = {
   id: string
   label: string
-  /** Real-change rate (y). */
+  /** Visible-change rate (y). */
   rate: number
   lo?: number | null
   hi?: number | null
@@ -21,9 +21,9 @@ export type PositionPoint = {
 }
 
 /**
- * Positioning: real-change rate (y) against continuation at week 8 (x), bubble area = people, the rate's 95%
+ * Positioning: visible-change rate (y) against continuation at week 8 (x), bubble area = people, the rate's 95%
  * interval as a vertical whisker, dashed guides at the median point. One neutral tone (no hue: brands are
- * identities, and ember stays "real change" only); the emphasised point is solid and labelled, others get
+ * identities, and ember stays "visible change" only); the emphasised point is solid and labelled, others get
  * their label on hover or focus. Every point is a focusable button (Enter selects); a plain table with the
  * same numbers is one click away under the chart.
  */

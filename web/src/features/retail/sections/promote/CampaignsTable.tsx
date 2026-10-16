@@ -159,14 +159,18 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
     {
       id: 'lift',
       header: <HeadTip label="Incremental lift" tip={`Adoption among people who could see the card minus adoption in the randomised holdout, who never see it. Shown once both groups have ${HOLDOUT_MIN} people; hover a figure for its 95% interval.`} />,
-      headerText: 'Incremental lift vs holdout',
+      headerText: 'Incremental lift vs holdout (pts)',
       align: 'right',
       width: '212px',
       sortValue: (c) => c.stats.incrementality?.lift ?? null,
       cell: (c) => {
         const inc = c.stats.incrementality
         if (!inc)
-          return (
+          return c.status === 'ended' ? (
+            <span className="whitespace-nowrap text-proof-small text-ink-2">
+              Not measured<span className="max-[1279px]:hidden"> · under {HOLDOUT_MIN} per group</span>
+            </span>
+          ) : (
             <span className="whitespace-nowrap text-proof-small text-ink-2">
               Collecting<span className="max-[1279px]:hidden"> · needs {HOLDOUT_MIN} per group</span>
             </span>
@@ -180,7 +184,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
           </span>
         )
       },
-      csv: (c) => c.stats.incrementality?.lift ?? 'collecting',
+      csv: (c) => (c.stats.incrementality ? Math.round(c.stats.incrementality.lift * 100) : c.status === 'ended' ? 'not measured' : 'collecting'),
     },
     {
       id: 'menu',

@@ -11,7 +11,7 @@ export const TIERS: Record<ProofTier, { label: string; glyph: string; text: stri
   promising: {
     label: 'Promising',
     glyph: '◐',
-    text: '10+ people and a positive lift, but the interval still includes zero. More people would settle it.',
+    text: '10+ people and a positive lift, but fewer than 30 people or an interval that still includes zero. More people would settle it.',
     tone: 'text-proof-leaf',
   },
   unclear: {

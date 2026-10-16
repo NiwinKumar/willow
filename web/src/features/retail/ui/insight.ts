@@ -53,10 +53,11 @@ export function briefHref(card: Pick<BriefCard, 'id' | 'link'>, carry = ''): str
       if (card.id === 'switching_net') hash = '#switching'
       break
     case 'demand':
+      // The anchor alone places the page (no `view=demand`: once a panel opens the hash is gone, and the old
+      // key would then scroll the page to What people want).
       path = sectionPath('customers')
-      q.set('view', 'demand')
       if (id) q.set('goal', id)
-      hash = { top_conflict: '#conflicts', assortment_gap: '#gaps', unmet_need: '#unmet', rising_goal: '#demand' }[card.id] ?? ''
+      hash = { top_conflict: '#conflicts', assortment_gap: '#gaps', unmet_need: '#unmet', rising_goal: '#demand' }[card.id] ?? '#demand'
       break
     default:
       path = sectionPath('campaigns')
@@ -92,7 +93,7 @@ export function cardFigure(card: Pick<BriefCard, 'id' | 'value' | 'unit'>): { va
 type SegCell = Segments['cells'][number]
 export type UnmetCell = SegCell & { unmet: number; users: number; skinLabel: string; goalLabel: string }
 
-/** Cells with an unmet share, most under-served first (share without a real change, then people). */
+/** Cells with an unmet share, most under-served first (share without a visible change, then people). */
 export function topUnmet(s: Pick<Segments, 'cells' | 'skin_types' | 'goals'>, limit = 5): UnmetCell[] {
   const skin = new Map(s.skin_types.map((x) => [x.id, x.label]))
   const goal = new Map(s.goals.map((x) => [x.id, x.label]))
