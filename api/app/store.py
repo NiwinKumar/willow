@@ -51,6 +51,20 @@ class Store(Protocol):
     def advisor_add(self, uid: str, turns: list[Doc], keep: int) -> None: ...
     def advisor_list(self, uid: str) -> list[Doc]: ...
     def advisor_clear(self, uid: str) -> None: ...
+    # Proof-gated promotion (app/campaigns.py): campaigns/{id}, daily/{day}, seen/{key}.
+    def campaign_set(self, cid: str, doc: Doc) -> None: ...
+    def campaign_get(self, cid: str) -> Doc | None: ...
+    def campaign_update(self, cid: str, fields: Doc) -> None: ...
+    def campaign_delete(self, cid: str) -> None: ...
+    def campaigns_of(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def campaigns_active(self) -> list[tuple[str, Doc]]: ...
+    def campaign_days(self, cid: str) -> list[tuple[str, Doc]]: ...
+    def campaign_event(self, cid: str, day: str, seen_id: str, kind: str) -> bool: ...
+    # Randomised holdout: campaigns/{id}/members/{sha(uid)} {group, first_day, added}.
+    def campaign_member_join(self, cid: str, member_id: str, doc: Doc) -> Doc: ...
+    def campaign_member_get(self, cid: str, member_id: str) -> Doc | None: ...
+    def campaign_member_update(self, cid: str, member_id: str, fields: Doc) -> None: ...
+    def campaign_members(self, cid: str) -> list[Doc]: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -244,6 +258,74 @@ class FirestoreStore:
         db = self._db()
         db.recursive_delete(db.collection(f"users/{uid}/advisor_messages"))
 
+    def campaign_set(self, cid: str, doc: Doc) -> None:
+        self._db().document(f"campaigns/{cid}").set(doc)
+
+    def campaign_get(self, cid: str) -> Doc | None:
+        snap = self._db().document(f"campaigns/{cid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def campaign_update(self, cid: str, fields: Doc) -> None:
+        self._db().document(f"campaigns/{cid}").update(fields)
+
+    def campaign_delete(self, cid: str) -> None:
+        db = self._db()
+        db.recursive_delete(db.document(f"campaigns/{cid}"))  # daily counters and seen keys too
+
+    def campaigns_of(self, uid: str) -> list[tuple[str, Doc]]:
+        # single-field equality: Firestore's automatic index, no composite index
+        q = self._db().collection("campaigns").where("owner_uid", "==", uid)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def campaigns_active(self) -> list[tuple[str, Doc]]:
+        q = self._db().collection("campaigns").where("status", "==", "active")
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def campaign_days(self, cid: str) -> list[tuple[str, Doc]]:
+        snaps = self._db().collection(f"campaigns/{cid}/daily").stream()
+        return [(s.id, s.to_dict()) for s in snaps]
+
+    def campaign_event(self, cid: str, day: str, seen_id: str, kind: str) -> bool:
+        """Atomically: count `kind` once per person per day (seen/{seen_id}); a click or an add
+        only after an impression that day. Returns whether it counted."""
+        from google.cloud import firestore
+
+        db = self._db()
+        seen = db.document(f"campaigns/{cid}/seen/{seen_id}")
+        daily = db.document(f"campaigns/{cid}/daily/{day}")
+
+        @firestore.transactional
+        def count(tx) -> bool:
+            had = seen.get(transaction=tx).to_dict() or {}
+            if had.get(kind) or (kind != "impression" and not had.get("impression")):
+                return False
+            tx.set(seen, {"day": day, kind: True}, merge=True)
+            tx.set(daily, {"day": day, f"{kind}s": firestore.Increment(1)}, merge=True)
+            return True
+
+        return count(db.transaction())
+
+    def campaign_member_join(self, cid: str, member_id: str, doc: Doc) -> Doc:
+        """Create-if-absent: the first assignment stands; returns the doc on record."""
+        from google.api_core.exceptions import AlreadyExists, Conflict
+
+        ref = self._db().document(f"campaigns/{cid}/members/{member_id}")
+        try:
+            ref.create(doc)
+            return dict(doc)
+        except (AlreadyExists, Conflict):
+            return ref.get().to_dict() or dict(doc)
+
+    def campaign_member_get(self, cid: str, member_id: str) -> Doc | None:
+        snap = self._db().document(f"campaigns/{cid}/members/{member_id}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def campaign_member_update(self, cid: str, member_id: str, fields: Doc) -> None:
+        self._db().document(f"campaigns/{cid}/members/{member_id}").update(fields)
+
+    def campaign_members(self, cid: str) -> list[Doc]:
+        return [s.to_dict() for s in self._db().collection(f"campaigns/{cid}/members").stream()]
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -257,6 +339,10 @@ class MemoryStore:
         self.push: dict[tuple[str, str], Doc] = {}
         self.reminders_sent: dict[tuple[str, str], Doc] = {}
         self.advisor: dict[tuple[str, str], Doc] = {}
+        self.campaigns: dict[str, Doc] = {}
+        self.campaign_daily: dict[tuple[str, str], Doc] = {}
+        self.campaign_seen: dict[tuple[str, str], Doc] = {}
+        self.campaign_member: dict[tuple[str, str], Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -389,6 +475,51 @@ class MemoryStore:
     def advisor_clear(self, uid: str) -> None:
         for key in [k for k in self.advisor if k[0] == uid]:
             del self.advisor[key]
+
+    def campaign_set(self, cid: str, doc: Doc) -> None:
+        self.campaigns[cid] = copy.deepcopy(doc)
+
+    def campaign_get(self, cid: str) -> Doc | None:
+        return copy.deepcopy(self.campaigns.get(cid))
+
+    def campaign_update(self, cid: str, fields: Doc) -> None:
+        self.campaigns[cid].update(copy.deepcopy(fields))
+
+    def campaign_delete(self, cid: str) -> None:
+        self.campaigns.pop(cid, None)
+        for table in (self.campaign_daily, self.campaign_seen, self.campaign_member):
+            for key in [k for k in table if k[0] == cid]:
+                del table[key]
+
+    def campaigns_of(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(c, copy.deepcopy(d)) for c, d in self.campaigns.items() if d["owner_uid"] == uid]
+
+    def campaigns_active(self) -> list[tuple[str, Doc]]:
+        return [(c, copy.deepcopy(d)) for c, d in self.campaigns.items() if d["status"] == "active"]
+
+    def campaign_days(self, cid: str) -> list[tuple[str, Doc]]:
+        return [(day, copy.deepcopy(d)) for (c, day), d in self.campaign_daily.items() if c == cid]
+
+    def campaign_event(self, cid: str, day: str, seen_id: str, kind: str) -> bool:
+        had = self.campaign_seen.setdefault((cid, seen_id), {"day": day})
+        if had.get(kind) or (kind != "impression" and not had.get("impression")):
+            return False
+        had[kind] = True
+        row = self.campaign_daily.setdefault((cid, day), {"day": day})
+        row[f"{kind}s"] = row.get(f"{kind}s", 0) + 1
+        return True
+
+    def campaign_member_join(self, cid: str, member_id: str, doc: Doc) -> Doc:
+        return copy.deepcopy(self.campaign_member.setdefault((cid, member_id), copy.deepcopy(doc)))
+
+    def campaign_member_get(self, cid: str, member_id: str) -> Doc | None:
+        return copy.deepcopy(self.campaign_member.get((cid, member_id)))
+
+    def campaign_member_update(self, cid: str, member_id: str, fields: Doc) -> None:
+        self.campaign_member[(cid, member_id)].update(copy.deepcopy(fields))
+
+    def campaign_members(self, cid: str) -> list[Doc]:
+        return [copy.deepcopy(d) for (c, _), d in self.campaign_member.items() if c == cid]
 
 
 @lru_cache

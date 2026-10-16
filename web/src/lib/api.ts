@@ -245,6 +245,8 @@ export type Profile = {
   skin_type: SkinType | null
   checkin: CheckinSchedule | null
   updated_at: string | null
+  /** Routine's "Sponsored · Willow Proven" card off (default false; absent from older apis). */
+  hide_sponsored?: boolean
 }
 export type ProfilePatch = Partial<Omit<Profile, 'updated_at'>>
 
@@ -429,6 +431,90 @@ export const api = {
   advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
   clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
   advisorChatStream,
+  /** Proof-gated promotion (api campaign_routes.py): the consumer's sponsored card and its events. */
+  sponsored: (token: string, placement: SponsoredPlacement = 'routine') => request<{ item: SponsoredItem | null }>(token, `/v1/sponsored?placement=${placement}`),
+  sponsoredEvent: (token: string, campaignId: string, kind: SponsoredEventKind) => request<void>(token, `/v1/sponsored/${encodeURIComponent(campaignId)}/events`, { method: 'POST', ...json({ kind }) }),
+  /** Retailer campaigns (Willow Proof "Promote"): sign-in, guest ok. */
+  eligibility: (token: string) => request<{ products: PromoEligibility[] }>(token, '/v1/retailer/eligibility'),
+  createCampaign: (token: string, body: NewCampaign) => request<Campaign>(token, '/v1/retailer/campaigns', { method: 'POST', ...json(body) }),
+  listCampaigns: (token: string) => request<{ campaigns: Campaign[] }>(token, '/v1/retailer/campaigns'),
+  updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
+  deleteCampaign: (token: string, id: string) => request<void>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+}
+
+/** Proof-gated promotion types (docs/CONTRACT.md section 3, docs/RETAILER_INSIGHTS.md). */
+export type SponsoredPlacement = 'routine'
+export type SponsoredEventKind = 'impression' | 'click' | 'add'
+export type SponsoredItem = {
+  campaign_id: string
+  product_id: string
+  product: string
+  brand: string
+  image_url: string | null
+  category: string
+  /** Deterministic, claim-ready line with its n (from the eligibility evidence). */
+  evidence: string
+  cohort_label: string
+  label: 'Sponsored'
+  /** What matched the person's own profile ("Why am I seeing this?"). */
+  matched: { goals: string[]; skin_type: SkinType | null }
+  disclosure: string
+}
+/** One product's promotion eligibility (cohort mixed, all time: the evidence shoppers see). */
+export type PromoEligibility = {
+  product_id: string
+  product: string
+  brand: string
+  tier: 'proven' | 'promising' | 'unclear' | 'too_few'
+  eligible: boolean
+  reasons: string[]
+  goals: string[]
+  skin_types: string[]
+  evidence: string
+}
+export type NewCampaign = {
+  product_id: string
+  /** 'retailer' or a catalog brand (a brand may only promote its own products). */
+  workspace: string
+  goals: string[]
+  /** Within the product's eligible skin types; [] = all eligible skin types. */
+  skin_types: SkinType[]
+  days: 7 | 14 | 30
+  placement?: SponsoredPlacement
+  /** Randomised holdout share, 0.1-0.5 (default 0.2). */
+  holdout_pct?: number
+}
+/** Delivery counts as counted (once per person per day per kind; never split by goal or skin type). */
+export type CampaignDay = { day: string; impressions: number; clicks: number; adds: number }
+export type IncrementalityGroup = { n: number; added: number | null; rate: number }
+export type CampaignStats = {
+  impressions: number
+  clicks: number
+  adds: number
+  /** clicks / impressions (null at 0 impressions). */
+  ctr: number | null
+  daily: CampaignDay[]
+  /** Adoption exposed vs randomised holdout; null until both groups have 10 people. */
+  incrementality: { exposed: IncrementalityGroup; holdout: IncrementalityGroup; lift: number; lift_lo: number; lift_hi: number } | null
+  incrementality_note: string
+}
+export type Campaign = {
+  id: string
+  workspace: string
+  product_id: string
+  goals: string[]
+  skin_types: SkinType[]
+  placement: SponsoredPlacement
+  status: 'active' | 'paused' | 'ended'
+  days: 7 | 14 | 30
+  starts_at: string
+  ends_at: string
+  created_at: string
+  product: string | null
+  brand: string | null
+  category: string | null
+  image_url: string | null
+  stats: CampaignStats
 }
 
 /** The stream could not be used at all (old api, a proxy, no readable body): nothing was sent or counted. */

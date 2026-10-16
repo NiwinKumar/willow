@@ -21,11 +21,15 @@ CAPS: dict[str, tuple[int, int]] = {
     "analyze": (60, 2000),
     "sample_runs": (12, 600),
     "routine_check": (100, 5000),  # re-run on every routine change; past it, rules only
+    # Proof-gated promotion (app/campaigns.py): Firestore writes, not paid calls; bounded anyway.
+    "campaign_create": (20, 2000),
+    "sponsored_event": (60, 100000),  # a person counts once a day per campaign and kind
 }
 
 MESSAGES = {
     "advisor": "That is 20 questions for today.",
     "retailer_ask": "That is 20 questions for today.",
+    "campaign_create": "That is 20 new campaigns for today.",
 }
 
 

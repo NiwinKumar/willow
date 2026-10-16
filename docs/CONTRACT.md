@@ -224,6 +224,13 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | GET | `/v1/retailer/brands?cohort&range` | `{filters, cohort, brands[{brand, products, users, n, rate, lo, hi, cont8, routine_share}], note}` |
 | GET | `/v1/retailer/brands/{brand}?cohort&range` | 404 unknown (case-insensitive, URL-encoded). `{filters, cohort, brand, products: Row[], goals[{goal_id, label, brand {rate, n, lo, hi}\|null, market {rate, n}\|null, best_competitor {brand, rate, n}\|null, rank, of}], share[{category, label, brand_share, users}], switching {won[{brand, n}], lost[{brand, n}], net}, positioning[{brand, rate, cont8, users, is_self}], skin[{skin, label, brand_rate, market_rate, n}], note}` |
 | GET | `/v1/retailer/brief?cohort&range&brand=` | 404 unknown brand. `{filters, cohort, cards[{id, kind: win\|risk\|opportunity\|trend\|gap, title, body, value, unit, n, link {section: products\|categories\|segments\|competitors\|demand\|promote, id?}}], summary {text, validated: true}\|null}`; cards deterministic (brand-centric with `brand`), summary from Gemini (<= 60 words, every number must be in the cards, cached; null on failure) |
+| GET | `/v1/retailer/eligibility` | proof-gated promotion (sign-in, guest ok): `{products: [{product_id, product, brand, tier, eligible, reasons[], goals[], skin_types[], evidence}]}`, always cohort=mixed, range=all (`app/retail_intel.py`); 503 `insights_unavailable` when the evidence can't be read |
+| POST | `/v1/retailer/campaigns` | `{product_id, workspace: 'retailer'\|catalog brand, goals[] (1-8 goal ids), skin_types[] (within the eligible skin types; [] = all eligible), days: 7\|14\|30, placement?: 'routine', holdout_pct?: 0.1-0.5 (default 0.2)}` -> 201 `Campaign`; 422 `{code: not_eligible, message, reasons[]}` (product not `proven`, a goal or skin type outside its evidence, no eligible skin type, or a brand workspace promoting another brand); 422 `bad_request` unknown workspace; 404 unknown product; 429 `too_many_active` past 3 running per owner (or the daily cap, 20) |
+| GET | `/v1/retailer/campaigns` | mine, newest first: `{campaigns: Campaign[]}`. `Campaign` = `{id, workspace, product_id, goals, skin_types, placement, status: active\|paused\|ended (ended once ends_at passed), days, starts_at, ends_at, created_at, product, brand, category, image_url, stats: {impressions, clicks, adds, ctr, daily: [{day, impressions, clicks, adds}], incrementality: {exposed: {n, added, rate}, holdout: {n, added, rate}, lift, lift_lo, lift_hi} \| null, incrementality_note}}`. Delivery counts are shown as counted (once per person per day for each kind; never split by goal or skin type); `ctr` = clicks / impressions (null at 0 impressions); `incrementality` null until both groups have 10 members (`added` null under 10; lift CI = diff +- 1.96 sqrt(p1(1-p1)/n1 + p2(1-p2)/n2), 2 dp) |
+| PATCH/DELETE | `/v1/retailer/campaigns/{id}` | owner only (others get 404): `{status: active\|paused}` -> `Campaign` (resuming re-checks the evidence and the cap: 422/429; 409 `ended`) / DELETE -> 204 (stats and members go too) |
+| GET | `/v1/sponsored?placement=routine` | `{item: {campaign_id, product_id, product, brand, image_url, category, evidence, cohort_label, label: 'Sponsored', matched: {goals[], skin_type \| null}, disclosure} \| null}`: running campaigns whose product is still eligible and not in the person's routine (any entry), goals overlapping `profile.goals`, `profile.skin_type` in the campaign's `skin_types` (or, when empty, in the product's eligible skin types; no skin type never matches); rotated by hash(uid + day); the person is assigned once to `exposed`/`holdout` per campaign (hash(campaign_id + uid) < holdout_pct = holdout; a holdout member gets the next match or null). null with `profile.hide_sponsored`, no goals, or the evidence unavailable |
+| POST | `/v1/sponsored/{campaign_id}/events` | `{kind: impression\|click\|add}` -> 204; each person counts once per day per kind; a click or add only after that day's impression, an add only with the product in the routine; 404 unknown campaign; 60 a day |
+| — | `POST /v1/routine` addition | a catalog product added by any path marks `added: true` on the person's membership in every running campaign for it (holdout attribution) |
 
 `SessionView` = `{session, result: AnalysisResult, labels: {candidate_id: label}, explanation: Explanation}`.
 
@@ -247,7 +254,8 @@ users/{uid}
   profile: {goals: string[] (<= 3 of dark_spots|even_tone|redness|blemishes|pores_texture|lines|
              under_eye|oil_glow), photo_time: morning|midday|evening|null, display_name: string|null (<= 60),
              skin_type: oily|combination|dry|normal|sensitive|null,
-             checkin: {days: int[] (0 = Mon .. 6 = Sun), time: "HH:MM", tz: IANA name} | null, updated_at}
+             checkin: {days: int[] (0 = Mon .. 6 = Sun), time: "HH:MM", tz: IANA name} | null, updated_at,
+             hide_sponsored: bool (default false; Routine's sponsored card off)}
 users/{uid}/sessions/{session_id}
   site, capture_mode, n_frames, created_at, status: uploading|processing|done|failed,
   frame_uris[], is_baseline, result (AnalysisResult), labels{}, explanation{}
@@ -282,6 +290,17 @@ products/{product_id}
    and size on `checked`, in the page's currency; null when not verified. Never estimated,
    converted or copied between stores. The top-level `price` is unchanged. Served as-is by
    GET /v1/catalog/search, GET /v1/catalog/{product_id} and advisor product cards.)
+campaigns/{campaign_id}                      (proof-gated promotion, api only; c_ + 12 hex)
+  owner_uid, workspace ('retailer' | brand name), product_id, goals[], skin_types[] ([] = every eligible skin type),
+  placement: 'routine', status: active|paused (ended is computed from ends_at), days (7|14|30),
+  holdout_pct (default 0.2), starts_at, ends_at, created_at, updated_at
+campaigns/{campaign_id}/daily/{YYYY-MM-DD}
+  day, impressions, clicks, adds                                (people per day, Increment)
+campaigns/{campaign_id}/seen/{sha256(uid + ":" + day)[:32]}
+  day, impression, click, add (bools)                           (once per person per day per kind)
+campaigns/{campaign_id}/members/{sha256(uid)[:32]}
+  group: exposed|holdout, first_day, added, added_day?          (randomised holdout; created once)
+  (queries: owner_uid ==, status == : single-field, automatic indexes; no composite index)
 ```
 Security rules: users read/write only their own `users/{uid}/**`; `products` read-only for signed-in users; demo users read-only.
 
