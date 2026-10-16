@@ -151,10 +151,10 @@ function Body({ d }: { d: Insights }) {
 
       <Panel flush title="Side by side" id="cmp-h" meta={<SimBadge cohort={d.cohort} />} footnote={<>{xs[0]?.competitors.note ?? 'Observational comparison under the same method; differences inside the confidence intervals are not meaningful.'} Hover a rate or lift for its <Term id="interval">95% interval</Term>.</>}>
         <div className="overflow-x-auto overscroll-x-contain">
-          <table className="w-full min-w-[640px] table-fixed border-separate border-spacing-0 text-proof-body">
+          <table className="w-full min-w-[560px] table-fixed border-separate border-spacing-0 text-proof-body">
             <caption className="sr-only">Products compared side by side</caption>
             <colgroup>
-              <col style={{ width: 168 }} />
+              <col className="w-[116px] sm:w-[168px]" />
               {ids.map((id) => (
                 <col key={id} />
               ))}
