@@ -3,7 +3,7 @@ import { GOALS } from '../../lib/metrics.ts'
 import { SKIN_LABEL, whyLines } from '../routine/sponsored.ts'
 
 /**
- * Willow Proof · Promote: the pure parts (words, dates, errors, the holdout interval), so `npm test` can read
+ * Willow Proof · Campaigns (formerly Promote): the pure parts (words, dates, errors, the holdout interval), so `npm test` can read
  * them without the app. Rules and shapes: docs/RETAILER_INSIGHTS.md "Proof-gated promotion", api campaigns.py.
  */
 
@@ -11,8 +11,8 @@ import { SKIN_LABEL, whyLines } from '../routine/sponsored.ts'
 export const MAX_ACTIVE = 3
 export const DAYS = [7, 14, 30] as const
 export type Days = (typeof DAYS)[number]
-/** Holdout shares the api accepts (0.1-0.5); 20% is the api default. */
-export const HOLDOUTS = [0.1, 0.2, 0.3, 0.5] as const
+/** Holdout shares the api accepts (0.1-0.5, here in 5-point steps); 20% is the api default. */
+export const HOLDOUT_RANGE = { min: 0.1, max: 0.5, step: 0.05 } as const
 export const DEFAULT_HOLDOUT = 0.2
 /** The consumer card's cohort label and disclosure, word for word (api campaigns.COHORT_LABEL / DISCLOSURE). */
 export const COHORT_LABEL = 'Willow cohort, includes simulated data'
@@ -144,4 +144,59 @@ export function exampleWhy(goals: string[], skinTypes: string[], eligibleSkins: 
 export function barHeights(values: number[]): number[] {
   const max = Math.max(0, ...values)
   return values.map((v) => (max ? v / max : 0))
+}
+
+/** "Dark spots, Lines · Oily, Combination"; no skin types = every skin type the evidence covers. */
+export function audienceText(goals: string[], skinTypes: string[]): string {
+  return `${goals.map(goalLabel).join(', ')} · ${skinTypes.length ? skinTypes.map(skinLabel).join(', ') : 'all eligible skin types'}`
+}
+
+/**
+ * The create panel's target from the URL: `?new=<product_id>` (the product page's Promote), `?new=1` (blank), or
+ * the older `?product=<id>`.
+ */
+export function createTarget(newParam: string | null, productParam: string | null): { open: boolean; product: string | null } {
+  const fromNew = newParam && newParam !== '1' ? newParam : null
+  return { open: Boolean(newParam || productParam), product: fromNew ?? (productParam || null) }
+}
+
+/**
+ * Why this workspace can't promote a product, in words ([] = it can): the api's reasons when it isn't Proven,
+ * the brand rule when it's another brand's, or "not in the catalog" when eligibility doesn't know it.
+ */
+export function blockedReasons(p: Pick<PromoEligibility, 'eligible' | 'brand' | 'reasons'> | undefined, brand: string | null): string[] {
+  if (!p) return ['This product isn’t in the catalog.']
+  if (!p.eligible) return p.reasons.length ? p.reasons : ['It isn’t Proven yet.']
+  if (brand !== null && p.brand !== brand) return [`A brand workspace promotes its own products; this one is ${p.brand}’s.`]
+  return []
+}
+
+/**
+ * Matching profiles in the cohort, from the skin type × goal people counts: at least the largest single goal
+ * (summed over the chosen skin types, which don't overlap), at most every goal added up (people with two goals
+ * count twice), capped by the people with those skin types. Suppressed groups (null) add nothing. null: no data.
+ */
+export function reachRange(cells: { skin: string; goal: string; users: number | null }[], goals: string[], skins: string[], skinTotals?: { id: string; users: number | null }[]): { lo: number; hi: number } | null {
+  if (!goals.length || !skins.length) return null
+  const per = goals.map((g) => cells.filter((c) => c.goal === g && skins.includes(c.skin)).reduce((sum, c) => sum + (c.users ?? 0), 0))
+  const lo = Math.max(...per)
+  let hi = per.reduce((a, b) => a + b, 0)
+  const cap = skinTotals?.filter((s) => skins.includes(s.id)).reduce((sum, s) => sum + (s.users ?? 0), 0)
+  if (cap) hi = Math.min(hi, Math.max(cap, lo))
+  return hi ? { lo, hi } : null
+}
+
+/** Totals for the page's one-line answer: running campaigns, impressions so far, and each measured holdout lift. */
+export function campaignSummary(cs: Pick<Campaign, 'status' | 'stats'>[]): { active: number; impressions: number; lifts: number[] } {
+  return {
+    active: runningCount(cs),
+    impressions: cs.reduce((sum, c) => sum + c.stats.impressions, 0),
+    lifts: cs.flatMap((c) => (c.stats.incrementality ? [c.stats.incrementality.lift] : [])),
+  }
+}
+
+/** A holdout lift for the answer line: "6 pts" + "above" / "below" / "level with" (the page bolds the figure). */
+export function liftWords(lift: number): { figure: string; dir: 'above' | 'below' | 'level with' } {
+  const p = Math.round(lift * 100)
+  return { figure: p > 0 ? `+${p} pts` : p < 0 ? `${-p} pts` : '', dir: p > 0 ? 'above' : p < 0 ? 'below' : 'level with' }
 }

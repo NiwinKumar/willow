@@ -1,224 +1,236 @@
-import { Pause, Play, Trash2 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { ExternalLink, Pause, Play, Trash2 } from 'lucide-react'
 
-import { ProductImage } from '../../../../components/willow/ProductImage'
-import { api, type Campaign } from '../../../../lib/api'
-import { useAuth } from '../../../../lib/useAuth'
-import { ctrText, dateRange, goalLabel, HOLDOUT_MIN, promoError, skinText, timeLeft, wilson, type PromoError } from '../../promote'
-import { int, interval, pct, pts, Sparkbars, Term, useTooltip, type SparkDay } from '../../ui'
+import type { Campaign, IncrementalityGroup } from '../../../../lib/api'
+import { ctrText, dateRange, goalLabel, HOLDOUT_MIN, skinLabel, timeLeft, wilson, type PromoError } from '../../promote'
+import { Badge, Button, int, interval, pct, pts, Sparkbars, type SparkDay } from '../../ui'
+import type { useCampaignActions } from './useCampaignActions'
 
-const STATUS: Record<Campaign['status'], { glyph: string; label: string; cls: string }> = {
-  active: { glyph: '●', label: 'Active', cls: 'border-proof-leaf-line bg-proof-leaf-soft text-ink [&>span]:text-proof-leaf' },
-  paused: { glyph: '❙❙', label: 'Paused', cls: 'border-line-strong text-ink [&>span]:text-ink-2' },
-  ended: { glyph: '■', label: 'Ended', cls: 'border-line text-ink-2 [&>span]:text-ink-2' },
+/*
+ * One campaign, in detail (the Campaigns page's side panel): status, audience and dates, the randomised-holdout
+ * comparison (the answer a buyer wants: the adoption the campaign caused), then delivery as counted with the
+ * daily bars. Pause / resume / delete act in place; the api's refusals (422 evidence, 429 cap, 409 ended) show
+ * inline. `useCampaignActions` is shared with the table's row menu.
+ */
+
+const STATUS: Record<Campaign['status'], { label: string; tone: 'green' | 'gray' | 'outline' }> = {
+  active: { label: 'Active', tone: 'green' },
+  paused: { label: 'Paused', tone: 'gray' },
+  ended: { label: 'Ended', tone: 'outline' },
 }
 
-export function StatusChip({ status }: { status: Campaign['status'] }) {
+export function StatusBadge({ status }: { status: Campaign['status'] }) {
   const s = STATUS[status]
   return (
-    <span className={`inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border px-2 text-proof-small ${s.cls}`}>
-      <span aria-hidden className="text-[9px] leading-none tracking-[-.1em]">
-        {s.glyph}
-      </span>
+    <Badge tone={s.tone}>
+      {status === 'active' ? <span aria-hidden className="size-1.5 rounded-full bg-proof-leaf" /> : null}
       {s.label}
-    </span>
+    </Badge>
   )
 }
 
 const dayLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-const n = (v: number, one: string, many = `${one}s`) => `${int(v)} ${v === 1 ? one : many}`
+const count = (v: number, one: string, many = `${one}s`) => `${int(v)} ${v === 1 ? one : many}`
 
-/**
- * One campaign: status (glyph + word), product, audience, dates, delivery as counted (impressions, clicks, CTR,
- * adds) with a daily sparkline, and the randomised-holdout comparison (or the honest pending state). Pause,
- * resume and delete act in place; the api's refusals (422 evidence, 429 cap, 409 ended) show inside the card.
- */
-export function CampaignCard({ c, onChanged, onDeleted, onStale, highlight, otherWorkspace }: { c: Campaign; onChanged: (c: Campaign) => void; onDeleted: (id: string) => void; onStale: () => void; highlight: boolean; otherWorkspace: string | null }) {
-  const { getIdToken } = useAuth()
-  const [busy, setBusy] = useState<null | 'status' | 'delete'>(null)
-  const [error, setError] = useState<PromoError | null>(null)
-  const [confirm, setConfirm] = useState(false)
+export function CampaignDetail({ c, otherWorkspace, actions }: { c: Campaign; otherWorkspace: string | null; actions: ReturnType<typeof useCampaignActions> }) {
   const s = c.stats
-
-  // A refusal can mean this list is out of date (a campaign started elsewhere, this one ended or was removed).
-  const fail = (e: unknown) => {
-    const err = promoError(e)
-    setError(err)
-    if (err.kind === 'too_many' || err.kind === 'ended' || (e as { status?: number }).status === 404) onStale()
-  }
-  const setStatus = async (status: 'active' | 'paused') => {
-    setBusy('status')
-    setError(null)
-    try {
-      onChanged(await api.updateCampaign(await getIdToken(), c.id, { status }))
-    } catch (e) {
-      fail(e)
-    } finally {
-      setBusy(null)
-    }
-  }
-  const remove = async () => {
-    setBusy('delete')
-    setError(null)
-    try {
-      await api.deleteCampaign(await getIdToken(), c.id)
-      onDeleted(c.id)
-    } catch (e) {
-      fail(e)
-      setBusy(null)
-    }
-  }
-
-  const days: SparkDay[] = s.daily.map((d) => ({ key: d.day, label: dayLabel(d.day), value: d.impressions, detail: `${n(d.impressions, 'impression')} · ${n(d.clicks, 'click')} · ${n(d.adds, 'add')}` }))
-  const btn = 'hit44 inline-flex h-8 items-center gap-1.5 rounded-xs border border-line-strong bg-transparent px-2.5 text-proof-small text-ink hover:bg-glass disabled:opacity-45'
-
+  const days: SparkDay[] = s.daily.map((d) => ({ key: d.day, label: dayLabel(d.day), value: d.impressions, detail: `${count(d.impressions, 'impression')} · ${count(d.clicks, 'click')} · ${count(d.adds, 'add')}` }))
+  const holdout = c.holdout_pct ?? 0.2
   return (
-    <article id={`campaign-${c.id}`} tabIndex={-1} aria-labelledby={`campaign-${c.id}-h`} className={`flex min-w-0 flex-col rounded-sm border bg-surface outline-none transition-[border-color,box-shadow] duration-700 ${highlight ? 'border-proof-leaf shadow-[0_0_0_3px_var(--proof-leaf-soft)]' : 'border-line'}`}>
-      <header className="flex items-start gap-3 border-b border-line px-4 py-3">
-        <ProductImage product={{ image_url: c.image_url, category: c.category ?? '', name: c.product ?? c.product_id }} size={36} decorative />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h3 id={`campaign-${c.id}-h`} className="m-0 truncate text-proof-h font-medium text-ink" title={c.product ?? c.product_id}>
-            {c.product ?? c.product_id}
-          </h3>
-          <span className="truncate text-proof-small text-ink-2">
-            {c.brand}
-            {otherWorkspace ? ` · from ${otherWorkspace}` : ''}
-          </span>
-        </div>
-        <StatusChip status={c.status} />
-      </header>
-
-      <div className="flex flex-col gap-3 px-4 py-3">
-        <dl className="m-0 grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 text-proof-small">
-          <dt className="text-ink-2">Audience</dt>
-          <dd className="m-0 min-w-0 text-ink">
-            {c.goals.map(goalLabel).join(', ')} · {skinText(c.skin_types)}
-          </dd>
-          <dt className="text-ink-2">Dates</dt>
-          <dd className="m-0 font-mono text-[12px] text-ink tnum">
-            {dateRange(c.starts_at, c.ends_at)} · <span className={c.status === 'ended' ? 'text-ink-2' : ''}>{timeLeft(c)}</span>
-          </dd>
-        </dl>
-
-        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-xs border border-line bg-line">
-          <Stat label="Impressions" value={int(s.impressions)} />
-          <Stat label="Clicks" value={int(s.clicks)} />
-          <Stat label={<Term id="ctr">CTR</Term>} value={ctrText(s.ctr)} />
-          <Stat label="Adds" value={int(s.adds)} title="Adds to routine from this card" />
-        </div>
-        {days.length ? <Sparkbars days={days} label={`Impressions per day for ${c.product ?? 'this campaign'}`} /> : null}
-        <p className="m-0 text-[11px] text-ink-2">Delivery counts each person once a day per kind, as counted; never split by goal or skin type.</p>
-
-        <Incrementality c={c} />
-
-        {error ? (
-          <div role="alert" className="flex flex-col gap-1 rounded-xs border border-line-strong bg-sunken p-3">
-            <span className="text-proof-body font-medium text-ink">{error.title}</span>
-            <span className="text-proof-small text-ink-2">{error.message}</span>
-            {error.reasons.length ? (
-              <ul className="m-0 list-disc pl-4 text-proof-small text-ink">
-                {error.reasons.map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      <footer className="mt-auto flex flex-wrap items-center gap-2 border-t border-line px-4 py-2.5">
-        {confirm ? (
-          <div role="group" aria-label="Confirm delete" className="flex w-full flex-wrap items-center gap-2">
-            <span className="mr-auto text-proof-small text-ink">Delete this campaign and its stats? This can’t be undone.</span>
-            <button type="button" autoFocus onClick={() => setConfirm(false)} className={btn}>
-              Keep it
-            </button>
-            <button type="button" onClick={() => void remove()} disabled={busy === 'delete'} className="hit44 inline-flex h-8 items-center gap-1.5 rounded-xs border-0 bg-selected px-3 text-proof-small font-medium text-inverse hover:bg-ink/85 disabled:opacity-45">
-              {busy === 'delete' ? 'Deleting…' : 'Delete campaign'}
-            </button>
-          </div>
-        ) : (
+    <div className="flex flex-col gap-8">
+      <dl className="m-0 grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-proof-body">
+        <dt className="text-ink-2">Status</dt>
+        <dd className="m-0 flex flex-wrap items-center gap-2">
+          <StatusBadge status={c.status} />
+          <span className="text-ink-2">{timeLeft(c)}</span>
+        </dd>
+        <dt className="text-ink-2">Dates</dt>
+        <dd className="m-0 text-ink tnum">
+          {dateRange(c.starts_at, c.ends_at)} · {c.days} days
+        </dd>
+        <dt className="text-ink-2">Goals</dt>
+        <dd className="m-0 text-ink">{c.goals.map(goalLabel).join(', ')}</dd>
+        <dt className="text-ink-2">Skin types</dt>
+        <dd className="m-0 text-ink">{c.skin_types.length ? c.skin_types.map(skinLabel).join(', ') : 'Every skin type the evidence covers'}</dd>
+        <dt className="text-ink-2">Holdout</dt>
+        <dd className="m-0 text-ink tnum">{Math.round(holdout * 100)}% of matching people, never shown</dd>
+        {otherWorkspace ? (
           <>
-            {c.status === 'active' ? (
-              <button type="button" onClick={() => void setStatus('paused')} disabled={busy !== null} className={btn}>
-                <Pause size={13} strokeWidth={1.8} aria-hidden />
-                {busy === 'status' ? 'Pausing…' : 'Pause'}
-              </button>
-            ) : c.status === 'paused' ? (
-              <button type="button" onClick={() => void setStatus('active')} disabled={busy !== null} className={btn}>
-                <Play size={13} strokeWidth={1.8} aria-hidden />
-                {busy === 'status' ? 'Resuming…' : 'Resume'}
-              </button>
-            ) : null}
-            <button type="button" onClick={() => setConfirm(true)} disabled={busy !== null} className={`${btn} ml-auto`}>
-              <Trash2 size={13} strokeWidth={1.8} aria-hidden />
-              Delete
-            </button>
+            <dt className="text-ink-2">Workspace</dt>
+            <dd className="m-0 text-ink">{otherWorkspace}</dd>
           </>
-        )}
-      </footer>
-    </article>
-  )
-}
+        ) : null}
+      </dl>
 
-function Stat({ label, value, title }: { label: ReactNode; value: string; title?: string }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 bg-surface px-2.5 py-2" title={title}>
-      <span className="truncate text-[11px] text-ink-2">{label}</span>
-      <span className="font-mono text-[15px] text-ink tnum">{value}</span>
+      <Incrementality c={c} holdout={holdout} />
+
+      <section aria-labelledby={`cmp-${c.id}-delivery`} className="flex flex-col gap-4">
+        <h3 id={`cmp-${c.id}-delivery`} className="m-0 text-proof-h text-ink">
+          Delivery
+        </h3>
+        <dl className="m-0 grid grid-cols-4 overflow-hidden rounded-card border border-line">
+          {[
+            ['Reach', int(s.impressions), 'Impressions: each person once a day'],
+            ['Clicks', int(s.clicks), '“View product” taps'],
+            ['CTR', ctrText(s.ctr), 'Clicks ÷ impressions'],
+            ['Adds', int(s.adds), 'Added to routine from the card'],
+          ].map(([label, value, title]) => (
+            <div key={label} title={title} className="flex min-w-0 flex-col gap-1 border-line px-4 py-3 [&:not(:last-child)]:border-r">
+              <dt className="truncate text-proof-small text-ink-2">{label}</dt>
+              <dd className="m-0 text-[20px] font-semibold leading-7 tracking-[-0.02em] text-ink tnum">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {days.length && s.impressions > 0 ? <Sparkbars days={days} label={`Impressions per day for ${c.product ?? 'this campaign'}`} height={48} /> : <p className="m-0 text-proof-small text-ink-2">No delivery yet. The first impression lands when a matching shopper opens Routine.</p>}
+        <p className="m-0 text-proof-small text-ink-2">Counted once per person a day for each kind, never split by goal or skin type.</p>
+        <a href="/routine" target="_blank" rel="noopener" className="hit44 inline-flex h-8 items-center gap-1.5 self-start rounded-ctl border border-line bg-surface px-2.5 text-proof-small font-medium text-ink no-underline transition-colors hover:border-line-strong hover:bg-pf-hover">
+          See the card in the Willow app
+          <ExternalLink size={13} strokeWidth={1.8} aria-hidden />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      </section>
+
+      {actions.error ? <ErrorBox error={actions.error} /> : null}
     </div>
   )
 }
 
-/** Exposed vs randomised holdout: adoption rate per group with n and its 95% interval, and the lift with its CI. */
-function Incrementality({ c }: { c: Campaign }) {
-  const inc = c.stats.incrementality
-  const liftTip = useTooltip(inc ? `95% interval ${pts(inc.lift_lo)} to ${pts(inc.lift_hi)}. Difference of two proportions.` : '')
-  return (
-    <section aria-label="Incrementality" className="flex flex-col gap-2 rounded-xs border border-line bg-sunken p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-proof-small font-medium text-ink">
-          <Term id="holdout">Lift vs randomised holdout</Term>
-        </span>
-        {inc ? (
-          <>
-            <span {...liftTip.trigger} tabIndex={0} className={`cursor-help font-mono text-proof-body tnum ${inc.lift > 0 ? 'text-ink' : 'text-ink-2'}`}>
-              {pts(inc.lift)} <span className="text-[11px] text-ink-2">({pts(inc.lift_lo)} to {pts(inc.lift_hi)})</span>
-            </span>
-            {liftTip.node}
-          </>
-        ) : null}
+/** The panel's footer: pause or resume, and delete, which asks first in the footer itself. */
+export function CampaignDetailFooter({ c, actions, confirmDelete, setConfirmDelete }: { c: Campaign; actions: ReturnType<typeof useCampaignActions>; confirmDelete: boolean; setConfirmDelete: (v: boolean) => void }) {
+  if (confirmDelete)
+    return (
+      <div role="group" aria-label="Confirm delete" className="flex flex-wrap items-center justify-end gap-x-2 gap-y-2">
+        <span className="mr-auto text-proof-body text-ink">Delete it and its stats? This can’t be undone.</span>
+        <Button kind="secondary" onClick={() => setConfirmDelete(false)}>
+          Keep it
+        </Button>
+        <Button kind="primary" onClick={() => void actions.remove()} disabled={actions.busy === 'delete'}>
+          {actions.busy === 'delete' ? 'Deleting…' : 'Delete campaign'}
+        </Button>
       </div>
+    )
+  return (
+    <div className="flex items-center gap-2">
+      {c.status === 'active' ? (
+        <Button kind="secondary" onClick={() => void actions.setStatus('paused')} disabled={actions.busy !== null}>
+          <Pause size={14} strokeWidth={1.8} aria-hidden />
+          {actions.busy === 'status' ? 'Pausing…' : 'Pause'}
+        </Button>
+      ) : c.status === 'paused' ? (
+        <Button kind="secondary" onClick={() => void actions.setStatus('active')} disabled={actions.busy !== null}>
+          <Play size={14} strokeWidth={1.8} aria-hidden />
+          {actions.busy === 'status' ? 'Resuming…' : 'Resume'}
+        </Button>
+      ) : null}
+      <span className="ml-auto">
+        <Button kind="ghost" onClick={() => setConfirmDelete(true)} disabled={actions.busy !== null}>
+          <Trash2 size={14} strokeWidth={1.8} aria-hidden />
+          Delete
+        </Button>
+      </span>
+    </div>
+  )
+}
+
+export function ErrorBox({ error }: { error: PromoError }) {
+  return (
+    <div role="alert" className="flex flex-col gap-1.5 rounded-card border border-line bg-pf-red-soft/40 p-4">
+      <span className="text-proof-body font-medium text-ink">{error.title}</span>
+      <span className="text-proof-small text-ink-2">{error.message}</span>
+      {error.reasons.length ? (
+        <ul className="m-0 flex list-disc flex-col gap-0.5 pl-4 text-proof-small text-ink">
+          {error.reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+/** Exposed vs randomised holdout: adoption per group (n, added, rate with its interval on hover) and the lift. */
+function Incrementality({ c, holdout }: { c: Campaign; holdout: number }) {
+  const inc = c.stats.incrementality
+  return (
+    <section aria-labelledby={`cmp-${c.id}-lift`} className="flex flex-col gap-4">
+      <h3 id={`cmp-${c.id}-lift`} className="m-0 text-proof-h text-ink">
+        Incremental lift
+      </h3>
       {inc ? (
-        <div className="flex flex-col gap-1.5">
-          <GroupRow label="Could see the card" g={inc.exposed} />
-          <GroupRow label={c.holdout_pct ? `Holdout (${Math.round(c.holdout_pct * 100)}%, never shown)` : 'Holdout (never shown)'} g={inc.holdout} />
-        </div>
+        <>
+          {/* In a side panel the interval is written out: the kit tooltip can't rise above a modal dialog. */}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className={`text-proof-kpi tnum ${Math.round(inc.lift * 100) > 0 ? 'text-proof-leaf' : 'text-ink'}`}>{pts(inc.lift)}</span>
+            <span className="flex flex-col">
+              <span className="text-proof-body text-ink">
+                {pct(inc.exposed.rate)} vs {pct(inc.holdout.rate)} added it to their routine
+              </span>
+              <span className="text-proof-small text-ink-2 tnum">
+                95% interval {pts(inc.lift_lo)} to {pts(inc.lift_hi)}
+              </span>
+            </span>
+          </div>
+          <table className="w-full table-fixed border-separate border-spacing-0 overflow-hidden rounded-card border border-line text-proof-body">
+            <caption className="sr-only">Adoption: could see the card vs randomised holdout</caption>
+            <colgroup>
+              <col />
+              <col className="w-[72px]" />
+              <col className="w-[72px]" />
+              <col className="w-[120px]" />
+            </colgroup>
+            <thead>
+              <tr className="bg-pf-bg2 text-proof-small text-ink-2">
+                <th scope="col" className="h-9 border-b border-line px-4 text-left font-medium">
+                  Group
+                </th>
+                <th scope="col" className="h-9 border-b border-line px-2 text-right font-medium">
+                  People
+                </th>
+                <th scope="col" className="h-9 border-b border-line px-2 text-right font-medium">
+                  Added
+                </th>
+                <th scope="col" className="h-9 border-b border-line px-4 text-right font-medium">
+                  Adoption
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <GroupRow label="Could see the card" g={inc.exposed} lead />
+              <GroupRow label={`Holdout (${Math.round(holdout * 100)}%)`} g={inc.holdout} />
+            </tbody>
+          </table>
+        </>
       ) : (
-        <p className="m-0 text-proof-small text-ink-2">
-          Holdout comparison appears once each group has {HOLDOUT_MIN} people. So far at least one group has fewer than {HOLDOUT_MIN} people, so no adoption rate is shown.
-        </p>
+        <div className="flex flex-col gap-1 rounded-card border border-dashed border-line-strong px-4 py-3.5">
+          <span className="text-proof-body text-ink">Collecting</span>
+          <span className="text-proof-small text-ink-2">The comparison appears once each group has {HOLDOUT_MIN} people. No rate is shown before then.</span>
+        </div>
       )}
-      <p className="m-0 text-[11px] text-ink-2">{c.stats.incrementality_note}</p>
+      <p className="m-0 text-proof-small text-ink-2">{c.stats.incrementality_note}</p>
     </section>
   )
 }
 
-function GroupRow({ label, g }: { label: string; g: { n: number; added: number; rate: number } }) {
+function GroupRow({ label, g, lead = false }: { label: string; g: IncrementalityGroup; lead?: boolean }) {
   const ci = wilson(g.added, g.n)
-  const x = (v: number) => `${Math.max(0, Math.min(100, v * 100))}%`
-  const text = `${label}: ${pct(g.rate)} added the product to their routine${ci ? `, 95% interval ${interval(ci[0], ci[1])}` : ''}; ${int(g.n)} people`
   return (
-    <div className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)_auto] items-center gap-2.5">
-      <span className="truncate text-proof-small text-ink-2">{label}</span>
-      <span role="img" aria-label={text} className="relative block h-3">
-        <span aria-hidden className="absolute inset-x-0 top-1/2 block h-1 -translate-y-1/2 rounded-pill bg-muted" />
-        {ci ? <span aria-hidden className="absolute top-1/2 block h-1 -translate-y-1/2 rounded-pill bg-ink/35" style={{ left: x(ci[0]), width: `calc(${x(ci[1])} - ${x(ci[0])})` }} /> : null}
-        <span aria-hidden className="absolute top-1/2 block size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink ring-2 ring-sunken" style={{ left: x(g.rate) }} />
-      </span>
-      <span className="whitespace-nowrap font-mono text-[12px] text-ink tnum">
-        {pct(g.rate)} <span className="text-[11px] text-ink-2">n={int(g.n)}</span>
-      </span>
-    </div>
+    <tr>
+      <th scope="row" className="h-12 border-b border-line px-4 text-left font-normal text-ink [tr:last-child>&]:border-b-0">
+        <span className="flex items-center gap-2">
+          <span aria-hidden className={`size-2 shrink-0 rounded-full ${lead ? 'bg-proof-leaf' : 'bg-[var(--pf-base)]'}`} />
+          <span className="truncate">{label}</span>
+        </span>
+      </th>
+      <td className="border-b border-line px-2 text-right text-ink-2 tnum [tr:last-child>&]:border-b-0">{int(g.n)}</td>
+      <td className="border-b border-line px-2 text-right text-ink-2 tnum [tr:last-child>&]:border-b-0">{int(g.added)}</td>
+      <td className="border-b border-line px-4 text-right [tr:last-child>&]:border-b-0">
+        <span className="flex items-center justify-end gap-2.5">
+          <span aria-hidden className="relative h-1.5 w-12 overflow-hidden rounded-pill bg-sunken">
+            <span className={`absolute inset-y-0 left-0 rounded-pill ${lead ? 'bg-proof-leaf' : 'bg-[var(--pf-base)]'}`} style={{ width: `${Math.max(0, Math.min(100, g.rate * 100))}%` }} />
+          </span>
+          <span className="text-ink tnum">{pct(g.rate)}</span>
+          {ci ? <span className="sr-only">, 95% interval {interval(ci[0], ci[1])}</span> : null}
+        </span>
+      </td>
+    </tr>
   )
 }
