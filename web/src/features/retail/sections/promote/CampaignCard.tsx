@@ -192,7 +192,7 @@ function Incrementality({ c }: { c: Campaign }) {
       {inc ? (
         <div className="flex flex-col gap-1.5">
           <GroupRow label="Could see the card" g={inc.exposed} />
-          <GroupRow label="Holdout (never shown)" g={inc.holdout} />
+          <GroupRow label={c.holdout_pct ? `Holdout (${Math.round(c.holdout_pct * 100)}%, never shown)` : 'Holdout (never shown)'} g={inc.holdout} />
         </div>
       ) : (
         <p className="m-0 text-proof-small text-ink-2">
@@ -204,8 +204,8 @@ function Incrementality({ c }: { c: Campaign }) {
   )
 }
 
-function GroupRow({ label, g }: { label: string; g: { n: number; added: number | null; rate: number } }) {
-  const ci = g.added !== null ? wilson(g.added, g.n) : null
+function GroupRow({ label, g }: { label: string; g: { n: number; added: number; rate: number } }) {
+  const ci = wilson(g.added, g.n)
   const x = (v: number) => `${Math.max(0, Math.min(100, v * 100))}%`
   const text = `${label}: ${pct(g.rate)} added the product to their routine${ci ? `, 95% interval ${interval(ci[0], ci[1])}` : ''}; ${int(g.n)} people`
   return (
