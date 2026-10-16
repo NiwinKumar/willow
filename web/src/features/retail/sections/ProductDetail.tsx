@@ -158,117 +158,108 @@ function Page({ x, d, back, brandView }: { x: Detail; d: Insights; back: ReactNo
 
       <StatStrip x={x} weeksN={d.cohort.weeks} />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Panel
-          title="When the lasting change began"
-          id="curve-h"
-          meta={<SimBadge cohort={x.cohort} />}
-          className="xl:col-span-7"
-          footnote={<>Cumulative share of each group whose real change (held to week {d.cohort.weeks}) had begun by that week; the week-{d.cohort.weeks} value is the rate. Non-users: people with an overlapping goal who don’t use it.</>}
-        >
-          {measured && x.curve.users.some((v) => v !== null) ? (
-            <CurveChart
-              title={`${p.product}: cumulative share with a real change by week, users and non-users`}
-              weeks={x.curve.weeks}
-              height={210}
-              series={[
-                { id: 'users', label: 'Users', values: x.curve.users, tone: 'signal', n: p.n },
-                ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : []),
-              ]}
-            />
-          ) : (
-            <EmptyState compact glyph="00" title="No curve yet" body={reasonText(p)} />
-          )}
-        </Panel>
-
-        <Panel
-          title="Who it works for"
-          id="seg-h"
-          meta={<SimBadge cohort={x.cohort} />}
-          className="xl:col-span-5"
-          footnote={
-            seg === 'goal' ? (
-              'People can hold several goals, so goal groups overlap and don’t add up to the product’s n.'
-            ) : seg === 'tone' ? (
-              'Tone bands are buckets for “works for whom”, never an order.'
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
+          <Panel
+            title="When the lasting change began"
+            id="curve-h"
+            meta={<SimBadge cohort={x.cohort} />}
+            footnote={<>Cumulative share of each group whose real change (held to week {d.cohort.weeks}) had begun by that week; the week-{d.cohort.weeks} value is the rate. Non-users: people with an overlapping goal who don’t use it.</>}
+          >
+            {measured && x.curve.users.some((v) => v !== null) ? (
+              <CurveChart
+                title={`${p.product}: cumulative share with a real change by week, users and non-users`}
+                weeks={x.curve.weeks}
+                height={210}
+                series={[
+                  { id: 'users', label: 'Users', values: x.curve.users, tone: 'signal', n: p.n },
+                  ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : []),
+                ]}
+              />
             ) : (
+              <EmptyState compact glyph="00" title="No curve yet" body={reasonText(p)} />
+            )}
+          </Panel>
+          <Panel
+            title="Against its category"
+            id="comp-h"
+            meta={
+              comp.rank ? (
+                <span className="font-mono text-[11px] text-ink-2 tnum">
+                  {comp.rank} of {comp.of}
+                </span>
+              ) : null
+            }
+            flush
+            footnote={
               <>
-                Dot: rate; bar: <Term id="interval">95% interval</Term>; tick: non-users in the same group.
+                {p.category_label} that share a goal with it, with 10+ people, by real-change rate. {comp.note ?? 'Differences inside the intervals are not meaningful.'}
               </>
-            )
-          }
-        >
-          <div className="flex flex-col gap-3">
-            <Tabs label="Segment" tabs={SEG_TABS.map((t) => ({ id: t.id, label: t.label }))} value={seg} onChange={(v) => setParam({ seg: v === 'skin' ? null : v })} panelId="seg-panel" />
-            <div id="seg-panel" role="tabpanel" aria-labelledby="seg-h">
-              <SegList segs={x.segments[seg]} />
+            }
+          >
+            <Competitors x={x} brandView={brandView} carry={carry} />
+          </Panel>
+          <Panel
+            title="Claim-evidence pack"
+            id="ev-h"
+            actions={
+              x.evidence.length ? (
+                <>
+                  <ToolButton onClick={() => copyText(x.evidence.map(statementLine).join('\n'), `Copied ${x.evidence.length} statements`)} label="Copy every statement">
+                    <Copy size={13} strokeWidth={1.6} aria-hidden /> Copy all
+                  </ToolButton>
+                  <ToolButton onClick={exportPack} label="Export the pack as a print-friendly HTML page">
+                    <Download size={13} strokeWidth={1.6} aria-hidden /> Export pack
+                  </ToolButton>
+                  <ToolButton onClick={() => downloadText(packName(x, 'md'), packMarkdown(x), 'text/markdown')} label="Export the pack as Markdown">
+                    <FileText size={13} strokeWidth={1.6} aria-hidden /> .md
+                  </ToolButton>
+                  <ToolButton
+                    onClick={() => {
+                      const c = packCsv(x)
+                      downloadCsv(packName(x, 'csv'), csvMeta(x, p.product), c.header, c.rows)
+                    }}
+                    label="Export the pack as CSV"
+                  >
+                    CSV
+                  </ToolButton>
+                </>
+              ) : null
+            }
+          >
+            <EvidencePack x={x} />
+          </Panel>
+        </div>
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-5">
+          <Panel
+            title="Who it works for"
+            id="seg-h"
+            meta={<SimBadge cohort={x.cohort} />}
+            footnote={
+              seg === 'goal' ? (
+                'People can hold several goals, so goal groups overlap and don’t add up to the product’s n.'
+              ) : seg === 'tone' ? (
+                'Tone bands are buckets for “works for whom”, never an order.'
+              ) : (
+                <>
+                  Dot: rate; bar: <Term id="interval">95% interval</Term>; tick: non-users in the same group.
+                </>
+              )
+            }
+          >
+            <div className="flex flex-col gap-3">
+              <Tabs label="Segment" tabs={SEG_TABS.map((t) => ({ id: t.id, label: t.label }))} value={seg} onChange={(v) => setParam({ seg: v === 'skin' ? null : v })} panelId="seg-panel" />
+              <div id="seg-panel" role="tabpanel" aria-labelledby="seg-h">
+                {measured ? <SegList segs={x.segments[seg]} /> : <EmptyState compact title="No groups yet" body={reasonText(p)} />}
+              </div>
             </div>
-          </div>
-        </Panel>
-
-        <Panel
-          title="Against its category"
-          id="comp-h"
-          meta={
-            comp.rank ? (
-              <span className="font-mono text-[11px] text-ink-2 tnum">
-                {comp.rank} of {comp.of}
-              </span>
-            ) : null
-          }
-          className="xl:col-span-7"
-          flush
-          footnote={
-            <>
-              {p.category_label} that share a goal with it, with 10+ people, by real-change rate. {comp.note ?? 'Differences inside the intervals are not meaningful.'}
-            </>
-          }
-        >
-          <Competitors x={x} brandView={brandView} carry={carry} />
-        </Panel>
-
-        <div className="flex flex-col gap-4 xl:col-span-5">
+          </Panel>
           <Panel title="Promotion" id="elig-h">
             <Eligibility x={x} promoteTo={promoteTo} skinLabel={skinLabel} />
           </Panel>
           <Panel title="Used alongside it" id="co-h" meta={p.users ? <span className="font-mono text-[11px] text-ink-2 tnum">of {int(p.users)} users</span> : null} flush footnote="Share of this product’s users who also use each product (any week): bundle and cross-sell candidates. Pairs under 10 people are left out.">
             <CoUsed x={x} carry={carry} />
           </Panel>
-        </div>
-
-        <Panel
-          title="Claim-evidence pack"
-          id="ev-h"
-          className="xl:col-span-7"
-          actions={
-            x.evidence.length ? (
-              <>
-                <ToolButton onClick={() => copyText(x.evidence.map(statementLine).join('\n'), `Copied ${x.evidence.length} statements`)} label="Copy every statement">
-                  <Copy size={13} strokeWidth={1.6} aria-hidden /> Copy all
-                </ToolButton>
-                <ToolButton onClick={exportPack} label="Export the pack as a print-friendly HTML page">
-                  <Download size={13} strokeWidth={1.6} aria-hidden /> Export pack
-                </ToolButton>
-                <ToolButton onClick={() => downloadText(packName(x, 'md'), packMarkdown(x), 'text/markdown')} label="Export the pack as Markdown">
-                  <FileText size={13} strokeWidth={1.6} aria-hidden /> .md
-                </ToolButton>
-                <ToolButton
-                  onClick={() => {
-                    const c = packCsv(x)
-                    downloadCsv(packName(x, 'csv'), csvMeta(x, p.product), c.header, c.rows)
-                  }}
-                  label="Export the pack as CSV"
-                >
-                  CSV
-                </ToolButton>
-              </>
-            ) : null
-          }
-        >
-          <EvidencePack x={x} />
-        </Panel>
-
-        <div className="flex flex-col gap-4 xl:col-span-5">
           <Panel title="Where people go when they stop" id="sw-h" meta={x.switching.stopped !== null ? <span className="font-mono text-[11px] text-ink-2 tnum">{int(x.switching.stopped)} stopped</span> : null} footnote="A switch: stopped this product and started another in the same category within a week before to two weeks after. Flows under 10 people are left out.">
             <Switching x={x} carry={carry} />
           </Panel>
@@ -316,11 +307,12 @@ function ProductImageLarge({ p }: { p: Detail['product'] }) {
 
 function StatStrip({ x, weeksN }: { x: Detail; weeksN: number }) {
   const p = x.product
+  const why = p.reason === 'not_measured' ? 'not measured' : p.reason === 'unused' ? 'not used yet' : 'Fewer than 10 people'
   return (
     <dl aria-label="Key figures" className="m-0 grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-line bg-line sm:grid-cols-4 xl:grid-cols-7">
       {[
-        <Stat key="rate" label={<Term id="real_change">Real change</Term>} value={pct(p.rate)} sub={p.n ? `n=${int(p.n)} · ${interval(p.rate_lo, p.rate_hi)}` : 'Fewer than 10 people'} />,
-        <Stat key="base" label={<Term id="base_rate">Non-users</Term>} value={pct(p.base_rate)} sub={p.base_rate === null ? 'Fewer than 10 people' : 'same goals'} />,
+        <Stat key="rate" label={<Term id="real_change">Real change</Term>} value={pct(p.rate)} sub={p.n ? `n=${int(p.n)} · ${interval(p.rate_lo, p.rate_hi)}` : why} />,
+        <Stat key="base" label={<Term id="base_rate">Non-users</Term>} value={pct(p.base_rate)} sub={p.base_rate !== null ? 'same goals' : p.rate === null ? why : 'Fewer than 10 people'} />,
         <Stat key="lift" label={<Term id="lift">Lift</Term>} value={pts(p.lift)} sub={p.lift_lo !== null && p.lift_hi !== null ? `${pts(p.lift_lo)} to ${pts(p.lift_hi)}` : undefined} />,
         <Stat key="weeks" label="Time to change" value={weeks(p.weeks)} sub="median" />,
         <Stat key="cont" label={<Term id="continuation">Still using wk {weeksN}</Term>} value={pct(p.cont8)} sub={p.n ? `of ${int(p.n)}` : undefined} />,
@@ -370,7 +362,12 @@ function SegList({ segs }: { segs: Seg[] }) {
 
 function Competitors({ x, brandView, carry }: { x: Detail; brandView: string | null; carry: string }) {
   const rows = x.competitors.rows
-  if (!rows.length) return <EmptyState compact title="No benchmark yet" body={`No product in ${x.product.category_label.toLowerCase()} sharing a goal with it has ${MIN_GROUP} or more people at week 8.`} />
+  if (!rows.length)
+    return (
+      <div className="px-4">
+        <EmptyState compact title="No benchmark yet" body={`No product in ${x.product.category_label.toLowerCase()} sharing a goal with it has ${MIN_GROUP} or more people at week 8.`} />
+      </div>
+    )
   const max = Math.min(1, Math.max(0.5, ...rows.map((r) => r.rate_hi ?? r.rate ?? 0)) + 0.05)
   return (
     <ol className="m-0 flex list-none flex-col p-0" aria-label={`${x.product.category_label} ranked by real-change rate`}>
@@ -448,7 +445,12 @@ function Chip({ children }: { children: ReactNode }) {
 }
 
 function CoUsed({ x, carry }: { x: Detail; carry: string }) {
-  if (!x.co_used.length) return <EmptyState compact title="No pairing reaches 10 people yet" body="Products used together by fewer than 10 people are not shown." />
+  if (!x.co_used.length)
+    return (
+      <div className="px-4">
+        <EmptyState compact title="No pairing reaches 10 people yet" body="Products used together by fewer than 10 people are not shown." />
+      </div>
+    )
   const max = Math.max(...x.co_used.map((c) => c.share))
   return (
     <ul className="m-0 flex list-none flex-col p-0">
@@ -469,12 +471,13 @@ type FlowItem = { key: string; label: string; sub?: string; n: number; to?: stri
 
 function Switching({ x, carry }: { x: Detail; carry: string }) {
   const s = x.switching
-  const brandItems = (b: BrandFlow[] | undefined): FlowItem[] => (b ?? []).map((f) => ({ key: `b:${f.brand}`, label: f.label, sub: f.same_brand ? undefined : 'brand', n: f.n }))
-  const productItems = (ps: Detail['switching']['to']): FlowItem[] => ps.map((f) => ({ key: f.product_id, label: f.product, sub: f.brand, n: f.n, to: `${sectionPath('products', f.product_id)}${carry}` }))
-  const from = [...productItems(s.from), ...brandItems(s.from_brands)]
-  const to = [...productItems(s.to), ...brandItems(s.to_brands)]
-  const max = Math.max(1, ...from.map((f) => f.n), ...to.map((f) => f.n))
-  if (s.stopped === null && !from.length && !to.length) return <EmptyState compact title="No switching yet" body={`Fewer than ${MIN_GROUP} people stopped it.`} />
+  const brands = (b: BrandFlow[] | undefined): FlowItem[] => (b ?? []).map((f) => ({ key: `b:${f.brand}`, label: f.label, n: f.n }))
+  const products = (ps: Detail['switching']['to']): FlowItem[] => ps.map((f) => ({ key: f.product_id, label: f.product, sub: f.brand, n: f.n, to: `${sectionPath('products', f.product_id)}${carry}` }))
+  const from = { products: products(s.from), brands: brands(s.from_brands) }
+  const to = { products: products(s.to), brands: brands(s.to_brands) }
+  const any = (g: typeof from) => g.products.length + g.brands.length > 0
+  const max = Math.max(1, ...[from, to].flatMap((g) => [...g.products, ...g.brands].map((f) => f.n)))
+  if (s.stopped === null && !any(from) && !any(to)) return <EmptyState compact title="No switching yet" body={`Fewer than ${MIN_GROUP} people stopped it.`} />
   return (
     <div className="flex flex-col gap-3">
       <p className="m-0 text-proof-body text-ink-2">
@@ -483,52 +486,61 @@ function Switching({ x, carry }: { x: Detail; carry: string }) {
             <span className="font-mono text-ink tnum">{int(s.stopped)}</span> of {int(x.product.users)} users stopped it.{' '}
           </>
         ) : null}
-        {!from.length && !to.length ? 'No destination reaches 10 people yet: switches spread over many products.' : null}
+        {!any(from) && !any(to) ? 'No destination reaches 10 people yet: switches spread over many products.' : null}
       </p>
-      {from.length || to.length ? (
+      {any(from) || any(to) ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FlowList title="Came from" items={from} max={max} empty="No source reaches 10 people yet" />
-          <FlowList title="Went to" items={to} max={max} empty="No destination reaches 10 people yet" />
+          <FlowList title="Came from" group={from} max={max} empty="No source reaches 10 people yet" />
+          <FlowList title="Went to" group={to} max={max} empty="No destination reaches 10 people yet" />
         </div>
       ) : null}
     </div>
   )
 }
 
-function FlowList({ title, items, max, empty }: { title: string; items: FlowItem[]; max: number; empty: string }) {
+/** One side of the switching flow: products first, then the same flows by brand (they overlap, so no totals). */
+function FlowList({ title, group, max, empty }: { title: string; group: { products: FlowItem[]; brands: FlowItem[] }; max: number; empty: string }) {
+  const items = (list: FlowItem[]) => (
+    <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+      {list.map((f) => (
+        <li key={f.key} className="flex flex-col gap-1">
+          <span className="flex min-w-0 items-baseline justify-between gap-2 text-proof-body">
+            {f.to ? (
+              <Link to={f.to} className="min-w-0 truncate text-ink no-underline hover:underline" title={f.sub ? `${f.label} · ${f.sub}` : f.label}>
+                {f.label}
+              </Link>
+            ) : (
+              <span className="min-w-0 truncate text-ink">{f.label}</span>
+            )}
+            <span className="shrink-0 font-mono text-[11px] text-ink-2 tnum">n={int(f.n)}</span>
+          </span>
+          <ShareBar value={f.n} max={max} />
+        </li>
+      ))}
+    </ul>
+  )
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <h3 className="m-0 text-proof-small font-normal text-ink-2">{title}</h3>
-      {items.length ? (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {items.map((f) => (
-            <li key={f.key} className="flex flex-col gap-1">
-              <span className="flex min-w-0 items-baseline justify-between gap-2 text-proof-body">
-                {f.to ? (
-                  <Link to={f.to} className="min-w-0 truncate text-ink no-underline hover:underline" title={f.sub ? `${f.label} · ${f.sub}` : f.label}>
-                    {f.label}
-                  </Link>
-                ) : (
-                  <span className="min-w-0 truncate text-ink">
-                    {f.label}
-                    {f.sub ? <span className="text-ink-2"> · {f.sub}</span> : null}
-                  </span>
-                )}
-                <span className="shrink-0 font-mono text-[11px] text-ink-2 tnum">n={int(f.n)}</span>
-              </span>
-              <ShareBar value={f.n} max={max} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="m-0 text-proof-small text-ink-2">{empty}</p>
-      )}
+      {group.products.length ? items(group.products) : null}
+      {group.brands.length ? (
+        <>
+          <span className="mt-1 text-[11px] text-ink-2">By brand</span>
+          {items(group.brands)}
+        </>
+      ) : null}
+      {!group.products.length && !group.brands.length ? <p className="m-0 text-proof-small text-ink-2">{empty}</p> : null}
     </div>
   )
 }
 
 function Conflicts({ x }: { x: Detail }) {
-  if (!x.conflicts.length) return <EmptyState compact title="No conflict reaches 10 people" body="Routine checks with this product found no conflict shared by 10 or more people." />
+  if (!x.conflicts.length)
+    return (
+      <div className="px-4">
+        <EmptyState compact title="No conflict reaches 10 people" body="Routine checks with this product found no conflict shared by 10 or more people." />
+      </div>
+    )
   return (
     <ul className="m-0 flex list-none flex-col p-0">
       {x.conflicts.map((c) => (
