@@ -43,6 +43,7 @@ html[data-proof][data-theme="light"] {
   --signal-noise-edge: rgba(0, 0, 0, .18);
   --pf-amber: #A35200;
   --pf-amber-soft: rgba(255, 178, 36, .16);
+  --pf-amber-fill: #FFB224;
   --pf-red: #D93036;
   --pf-red-soft: rgba(217, 48, 54, .08);
   --pf-blue: #0068D6;
@@ -79,6 +80,7 @@ html[data-proof][data-theme="dark"] {
   --signal-noise-edge: rgba(255, 255, 255, .22);
   --pf-amber: #F5A524;
   --pf-amber-soft: rgba(245, 165, 36, .14);
+  --pf-amber-fill: #D98A0B;
   --pf-red: #FF6166;
   --pf-red-soft: rgba(255, 97, 102, .12);
   --pf-blue: #52A8FF;
