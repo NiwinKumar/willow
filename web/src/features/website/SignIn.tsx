@@ -150,7 +150,8 @@ export default function SignIn() {
 
       <div className="grid place-items-center px-[clamp(12px,4vw,48px)] pt-[clamp(8px,2vh,32px)] pb-[clamp(6px,1.5vh,32px)]">
         <main className="flex w-full max-w-[440px] animate-rise flex-col gap-[clamp(7px,1.2vh,14px)] rounded-[32px] p-[clamp(14px,2.2vh,30px)] backdrop-blur-[26px] backdrop-saturate-[1.3]" style={{ background: 'rgba(250,250,248,.84)', boxShadow: '0 40px 80px -40px rgba(40,50,110,.45), inset 0 0 0 1px rgba(255,255,255,.6)' }}>
-          <div role="tablist" aria-label="Account" className="flex gap-[3px] self-start rounded-pill bg-canvas p-1">
+          {/* A two-way switch, not tabs: there is no tab panel or arrow-key handling to back a tab role. */}
+          <div role="group" aria-label="Account" className="flex gap-[3px] self-start rounded-pill bg-canvas p-1">
             {(
               [
                 ['signin', 'Sign in'],
@@ -160,8 +161,7 @@ export default function SignIn() {
               <button
                 key={k}
                 type="button"
-                role="tab"
-                aria-selected={mode === k}
+                aria-pressed={mode === k}
                 onClick={() => setMode(k)}
                 className={`min-h-[36px] rounded-pill px-4 text-[14px] transition-colors ${mode === k ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,.08)]' : 'bg-transparent'}`}
               >
