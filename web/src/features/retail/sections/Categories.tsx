@@ -2,15 +2,20 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { useRetailData } from '../context'
 import { csvMeta, csvName, type Category, type Flow, type Insights } from '../data'
+import { useProducts } from '../productData'
+import { brandShares, TIER_ORDER } from '../productModel'
 import { sectionPath, useRetailState } from '../state'
-import { CurveChart, DataTable, EmptyState, EvidenceBar, int, MIN_GROUP, Panel, pct, pts, SectionHeader, SimBadge, SkeletonHeader, SkeletonPanel, Tabs, Term, weeks, type Column } from '../ui'
+import type { ProductRow } from '../types'
+import { CurveChart, DataTable, EmptyState, EvidenceBar, int, LiftValue, MIN_GROUP, Panel, pct, ProductCell, ProofTierChip, pts, SectionHeader, SimBadge, SkeletonHeader, SkeletonPanel, Tabs, Term, TIERS, weeks, type Column } from '../ui'
 import { InsightsGate, useWorkspaceLabel, YoursTag } from './shared'
 
 /*
  * Categories (/retail/categories/:category?goal=): per product group and goal, how many users reach a real
  * change by week 2, 4 and 8 and how many keep using the category's products (the existing category flows),
  * against non-users with the same goal; and each brand's real-change rate in the category with its interval.
- * TODO(slice D): brand share of routines vs share of outcomes, price-tier gaps per category.
+ * Under them (GET /v1/retailer/products, filtered to the category): each brand's share of the category's routines
+ * against its share of the category's real changes, and the category's products as a mini scoreboard.
+ * TODO: price-tier gaps per category.
  */
 export default function Categories() {
   return (
@@ -116,6 +121,7 @@ function Body({ d }: { d: Insights }) {
           </Panel>
           <BrandsPanel cat={cat} d={d} brandView={brandView} className="xl:col-span-5" />
         </div>
+        <CategoryProducts category={cat.category} label={cat.label} d={d} brandView={brandView} />
         <GoalsTable cat={cat} d={d} selected={flow.goal_id} onPick={(g) => setParam({ goal: g })} />
       </div>
     </div>
@@ -223,6 +229,143 @@ function GoalsTable({ cat, d, selected, onPick }: { cat: Category; d: Insights; 
         csv={{ name: csvName(`category-${cat.category}`, d), meta: csvMeta(d, cat.label) }}
         minWidth={880}
       />
+    </Panel>
+  )
+}
+
+/**
+ * The category's brands and products from the scoreboard rows: share of routines vs share of real changes (a
+ * dot plot), and the products ranked by Proof tier and rate (rows open the product page).
+ */
+function CategoryProducts({ category, label, d, brandView }: { category: string; label: string; d: Insights; brandView: string | null }) {
+  const { filters } = useRetailData()
+  const { carry } = useRetailState()
+  const navigate = useNavigate()
+  const { state } = useProducts(filters)
+  if (state.status === 'loading')
+    return (
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <SkeletonPanel height={260} className="xl:col-span-5" />
+        <SkeletonPanel height={260} className="xl:col-span-7" />
+      </div>
+    )
+  if (state.status !== 'ready') return null
+  const rows = state.d.products.filter((r) => r.category === category)
+  const shares = brandShares(state.d.products, category)
+  const cols: Column<ProductRow>[] = [
+    { id: 'product', header: 'Product', rowHeader: true, sortValue: (r) => r.product, cell: (r) => <ProductCell p={r} size={24} tag={brandView === r.brand ? <YoursTag /> : null} />, csv: (r) => `${r.product} (${r.brand})` },
+    { id: 'tier', header: <Term id="proof_tier">Proof tier</Term>, headerText: 'Proof tier', width: '150px', sortValue: (r) => TIER_ORDER[r.tier] * 1000 + (r.rate ?? 0) * 100, firstDir: 'desc', cell: (r) => <ProofTierChip tier={r.tier} size="sm" />, csv: (r) => TIERS[r.tier].label },
+    {
+      id: 'rate',
+      header: <Term id="real_change">Real change</Term>,
+      headerText: 'Real change by week 8 (%)',
+      align: 'right',
+      width: '110px',
+      sortValue: (r) => r.rate,
+      cell: (r) =>
+        r.rate === null ? (
+          <span className="text-proof-small text-ink-2">{r.reason === 'not_measured' ? 'Not measured' : `n<${MIN_GROUP}`}</span>
+        ) : (
+          <span className="whitespace-nowrap font-mono tnum">
+            {pct(r.rate)} <span className="text-[11px] text-ink-2">n={int(r.n)}</span>
+          </span>
+        ),
+      csv: (r) => (r.rate === null ? (r.reason ?? 'suppressed') : Math.round(r.rate * 100)),
+    },
+    { id: 'lift', header: <Term id="lift">Lift</Term>, headerText: 'Lift (pts)', align: 'right', width: '80px', sortValue: (r) => r.lift, cell: (r) => <LiftValue lift={r.lift} lo={r.lift_lo} hi={r.lift_hi} />, csv: (r) => (r.lift === null ? '' : Math.round(r.lift * 100)) },
+  ]
+  return (
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <ShareVsOutcome shares={shares} label={label} d={d} brandView={brandView} className="xl:col-span-5" />
+      <Panel flush className="xl:col-span-7">
+        <DataTable
+          heading={
+            <>
+              <h2 className="m-0 text-proof-h font-medium text-ink">Products in {label.toLowerCase()}</h2>
+              <SimBadge cohort={d.cohort} />
+            </>
+          }
+          caption={`${label}: products by Proof tier and real-change rate`}
+          columns={cols}
+          rows={rows}
+          rowKey={(r) => r.product_id}
+          onRowClick={(r) => navigate(`${sectionPath('products', r.product_id)}${carry}`)}
+          rowLabel={(r) => `Open ${r.product}, ${r.brand}`}
+          rowClassName={(r) => (brandView === r.brand ? '[&>*:first-child]:shadow-[inset_2px_0_0_var(--proof-leaf)]' : '')}
+          defaultSort={{ id: 'tier', dir: 'desc' }}
+          minWidth={560}
+          csv={{ name: csvName(`category-${category}-products`, d), meta: csvMeta(d, label) }}
+          empty={`No ${label.toLowerCase()} in the catalog.`}
+        />
+      </Panel>
+    </div>
+  )
+}
+
+/** Brand share of the category's routines (ring) vs its share of the category's real changes (ember dot). */
+function ShareVsOutcome({ shares, label, d, brandView, className }: { shares: ReturnType<typeof brandShares>; label: string; d: Insights; brandView: string | null; className?: string }) {
+  const bs = shares.brands
+  const max = Math.min(1, Math.ceil((Math.max(0.1, ...bs.flatMap((b) => [b.routine, b.outcome])) + 0.02) * 10) / 10)
+  const x = (v: number) => `${(v / max) * 100}%`
+  const over = bs.length > 1 ? [...bs].sort((a, b) => b.gap - a.gap)[0] : undefined
+  return (
+    <Panel
+      title="Share of routines vs share of outcomes"
+      id="share-h"
+      meta={<SimBadge cohort={d.cohort} />}
+      className={className}
+      footnote={
+        <>
+          Ring: the brand’s share of {label.toLowerCase()} users ({int(shares.users)}, a person counted once per product). Ember: its share of the {int(shares.changed)} <Term id="real_change">real changes</Term> by week {d.cohort.weeks}, counted the same way. Ember right of the ring: more outcomes than its footprint. Measured products with 10+ people only.
+        </>
+      }
+    >
+      {bs.length < 2 ? (
+        <EmptyState compact title="Not enough brands to compare" body={`Fewer than two brands have a measured product with ${MIN_GROUP} or more people in this category.`} />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {over && over.gap > 0 ? (
+            <p className="m-0 text-proof-body text-ink-2">
+              <span className="text-ink">{over.brand}</span> delivers the most above its footprint: {pct(over.outcome)} of real changes from {pct(over.routine)} of routines.
+            </p>
+          ) : null}
+          <div aria-hidden className="flex items-center gap-4 text-[11px] text-ink-2">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="block size-2.5 rounded-full border-[1.5px] border-ink-2" /> Share of routines
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="block size-2.5 rounded-full bg-signal" /> Share of real changes
+            </span>
+          </div>
+          <ul className="m-0 flex list-none flex-col p-0">
+            {bs.map((b) => (
+              <li key={b.brand} className={`grid min-h-9 grid-cols-[minmax(0,120px)_minmax(0,1fr)_64px] items-center gap-3 border-b border-line last:border-b-0 ${brandView === b.brand ? 'bg-proof-leaf-soft' : ''}`}>
+                <span className="truncate pl-1 text-proof-body text-ink" title={`${b.brand} · ${b.products} measured ${b.products === 1 ? 'product' : 'products'}`}>
+                  {b.brand}
+                  {brandView === b.brand ? <YoursTag /> : null}
+                </span>
+                <span role="img" aria-label={`${b.brand}: ${pct(b.routine)} of routines (${int(b.users)} product users), ${pct(b.outcome)} of real changes (${int(b.changed)} people)`} className="relative block h-4">
+                  <span aria-hidden className="absolute inset-x-0 top-1/2 h-px bg-line" />
+                  <span aria-hidden className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-ink/40" style={{ left: x(Math.min(b.routine, b.outcome)), width: x(Math.abs(b.outcome - b.routine)) }} />
+                  <span aria-hidden className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-ink-2 bg-surface" style={{ left: x(b.routine) }} />
+                  <span aria-hidden className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-signal ring-2 ring-surface" style={{ left: x(b.outcome) }} />
+                </span>
+                <span className="text-right font-mono text-proof-small tnum text-ink" title={b.gap > 0 ? 'More of the real changes than its share of routines' : b.gap < 0 ? 'Fewer of the real changes than its share of routines' : 'In line with its share of routines'}>
+                  {pts(b.gap)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <span aria-hidden className="grid grid-cols-[minmax(0,120px)_minmax(0,1fr)_64px] gap-3 font-mono text-[10.5px] text-ink-2">
+            <span />
+            <span className="flex justify-between">
+              <span>0</span>
+              <span>{pct(max)}</span>
+            </span>
+            <span className="text-right">gap</span>
+          </span>
+        </div>
+      )}
     </Panel>
   )
 }
