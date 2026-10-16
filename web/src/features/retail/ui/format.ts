@@ -71,3 +71,28 @@ export function downloadCsv(file: string, meta: string[], header: string[], rows
     toast('The export could not be created in this browser.')
   }
 }
+
+/** Download a text file built in the browser (an evidence pack as HTML or Markdown). */
+export function downloadText(file: string, body: string, type: string) {
+  try {
+    const url = URL.createObjectURL(new Blob([body], { type }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast(`Exported ${file}`)
+  } catch {
+    toast('The export could not be created in this browser.')
+  }
+}
+
+/** Copy text to the clipboard with a toast either way (claim statements). */
+export async function copyText(text: string, what = 'Copied') {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast(what)
+  } catch {
+    toast('Copy is blocked in this browser. Select the text instead.')
+  }
+}

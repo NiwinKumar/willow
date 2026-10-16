@@ -4,11 +4,13 @@
  */
 export type {
   RetailerBrandDetail as BrandDetail,
+  RetailerBrandFlow as BrandFlow,
   RetailerBrandSummary as BrandSummary,
   RetailerBrief as Brief,
   RetailerBriefCard as BriefCard,
   RetailerBriefSection as BriefSection,
   RetailerCohort as Cohort,
+  RetailerEvidence as Evidence,
   RetailerFilters as Filters,
   RetailerInsights as Insights,
   RetailerProductDetail as ProductDetail,

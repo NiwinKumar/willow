@@ -8,7 +8,7 @@ export type ComboOption = { value: string; label: string; hint?: string; group?:
  * a filter field (role=combobox) over a listbox. ↑/↓ move, Enter picks, Esc closes and returns focus to the
  * button, a click outside closes. Options can carry a group heading and a quiet hint (e.g. a product count).
  */
-export function Combobox({ label, value, options, onChange, prefix, footer, width = 280 }: { label: string; value: string; options: ComboOption[]; onChange: (v: string) => void; prefix?: ReactNode; footer?: ReactNode; width?: number }) {
+export function Combobox({ label, value, options, onChange, prefix, footer, width = 280, searchPlaceholder = 'Search brands', emptyText = 'Choose', disabled = false }: { label: string; value: string; options: ComboOption[]; onChange: (v: string) => void; prefix?: ReactNode; footer?: ReactNode; width?: number; searchPlaceholder?: string; emptyText?: string; disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
@@ -72,12 +72,13 @@ export function Combobox({ label, value, options, onChange, prefix, footer, widt
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => (open ? close() : openList())}
-        className="hit44 flex h-8 min-w-0 max-w-full items-center gap-2 rounded-xs border border-line-strong bg-sunken pl-2.5 pr-2 text-proof-small text-ink hover:border-ink/40"
+        className="hit44 flex h-8 min-w-0 max-w-full items-center gap-2 rounded-xs border border-line-strong bg-sunken pl-2.5 pr-2 text-proof-small text-ink hover:border-ink/40 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="shrink-0 text-ink-2">{label}</span>
         {prefix}
-        <span className="min-w-0 truncate font-medium">{current?.label ?? 'Choose'}</span>
+        <span className="min-w-0 truncate font-medium">{current?.label ?? emptyText}</span>
         <ChevronsUpDown size={14} strokeWidth={1.6} aria-hidden className="shrink-0 text-ink-2" />
       </button>
       {open ? (
@@ -95,11 +96,11 @@ export function Combobox({ label, value, options, onChange, prefix, footer, widt
               setActive(0)
             }}
             onKeyDown={key}
-            placeholder="Search brands"
+            placeholder={searchPlaceholder}
             className="h-10 w-full border-0 border-b border-line bg-transparent px-3 text-proof-body text-ink outline-none placeholder:text-ink-2"
           />
           <ul id={`${base}-list`} role="listbox" aria-label={label} className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-1">
-            {shown.length === 0 ? <li className="px-2.5 py-2 text-proof-small text-ink-2">No brand matches “{q}”.</li> : null}
+            {shown.length === 0 ? <li className="px-2.5 py-2 text-proof-small text-ink-2">Nothing matches “{q}”.</li> : null}
             {shown.map((o, i) => {
               const head = o.group && o.group !== shown[i - 1]?.group
               return (

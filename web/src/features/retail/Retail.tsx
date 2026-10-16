@@ -23,6 +23,7 @@ import { cohortKind, Combobox, int, Segmented, SidePanel, SkeletonHeader, Skelet
 const Overview = lazy(() => import('./sections/Overview'))
 const Products = lazy(() => import('./sections/Products'))
 const ProductDetail = lazy(() => import('./sections/ProductDetail'))
+const Compare = lazy(() => import('./sections/Compare'))
 const Categories = lazy(() => import('./sections/Categories'))
 const SkinProfiles = lazy(() => import('./sections/SkinProfiles'))
 const Competitors = lazy(() => import('./sections/Competitors'))
@@ -58,7 +59,8 @@ function writeCollapsed(v: boolean) {
 /** Which section a path is in ("/retail/categories/serum" → categories). */
 function sectionOf(pathname: string): (typeof SECTIONS)[number] {
   const seg = pathname.replace(/^\/retail\/?/, '').split('/')[0]
-  return SECTIONS.find((s) => s.path === seg) ?? SECTIONS[0]
+  // Compare lives under Products (reached from its scoreboard and product pages).
+  return SECTIONS.find((s) => s.path === (seg === 'compare' ? 'products' : seg)) ?? SECTIONS[0]
 }
 
 export default function Retail() {
@@ -140,6 +142,7 @@ function Shell() {
                     <Route index element={<Overview />} />
                     <Route path="products" element={<Products />} />
                     <Route path="products/:productId" element={<ProductDetail />} />
+                    <Route path="compare" element={<Compare />} />
                     <Route path="categories" element={<Categories />} />
                     <Route path="categories/:category" element={<Categories />} />
                     <Route path="segments" element={<SkinProfiles />} />
@@ -291,10 +294,13 @@ function TopBar({ onMenu, menuOpen, onAsk }: { onMenu: () => void; menuOpen: boo
 
 function NavItems({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const { carry } = useRetailState()
+  const { pathname } = useLocation()
   return (
     <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
       {SECTIONS.map((s) => {
         const Icon = ICONS[s.id]
+        // Compare (/retail/compare) belongs to Products.
+        const also = s.id === 'products' && pathname.startsWith('/retail/compare')
         return (
           <li key={s.id}>
             <NavLink
@@ -303,14 +309,15 @@ function NavItems({ collapsed = false, onNavigate }: { collapsed?: boolean; onNa
               onClick={onNavigate}
               title={collapsed ? s.label : undefined}
               aria-label={collapsed ? s.label : undefined}
+              aria-current={also ? 'page' : undefined}
               className={({ isActive }) =>
-                `group relative flex h-9 items-center gap-2.5 rounded-xs px-2.5 text-proof-body no-underline transition-colors duration-150 ${isActive ? 'bg-proof-leaf-soft text-ink' : 'text-ink-2 hover:bg-glass hover:text-ink'} ${collapsed ? 'justify-center px-0' : ''}`
+                `group relative flex h-9 items-center gap-2.5 rounded-xs px-2.5 text-proof-body no-underline transition-colors duration-150 ${isActive || also ? 'bg-proof-leaf-soft text-ink' : 'text-ink-2 hover:bg-glass hover:text-ink'} ${collapsed ? 'justify-center px-0' : ''}`
               }
             >
               {({ isActive }) => (
                 <>
-                  {isActive ? <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-pill bg-proof-leaf" /> : null}
-                  <Icon size={16} strokeWidth={1.6} aria-hidden className={isActive ? 'text-proof-leaf' : ''} />
+                  {isActive || also ? <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-pill bg-proof-leaf" /> : null}
+                  <Icon size={16} strokeWidth={1.6} aria-hidden className={isActive || also ? 'text-proof-leaf' : ''} />
                   {collapsed ? null : <span className="truncate">{s.label}</span>}
                 </>
               )}
