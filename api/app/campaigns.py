@@ -19,12 +19,13 @@ from typing import Any
 from fastapi import HTTPException
 
 from app import catalog, cohort
-from app.retailer import GOAL_LABEL
+from app.retailer import GOAL_LABEL, SKIN_LABEL
 from app.store import Doc, Store, iso
 
 MAX_ACTIVE = 3  # running (active, in date) campaigns per owner
-# Counts of people (one per person per day for each kind) under this are reported as null, as
-# every other retail aggregate (retailer.MIN_GROUP).
+# The holdout comparison (people with person-level outcomes, exposed vs holdout) waits for this many
+# people in each group, as every other retail aggregate (retailer.MIN_GROUP). Delivery counts are
+# ad events with no person attribute and no segment split: shown as counted.
 MIN_GROUP = 10
 COHORT_LABEL = "Willow cohort, includes simulated data"
 DISCLOSURE = (
@@ -113,8 +114,11 @@ def workspaces() -> set[str]:
     return {"retailer", *(p["brand"] for p in catalog.products())}
 
 
-def check(product: dict[str, Any], workspace: str, goals: list[str]) -> list[str]:
-    """Why this product cannot be promoted with these goals from this workspace ([] = it can)."""
+def check(
+    product: dict[str, Any], workspace: str, goals: list[str], skin_types: list[str]
+) -> list[str]:
+    """Why this product cannot be promoted with these goals and skin types from this workspace
+    ([] = it can). Skin types must be among the eligible ones; [] means all of those."""
     elig = eligibility_of(product["product_id"])
     reasons: list[str] = []
     if not elig or not elig.get("eligible") or elig.get("tier") != "proven":
@@ -125,6 +129,12 @@ def check(product: dict[str, Any], workspace: str, goals: list[str]) -> list[str
         if outside:
             labels = ", ".join(GOAL_LABEL.get(g, g) for g in outside)
             reasons.append(f"The evidence does not cover these goals: {labels}.")
+        allowed = set(elig.get("skin_types") or [])
+        if not allowed:
+            reasons.append("No skin type has enough evidence for this product yet.")
+        elif off := [t for t in skin_types if t not in allowed]:
+            labels = ", ".join(SKIN_LABEL.get(t, t).lower() for t in off)
+            reasons.append(f"The evidence does not cover these skin types: {labels}.")
     if workspace != "retailer" and workspace != product["brand"]:
         reasons.append("A brand workspace can only promote its own brand's products.")
     return reasons
@@ -183,8 +193,10 @@ def _count(n: int) -> int | None:
 
 
 def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
-    """Totals and one row per day from the start to today (or the end). Counts are people per day
-    (each person counts once a day for each kind); under 10 they are null, as every retail count."""
+    """Totals and one row per day from the start to today (or the end). Delivery counts (each
+    person counts once a day for each kind) carry no person attribute and are never split by goal
+    or skin type, so they are shown as counted, as standard ad reporting. Only the holdout
+    comparison waits for 10 people per group."""
     rows = {day: d for day, d in store.campaign_days(cid)}
     start = (_aware(doc.get("starts_at")) or now()).date()
     end = (_aware(doc.get("ends_at")) or now()).date()
@@ -197,7 +209,7 @@ def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
         for k in totals:
             n = int(d.get(k) or 0)
             totals[k] += n
-            row[k] = _count(n)
+            row[k] = n
         daily.append(row)
         day += timedelta(days=1)
     # days outside the window (clock edges) still count in the totals
@@ -207,11 +219,10 @@ def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
                 totals[k] += int(d.get(k) or 0)
     imp = totals["impressions"]
     return {
-        "impressions": _count(imp),
-        "clicks": _count(totals["clicks"]),
-        "adds": _count(totals["adds"]),
-        "ctr": round(totals["clicks"] / imp, 3) if imp >= MIN_GROUP else None,
-        "suppressed": any(v < MIN_GROUP for v in totals.values()),
+        "impressions": imp,
+        "clicks": totals["clicks"],
+        "adds": totals["adds"],
+        "ctr": round(totals["clicks"] / imp, 3) if imp else None,
         "daily": daily,
         "incrementality": incrementality(store.campaign_members(cid)),
         "incrementality_note": INCREMENTALITY_NOTE,
@@ -350,7 +361,6 @@ def sponsored(store: Store, uid: str) -> dict[str, Any] | None:
         and d.get("placement", "routine") == "routine"
         and d.get("product_id") not in owned
         and goals & set(d.get("goals") or [])
-        and (not d.get("skin_types") or skin in d["skin_types"])
     ]
     evidence: dict[str, dict[str, Any]] = {}
     eligible = []
@@ -362,7 +372,14 @@ def sponsored(store: Store, uid: str) -> dict[str, Any] | None:
             except Unavailable:
                 return None
         e = evidence[pid]
-        if e.get("eligible") and e.get("tier") == "proven" and catalog.by_id(pid):
+        # skin types: the campaign's, or every skin type the evidence covers ([]); never "all"
+        targets = d.get("skin_types") or e.get("skin_types") or []
+        if (
+            e.get("eligible")
+            and e.get("tier") == "proven"
+            and skin in targets
+            and catalog.by_id(pid)
+        ):
             eligible.append((cid, d))
     day = at.date().isoformat()
     # The first campaign in today's rotation whose randomised group for this person is
@@ -387,7 +404,7 @@ def sponsored(store: Store, uid: str) -> dict[str, Any] | None:
         # "Why am I seeing this?": what matched, from the person's own profile
         "matched": {
             "goals": sorted(goals & set(d.get("goals") or [])),
-            "skin_type": skin if d.get("skin_types") else None,
+            "skin_type": skin,
         },
         "disclosure": DISCLOSURE,
     }

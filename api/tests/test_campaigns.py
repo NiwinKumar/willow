@@ -16,7 +16,10 @@ PROVEN_4 = "clinique-even-better-clinical-dark-spot-clearing-serum"
 PROMISING = "cerave-resurfacing-retinol-serum"
 
 
-def _elig(pid: str, tier: str, goals: list[str]) -> dict:
+ALL_SKIN = ["oily", "combination", "dry", "normal", "sensitive"]
+
+
+def _elig(pid: str, tier: str, goals: list[str], skin: list[str] = ALL_SKIN) -> dict:
     return {
         "product_id": pid,
         "product": pid,
@@ -25,14 +28,14 @@ def _elig(pid: str, tier: str, goals: list[str]) -> dict:
         "eligible": tier == "proven",
         "reasons": [] if tier == "proven" else ["Needs 30 people and a lift above zero."],
         "goals": goals,
-        "skin_types": [],
+        "skin_types": list(skin),
         "evidence": f"In the Willow cohort, 48% had a real change (n=212). {pid}",
     }
 
 
 ELIG = {
     PROVEN: _elig(PROVEN, "proven", ["dark_spots", "even_tone"]),
-    PROVEN_2: _elig(PROVEN_2, "proven", ["dark_spots"]),
+    PROVEN_2: _elig(PROVEN_2, "proven", ["dark_spots"], ["oily", "combination"]),
     PROVEN_3: _elig(PROVEN_3, "proven", ["dark_spots", "oil_glow"]),
     PROVEN_4: _elig(PROVEN_4, "proven", ["dark_spots"]),
     PROMISING: _elig(PROMISING, "promising", ["blemishes"]),
@@ -127,7 +130,8 @@ def test_create_a_campaign(client, fake):
     assert c["id"].startswith("c_") and c["status"] == "active" and c["placement"] == "routine"
     assert c["product"] and c["brand"] == "The Ordinary" and c["image_url"]
     assert c["skin_types"] == ["oily"] and c["days"] == 14
-    assert c["stats"]["impressions"] is None and c["stats"]["ctr"] is None
+    assert c["stats"]["impressions"] == 0 and c["stats"]["ctr"] is None
+    assert "suppressed" not in c["stats"]
     assert len(c["stats"]["daily"]) == 1
     doc = fake.store.campaigns[c["id"]]
     assert doc["owner_uid"] == "u_test" and doc["ends_at"] - doc["starts_at"] == timedelta(days=14)
@@ -276,9 +280,43 @@ def test_sponsored_matches_goals_and_skin_type(client, fake):
     assert _shopper("none", goals=[]).get("/v1/sponsored").json()["item"] is None
 
 
-def test_empty_skin_types_mean_everyone(client, fake):
-    _create(client)
-    assert _shopper(skin="sensitive").get("/v1/sponsored").json()["item"]
+def test_empty_skin_types_mean_every_eligible_skin_type(client, fake):
+    _create(client, pid=PROVEN_2)  # evidence covers oily and combination only
+    item = _shopper("c", skin="combination").get("/v1/sponsored").json()["item"]
+    assert item and item["matched"]["skin_type"] == "combination"
+    assert _shopper("s", skin="sensitive").get("/v1/sponsored").json()["item"] is None
+    # no skin type on the profile: not in any eligible list
+    nobody = _as("noskin")
+    nobody.put("/v1/me/profile", json={"goals": ["dark_spots"]})
+    assert nobody.get("/v1/sponsored").json()["item"] is None
+
+
+def test_skin_types_must_be_within_the_evidence(client, fake):
+    res = _create(client, pid=PROVEN_2, skin=("oily", "dry"))
+    assert res.status_code == 422
+    assert res.json()["detail"]["reasons"] == ["The evidence does not cover these skin types: dry."]
+    assert _create(client, pid=PROVEN_2, skin=("combination",)).status_code == 201
+    # no skin type with enough evidence: nothing can be promoted
+    saved = ELIG[PROVEN]["skin_types"]
+    ELIG[PROVEN]["skin_types"] = []
+    try:
+        res = _create(client)
+        assert res.status_code == 422
+        assert "No skin type has enough evidence" in res.json()["detail"]["reasons"][0]
+    finally:
+        ELIG[PROVEN]["skin_types"] = saved
+
+
+def test_resume_rechecks_skin_types(client, fake):
+    cid = _create(client, skin=("dry",)).json()["id"]
+    client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "paused"})
+    saved = ELIG[PROVEN]["skin_types"]
+    ELIG[PROVEN]["skin_types"] = ["oily"]
+    try:
+        res = client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "active"})
+        assert res.status_code == 422 and "dry" in res.json()["detail"]["reasons"][0]
+    finally:
+        ELIG[PROVEN]["skin_types"] = saved
 
 
 def test_sponsored_skips_paused_and_no_longer_proven(client, fake):
@@ -374,23 +412,37 @@ def test_events_reject_bad_input(client, fake):
     )
 
 
-def test_stats_suppress_small_counts_and_compute_ctr(client, fake):
+def test_delivery_counts_are_shown_as_counted(client, fake):
+    cid = _create(client).json()["id"]
+    s = _shopper("first")
+    _event(s, cid, "impression")
+    st = client.get("/v1/retailer/campaigns").json()["campaigns"][0]["stats"]
+    # a judge sees "1 impression" right after viewing the card
+    assert st["impressions"] == 1 and st["clicks"] == 0 and st["ctr"] == 0.0
+    assert st["daily"][-1] == {
+        "day": st["daily"][-1]["day"],
+        "impressions": 1,
+        "clicks": 0,
+        "adds": 0,
+    }
+    _event(s, cid, "click")
+    s.post("/v1/routine", json={"product_id": PROVEN, "slots": ["pm"]})
+    _event(s, cid, "add")
+    st = client.get("/v1/retailer/campaigns").json()["campaigns"][0]["stats"]
+    assert (st["impressions"], st["clicks"], st["adds"], st["ctr"]) == (1, 1, 1, 1.0)
+    assert st["incrementality"] is None  # the holdout comparison waits for 10 per group
+
+
+def test_ctr(client, fake):
     cid = _create(client).json()["id"]
     for i in range(20):
         s = _shopper(f"s{i}")
         _event(s, cid, "impression")
         if i < 5:
             _event(s, cid, "click")
-    [row] = client.get("/v1/retailer/campaigns").json()["campaigns"]
-    st = row["stats"]
-    assert st["impressions"] == 20 and st["clicks"] is None and st["adds"] is None
-    assert st["ctr"] == 0.25 and st["suppressed"] is True
-    assert st["daily"][-1]["impressions"] == 20 and st["daily"][-1]["clicks"] is None
-
-    for i in range(5, 12):
-        _event(_as(f"s{i}"), cid, "click")
     st = client.get("/v1/retailer/campaigns").json()["campaigns"][0]["stats"]
-    assert st["clicks"] == 12 and st["ctr"] == 0.6
+    assert (st["impressions"], st["clicks"], st["adds"], st["ctr"]) == (20, 5, 0, 0.25)
+    assert "suppressed" not in st
 
 
 def test_events_are_rate_limited(client, fake, monkeypatch):
