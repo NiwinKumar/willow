@@ -409,6 +409,30 @@ def test_brief_summary_is_validated_and_cached(proof, monkeypatch):
     assert proof.get("/v1/retailer/brief").json()["summary"] is None
 
 
+def test_a_rejected_summary_gets_one_rewrite_told_what_failed(proof, monkeypatch):
+    cards = retail_intel.brief_cards(_facts())
+    good = f"{cards[0]['title']}: {cards[0]['value']} points (simulated cohort)."
+    drafts = [" ".join(["word"] * 70), good]
+    seen = []
+
+    def reply(_name, parts, *a, **k):
+        seen.append(parts)
+        return retail_intel.Summary(text=drafts[len(seen) - 1])
+
+    monkeypatch.setattr(retail_intel, "_summaries", {})
+    monkeypatch.setattr(gemini, "generate_json", reply)
+    assert proof.get("/v1/retailer/brief").json()["summary"] == {"text": good, "validated": True}
+    assert len(seen) == 2 and "longer than 60 words" in seen[1][-1]
+
+    # Two rejected drafts: no summary, cached, no third call.
+    seen.clear()
+    drafts[1] = drafts[0]
+    monkeypatch.setattr(retail_intel, "_summaries", {})
+    assert proof.get("/v1/retailer/brief").json()["summary"] is None
+    proof.get("/v1/retailer/brief")
+    assert len(seen) == 2
+
+
 def test_brief_cards_never_wait_on_a_slow_summary(proof, monkeypatch):
     import threading
 

@@ -1442,7 +1442,7 @@ def brief_cards(f: Facts, brand: str | None = None) -> list[dict[str, Any]]:
 SUMMARY_INSTRUCTIONS = """You write the opening summary of a retail intelligence brief for a
 skincare {audience}. CARDS (JSON) are insights computed from measured skin outcomes of people
 tracking their skin with Willow: a "visible change" is a measured change beyond the person's own
-photo noise that holds to week 8. Write at most 60 words, 2 or 3 sentences, plain British
+photo noise that holds to week 8. Write at most 50 words, 2 or 3 short sentences, plain British
 English, for a business reader: the most important win, the main risk and one next step.
 - Use only numbers that appear in CARDS, exactly as written there. Never compute new numbers.
 - Observational, cosmetic language. Never say "clinically proven", "proven to treat", "cures"
@@ -1468,6 +1468,7 @@ def summary_problems(text: str, cards: list[dict[str, Any]]) -> list[str]:
 
 _summaries: dict[tuple, tuple[float, dict[str, Any] | None]] = {}
 SUMMARY_RETRY_SECONDS = 60
+SUMMARY_DRAFTS = 2
 
 
 def summarise(
@@ -1481,29 +1482,38 @@ def summarise(
     if not cards:
         return None
     payload = {"cohort": cohort_label_, "brand": brand, "cards": cards}
-    try:
-        reply = gemini.generate_json(
-            "retailer_brief",
-            [f"CARDS (JSON):\n{json.dumps(payload, separators=(',', ':'))}"],
-            Summary,
-            instructions=SUMMARY_INSTRUCTIONS.format(audience="brand" if brand else "retailer"),
-            temperature=0.2,
-            max_output_tokens=2048,
-            attempts=1,
-            timeout_ms=20_000,
-        )
-    except Exception as exc:  # Gemini down, timeout, bad JSON: the brief still loads
-        log.warning(
-            "brief summary unavailable: %s", exc, exc_info=not isinstance(exc, gemini.GeminiError)
-        )
-        _summaries[key] = (time.time() + SUMMARY_RETRY_SECONDS, None)
-        return None
-    found = summary_problems(reply.text, cards)
-    if found:
-        log.warning("brief summary rejected: %s", found)
-        out = None
-    else:
-        out = {"text": reply.text.strip(), "validated": True}
+    parts = [f"CARDS (JSON):\n{json.dumps(payload, separators=(',', ':'))}"]
+    out = None
+    for draft in range(SUMMARY_DRAFTS):  # a rejected draft gets one rewrite, told what failed
+        try:
+            reply = gemini.generate_json(
+                "retailer_brief",
+                parts,
+                Summary,
+                instructions=SUMMARY_INSTRUCTIONS.format(audience="brand" if brand else "retailer"),
+                temperature=0.2,
+                max_output_tokens=2048,
+                attempts=1,
+                timeout_ms=20_000,
+            )
+        except Exception as exc:  # Gemini down, timeout, bad JSON: the brief still loads
+            log.warning(
+                "brief summary unavailable: %s",
+                exc,
+                exc_info=not isinstance(exc, gemini.GeminiError),
+            )
+            _summaries[key] = (time.time() + SUMMARY_RETRY_SECONDS, None)
+            return None
+        found = summary_problems(reply.text, cards)
+        if not found:
+            out = {"text": reply.text.strip(), "validated": True}
+            break
+        log.warning("brief summary draft %d rejected: %s", draft + 1, found)
+        parts = [
+            *parts[:1],
+            f"Your previous draft was rejected ({'; '.join(found)}):\n{reply.text}\n"
+            "Rewrite it to fix exactly that, keeping every other rule.",
+        ]
     # Kept for this data version and day (a rejected draft too); only an outage is retried.
     _summaries[key] = (math.inf, out)
     return out
