@@ -7,7 +7,7 @@ from zoneinfo import available_timezones
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import baselines, storage, tracks, views
+from app import baselines, campaigns, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
@@ -163,6 +163,7 @@ def delete_me(
 
     Records first, so the app forgets them at once even if removing many files takes a while."""
     store.delete_user(user.uid)
+    campaigns.delete_owned(store, user.uid)
     storage.delete_prefix(f"uploads/{user.uid}/")
     storage.delete_prefix(f"results/{user.uid}/")
     return Response(status_code=204)
@@ -220,7 +221,7 @@ Goal = Literal[
     "oil_glow",
 ]
 MAX_GOALS = 3
-PROFILE_FIELDS = ("goals", "photo_time", "display_name", "skin_type", "checkin")
+PROFILE_FIELDS = ("goals", "photo_time", "display_name", "skin_type", "checkin", "hide_sponsored")
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
@@ -277,6 +278,8 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, max_length=60)
     skin_type: Literal["oily", "combination", "dry", "normal", "sensitive"] | None = None
     checkin: Checkin | None = None
+    # Routine's "Sponsored · Willow Proven" card off (null = back to the default, shown)
+    hide_sponsored: bool | None = None
 
     @field_validator("goals")
     @classmethod
@@ -298,6 +301,7 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
         "display_name": p.get("display_name"),
         "skin_type": p.get("skin_type"),
         "checkin": p.get("checkin"),
+        "hide_sponsored": bool(p.get("hide_sponsored")),
     }
     out["updated_at"] = iso(p.get("updated_at"))
     return out
@@ -314,6 +318,7 @@ def put_profile(
     changes = body.model_dump(include=body.model_fields_set)
     profile = {k: saved.get(k) for k in PROFILE_FIELDS} | changes
     profile["goals"] = profile.get("goals") or []
+    profile["hide_sponsored"] = bool(profile.get("hide_sponsored"))
     profile["updated_at"] = datetime.now(UTC)
     store.user_merge(user.uid, {"profile": profile})
     return {"profile": _profile_out(profile)}
