@@ -702,6 +702,8 @@ export type RetailerBrandDetail = RetailerHead & {
   switching: { won: { brand: string; n: number }[]; lost: { brand: string; n: number }[]; net: number | null }
   positioning: { brand: string; rate: number; cont8: number; users: number; is_self: boolean }[]
   skin: { skin: string; label: string; brand_rate: number | null; market_rate: number | null; n: number | null }[]
+  /** "Observational comparison under the same method; …" (shown next to every comparison). */
+  note?: string
 }
 export type RetailerBriefSection = 'products' | 'categories' | 'segments' | 'competitors' | 'demand' | 'promote'
 export type RetailerBriefCard = {
@@ -734,7 +736,7 @@ export const retailerProducts = (filters?: RetailerFilters) => retailerGet<Retai
 export const retailerProduct = (productId: string, filters?: RetailerFilters) =>
   retailerGet<RetailerProductDetail>(`/v1/retailer/products/${encodeURIComponent(productId)}${retailerQs(filters)}`)
 export const retailerSegments = (filters?: RetailerFilters) => retailerGet<RetailerSegments>(`/v1/retailer/segments${retailerQs(filters)}`)
-export const retailerBrands = (filters?: RetailerFilters) => retailerGet<{ brands: RetailerBrandSummary[] }>(`/v1/retailer/brands${retailerQs(filters)}`)
+export const retailerBrands = (filters?: RetailerFilters) => retailerGet<{ brands: RetailerBrandSummary[]; note?: string }>(`/v1/retailer/brands${retailerQs(filters)}`)
 export const retailerBrand = (brand: string, filters?: RetailerFilters) =>
   retailerGet<RetailerBrandDetail>(`/v1/retailer/brands/${encodeURIComponent(brand)}${retailerQs(filters)}`)
 export const retailerBrief = (filters?: RetailerFilters & { brand?: string }) => retailerGet<RetailerBrief>(`/v1/retailer/brief${retailerQs(filters)}`)
