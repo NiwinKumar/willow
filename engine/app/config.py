@@ -413,6 +413,10 @@ FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as foreh
 MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
 FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
 FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)
+AREA_OUTLINE_MM = 1.0  # result.rois zone outlines simplified to this (fewer points, same shape)
+# a zone with less visible skin than this gets no outline (far side of a turned face)
+AREA_MIN_MM2 = 40.0
+AREA_SMOOTH_MM = 2.0  # zone masks opened and closed by this before outlining
 
 # Alignment across the photos of one session (docs/METRICS.md step 7)
 ALIGN_MATCH_MM = 3.0  # a spot in another photo within 3 mm of this one is the same spot
