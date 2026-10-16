@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     vapid_subject: str | None = None  # "mailto:..." or an https URL the push services can reach
     # The web app, for the calendar event's link and notification clicks.
     app_url: str = "https://willow-511508.web.app"
+    # the one store people are sent to buy from (web: VITE_PARTNER_STORE); else the brand site
+    partner_store: str = "Nykaa"
     # POST /v1/internal/reminders accepts Cloud Scheduler's OIDC token only with this audience and
     # this service account's email. Unset audience: the route answers 503 (except AUTH_MODE=dev).
     reminders_audience: str | None = None

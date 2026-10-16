@@ -220,3 +220,12 @@ def test_search_step_reads_like_words():
         {"products": [1, 2, 3]},
     )
     assert line == "Searched the catalog (dark spots, eye care, under ₹1,000): 3 products found"
+
+
+def test_gemini_is_told_only_the_partner_store():
+    from app.advisor import _where_to_buy
+
+    stores = [{"store": "Brand site"}, {"store": "Ulta"}, {"store": "Nykaa"}, {"store": "Boots"}]
+    assert _where_to_buy(stores) == ["Nykaa"]
+    assert _where_to_buy([{"store": "Ulta"}, {"store": "Brand site"}]) == ["Brand site"]
+    assert _where_to_buy([{"store": "Ulta"}]) == []
