@@ -34,6 +34,14 @@ export const GLOSSARY = {
     term: 'Share of routines',
     text: 'People using the product out of everyone using any product in the same category.',
   },
+  ctr: {
+    term: 'CTR',
+    text: 'Click-through rate: “View product” clicks divided by impressions. Each person counts once a day for each.',
+  },
+  holdout: {
+    term: 'Randomised holdout',
+    text: 'A share of the people a campaign matches, picked at random, who never see its card. Adoption (adding the product to the routine by any path) among people who could see it, minus adoption in the holdout, is the lift the campaign caused. Shown once each group has 10 people.',
+  },
 } as const satisfies Record<string, { term: string; text: string }>
 
 export type TermId = keyof typeof GLOSSARY
