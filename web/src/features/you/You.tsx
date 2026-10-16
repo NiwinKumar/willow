@@ -157,7 +157,8 @@ function AccountCard() {
       clearQueries()
       resetChat()
       prefs.clearAll()
-      navigate('/', { replace: true })
+      // Not / (that would start onboarding as a new guest): the about page, with Sign in and Get started.
+      navigate('/about', { replace: true })
     } catch {
       setLeaving(false)
       toast.error('Signing out didn’t finish. Try again.')
