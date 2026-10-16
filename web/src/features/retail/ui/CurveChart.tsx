@@ -11,6 +11,8 @@ export type CurveSeries = {
   tone: 'signal' | 'muted'
   /** The group size, shown in the label ("Users · n=212"). */
   n?: number | null
+  /** A stroke pattern ("6 3", "1.5 3") that tells several same-tone lines apart (Compare). */
+  dash?: string
 }
 
 /**
@@ -90,7 +92,7 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
               fill="none"
               stroke={s.tone === 'signal' ? 'var(--signal-change)' : 'var(--text-secondary)'}
               strokeWidth={s.tone === 'signal' ? 2 : 1.5}
-              strokeDasharray={s.tone === 'muted' ? '4 3' : undefined}
+              strokeDasharray={s.dash ?? (s.tone === 'muted' ? '4 3' : undefined)}
               strokeLinejoin="round"
             />
           ))}
