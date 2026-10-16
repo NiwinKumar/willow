@@ -227,12 +227,14 @@ export function ProcessingStep(props: {
     ? [
         'None of the photos could be used.',
         perPhoto(view) ?? failureReasons(view.result).join(' '),
-        sample || view.session.is_baseline ? '' : 'Your baseline is unchanged.',
+        // Only when there is one: a first check-in that fails sets no baseline.
+        sample || view.session.is_baseline ? '' : view.session.baseline ? 'Your baseline is unchanged.' : 'No baseline was set: the first check-in with usable photos becomes it.',
       ]
         .filter(Boolean)
         .join(' ')
     : ''
-  const tips = view && outcome === 'rejected' ? [...new Set((view.result?.quality.reasons ?? []).map((r) => qualityCopy(r, view.session.site)?.text).filter((t): t is string => Boolean(t)))].slice(0, 3) : []
+  // (too_few_frames only repeats "None of the photos could be used")
+  const tips = view && outcome === 'rejected' ? [...new Set((view.result?.quality.reasons ?? []).filter((r) => r !== 'too_few_frames').map((r) => qualityCopy(r, view.session.site)?.text).filter((t): t is string => Boolean(t)))].slice(0, 3) : []
   const errorText =
     state.kind === 'error'
       ? {
