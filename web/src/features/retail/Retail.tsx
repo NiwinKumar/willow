@@ -1,49 +1,68 @@
 import './retail.css'
 
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowUpRight, Grid3x3, LayoutDashboard, Megaphone, Menu, MessageSquareText, Package, PanelLeftClose, PanelLeftOpen, Scale, Shapes, SlidersHorizontal, TrendingUp, X, type LucideIcon } from 'lucide-react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 
-import { LogoMark } from '../../components/willow/Logo'
-import { Disclaimer } from '../../components/willow/Disclaimer'
-import { api } from '../../lib/api'
+import { ErrorBoundary } from '../../components/ErrorBoundary'
 import { AskAggregates } from './AskAggregates'
-import { COHORTS, cohortKind, DATA_STUDIO, DEFAULT_FILTERS, MIN_GROUP, RANGES, totalUsers, type CohortKind, type Filters, type Insights } from './data'
-import { AllProductsCard, CategoryCard, ConflictsCard, GapsCard, NeedsCard, OutcomesCard, SegRadio } from './Sections'
+import { ProofLockup, ProofMark } from './brand'
+import { RetailDataProvider, useRetailData } from './context'
+import { totalUsers } from './data'
+import { COHORTS, RANGES, SECTIONS, sectionPath, useRetailState } from './state'
+import type { Insights, SectionId } from './types'
+import { cohortKind, Combobox, int, Segmented, SidePanel, SkeletonHeader, SkeletonKpis, SkeletonTable, type CohortKind } from './ui'
 
-/**
- * Retailer insights (Willow Retail.dc.html): a standalone dark dashboard over the public, suppressed
- * aggregates (GET /v1/retailer/insights) and the Gemini "Ask" (POST /v1/retailer/ask, guest sign-in).
+/*
+ * Willow Proof (docs/RETAIL_BRAND.md, docs/RETAILER_INSIGHTS.md "App structure"): the business app at
+ * /retail/*. One shell: cohort banner, top bar (lockup, "Viewing as", range + cohort filters, Ask), a left nav
+ * that collapses to icons (remembered on this browser), and one lazily loaded route per section. All state is
+ * in the URL (state.ts); the insights aggregates are fetched once per filter (context.tsx).
  */
+
+const Overview = lazy(() => import('./sections/Overview'))
+const Products = lazy(() => import('./sections/Products'))
+const ProductDetail = lazy(() => import('./sections/ProductDetail'))
+const Categories = lazy(() => import('./sections/Categories'))
+const SkinProfiles = lazy(() => import('./sections/SkinProfiles'))
+const Competitors = lazy(() => import('./sections/Competitors'))
+const Demand = lazy(() => import('./sections/Demand'))
+const Promote = lazy(() => import('./sections/Promote'))
+
+const ICONS: Record<SectionId, LucideIcon> = {
+  overview: LayoutDashboard,
+  products: Package,
+  categories: Shapes,
+  segments: Grid3x3,
+  competitors: Scale,
+  demand: TrendingUp,
+  promote: Megaphone,
+}
+
+const NAV_KEY = 'willow.proof.nav.collapsed'
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(NAV_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function writeCollapsed(v: boolean) {
+  try {
+    window.localStorage.setItem(NAV_KEY, v ? '1' : '0')
+  } catch {
+    /* private mode or blocked storage: the choice lasts for this visit only */
+  }
+}
+
+/** Which section a path is in ("/retail/categories/serum" → categories). */
+function sectionOf(pathname: string): (typeof SECTIONS)[number] {
+  const seg = pathname.replace(/^\/retail\/?/, '').split('/')[0]
+  return SECTIONS.find((s) => s.path === seg) ?? SECTIONS[0]
+}
+
 export default function Retail() {
-  const [attempt, setAttempt] = useState(0)
-  // The last answer and the request it belongs to: a different filter (or a retry) shows loading until its own arrives.
-  const [res, setRes] = useState<{ key: string; d: Insights | null; failed: boolean }>({ key: '', d: null, failed: false })
-  // The filters live in the URL (?cohort=&range=), so a filtered view can be shared or reloaded.
-  const [params, setParams] = useSearchParams()
-  const filters: Filters = {
-    cohort: COHORTS.find((c) => c.value === params.get('cohort'))?.value ?? DEFAULT_FILTERS.cohort,
-    range: RANGES.find((r) => r.value === params.get('range'))?.value ?? DEFAULT_FILTERS.range,
-  }
-  const setFilters = (f: Partial<Filters>) => {
-    const next = { ...filters, ...f }
-    setParams(next.cohort === DEFAULT_FILTERS.cohort && next.range === DEFAULT_FILTERS.range ? {} : next, { replace: true })
-  }
-
-  const key = `${filters.cohort}|${filters.range}|${attempt}`
-  useEffect(() => {
-    let alive = true
-    api
-      .retailerInsights({ cohort: filters.cohort, range: filters.range })
-      .then((r) => alive && setRes({ key, d: r, failed: false }))
-      .catch(() => alive && setRes({ key, d: null, failed: true }))
-    return () => {
-      alive = false
-    }
-  }, [key, filters.cohort, filters.range])
-  const d = res.key === key ? res.d : null
-  const failed = res.key === key && res.failed
-
-  // The whole document goes dark while this page is open (overscroll, the toast), and back when it closes.
+  // The whole document goes dark while Proof is open (overscroll, toasts, portals), and back when it closes.
   useEffect(() => {
     const html = document.documentElement
     const before = html.dataset.theme
@@ -55,317 +74,308 @@ export default function Retail() {
       html.style.colorScheme = ''
     }
   }, [])
-
-  const state = d ? (d.empty || totalUsers(d.cohort) === 0 ? 'empty' : 'ready') : failed ? 'failed' : 'loading'
-  const rangeCaps = RANGES.find((r) => r.value === filters.range)!.caps
   return (
-    <div data-theme="dark" className="relative min-h-dvh overflow-x-clip bg-canvas pb-20 font-ui text-ink">
-      <Backdrop />
-      {d ? <CohortBanner d={d} /> : null}
-      <Header ready={state === 'ready'} />
+    <RetailDataProvider>
+      <Shell />
+    </RetailDataProvider>
+  )
+}
 
-      <main className="relative z-[1] mx-auto flex max-w-[1320px] flex-col gap-4 px-[clamp(16px,4vw,40px)]">
-        <div className="flex flex-wrap items-end justify-between gap-5 pb-1 pt-[clamp(16px,4vw,48px)]">
-          <h1 className="m-0 text-[clamp(44px,6.5vw,96px)] font-light leading-[.92] tracking-[-0.035em]">
-            What customers
-            <br />
-            are trying to change
-          </h1>
-          <p className="m-0 max-w-[420px] leading-normal text-ink-2">
-            Anonymised aggregates. Every rate shows its denominator. Groups below {MIN_GROUP} people are suppressed everywhere, including exports and answers.
-          </p>
-        </div>
+function Shell() {
+  const { pathname } = useLocation()
+  const section = sectionOf(pathname)
+  const { param, setParam } = useRetailState()
+  const { insights, filters } = useRetailData()
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  const [menu, setMenu] = useState(false)
+  const head = useRef<HTMLDivElement>(null)
+  const root = useRef<HTMLDivElement>(null)
+  const askOpen = param('ask') === '1'
 
-        <p className="m-0 rounded-[20px] border border-line bg-surface px-4 py-3 text-[13px] text-ink-2 lg:hidden">
-          Best on a laptop. On a smaller screen the cards stack and wide tables scroll sideways.
-        </p>
+  // "Willow Proof · <Section>" in the tab (App's PageTitle leaves /retail to this shell).
+  useEffect(() => {
+    document.title = `Willow Proof · ${section.label}`
+  }, [section.label])
+  // The sticky header's height drives the nav's top and the scroll padding (focus never lands under it).
+  useLayoutEffect(() => {
+    const el = head.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      root.current?.style.setProperty('--proof-head', `${el.offsetHeight}px`)
+      document.documentElement.style.scrollPaddingTop = `${el.offsetHeight + 12}px`
+    })
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      document.documentElement.style.scrollPaddingTop = ''
+    }
+  }, [])
 
-        <div className="flex flex-wrap items-center gap-2.5 py-2">
-          <SegRadio label="Date range" options={RANGES} value={filters.range} onChange={(range) => setFilters({ range })} />
-          <SegRadio label="Cohort" options={COHORTS} value={filters.cohort} onChange={(cohort) => setFilters({ cohort })} />
-          <span aria-live="polite" className="font-mono text-[13px] text-ink-2">
-            {state === 'ready' && d ? `${totalUsers(d.cohort)} USERS · ${rangeCaps}${d.filters ? ` TO ${d.filters.today}` : ''}` : ''}
-          </span>
-        </div>
+  const toggle = () =>
+    setCollapsed((c) => {
+      writeCollapsed(!c)
+      return !c
+    })
+  const d = insights.status === 'ready' || insights.status === 'empty' ? insights.d : null
 
-        {state === 'loading' ? <Loading /> : null}
-        {state === 'failed' ? (
-          <Notice
-            role="alert"
-            glyph="—"
-            title="Aggregates couldn’t load"
-            text="The warehouse didn’t respond. No partial numbers are shown."
-            action={{ label: 'Retry', onClick: () => setAttempt((a) => a + 1) }}
-          />
-        ) : null}
-        {state === 'empty' && d ? (
-          <Notice
-            glyph="00"
-            title={filters.cohort === 'real' ? 'No consented data in this range' : 'Not enough data in this range'}
-            text={emptyText(d, filters)}
-            action={filters.cohort === 'simulated' && filters.range === 'all' ? undefined : { label: 'Show all time, simulated cohort', onClick: () => setFilters({ cohort: 'simulated', range: 'all' }) }}
-          />
-        ) : null}
-        {state === 'ready' && d ? <Dashboard d={d} filters={filters} /> : null}
-      </main>
+  return (
+    <div ref={root} data-theme="dark" className="proof-root relative min-h-dvh bg-canvas font-ui text-proof-body text-ink [--proof-head:80px]">
+      <a href="#proof-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xs focus:bg-selected focus:px-3 focus:py-2 focus:text-inverse">
+        Skip to content
+      </a>
+      <div ref={head} className="sticky top-0 z-40">
+        <CohortBanner d={d} loading={insights.status === 'loading'} />
+        <TopBar onMenu={() => setMenu((m) => !m)} menuOpen={menu} onAsk={() => setParam({ ask: '1' }, { push: true })} />
+        {menu ? <MobileNav onClose={() => setMenu(false)} /> : null}
+      </div>
+
+      <div className="flex">
+        <SideNav collapsed={collapsed} onToggle={toggle} />
+        <main id="proof-main" tabIndex={-1} className="min-w-0 flex-1 px-4 pb-16 pt-5 outline-none sm:px-6 lg:px-7">
+          <div className="mx-auto w-full max-w-[1560px]">
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense fallback={<SectionFallback />}>
+                <div key={section.id} className="animate-[proofPage_.24s_var(--ease-standard)_both]">
+                  <Routes>
+                    <Route index element={<Overview />} />
+                    <Route path="products" element={<Products />} />
+                    <Route path="products/:productId" element={<ProductDetail />} />
+                    <Route path="categories" element={<Categories />} />
+                    <Route path="categories/:category" element={<Categories />} />
+                    <Route path="segments" element={<SkinProfiles />} />
+                    <Route path="competitors" element={<Competitors />} />
+                    <Route path="demand" element={<Demand />} />
+                    <Route path="promote" element={<Promote />} />
+                    <Route path="*" element={<Overview />} />
+                  </Routes>
+                </div>
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        </main>
+      </div>
+
+      <SidePanel open={askOpen} onClose={() => setParam({ ask: null })} title="Ask the aggregates" subtitle={`Same filters as the screen · ${RANGES.find((r) => r.value === filters.range)?.label} · ${COHORTS.find((c) => c.value === filters.cohort)?.label} cohort`} width={460} labelledBy="proof-ask-title">
+        <AskAggregates d={d} filters={filters} />
+      </SidePanel>
     </div>
   )
 }
 
-function emptyText(d: Insights, f: Filters): string {
-  const n = totalUsers(d.cohort)
-  const who = f.cohort === 'real' ? 'real consented' : f.cohort === 'simulated' ? 'simulated' : ''
-  const when = f.range === 'all' ? 'so far' : `in the last ${f.range === '30d' ? 30 : 90} days`
-  if (n === 0) return `No ${who ? `${who} ` : ''}users shared aggregate results ${when}.`
-  return `Only ${n} ${who ? `${who} ` : ''}${n === 1 ? 'user' : 'users'} ${when}, which is below the reporting threshold of ${MIN_GROUP}.`
-}
-
-function Dashboard({ d, filters }: { d: Insights; filters: Filters }) {
+function SectionFallback() {
   return (
-    <>
-      <Kpis d={d} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,520px),1fr))] gap-4">
-        <NeedsCard d={d} />
-        <CategoryCard d={d} />
-      </div>
-      <OutcomesCard d={d} />
-      <AllProductsCard d={d} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,520px),1fr))] gap-4">
-        <GapsCard d={d} />
-        <ConflictsCard d={d} />
-      </div>
-      <AskAggregates d={d} filters={filters} />
-      <About d={d} />
-    </>
-  )
-}
-
-/* ───────────────────────────── chrome ───────────────────────────── */
-
-function Backdrop() {
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 h-[1000px] overflow-hidden"
-      style={{ background: 'radial-gradient(40% 40% at 0% 0%, rgba(29,60,160,.55), transparent 70%), radial-gradient(35% 40% at 100% 10%, rgba(14,80,70,.45), transparent 70%)' }}
-    >
-      {[0, 1].map((i) => (
-        <div
-          key={i}
-          className="absolute size-[40vw] rounded-full blur-[60px]"
-          style={{ left: i ? '60%' : '-10%', top: i ? '-10%' : 0, background: i ? 'rgba(20,120,100,.35)' : 'rgba(40,80,220,.35)', animation: `wDrift ${20 + i * 5}s ease-in-out infinite alternate` }}
-        />
-      ))}
+    <div role="status" aria-label="Loading section" className="flex flex-col gap-4">
+      <SkeletonHeader />
+      <SkeletonKpis />
+      <SkeletonTable rows={6} />
     </div>
   )
 }
+
+/* ───────────────────────────── banner ───────────────────────────── */
 
 const BANNER: Record<CohortKind, (d: Insights) => string> = {
-  simulated: (d) => `■ SIMULATED EVIDENCE · ${d.cohort.synthetic} SYNTHETIC USERS GENERATED FROM MEASURED NOISE · NOT REAL CUSTOMERS`,
-  mixed: (d) => `■ MIXED COHORT · ${d.cohort.real} REAL CONSENTED ${d.cohort.real === 1 ? 'USER' : 'USERS'} + ${d.cohort.synthetic} SIMULATED · COUNTED TOGETHER IN EVERY AGGREGATE`,
+  simulated: (d) => `■ SIMULATED EVIDENCE · ${int(d.cohort.synthetic)} SYNTHETIC USERS GENERATED FROM MEASURED NOISE · NOT REAL CUSTOMERS`,
+  mixed: (d) => `■ MIXED COHORT · ${int(d.cohort.real)} REAL CONSENTED ${d.cohort.real === 1 ? 'USER' : 'USERS'} + ${int(d.cohort.synthetic)} SIMULATED · COUNTED TOGETHER`,
   real: () => '■ REAL CONSENTED USERS ONLY · SMALL COHORT · GROUPS UNDER 10 SUPPRESSED',
 }
 
 /** SyntheticBanner (docs/DESIGN.md): yellow hatched while any row is simulated, lime when every row is real. */
-function CohortBanner({ d }: { d: Insights }) {
+function CohortBanner({ d, loading }: { d: Insights | null; loading: boolean }) {
+  if (!d) {
+    return (
+      <div role="note" className="flex h-7 items-center justify-center bg-sunken px-4 font-mono text-[11px] tracking-[.06em] text-ink-2">
+        {loading ? '■ LOADING COHORT…' : '■ COHORT UNAVAILABLE · NO NUMBERS SHOWN'}
+      </div>
+    )
+  }
   const kind = cohortKind(d.cohort)
   return (
-    <div role="note" className={`sticky top-0 z-30 flex justify-center px-4 py-2.5 text-center font-mono text-[12px] tracking-[.06em] ${kind === 'real' ? 'retail-real' : 'retail-synthetic'}`}>
-      <span className="hidden sm:inline">{BANNER[kind](d)}</span>
-      {/* Phone: the same facts, short enough to keep the sticky strip to one line or two. */}
-      <span className="sm:hidden">{kind === 'real' ? '■ REAL CONSENTED USERS ONLY' : `■ ${kind === 'mixed' ? 'MIXED' : 'SIMULATED'} · ${d.cohort.synthetic} SYNTHETIC${d.cohort.real ? ` + ${d.cohort.real} REAL` : ''} USERS`}</span>
+    <div role="note" className={`flex min-h-7 items-center justify-center px-4 py-1 text-center font-mono text-[11px] tracking-[.06em] ${kind === 'real' ? 'retail-real' : 'retail-synthetic'}`}>
+      <span className="hidden md:inline">{BANNER[kind](d)}</span>
+      <span className="md:hidden">{kind === 'real' ? '■ REAL CONSENTED USERS ONLY' : `■ ${kind === 'mixed' ? 'MIXED' : 'SIMULATED'} · ${int(d.cohort.synthetic)} SYNTHETIC${d.cohort.real ? ` + ${d.cohort.real} REAL` : ''} USERS`}</span>
     </div>
   )
 }
 
-const SECTIONS = [
-  ['needs', 'Needs'],
-  ['outcomes', 'Outcomes'],
-  ['brands', 'Brands'],
-  ['gaps', 'Gaps'],
-  ['conflicts', 'Conflicts'],
-  ['ask', 'Ask'],
-] as const
+/* ───────────────────────────── top bar ───────────────────────────── */
 
-/** The section in view, for the nav pill (the design marked "Ask" only; this follows the scroll). */
-function useSectionInView(ready: boolean): string | null {
-  const [active, setActive] = useState<string | null>(null)
-  useEffect(() => {
-    // The sections exist only once the dashboard is drawn (never on the loading, failed or empty states).
-    if (!ready) return
-    const seen = new Map<string, boolean>()
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => seen.set(e.target.id, e.isIntersecting))
-        setActive(SECTIONS.map(([id]) => id).find((id) => seen.get(id)) ?? null)
-      },
-      { rootMargin: '-30% 0px -55% 0px' },
-    )
-    SECTIONS.forEach(([id]) => {
-      const el = document.getElementById(id)
-      if (el) io.observe(el)
-    })
-    return () => io.disconnect()
-  }, [ready])
-  return active
+function Workspace() {
+  const { brands, workspace } = useRetailData()
+  const { setWorkspace } = useRetailState()
+  const options = [
+    { value: 'retailer', label: 'Retailer · all brands', group: 'Retailer' },
+    ...brands.map((b) => ({ value: `brand:${b.slug}`, label: b.brand, hint: b.products ? `${b.products} ${b.products === 1 ? 'product' : 'products'}` : undefined, group: 'Brand' })),
+  ]
+  const value = workspace.kind === 'brand' ? `brand:${workspace.slug}` : 'retailer'
+  // A brand in the URL that this filter does not know (yet): keep it visible rather than silently switching.
+  if (workspace.kind === 'brand' && !options.some((o) => o.value === value)) options.push({ value, label: workspace.slug, group: 'Brand' })
+  return (
+    <Combobox
+      label="Viewing as"
+      value={value}
+      options={options}
+      onChange={(v) => setWorkspace(v.startsWith('brand:') ? { kind: 'brand', slug: v.slice(6) } : { kind: 'retailer' })}
+      footer="Demo workspace: any brand view is open to everyone, with no ownership check. Competitors are named; every brand sees the same method and suppression."
+    />
+  )
 }
 
-function Header({ ready }: { ready: boolean }) {
-  const active = useSectionInView(ready)
+function Filters({ wrap = false }: { wrap?: boolean }) {
+  const { filters, setFilters } = useRetailState()
   return (
-    <header className="relative z-[2] flex flex-wrap items-center justify-between gap-3 px-[clamp(16px,4vw,40px)] py-[18px]">
-      <Link to="/" aria-label="Willow home" className="flex items-center gap-2.5 no-underline">
-        <LogoMark size={32} />
-        <span className="text-[26px] font-light tracking-[-0.03em] text-white">willow</span>
-        <span className="rounded-pill border border-[#333] px-3 py-1.5 font-mono text-[12px] text-[#C9C6C0]">RETAIL</span>
-      </Link>
-      <nav aria-label="Sections" className="no-scrollbar flex max-w-full gap-0.5 overflow-x-auto rounded-pill border border-muted bg-sunken p-[5px]">
-        {SECTIONS.map(([id, label]) => (
-          <a
-            key={id}
-            href={`#${id}`}
-            aria-current={active === id ? 'true' : undefined}
-            className={`whitespace-nowrap rounded-pill px-4 py-2.5 text-[14px] no-underline transition-[background] duration-200 ${active === id ? 'bg-selected text-inverse' : 'text-ink hover:bg-muted'}`}
-          >
-            {label}
-          </a>
-        ))}
-      </nav>
-      <a href={DATA_STUDIO} target="_blank" rel="noopener noreferrer" className="flex min-h-[46px] items-center gap-2 rounded-pill bg-cta px-[18px] text-[14px] text-inverse no-underline hover:bg-cta-hover">
-        Open Data Studio report ↗<span className="sr-only"> (opens in a new tab)</span>
-      </a>
+    <div className={`flex items-center gap-2 ${wrap ? 'flex-wrap' : ''}`}>
+      <Segmented label="Date range" options={RANGES} value={filters.range} onChange={(range) => setFilters({ range })} />
+      <Segmented label="Cohort" options={COHORTS} value={filters.cohort} onChange={(cohort) => setFilters({ cohort })} />
+    </div>
+  )
+}
+
+function UsersCount() {
+  const { insights, filters } = useRetailData()
+  const d = insights.status === 'ready' || insights.status === 'empty' ? insights.d : null
+  const caps = RANGES.find((r) => r.value === filters.range)!.caps
+  return (
+    <span aria-live="polite" className="hidden whitespace-nowrap font-mono text-[11px] text-ink-2 tnum 2xl:inline">
+      {d ? `${int(totalUsers(d.cohort))} USERS · ${caps}${d.filters ? ` TO ${d.filters.today}` : ''}` : ''}
+    </span>
+  )
+}
+
+function TopBar({ onMenu, menuOpen, onAsk }: { onMenu: () => void; menuOpen: boolean; onAsk: () => void }) {
+  const { carry, filters } = useRetailState()
+  return (
+    <header className="border-b border-line bg-canvas/85 [-webkit-backdrop-filter:blur(20px)_saturate(1.4)] [backdrop-filter:blur(20px)_saturate(1.4)]">
+      <div className="flex h-[var(--proof-topbar)] items-center gap-3 px-3 sm:px-4">
+        <button type="button" onClick={onMenu} aria-expanded={menuOpen} aria-controls="proof-mobile-nav" aria-label={menuOpen ? 'Close menu' : 'Open menu'} className="hit44 grid size-8 place-items-center rounded-xs border-0 bg-transparent text-ink hover:bg-glass lg:hidden">
+          {menuOpen ? <X size={18} strokeWidth={1.6} aria-hidden /> : <Menu size={18} strokeWidth={1.6} aria-hidden />}
+        </button>
+        <Link to={`/retail${carry}`} aria-label="Willow Proof, Overview" className="flex shrink-0 items-center rounded-xs no-underline lg:w-[calc(var(--proof-nav-open)-28px)]">
+          <ProofLockup size={22} />
+        </Link>
+        <span aria-hidden className="hidden h-5 w-px bg-line lg:block" />
+        <div className="hidden min-w-0 sm:block">
+          <Workspace />
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <UsersCount />
+          <div className="hidden lg:block">
+            <Filters />
+          </div>
+          <button type="button" onClick={onAsk} className="hit44 inline-flex h-8 items-center gap-1.5 rounded-xs border-0 bg-selected px-3 text-proof-small font-medium text-inverse transition-[transform,background] duration-150 hover:bg-ink/85 active:scale-[.98]">
+            <MessageSquareText size={14} strokeWidth={1.8} aria-hidden />
+            Ask
+          </button>
+        </div>
+      </div>
+      {/* Below 1040 px the workspace and filters get their own scrollable row. */}
+      <div className="flex items-center gap-2 border-t border-line px-3 py-2 sm:px-4 lg:hidden">
+        <div className="min-w-0 flex-1 sm:hidden">
+          <Workspace />
+        </div>
+        {/* Phones: the filters live in the menu sheet; this chip says what is applied and opens it. */}
+        <button type="button" onClick={onMenu} aria-expanded={menuOpen} aria-controls="proof-mobile-nav" className="hit44 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xs border border-line-strong bg-transparent px-2.5 text-proof-small text-ink hover:bg-glass sm:hidden">
+          <SlidersHorizontal size={14} strokeWidth={1.6} aria-hidden />
+          <span className="sr-only">Filters: </span>
+          {RANGES.find((r) => r.value === filters.range)?.label} · {COHORTS.find((c) => c.value === filters.cohort)?.label}
+        </button>
+        <div className="no-scrollbar hidden min-w-0 overflow-x-auto sm:block">
+          <Filters />
+        </div>
+      </div>
     </header>
   )
 }
 
-/* ───────────────────────────── states ───────────────────────────── */
+/* ───────────────────────────── navigation ───────────────────────────── */
 
-function Loading() {
+function NavItems({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
+  const { carry } = useRetailState()
   return (
-    <div role="status" aria-label="Loading aggregates" className="flex flex-col gap-3">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="retail-shimmer h-[150px] rounded-[32px]" />
-        ))}
-      </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,520px),1fr))] gap-4">
-        <div className="retail-shimmer h-[520px] rounded-[44px] [animation-delay:.1s]" />
-        <div className="retail-shimmer h-[520px] rounded-[44px] [animation-delay:.2s]" />
-      </div>
-      <span className="flex items-center gap-2.5 text-[14px] text-ink-2">
-        <span aria-hidden className="flex gap-1">
-          {[0, 0.15, 0.3].map((delay) => (
-            <span key={delay} className="size-[7px] rounded-full bg-white animate-[wBounce_1.1s_infinite]" style={{ animationDelay: `${delay}s` }} />
-          ))}
-        </span>
-        Loading aggregates…
-      </span>
-    </div>
+    <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+      {SECTIONS.map((s) => {
+        const Icon = ICONS[s.id]
+        return (
+          <li key={s.id}>
+            <NavLink
+              to={`${sectionPath(s.id)}${carry}`}
+              end={s.id === 'overview'}
+              onClick={onNavigate}
+              title={collapsed ? s.label : undefined}
+              aria-label={collapsed ? s.label : undefined}
+              className={({ isActive }) =>
+                `group relative flex h-9 items-center gap-2.5 rounded-xs px-2.5 text-proof-body no-underline transition-colors duration-150 ${isActive ? 'bg-proof-leaf-soft text-ink' : 'text-ink-2 hover:bg-glass hover:text-ink'} ${collapsed ? 'justify-center px-0' : ''}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive ? <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-pill bg-proof-leaf" /> : null}
+                  <Icon size={16} strokeWidth={1.6} aria-hidden className={isActive ? 'text-proof-leaf' : ''} />
+                  {collapsed ? null : <span className="truncate">{s.label}</span>}
+                </>
+              )}
+            </NavLink>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
-function Notice({ glyph, title, text, action, role }: { glyph: string; title: string; text: string; action?: { label: string; onClick: () => void }; role?: 'alert' }) {
+function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
-    <div role={role} className="flex min-h-[320px] flex-col items-center justify-center gap-3.5 rounded-[44px] bg-surface p-6 text-center">
-      <span className={`font-dot text-[64px] ${role === 'alert' ? 'text-coral' : ''}`}>{glyph}</span>
-      <span className="text-[20px]">{title}</span>
-      <span className="max-w-[420px] leading-normal text-ink-2">{text}</span>
-      {action ? (
-        <button type="button" onClick={action.onClick} className="min-h-[50px] rounded-pill bg-selected px-[22px] text-inverse">
-          {action.label}
-        </button>
-      ) : null}
-    </div>
-  )
-}
-
-/* ───────────────────────────── KPIs ───────────────────────────── */
-
-type Kpi = { label: string; value: string; unit: string; note: string }
-
-function Kpis({ d }: { d: Insights }) {
-  const kind = cohortKind(d.cohort)
-  const active = d.tiles.find((t) => t.label === 'Active users')
-  const catalog = d.kpis?.catalog ?? null
-  const cont = d.kpis?.continuation_wk8 ?? null
-  // The design's median is for one goal: the most-chosen goal whose median is shown (10+ people changed).
-  const goal = d.needs.find((n) => n.weeks !== null && n.weeks !== undefined)
-  const hidden = catalog ? [catalog.below_min ? `${catalog.below_min} BELOW n=${MIN_GROUP} · SUPPRESSED` : '', catalog.not_measured ? `${catalog.not_measured} NOT MEASURED` : '', catalog.unused ? `${catalog.unused} UNUSED` : ''].filter(Boolean).join(' · ') : ''
-  const kpis: Kpi[] = [
-    {
-      // Simulated people never consented to anything: only real rows are "consented users".
-      label: kind === 'simulated' ? 'Simulated users' : kind === 'real' ? 'Consented users' : 'Users',
-      value: String(totalUsers(d.cohort)),
-      unit: kind === 'simulated' ? 'synthetic' : kind,
-      note: `${kind === 'mixed' ? `${d.cohort.real} REAL · ${d.cohort.synthetic} SIMULATED · ` : ''}${active && active.value !== '–' ? `${active.n} REACHED WEEK ${d.cohort.weeks}` : `FEWER THAN ${MIN_GROUP} AT WEEK ${d.cohort.weeks}`}`,
-    },
-    {
-      label: 'Products with outcomes',
-      value: String(catalog?.with_outcomes ?? Object.keys(d.product_outcomes ?? {}).length),
-      unit: catalog ? `of ${catalog.products}` : 'products',
-      note: hidden || `EACH WITH ${MIN_GROUP}+ PEOPLE AT WEEK ${d.cohort.weeks}`,
-    },
-    goal
-      ? { label: 'Median time to change', value: String(goal.weeks), unit: 'weeks', note: `${goal.goal.toUpperCase()} GOAL · n=${goal.weeks_n}` }
-      : { label: 'Median time to change', value: '—', unit: 'suppressed', note: `FEWER THAN ${MIN_GROUP} CHANGED IN ANY GOAL` },
-    cont
-      ? { label: `Continuation at wk ${d.cohort.weeks}`, value: String(Math.round(cont.rate * 100)), unit: '%', note: `${cont.k} / ${cont.n} USERS STILL USING A GOAL PRODUCT` }
-      : { label: `Continuation at wk ${d.cohort.weeks}`, value: '—', unit: 'suppressed', note: `n < ${MIN_GROUP}` },
-  ]
-  return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3">
-      {kpis.map((k, i) => (
-        <div key={k.label} className="flex flex-col gap-3.5 rounded-[32px] border border-line bg-surface p-[22px] animate-[wRise_.5s_both]" style={{ animationDelay: `${i * 70}ms` }}>
-          <span className="text-[14px] text-ink-2">{k.label}</span>
-          <span className="flex items-baseline gap-2">
-            <span className="font-dot text-[52px] leading-[.9]">{k.value}</span>
-            <span className="text-[14px] text-ink-2">{k.unit}</span>
-          </span>
-          <span className="font-mono text-[12px] text-ink-2">{k.note}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* ───────────────────────────── about the data ───────────────────────────── */
-
-function About({ d }: { d: Insights }) {
-  const kind = cohortKind(d.cohort)
-  const items = [
-    {
-      k: 'COHORT',
-      v:
-        kind === 'real'
-          ? `${d.cohort.real} real people who opted in to anonymized sharing. Small, so many groups fall below the threshold.`
-          : `${d.cohort.synthetic} synthetic people${d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ''}, who started in August, September or October with one to three goals, a routine of real catalogue products and a reading every week up to today; ${Math.round(d.cohort.dropout * 100)}% stopped early. Fixed seed (${d.cohort.seed}), so the numbers are reproducible.${d.cohort.real ? '' : ' No real customer is represented.'}`,
-    },
-    {
-      k: 'REAL CHANGE',
-      v: `A person counts when a goal metric is still beyond their own photo noise band at the week-${d.cohort.weeks} reading, in the desired direction. One lucky reading earlier does not count.`,
-    },
-    { k: 'SUPPRESSION', v: `Any group with fewer than ${MIN_GROUP} people is hidden in the data query and the api, so also in charts, tables, exports and answers.` },
-    {
-      k: 'ASSUMPTIONS',
-      v: 'Outcomes are associations with product use, not proof of effect: people chose their own products and groups are not randomised. In the simulation each product moves its target metrics by 0.2 to 1.1 times the noise band, about 3 in 10 have no effect, and tone band, skin type and region have no effect. The month-to-month shift in goals is invented, to show the month view.',
-    },
-  ]
-  return (
-    <section aria-label="About this data" className="flex flex-col gap-5 rounded-[44px] border border-line bg-surface p-[clamp(20px,3vw,32px)]">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-5">
-        {items.map((p) => (
-          <div key={p.k} className="flex flex-col gap-2">
-            <span className="font-mono text-[12px] text-ink-2">■ {p.k}</span>
-            <span className="text-[15px] leading-normal text-[#E4E1DB]">{p.v}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-        <Disclaimer />
-        <Link to="/" className="min-h-11 content-center text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
-          ← Back to the Willow website
+    <nav
+      aria-label="Willow Proof sections"
+      className="sticky top-[var(--proof-head)] hidden h-[calc(100dvh-var(--proof-head))] shrink-0 flex-col border-r border-line bg-canvas px-2 py-3 transition-[width] duration-[360ms] ease-[var(--ease-spring)] lg:flex"
+      style={{ width: collapsed ? 'var(--proof-nav-closed)' : 'var(--proof-nav-open)' }}
+    >
+      <NavItems collapsed={collapsed} />
+      <div className="mt-auto flex flex-col gap-1 border-t border-line pt-2">
+        {collapsed ? null : (
+          <p className="m-0 px-2.5 pb-1 text-[11px] leading-snug text-ink-2">
+            Aggregates only. Groups under 10 people are suppressed in the api.
+          </p>
+        )}
+        <Link to="/" title={collapsed ? 'Willow website' : undefined} className={`flex h-9 items-center gap-2.5 rounded-xs px-2.5 text-proof-small text-ink-2 no-underline hover:bg-glass hover:text-ink ${collapsed ? 'justify-center px-0' : ''}`}>
+          <ArrowUpRight size={15} strokeWidth={1.6} aria-hidden />
+          {collapsed ? <span className="sr-only">Willow website</span> : 'Willow website'}
         </Link>
+        <button type="button" onClick={onToggle} aria-expanded={!collapsed} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} className={`flex h-9 items-center gap-2.5 rounded-xs border-0 bg-transparent px-2.5 text-proof-small text-ink-2 hover:bg-glass hover:text-ink ${collapsed ? 'justify-center px-0' : ''}`}>
+          {collapsed ? <PanelLeftOpen size={16} strokeWidth={1.6} aria-hidden /> : <PanelLeftClose size={16} strokeWidth={1.6} aria-hidden />}
+          {collapsed ? null : 'Collapse'}
+        </button>
       </div>
-    </section>
+    </nav>
+  )
+}
+
+/** Phone and tablet: the sections drop down from the top bar as a sheet; Esc or a choice closes it. */
+function MobileNav({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('a[aria-current="page"], a')?.focus()
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [onClose])
+  return (
+    <>
+      <button type="button" aria-label="Close menu" tabIndex={-1} onClick={onClose} className="fixed inset-0 top-[var(--proof-head)] z-[-1] border-0 bg-black/50 lg:hidden" />
+      <div id="proof-mobile-nav" ref={ref} className="absolute inset-x-0 top-full border-b border-line bg-surface px-3 pb-3 pt-2 shadow-modal animate-[proofDrop_.22s_var(--ease-standard)_both] lg:hidden">
+        <nav aria-label="Willow Proof sections">
+          <NavItems onNavigate={onClose} />
+        </nav>
+        <div className="mt-2 flex flex-col gap-2 border-t border-line pt-3 sm:hidden">
+          <span className="text-proof-label uppercase text-ink-2">Filters</span>
+          <Filters wrap />
+        </div>
+        <div className="mt-2 flex items-center justify-between border-t border-line pt-2">
+          <ProofMark size={20} />
+          <Link to="/" className="text-proof-small text-ink-2">
+            Willow website
+          </Link>
+        </div>
+      </div>
+    </>
   )
 }

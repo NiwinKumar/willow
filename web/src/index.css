@@ -65,6 +65,30 @@
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
 
+  /* Willow Proof (retail sub-brand, docs/RETAIL_BRAND.md): its accent and the dense desktop type scale. */
+  --color-proof-ground: var(--proof-ground);
+  --color-proof-leaf: var(--proof-leaf);
+  --color-proof-leaf-hi: var(--proof-leaf-hi);
+  --color-proof-leaf-soft: var(--proof-leaf-soft);
+  --color-proof-leaf-line: var(--proof-leaf-line);
+  --text-proof-title: 26px;
+  --text-proof-title--line-height: 1.1;
+  --text-proof-title--letter-spacing: -0.01em;
+  --text-proof-answer: 15px;
+  --text-proof-answer--line-height: 1.45;
+  --text-proof-h: 14px;
+  --text-proof-h--line-height: 1.3;
+  --text-proof-h--font-weight: 500;
+  --text-proof-body: 13px;
+  --text-proof-body--line-height: 1.45;
+  --text-proof-small: 12px;
+  --text-proof-small--line-height: 1.35;
+  --text-proof-label: 11px;
+  --text-proof-label--line-height: 1.2;
+  --text-proof-label--letter-spacing: 0.08em;
+  --text-proof-kpi: 34px;
+  --text-proof-kpi--line-height: 0.9;
+
   --text-display-xl: 72px;
   --text-display-xl--line-height: 0.95;
   --text-display-xl--letter-spacing: -0.04em;
