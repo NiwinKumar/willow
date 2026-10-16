@@ -8,6 +8,7 @@ import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, confidenceOf, verdictKind } from '../../lib/verdict'
 import { METRIC_LOOK } from './metricLook'
 import { bandOf, bandText, deltaText, metricOf, sessionState, valueText } from './model'
+import { StoryCard } from './StoryCard'
 import { metricSeries } from './series'
 
 /** Why this verdict, in one sentence, from the same numbers the stats show. */
@@ -24,7 +25,8 @@ function why(m: Metric, s: Session, band: number | null): string {
 }
 
 /**
- * Metric detail (design bottom sheet): what the number is, baseline / this check-in / change / normal range /
+ * Metric detail (design bottom sheet): what changed in points (StoryCard), what the number is, baseline / this
+ * check-in / change / normal range /
  * confidence, the verdict and why, the metric over time in this site and mode, what else moves it.
  */
 export function MetricSheet({ metric, session, baseline, sessions, onClose, onAsk }: { metric: Metric | null; session: Session; baseline: Session | null; sessions: Session[]; onClose: () => void; onAsk: (m: Metric) => void }) {
@@ -57,6 +59,8 @@ export function MetricSheet({ metric, session, baseline, sessions, onClose, onAs
           </span>
           <h2 className="m-0 font-serif text-[clamp(28px,3.25vw,42px)] leading-[1.05] font-normal">{label}</h2>
         </div>
+        {/* What changed first, in words; the numbers below are the detail behind it. */}
+        <StoryCard session={session} metricId={m.id} />
         <p className="m-0 max-w-[760px] text-[17px] leading-[1.55] text-ink-2">{look.explain}</p>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
           {stats.map(([k, v, dark]) => (
