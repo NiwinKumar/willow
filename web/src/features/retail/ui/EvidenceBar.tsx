@@ -16,7 +16,7 @@ export function EvidenceBar({ rate, lo, hi, base, n, max = 1, showN = true, clas
   }
   const x = (v: number) => `${Math.max(0, Math.min(100, (v / max) * 100))}%`
   const ci = interval(lo, hi)
-  const label = `${pct(rate)} had a real change${ci ? `, 95% interval ${ci}` : ''}${base !== null && base !== undefined ? `; ${baseLabel} ${pct(base)}` : ''}${n ? `; ${int(n)} people` : ''}`
+  const label = `${pct(rate)} had a visible change${ci ? `, 95% interval ${ci}` : ''}${base !== null && base !== undefined ? `; ${baseLabel} ${pct(base)}` : ''}${n ? `; ${int(n)} people` : ''}`
   return (
     <span className={`flex items-center gap-2.5 ${className}`}>
       <span role="img" aria-label={label} className="relative block h-3 min-w-16 flex-1">

@@ -10,7 +10,7 @@ export function Bone({ className = '', style }: { className?: string; style?: CS
 /** Matches KpiStrip: one surface, `n` cells. */
 export function SkeletonKpis({ n = 4 }: { n?: number }) {
   return (
-    <div aria-hidden className="grid grid-cols-2 overflow-hidden rounded-sm border border-line bg-surface xl:grid-cols-[repeat(var(--n),minmax(0,1fr))]" style={{ ['--n' as string]: n }}>
+    <div aria-hidden className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-surface xl:grid-cols-[repeat(var(--n),minmax(0,1fr))]" style={{ ['--n' as string]: n }}>
       {Array.from({ length: n }, (_, i) => (
         <div key={i} className="flex flex-col gap-3 border-line px-4 py-3.5 [&:not(:last-child)]:border-b xl:border-b-0 xl:[&:not(:last-child)]:border-r">
           <Bone className="h-3 w-28" />
@@ -25,7 +25,7 @@ export function SkeletonKpis({ n = 4 }: { n?: number }) {
 /** Matches Panel + DataTable: a header bar, a toolbar and `rows` 36 px rows. */
 export function SkeletonTable({ rows = 8, toolbar = true }: { rows?: number; toolbar?: boolean }) {
   return (
-    <div aria-hidden className="flex flex-col rounded-sm border border-line bg-surface">
+    <div aria-hidden className="flex flex-col rounded-card border border-line bg-surface">
       <div className="flex h-12 items-center border-b border-line px-4">
         <Bone className="h-3.5 w-48" />
       </div>
@@ -50,7 +50,7 @@ export function SkeletonTable({ rows = 8, toolbar = true }: { rows?: number; too
 /** Matches a Panel holding a chart of `height` px. */
 export function SkeletonPanel({ height = 240, className = '' }: { height?: number; className?: string }) {
   return (
-    <div aria-hidden className={`flex flex-col rounded-sm border border-line bg-surface ${className}`}>
+    <div aria-hidden className={`flex flex-col rounded-card border border-line bg-surface ${className}`}>
       <div className="flex h-12 items-center border-b border-line px-4">
         <Bone className="h-3.5 w-40" />
       </div>
