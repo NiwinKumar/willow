@@ -49,8 +49,8 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
     },
     {
       id: 'rate',
-      header: <HeadTip label="Real change" tip="Share of its users with a visible change held to week 8, against non-users with the same goals. Hover a figure for n and the 95% interval." />,
-      headerText: 'Real change vs non-users',
+      header: <HeadTip label="Visible change" tip="Share of its users with a visible change held to week 8, against non-users with the same goals. Hover a figure for n and the 95% interval." />,
+      headerText: 'Visible change vs non-users',
       width: '148px',
       cell: (p) => {
         const x = extras.get(p.product_id)

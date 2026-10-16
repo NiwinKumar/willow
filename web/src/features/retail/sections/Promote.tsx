@@ -10,7 +10,7 @@ import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEl
 import { sectionPath, useRetailState } from '../state'
 import type { ProductRow, Products } from '../types'
 import { Bone, Button, EmptyState, ErrorState, int, PageHeader, pts, SidePanel, SkeletonTable, ToolButton } from '../ui'
-import { CampaignDetail, CampaignDetailFooter } from './promote/CampaignCard'
+import { CampaignDetail, CampaignDetailFooter, type Confirm } from './promote/CampaignCard'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
 import { useCampaignActions } from './promote/useCampaignActions'
@@ -149,7 +149,7 @@ function Body({ uid }: { uid: string }) {
     el?.focus({ preventScroll: true })
   }, [highlight])
 
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<{ id: string; kind: Confirm } | null>(null)
   // The open campaign's panel keeps its last campaign while it slides out.
   const openId = param('campaign')
   const all = elig.data ?? []
@@ -192,7 +192,7 @@ function Body({ uid }: { uid: string }) {
   const openCampaign = (id: string) => setParam({ campaign: id }, { push: true })
   const closeCampaign = () => {
     setParam({ campaign: null })
-    setConfirmDelete(null)
+    setConfirm(null)
   }
 
   const onCreated = (c: Campaign) => {
@@ -229,7 +229,15 @@ function Body({ uid }: { uid: string }) {
       ) : (
         'No campaign running'
       )}
-      , <strong>{int(sum.impressions)}</strong> {sum.impressions === 1 ? 'impression' : 'impressions'} so far
+      {sum.reach !== null ? (
+        <>
+          , <strong>{int(sum.reach)}</strong> {sum.reach === 1 ? 'person' : 'people'} reached so far
+        </>
+      ) : (
+        <>
+          , <strong>{int(sum.impressions)}</strong> {sum.impressions === 1 ? 'impression' : 'impressions'} so far
+        </>
+      )}
       <LiftClause lifts={sum.lifts} />
     </>
   ) : eligible.length ? (
@@ -287,8 +295,8 @@ function Body({ uid }: { uid: string }) {
             }
             highlight={highlight}
             onOpen={openCampaign}
-            onDelete={(id) => {
-              setConfirmDelete(id)
+            onConfirm={(id, kind) => {
+              setConfirm({ id, kind })
               openCampaign(id)
             }}
             onChanged={onChanged}
@@ -342,8 +350,8 @@ function Body({ uid }: { uid: string }) {
           open={Boolean(current)}
           onClose={closeCampaign}
           otherWorkspace={workspaceOf(shown)}
-          confirmDelete={confirmDelete === shown.id}
-          setConfirmDelete={(v) => setConfirmDelete(v ? shown.id : null)}
+          confirm={confirm?.id === shown.id ? confirm.kind : null}
+          setConfirm={(kind) => setConfirm(kind ? { id: shown.id, kind } : null)}
           onChanged={onChanged}
           onDeleted={onDeleted}
           onStale={() => void refetch()}
@@ -412,13 +420,13 @@ function HowItWorks() {
   )
 }
 
-function CampaignPanel({ c, open, onClose, otherWorkspace, confirmDelete, setConfirmDelete, onChanged, onDeleted, onStale }: {
+function CampaignPanel({ c, open, onClose, otherWorkspace, confirm, setConfirm, onChanged, onDeleted, onStale }: {
   c: Campaign
   open: boolean
   onClose: () => void
   otherWorkspace: string | null
-  confirmDelete: boolean
-  setConfirmDelete: (v: boolean) => void
+  confirm: Confirm | null
+  setConfirm: (kind: Confirm | null) => void
   onChanged: (c: Campaign) => void
   onDeleted: (id: string) => void
   onStale: () => void
@@ -432,7 +440,7 @@ function CampaignPanel({ c, open, onClose, otherWorkspace, confirmDelete, setCon
       subtitle={c.brand ?? undefined}
       width={560}
       labelledBy="proof-campaign-panel"
-      footer={<CampaignDetailFooter c={c} actions={actions} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete} />}
+      footer={<CampaignDetailFooter c={c} actions={actions} confirm={confirm} setConfirm={setConfirm} />}
     >
       <CampaignDetail c={c} otherWorkspace={otherWorkspace} actions={actions} />
     </SidePanel>

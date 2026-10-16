@@ -1,7 +1,7 @@
-import { ExternalLink, Pause, Play, Trash2 } from 'lucide-react'
+import { ExternalLink, Pause, Play, Square, Trash2 } from 'lucide-react'
 
 import type { Campaign, IncrementalityGroup } from '../../../../lib/api'
-import { ctrText, dateRange, goalLabel, HOLDOUT_MIN, skinLabel, timeLeft, wilson, type PromoError } from '../../promote'
+import { ctrText, dateRange, durationText, goalLabel, HOLDOUT_MIN, skinLabel, timeLeft, type PromoError, wilson } from '../../promote'
 import { Badge, Button, int, interval, pct, pts, Sparkbars, type SparkDay } from '../../ui'
 import type { useCampaignActions } from './useCampaignActions'
 
@@ -45,7 +45,7 @@ export function CampaignDetail({ c, otherWorkspace, actions }: { c: Campaign; ot
         </dd>
         <dt className="text-ink-2">Dates</dt>
         <dd className="m-0 text-ink tnum">
-          {dateRange(c.starts_at, c.ends_at)} · {c.days} days
+          {dateRange(c.starts_at, c.ends_at)} · {durationText(c)}
         </dd>
         <dt className="text-ink-2">Goals</dt>
         <dd className="m-0 text-ink">{c.goals.map(goalLabel).join(', ')}</dd>
@@ -67,21 +67,22 @@ export function CampaignDetail({ c, otherWorkspace, actions }: { c: Campaign; ot
         <h3 id={`cmp-${c.id}-delivery`} className="m-0 text-proof-h text-ink">
           Delivery
         </h3>
-        <dl className="m-0 grid grid-cols-4 overflow-hidden rounded-card border border-line">
+        <dl className="m-0 grid grid-cols-3 overflow-hidden rounded-card border border-line sm:grid-cols-5">
           {[
-            ['Reach', int(s.impressions), 'Impressions: each person once a day'],
+            ['Reach', s.reach !== undefined ? int(s.reach) : '—', 'People shown the card at least once (each person counted once)'],
+            ['Impressions', int(s.impressions), 'Card at least half on screen; each person once a day'],
             ['Clicks', int(s.clicks), '“View product” taps'],
             ['CTR', ctrText(s.ctr), 'Clicks ÷ impressions'],
             ['Adds', int(s.adds), 'Added to routine from the card'],
           ].map(([label, value, title]) => (
-            <div key={label} title={title} className="flex min-w-0 flex-col gap-1 border-line px-4 py-3 [&:not(:last-child)]:border-r">
+            <div key={label} title={title} className="flex min-w-0 flex-col gap-1 border-line px-3 py-3 max-sm:[&:nth-child(-n+3)]:border-b max-sm:[&:not(:nth-child(3n))]:border-r sm:[&:not(:last-child)]:border-r">
               <dt className="truncate text-proof-small text-ink-2">{label}</dt>
               <dd className="m-0 text-[20px] font-semibold leading-7 tracking-[-0.02em] text-ink tnum">{value}</dd>
             </div>
           ))}
         </dl>
         {days.length && s.impressions > 0 ? <Sparkbars days={days} label={`Impressions per day for ${c.product ?? 'this campaign'}`} height={48} /> : <p className="m-0 text-proof-small text-ink-2">No delivery yet. The first impression lands when a matching shopper opens Routine.</p>}
-        <p className="m-0 text-proof-small text-ink-2">Counted once per person a day for each kind, never split by goal or skin type.</p>
+        <p className="m-0 text-proof-small text-ink-2">Reach counts each person once; impressions, clicks and adds once per person a day. Never split by goal or skin type.</p>
         <a href="/routine" target="_blank" rel="noopener" className="hit44 inline-flex h-8 items-center gap-1.5 self-start rounded-ctl border border-line bg-surface px-2.5 text-proof-small font-medium text-ink no-underline transition-colors hover:border-line-strong hover:bg-pf-hover">
           See the card in the Willow app
           <ExternalLink size={13} strokeWidth={1.8} aria-hidden />
@@ -94,13 +95,35 @@ export function CampaignDetail({ c, otherWorkspace, actions }: { c: Campaign; ot
   )
 }
 
-/** The panel's footer: pause or resume, and delete, which asks first in the footer itself. */
-export function CampaignDetailFooter({ c, actions, confirmDelete, setConfirmDelete }: { c: Campaign; actions: ReturnType<typeof useCampaignActions>; confirmDelete: boolean; setConfirmDelete: (v: boolean) => void }) {
-  if (confirmDelete)
+export type Confirm = 'delete' | 'end'
+
+/** The panel's footer: pause or resume, end early and delete; ending and deleting ask first in the footer itself. */
+export function CampaignDetailFooter({ c, actions, confirm, setConfirm }: { c: Campaign; actions: ReturnType<typeof useCampaignActions>; confirm: Confirm | null; setConfirm: (kind: Confirm | null) => void }) {
+  if (confirm === 'end' && c.status !== 'ended')
+    return (
+      <div role="group" aria-label="Confirm end" className="flex flex-wrap items-center justify-end gap-x-2 gap-y-2">
+        <span className="mr-auto text-proof-body text-ink">End it now? It stops for good; its results stay.</span>
+        <Button kind="secondary" onClick={() => setConfirm(null)}>
+          Keep running
+        </Button>
+        <Button
+          kind="primary"
+          onClick={() =>
+            void actions.setStatus('ended').then((err) => {
+              if (!err) setConfirm(null)
+            })
+          }
+          disabled={actions.busy === 'status'}
+        >
+          {actions.busy === 'status' ? 'Ending…' : 'End campaign'}
+        </Button>
+      </div>
+    )
+  if (confirm === 'delete')
     return (
       <div role="group" aria-label="Confirm delete" className="flex flex-wrap items-center justify-end gap-x-2 gap-y-2">
         <span className="mr-auto text-proof-body text-ink">Delete it and its stats? This can’t be undone.</span>
-        <Button kind="secondary" onClick={() => setConfirmDelete(false)}>
+        <Button kind="secondary" onClick={() => setConfirm(null)}>
           Keep it
         </Button>
         <Button kind="primary" onClick={() => void actions.remove()} disabled={actions.busy === 'delete'}>
@@ -121,8 +144,14 @@ export function CampaignDetailFooter({ c, actions, confirmDelete, setConfirmDele
           {actions.busy === 'status' ? 'Resuming…' : 'Resume'}
         </Button>
       ) : null}
+      {c.status !== 'ended' ? (
+        <Button kind="secondary" onClick={() => setConfirm('end')} disabled={actions.busy !== null}>
+          <Square size={13} strokeWidth={1.8} aria-hidden />
+          End
+        </Button>
+      ) : null}
       <span className="ml-auto">
-        <Button kind="ghost" onClick={() => setConfirmDelete(true)} disabled={actions.busy !== null}>
+        <Button kind="ghost" onClick={() => setConfirm('delete')} disabled={actions.busy !== null}>
           <Trash2 size={14} strokeWidth={1.8} aria-hidden />
           Delete
         </Button>
