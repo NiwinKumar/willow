@@ -13,7 +13,7 @@ import { syncConsent } from '../../lib/consent'
 import { identity } from '../../lib/identity'
 import type { PhotoTime, ProfilePatch } from '../../lib/api'
 import { GOALS, MAX_GOALS } from '../../lib/metrics'
-import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
+import { browserTz, localProfile, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
@@ -395,6 +395,8 @@ function PrivacyCard() {
           description={!consent ? 'Available once you have accepted the terms before your first photo.' : share ? 'On · included only in groups of 10 or more' : 'Off · your results stay out of retailer aggregates'}
         />
       </div>
+      <SponsoredToggle />
+
       <details className="text-[14px] leading-[1.55]">
         <summary className="flex min-h-11 cursor-pointer items-center">{consent ? 'Read the consent you agreed to' : 'Read the consent'}</summary>
         <p className="mt-1.5 mb-0 text-[#3E3C38]">
@@ -402,6 +404,46 @@ function PrivacyCard() {
         </p>
       </details>
     </Panel>
+  )
+}
+
+/**
+ * "Sponsored suggestions" (users/{uid}.profile.hide_sponsored, on by default): Routine's one labelled card for a
+ * product that met Willow's evidence bar. Off hides it; nothing else in the app reads campaigns.
+ */
+function SponsoredToggle() {
+  const { getIdToken } = useAuth()
+  const uid = useOwner()
+  const me = useMe()
+  const [local, setLocal] = useState<boolean | null>(null)
+  const on = local ?? !me.data?.profile?.hide_sponsored
+  const onChange = (next: boolean) => {
+    if (!uid) return
+    setLocal(next)
+    // an account without a profile yet gets this device's copy with it (never an empty profile)
+    const base = me.data?.profile ? {} : localProfile()
+    void getIdToken()
+      .then((t) => api.putProfile(t, { ...base, hide_sponsored: !next }))
+      .then(() => {
+        invalidate(['me', uid])
+        invalidate(['sponsored', uid])
+        toast(next ? 'Sponsored suggestions on' : 'Sponsored suggestions off')
+      })
+      .catch(() => {
+        setLocal(null)
+        toast.error("Couldn't change sponsored suggestions. Try again.")
+      })
+  }
+  return (
+    <div className="rounded-[20px] bg-sunken px-4 py-2">
+      <Toggle
+        label="Sponsored suggestions"
+        checked={on}
+        disabled={!uid || me.status === 'loading'}
+        onChange={onChange}
+        description={on ? 'On · at most one labelled card on Routine, only for products that meet Willow’s evidence bar' : 'Off · no sponsored cards; your recommendations are the same either way'}
+      />
+    </div>
   )
 }
 

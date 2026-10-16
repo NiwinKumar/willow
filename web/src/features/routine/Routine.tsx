@@ -17,6 +17,7 @@ import { entryName, findingsOf, imageOf, useOutcomeSessions, type Finding } from
 import { addDays } from './schedule'
 import { RoutineCheckCard } from './RoutineCheckCard'
 import { SlotCard } from './SlotCard'
+import { SponsoredCard } from './SponsoredCard'
 import { ProductTestCard, Suggestions } from './Suggestions'
 import { AvailableInOwnAccount } from './OwnAccountNotice'
 import { useRoutineWrites } from './writes'
@@ -69,6 +70,8 @@ function LiveRoutine() {
   const loading = routine.status === 'loading' || routine.status === 'idle'
   const failed = routine.status === 'error'
   const inRoutine = useMemo(() => new Set(current.map((e) => e.product_id).filter((x): x is string => Boolean(x))), [current])
+  // every catalog product ever in the routine (stopped too): the sponsored card never offers one of them
+  const everAdded = useMemo(() => new Set(entries.map((e) => e.product_id).filter((x): x is string => Boolean(x))), [entries])
   const both = am.length > 0 && pm.length > 0
   // "last changed": the newest add, stop, slot or schedule change (updated_at; created_at for older entries).
   const changed = entries.map((e) => e.updated_at ?? e.created_at ?? e.started_at).sort().at(-1)
@@ -186,6 +189,8 @@ function LiveRoutine() {
           <p className="mx-2 max-w-[820px] text-[14px] leading-[1.5] text-ink-2">Outcome lines show what your readings did after a start date. Timing is an association: light, season and other products change too, so it isn’t proof a product caused a change.</p>
         </>
       )}
+
+      {!loading && !failed ? <SponsoredCard inRoutine={everAdded} onView={(productId) => setInfo({ productId })} /> : null}
 
       {stopped.length && !loading ? (
         <details className="card px-5 py-1">
