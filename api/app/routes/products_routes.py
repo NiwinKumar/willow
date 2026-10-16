@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from app import advisor, catalog, gemini, label_scan, limits, routine_check, routine_log
+from app import advisor, campaigns, catalog, gemini, label_scan, limits, routine_check, routine_log
 from app.auth import AuthUser, current_user
 from app.schedule import Schedule
 from app.store import Store, get_store, iso
@@ -264,7 +264,17 @@ def add_routine_entry(
     doc["updated_at"] = doc["created_at"]
     entry_id = entry_id or f"r_{secrets.token_hex(4)}"
     store.routine_set(uid, entry_id, doc)
+    if body.product_id:
+        attribute_add(store, uid, body.product_id)
     return entry_id, doc
+
+
+def attribute_add(store: Store, uid: str, product_id: str) -> None:
+    """Campaign holdout attribution (app/campaigns.py); never blocks the routine write."""
+    try:
+        campaigns.attribute_add(store, uid, product_id)
+    except Exception:
+        log.exception("campaign attribution failed for %s", product_id)
 
 
 @router.patch("/routine/{entry_id}")

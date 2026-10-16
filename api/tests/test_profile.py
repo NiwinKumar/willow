@@ -68,6 +68,18 @@ def test_delete_me_removes_the_profile(client, fake):
     assert client.get("/v1/me").json()["profile"] is None
 
 
+def test_hide_sponsored_defaults_off_and_merges(client, fake):
+    profile = client.put("/v1/me/profile", json={"goals": ["redness"]}).json()["profile"]
+    assert profile["hide_sponsored"] is False
+    client.put("/v1/me/profile", json={"hide_sponsored": True})
+    client.put("/v1/me/profile", json={"skin_type": "dry"})  # later updates keep it
+    profile = client.get("/v1/me").json()["profile"]
+    assert profile["hide_sponsored"] is True and profile["goals"] == ["redness"]
+    client.put("/v1/me/profile", json={"hide_sponsored": None})  # null: back to the default
+    assert client.get("/v1/me").json()["profile"]["hide_sponsored"] is False
+    assert client.put("/v1/me/profile", json={"hide_sponsored": "maybe"}).status_code == 422
+
+
 def test_export_carries_real_goals_and_skin_type(client, fake):
     from tests.test_analyze_flow import _create, _upload_all
 
