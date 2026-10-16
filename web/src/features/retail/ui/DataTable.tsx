@@ -25,6 +25,8 @@ export type Column<T> = {
   csv?: (row: T) => CsvValue
   /** This column names the row (th scope="row"). */
   rowHeader?: boolean
+  /** Left out of the CSV (row-selection checkboxes, action buttons). */
+  noCsv?: boolean
 }
 
 /**
@@ -105,11 +107,12 @@ export function DataTable<T>({
   const exportCsv = () => {
     if (!csv) return
     const text = (c: Column<T>) => c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)
+    const cols = columns.filter((c) => !c.noCsv)
     downloadCsv(
       csv.name,
       csv.meta,
-      columns.map(text),
-      sorted.map((r) => columns.map((c) => (c.csv ? c.csv(r) : (c.sortValue?.(r) ?? '')))),
+      cols.map(text),
+      sorted.map((r) => cols.map((c) => (c.csv ? c.csv(r) : (c.sortValue?.(r) ?? '')))),
     )
   }
 
@@ -203,7 +206,7 @@ export function DataTable<T>({
                     className={`group ${onRowClick ? 'cursor-pointer' : ''} ${selected ? 'bg-proof-leaf-soft' : onRowClick ? 'hover:bg-glass' : ''} focus-visible:outline-offset-[-2px] ${rowClassName?.(r) ?? ''}`}
                   >
                     {columns.map((c) => {
-                      const cls = `h-[var(--proof-row)] border-b border-line px-3 py-1.5 align-middle first:pl-4 last:pr-4 ${c.align === 'right' ? 'text-right' : 'text-left'}`
+                      const cls = `h-[var(--proof-row)] border-b border-line px-3 py-1 align-middle first:pl-4 last:pr-4 ${c.align === 'right' ? 'text-right' : 'text-left'}`
                       return c.rowHeader ? (
                         <th key={c.id} scope="row" className={`${cls} font-normal`}>
                           {c.cell(r)}

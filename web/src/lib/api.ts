@@ -649,6 +649,10 @@ export type RetailerProductRow = {
   tier: RetailerProofTier
   /** Why a product has no numbers: nobody used it, its targets aren't measured, or fewer than 10 people. */
   reason?: 'unused' | 'not_measured' | 'few'
+  /** The tier in words ("No clear effect yet"). */
+  tier_label?: string
+  /** Promising only: about how many more people at week 8 would make it Proven if the rates hold. */
+  to_proven?: number | null
 }
 type RetailerHead = { filters: { cohort: RetailerCohort; range: RetailerRange; since: string | null; today: string }; cohort: RetailerInsights['cohort'] }
 export type RetailerProducts = RetailerHead & {
@@ -658,16 +662,21 @@ export type RetailerProducts = RetailerHead & {
 export type RetailerSeg = { id: string; label: string; n: number | null; rate: number | null; base_rate: number | null; suppressed: boolean }
 type RetailerProductRef = { product_id: string; product: string; brand: string }
 export type RetailerProductDetail = RetailerHead & {
-  product: RetailerProductRow & { key_actives: string[]; size: string | null; price: number | null; image_source: string | null; stores: number }
+  product: RetailerProductRow & { key_actives: { name: string; pct: number | null }[]; size: string | null; price: { amount: number; currency: string } | null; image_source: string | null; stores: number }
   curve: { weeks: number[]; users: (number | null)[]; base: (number | null)[] }
   segments: { skin: RetailerSeg[]; tone: RetailerSeg[]; goal: RetailerSeg[] }
-  competitors: { rows: (RetailerProductRow & { is_self: boolean })[]; rank: number | null; of: number }
+  competitors: { rows: (RetailerProductRow & { is_self: boolean })[]; rank: number | null; of: number; note?: string }
   co_used: (RetailerProductRef & { category: string; image_url: string | null; n: number; share: number })[]
-  switching: { stopped: number | null; to: (RetailerProductRef & { n: number })[]; from: (RetailerProductRef & { n: number })[] }
+  switching: { stopped: number | null; to: (RetailerProductRef & { n: number })[]; from: (RetailerProductRef & { n: number })[]; to_brands?: RetailerBrandFlow[]; from_brands?: RetailerBrandFlow[] }
   conflicts: { kind: string; label: string; fix: string; n: number; share: number }[]
-  evidence: { id: string; text: string; n: number; kind: 'efficacy' | 'speed' | 'segment' | 'retention' }[]
+  evidence: RetailerEvidence[]
+  evidence_caveat?: string
   eligibility: { eligible: boolean; tier: RetailerProofTier; reasons: string[]; goals: string[]; skin_types: string[] }
 }
+/** A switching flow by brand (people, >= 10); the product's own brand reads "Same brand, other product". */
+export type RetailerBrandFlow = { brand: string; label: string; same_brand: boolean; n: number }
+/** One claim-ready statement: cosmetic, observational, numbers only from the row, with its method and cohort. */
+export type RetailerEvidence = { id: string; text: string; n: number; kind: 'efficacy' | 'speed' | 'segment' | 'retention'; method?: string; window?: string; cohort_label?: string; caveat?: string }
 type RetailerPick = RetailerProductRef & { rate: number; n: number }
 export type RetailerSegments = RetailerHead & {
   skin_types: { id: string; label: string; users: number | null }[]
