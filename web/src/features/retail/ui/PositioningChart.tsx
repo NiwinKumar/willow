@@ -75,7 +75,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
           {ticks(y0, y1).map((t) => (
             <g key={`y${t}`}>
               <line x1={m.l} x2={W - m.r} y1={Y(t)} y2={Y(t)} stroke="var(--line-subtle)" strokeWidth={1} />
-              <text x={m.l - 8} y={Y(t)} dy="0.32em" textAnchor="end" className="fill-[var(--text-secondary)] font-mono text-[10.5px] tnum">
+              <text x={m.l - 8} y={Y(t)} dy="0.32em" textAnchor="end" className="fill-[var(--text-secondary)] text-proof-label tnum">
                 {Math.round(t * 100)}%
               </text>
             </g>
@@ -83,7 +83,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
           {ticks(x0, x1).map((t) => (
             <g key={`x${t}`}>
               <line x1={X(t)} x2={X(t)} y1={m.t} y2={H - m.b} stroke="var(--line-subtle)" strokeWidth={1} />
-              <text x={X(t)} y={H - m.b + 15} textAnchor="middle" className="fill-[var(--text-secondary)] font-mono text-[10.5px] tnum">
+              <text x={X(t)} y={H - m.b + 15} textAnchor="middle" className="fill-[var(--text-secondary)] text-proof-label tnum">
                 {Math.round(t * 100)}%
               </text>
             </g>
@@ -181,13 +181,13 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
                   <th scope="row" className="h-8 pr-2 text-left font-normal text-ink">
                     {p.label}
                   </th>
-                  <td className="px-2 text-right font-mono tnum text-ink">
+                  <td className="px-2 text-right tnum text-ink">
                     {pct(p.rate)}
                     {p.n ? <span className="text-ink-2"> n={int(p.n)}</span> : null}
                   </td>
-                  <td className="px-2 text-right font-mono tnum">{interval(p.lo, p.hi) ?? '—'}</td>
-                  <td className="px-2 text-right font-mono tnum">{pct(p.cont)}</td>
-                  <td className="pl-2 text-right font-mono tnum">{int(p.users)}</td>
+                  <td className="px-2 text-right tnum">{interval(p.lo, p.hi) ?? '—'}</td>
+                  <td className="px-2 text-right tnum">{pct(p.cont)}</td>
+                  <td className="pl-2 text-right tnum">{int(p.users)}</td>
                 </tr>
               ))}
           </tbody>

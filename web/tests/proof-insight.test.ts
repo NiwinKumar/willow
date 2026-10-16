@@ -15,13 +15,13 @@ test('wilson matches the api (retailer._wilson) to 2 dp', () => {
 test('brief cards link to their exact view and keep the workspace', () => {
   const carry = '?as=brand:cerave&cohort=simulated'
   assert.equal(briefHref({ id: 'top_proven', link: { section: 'products', id: 'cerave-x' } }, carry), '/retail/products/cerave-x?as=brand%3Acerave&cohort=simulated')
-  assert.equal(briefHref({ id: 'segment_lift', link: { section: 'segments', id: 'combination' } }), '/retail/segments?skin=combination')
-  assert.equal(briefHref({ id: 'brand_best_goal', link: { section: 'competitors', id: 'lines' } }), '/retail/competitors?goal=lines')
-  assert.equal(briefHref({ id: 'switching_net', link: { section: 'competitors' } }), '/retail/competitors#switching')
-  assert.equal(briefHref({ id: 'top_conflict', link: { section: 'demand' } }), '/retail/demand#conflicts')
-  assert.equal(briefHref({ id: 'unmet_need', link: { section: 'demand', id: 'even_tone' } }), '/retail/demand?goal=even_tone#unmet')
-  assert.equal(briefHref({ id: 'rising_goal', link: { section: 'demand', id: 'dark_spots' } }), '/retail/demand?goal=dark_spots#months-h')
-  assert.equal(briefHref({ id: 'promotable', link: { section: 'promote' } }), '/retail/promote')
+  assert.equal(briefHref({ id: 'segment_lift', link: { section: 'segments', id: 'combination' } }), '/retail/customers?skin=combination')
+  assert.equal(briefHref({ id: 'brand_best_goal', link: { section: 'competitors', id: 'lines' } }), '/retail/market?goal=lines')
+  assert.equal(briefHref({ id: 'switching_net', link: { section: 'competitors' } }), '/retail/market#switching')
+  assert.equal(briefHref({ id: 'top_conflict', link: { section: 'demand' } }), '/retail/customers?view=demand#conflicts')
+  assert.equal(briefHref({ id: 'unmet_need', link: { section: 'demand', id: 'even_tone' } }), '/retail/customers?view=demand&goal=even_tone#unmet')
+  assert.equal(briefHref({ id: 'rising_goal', link: { section: 'demand', id: 'dark_spots' } }), '/retail/customers?view=demand&goal=dark_spots#demand')
+  assert.equal(briefHref({ id: 'promotable', link: { section: 'promote' } }), '/retail/campaigns')
 })
 
 test('card figures carry their unit and a true minus', () => {
