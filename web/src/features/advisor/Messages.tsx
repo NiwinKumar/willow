@@ -7,6 +7,7 @@ import type { MetricId, Product } from '../../data/types'
 import type { AdvisorReply, AnswerBlock } from '../../lib/api'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
+import { purchaseLink } from '../../lib/partnerStore'
 import { ProductImage } from '../routine/productUi'
 import { metaLine } from '../routine/routineModel'
 import { retry, type ChatMessage } from './chatStore'
@@ -217,8 +218,13 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
   )
 })
 
-/** A product the advisor named (from reply.products: real catalog listings). Stores are links, with the price read off each store's page when the catalog has one. */
+/**
+ * A product the advisor named (from reply.products: real catalog listings), with one purchase link: the
+ * retail partner's page (lib/partnerStore), else the brand's own site; the price read off that page when the
+ * catalog has one.
+ */
 function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
+  const buy = purchaseLink(p.stores)
   return (
     <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3" style={{ animation: 'wRise .45s both' }}>
       <button type="button" onClick={onOpen} aria-label={`Product details: ${p.name}`} className="shrink-0 rounded-full transition-transform hover:scale-105">
@@ -231,24 +237,19 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
           {fmtPrice(p.price)} · price checked {fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}
         </span>
       </button>
-      {p.stores.length ? (
-        <span className="flex flex-wrap gap-1.5">
-          {p.stores.map((s) => (
-            <a
-              key={s.url}
-              href={s.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={s.price ? `Price on the store's page, checked ${fmtDate(s.price.checked)}` : undefined}
-              aria-label={`${s.store}${s.price ? `, ${fmtPrice(s.price)}, checked ${fmtDate(s.price.checked)}` : ''}, opens in new tab`}
-              className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline"
-            >
-              {s.store}
-              {s.price ? <span className="tnum text-ink-2">{fmtPrice(s.price)}</span> : null}
-              <ExternalLink size={12} strokeWidth={1.5} aria-hidden />
-            </a>
-          ))}
-        </span>
+      {buy ? (
+        <a
+          href={buy.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={buy.price ? `Price on the store's page, checked ${fmtDate(buy.price.checked)}` : undefined}
+          aria-label={`Buy at ${buy.store}${buy.price ? `, ${fmtPrice(buy.price)}, checked ${fmtDate(buy.price.checked)}` : ''}, opens in new tab`}
+          className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline"
+        >
+          Buy at {buy.store}
+          {buy.price ? <span className="tnum text-ink-2">{fmtPrice(buy.price)}</span> : null}
+          <ExternalLink size={12} strokeWidth={1.5} aria-hidden />
+        </a>
       ) : null}
     </div>
   )

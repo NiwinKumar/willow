@@ -164,8 +164,18 @@ def _compact(p: dict[str, Any]) -> dict[str, Any]:
         "key_actives": p["key_actives"],
         "price": p["price"],
         "size": p["size"],
-        "stores": [s["store"] for s in p["stores"]],
+        "stores": _where_to_buy(p["stores"]),
     }
+
+
+def _where_to_buy(stores: list[dict[str, Any]]) -> list[str]:
+    """The store the app links to (its retail partner, else the brand site), so the reply never
+    sends people to another retailer: the web shows only that one link (lib/partnerStore.ts)."""
+    names = {s["store"].strip().lower(): s["store"] for s in stores}
+    for want in (get_settings().partner_store, "Brand site"):
+        if want.strip().lower() in names:
+            return [names[want.strip().lower()]]
+    return []
 
 
 def context(store: Store, uid: str) -> dict[str, Any]:
