@@ -1466,8 +1466,10 @@ def summarise(
             attempts=1,
             timeout_ms=20_000,
         )
-    except Exception:  # Gemini down, timeout, bad JSON: the brief still loads
-        log.warning("brief summary unavailable", exc_info=True)
+    except Exception as exc:  # Gemini down, timeout, bad JSON: the brief still loads
+        log.warning(
+            "brief summary unavailable: %s", exc, exc_info=not isinstance(exc, gemini.GeminiError)
+        )
         _summaries[key] = (time.time() + SUMMARY_RETRY_SECONDS, None)
         return None
     found = summary_problems(reply.text, cards)
