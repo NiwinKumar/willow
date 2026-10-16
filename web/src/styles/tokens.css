@@ -231,3 +231,19 @@
   --action-selected: #FFFFFF;
   --focus-ring: #4F82FF;
 }
+
+/* Willow Proof: the retail sub-brand (docs/RETAIL_BRAND.md). Every colour is a Willow token or a tint of one;
+   Proof is always drawn on the dark theme above. Ember (signal-change) keeps its one meaning, Real change. */
+:root {
+  --proof-ground: #0F3B3A;                  /* willow-900: the mark's ground */
+  --proof-leaf: #86C5B0;                    /* willow-leaf: the one Proof accent (nav, tier glyphs, the mark's tick) */
+  --proof-leaf-hi: #B8E986;                 /* willow-200: leaf-tip highlight in the mark */
+  --proof-leaf-soft: rgba(134,197,176,.14); /* selected nav row, accent wells */
+  --proof-leaf-line: rgba(134,197,176,.40); /* accent hairline (selected chip, active tab) */
+  --proof-band: rgba(255,255,255,.13);      /* the noise band inside the mark */
+  --proof-band-edge: rgba(255,255,255,.30);
+  --proof-nav-open: 216px;
+  --proof-nav-closed: 60px;
+  --proof-topbar: 52px;
+  --proof-row: 36px;
+}
