@@ -29,6 +29,21 @@ const HONEST = [
   ['The retailer assistant sees aggregates only.', 'No rows, groups under 10 people hidden; chart labels and values must exist in the data.'],
 ] as const
 
+/**
+ * The setup adds the routine only once (to an empty routine), so a second visit is told 0. What the first
+ * visit added is kept for this tab, like the tour's progress, so stop 04 keeps describing it.
+ */
+const ROUTINE_KEY = 'willow.judgeRoutine'
+function seededRoutine(uid: string, added: number): number {
+  try {
+    if (added > 0) sessionStorage.setItem(ROUTINE_KEY, `${uid}:${added}`)
+    const [who, n] = (sessionStorage.getItem(ROUTINE_KEY) ?? '').split(':')
+    return who === uid ? Number(n) || 0 : added
+  } catch {
+    return added
+  }
+}
+
 /** idle covers "working on it": the guest account or the tour setup is on its way. */
 type Setup = 'idle' | 'ready' | 'failed' | 'no-guest'
 
@@ -87,10 +102,11 @@ export default function Judge() {
   useEffect(() => {
     if (!user || started.current === user.uid) return
     started.current = user.uid
+    const uid = user.uid
     getIdToken()
       .then((t) => api.judgeSetup(t))
       .then((r) => {
-        setRoutineAdded(r.routine_added)
+        setRoutineAdded(seededRoutine(uid, r.routine_added))
         setSetup('ready')
       })
       // The api may still be waking up: Retry runs the setup again for the same account.
@@ -110,6 +126,8 @@ export default function Judge() {
   const failed = setup === 'failed' || setup === 'no-guest'
   const sample = samples.state === 'ready' ? samples.samples[0] : undefined
   const seen = (s: JudgeStop) => tour.seen.includes(s)
+  // A stop that needs the guest account says why it is off: still setting up, or setup failed (Retry above).
+  const needsGuest = failed ? 'Retry the setup above first' : 'Waiting for guest access'
 
   const go = (stop: JudgeStop, to: string, demo = false) => {
     judge.visit(stop)
@@ -144,7 +162,7 @@ export default function Judge() {
         ? `${sample.title}: ${sample.note}. ${sample.credit}. The photos are copied into your account and go through the real upload, quality checks and measurement.`
         : 'Sample photos of a consenting team member go through the real upload, quality checks and measurement.',
       cta: 'Run it',
-      disabled: !ready ? 'Waiting for guest access' : samples.state === 'loading' ? 'Loading the samples' : !sample ? 'Sample photos are not available right now' : undefined,
+      disabled: !ready ? needsGuest : samples.state === 'loading' ? 'Loading the samples' : !sample ? 'Sample photos are not available right now' : undefined,
       act: () => sample && go('run', `/check-in?${new URLSearchParams({ site: sample.site, mode: sample.capture_mode, sample: sample.id })}`),
     },
     {
@@ -167,7 +185,7 @@ export default function Judge() {
       tag: 'LIVE AI · TOOL CALLS',
       body: 'Gemini reads your results and routine, calls the catalog and the routine checker as tools, and may quote only measured numbers. The steps it took are shown with each answer.',
       cta: 'Ask a question',
-      disabled: ready ? undefined : 'Waiting for guest access',
+      disabled: ready ? undefined : needsGuest,
       act: () => go('advisor', `/home?${new URLSearchParams({ advisor: '1', ask: ADVISOR_QUESTION })}`),
     },
     {
@@ -176,7 +194,7 @@ export default function Judge() {
       tag: 'LIVE AI · RULE TABLE',
       body: `${routineAdded ? 'Your guest routine pairs a retinoid with a BHA at night and has no sunscreen; the check finds both.' : 'The check runs on the routine in this account.'} Scan any ingredient label and Gemini reads it into a product.`,
       cta: 'Open routine',
-      disabled: ready ? undefined : 'Waiting for guest access',
+      disabled: ready ? undefined : needsGuest,
       act: () => go('routine', '/routine'),
     },
     {
