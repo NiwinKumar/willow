@@ -123,14 +123,14 @@ function Body({ d }: { d: Insights }) {
       <strong>
         {proven} of {mine.length}
       </strong>{' '}
-      of your products are Proven.
+      of your {mine.length === 1 ? 'product is' : 'products are'} Proven.
     </>
   ) : (
     <>
       <strong>
         {proven} of {all.length}
       </strong>{' '}
-      products are Proven; {measured} have a measured outcome.
+      products are Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 
@@ -186,7 +186,7 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'rate',
-      header: <HeadTip label="Visible change" tip={`Share of people using it who saw a real, visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`} />,
+      header: <HeadTip label="Visible change" tip={`Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`} />,
       headerText: `Visible change by week ${wk} (%)`,
       width: '196px',
       sortValue: (r) => r.rate,

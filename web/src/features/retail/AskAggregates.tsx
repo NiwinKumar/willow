@@ -1,11 +1,11 @@
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { ApiError, api, type RetailerAnswer } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import type { Filters, Insights } from './types'
-import { cohortKind, MIN_GROUP, SimBadge } from './ui'
+import { cohortKind, MIN_GROUP } from './ui'
 
 /** Starters: each one is answerable from the aggregates (the last is refused: no individuals). */
 const SUGGESTIONS = ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How do outcomes compare with non-users?', 'Which users changed the most?']
@@ -94,7 +94,7 @@ export function AskAggregates({ d, filters }: { d: Insights | null; filters: Fil
             {m.reply && d ? (
               <Answer d={d} reply={m.reply} reveal={revealing === m.id} onRevealed={() => setRevealing((r) => (r === m.id ? null : r))} followUps={m === last} onAsk={ask} disabled={busy || revealing !== null} />
             ) : m.error ? (
-              <div role="alert" className="flex flex-col gap-1 rounded-sm border border-line bg-sunken p-3.5">
+              <div role="alert" className="flex flex-col gap-1 rounded-card border border-line bg-pf-bg2 p-3.5">
                 <span className="text-proof-small font-medium text-ink">{m.error.title} · no numbers returned</span>
                 <span className="text-proof-body text-ink-2">{m.error.message}</span>
               </div>
@@ -116,9 +116,9 @@ export function AskAggregates({ d, filters }: { d: Insights | null; filters: Fil
 
       {thread.length === 0 ? (
         <div className="flex flex-col gap-1.5">
-          <span className="eyebrow">■ Try</span>
+          <span className="text-proof-small font-medium text-ink-2">Try asking</span>
           {SUGGESTIONS.map((t) => (
-            <button key={t} type="button" disabled={!d} onClick={() => void ask(t)} className="min-h-9 rounded-xs border border-line px-3 py-1.5 text-left text-proof-body text-ink transition-colors hover:bg-glass">
+            <button key={t} type="button" disabled={!d} onClick={() => void ask(t)} className="min-h-9 rounded-ctl border border-line px-3 py-1.5 text-left text-proof-body text-ink transition-colors hover:bg-pf-hover">
               {t}
             </button>
           ))}
@@ -131,7 +131,7 @@ export function AskAggregates({ d, filters }: { d: Insights | null; filters: Fil
             e.preventDefault()
             void ask(draft)
           }}
-          className="flex items-center gap-1.5 rounded-sm border border-line-strong bg-sunken p-1 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus"
+          className="flex items-center gap-1.5 rounded-ctl border border-line-strong bg-surface p-1 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus"
         >
           <label htmlFor="retail-ask" className="sr-only">
             Question about the aggregates
@@ -146,11 +146,11 @@ export function AskAggregates({ d, filters }: { d: Insights | null; filters: Fil
             placeholder={d ? 'Ask about these aggregates' : 'Waiting for the aggregates…'}
             className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2.5 text-[16px] text-ink outline-none placeholder:text-ink-2 sm:text-proof-body"
           />
-          <button type="submit" aria-label="Ask" disabled={!canSend} className="grid size-9 flex-none place-items-center rounded-xs border-0 bg-selected text-inverse">
+          <button type="submit" aria-label="Ask" disabled={!canSend} className="grid size-8 flex-none place-items-center rounded-ctl border-0 bg-selected text-inverse disabled:opacity-40">
             <ArrowUp size={16} strokeWidth={1.8} aria-hidden />
           </button>
         </form>
-        <span className="text-[11px] text-ink-2">Each question is answered on its own; follow-ups don’t see the earlier answer. Up to 20 questions a day.</span>
+        <span className="text-proof-label text-ink-3">Each question is answered on its own; follow-ups don’t see the earlier answer. Up to 20 questions a day.</span>
       </div>
     </div>
   )
@@ -187,8 +187,11 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
       : `Source ${sources.length ? sources.join(', ') : 'retailer aggregates'} · n≥${MIN_GROUP} · ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model}`
   return (
     <div className="flex flex-col gap-3" aria-busy={!done}>
-      <div className="flex flex-col gap-2 rounded-sm border border-line bg-sunken p-3.5">
-        <span className="eyebrow">{refused ? '■ No numbers returned' : `■ Gemini · grounded in aggregates · ${kind}`}</span>
+      <div className="flex flex-col gap-2 rounded-card border border-line bg-pf-bg2 p-3.5">
+        <span className="flex items-center gap-1.5 text-proof-small font-medium text-ink-2">
+          <Sparkles size={13} strokeWidth={1.7} aria-hidden className="text-proof-leaf" />
+          {refused ? 'No numbers returned' : `Gemini, from the ${kind === 'real' ? 'real-people' : kind} aggregates`}
+        </span>
         <p className="m-0 text-proof-answer text-ink">
           <span className="sr-only">{reply.answer}</span>
           <span aria-hidden>
@@ -199,13 +202,13 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
             ))}
           </span>
         </p>
-        {done ? <span className="font-mono text-[11px] leading-relaxed text-ink-2">{prov}</span> : null}
+        {done ? <span className="text-proof-label text-ink-3">{prov}</span> : null}
       </div>
-      {chart && done ? <AnswerChart d={d} chart={chart} /> : null}
+      {chart && done ? <AnswerChart chart={chart} /> : null}
       {done && followUps && reply.follow_ups.length ? (
         <div className="flex flex-wrap gap-1.5">
           {reply.follow_ups.map((f) => (
-            <button key={f} type="button" disabled={disabled} onClick={() => onAsk(f)} className="min-h-8 rounded-xs border border-line px-2.5 py-1 text-left text-proof-small text-ink hover:bg-glass">
+            <button key={f} type="button" disabled={disabled} onClick={() => onAsk(f)} className="min-h-8 rounded-ctl border border-line px-2.5 py-1 text-left text-proof-small text-ink hover:bg-pf-hover">
               {f}
             </button>
           ))}
@@ -215,32 +218,29 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled }: { 
   )
 }
 
-function AnswerChart({ d, chart }: { d: Insights; chart: NonNullable<RetailerAnswer['chart']> }) {
+function AnswerChart({ chart }: { chart: NonNullable<RetailerAnswer['chart']> }) {
   const max = Math.max(...chart.bars.map((b) => Math.abs(b.value)), 1)
   const bars = chart.bars.map((b) => ({ ...b, n: chart.unit === 'percent' ? (b.n ?? null) : null }))
   const axis = chart.unit === 'percent' ? `% of people${bars.some((b) => b.n !== null) ? ' · n per bar' : ''} · 0–${max}%` : chart.unit === 'weeks' ? `Weeks · 0–${max}` : `Count · 0–${max}`
   const alt = `${chart.title}: ${bars.map((b) => `${b.label} ${UNIT[chart.unit](b.value)}${b.n !== null ? `, n=${b.n}` : ''}`).join('; ')}`
   return (
-    <div role="img" aria-label={alt} className="flex flex-col gap-2.5 rounded-sm border border-line p-3.5">
-      <span className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-proof-small text-ink">{chart.title}</span>
-        <SimBadge cohort={d.cohort} />
-      </span>
+    <div role="img" aria-label={alt} className="flex flex-col gap-2.5 rounded-card border border-line p-3.5">
+      <span className="text-proof-small font-medium text-ink">{chart.title}</span>
       {bars.map((b, i) => (
         <div key={`${b.label}-${i}`} className="flex flex-col gap-1">
           <span className="flex justify-between gap-2.5 text-proof-small">
             <span className="min-w-0 text-ink">{b.label}</span>
-            <span className="whitespace-nowrap font-mono text-ink tnum">
+            <span className="whitespace-nowrap text-ink tnum">
               {UNIT[chart.unit](b.value)}
               {b.n !== null ? <span className="text-ink-2"> · n={b.n}</span> : null}
             </span>
           </span>
-          <span className="block h-1.5 rounded-pill bg-muted">
-            <span className="block h-full origin-left rounded-pill bg-ink/80 animate-[wGrowX_.6s_var(--ease-standard)_both]" style={{ width: `${(Math.abs(b.value) / max) * 100}%` }} />
+          <span className="block h-1.5 rounded-pill bg-sunken">
+            <span className="block h-full origin-left rounded-pill bg-ink-2 animate-[wGrowX_.6s_var(--ease-standard)_both]" style={{ width: `${(Math.abs(b.value) / max) * 100}%` }} />
           </span>
         </div>
       ))}
-      <span className="font-mono text-[11px] text-ink-2">{axis}</span>
+      <span className="text-proof-label text-ink-3">{axis}</span>
     </div>
   )
 }

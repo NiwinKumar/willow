@@ -15,7 +15,7 @@ import { BarChart, type BarFormat } from './explore/BarChart'
 import type { Option } from './explore/MultiSelect'
 import { aggregate, brandKey, DEFAULT_QUERY, FILTERS, filterCount, groupOf, measureOf, parseQuery, PRESETS, queryParams, sameQuery, type FilterId, type Group, type Labels, type MeasureKind, type Query } from './explore/query'
 import { QueryPanel } from './explore/QueryPanel'
-import { YoursTag } from './shared'
+import { InsightsGate, YoursTag } from './shared'
 
 /*
  * Explore (/retail/explore): build your own view of the product outcomes (GET /v1/retailer/products), after
@@ -42,6 +42,11 @@ const FORMATS: Record<MeasureKind, BarFormat> = {
 const csvValue = (kind: MeasureKind, v: number | null): CsvValue => (v === null ? '' : kind === 'rate' || kind === 'points' ? Math.round(v * 100) : kind === 'weeks' ? Math.round(v * 10) / 10 : v)
 
 export default function Explore() {
+  // The same "not enough data" answer as every other section when the filter has too few people.
+  return <InsightsGate skeleton={<ExploreSkeleton />}>{() => <Loaded />}</InsightsGate>
+}
+
+function Loaded() {
   const { filters } = useRetailData()
   const view = useView<Products>(`products|${filters.cohort}|${filters.range}`, () => fetchProducts(filters))
   return (
@@ -185,8 +190,8 @@ function Body({ d }: { d: Products }) {
           {nothing ? (
             <EmptyState
               title="Nothing matches this query"
-              body={`No product with ${q.min}+ people matches ${filterCount(q) ? 'these filters' : 'this minimum'}.`}
-              action={{ label: 'Reset filters', onClick: () => setQuery({ ...q, filters: DEFAULT_QUERY.filters, min: DEFAULT_QUERY.min }) }}
+              body={filterCount(q) || q.min !== DEFAULT_QUERY.min ? `No product with ${q.min}+ people matches ${filterCount(q) ? 'these filters' : 'this minimum'}.` : `No product has ${q.min}+ people with a value for ${measure.label.toLowerCase()} in this filter.`}
+              action={filterCount(q) || q.min !== DEFAULT_QUERY.min ? { label: 'Reset filters', onClick: () => setQuery({ ...q, filters: DEFAULT_QUERY.filters, min: DEFAULT_QUERY.min }) } : undefined}
             />
           ) : (
             <>

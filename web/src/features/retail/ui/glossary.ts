@@ -2,17 +2,17 @@ import { MIN_GROUP } from './format'
 
 /** The Willow Proof glossary: one plain-language definition per term, shared by every section. */
 export const GLOSSARY = {
-  real_change: {
-    term: 'Real change',
+  visible_change: {
+    term: 'Visible change',
     text: 'A goal metric that is still beyond the person’s own photo noise band at the week-8 reading, in the desired direction. One lucky reading earlier does not count.',
   },
   proof_tier: {
     term: 'Proof tier',
-    text: 'Proven: 30+ people and the lift’s 95% interval is above zero. Promising: 10+ people and a positive lift that could still be chance. No clear effect yet: no lift over non-users. Not enough data: fewer than 10 people.',
+    text: 'Proven: 30+ people and the lift’s 95% interval is above zero. Promising: 10+ people and a positive lift, but fewer than 30 people or an interval that still includes zero. No clear effect yet: no lift over non-users. Not enough data: fewer than 10 people.',
   },
   lift: {
     term: 'Lift',
-    text: 'The product’s real-change rate minus the rate of people with the same goal who don’t use it, in percentage points. An association, not proof of cause: people chose their own products.',
+    text: 'The product’s visible-change rate minus the rate of people with the same goal who don’t use it, in percentage points. An association, not proof of cause: people chose their own products.',
   },
   base_rate: {
     term: 'Non-users',
