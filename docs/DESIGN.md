@@ -454,7 +454,7 @@ ASSUMPTION: the long label is canonical (reports, metric rows, tooltips). The sh
 
 ### Willow Proof (retail sub-brand)
 
-The retail dashboard is branded **Willow Proof** (“Retail intelligence by Willow”). Its mark, lockups, clear space, minimum sizes, Proof tokens (`--proof-*`, all Willow tokens or tints), dense type scale (`text-proof-*`) and do/don't live in `docs/RETAIL_BRAND.md`; this document stays the source for every shared token. Proof is always on the dark theme; ember keeps its one meaning (real change) and leaf is the only Proof accent.
+The retail dashboard is branded **Willow Proof** (“Retail intelligence by Willow”). Its mark, lockups, clear space, minimum sizes, Proof tokens (`--proof-*`, all Willow tokens or tints), dense type scale (`text-proof-*`) and do/don't live in `docs/RETAIL_BRAND.md`; this document stays the source for every shared token. Since Oct 16 (round 2) Proof follows Vercel's Geist language in its own light and dark themes (`features/retail/retail.css` redefines the semantic tokens under `html[data-proof]`), set in Geist with tabular figures; leaf green is its only accent and the retail-chart rules above (Geist Mono cells, per-chart SIMULATED badge) are superseded there: the data scope is stated once in the top bar.
 
 ## Components
 
