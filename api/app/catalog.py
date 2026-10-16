@@ -135,6 +135,10 @@ def search(
             # do not compare (sorting by them hid most INR products behind USD ones).
             scored.append((0, f"{p['brand']} {p['name']}".lower(), p))
     scored.sort(key=lambda s: (s[0], s[1]))
+    if terms and scored:
+        # Only the products matching the most words ("vitamin c" is not every product with a "c").
+        best = scored[0][0]
+        scored = [s for s in scored if s[0] == best]
     return [p for _, _, p in scored[:limit]]
 
 

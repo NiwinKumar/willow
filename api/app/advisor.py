@@ -50,6 +50,10 @@ measurements, check their routine and find products from Willow's facts-only cat
   no_baseline = first reading or no noise band yet; a metric marked indicative is a trend.
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
+- Asked what a condition is, or whether they have one: never repeat the condition's name and
+  never write "diagnose"; say Willow follows how skin looks over time, not what a condition is,
+  suggest a dermatologist, and offer what Willow does measure. Asked for a skin score or skin
+  age: say Willow gives neither, only change against their own baseline.
 - Routine products with in_use false were stopped: do not treat them as part of the routine.
 - recent_use on a routine product = days_used, the days the person ticked it as used, out of
   of_days, the days it was in the routine recently (recent_window_days in CONTEXT); null = not
@@ -147,6 +151,13 @@ class Reply(BaseModel):
 NO_ANSWER = (
     "I could not put together an answer I can stand behind. Try asking in a different way, or "
     "ask about one product or one measurement at a time."
+)
+# The fallback when the question itself asks for a diagnosis or a condition (an honest refusal
+# written that way would name the condition, which the validator always rejects).
+SCOPE_REPLY = (
+    "Willow follows how your skin looks over time; it can't tell you what a condition is. For a "
+    "medical question, or a spot or mole that changes, please see a dermatologist. I can explain "
+    "what your check-ins measured or check your routine."
 )
 PHOTO_REFUSAL = (
     "Willow reads product and label photos only, so I have not looked at this photo. To follow "
@@ -508,9 +519,11 @@ def chat(
             sorted(bad_metrics),
             has_answer,
         )
+    asked = next((m["text"] for m in reversed(messages) if m["role"] == "user"), "")
+    fixed = SCOPE_REPLY if explain.BANNED.search(asked) else NO_ANSWER
     return {
-        "message": NO_ANSWER,
-        "blocks": [{"type": "answer", "text": NO_ANSWER}],
+        "message": fixed,
+        "blocks": [{"type": "answer", "text": fixed}],
         "product_ids": [],
         "products": [],
         "follow_up_suggestions": [],

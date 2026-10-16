@@ -573,6 +573,10 @@ function DeleteCard() {
       await api.deleteMe(await getIdToken())
       pending.current = true
       setState('done')
+      // The server copy is gone: drop what this tab still shows (counts, routine, chat) at once.
+      clearQueries()
+      resetChat()
+      void data.refresh()
     } catch {
       setState('failed')
     }
@@ -613,7 +617,8 @@ function DeleteCard() {
         <>
           <label className="flex max-w-[360px] flex-col gap-1.5 text-[14px] text-[#BDBAB4]">
             Type DELETE to confirm
-            <input type="text" value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} className="min-h-12 rounded-[14px] border border-[#333] bg-[#1C1C1C] px-3.5 text-[16px] text-inverse" />
+            {/* the button pressed to get here is gone: the confirmation field takes focus */}
+            <input type="text" autoFocus value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} className="min-h-12 rounded-[14px] border border-[#333] bg-[#1C1C1C] px-3.5 text-[16px] text-inverse" />
           </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void run()} disabled={word.trim().toUpperCase() !== 'DELETE'} className={`${btn} bg-coral text-ink`}>

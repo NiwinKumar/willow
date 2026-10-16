@@ -358,3 +358,9 @@ def test_an_unreadable_label_photo_does_not_cost_a_scan(client, fake, monkeypatc
     assert res.json()["scan"]["failure"] == "blurry" and res.json()["match"] is None
     day = datetime.now(UTC).date().isoformat()
     assert fake.store.usage_incr("u_test", day, "label_scan", 0) == 0
+
+
+def test_a_search_keeps_only_the_products_matching_the_most_words(client, fake):
+    # both are serums; only one is salicylic ("vitamin c" used to list every product with a "c")
+    found = client.get("/v1/catalog/search", params={"q": "salicylic serum"}).json()
+    assert [p["name"] for p in found["products"]] == ["Salicylic Acid 2% Face Serum"]
