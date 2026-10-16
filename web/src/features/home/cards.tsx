@@ -124,7 +124,8 @@ export function NextStepCard({ title, body, onRoutine, onAsk, className }: { tit
   )
 }
 
-export type RecentRow = { key: string; at: number; d: string; t: string; x: string; onClick?: () => void }
+/** tie: orders rows on the same `at` (products started the same day: the one added last first). */
+export type RecentRow = { key: string; at: number; tie?: number; d: string; t: string; x: string; onClick?: () => void }
 
 /** Recent: sessions, notes, baselines and routine changes, newest first, each opening its place. */
 export function RecentCard({ rows, onAll, className }: { rows: RecentRow[]; onAll: () => void; className?: string }) {

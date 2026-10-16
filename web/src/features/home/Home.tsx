@@ -90,11 +90,15 @@ function HomeBody() {
   const demo = data.mode === 'demo'
   // Goals live on this device (You writes them); read fresh so a change there reorders Home at once.
   const goals = data.goals
-  const face = data.series('face_full')?.sessions ?? EMPTY
+  // Judge sample runs (hosted sample photos, sample_id) are not the person's own check-ins: Home's
+  // greeting, lead card and week never read them; Recent lists them as sample runs.
+  const own = useMemo(() => data.all.filter((s) => !s.sample_id), [data.all])
+  const faceAll = data.series('face_full')?.sessions ?? EMPTY
+  const face = useMemo(() => (faceAll.some((s) => s.sample_id) ? faceAll.filter((s) => !s.sample_id) : faceAll), [faceAll])
   // The check-in schedule (You): when check-ins are due, the weekly day, and how long a gap is.
   const checkin = useCheckin()
   const due = useCheckinDue()
-  const read = useMemo(() => readHome(data.all, face, gapDaysFor(checkin)), [data.all, face, checkin])
+  const read = useMemo(() => readHome(own, face, gapDaysFor(checkin)), [own, face, checkin])
 
   // A check-in still uploading or measuring: re-read sessions every 10 s until its result lands.
   const running = !demo && data.all.some((s) => inFlight(s) && !stalled(s))
@@ -226,7 +230,7 @@ function HomeBody() {
   }
 
   const recent = recentRows({ all: data.all, entries: demo ? undefined : entries, joined: demo ? null : (user?.metadata?.creationTime ?? null), goals, navigate })
-  const week = demo ? null : weekOf(data.all, read, goals, weeklyDayOf(checkin))
+  const week = demo ? null : weekOf(own, read, goals, weeklyDayOf(checkin))
 
   return (
     <Frame>
@@ -346,7 +350,7 @@ function leadFor({
   const f = read.baselineFrames ?? 0
   switch (read.person) {
     case 'new':
-      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: 'Face photos by a window, about three minutes. Every later check-in is compared with this one.', big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos for a normal range', prog: 0, chips: ['Face', 'Phone or RAW'], cta: { label: 'Start baseline', onClick: () => checkIn('face_full') }, aura: 'coral' }
+      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Five face photos by a window, about three minutes. ${countWord(BAND_FRAMES)} need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: ['Face', 'Phone or RAW'], cta: { label: 'Start baseline', onClick: () => checkIn('face_full') }, aura: 'coral' }
     case 'noBand': {
       // Photos kept (under 30 days): add the missing ones to this same baseline (design: "Add 2 photos").
       const need = topUpNeed(read.baseline)
@@ -535,11 +539,11 @@ function recentRows({ all, entries, joined, goals, navigate }: { all: Session[];
     const at = Date.parse(s.created_at)
     const open = () => navigate(`/result/${s.id}`)
     const baseline = s.is_baseline && usable(s)
-    rows.push({ key: `s:${s.id}`, at, d: shortDay(s.created_at), t: `${baseline ? 'Baseline set' : 'Check-in'} · ${SITE_SHORT[s.site]}`, x: summaryOf(s), onClick: open })
+    rows.push({ key: `s:${s.id}`, at, d: shortDay(s.created_at), t: `${s.sample_id ? 'Sample run' : baseline ? 'Baseline set' : 'Check-in'} · ${SITE_SHORT[s.site]}`, x: summaryOf(s), onClick: open })
     if (s.note) rows.push({ key: `n:${s.id}`, at: at + 1, d: shortDay(s.created_at), t: 'Note', x: `“${s.note}”`, onClick: open })
   }
   for (const e of entries ?? []) {
-    rows.push({ key: `r:${e.id}`, at: parseDate(e.started_at).getTime(), d: shortDay(e.started_at), t: 'Started a product', x: e.custom_name, onClick: () => navigate('/routine') })
+    rows.push({ key: `r:${e.id}`, at: parseDate(e.started_at).getTime(), tie: Date.parse(e.created_at ?? '') || 0, d: shortDay(e.started_at), t: 'Started a product', x: e.custom_name, onClick: () => navigate('/routine') })
     if (e.ended_at) rows.push({ key: `e:${e.id}`, at: parseDate(e.ended_at).getTime(), d: shortDay(e.ended_at), t: 'Stopped a product', x: e.custom_name, onClick: () => navigate('/routine') })
   }
   if (joined) {
@@ -547,7 +551,7 @@ function recentRows({ all, entries, joined, goals, navigate }: { all: Session[];
     const names = goals.map((g) => GOALS.find((x) => x.id === g)?.label.toLowerCase()).filter(Boolean)
     rows.push({ key: 'joined', at: Date.parse(iso), d: shortDay(iso), t: 'Joined Willow', x: names.length ? `Goals: ${names.join(', ')}` : 'No goals chosen yet', onClick: () => navigate('/you') })
   }
-  return rows.sort((a, b) => b.at - a.at).slice(0, 6)
+  return rows.sort((a, b) => b.at - a.at || (b.tie ?? 0) - (a.tie ?? 0)).slice(0, 6)
 }
 
 function summaryOf(s: Session): string {

@@ -370,7 +370,8 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
             </a>
           ))}
           <span className="px-1.5 text-[12px] text-ink-2">
-            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed. No ads, no commissions.' : 'Store links only: the price above is the catalog’s one checked price. No ads, no commissions.'}
+            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed.' : 'Store links only: the price above is the catalog’s one checked price.'}{' '}
+            No commissions on store links. Suggestions are never paid for; a sponsored card is always labelled Sponsored and never changes your recommendations.
           </span>
         </div>
       ) : null}

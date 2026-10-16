@@ -160,6 +160,9 @@ export function ProductThumb({ product, category, size }: { product: Product | n
 
 function ProductWidget({ productId, links }: { productId: string; links: WidgetLinks }) {
   const p = links.product(productId)
+  const routine = useRoutine()
+  // Already in use: say so (as the product sheet does) instead of offering a second entry for it.
+  const entry = routine.data?.find((e) => e.product_id === productId && !e.ended_at)
   if (!p) return null
   return (
     <Frame title="Product" link="Details" onLink={() => links.onProduct(p)}>
@@ -174,9 +177,13 @@ function ProductWidget({ productId, links }: { productId: string; links: WidgetL
         </span>
       </span>
       <span className="flex flex-wrap gap-1.5">
-        <button type="button" onClick={() => links.onAdd(p)} className="hit44 min-h-9 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse">
-          Add to routine
-        </button>
+        {entry ? (
+          <span className="flex min-h-9 items-center rounded-pill bg-lime px-3.5 text-[12.5px]">✓ In your routine since {fmtDate(entry.started_at)}</span>
+        ) : (
+          <button type="button" onClick={() => links.onAdd(p)} className="hit44 min-h-9 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse">
+            Add to routine
+          </button>
+        )}
         <button type="button" onClick={() => links.onProduct(p)} className="hit44 min-h-9 rounded-pill bg-white px-3.5 text-[12.5px]">
           Ingredients and stores
         </button>
