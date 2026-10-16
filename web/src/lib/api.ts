@@ -326,6 +326,9 @@ export type DemoStatus = {
   checked_at: string
 }
 
+/** Retailer reads give up after this, so a stalled request shows the error state (with Retry) instead of a skeleton forever. A cold api plus BigQuery answers well inside it. */
+const RETAILER_TIMEOUT_MS = 30_000
+
 async function publicGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) throw new ApiError(res.status, `${path} unavailable`)
@@ -341,7 +344,7 @@ export const api = {
   /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
   retailerInsights: async (filters?: { cohort: RetailerCohort; range: RetailerRange }) => {
     const qs = filters ? `?${new URLSearchParams(filters).toString()}` : ''
-    const res = await fetch(`${API_URL}/v1/retailer/insights${qs}`)
+    const res = await fetch(`${API_URL}/v1/retailer/insights${qs}`, { signal: AbortSignal.timeout(RETAILER_TIMEOUT_MS) })
     if (!res.ok) throw new ApiError(res.status, 'insights unavailable')
     return (await res.json()) as RetailerInsights
   },
@@ -728,7 +731,7 @@ function retailerQs(filters?: Partial<RetailerFilters> & { brand?: string }): st
 
 /** GETs that keep the api's status on failure (404 = unknown id, or an endpoint this api build doesn't have yet). */
 async function retailerGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`)
+  const res = await fetch(`${API_URL}${path}`, { signal: AbortSignal.timeout(RETAILER_TIMEOUT_MS) })
   if (!res.ok) throw new ApiError(res.status, `${path.split('?')[0]} unavailable`)
   return (await res.json()) as T
 }

@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, ChevronsUpDown, Download } from 'lucide-react'
-import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Columns3, Download } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 import { downloadCsv, type CsvValue } from './format'
 import { ToolButton } from './Layout'
@@ -27,17 +27,31 @@ export type Column<T> = {
   rowHeader?: boolean
   /** Left out of the CSV (row-selection checkboxes, action buttons). */
   noCsv?: boolean
+  /** The viewer can hide or show this column (the Columns menu). `hidden` starts it hidden. */
+  optional?: boolean
+  hidden?: boolean
+}
+
+function readHidden(key: string | undefined, cols: { id: string; hidden?: boolean }[]): Set<string> {
+  const fallback = new Set(cols.filter((c) => c.hidden).map((c) => c.id))
+  if (!key) return fallback
+  try {
+    const v = window.localStorage.getItem(`willow.proof.cols.${key}`)
+    return v ? new Set(JSON.parse(v) as string[]) : fallback
+  } catch {
+    return fallback
+  }
 }
 
 /**
- * The Proof table: typed columns, sortable headers (aria-sort), sticky header, right-aligned tabular
- * numbers, 36 px rows, row click → handler (Enter/Space too; ↑/↓ move between rows), CSV export of exactly
+ * The Proof table (Geist Table): typed columns, sortable headers (aria-sort), sticky header, right-aligned
+ * tabular numbers, 48 px rows, an optional Columns menu, row click → handler (Enter/Space too; ↑/↓ move between rows), CSV export of exactly
  * the visible columns in the current order, and an empty state. Sort can be controlled (deep links keep it in
  * the URL) or left to the table. Scrolls sideways inside its own box on narrow screens.
  */
 export function DataTable<T>({
   caption,
-  columns,
+  columns: allColumns,
   rows,
   rowKey,
   onRowClick,
@@ -53,6 +67,7 @@ export function DataTable<T>({
   maxHeight,
   minWidth = 720,
   rowClassName,
+  columnsKey,
 }: {
   /** Names the table for screen readers (visually hidden). */
   caption: string
@@ -76,7 +91,23 @@ export function DataTable<T>({
   maxHeight?: number | string
   minWidth?: number
   rowClassName?: (row: T) => string
+  /** Adds the Columns menu (optional columns), remembered on this browser under this key. */
+  columnsKey?: string
 }) {
+  const [hidden, setHidden] = useState<Set<string>>(() => readHidden(columnsKey, allColumns))
+  const columns = useMemo(() => allColumns.filter((c) => !c.optional || !hidden.has(c.id)), [allColumns, hidden])
+  const toggleColumn = (id: string) =>
+    setHidden((h) => {
+      const next = new Set(h)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      try {
+        if (columnsKey) window.localStorage.setItem(`willow.proof.cols.${columnsKey}`, JSON.stringify([...next]))
+      } catch {
+        /* storage blocked: the choice lasts for this visit */
+      }
+      return next
+    })
   const [own, setOwn] = useState<Sort | null>(defaultSort ?? null)
   const sort = sortProp !== undefined ? sortProp : own
   const setSort = (s: Sort | null) => (onSortChange ? onSortChange(s) : setOwn(s))
@@ -131,19 +162,22 @@ export function DataTable<T>({
 
   return (
     <div className="flex min-w-0 flex-col">
-      {toolbar || csv || heading ? (
-        <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-2">
+      {toolbar || csv || heading || columnsKey ? (
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3">
           {heading ? <div className="flex min-w-0 flex-wrap items-center gap-2">{heading}</div> : null}
-          <div className={`flex min-w-0 flex-wrap items-center gap-2 ${heading ? 'ml-auto' : ''}`}>{toolbar}</div>
-          {csv ? (
-            <ToolButton onClick={exportCsv} label={`Export ${caption} as CSV`}>
-              <Download size={14} strokeWidth={1.6} aria-hidden />
-              Export CSV
-            </ToolButton>
-          ) : null}
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+            {toolbar}
+            {columnsKey ? <ColumnsMenu columns={allColumns} hidden={hidden} onToggle={toggleColumn} /> : null}
+            {csv ? (
+              <ToolButton onClick={exportCsv} label={`Export ${caption} as CSV`}>
+                <Download size={15} strokeWidth={1.6} aria-hidden />
+                Export
+              </ToolButton>
+            ) : null}
+          </div>
         </div>
       ) : null}
-      <div className="relative overflow-auto overscroll-x-contain" style={{ maxHeight }}>
+      <div className="relative overflow-auto overscroll-x-contain border-t border-line" style={{ maxHeight }}>
         <table className="w-full table-fixed border-separate border-spacing-0 text-proof-body" style={{ minWidth }}>
           <caption className="sr-only">{caption}</caption>
           <colgroup>
@@ -161,7 +195,7 @@ export function DataTable<T>({
                     key={c.id}
                     scope="col"
                     aria-sort={on ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : c.sortValue ? 'none' : undefined}
-                    className={`sticky top-0 z-[1] h-9 whitespace-nowrap border-b border-line bg-surface px-3 align-middle text-proof-small font-normal text-ink-2 first:pl-4 last:pr-4 ${right ? 'text-right' : 'text-left'}`}
+                    className={`sticky top-0 z-[1] h-10 whitespace-nowrap border-b border-line bg-pf-bg2 px-4 align-middle text-proof-small font-medium text-ink-2 first:pl-5 last:pr-5 ${right ? 'text-right' : 'text-left'}`}
                   >
                     {c.sortValue && typeof c.header === 'string' ? (
                       <button
@@ -203,7 +237,7 @@ export function DataTable<T>({
           <tbody ref={body}>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-proof-body text-ink-2">
+                <td colSpan={columns.length} className="px-5 py-12 text-center text-proof-body text-ink-2">
                   {empty ?? 'Nothing to show for these filters.'}
                 </td>
               </tr>
@@ -219,10 +253,10 @@ export function DataTable<T>({
                     aria-current={selected || undefined}
                     onClick={onRowClick ? () => onRowClick(r) : undefined}
                     onKeyDown={onRowClick ? (e) => onRowKey(e, r) : undefined}
-                    className={`group ${onRowClick ? 'cursor-pointer' : ''} ${selected ? 'bg-proof-leaf-soft' : onRowClick ? 'hover:bg-glass' : ''} focus-visible:outline-offset-[-2px] ${rowClassName?.(r) ?? ''}`}
+                    className={`group ${onRowClick ? 'cursor-pointer' : ''} ${selected ? 'bg-pf-hover' : onRowClick ? 'hover:bg-pf-hover' : ''} transition-colors duration-100 focus-visible:outline-offset-[-2px] ${rowClassName?.(r) ?? ''}`}
                   >
                     {columns.map((c) => {
-                      const cls = `h-[var(--proof-row)] border-b border-line px-3 py-1 align-middle first:pl-4 last:pr-4 ${c.align === 'right' ? 'text-right' : 'text-left'}`
+                      const cls = `h-[var(--proof-row)] border-b border-line px-4 py-2 align-middle first:pl-5 last:pr-5 group-last:border-b-0 ${c.align === 'right' ? 'text-right' : 'text-left'}`
                       return c.rowHeader ? (
                         <th key={c.id} scope="row" className={`${cls} font-normal`}>
                           {c.cell(r)}
@@ -247,4 +281,44 @@ export function DataTable<T>({
 function SortIcon({ on, dir }: { on: boolean; dir?: 'asc' | 'desc' }) {
   if (!on) return <ChevronsUpDown size={12} strokeWidth={1.6} aria-hidden className="opacity-50" />
   return dir === 'asc' ? <ArrowUp size={12} strokeWidth={1.8} aria-hidden /> : <ArrowDown size={12} strokeWidth={1.8} aria-hidden />
+}
+
+/** The Columns menu: a checklist of the optional columns (a popover; Esc or a click outside closes it). */
+function ColumnsMenu<T>({ columns, hidden, onToggle }: { columns: Column<T>[]; hidden: Set<string>; onToggle: (id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
+    const key = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('pointerdown', down)
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('pointerdown', down)
+      document.removeEventListener('keydown', key)
+    }
+  }, [open])
+  const optional = columns.filter((c) => c.optional)
+  if (!optional.length) return null
+  return (
+    <div ref={box} className="relative">
+      <ToolButton onClick={() => setOpen((o) => !o)} label="Choose columns" pressed={open}>
+        <Columns3 size={15} strokeWidth={1.6} aria-hidden />
+        Columns
+      </ToolButton>
+      {open ? (
+        <div role="group" aria-label="Columns" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-56 flex-col rounded-card border border-line bg-surface p-1 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.12)] animate-[wFadeIn_.12s_ease_both]">
+          {optional.map((c) => {
+            const on = !hidden.has(c.id)
+            return (
+              <button key={c.id} type="button" role="menuitemcheckbox" aria-checked={on} onClick={() => onToggle(c.id)} className="flex h-9 items-center gap-2 rounded-ctl border-0 bg-transparent px-2.5 text-left text-proof-body text-ink hover:bg-pf-hover">
+                <span className={`grid size-4 shrink-0 place-items-center rounded-[4px] border ${on ? 'border-ink bg-ink text-inverse' : 'border-line-strong'}`}>{on ? <Check size={12} strokeWidth={2.5} aria-hidden /> : null}</span>
+                {c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
 }

@@ -137,3 +137,31 @@ export function money(p: { amount: number; currency: string } | null | undefined
     return `${p.amount} ${p.currency}`
   }
 }
+
+/** Why a row has no rate, in the scoreboard's words: nobody used it, its goal isn't measured, or too few people. */
+export function noDataReason(r: Pick<ProductRow, 'rate' | 'reason'>): string | null {
+  if (r.rate !== null) return null
+  if (r.reason === 'unused') return 'Not used yet'
+  if (r.reason === 'not_measured') return 'Goal not measured'
+  return 'Fewer than 10 people'
+}
+
+/**
+ * The column that leads a Compare row: the index of the single highest (or lowest, for `low`) value among at
+ * least two measured values. Ties and rows with fewer than two values have no leader (null).
+ */
+export function leaderOf(values: (number | null | undefined)[], better: 'high' | 'low' = 'high'): number | null {
+  const got = values.map((v, i) => ({ v, i })).filter((x): x is { v: number; i: number } => x.v !== null && x.v !== undefined)
+  if (got.length < 2) return null
+  got.sort((a, b) => (better === 'high' ? b.v - a.v : a.v - b.v))
+  return got[0].v === got[1].v ? null : got[0].i
+}
+
+/** The scoreboard's status filter: All, then each tier, with the short tab labels. */
+export const TIER_TABS: { id: 'all' | ProofTier; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'proven', label: 'Proven' },
+  { id: 'promising', label: 'Promising' },
+  { id: 'unclear', label: 'No clear effect' },
+  { id: 'too_few', label: 'Not enough data' },
+]

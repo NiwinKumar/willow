@@ -23,16 +23,28 @@ export const COHORTS: { value: Cohort; label: string }[] = [
 /** The api's defaults: every row, all time. */
 export const DEFAULT_FILTERS: Filters = { cohort: 'mixed', range: 'all' }
 
-/** The sections in nav order: id, label, URL segment and the question each one answers (nav tooltips, titles). */
+/**
+ * The sections in nav order: id, label, URL segment and the question each one answers (page subtitles). Built
+ * around what a skin brand asks, in order: how am I doing, which products work, who are my customers, how do I
+ * compare, how do I grow it; Explore answers anything else.
+ */
 export const SECTIONS: { id: SectionId; label: string; path: string; question: string }[] = [
-  { id: 'overview', label: 'Overview', path: '', question: 'What changed, and what needs attention?' },
-  { id: 'products', label: 'Products', path: 'products', question: 'Which products produce measured change?' },
-  { id: 'categories', label: 'Categories', path: 'categories', question: 'How does each category perform by goal?' },
-  { id: 'segments', label: 'Skin profiles', path: 'segments', question: 'Which skin profiles are under-served?' },
-  { id: 'competitors', label: 'Competitors', path: 'competitors', question: 'How does a brand compare with the market?' },
-  { id: 'demand', label: 'Demand', path: 'demand', question: 'What are customers trying to change?' },
-  { id: 'promote', label: 'Promote', path: 'promote', question: 'Which products can be promoted, and to whom?' },
+  { id: 'overview', label: 'Overview', path: '', question: 'What is working, and what needs attention?' },
+  { id: 'products', label: 'Products', path: 'products', question: 'Which products produce visible change?' },
+  { id: 'customers', label: 'Customers', path: 'customers', question: 'Who is buying, what do they want, and who is under-served?' },
+  { id: 'market', label: 'Market', path: 'market', question: 'How do brands and categories compare on outcomes?' },
+  { id: 'campaigns', label: 'Campaigns', path: 'campaigns', question: 'Promote proven products, and measure the lift.' },
+  { id: 'explore', label: 'Explore', path: 'explore', question: 'Ask your own question of the outcomes.' },
 ]
+
+/** Round-1 paths and where they live now (old links and brief cards keep working). */
+export const LEGACY_PATHS: Record<'categories' | 'segments' | 'demand' | 'competitors' | 'promote', { section: SectionId; params?: Record<string, string> }> = {
+  categories: { section: 'market', params: { view: 'categories' } },
+  segments: { section: 'customers' },
+  demand: { section: 'customers', params: { view: 'demand' } },
+  competitors: { section: 'market' },
+  promote: { section: 'campaigns' },
+}
 
 /** The keys shared by every section (kept when moving between sections); section keys are dropped. */
 const GLOBAL_KEYS = ['as', 'cohort', 'range'] as const
@@ -91,8 +103,12 @@ export function useRetailState() {
   return { filters, workspace, setFilters, setWorkspace, param, setParam, carry, params }
 }
 
-/** The path of a section ("/retail/products"), with an optional sub-path ("/retail/categories/serum"). */
-export function sectionPath(id: SectionId, sub?: string): string {
-  const s = SECTIONS.find((x) => x.id === id)!
-  return `/retail${s.path ? `/${s.path}` : ''}${sub ? `/${encodeURIComponent(sub)}` : ''}`
+/**
+ * The path of a section ("/retail/products"), with an optional sub-path ("/retail/products/x"). A round-1 id
+ * ("categories", "promote"...) gives its old path, which the shell redirects to the new home.
+ */
+export function sectionPath(id: SectionId | keyof typeof LEGACY_PATHS, sub?: string): string {
+  const s = SECTIONS.find((x) => x.id === id)
+  const path = s ? s.path : id
+  return `/retail${path ? `/${path}` : ''}${sub ? `/${encodeURIComponent(sub)}` : ''}`
 }

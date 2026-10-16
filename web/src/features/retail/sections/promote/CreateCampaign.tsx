@@ -1,29 +1,34 @@
 import { Check } from 'lucide-react'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
-import { api, type Campaign, type PromoEligibility, type SkinType } from '../../../../lib/api'
+import { api, retailerSegments, type Campaign, type PromoEligibility, type SkinType } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/useAuth'
-import { ProductImage } from '../../../../components/willow/ProductImage'
-import { DAYS, DEFAULT_HOLDOUT, goalLabel, HOLDOUTS, MAX_ACTIVE, promoError, skinLabel, skinText, type Days, type PromoError } from '../../promote'
-import type { ProductRow } from '../../types'
-import { int, pct, pts, ProofTierChip, SearchField, Segmented, SidePanel } from '../../ui'
+import { blockedReasons, DAYS, DEFAULT_HOLDOUT, goalLabel, HOLDOUT_RANGE, MAX_ACTIVE, promoError, reachRange, skinLabel, type Days, type PromoError } from '../../promote'
+import type { ProductRow, Segments } from '../../types'
+import { Button, int, LiftValue, pct, ProductCell, ProofTierChip, SearchField, Segmented, SidePanel } from '../../ui'
+import { useView } from '../../useView'
+import { ErrorBox } from './CampaignCard'
 import { ShopperPreview } from './ShopperPreview'
-
-const STEPS = ['Product', 'Audience', 'Duration', 'Review'] as const
 
 const endDate = (days: number) => new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
 /**
- * Create a campaign, in a side panel: product → audience → duration and holdout → review, with the shopper's card
- * drawn live beside the form (in the review step on phones). Only eligible products, goals and skin types are
- * offered; the api checks them again and its reasons are shown inline when it refuses (422), as is the running cap
- * (429). `?new=1&product=<id>` opens it with the product chosen.
+ * New campaign, one scrolling form in a side panel: 1 product (only eligible ones can be picked; the rest are
+ * greyed with the reason on hover), 2 audience (the goals and skin types the evidence covers, all ticked; they
+ * can only be narrowed), 3 duration and holdout, 4 the exact card a shopper will see. The api checks everything
+ * again; its refusals (422 reasons, 429 cap) show above the footer. `?new=<product_id>` opens it with the
+ * product chosen, or with the reasons it can't be promoted.
  */
-export function CreateCampaign({ open, onClose, products, rows, workspace, initialProduct, running, onCreated, onShowCampaigns }: {
+export function CreateCampaign({ open, onClose, eligible, blocked, all, brand, rows, workspace, initialProduct, running, onCreated, onShowCampaigns }: {
   open: boolean
   onClose: () => void
-  /** Eligible products this workspace may promote. */
-  products: PromoEligibility[]
+  /** Products this workspace may promote. */
+  eligible: PromoEligibility[]
+  /** This workspace's products that can't be promoted yet (listed greyed). */
+  blocked: PromoEligibility[]
+  /** Every product's eligibility, to explain a product in the link that can't be promoted. */
+  all: PromoEligibility[]
+  brand: string | null
   rows: Map<string, ProductRow>
   workspace: { id: string; label: string }
   initialProduct: string | null
@@ -33,49 +38,37 @@ export function CreateCampaign({ open, onClose, products, rows, workspace, initi
   onShowCampaigns: () => void
 }) {
   const { getIdToken } = useAuth()
-  const [step, setStep] = useState(0)
   const [productId, setProductId] = useState<string | null>(null)
+  const [picking, setPicking] = useState(true)
   const [goals, setGoals] = useState<string[]>([])
   const [skins, setSkins] = useState<string[]>([])
   const [days, setDays] = useState<Days>(14)
   const [holdout, setHoldout] = useState<number>(DEFAULT_HOLDOUT)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<PromoError | null>(null)
-  const body = useRef<HTMLDivElement>(null)
 
-  // Each opening starts fresh; a product in the URL skips to the audience. (State adjusted while rendering, when
+  const choose = (p: PromoEligibility | undefined) => {
+    setProductId(p?.product_id ?? null)
+    setGoals(p ? [...p.goals] : [])
+    setSkins(p ? [...p.skin_types] : [])
+    setPicking(!p)
+    setError(null)
+  }
+  // Each opening starts fresh, with the link's product when it can be promoted. (Adjusted while rendering, when
   // the panel opens or its product changes, rather than in an effect: no extra render with stale values.)
   const opening = open ? `open|${initialProduct ?? ''}` : 'closed'
   const [seen, setSeen] = useState('closed')
   if (opening !== seen) {
     setSeen(opening)
     if (open) {
-      const pre = initialProduct && products.some((p) => p.product_id === initialProduct) ? initialProduct : null
-      const p = products.find((x) => x.product_id === pre)
-      setProductId(pre)
-      setGoals(p ? [...p.goals] : [])
-      setSkins([])
+      choose(eligible.find((p) => p.product_id === initialProduct))
       setDays(14)
       setHoldout(DEFAULT_HOLDOUT)
-      setError(null)
-      setStep(pre ? 1 : 0)
     }
   }
 
-  const product = products.find((p) => p.product_id === productId) ?? null
-  const preselectedMissing = open && initialProduct && !products.some((p) => p.product_id === initialProduct) ? initialProduct : null
-  const choose = (p: PromoEligibility) => {
-    setProductId(p.product_id)
-    setGoals([...p.goals])
-    setSkins([])
-    setError(null)
-  }
-  const canNext = [Boolean(product), goals.length > 0, true, true]
-  const go = (s: number) => {
-    setStep(s)
-    setError(null)
-    requestAnimationFrame(() => body.current?.querySelector<HTMLElement>('[data-step-focus]')?.focus({ preventScroll: false }))
-  }
+  const product = eligible.find((p) => p.product_id === productId) ?? null
+  const linkBlocked = open && initialProduct && !eligible.some((p) => p.product_id === initialProduct) ? { p: all.find((x) => x.product_id === initialProduct), reasons: blockedReasons(all.find((x) => x.product_id === initialProduct), brand) } : null
 
   const launch = async () => {
     if (!product || busy) return
@@ -86,7 +79,8 @@ export function CreateCampaign({ open, onClose, products, rows, workspace, initi
         product_id: product.product_id,
         workspace: workspace.id,
         goals,
-        skin_types: skins as SkinType[],
+        // every covered skin type ticked = "all eligible" ([]), which keeps following the evidence
+        skin_types: (skins.length === product.skin_types.length ? [] : skins) as SkinType[],
         days,
         placement: 'routine',
         holdout_pct: holdout,
@@ -99,295 +93,254 @@ export function CreateCampaign({ open, onClose, products, rows, workspace, initi
     }
   }
 
-  const extra = product ? rows.get(product.product_id) : undefined
-  const preview = product ? <ShopperPreview product={product} extra={extra} goals={goals} skinTypes={skins} /> : null
-
+  const capped = running >= MAX_ACTIVE || error?.kind === 'too_many'
   return (
     <SidePanel
       open={open}
       onClose={onClose}
       title="New campaign"
       subtitle={`${workspace.label} · ${running} of ${MAX_ACTIVE} running`}
-      width={980}
+      width={600}
       labelledBy="proof-new-campaign"
       footer={
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-[11px] text-ink-2 tnum">
-            Step {step + 1} of {STEPS.length}
-          </span>
-          <div className="flex items-center gap-2">
-            {step > 0 ? (
-              <button type="button" onClick={() => go(step - 1)} className="hit44 inline-flex h-8 items-center rounded-xs border border-line-strong bg-transparent px-3 text-proof-small text-ink hover:bg-glass">
-                Back
-              </button>
-            ) : (
-              <button type="button" onClick={onClose} className="hit44 inline-flex h-8 items-center rounded-xs border border-line-strong bg-transparent px-3 text-proof-small text-ink hover:bg-glass">
+        <div className="flex flex-col gap-3">
+          {error && error.kind !== 'too_many' ? <ErrorBox error={error} /> : null}
+          {capped ? (
+            <div role={error ? 'alert' : undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-card border border-line bg-pf-amber-soft/50 px-4 py-3 text-proof-small text-ink">
+              <span className="min-w-0 flex-1">{MAX_ACTIVE} campaigns are already running. Pause one before launching another.</span>
+              <Button kind="secondary" size="sm" onClick={onShowCampaigns}>
+                See running campaigns
+              </Button>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <span className="min-w-0 truncate text-proof-small text-ink-2 tnum max-sm:hidden">{product ? `${days} days, ends ${endDate(days)} · ${Math.round(holdout * 100)}% holdout` : 'Choose a product to continue'}</span>
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <Button kind="ghost" onClick={onClose}>
                 Cancel
-              </button>
-            )}
-            {step < STEPS.length - 1 ? (
-              <button type="button" disabled={!canNext[step]} onClick={() => go(step + 1)} className="hit44 inline-flex h-8 items-center rounded-xs border-0 bg-selected px-3.5 text-proof-small font-medium text-inverse hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-45">
-                Next: {STEPS[step + 1]}
-              </button>
-            ) : (
-              <button type="button" disabled={!product || !goals.length || busy} aria-busy={busy || undefined} onClick={() => void launch()} className="hit44 inline-flex h-8 items-center rounded-xs border-0 bg-selected px-3.5 text-proof-small font-medium text-inverse hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-45">
-                {busy ? 'Launching…' : `Launch for ${days} days`}
-              </button>
-            )}
+              </Button>
+              <Button kind="primary" onClick={() => void launch()} disabled={!product || !goals.length || !skins.length || busy || capped}>
+                {busy ? 'Launching…' : 'Launch campaign'}
+              </Button>
+            </div>
           </div>
         </div>
       }
     >
-      <div ref={body} className="flex flex-col gap-5">
-        <Stepper step={step} canReach={(i) => i <= step || canNext.slice(0, i).every(Boolean)} onGo={go} />
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="flex min-w-0 flex-col gap-4">
-            {step === 0 ? <ProductStep products={products} rows={rows} value={productId} onChoose={choose} missing={preselectedMissing} workspace={workspace.label} /> : null}
-            {step === 1 && product ? <AudienceStep product={product} goals={goals} setGoals={setGoals} skins={skins} setSkins={setSkins} /> : null}
-            {step === 2 ? <DurationStep days={days} setDays={setDays} holdout={holdout} setHoldout={setHoldout} /> : null}
-            {step === 3 && product ? (
-              <ReviewStep product={product} extra={extra} workspace={workspace.label} goals={goals} skins={skins} days={days} holdout={holdout} error={error} onFix={go} running={running} onShowCampaigns={onShowCampaigns} />
-            ) : null}
-            {step === 3 ? <div className="md:hidden">{preview}</div> : null}
-          </div>
-          <aside aria-label="Live preview" className="hidden md:block">
-            <div className="sticky top-0 flex flex-col gap-2">
-              <span className="text-proof-small font-medium text-ink">How shoppers will see it</span>
-              {preview ?? <p className="m-0 rounded-sm border border-dashed border-line-strong p-4 text-proof-small text-ink-2">Choose a product to see the card shoppers get, with its evidence line.</p>}
+      <form
+        className="flex flex-col gap-8 pb-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void launch()
+        }}
+      >
+        <Step n={1} title="Product">
+          {linkBlocked ? (
+            <div role="alert" className="flex flex-col gap-1.5 rounded-card border border-line bg-pf-amber-soft/50 p-4">
+              <span className="text-proof-body font-medium text-ink">{linkBlocked.p ? `${linkBlocked.p.product} can’t be promoted yet` : 'That product can’t be promoted'}</span>
+              <ul className="m-0 flex list-disc flex-col gap-0.5 pl-4 text-proof-small text-ink-2">
+                {linkBlocked.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              {eligible.length ? <span className="text-proof-small text-ink-2">Choose an eligible product below.</span> : null}
             </div>
-          </aside>
-        </div>
-      </div>
+          ) : null}
+          {product && !picking ? (
+            <div className="flex items-center gap-3 rounded-card border border-proof-leaf-line bg-proof-leaf-soft/40 px-4 py-3">
+              <span className="min-w-0 flex-1">
+                <ProductCell p={{ product: product.product, brand: product.brand, category: rows.get(product.product_id)?.category ?? '', image_url: rows.get(product.product_id)?.image_url }} size={36} />
+              </span>
+              <Outcome row={rows.get(product.product_id)} />
+              <Button kind="ghost" size="sm" onClick={() => setPicking(true)}>
+                Change
+              </Button>
+            </div>
+          ) : (
+            <ProductPicker eligible={eligible} blocked={blocked} rows={rows} value={productId} onChoose={(p) => choose(p)} />
+          )}
+        </Step>
+
+        <Step n={2} title="Audience" hint="Only the goals and skin types this product’s evidence covers. Untick to narrow; you can’t widen.">
+          {product ? <Audience product={product} goals={goals} setGoals={setGoals} skins={skins} setSkins={setSkins} /> : <Waiting />}
+        </Step>
+
+        <Step n={3} title="Duration and holdout">
+          <div className="flex flex-wrap items-center gap-3">
+            <Segmented label="Duration" options={DAYS.map((d) => ({ value: String(d) as `${Days}`, label: `${d} days` }))} value={String(days) as `${Days}`} onChange={(v) => setDays(Number(v) as Days)} />
+            <span className="text-proof-small text-ink-2 tnum">Ends {endDate(days)}</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <label htmlFor="proof-holdout" className="text-proof-body text-ink">
+                Randomised holdout
+              </label>
+              <output htmlFor="proof-holdout" className="text-proof-body font-medium text-ink tnum">
+                {Math.round(holdout * 100)}%
+              </output>
+            </div>
+            <input
+              id="proof-holdout"
+              type="range"
+              min={HOLDOUT_RANGE.min * 100}
+              max={HOLDOUT_RANGE.max * 100}
+              step={HOLDOUT_RANGE.step * 100}
+              value={Math.round(holdout * 100)}
+              onChange={(e) => setHoldout(Number(e.target.value) / 100)}
+              aria-valuetext={`${Math.round(holdout * 100)}% held out`}
+              className="h-5 w-full cursor-pointer accent-[var(--proof-leaf)]"
+            />
+            <p className="m-0 text-proof-small text-ink-2">{Math.round(holdout * 100)}% of matching shoppers never see the card, so the difference in adoption is the lift the campaign caused, not who would have added it anyway.</p>
+          </div>
+        </Step>
+
+        <Step n={4} title="Preview" hint="The card exactly as a matching shopper sees it in the Willow app.">
+          {product ? <ShopperPreview product={product} extra={rows.get(product.product_id)} goals={goals} skinTypes={skins.length === product.skin_types.length ? [] : skins} /> : <Waiting />}
+        </Step>
+      </form>
     </SidePanel>
   )
 }
 
-function Stepper({ step, canReach, onGo }: { step: number; canReach: (i: number) => boolean; onGo: (i: number) => void }) {
+function Step({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
   return (
-    <ol aria-label="Steps" className="m-0 grid list-none grid-cols-4 gap-1.5 p-0">
-      {STEPS.map((s, i) => {
-        const done = i < step
-        const on = i === step
-        return (
-          <li key={s} className="min-w-0">
-            <button
-              type="button"
-              disabled={!canReach(i)}
-              aria-current={on ? 'step' : undefined}
-              onClick={() => !on && onGo(i)}
-              className={`flex h-9 w-full min-w-0 items-center gap-2 border-0 border-t-2 bg-transparent px-0 pt-1 text-left text-proof-small transition-colors disabled:cursor-default ${on ? 'border-ink font-medium text-ink' : done ? 'border-proof-leaf text-ink hover:text-ink' : 'border-line-strong text-ink-2'}`}
-            >
-              <span aria-hidden className="font-mono text-[11px] tnum">{done ? <Check size={12} strokeWidth={2} className="text-proof-leaf" /> : i + 1}</span>
-              <span className="truncate">{s}</span>
-              {done ? <span className="sr-only">(done)</span> : null}
-            </button>
-          </li>
-        )
-      })}
-    </ol>
+    <fieldset className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+      <legend className="contents">
+        <span className="flex items-center gap-2.5">
+          <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-full border border-line text-proof-label font-medium text-ink-2 tnum">
+            {n}
+          </span>
+          <span className="text-proof-h text-ink">{title}</span>
+        </span>
+      </legend>
+      {hint ? <p className="-mt-2 m-0 pl-[34px] text-proof-small text-ink-2 max-sm:pl-0">{hint}</p> : null}
+      <div className="flex min-w-0 flex-col gap-4 pl-[34px] max-sm:pl-0">{children}</div>
+    </fieldset>
   )
 }
 
-function StepTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
+function Waiting() {
+  return <p className="m-0 rounded-card border border-dashed border-line px-4 py-3 text-proof-small text-ink-2">Choose a product first.</p>
+}
+
+/** "63% vs 29% · +34 pts" (n and the intervals on hover, in the kit cells). */
+function Outcome({ row }: { row?: ProductRow }) {
+  if (!row || row.rate === null) return null
   return (
-    <div className="flex flex-col gap-1">
-      <h3 data-step-focus tabIndex={-1} className="m-0 text-proof-h font-medium text-ink outline-none">
-        {children}
-      </h3>
-      {hint ? <p className="m-0 max-w-[62ch] text-proof-small text-ink-2">{hint}</p> : null}
+    <span className="hidden shrink-0 flex-col items-end gap-0.5 text-proof-small sm:flex">
+      <span className="text-ink tnum">
+        {pct(row.rate)} <span className="text-ink-2">vs {pct(row.base_rate)}</span>
+      </span>
+      <LiftValue lift={row.lift} lo={row.lift_lo} hi={row.lift_hi} />
+    </span>
+  )
+}
+
+function ProductPicker({ eligible, blocked, rows, value, onChoose }: { eligible: PromoEligibility[]; blocked: PromoEligibility[]; rows: Map<string, ProductRow>; value: string | null; onChoose: (p: PromoEligibility) => void }) {
+  const [q, setQ] = useState('')
+  const match = (p: PromoEligibility) => !q || `${p.product} ${p.brand}`.toLowerCase().includes(q.toLowerCase())
+  const shown = useMemo(() => eligible.filter(match), [eligible, q]) // eslint-disable-line react-hooks/exhaustive-deps
+  const greyed = useMemo(() => blocked.filter(match), [blocked, q]) // eslint-disable-line react-hooks/exhaustive-deps
+  const cell = (p: PromoEligibility) => ({ product: p.product, brand: p.brand, category: rows.get(p.product_id)?.category ?? '', image_url: rows.get(p.product_id)?.image_url })
+  return (
+    <div className="flex flex-col gap-3">
+      {eligible.length + blocked.length > 8 ? <SearchField label="Search products" value={q} onChange={setQ} placeholder="Search products" /> : null}
+      <div role="radiogroup" aria-label="Product" className="flex max-h-[340px] flex-col overflow-y-auto rounded-card border border-line">
+        {shown.map((p) => {
+          const on = p.product_id === value
+          return (
+            <label key={p.product_id} className={`flex min-h-14 cursor-pointer items-center gap-3 border-b border-line px-4 py-2 transition-colors last:border-b-0 ${on ? 'bg-proof-leaf-soft/50' : 'hover:bg-pf-hover'}`}>
+              <input type="radio" name="campaign-product" checked={on} onChange={() => onChoose(p)} className="size-4 shrink-0 accent-[var(--proof-leaf)]" />
+              <span className="min-w-0 flex-1">
+                <ProductCell p={cell(p)} />
+              </span>
+              <Outcome row={rows.get(p.product_id)} />
+            </label>
+          )
+        })}
+        {greyed.length ? (
+          <>
+            <span className="sticky top-0 border-b border-line bg-pf-bg2 px-4 py-2 text-proof-small text-ink-2">Not eligible yet · hover for why</span>
+            {greyed.map((p) => (
+              <BlockedRow key={p.product_id} p={p} cell={cell(p)} />
+            ))}
+          </>
+        ) : null}
+        {!shown.length && !greyed.length ? <p className="m-0 px-4 py-6 text-center text-proof-small text-ink-2">No product matches “{q}”.</p> : null}
+      </div>
     </div>
   )
 }
 
-function ProductStep({ products, rows, value, onChoose, missing, workspace }: { products: PromoEligibility[]; rows: Map<string, ProductRow>; value: string | null; onChoose: (p: PromoEligibility) => void; missing: string | null; workspace: string }) {
-  const [q, setQ] = useState('')
-  const shown = useMemo(() => products.filter((p) => !q || `${p.product} ${p.brand}`.toLowerCase().includes(q.toLowerCase())), [products, q])
+function BlockedRow({ p, cell }: { p: PromoEligibility; cell: { product: string; brand: string; category: string; image_url?: string | null } }) {
+  // A native title, not the kit tooltip: the kit's portalled tooltip sits under a modal dialog's top layer.
+  const why = p.reasons.join(' ') || 'Not Proven yet.'
   return (
-    <>
-      <StepTitle hint={`Only Proven products with at least one goal the evidence covers are listed. ${workspace === 'Retailer · all brands' ? 'As the retailer you can promote any brand.' : 'A brand workspace promotes its own products.'}`}>Which product?</StepTitle>
-      {missing ? <p role="alert" className="m-0 rounded-sm border border-line bg-sunken p-3 text-proof-small text-ink">The product in the link can’t be promoted from this workspace (not Proven, or another brand’s). Choose one below.</p> : null}
-      {products.length > 8 ? <SearchField label="Search eligible products" value={q} onChange={setQ} placeholder="Search products" /> : null}
-      <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
-        <legend className="sr-only">Eligible products</legend>
-        {shown.map((p) => {
-          const r = rows.get(p.product_id)
-          const on = p.product_id === value
-          return (
-            <label key={p.product_id} className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xs border px-3 py-2 transition-colors ${on ? 'border-proof-leaf-line bg-proof-leaf-soft' : 'border-line hover:bg-glass'}`}>
-              <input type="radio" name="promote-product" checked={on} onChange={() => onChoose(p)} className="size-4 shrink-0 accent-[var(--proof-leaf)]" />
-              <ProductImage product={{ image_url: r?.image_url, category: r?.category ?? '', name: p.product }} size={30} decorative />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-proof-body text-ink" title={p.product}>
-                  {p.product}
-                </span>
-                <span className="truncate text-proof-small text-ink-2">
-                  {p.brand} · {p.goals.map(goalLabel).join(', ')}
-                </span>
-              </span>
-              {r && r.rate !== null ? (
-                <span className="hidden shrink-0 flex-col items-end font-mono text-[11px] text-ink-2 tnum sm:flex">
-                  <span className="text-proof-body text-ink">{pct(r.rate)}</span>
-                  <span>
-                    {pts(r.lift)} · n={int(r.n)}
-                  </span>
-                </span>
-              ) : null}
-            </label>
-          )
-        })}
-        {!shown.length ? <p className="m-0 py-3 text-proof-small text-ink-2">No eligible product matches “{q}”.</p> : null}
-      </fieldset>
-    </>
+    <div tabIndex={0} aria-disabled="true" title={why} className="flex min-h-14 cursor-not-allowed items-center gap-3 border-b border-line px-4 py-2 last:border-b-0">
+      <span aria-hidden className="size-4 shrink-0 rounded-full border border-line-strong opacity-60" />
+      <span className="min-w-0 flex-1 opacity-55">
+        <ProductCell p={cell} />
+      </span>
+      <ProofTierChip tier={p.tier} size="sm" />
+      <span className="sr-only">Not eligible: {why}</span>
+    </div>
   )
 }
 
-function Chip({ on, onClick, children, disabled }: { on: boolean; onClick: () => void; children: ReactNode; disabled?: boolean }) {
+function Chip({ on, onClick, children, last }: { on: boolean; onClick: () => void; children: ReactNode; last: boolean }) {
   return (
     <button
       type="button"
       aria-pressed={on}
-      disabled={disabled}
-      onClick={onClick}
-      className={`hit44 inline-flex h-8 items-center gap-1.5 rounded-pill border px-3 text-proof-small transition-colors ${on ? 'border-proof-leaf-line bg-proof-leaf-soft text-ink' : 'border-line-strong text-ink-2 hover:bg-glass hover:text-ink'} disabled:opacity-45`}
+      aria-disabled={last || undefined}
+      title={last ? 'At least one is needed' : undefined}
+      onClick={() => !last && onClick()}
+      className={`hit44 inline-flex h-8 items-center gap-1.5 rounded-pill border px-3 text-proof-small transition-colors ${on ? 'border-proof-leaf-line bg-proof-leaf-soft text-ink' : 'border-line text-ink-2 hover:border-line-strong hover:text-ink'} ${last ? 'cursor-not-allowed' : ''}`}
     >
-      {on ? <Check size={12} strokeWidth={2} aria-hidden className="text-proof-leaf" /> : null}
+      {on ? <Check size={12} strokeWidth={2.2} aria-hidden className="text-proof-leaf" /> : null}
       {children}
     </button>
   )
 }
 
-function AudienceStep({ product, goals, setGoals, skins, setSkins }: { product: PromoEligibility; goals: string[]; setGoals: (g: string[]) => void; skins: string[]; setSkins: (s: string[]) => void }) {
+function Audience({ product, goals, setGoals, skins, setSkins }: { product: PromoEligibility; goals: string[]; setGoals: (g: string[]) => void; skins: string[]; setSkins: (s: string[]) => void }) {
+  // The cohort's skin type × goal counts on the same evidence as eligibility (mixed cohort, all time).
+  const seg = useView<Segments>('segments|mixed|all', () => retailerSegments({ cohort: 'mixed', range: 'all' }))
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
+  const reach = seg.data ? reachRange(seg.data.cells, goals, skins, seg.data.skin_types) : null
   return (
     <>
-      <StepTitle hint="The card shows to people whose profile goals include at least one of these, and whose skin type is targeted. Only goals and skin types where this product has its own positive lift (10+ people each) can be chosen.">Who should see it?</StepTitle>
-      <div role="group" aria-labelledby="promote-goals" className="flex flex-col gap-2">
-        <span id="promote-goals" className="text-proof-small text-ink-2">
-          Goals <span className="text-ink-2">· at least one</span>
+      <div role="group" aria-labelledby="campaign-goals" className="flex flex-col gap-2">
+        <span id="campaign-goals" className="text-proof-small text-ink-2">
+          Goals · shown to people with at least one
         </span>
         <div className="flex flex-wrap gap-1.5">
           {product.goals.map((g) => (
-            <Chip key={g} on={goals.includes(g)} onClick={() => setGoals(toggle(goals, g))}>
+            <Chip key={g} on={goals.includes(g)} last={goals.length === 1 && goals[0] === g} onClick={() => setGoals(toggle(goals, g))}>
               {goalLabel(g)}
             </Chip>
           ))}
         </div>
-        {!goals.length ? (
-          <p role="alert" className="m-0 text-proof-small text-ink">
-            Choose at least one goal.
-          </p>
-        ) : null}
       </div>
-      <div role="group" aria-labelledby="promote-skins" className="flex flex-col gap-2">
-        <span id="promote-skins" className="text-proof-small text-ink-2">
+      <div role="group" aria-labelledby="campaign-skins" className="flex flex-col gap-2">
+        <span id="campaign-skins" className="text-proof-small text-ink-2">
           Skin types
         </span>
         <div className="flex flex-wrap gap-1.5">
-          <Chip on={!skins.length} onClick={() => setSkins([])}>
-            All eligible skin types
-          </Chip>
           {product.skin_types.map((s) => (
-            <Chip key={s} on={skins.includes(s)} onClick={() => setSkins(toggle(skins, s))}>
+            <Chip key={s} on={skins.includes(s)} last={skins.length === 1 && skins[0] === s} onClick={() => setSkins(toggle(skins, s))}>
               {skinLabel(s)}
             </Chip>
           ))}
         </div>
-        <p className="m-0 text-proof-small text-ink-2">{skinText(skins, product.skin_types)}. People without a skin type in their profile never match.</p>
       </div>
-    </>
-  )
-}
-
-function DurationStep({ days, setDays, holdout, setHoldout }: { days: Days; setDays: (d: Days) => void; holdout: number; setHoldout: (h: number) => void }) {
-  return (
-    <>
-      <StepTitle hint="The campaign starts at once and ends by itself. You can pause and resume it while it runs.">How long, and how will you measure it?</StepTitle>
-      <div className="flex flex-col gap-2">
-        <span className="text-proof-small text-ink-2">Duration</span>
-        <div className="flex flex-wrap items-center gap-3">
-          <Segmented label="Duration" options={DAYS.map((d) => ({ value: String(d) as `${Days}`, label: `${d} days` }))} value={String(days) as `${Days}`} onChange={(v) => setDays(Number(v) as Days)} />
-          <span className="font-mono text-[11px] text-ink-2 tnum">Ends {endDate(days)}</span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        <span className="text-proof-small text-ink-2">Randomised holdout</span>
-        <div className="self-start">
-          <Segmented label="Randomised holdout" options={HOLDOUTS.map((h) => ({ value: String(h), label: `${Math.round(h * 100)}%${h === DEFAULT_HOLDOUT ? ' · default' : ''}` }))} value={String(holdout)} onChange={(v) => setHoldout(Number(v))} />
-        </div>
-        <div className="flex max-w-[64ch] flex-col gap-1.5 rounded-sm border border-line bg-sunken p-3 text-proof-small text-ink-2">
-          <p className="m-0 text-ink">
-            {Math.round(holdout * 100)}% of the people this campaign matches are picked at random and never see the card.
-          </p>
-          <p className="m-0">Comparing how many in each group add the product to their routine (by any path) shows the adoption your campaign caused, not only who clicked. A larger holdout settles the answer sooner but reaches fewer people. The comparison appears once each group has 10 people.</p>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function ReviewStep({ product, extra, workspace, goals, skins, days, holdout, error, onFix, running, onShowCampaigns }: { product: PromoEligibility; extra?: ProductRow; workspace: string; goals: string[]; skins: string[]; days: Days; holdout: number; error: PromoError | null; onFix: (step: number) => void; running: number; onShowCampaigns: () => void }) {
-  const rows: [string, ReactNode, number | null][] = [
-    ['Workspace', workspace, null],
-    [
-      'Product',
-      <span key="p" className="inline-flex flex-wrap items-center gap-2">
-        {product.product} · {product.brand} <ProofTierChip tier={product.tier} size="sm" />
-      </span>,
-      0,
-    ],
-    ['Goals', goals.map(goalLabel).join(', '), 1],
-    ['Skin types', skinText(skins, product.skin_types), 1],
-    ['Placement', 'Routine page, under the shopper’s own routine; at most one sponsored card a day', null],
-    ['Duration', `${days} days, ends ${endDate(days)}`, 2],
-    ['Holdout', `${Math.round(holdout * 100)}% of matched people, at random`, 2],
-  ]
-  return (
-    <>
-      <StepTitle hint="Payment buys reach only: it never changes a product’s rank, its eligibility, or anyone’s own recommendations. If the product drops below Proven, the card stops showing.">Review and launch</StepTitle>
-      <dl className="m-0 flex flex-col rounded-sm border border-line">
-        {rows.map(([k, v, fix]) => (
-          <div key={k} className="grid grid-cols-[110px_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line px-3 py-2 last:border-b-0">
-            <dt className="text-proof-small text-ink-2">{k}</dt>
-            <dd className="m-0 min-w-0 text-proof-body text-ink">{v}</dd>
-            {fix !== null ? (
-              <button type="button" onClick={() => onFix(fix)} className="hit44 border-0 bg-transparent p-0 text-proof-small text-ink-2 underline underline-offset-4 hover:text-ink">
-                Edit<span className="sr-only"> {k.toLowerCase()}</span>
-              </button>
-            ) : (
-              <span />
-            )}
-          </div>
-        ))}
-      </dl>
-      {extra && extra.rate !== null ? (
-        <p className="m-0 text-proof-small text-ink-2">
-          Evidence shoppers see (mixed cohort, all time): {pct(extra.rate)} had a real change held to week 8 vs {pct(extra.base_rate)} of non-users, {pts(extra.lift)}, n={int(extra.n)}.
-        </p>
-      ) : null}
-      {running >= MAX_ACTIVE && !error ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-line bg-sunken p-3 text-proof-small text-ink">
-          <span className="min-w-0 flex-1">{MAX_ACTIVE} campaigns are already running. Launching will be refused until you pause or delete one.</span>
-          <button type="button" onClick={onShowCampaigns} className="hit44 inline-flex h-8 items-center rounded-xs border border-line-strong bg-transparent px-2.5 text-proof-small text-ink hover:bg-glass">
-            See running campaigns
-          </button>
-        </div>
-      ) : null}
-      {error ? (
-        <div role="alert" className="flex flex-col gap-1.5 rounded-sm border border-line-strong bg-sunken p-3.5">
-          <span className="text-proof-body font-medium text-ink">{error.title}</span>
-          <span className="text-proof-small text-ink-2">{error.message}</span>
-          {error.reasons.length ? (
-            <ul className="m-0 flex list-disc flex-col gap-0.5 pl-4 text-proof-small text-ink">
-              {error.reasons.map((r) => (
-                <li key={r}>{r}</li>
-              ))}
-            </ul>
-          ) : null}
-          {error.kind === 'too_many' ? (
-            <button type="button" onClick={onShowCampaigns} className="hit44 mt-1 inline-flex h-8 items-center self-start rounded-xs border border-line-strong bg-transparent px-2.5 text-proof-small text-ink hover:bg-glass">
-              See running campaigns
-            </button>
-          ) : null}
+      {reach ? (
+        <div aria-live="polite" className="flex flex-col gap-1 rounded-card bg-pf-bg2 px-4 py-3">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="text-proof-body text-ink">Matching profiles</span>
+            <span className="text-proof-body font-medium text-ink tnum">{reach.lo === reach.hi ? int(reach.lo) : `${int(reach.lo)}–${int(reach.hi)}`} people</span>
+          </span>
+          <span className="text-proof-small text-ink-2">In the Willow cohort with one of these goals and one of these skin types. Current users of the product never see the card.</span>
         </div>
       ) : null}
     </>

@@ -24,10 +24,10 @@ export function RateCell({ rate, n, lo, hi, k, showN = true }: { rate: number | 
   if (rate === null || rate === undefined) return <Suppressed short />
   return (
     <span className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-      <span {...tip.trigger} tabIndex={detail ? 0 : undefined} className={`font-mono text-proof-body tnum text-ink ${detail ? 'cursor-help' : ''}`}>
+      <span {...tip.trigger} tabIndex={detail ? 0 : undefined} className={`text-proof-body tnum text-ink ${detail ? 'cursor-help' : ''}`}>
         {pct(rate)}
       </span>
-      {showN && n ? <span className="font-mono text-[11px] text-ink-2 tnum">n={int(n)}</span> : null}
+      {showN && n ? <span className="text-proof-label text-ink-2 tnum">n={int(n)}</span> : null}
       {detail ? tip.node : null}
     </span>
   )
@@ -42,14 +42,14 @@ export function LiftValue({ lift, lo, hi }: { lift: number | null | undefined; l
   const tip = useTooltip(ci)
   if (lift === null || lift === undefined)
     return (
-      <span className="font-mono text-proof-body text-ink-2">
+      <span className="text-proof-body text-ink-2">
         <span aria-hidden>—</span>
         <span className="sr-only">No comparison: fewer than {MIN_GROUP} non-users</span>
       </span>
     )
   return (
     <>
-      <span {...tip.trigger} tabIndex={ci ? 0 : undefined} className={`whitespace-nowrap font-mono text-proof-body tnum ${lift > 0 ? 'text-ink' : 'text-ink-2'} ${ci ? 'cursor-help' : ''}`}>
+      <span {...tip.trigger} tabIndex={ci ? 0 : undefined} className={`whitespace-nowrap text-proof-body tnum ${lift > 0 ? 'text-proof-leaf' : 'text-ink-2'} ${ci ? 'cursor-help' : ''}`}>
         {pts(lift)}
       </span>
       {ci ? tip.node : null}

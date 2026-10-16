@@ -23,7 +23,7 @@ export const TIERS: Record<ProofTier, { label: string; glyph: string; text: stri
   too_few: {
     label: 'Not enough data',
     glyph: '—',
-    text: 'Fewer than 10 people with 8 weeks of readings used it, so no number is shown.',
+    text: 'Fewer than 10 people with 8 weeks of readings used it, or Willow does not measure its goal yet, so no number is shown.',
     tone: 'text-ink-2',
   },
 }

@@ -89,7 +89,7 @@ function HeatTd({ v, fill, onClick }: { v: HeatCell; fill: (v: number) => string
       <span className="block max-w-[11ch] text-[11px] leading-tight text-ink-2">{SUPPRESSED}</span>
     ) : (
       <span className="flex flex-col">
-        <span className="flex items-center gap-1 font-mono tnum text-ink">
+        <span className="flex items-center gap-1 tnum text-ink">
           {v.text}
           {v.flag ? <span className="text-[11px] text-ink">◇ {v.flag}</span> : null}
         </span>
