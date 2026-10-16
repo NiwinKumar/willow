@@ -11,14 +11,25 @@ plainly (the retailer page's "About this data" panel repeats it):
   between weeks 3 and 7, and a product for it.
 - Routine: 2 to 5 real catalog products that target those goals, plus a sunscreen for about 60%
   of people. About 3 in 10 product uses stop at some week between 2 and 10.
+- Switching: about half the time a product use stops, the person starts a different catalog
+  product in the same category for the same goal 0 to 2 weeks later (it has its own effect, and
+  about 3 in 10 of these stop again 2 to 8 weeks after they start).
 - Product effect: a per-product drift towards the desired direction on the metrics its concerns
   map to (CATALOG_SPEC), growing to full size 6 weeks after the person starts it, between 0.2 and
   1.1 times the metric's MDC95; about 3 in 10 products have no effect. Effect sizes are invented:
   this demonstrates the dashboard, it is not evidence.
+- Skin type changes the size of a product's effect (an invented assumption, there to demonstrate
+  the skin-profile views): oil-control products (oil or blemish concerns, salicylic acid / BHA,
+  zinc, clays, benzoyl peroxide) work better on oily and combination skin and less on dry;
+  barrier and gentle hydrating products (dryness or redness concerns, ceramides, panthenol,
+  centella, squalane) work better on dry and sensitive skin; strong retinoids and acids
+  (retinol, retinal, glycolic acid, benzoyl peroxide, L-ascorbic acid, 1%+ salicylic acid) work
+  less on sensitive skin; plus a small random spread per product and skin type (SKIN_EFFECT).
 - Noise: each weekly reading adds noise with the per-metric spread from the contract fixture, and
   the verdict is real_change only when |delta| exceeds the metric's MDC95, as in the product.
 - Skin type (oily, combination, dry, normal, sensitive; a fixed mix), skin-tone band and region
-  have no effect on outcomes or on which goals and products people pick.
+  have no effect on which goals and products people pick; tone band and region have no effect on
+  outcomes.
 - 15% drop out between weeks 2 and 7.
 - Routine findings come from the app's own rule table (routine_check.rule_findings) on the
   products still in use: conflicts, a missing morning sunscreen, and duplicate actives.
@@ -37,9 +48,18 @@ USERS = 2000
 WEEKS = 8
 REGIONS = [("IN", 0.35), ("US", 0.2), ("UK", 0.1), ("KR", 0.1), ("SEA", 0.15), ("GCC", 0.1)]
 TONE_BANDS = ["very_light", "light", "intermediate", "tan", "brown", "dark"]
-# The profile's skin types (users/{uid}.profile.skin_type); a fixed mix, no effect on anything.
+# The profile's skin types (users/{uid}.profile.skin_type); a fixed mix. Skin type changes the
+# size of a product's effect (skin_effect), nothing else.
 SKIN_TYPES = ["oily", "combination", "dry", "normal", "sensitive"]
 SKIN_MIX = [0.22, 0.32, 0.18, 0.16, 0.12]
+# Invented demonstration assumption: effect multipliers per skin type for three product traits.
+SKIN_EFFECT = {
+    "oil_control": {"oily": 1.35, "combination": 1.2, "dry": 0.8, "sensitive": 0.9},
+    "barrier": {"dry": 1.35, "sensitive": 1.3, "oily": 0.85},
+    "strong": {"sensitive": 0.55, "dry": 0.85},
+}
+SKIN_SPREAD = (0.85, 1.15)  # random spread per product x skin type
+SWITCH_SHARE = 0.5  # of stopped product uses, the share followed by another product
 CONCERN_METRICS = {
     "acne_blemishes": ["blemishes", "redness"],
     "dark_spots_pigmentation": ["pigment_spots"],
@@ -133,6 +153,43 @@ def product_goals(p: dict[str, Any]) -> list[str]:
     return sorted({CONCERN_GOAL[c] for c in p["concerns"] if CONCERN_GOAL.get(c)})
 
 
+_OIL_ACTIVES = ("salicyl", "zinc", "kaolin", "bentonite", "benzoyl peroxide")
+_BARRIER_ACTIVES = ("ceramide", "panthenol", "madecassoside", "centella", "cica", "squalane")
+_STRONG_ACTIVES = ("retinol", "retinal", "glycolic acid", "benzoyl peroxide")
+
+
+def product_traits(p: dict[str, Any]) -> list[str]:
+    """Which SKIN_EFFECT traits a catalog product has, from its concerns and key actives."""
+    actives = [(a["name"].lower(), a.get("pct")) for a in p["key_actives"]]
+    concerns = set(p["concerns"])
+
+    def has(words: tuple[str, ...]) -> bool:
+        return any(w in name for name, _ in actives for w in words)
+
+    strong = has(_STRONG_ACTIVES) or any(
+        (name == "ascorbic acid" and (pct or 0) >= 10)  # L-ascorbic acid, not its derivatives
+        or (name.startswith("salicylic acid") and (pct or 0) >= 1)
+        for name, pct in actives
+    )
+    out = []
+    if concerns & {"oiliness_shine", "acne_blemishes"} or has(_OIL_ACTIVES):
+        out.append("oil_control")
+    if concerns & {"dryness_barrier", "redness_sensitivity"} or has(_BARRIER_ACTIVES):
+        out.append("barrier")
+    if strong:
+        out.append("strong")
+    return out
+
+
+def skin_effect(p: dict[str, Any]) -> dict[str, float]:
+    """The product's effect multiplier per skin type before the random spread."""
+    out = dict.fromkeys(SKIN_TYPES, 1.0)
+    for t in product_traits(p):
+        for skin, k in SKIN_EFFECT[t].items():
+            out[skin] *= k
+    return out
+
+
 def _noise() -> dict[str, tuple[float, float]]:
     """(reading SD, MDC95) per metric from the contract fixture, plus pores and texture."""
     fixture = {m["id"]: m for m in contract.load("analysis_result.sample.json")["metrics"]}
@@ -183,9 +240,13 @@ def finding_kinds(entries: list[dict[str, Any]]) -> list[str]:
     return sorted(kinds) or ["none"]
 
 
-def generate(today: date | datetime | None = None) -> dict[str, list[dict[str, Any]]]:
+def generate(
+    today: date | datetime | None = None, *, switching: bool = True, skin_effects: bool = True
+) -> dict[str, list[dict[str, Any]]]:
     """Every table for `today` (default: now). The random draws do not depend on `today`: the
-    same people exist on every run, and a later `today` only reveals more of their weeks."""
+    same people exist on every run, and a later `today` only reveals more of their weeks.
+    `switching=False, skin_effects=False` gives the cohort as it was before those two
+    assumptions (Oct 15), draw for draw (a test holds it to that)."""
     now = (
         datetime.now(UTC)
         if today is None
@@ -205,6 +266,16 @@ def generate(today: date | datetime | None = None) -> dict[str, list[dict[str, A
     for p in products:  # weekly drift, in units of the metric's MDC95, at full size
         effect[p["product_id"]] = 0.0 if rng.random() < 0.3 else rng.uniform(0.2, 1.1)
     goals_pool = [g for g in GOALS if g in by_goal]
+    # New draws come from their own streams (SEED + n), so every draw above and in the loop below
+    # stays what it was before switching and skin effects existed: the same people, goals,
+    # routines, stops and noise.
+    skin_rng = random.Random(SEED + 1)
+    skin_mod = {
+        (p["product_id"], s): (k * skin_rng.uniform(*SKIN_SPREAD)) if skin_effects else 1.0
+        for p in products
+        for s, k in skin_effect(p).items()
+    }
+    switch_rng = random.Random(SEED + 2)
 
     def pick_goal(month: int, taken: list[str]) -> str:
         weights = MONTH_WEIGHTS[min(max(month, 8), 10)]
@@ -249,6 +320,37 @@ def generate(today: date | datetime | None = None) -> dict[str, list[dict[str, A
             for w in range(1, 21)
             for m, (sd, _) in noise.items()
         }
+        # Switching: for every stop draw (whether or not it has happened by `today`), the same
+        # six draws; about half the time another product in the same category, for the same
+        # goal, starts 0-2 weeks after the stop. product_id -> (product, started, stop, slots)
+        all_goals = goals + ([added_goal] if added_goal else [])
+        swaps: dict[str, tuple[dict[str, Any], int, int | None, list[str]]] = {}
+        for pid, w in stop_draw.items():
+            if w is None:
+                continue
+            go = switch_rng.random() < SWITCH_SHARE
+            lag = switch_rng.randint(0, 2)
+            which = switch_rng.random()
+            stops_too = switch_rng.random() < 0.3
+            stop_after = switch_rng.randint(2, 8)
+            slots_q = switch_rng.choice([["pm"], ["am"], ["am", "pm"]])
+            p, started = picks[pid]
+            if not switching or not go or w <= started:
+                continue
+            want = set(product_goals(p)) & set(all_goals) or set(product_goals(p))
+            options = [
+                q
+                for q in products
+                if q["category"] == p["category"]
+                and q["product_id"] not in picks
+                and q["product_id"] not in swaps
+                and (not want or want & set(product_goals(q)))
+            ]
+            if options:
+                q = options[int(which * len(options))]
+                begin = w + lag
+                stop = begin + stop_after if stops_too else None
+                swaps[q["product_id"]] = (q, begin, stop, slots_q)
 
         # Everything above is drawn whatever `today` is; below, only what has happened by now.
         weeks = [
@@ -268,6 +370,11 @@ def generate(today: date | datetime | None = None) -> dict[str, list[dict[str, A
             pid: (w if happened(w) and w > picks[pid][1] else None) for pid, w in stop_draw.items()
         }
         live = {pid: v for pid, v in picks.items() if v[1] <= last_week}
+        for qid, (q, begin, stop, slots_q) in swaps.items():
+            if begin <= last_week:
+                live[qid] = (q, begin)
+                stopped[qid] = stop if happened(stop) else None
+                slot_draw[qid] = slots_q
         entries = []
         for pid, (p, started) in live.items():
             slots = ["am"] if p["category"] == "sunscreen" else slot_draw[pid]
@@ -310,7 +417,8 @@ def generate(today: date | datetime | None = None) -> dict[str, list[dict[str, A
                     end = stopped[pid] or week
                     active_weeks = max(0, min(week, end) - started)
                     if any(metric in CONCERN_METRICS.get(c, []) for c in p["concerns"]):
-                        drift += effect[pid] * mdc * min(active_weeks, 6) / 6
+                        size = effect[pid] * skin_mod[(pid, skin)]
+                        drift += size * mdc * min(active_weeks, 6) / 6
                 sign = 1 if metric in UP_IS_GOOD else -1
                 delta = sign * drift + deltas[(week, metric)]
                 sessions.append(
