@@ -1509,6 +1509,37 @@ def summarise(
     return out
 
 
+SUMMARY_WAIT_SECONDS = 1.5
+_inflight: dict[tuple, threading.Thread] = {}
+_inflight_lock = threading.Lock()
+
+
+def summary_for(
+    cards: list[dict[str, Any]], key: tuple, cohort_label_: str, brand: str | None
+) -> tuple[dict[str, Any] | None, bool]:
+    """(summary, pending). The cards never wait on Gemini: the summary is written in the
+    background and the request waits at most SUMMARY_WAIT_SECONDS for it; when it isn't ready
+    the brief says `summary_pending` and the page asks again a few seconds later."""
+    hit = _summaries.get(key)
+    if hit and time.time() < hit[0]:
+        return hit[1], False
+    if not cards:
+        return None, False
+    with _inflight_lock:
+        t = _inflight.get(key)
+        if t is None or not t.is_alive():
+            t = threading.Thread(
+                target=summarise, args=(cards, key, cohort_label_, brand), daemon=True
+            )
+            _inflight[key] = t
+            t.start()
+    t.join(SUMMARY_WAIT_SECONDS)
+    hit = _summaries.get(key)
+    if hit and time.time() < hit[0]:
+        return hit[1], False
+    return None, True
+
+
 # ── cached wrappers (what the routes call) ─────────────────────────────────────────────────
 
 _facts: dict[tuple[str, str], tuple[int, date, Facts]] = {}
@@ -1574,8 +1605,8 @@ def brand(name: str, cohort_: str = "mixed", range_: str = "all") -> dict[str, A
 def brief(
     cohort_: str = "mixed", range_: str = "all", brand_name: str | None = None
 ) -> dict[str, Any] | None:
-    """Deterministic cards plus a validated Gemini summary (None if unavailable). None when the
-    brand is unknown."""
+    """Deterministic cards plus a validated Gemini summary (None if unavailable; `summary_pending`
+    while it is being written). None when the brand is unknown."""
     f, version, today = facts(cohort_, range_)
     b = None
     if brand_name:
@@ -1583,13 +1614,15 @@ def brief(
         if b is None:
             return None
     cards = _cached("brief", cohort_, range_, brief_cards, b)
+    summary, pending = summary_for(
+        cards, (cohort_, range_, b, version, today), cohort_label(f.cohort), b
+    )
     return {
         "filters": f.filters,
         "cohort": f.cohort,
         "cards": cards,
-        "summary": summarise(
-            cards, (cohort_, range_, b, version, today), cohort_label(f.cohort), b
-        ),
+        "summary": summary,
+        "summary_pending": pending,
     }
 
 

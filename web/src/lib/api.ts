@@ -486,7 +486,7 @@ export type NewCampaign = {
 }
 /** Delivery counts as counted (once per person per day per kind; never split by goal or skin type). */
 export type CampaignDay = { day: string; impressions: number; clicks: number; adds: number }
-export type IncrementalityGroup = { n: number; added: number | null; rate: number }
+export type IncrementalityGroup = { n: number; added: number; rate: number }
 export type CampaignStats = {
   impressions: number
   clicks: number
@@ -505,6 +505,8 @@ export type Campaign = {
   goals: string[]
   skin_types: SkinType[]
   placement: SponsoredPlacement
+  /** Randomised holdout share of the people the campaign matches. */
+  holdout_pct?: number
   status: 'active' | 'paused' | 'ended'
   days: 7 | 14 | 30
   starts_at: string
@@ -617,3 +619,125 @@ export function putSigned(target: UploadTarget, file: File, onProgress: (fractio
     xhr.send(file)
   })
 }
+
+/* ───────────── Willow Proof (retail) intelligence: GET /v1/retailer/{products,segments,brands,brief} ───────────── */
+// Public aggregates like /v1/retailer/insights: no sign-in, every group under 10 people suppressed by the api.
+// Shapes: docs/CONTRACT.md section 3 (retail intelligence rows). Rates are fractions (0.48), lifts too.
+
+export type RetailerFilters = { cohort: RetailerCohort; range: RetailerRange }
+export type RetailerProofTier = 'proven' | 'promising' | 'unclear' | 'too_few'
+/** One product's scoreboard row; numbers are null when the tier is too_few (or the product is unused). */
+export type RetailerProductRow = {
+  product_id: string
+  product: string
+  brand: string
+  category: string
+  category_label: string
+  goal_ids: string[]
+  price_tier: 'budget' | 'mid' | 'premium'
+  image_url: string | null
+  users: number | null
+  n: number | null
+  rate: number | null
+  rate_lo: number | null
+  rate_hi: number | null
+  base_rate: number | null
+  lift: number | null
+  lift_lo: number | null
+  lift_hi: number | null
+  weeks: number | null
+  cont8: number | null
+  routine_share: number | null
+  tier: RetailerProofTier
+  /** Why a product has no numbers: nobody used it, its targets aren't measured, or fewer than 10 people. */
+  reason?: 'unused' | 'not_measured' | 'few'
+  /** The tier in words ("No clear effect yet"). */
+  tier_label?: string
+  /** Promising only: about how many more people at week 8 would make it Proven if the rates hold. */
+  to_proven?: number | null
+}
+type RetailerHead = { filters: { cohort: RetailerCohort; range: RetailerRange; since: string | null; today: string }; cohort: RetailerInsights['cohort'] }
+export type RetailerProducts = RetailerHead & {
+  products: RetailerProductRow[]
+  counts: { products: number; measured: number; too_few: number; unused: number; not_measured: number }
+}
+export type RetailerSeg = { id: string; label: string; n: number | null; rate: number | null; base_rate: number | null; suppressed: boolean }
+type RetailerProductRef = { product_id: string; product: string; brand: string }
+export type RetailerProductDetail = RetailerHead & {
+  product: RetailerProductRow & { key_actives: { name: string; pct: number | null }[]; size: string | null; price: { amount: number; currency: string } | null; image_source: string | null; stores: number }
+  curve: { weeks: number[]; users: (number | null)[]; base: (number | null)[] }
+  segments: { skin: RetailerSeg[]; tone: RetailerSeg[]; goal: RetailerSeg[] }
+  competitors: { rows: (RetailerProductRow & { is_self: boolean })[]; rank: number | null; of: number; note?: string }
+  co_used: (RetailerProductRef & { category: string; image_url: string | null; n: number; share: number })[]
+  switching: { stopped: number | null; to: (RetailerProductRef & { n: number })[]; from: (RetailerProductRef & { n: number })[]; to_brands?: RetailerBrandFlow[]; from_brands?: RetailerBrandFlow[] }
+  conflicts: { kind: string; label: string; fix: string; n: number; share: number }[]
+  evidence: RetailerEvidence[]
+  evidence_caveat?: string
+  eligibility: { eligible: boolean; tier: RetailerProofTier; reasons: string[]; goals: string[]; skin_types: string[] }
+}
+/** A switching flow by brand (people, >= 10); the product's own brand reads "Same brand, other product". */
+export type RetailerBrandFlow = { brand: string; label: string; same_brand: boolean; n: number }
+/** One claim-ready statement: cosmetic, observational, numbers only from the row, with its method and cohort. */
+export type RetailerEvidence = { id: string; text: string; n: number; kind: 'efficacy' | 'speed' | 'segment' | 'retention'; method?: string; window?: string; cohort_label?: string; caveat?: string }
+type RetailerPick = RetailerProductRef & { rate: number; n: number }
+export type RetailerSegments = RetailerHead & {
+  skin_types: { id: string; label: string; users: number | null }[]
+  goals: { id: string; label: string }[]
+  cells: { skin: string; goal: string; users: number | null; unmet: number | null; best: RetailerPick | null; runner_up: RetailerPick | null }[]
+  by_skin: {
+    skin: string
+    label: string
+    users: number | null
+    top_goals: { goal_id: string; label: string; share: number }[]
+    top_products: (RetailerProductRef & { image_url: string | null; rate: number; n: number; lift: number | null })[]
+    conflict_share: number | null
+  }[]
+}
+export type RetailerBrandSummary = { brand: string; products: number; users: number | null; n: number | null; rate: number | null; lo: number | null; hi: number | null; cont8: number | null; routine_share: number | null }
+export type RetailerBrandDetail = RetailerHead & {
+  brand: string
+  products: RetailerProductRow[]
+  goals: { goal_id: string; label: string; brand: { rate: number; n: number; lo: number; hi: number } | null; market: { rate: number; n: number } | null; best_competitor: { brand: string; rate: number; n: number } | null; rank: number | null; of: number }[]
+  share: { category: string; label: string; brand_share: number | null; users: number | null }[]
+  switching: { won: { brand: string; n: number }[]; lost: { brand: string; n: number }[]; net: number | null }
+  positioning: { brand: string; rate: number; cont8: number; users: number; is_self: boolean }[]
+  skin: { skin: string; label: string; brand_rate: number | null; market_rate: number | null; n: number | null }[]
+  /** "Observational comparison under the same method; …" (shown next to every comparison). */
+  note?: string
+}
+export type RetailerBriefSection = 'products' | 'categories' | 'segments' | 'competitors' | 'demand' | 'promote'
+export type RetailerBriefCard = {
+  id: string
+  kind: 'win' | 'risk' | 'opportunity' | 'trend' | 'gap'
+  title: string
+  body: string
+  value: number | string | null
+  unit: string | null
+  n: number | null
+  link: { section: RetailerBriefSection; id?: string }
+}
+/** `summary_pending`: Gemini is still writing the summary; ask again in a few seconds (the cards never wait). */
+export type RetailerBrief = RetailerHead & { cards: RetailerBriefCard[]; summary: { text: string; validated: true } | null; summary_pending?: boolean }
+
+function retailerQs(filters?: Partial<RetailerFilters> & { brand?: string }): string {
+  const p = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters ?? {})) if (v) p.set(k, String(v))
+  const s = p.toString()
+  return s ? `?${s}` : ''
+}
+
+/** GETs that keep the api's status on failure (404 = unknown id, or an endpoint this api build doesn't have yet). */
+async function retailerGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`)
+  if (!res.ok) throw new ApiError(res.status, `${path.split('?')[0]} unavailable`)
+  return (await res.json()) as T
+}
+
+export const retailerProducts = (filters?: RetailerFilters) => retailerGet<RetailerProducts>(`/v1/retailer/products${retailerQs(filters)}`)
+export const retailerProduct = (productId: string, filters?: RetailerFilters) =>
+  retailerGet<RetailerProductDetail>(`/v1/retailer/products/${encodeURIComponent(productId)}${retailerQs(filters)}`)
+export const retailerSegments = (filters?: RetailerFilters) => retailerGet<RetailerSegments>(`/v1/retailer/segments${retailerQs(filters)}`)
+export const retailerBrands = (filters?: RetailerFilters) => retailerGet<{ brands: RetailerBrandSummary[]; note?: string }>(`/v1/retailer/brands${retailerQs(filters)}`)
+export const retailerBrand = (brand: string, filters?: RetailerFilters) =>
+  retailerGet<RetailerBrandDetail>(`/v1/retailer/brands/${encodeURIComponent(brand)}${retailerQs(filters)}`)
+export const retailerBrief = (filters?: RetailerFilters & { brand?: string }) => retailerGet<RetailerBrief>(`/v1/retailer/brief${retailerQs(filters)}`)
