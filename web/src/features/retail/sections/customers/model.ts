@@ -67,7 +67,7 @@ export function ownForGoal<P extends Pick<ProductRow, 'brand' | 'goal_ids' | 'ra
 
 /** The cell's fill for the matrix: unmet on a gray-to-amber ramp, people on a gray ramp; null = hatched. */
 export function cellFill(mode: MatrixMode, c: SegCell, maxUsers: number): string | null {
-  if (mode === 'unmet') return c.unmet === null ? null : `color-mix(in oklch, var(--pf-amber) ${Math.round(c.unmet * 60)}%, var(--bg-sunken))`
+  if (mode === 'unmet') return c.unmet === null ? null : `color-mix(in srgb, var(--pf-amber-fill) ${Math.round(c.unmet * 60)}%, var(--bg-sunken))`
   if (mode === 'people') return c.users === null ? null : `color-mix(in srgb, var(--text-primary) ${Math.round((c.users / (maxUsers || 1)) * 30)}%, var(--bg-sunken))`
   return 'var(--bg-sunken)'
 }

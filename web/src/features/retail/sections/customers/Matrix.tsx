@@ -161,7 +161,7 @@ function MatrixCell({ c, mode, maxUsers, where, selected, mine, onOpen }: { c: S
 function Legend({ mode, maxUsers, mine }: { mode: MatrixMode; maxUsers: number; mine: string | null }) {
   const ramp =
     mode === 'unmet'
-      ? { from: '0%', to: '100%', what: 'No visible change by week 8', grad: 'linear-gradient(90deg, var(--bg-sunken), color-mix(in oklch, var(--pf-amber) 60%, var(--bg-sunken)))' }
+      ? { from: '0%', to: '100%', what: 'No visible change by week 8', grad: 'linear-gradient(90deg, var(--bg-sunken), color-mix(in srgb, var(--pf-amber-fill) 60%, var(--bg-sunken)))' }
       : mode === 'people'
         ? { from: '0', to: int(maxUsers), what: 'People', grad: 'linear-gradient(90deg, var(--bg-sunken), color-mix(in srgb, var(--text-primary) 30%, var(--bg-sunken)))' }
         : null
