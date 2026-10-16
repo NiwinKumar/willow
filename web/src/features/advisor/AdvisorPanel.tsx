@@ -211,6 +211,19 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
     if (atEnd) toEnd()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follow new content only
   }, [chat.messages.length, chat.phase, progress, chat.stages.length])
+  // Content that grows after it is drawn (packshots, widgets, a history loaded while closed) keeps the
+  // person at the end when they were there.
+  const atEndRef = useRef(atEnd)
+  atEndRef.current = atEnd
+  useEffect(() => {
+    const el = scroller.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      if (atEndRef.current) el.scrollTop = el.scrollHeight
+    })
+    for (const c of Array.from(el.children)) ro.observe(c)
+    return () => ro.disconnect()
+  }, [chat.messages.length, started])
   // a new question always brings the conversation to the end
   useEffect(() => {
     if (last?.role === 'user') {
@@ -425,7 +438,7 @@ async function toAttachment(file: File): Promise<Attachment> {
   let img = await toJpegBase64(file)
   if (img.data_base64.length > MAX_B64) img = await toJpegBase64(file, 1100, 0.75)
   if (img.data_base64.length > MAX_B64) throw new Error('This photo is too large to send.')
-  return { ...img, name: file.name || 'photo.jpg', meta: `${(file.size / 1e6).toFixed(1)} MB · photo`, thumb: URL.createObjectURL(file) }
+  return { ...img, name: file.name || 'photo.jpg', meta: `${file.size < 1e6 ? `${Math.max(1, Math.round(file.size / 1e3))} KB` : `${(file.size / 1e6).toFixed(1)} MB`} · photo`, thumb: URL.createObjectURL(file) }
 }
 
 function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean; capped: boolean }) {
