@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { packCsv, packHtml, packMarkdown, packName, statementLine } from '../src/features/retail/evidencePack.ts'
-import { brandShares, filterRows, hintOf, money, parseIds, rivalOf, segInterval, toggleId, wilson } from '../src/features/retail/productModel.ts'
+import { brandShares, filterRows, hintOf, leaderOf, money, noDataReason, parseIds, rivalOf, segInterval, toggleId, wilson } from '../src/features/retail/productModel.ts'
 import type { ProductDetail, ProductRow } from '../src/features/retail/types.ts'
 
 function row(p: Partial<ProductRow> & { product_id: string }): ProductRow {
@@ -115,4 +115,20 @@ test('evidence pack carries every statement with n, window, cohort and the cavea
   assert.equal(packCsv(d).rows[0][4], 63)
   assert.equal(statementLine(d.evidence[1]), 'Measured in 63 Willow users: 76% still used it. (n=63, 8 weeks, Simulated cohort)')
   assert.equal(packName(d, 'md'), 'willow-proof-evidence-p<1>.md')
+})
+
+test('rows without a rate say why', () => {
+  assert.equal(noDataReason(row({ product_id: 'a' })), null)
+  assert.equal(noDataReason(row({ product_id: 'a', rate: null, reason: 'unused' })), 'Not used yet')
+  assert.equal(noDataReason(row({ product_id: 'a', rate: null, reason: 'not_measured' })), 'Goal not measured')
+  assert.equal(noDataReason(row({ product_id: 'a', rate: null, reason: 'few' })), 'Fewer than 10 people')
+  assert.equal(noDataReason(row({ product_id: 'a', rate: null })), 'Fewer than 10 people')
+})
+
+test('a compare row has one leader or none', () => {
+  assert.equal(leaderOf([0.5, 0.7, 0.6]), 1)
+  assert.equal(leaderOf([6, 4, 5], 'low'), 1)
+  assert.equal(leaderOf([0.7, 0.7, 0.2]), null)
+  assert.equal(leaderOf([0.7, null]), null)
+  assert.equal(leaderOf([null, 0.4, 0.3]), 1)
 })
