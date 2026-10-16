@@ -2,12 +2,21 @@ import type { ProofTier } from '../types'
 import { TIERS } from './tiers'
 import { useTooltip } from './Tooltip'
 
+const TONE: Record<ProofTier, { chip: string; dot: string }> = {
+  proven: { chip: 'bg-proof-leaf-soft text-proof-leaf', dot: 'bg-proof-leaf' },
+  promising: { chip: 'bg-pf-amber-soft text-pf-amber', dot: 'bg-pf-amber' },
+  unclear: { chip: 'bg-sunken text-ink-2', dot: 'bg-ink-3' },
+  too_few: { chip: 'border border-line text-ink-2', dot: 'border border-ink-3 bg-transparent' },
+}
+
 /**
- * The Proof tier of a product: Proven / Promising / No clear effect yet / Not enough data. Hover or focus shows
- * the definition, plus `hint` when given (e.g. the "what would it take" line for a Promising product).
+ * A product's Proof status, read like a deployment status: Proven (green), Promising (amber), No clear effect
+ * yet (gray), Not enough data (hollow). Dot plus word, never colour alone; hover or focus gives the definition,
+ * plus `hint` (e.g. how many more people would settle a Promising product).
  */
 export function ProofTierChip({ tier, hint, size = 'md' }: { tier: ProofTier; hint?: string; size?: 'sm' | 'md' }) {
   const t = TIERS[tier]
+  const tone = TONE[tier]
   const tip = useTooltip(
     <>
       <strong className="font-medium">{t.label}.</strong> {t.text}
@@ -16,17 +25,16 @@ export function ProofTierChip({ tier, hint, size = 'md' }: { tier: ProofTier; hi
   )
   return (
     <>
-      <span
-        {...tip.trigger}
-        tabIndex={0}
-        className={`inline-flex cursor-help items-center gap-1.5 whitespace-nowrap rounded-pill border ${tier === 'proven' ? 'border-proof-leaf-line bg-proof-leaf-soft' : 'border-line'} ${size === 'sm' ? 'h-5 px-1.5 text-[11px]' : 'h-6 px-2 text-proof-small'} text-ink`}
-      >
-        <span aria-hidden className={`${t.tone} leading-none`}>
-          {t.glyph}
-        </span>
+      <span {...tip.trigger} tabIndex={0} className={`inline-flex cursor-help items-center gap-1.5 whitespace-nowrap rounded-pill font-medium ${tone.chip} ${size === 'sm' ? 'h-[22px] px-2 text-proof-label' : 'h-6 px-2.5 text-proof-label'}`}>
+        <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${tone.dot}`} />
         {t.label}
       </span>
       {tip.node}
     </>
   )
+}
+
+/** Just the status dot (dense lists where the word is in a column header or beside it). */
+export function TierDot({ tier }: { tier: ProofTier }) {
+  return <span aria-hidden className={`inline-block size-2 shrink-0 rounded-full ${TONE[tier].dot}`} />
 }

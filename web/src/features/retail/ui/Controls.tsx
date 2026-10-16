@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 
 /**
@@ -22,7 +22,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
     ref.current?.querySelector<HTMLElement>(`[data-tab="${value}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [value])
   return (
-    <div ref={ref} role="tablist" aria-label={label} onKeyDown={move} className="no-scrollbar flex max-w-full gap-4 overflow-x-auto border-b border-line">
+    <div ref={ref} role="tablist" aria-label={label} onKeyDown={move} className="no-scrollbar flex max-w-full gap-6 overflow-x-auto border-b border-line">
       {tabs.map((t) => {
         const on = t.id === value
         return (
@@ -35,10 +35,10 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
             aria-controls={panelId}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(t.id)}
-            className={`relative -mb-px flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap border-0 border-b-2 bg-transparent px-0.5 text-proof-body transition-colors duration-150 ${on ? 'border-ink text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}
+            className={`relative -mb-px flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap border-0 border-b-2 bg-transparent px-0.5 text-proof-body transition-colors duration-150 ${on ? 'border-ink text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}
           >
             {t.label}
-            {t.count !== undefined && t.count !== null ? <span className="font-mono text-[11px] text-ink-2 tnum">{t.count}</span> : null}
+            {t.count !== undefined && t.count !== null ? <span className="rounded-pill bg-sunken px-1.5 text-proof-label text-ink-2 tnum">{t.count}</span> : null}
           </button>
         )
       })}
@@ -47,8 +47,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
 }
 
 /**
- * Compact segmented radio group (the SegRadio pattern at desktop density): 32 px, arrow keys move, the chosen
- * option filled white on the dark track. Used for the top bar's range and cohort filters.
+ * Segmented radio group (Geist Switch): 36 px, arrow keys move, the chosen option raised on a sunken track.
  */
 export function Segmented<T extends string>({ label, options, value, onChange, className = '' }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -69,7 +68,7 @@ export function Segmented<T extends string>({ label, options, value, onChange, c
     onChange(options[k].value)
   }
   return (
-    <div ref={ref} role="radiogroup" aria-label={label} onKeyDown={move} className={`no-scrollbar flex h-8 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-xs border border-line bg-sunken p-0.5 ${className}`}>
+    <div ref={ref} role="radiogroup" aria-label={label} onKeyDown={move} className={`no-scrollbar flex h-9 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-ctl border border-line bg-sunken p-[3px] ${className}`}>
       {options.map((o) => {
         const on = o.value === value
         return (
@@ -80,7 +79,7 @@ export function Segmented<T extends string>({ label, options, value, onChange, c
             aria-checked={on}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(o.value)}
-            className={`h-full whitespace-nowrap rounded-[6px] border-0 px-2.5 text-proof-small transition-colors duration-150 ${on ? 'bg-selected text-inverse' : 'bg-transparent text-ink-2 hover:bg-glass hover:text-ink'}`}
+            className={`h-full whitespace-nowrap rounded-[4px] border-0 px-3 text-proof-small transition-colors duration-150 ${on ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line-subtle),0_1px_2px_rgba(0,0,0,.06)]' : 'bg-transparent text-ink-2 hover:text-ink'}`}
           >
             {o.label}
           </button>
@@ -90,7 +89,7 @@ export function Segmented<T extends string>({ label, options, value, onChange, c
   )
 }
 
-/** A labelled native select at toolbar density (32 px). Native, so phones get the system picker. */
+/** A labelled native select (36 px). Native, so phones get the system picker. */
 export function Select<T extends string>({ label, value, options, onChange, hideLabel = false }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; hideLabel?: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-proof-small text-ink-2">
@@ -99,7 +98,7 @@ export function Select<T extends string>({ label, value, options, onChange, hide
         <select
           value={value}
           onChange={(e) => onChange(e.target.value as T)}
-          className="h-8 max-w-[220px] appearance-none truncate rounded-xs border border-line-strong bg-sunken py-0 pl-2.5 pr-7 text-proof-small text-ink hover:border-ink/40"
+          className="h-9 max-w-[220px] appearance-none truncate rounded-ctl border border-line bg-surface py-0 pl-3 pr-8 text-proof-small text-ink hover:border-line-strong"
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>
@@ -107,23 +106,25 @@ export function Select<T extends string>({ label, value, options, onChange, hide
             </option>
           ))}
         </select>
-        <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-ink-2" />
+        <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-2" />
       </span>
     </label>
   )
 }
 
-/** Toolbar search box (type to filter a table), 32 px, labelled. */
-export function SearchField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+/** Toolbar search box (type to filter a table), 36 px, labelled, with the search glyph inside. */
+export function SearchField({ label, value, onChange, placeholder, width = 240 }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; width?: number }) {
   return (
-    <label className="inline-flex items-center">
+    <label className="relative inline-flex items-center">
       <span className="sr-only">{label}</span>
+      <Search size={15} strokeWidth={1.7} aria-hidden className="pointer-events-none absolute left-3 text-ink-2" />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-8 w-[200px] rounded-xs border border-line-strong bg-sunken px-2.5 text-proof-small text-ink placeholder:text-ink-2 hover:border-ink/40"
+        style={{ width }}
+        className="h-9 max-w-full rounded-ctl border border-line bg-surface pl-9 pr-3 text-proof-small text-ink placeholder:text-ink-2 hover:border-line-strong"
       />
     </label>
   )

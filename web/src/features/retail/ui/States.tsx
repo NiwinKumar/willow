@@ -1,36 +1,38 @@
+import { CircleAlert, Inbox } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link, type To } from 'react-router-dom'
+import type { To } from 'react-router-dom'
+
+import { Button } from './Layout'
 
 type Action = { label: string; onClick: () => void } | { label: string; to: To }
 
 function ActionButton({ action, primary }: { action: Action; primary?: boolean }) {
-  const cls = `hit44 inline-flex h-8 items-center rounded-xs px-3 text-proof-small no-underline transition-colors ${primary ? 'bg-selected text-inverse hover:bg-ink/85' : 'border border-line-strong text-ink hover:bg-glass'}`
   return 'to' in action ? (
-    <Link to={action.to} className={cls}>
+    <Button to={typeof action.to === 'string' ? action.to : undefined} kind={primary ? 'primary' : 'secondary'}>
       {action.label}
-    </Link>
+    </Button>
   ) : (
-    <button type="button" onClick={action.onClick} className={cls}>
+    <Button onClick={action.onClick} kind={primary ? 'primary' : 'secondary'}>
       {action.label}
-    </button>
+    </Button>
   )
 }
 
 /**
- * Nothing to show: what is missing and the one thing to do next (never a dead end). `glyph` is a quiet Doto
- * figure ("00", "—"). `compact` fits inside a panel.
+ * Nothing to show (Geist Empty State): an icon tile, a title, one line that adds information, and at most one
+ * primary and one secondary action, so it is never a dead end. `compact` fits inside a panel.
  */
-export function EmptyState({ title, body, action, secondary, glyph = '—', compact = false, children }: { title: string; body?: ReactNode; action?: Action; secondary?: Action; glyph?: string; compact?: boolean; children?: ReactNode }) {
+export function EmptyState({ title, body, action, secondary, compact = false, icon, children }: { title: string; body?: ReactNode; action?: Action; secondary?: Action; glyph?: string; compact?: boolean; icon?: ReactNode; children?: ReactNode }) {
   return (
-    <div className={`flex flex-col items-start gap-2.5 ${compact ? 'px-1 py-4' : 'rounded-sm border border-dashed border-line-strong bg-surface/60 px-6 py-8'}`}>
-      <span aria-hidden className={`font-dot leading-none text-ink-2 ${compact ? 'text-[22px]' : 'text-[32px]'}`}>
-        {glyph}
+    <div className={`flex flex-col items-center gap-3 text-center ${compact ? 'px-4 py-8' : 'rounded-card border border-line bg-surface px-6 py-14'}`}>
+      <span aria-hidden className="grid size-10 place-items-center rounded-card border border-line bg-pf-bg2 text-ink-2">
+        {icon ?? <Inbox size={18} strokeWidth={1.6} />}
       </span>
-      <h2 className="m-0 text-proof-h font-medium text-ink">{title}</h2>
-      {body ? <div className="max-w-[64ch] text-proof-body text-ink-2">{body}</div> : null}
+      <h2 className="m-0 text-proof-h text-ink">{title}</h2>
+      {body ? <div className="max-w-[56ch] text-proof-body text-ink-2">{body}</div> : null}
       {children}
       {action || secondary ? (
-        <div className="mt-1 flex flex-wrap gap-2">
+        <div className="mt-1 flex flex-wrap justify-center gap-2">
           {action ? <ActionButton action={action} primary /> : null}
           {secondary ? <ActionButton action={secondary} /> : null}
         </div>
@@ -42,12 +44,12 @@ export function EmptyState({ title, body, action, secondary, glyph = '—', comp
 /** Something failed: what happened, that no partial numbers are shown, and Retry (role=alert). */
 export function ErrorState({ title, body, onRetry, compact = false }: { title: string; body?: ReactNode; onRetry?: () => void; compact?: boolean }) {
   return (
-    <div role="alert" className={`flex flex-col items-start gap-2.5 ${compact ? 'px-1 py-4' : 'rounded-sm border border-line bg-surface px-6 py-8'}`}>
-      <span aria-hidden className="font-dot text-[28px] leading-none text-coral">
-        —
+    <div role="alert" className={`flex flex-col items-center gap-3 text-center ${compact ? 'px-4 py-8' : 'rounded-card border border-line bg-surface px-6 py-14'}`}>
+      <span aria-hidden className="grid size-10 place-items-center rounded-card border border-line bg-pf-red-soft text-pf-red">
+        <CircleAlert size={18} strokeWidth={1.6} />
       </span>
-      <h2 className="m-0 text-proof-h font-medium text-ink">{title}</h2>
-      {body ? <div className="max-w-[64ch] text-proof-body text-ink-2">{body}</div> : null}
+      <h2 className="m-0 text-proof-h text-ink">{title}</h2>
+      {body ? <div className="max-w-[56ch] text-proof-body text-ink-2">{body}</div> : null}
       {onRetry ? <ActionButton action={{ label: 'Retry', onClick: onRetry }} primary /> : null}
     </div>
   )

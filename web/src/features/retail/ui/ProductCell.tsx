@@ -8,20 +8,20 @@ import { ProductImage } from '../../routine/productUi'
  * is none or it fails), the name truncated with the full name as a tooltip, and the brand under it. `tag` sits
  * after the brand (e.g. "Yours"); `to` makes the name a link (lists outside a clickable row).
  */
-export function ProductCell({ p, size = 28, tag, to, sub }: { p: { product: string; brand: string; category: string; image_url?: string | null }; size?: number; tag?: ReactNode; to?: string; sub?: ReactNode }) {
+export function ProductCell({ p, size = 32, tag, to, sub }: { p: { product: string; brand: string; category: string; image_url?: string | null }; size?: number; tag?: ReactNode; to?: string; sub?: ReactNode }) {
   const name = to ? (
-    <Link to={to} className="block min-w-0 truncate text-ink no-underline hover:underline">
+    <Link to={to} className="block min-w-0 truncate font-medium text-ink no-underline hover:underline">
       {p.product}
     </Link>
   ) : (
-    <span className="block min-w-0 truncate text-ink">{p.product}</span>
+    <span className="block min-w-0 truncate font-medium text-ink">{p.product}</span>
   )
   return (
-    <span className="flex min-w-0 items-center gap-2.5" title={`${p.product} · ${p.brand}`}>
+    <span className="flex min-w-0 items-center gap-3" title={`${p.product} · ${p.brand}`}>
       <ProductImage product={{ image_url: p.image_url, category: p.category, name: p.product }} size={size} decorative />
-      <span className="flex min-w-0 flex-col leading-tight">
+      <span className="flex min-w-0 flex-col gap-0.5">
         {name}
-        <span className="flex min-w-0 items-center text-[11.5px] text-ink-2">
+        <span className="flex min-w-0 items-center text-proof-label text-ink-2">
           <span className="truncate">{p.brand}</span>
           {tag}
           {sub ? <span className="ml-1.5 shrink-0">{sub}</span> : null}

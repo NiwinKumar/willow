@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import { useRetailData } from '../context'
 import { csvMeta, csvName, type Category, type Flow, type Insights } from '../data'
@@ -36,9 +36,8 @@ export default function Categories() {
 }
 
 function Body({ d }: { d: Insights }) {
-  const { category: catParam } = useParams()
-  const navigate = useNavigate()
-  const { param, setParam, carry } = useRetailState()
+  const { param, setParam } = useRetailState()
+  const catParam = param('category') ?? undefined
   const { workspace } = useRetailData()
   const eyebrow = useWorkspaceLabel()
   const brandView = workspace.kind === 'brand' ? workspace.brand : null
@@ -54,7 +53,7 @@ function Body({ d }: { d: Insights }) {
       </div>
     )
   }
-  const pick = (c: string) => navigate(`${sectionPath('categories', c)}${carry}`)
+  const pick = (c: string) => setParam({ category: c })
   const last = flow.changed.length - 1
   const lift = flow.base ? flow.rate - flow.base.rate : null
   return (

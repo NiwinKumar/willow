@@ -26,4 +26,4 @@ export type {
 export type Workspace = { kind: 'retailer' } | { kind: 'brand'; slug: string; brand: string | null }
 
 /** The sections of the app, in nav order (the id is the URL segment under /retail). */
-export type SectionId = 'overview' | 'products' | 'categories' | 'segments' | 'competitors' | 'demand' | 'promote'
+export type SectionId = 'overview' | 'products' | 'customers' | 'market' | 'campaigns' | 'explore'
