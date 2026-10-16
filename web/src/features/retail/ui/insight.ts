@@ -39,24 +39,27 @@ export function briefHref(card: Pick<BriefCard, 'id' | 'link'>, carry = ''): str
       path = id ? sectionPath('products', id) : sectionPath('products')
       break
     case 'categories':
-      path = id ? sectionPath('categories', id) : sectionPath('categories')
+      path = sectionPath('market')
+      q.set('view', 'categories')
+      if (id) q.set('category', id)
       break
     case 'segments':
-      path = sectionPath('segments')
+      path = sectionPath('customers')
       if (id) q.set('skin', id)
       break
     case 'competitors':
-      path = sectionPath('competitors')
+      path = sectionPath('market')
       if (id) q.set('goal', id)
       if (card.id === 'switching_net') hash = '#switching'
       break
     case 'demand':
-      path = sectionPath('demand')
+      path = sectionPath('customers')
+      q.set('view', 'demand')
       if (id) q.set('goal', id)
-      hash = { top_conflict: '#conflicts', assortment_gap: '#gaps', unmet_need: '#unmet', rising_goal: '#months-h' }[card.id] ?? ''
+      hash = { top_conflict: '#conflicts', assortment_gap: '#gaps', unmet_need: '#unmet', rising_goal: '#demand' }[card.id] ?? ''
       break
     default:
-      path = sectionPath('promote')
+      path = sectionPath('campaigns')
       if (id) q.set('product', id)
   }
   const s = q.toString()
