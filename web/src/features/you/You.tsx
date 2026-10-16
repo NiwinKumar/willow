@@ -256,13 +256,13 @@ function GoalsCard({ demo }: { demo: boolean }) {
       <span className="text-[13px] text-ink-2">Goals put their measures first in your results{demo ? ', the demo journey included' : ''}.</span>
       {demo ? null : (
         <>
-          <span className="text-[14px] text-ink-2">Usual photo time</span>
+          <span className="text-[14px] text-ink-2">Check-in photo time</span>
           <SegmentedControl
-            label="Usual photo time"
+            label="Check-in photo time"
             className="self-start"
             options={PHOTO_TIMES.map((t) => ({ value: t.id as string, label: t.label }))}
             value={profile.photo_time ?? ''}
-            onChange={(v) => void saveOne({ photo_time: v as PhotoTime }, `Usual photo time: ${v}`)}
+            onChange={(v) => void saveOne({ photo_time: v as PhotoTime }, `Check-in photo time: ${v}`)}
           />
           <span className="text-[13px] text-ink-2">The same time of day keeps the light comparable.</span>
           <span id="skin-type-label" className="text-[14px] text-ink-2">
