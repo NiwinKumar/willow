@@ -1,6 +1,8 @@
 /* Willow design tokens, copied from the Claude Design handoff (design-from-claude-design/handoff/tokens.css,
    generated from willow-ds.js). docs/DESIGN.md is the reference. Change tokens there first, then copy here. */
-:root {
+/* `[data-theme="light"]` re-applies the light (shopper) colours inside a dark surface: Willow Proof's shopper preview. */
+:root,
+[data-theme="light"] {
   /* colour */
   --bg-canvas: #ECEBE7;
   --bg-surface: #FAFAF8;

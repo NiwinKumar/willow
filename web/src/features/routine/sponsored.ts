@@ -8,13 +8,14 @@ import type { SponsoredItem } from '../../lib/api'
 /** The disclosure, first on the card: the word "Sponsored" in text, never only a tooltip or a colour. */
 export const SPONSORED_EYEBROW = 'Sponsored · Willow Proven'
 
-const SKIN: Record<string, string> = { oily: 'Oily', combination: 'Combination', dry: 'Dry', normal: 'Normal', sensitive: 'Sensitive' }
+/** Skin type labels (profile values), shared with Willow Proof's campaign audience. */
+export const SKIN_LABEL: Record<string, string> = { oily: 'Oily', combination: 'Combination', dry: 'Dry', normal: 'Normal', sensitive: 'Sensitive' }
 
 /** "Why am I seeing this?": what matched from the person's own profile, then the disclosure. */
 export function whyLines(item: Pick<SponsoredItem, 'matched' | 'disclosure'>, goalLabel: (id: string) => string): { matched: string[]; disclosure: string } {
   const goals = item.matched.goals.map(goalLabel)
   const matched = goals.length ? [`${goals.length === 1 ? 'Your goal' : 'Your goals'}: ${goals.join(', ')}`] : []
-  if (item.matched.skin_type) matched.push(`Your skin type: ${SKIN[item.matched.skin_type] ?? item.matched.skin_type}`)
+  if (item.matched.skin_type) matched.push(`Your skin type: ${SKIN_LABEL[item.matched.skin_type] ?? item.matched.skin_type}`)
   return { matched, disclosure: item.disclosure }
 }
 
