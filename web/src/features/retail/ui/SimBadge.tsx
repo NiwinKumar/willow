@@ -1,12 +1,9 @@
-import { cohortKind, type CohortCounts } from './cohort'
+import type { CohortCounts } from './cohort'
 
-/** "SIMULATED" badge on every chart while any row is simulated (docs/DESIGN.md "Retail charts"). Yellow, hatched. */
-export function SimBadge({ cohort }: { cohort: CohortCounts }) {
-  const kind = cohortKind(cohort)
-  if (kind === 'real') return null
-  return (
-    <span className="retail-synthetic inline-flex h-5 items-center rounded-pill px-2 font-mono text-[10px] tracking-[.08em]">
-      {kind === 'mixed' ? (cohort.synthetic > cohort.real ? 'MIXED · MOSTLY SIMULATED' : 'MIXED · PART SIMULATED') : 'SIMULATED'}
-    </span>
-  )
+/**
+ * Round 1 put a "SIMULATED" badge on every chart. Round 2 says what is counted once, in the top bar's data
+ * scope control (Retail.tsx), so this renders nothing; it stays exported so older call sites compile.
+ */
+export function SimBadge(_: { cohort: CohortCounts }) {
+  return null
 }

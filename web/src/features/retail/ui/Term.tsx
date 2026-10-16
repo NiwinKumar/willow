@@ -19,7 +19,7 @@ export function Term({ id, children }: { id: TermId; children?: ReactNode }) {
       <button
         type="button"
         {...tip.trigger}
-        className="cursor-help border-0 bg-transparent p-0 text-inherit underline decoration-ink-2/60 decoration-dotted underline-offset-[3px] hover:decoration-ink"
+        className="cursor-help border-0 bg-transparent p-0 text-inherit underline decoration-line-strong decoration-dotted underline-offset-[4px] hover:decoration-ink-2"
       >
         {children ?? g.term}
       </button>

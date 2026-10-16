@@ -45,5 +45,5 @@ export function useWorkspaceLabel(): string {
 
 /** A small "Yours" tag on rows of the brand being viewed as (text, so not colour alone). */
 export function YoursTag() {
-  return <span className="ml-1.5 inline-flex h-[18px] items-center rounded-[4px] border border-proof-leaf-line bg-proof-leaf-soft px-1.5 align-middle text-[10.5px] text-ink">Yours</span>
+  return <span className="ml-2 inline-flex h-5 shrink-0 items-center rounded-pill bg-proof-leaf-soft px-2 align-middle text-proof-label font-medium text-proof-leaf">Yours</span>
 }

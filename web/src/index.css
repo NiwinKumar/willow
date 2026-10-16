@@ -65,29 +65,48 @@
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
 
-  /* Willow Proof (retail sub-brand, docs/RETAIL_BRAND.md): its accent and the dense desktop type scale. */
+  /* Willow Proof (retail sub-brand, docs/RETAIL_BRAND.md): Geist-style calm scale, one accent, status hues.
+     Colours resolve per theme in features/retail/retail.css (html[data-proof]). */
+  --font-geist: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-ctl: 6px;
+  --radius-card: 12px;
   --color-proof-ground: var(--proof-ground);
   --color-proof-leaf: var(--proof-leaf);
   --color-proof-leaf-hi: var(--proof-leaf-hi);
   --color-proof-leaf-soft: var(--proof-leaf-soft);
   --color-proof-leaf-line: var(--proof-leaf-line);
-  --text-proof-title: 26px;
-  --text-proof-title--line-height: 1.1;
-  --text-proof-title--letter-spacing: -0.01em;
+  --color-pf-bg2: var(--pf-bg2);
+  --color-pf-hover: var(--pf-hover);
+  --color-pf-amber: var(--pf-amber);
+  --color-pf-amber-soft: var(--pf-amber-soft);
+  --color-pf-red: var(--pf-red);
+  --color-pf-red-soft: var(--pf-red-soft);
+  --color-pf-blue: var(--pf-blue);
+  --color-pf-base: var(--pf-base);
+  --text-proof-hero: 48px;
+  --text-proof-hero--line-height: 52px;
+  --text-proof-hero--letter-spacing: -0.04em;
+  --text-proof-hero--font-weight: 600;
+  --text-proof-title: 24px;
+  --text-proof-title--line-height: 32px;
+  --text-proof-title--letter-spacing: -0.025em;
+  --text-proof-title--font-weight: 600;
   --text-proof-answer: 15px;
-  --text-proof-answer--line-height: 1.45;
-  --text-proof-h: 14px;
-  --text-proof-h--line-height: 1.3;
-  --text-proof-h--font-weight: 500;
-  --text-proof-body: 13px;
-  --text-proof-body--line-height: 1.45;
-  --text-proof-small: 12px;
-  --text-proof-small--line-height: 1.35;
-  --text-proof-label: 11px;
-  --text-proof-label--line-height: 1.2;
-  --text-proof-label--letter-spacing: 0.08em;
-  --text-proof-kpi: 34px;
-  --text-proof-kpi--line-height: 0.9;
+  --text-proof-answer--line-height: 22px;
+  --text-proof-h: 16px;
+  --text-proof-h--line-height: 24px;
+  --text-proof-h--letter-spacing: -0.01em;
+  --text-proof-h--font-weight: 600;
+  --text-proof-body: 14px;
+  --text-proof-body--line-height: 20px;
+  --text-proof-small: 13px;
+  --text-proof-small--line-height: 18px;
+  --text-proof-label: 12px;
+  --text-proof-label--line-height: 16px;
+  --text-proof-kpi: 28px;
+  --text-proof-kpi--line-height: 32px;
+  --text-proof-kpi--letter-spacing: -0.03em;
+  --text-proof-kpi--font-weight: 600;
 
   --text-display-xl: 72px;
   --text-display-xl--line-height: 0.95;
