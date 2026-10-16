@@ -573,6 +573,10 @@ function DeleteCard() {
       await api.deleteMe(await getIdToken())
       pending.current = true
       setState('done')
+      // The server copy is gone: drop what this tab still shows (counts, routine, chat) at once.
+      clearQueries()
+      resetChat()
+      void data.refresh()
     } catch {
       setState('failed')
     }

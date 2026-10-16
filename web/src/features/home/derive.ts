@@ -155,7 +155,8 @@ export function shortName(e: Pick<RoutineEntry, 'custom_name' | 'brand' | 'key_a
     if (/[\d%+]/.test(w)) break
     words.push(w)
   }
-  const out = (words.length ? words : name.split(/\s+/)).slice(-2).join(' ')
+  // A name that starts with its strength ("1% Hyaluronic Sunscreen … & PA++++"): its first plain words.
+  const out = (words.length ? words.slice(-2) : name.split(/\s+/).filter((w) => /^[\p{L}'-]+$/u.test(w)).slice(0, 2)).join(' ')
   return out || e.category || 'Product'
 }
 
