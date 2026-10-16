@@ -1,16 +1,20 @@
-import { Download } from 'lucide-react'
+import { ArrowRight, Download } from 'lucide-react'
 import { useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 import { csvMeta, csvName, gapTier, monthLabel, TIER_LABEL, TIERS, totalUsers, type Gap, type Insights, type Tier } from '../data'
-import { DataTable, EmptyState, Heatmap, int, MIN_GROUP, Panel, pct, SectionHeader, SimBadge, SkeletonHeader, SkeletonPanel, Term, ToolButton, weeks, type Column } from '../ui'
+import { sectionPath, useRetailState } from '../state'
+import { Bone, DataTable, EmptyState, ErrorState, Heatmap, int, MIN_GROUP, Panel, pct, SectionHeader, SimBadge, SkeletonHeader, SkeletonPanel, Term, ToolButton, weeks, type Column } from '../ui'
 import { downloadCsv } from '../ui/format'
+import { topUnmet } from '../ui/insight'
+import { useSegments } from '../useView'
 import { InsightsGate, useWorkspaceLabel } from './shared'
 
 /*
  * Demand (/retail/demand): what customers are trying to change. Goal demand by month (the existing radial,
  * re-laid as a heat table), outcomes by goal, assortment gaps by price tier, and routine conflicts as
- * education and cross-sell openings. TODO(slice D): unmet needs by skin profile (GET /v1/retailer/segments).
+ * education and cross-sell openings, and unmet need by skin profile (GET /v1/retailer/segments). `?goal=` (from a
+ * brief card) highlights that goal; #months-h, #unmet, #gaps and #conflicts land on their panel.
  */
 export default function Demand() {
   return (
@@ -19,8 +23,8 @@ export default function Demand() {
         <div className="flex flex-col gap-4">
           <SkeletonHeader />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <SkeletonPanel height={300} className="xl:col-span-6" />
-            <SkeletonPanel height={300} className="xl:col-span-6" />
+            <SkeletonPanel height={300} className="xl:col-span-7" />
+            <SkeletonPanel height={300} className="xl:col-span-5" />
           </div>
         </div>
       }
@@ -33,10 +37,18 @@ export default function Demand() {
 function Body({ d }: { d: Insights }) {
   const eyebrow = useWorkspaceLabel()
   const { hash } = useLocation()
-  // #conflicts and #gaps links from the Overview land on their panel.
+  const { param } = useRetailState()
+  const seg = useSegments()
+  const worst = seg.status === 'ready' ? topUnmet(seg.data, 1)[0] : undefined
+  const goalId = param('goal')
+  const goalRow = goalId ? d.needs.find((n) => n.goal_id === goalId) : undefined
+  // #conflicts, #gaps, #unmet links from the Overview land on their panel (#unmet once the profiles are in).
+  const ready = hash !== '#unmet' || seg.status !== 'loading'
   useEffect(() => {
-    if (hash) requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }))
-  }, [hash])
+    if (hash && ready) requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }))
+  }, [hash, ready])
+  // Lowest share with a real change among goals with enough people (needs are shares of everyone with the goal).
+  const lowest = [...d.needs].sort((a, b) => a.real - b.real || b.n - a.n)[0]
   const nbm = d.needs_by_month
   const months = nbm?.months ?? []
   const last = months.length - 1
@@ -56,6 +68,15 @@ function Body({ d }: { d: Insights }) {
         title="Demand"
         answer={
           <>
+            {worst ? (
+              <>
+                Most under-served: <strong>{worst.skinLabel.toLowerCase()} skin with {worst.goalLabel.toLowerCase()}</strong>, {pct(worst.unmet)} of those at week {d.cohort.weeks} with no <Term id="real_change">real change</Term> yet ({int(worst.users)} people chose it).{' '}
+              </>
+            ) : lowest ? (
+              <>
+                <strong>{lowest.goal}</strong> has the fewest real changes so far ({lowest.real}% of {int(lowest.n)} people).{' '}
+              </>
+            ) : null}
             {top ? (
               <>
                 <strong>{top.goal}</strong> is the most-chosen goal ({int(top.n)} people).{' '}
@@ -70,18 +91,19 @@ function Body({ d }: { d: Insights }) {
         }
       />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <MonthsPanel d={d} className="xl:col-span-6" />
-        <OutcomesByGoal d={d} className="xl:col-span-6" />
+        <MonthsPanel d={d} highlight={goalId} className="xl:col-span-7" />
+        <UnmetPanel d={d} seg={seg} className="xl:col-span-5" />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <GapsPanel d={d} className="xl:col-span-7" />
         <ConflictsPanel d={d} className="xl:col-span-5" />
       </div>
+      <OutcomesByGoal d={d} selected={goalRow?.goal ?? null} />
     </div>
   )
 }
 
-function MonthsPanel({ d, className }: { d: Insights; className?: string }) {
+function MonthsPanel({ d, className, highlight }: { d: Insights; className?: string; highlight?: string | null }) {
   const nbm = d.needs_by_month
   const months = nbm?.months ?? []
   const goals = (nbm?.goals ?? []).filter((g) => g.counts.some((c) => c !== null))
@@ -106,7 +128,7 @@ function MonthsPanel({ d, className }: { d: Insights; className?: string }) {
       ) : (
         <Heatmap
           caption="Goal demand by month: people per goal, shaded by share of the month's most-chosen goal"
-          rows={goals.map((g) => ({ id: g.goal_id, label: g.goal, g }))}
+          rows={goals.map((g) => ({ id: g.goal_id, label: highlight === g.goal_id ? <span className="font-medium underline decoration-ink/60 underline-offset-4">{g.goal}</span> : g.goal, g }))}
           cols={months.map((m, i) => ({ id: m, label: monthLabel(m), i }))}
           corner="Goal"
           cell={(r, c) => {
@@ -123,7 +145,7 @@ function MonthsPanel({ d, className }: { d: Insights; className?: string }) {
 
 type Need = Insights['needs'][number]
 
-function OutcomesByGoal({ d, className }: { d: Insights; className?: string }) {
+function OutcomesByGoal({ d, className, selected }: { d: Insights; className?: string; selected?: string | null }) {
   const columns: Column<Need>[] = [
     { id: 'goal', header: 'Goal', rowHeader: true, sortValue: (r) => r.goal, cell: (r) => <span className="block truncate text-ink">{r.goal}</span> },
     { id: 'n', header: 'People', align: 'right', width: '76px', sortValue: (r) => r.n, cell: (r) => <span className="font-mono tnum">{int(r.n)}</span> },
@@ -137,7 +159,7 @@ function OutcomesByGoal({ d, className }: { d: Insights; className?: string }) {
       flush
       footnote={`Of everyone with the goal: a real change by week ${d.cohort.weeks}, or still too early (under ${d.cohort.weeks} weeks of readings). Median weeks among those who changed; hidden under ${MIN_GROUP}.`}
     >
-      <DataTable heading={<><h2 className="m-0 text-proof-h font-medium text-ink">Outcomes by goal</h2><SimBadge cohort={d.cohort} /></>} caption="Outcomes by goal" columns={columns} rows={d.needs} rowKey={(r) => r.goal} defaultSort={{ id: 'n', dir: 'desc' }} csv={{ name: csvName('outcomes-by-goal', d), meta: csvMeta(d) }} minWidth={480} />
+      <DataTable heading={<><h2 className="m-0 text-proof-h font-medium text-ink">Outcomes by goal</h2><SimBadge cohort={d.cohort} /></>} caption="Outcomes by goal" columns={columns} rows={d.needs} rowKey={(r) => r.goal} selectedKey={selected} defaultSort={{ id: 'n', dir: 'desc' }} csv={{ name: csvName('outcomes-by-goal', d), meta: csvMeta(d) }} minWidth={480} />
     </Panel>
   )
 }
@@ -249,6 +271,76 @@ function ConflictsPanel({ d, className }: { d: Insights; className?: string }) {
             </li>
           ))}
         </ul>
+      )}
+    </Panel>
+  )
+}
+
+/* ───────────────────────────── unmet need by skin profile ───────────────────────────── */
+
+function UnmetPanel({ d, seg, className }: { d: Insights; seg: ReturnType<typeof useSegments>; className?: string }) {
+  const { carry } = useRetailState()
+  const all = seg.status === 'ready' ? topUnmet(seg.data, 1000) : []
+  const rows = all.slice(0, 10)
+  const csv = () =>
+    seg.status === 'ready' &&
+    downloadCsv(
+      csvName('unmet-need-by-skin-profile', d),
+      csvMeta(seg.data),
+      ['rank', 'skin_type', 'goal', 'no_real_change_pct', 'people_with_goal', 'best_product', 'best_brand', 'best_real_change_pct', 'best_n'],
+      all.map((c, i) => [i + 1, c.skinLabel, c.goalLabel, Math.round(c.unmet * 100), c.users, c.best?.product ?? '', c.best?.brand ?? '', c.best ? Math.round(c.best.rate * 100) : '', c.best?.n ?? '']),
+    )
+  return (
+    <Panel
+      title="Unmet need by skin profile"
+      id="unmet"
+      meta={<SimBadge cohort={d.cohort} />}
+      className={className}
+      actions={
+        <ToolButton onClick={() => csv()} label="Export unmet need by skin profile as CSV" disabled={seg.status !== 'ready'}>
+          <Download size={14} strokeWidth={1.6} aria-hidden />
+          Export CSV
+        </ToolButton>
+      }
+      footnote={
+        <>
+          Skin type and goal groups, most under-served first: the share of people with the goal and {d.cohort.weeks} weeks of readings who have no <Term id="real_change">real change</Term> in its metrics yet, and everyone who chose it. Groups under {MIN_GROUP} are hidden. Select one for its best products.
+        </>
+      }
+    >
+      {seg.status === 'loading' ? (
+        <div role="status" aria-label="Loading skin profiles" className="flex flex-col gap-3">
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+            <Bone key={i} className="h-7 w-full" />
+          ))}
+        </div>
+      ) : seg.status === 'failed' ? (
+        <ErrorState compact title="Skin profiles couldn’t load" body="No partial numbers are shown." onRetry={seg.retry} />
+      ) : rows.length === 0 ? (
+        <EmptyState compact title="No profile has enough people yet" body={`No skin type and goal has ${MIN_GROUP} or more people at week ${d.cohort.weeks} in this filter.`} />
+      ) : (
+        <ol className="m-0 flex list-none flex-col p-0">
+          {rows.map((c, i) => (
+            <li key={`${c.skin}.${c.goal}`} className="border-b border-line last:border-b-0">
+              <Link
+                to={`${sectionPath('segments')}${carry}${carry ? '&' : '?'}cell=${encodeURIComponent(`${c.skin}.${c.goal}`)}`}
+                className="group grid grid-cols-[18px_minmax(0,1fr)_minmax(40px,18%)_36px_72px_14px] items-center gap-2.5 py-2 no-underline hover:bg-glass"
+                aria-label={`${c.skinLabel} skin, ${c.goalLabel}: ${pct(c.unmet)} with no real change yet, ${int(c.users)} people. Open in skin profiles`}
+              >
+                <span className="font-mono text-[11px] text-ink-2 tnum">{i + 1}</span>
+                <span className="min-w-0 truncate text-proof-body text-ink">
+                  {c.skinLabel} <span className="text-ink-2">·</span> {c.goalLabel}
+                </span>
+                <span aria-hidden className="block h-1.5 rounded-pill bg-muted">
+                  <span className="block h-full rounded-pill bg-ink/70" style={{ width: `${c.unmet * 100}%` }} />
+                </span>
+                <span className="text-right font-mono text-proof-small tnum text-ink">{pct(c.unmet)}</span>
+                <span className="whitespace-nowrap text-right font-mono text-[11px] tnum text-ink-2">{int(c.users)} people</span>
+                <ArrowRight size={13} strokeWidth={1.6} aria-hidden className="text-ink-2 group-hover:text-ink" />
+              </Link>
+            </li>
+          ))}
+        </ol>
       )}
     </Panel>
   )
