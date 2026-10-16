@@ -716,7 +716,8 @@ export type RetailerBriefCard = {
   n: number | null
   link: { section: RetailerBriefSection; id?: string }
 }
-export type RetailerBrief = RetailerHead & { cards: RetailerBriefCard[]; summary: { text: string; validated: true } | null }
+/** `summary_pending`: Gemini is still writing the summary; ask again in a few seconds (the cards never wait). */
+export type RetailerBrief = RetailerHead & { cards: RetailerBriefCard[]; summary: { text: string; validated: true } | null; summary_pending?: boolean }
 
 function retailerQs(filters?: Partial<RetailerFilters> & { brand?: string }): string {
   const p = new URLSearchParams()
