@@ -261,15 +261,19 @@ def _empty(cohort_counts: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
-    users = {
+def people(raw: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
+    """user_hash -> the person, goals as the app's 8 ids, in user_hash order."""
+    return {
         u["user_hash"]: {**u, "goals": cohort.goals_of(u.get("goals"))}
         for u in sorted(raw["users"], key=lambda u: u["user_hash"])
     }
+
+
+def cohort_counts_of(users: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Head counts for the "About this data" panel. Stopped early: no week-8 reading and no
+    reading in the 14 days before the newest reading in the data (people who started recently
+    are "not there yet", not dropouts)."""
     synthetic = sum(1 for u in users.values() if u["synthetic"])
-    active = sum(1 for u in users.values() if u["last_week"] >= WEEKS)
-    # Stopped early: no week-8 reading and no reading in the 14 days before the newest reading in
-    # the data (people who started recently are "not there yet", not dropouts).
     stamps = [t for t in (_ts(u.get("last_ts")) for u in users.values()) if t]
     end = max(stamps) if stamps else None
     dropped = sum(
@@ -279,34 +283,55 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         and end is not None
         and (_ts(u.get("last_ts")) or end) < end - timedelta(days=14)
     )
-    cohort_counts = {
+    return {
         "synthetic": synthetic,
         "real": len(users) - synthetic,
         "weeks": WEEKS,
         "dropout": round(dropped / len(users), 2) if users else 0,
         "seed": cohort.SEED,
     }
-    if len(users) < MIN_GROUP:
-        return _empty(cohort_counts)
 
+
+def outcome_starts(first_rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """user_hash -> metric -> the week the improved run that holds to week 8 started (metrics
+    not still improved at week 8 are absent)."""
     first: dict[str, dict[str, int]] = defaultdict(dict)
-    for r in raw["first"]:
+    for r in first_rows:
         weeks = set(r["improved_weeks"])
         if WEEKS in weeks:  # still improved at week 8; the run started at `start`
             start = WEEKS
             while start - 1 in weeks:
                 start -= 1
             first[r["user_hash"]][r["metric_id"]] = start
+    return first
+
+
+def outcome_of(first: dict[str, dict[str, int]], uh: str, metrics: list[str]) -> int | None:
+    """The outcome: the earliest start of a lasting change in any of `metrics`, or None."""
+    mine = first.get(uh, {})
+    weeks = [mine[m] for m in metrics if m in mine]
+    return min(weeks) if weeks else None
+
+
+def product_targets(p: dict[str, Any]) -> list[str]:
+    """The metrics a product's concerns map to (empty: nothing Willow measures)."""
+    return sorted({m for c in p["concerns"] for m in cohort.CONCERN_METRICS.get(c, [])})
+
+
+def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    users = people(raw)
+    active = sum(1 for u in users.values() if u["last_week"] >= WEEKS)
+    cohort_counts = cohort_counts_of(users)
+    if len(users) < MIN_GROUP:
+        return _empty(cohort_counts)
+
+    first = outcome_starts(raw["first"])
     products = {p["product_id"]: p for p in catalog.products()}
-    targets = {
-        pid: sorted({m for c in p["concerns"] for m in cohort.CONCERN_METRICS.get(c, [])})
-        for pid, p in products.items()
-    }
+    targets = {pid: product_targets(p) for pid, p in products.items()}
     pgoals = {pid: cohort.product_goals(p) for pid, p in products.items()}
 
     def outcome(uh: str, metrics: list[str]) -> int | None:
-        weeks = [first[uh][m] for m in metrics if m in first[uh]]
-        return min(weeks) if weeks else None
+        return outcome_of(first, uh, metrics)
 
     def eligible(uh: str) -> bool:  # reached the week-8 reading
         return users[uh]["last_week"] >= WEEKS
