@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app import analysis, baselines, engine, limits, sessions, storage, views
+from app import analysis, baselines, engine, limits, metric_story, sessions, storage, views
 from app.auth import AuthUser, current_user
 from app.models import (
     CONTENT_TYPES,
@@ -487,6 +487,24 @@ def get_session(
 ) -> dict[str, Any]:
     doc = _load(store, user.uid, session_id)
     return _detail_view(store, user.uid, session_id, doc)
+
+
+@router.get("/{session_id}/story/{metric_id}")
+def get_metric_story(
+    session_id: str,
+    metric_id: str,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """What changed for one metric since the previous check-in, in points, with the routine
+    products aimed at it and up to two AI-suggested possible reasons (app/metric_story.py)."""
+    if not re.fullmatch(r"[a-z_]{2,32}", metric_id):
+        raise HTTPException(404, {"code": "not_found", "message": "metric not found"})
+    doc = _load(store, user.uid, session_id)
+    out = metric_story.story(store, user.uid, session_id, doc, metric_id)
+    if out is None:
+        raise HTTPException(404, {"code": "not_found", "message": "no reading for this metric"})
+    return out
 
 
 @router.patch("/{session_id}")
