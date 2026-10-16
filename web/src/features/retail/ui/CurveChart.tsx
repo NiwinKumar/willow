@@ -7,7 +7,7 @@ export type CurveSeries = {
   /** Direct label at the line's end ("Users", "Non-users"). */
   label: string
   values: (number | null)[]
-  /** signal = ember (a real-change share); muted = grey dashed (the comparison). One accent per chart. */
+  /** signal = ember (a visible-change share); muted = grey dashed (the comparison). One accent per chart. */
   tone: 'signal' | 'muted'
   /** The group size, shown in the label ("Users · n=212"). */
   n?: number | null
@@ -104,11 +104,14 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
             .map((s) => (
               <path key={`a-${s.id}`} d={areaOf(s.values)} fill={`url(#area-${gid})`} />
             ))}
-          {weeks.map((wk, i) => (
-            <text key={wk} x={x(i)} y={height - 8} textAnchor="middle" fontSize={12} fill="var(--text-secondary)" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {i === weeks.length - 1 ? `Week ${wk}` : wk}
-            </text>
-          ))}
+          {weeks.map((wk, i) =>
+            // "Week 8" is wider than a number: on a narrow chart the label before it would collide, so it drops.
+            i === weeks.length - 2 && weeks.length > 2 && x(i + 1) - x(i) < 44 ? null : (
+              <text key={wk} x={x(i)} y={height - 8} textAnchor="middle" fontSize={12} fill="var(--text-secondary)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {i === weeks.length - 1 ? `Week ${wk}` : wk}
+              </text>
+            ),
+          )}
           {series.map((s) => (
             <path
               key={s.id}

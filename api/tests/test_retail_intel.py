@@ -289,6 +289,7 @@ def test_evidence_is_measured_cosmetic_and_quotes_only_computed_numbers():
         assert e["text"].endswith("Simulated cohort.") and e["cohort_label"] == "Simulated cohort"
         assert e["method"] == retail_intel.METHOD and e["window"] == "8 weeks"
         assert "not a controlled trial" in e["caveat"] and e["n"] >= M
+        assert " a under-eye" not in e["text"] and " a oil" not in e["text"], e["text"]
     assert retail_intel.cohort_label({"real": 3, "synthetic": 0}) == "Consented users"
     assert retail_intel.cohort_label({"real": 3, "synthetic": 9}) == "Mixed"
 
