@@ -2,7 +2,8 @@
 import type { MetricId, Session } from '../../data/types'
 
 /**
- * Region name (engine/app/landmarks.py ROI_POINTS, pipeline_macro REGIONS, forearm "forearm_square") -> the
+ * Region name (face: the whole face in the face map's zones, engine config FACE_ZONES, plus the under-eye
+ * patches; older sessions: landmarks.py ROI_POINTS; pipeline_macro REGIONS, forearm "forearm_square") -> the
  * metrics read on that skin (docs/METRICS.md). Face sides are the person's own sides, as the engine names them.
  */
 const FACE: Record<string, MetricId[]> = {
@@ -10,7 +11,10 @@ const FACE: Record<string, MetricId[]> = {
   right_cheek: ['tone_ita', 'pigment_spots', 'tone_evenness', 'redness', 'blemishes', 'lines', 'glow'],
   left_cheek: ['tone_ita', 'pigment_spots', 'tone_evenness', 'redness', 'blemishes', 'lines', 'glow'],
   nose: ['tone_evenness', 'redness', 'blemishes', 'shine'],
-  chin: ['tone_evenness', 'blemishes', 'lines'],
+  chin: ['tone_evenness', 'pigment_spots', 'blemishes', 'lines', 'shine'],
+  around_mouth: ['pigment_spots', 'blemishes', 'lines'],
+  right_jaw: ['pigment_spots', 'blemishes', 'lines'],
+  left_jaw: ['pigment_spots', 'blemishes', 'lines'],
   right_under_eye: ['dark_circles'],
   left_under_eye: ['dark_circles'],
 }
@@ -26,6 +30,9 @@ export const REGION_NAME: Record<string, string> = {
   left_cheek: 'Left cheek',
   nose: 'Nose',
   chin: 'Chin',
+  around_mouth: 'Around the mouth',
+  right_jaw: 'Right jaw',
+  left_jaw: 'Left jaw',
   right_under_eye: 'Right under-eye',
   left_under_eye: 'Left under-eye',
   cheek: 'Cheek',
