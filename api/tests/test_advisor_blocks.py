@@ -67,6 +67,21 @@ def test_unknown_product_or_metric_links_reject_the_answer(client, fake, monkeyp
     assert _ask(client, monkeypatch, bad_metric)["message"] == advisor.NO_ANSWER
 
 
+def test_a_diagnosis_question_falls_back_to_the_cosmetic_scope_reply(client, fake, monkeypatch):
+    # an honest refusal that names the condition is still rejected: the fixed reply says why instead
+    _fake_model(
+        monkeypatch,
+        SEARCH,
+        {"blocks": [{"type": "answer", "text": "I can't say if it is melasma."}]},
+    )
+    res = client.post(
+        "/v1/advisor/chat", json={"messages": [{"role": "user", "text": "Do I have melasma?"}]}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["message"] == advisor.SCOPE_REPLY
+    assert not advisor.explain.BANNED.search(advisor.SCOPE_REPLY)
+
+
 def test_an_answer_block_is_required(client, fake, monkeypatch):
     only_bullets = {"blocks": [{"type": "bullets", "items": ["Sunscreen"]}]}
     assert _ask(client, monkeypatch, only_bullets)["message"] == advisor.NO_ANSWER
