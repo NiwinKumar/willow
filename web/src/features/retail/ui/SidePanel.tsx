@@ -47,7 +47,6 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer, wi
       onClick={(e) => {
         if (e.target === ref.current) onClose()
       }}
-      data-theme="dark"
       className={`m-0 ml-auto h-dvh max-h-none max-w-[100vw] overflow-hidden border-0 border-l border-line bg-surface p-0 text-ink shadow-modal backdrop:bg-black/50 ${leaving ? 'animate-[proofOut_.18s_var(--ease-exit)_both]' : 'animate-[proofIn_.32s_var(--ease-spring)_both]'}`}
       style={{ width: `min(${width}px, 100vw)` }}
     >
@@ -55,12 +54,12 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer, wi
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3.5">
             <div className="flex min-w-0 flex-col gap-0.5">
-              <h2 id={titleId} className="m-0 text-proof-h font-medium text-ink">
+              <h2 id={titleId} className="m-0 text-proof-h text-ink">
                 {title}
               </h2>
               {subtitle ? <p className="m-0 text-proof-small text-ink-2">{subtitle}</p> : null}
             </div>
-            <button type="button" onClick={onClose} aria-label="Close panel" className="hit44 -mr-1.5 grid size-8 shrink-0 place-items-center rounded-xs border-0 bg-transparent text-ink-2 hover:bg-glass hover:text-ink">
+            <button type="button" onClick={onClose} aria-label="Close panel" className="hit44 -mr-1.5 grid size-8 shrink-0 place-items-center rounded-ctl border-0 bg-transparent text-ink-2 hover:bg-pf-hover hover:text-ink">
               <X size={16} strokeWidth={1.6} aria-hidden />
             </button>
           </div>
