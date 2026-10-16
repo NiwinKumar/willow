@@ -119,12 +119,14 @@ export type SpotZoneSummary = {
   /** Only once 3+ marks here have faded; null before that. */
   typical_days_visible: { at_least: number; at_most: number; from: number } | null
 }
-/** GET /v1/sessions/{id}/story/{metric_id}: points built from the numbers, dates and routine ticks; `reasons` are
- * up to two AI-suggested sentences (numbers checked against the facts), empty when Gemini had nothing or failed. */
+/** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
+ * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
+ * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
 export type MetricStory = {
   metric_id: string
   points: string[]
   reasons: string[]
+  source: 'gemini' | 'facts'
   products: { name: string; brand: string; use: { days_used: number; of_days: number } | null }[]
   has_previous: boolean
 }
