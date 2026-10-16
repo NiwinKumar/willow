@@ -486,7 +486,7 @@ export type NewCampaign = {
 }
 /** Delivery counts as counted (once per person per day per kind; never split by goal or skin type). */
 export type CampaignDay = { day: string; impressions: number; clicks: number; adds: number }
-export type IncrementalityGroup = { n: number; added: number | null; rate: number }
+export type IncrementalityGroup = { n: number; added: number; rate: number }
 export type CampaignStats = {
   impressions: number
   clicks: number
@@ -505,6 +505,8 @@ export type Campaign = {
   goals: string[]
   skin_types: SkinType[]
   placement: SponsoredPlacement
+  /** Randomised holdout share of the people the campaign matches. */
+  holdout_pct?: number
   status: 'active' | 'paused' | 'ended'
   days: 7 | 14 | 30
   starts_at: string

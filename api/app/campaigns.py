@@ -188,10 +188,6 @@ def create(
     return cid, doc
 
 
-def _count(n: int) -> int | None:
-    return n if n >= MIN_GROUP else None
-
-
 def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
     """Totals and one row per day from the start to today (or the end). Delivery counts (each
     person counts once a day for each kind) carry no person attribute and are never split by goal
@@ -235,7 +231,8 @@ def _rate(added: int, n: int) -> float:
 
 def incrementality(members: list[Doc]) -> dict[str, Any] | None:
     """Adoption among people the campaign matched who could see its card (exposed) vs the
-    randomised holdout who could not; null until both groups have 10 people. Lift CI: the
+    randomised holdout who could not; null until both groups have 10 people. Within groups of 10 or
+    more, the count and rate are shown as every retail rate is (a rate of n >= 10). Lift CI: the
     difference of two proportions +- 1.96 * sqrt(p1(1-p1)/n1 + p2(1-p2)/n2), to 2 dp."""
     groups = {g: [m for m in members if m.get("group") == g] for g in ("exposed", "holdout")}
     if any(len(ms) < MIN_GROUP for ms in groups.values()):
@@ -245,7 +242,7 @@ def incrementality(members: list[Doc]) -> dict[str, Any] | None:
     for g, ms in groups.items():
         added = sum(1 for m in ms if m.get("added"))
         p[g] = added / len(ms)
-        out[g] = {"n": len(ms), "added": _count(added), "rate": _rate(added, len(ms))}
+        out[g] = {"n": len(ms), "added": added, "rate": _rate(added, len(ms))}
     n1, n2 = len(groups["exposed"]), len(groups["holdout"])
     diff = p["exposed"] - p["holdout"]
     half = 1.96 * math.sqrt(
@@ -267,6 +264,7 @@ def view(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
         "goals": list(doc.get("goals") or []),
         "skin_types": list(doc.get("skin_types") or []),
         "placement": doc.get("placement", "routine"),
+        "holdout_pct": doc.get("holdout_pct", HOLDOUT_PCT),
         "status": status_of(doc),
         "days": doc.get("days"),
         "starts_at": iso(doc.get("starts_at")),
