@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { answerLine, barHeights, ctrText, dateRange, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
+import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, reachRange, ctrText, dateRange, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
 
 const p = (brand: string, eligible: boolean) => ({ brand, eligible })
 
@@ -70,4 +70,47 @@ test('helpers: running count, workspace, order, bars', () => {
   assert.deepEqual([e('too_few', 'a'), e('promising', 'b'), e('unclear', 'c')].sort(notEligibleOrder).map((x) => x.product), ['b', 'c', 'a'])
   assert.deepEqual(barHeights([0, 2, 4]), [0, 0.5, 1])
   assert.deepEqual(barHeights([0, 0]), [0, 0])
+})
+
+test('campaigns: audience, create target, blocked reasons', () => {
+  assert.equal(audienceText(['oil_glow'], []), 'Shine and glow · all eligible skin types')
+  assert.equal(audienceText(['oil_glow', 'lines'], ['oily']), 'Shine and glow, Lines · Oily')
+  assert.deepEqual(createTarget('prod-a', null), { open: true, product: 'prod-a' })
+  assert.deepEqual(createTarget('1', 'prod-b'), { open: true, product: 'prod-b' })
+  assert.deepEqual(createTarget(null, 'prod-c'), { open: true, product: 'prod-c' })
+  assert.deepEqual(createTarget('1', null), { open: true, product: null })
+  assert.deepEqual(createTarget(null, null), { open: false, product: null })
+  const ok = { eligible: true, brand: 'Plum', reasons: [] }
+  assert.deepEqual(blockedReasons(ok, null), [])
+  assert.deepEqual(blockedReasons(ok, 'Plum'), [])
+  assert.match(blockedReasons(ok, 'COSRX')[0], /promotes its own products; this one is Plum’s/)
+  assert.deepEqual(blockedReasons({ eligible: false, brand: 'Plum', reasons: ['About 5 more people at week 8 would make it Proven.'] }, null), ['About 5 more people at week 8 would make it Proven.'])
+  assert.deepEqual(blockedReasons(undefined, null), ['This product isn’t in the catalog.'])
+})
+
+test('reach is a range: the largest goal up to every goal added, capped by the skin types', () => {
+  const cells = [
+    { skin: 'oily', goal: 'a', users: 100 },
+    { skin: 'dry', goal: 'a', users: 50 },
+    { skin: 'oily', goal: 'b', users: 80 },
+    { skin: 'dry', goal: 'b', users: null },
+    { skin: 'normal', goal: 'a', users: 999 },
+  ]
+  assert.deepEqual(reachRange(cells, ['a'], ['oily', 'dry']), { lo: 150, hi: 150 })
+  assert.deepEqual(reachRange(cells, ['a', 'b'], ['oily', 'dry']), { lo: 150, hi: 230 })
+  assert.deepEqual(reachRange(cells, ['a', 'b'], ['oily', 'dry'], [{ id: 'oily', users: 120 }, { id: 'dry', users: 60 }]), { lo: 150, hi: 180 })
+  assert.equal(reachRange(cells, [], ['oily']), null)
+  assert.equal(reachRange(cells, ['b'], ['dry']), null)
+})
+
+test('campaign summary and lift words', () => {
+  const st = (impressions: number, lift: number | null) => ({ impressions, clicks: 0, adds: 0, ctr: null, daily: [], incrementality_note: '', incrementality: lift === null ? null : { exposed: { n: 10, added: 1, rate: 0.1 }, holdout: { n: 10, added: 0, rate: 0 }, lift, lift_lo: 0, lift_hi: 0.2 } })
+  const s = campaignSummary([
+    { status: 'active', stats: st(1200, 0.06) },
+    { status: 'paused', stats: st(40, null) },
+  ])
+  assert.deepEqual(s, { active: 1, impressions: 1240, lifts: [0.06] })
+  assert.deepEqual(liftWords(0.06), { figure: '+6 pts', dir: 'above' })
+  assert.deepEqual(liftWords(-0.03), { figure: '3 pts', dir: 'below' })
+  assert.deepEqual(liftWords(0.001), { figure: '', dir: 'level with' })
 })
