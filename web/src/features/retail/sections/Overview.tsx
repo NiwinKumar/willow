@@ -10,8 +10,8 @@ import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipe
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail, useProducts } from '../productData'
 import { sectionPath, useRetailState } from '../state'
-import type { Brief, BriefCard, Insights, ProductRow, Products } from '../types'
-import { Badge, Bone, Button, cohortKind, CurveChart, EmptyState, int, KpiStrip, MIN_GROUP, PageHeader, Panel, pct, pts, SkeletonKpis, SkeletonPanel, TierDot, ToolButton, type Kpi } from '../ui'
+import type { Brief, BriefCard, BrandSummary, Insights, ProductRow, Products } from '../types'
+import { Badge, Bone, Button, cohortKind, CurveChart, EmptyState, ErrorState, int, KpiStrip, MIN_GROUP, PageHeader, Panel, pct, pts, SkeletonKpis, SkeletonPanel, TierDot, ToolButton, type Kpi } from '../ui'
 import { briefHref, cardFigure } from '../ui/insight'
 import { InsightsGate } from './shared'
 
@@ -65,15 +65,24 @@ function spotlightOf(rows: ProductRow[]): ProductRow | null {
 }
 
 function Body({ d }: { d: Insights }) {
-  const { workspace, filters } = useRetailData()
+  const { workspace, filters, brands } = useRetailData()
   const { carry } = useRetailState()
   const brand = workspace.kind === 'brand' ? workspace.brand : null
-  const { state } = useProducts(filters)
+  const summary = brand ? (brands.find((b) => b.brand === brand)?.summary ?? null) : null
+  const { state, retry } = useProducts(filters)
   const all = state.status === 'ready' ? state.d : null
   const rows = useMemo(() => (all ? (brand ? all.products.filter((r) => r.brand === brand) : all.products) : []), [all, brand])
   const proven = rows.filter((r) => r.tier === 'proven').length
   const measured = rows.filter((r) => r.rate !== null).length
   const spot = spotlightOf(rows)
+
+  if (state.status === 'failed' || state.status === 'missing')
+    return (
+      <div className="flex flex-col gap-8">
+        <PageHeader title={brand ?? 'Overview'} />
+        <ErrorState title="Products couldn’t load" body="The products service didn’t answer. No partial numbers are shown." onRetry={retry} />
+      </div>
+    )
 
   const description = !all ? (
     <span className="inline-block h-4 w-80 animate-pulse rounded bg-sunken align-middle" />
@@ -83,7 +92,7 @@ function Body({ d }: { d: Insights }) {
         <strong>
           {proven} of {rows.length}
         </strong>{' '}
-        of your products are Proven; {measured} have a measured outcome.
+        of your {rows.length === 1 ? 'product is' : 'products are'} Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
       </>
     ) : (
       <>No {brand} product is in the catalog for this filter.</>
@@ -93,7 +102,7 @@ function Body({ d }: { d: Insights }) {
       <strong>
         {proven} of {rows.length}
       </strong>{' '}
-      products are Proven across {new Set(rows.map((r) => r.brand)).size} brands; {measured} have a measured outcome.
+      products are Proven across {new Set(rows.map((r) => r.brand)).size} brands; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 
@@ -112,7 +121,7 @@ function Body({ d }: { d: Insights }) {
         }
       />
       {state.status === 'loading' ? <SkeletonPanel height={300} /> : spot ? <Spotlight row={spot} weeksN={d.cohort.weeks} mine={Boolean(brand)} /> : <NoSpotlight brand={brand} />}
-      <Kpis d={d} all={all} rows={rows} brand={brand} />
+      <Kpis d={d} all={all} rows={rows} brand={brand} summary={summary} />
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <BriefPanel brand={brand} className="lg:col-span-7" />
         <TopProducts rows={rows} brand={brand} className="lg:col-span-5" />
@@ -189,7 +198,7 @@ function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; min
             <Button to={productTo} kind="secondary">
               View proof <ArrowRight size={15} strokeWidth={1.7} aria-hidden />
             </Button>
-            {eligible && !campaign ? (
+            {eligible && (!campaign || campaign.status === 'ended') ? (
               <Button to={promoteTo} kind="primary">
                 <Megaphone size={15} strokeWidth={1.7} aria-hidden /> Promote
               </Button>
@@ -215,15 +224,17 @@ function NoSpotlight({ brand }: { brand: string | null }) {
 
 /* ───────────────────────────── key figures ───────────────────────────── */
 
-function Kpis({ d, all, rows, brand }: { d: Insights; all: Products | null; rows: ProductRow[]; brand: string | null }) {
+function Kpis({ d, all, rows, brand, summary }: { d: Insights; all: Products | null; rows: ProductRow[]; brand: string | null; summary: BrandSummary | null }) {
   if (!all) return <SkeletonKpis n={4} />
   const kind = cohortKind(d.cohort)
   const proven = rows.filter((r) => r.tier === 'proven').length
-  const own = weighted(rows, 'rate')
+  // A brand's own figures come from the api's brand summary (each person once, as Market shows them); the
+  // product rows are the fallback when this api build has no /brands.
+  const own = summary ? (summary.rate !== null && summary.n !== null ? { value: summary.rate, n: summary.n } : null) : weighted(rows, 'rate')
   const market = weighted(all.products, 'rate')
-  const cont = brand ? weighted(rows, 'cont8') : null
+  const cont = brand ? (summary ? (summary.cont8 !== null ? { value: summary.cont8, n: null } : null) : weighted(rows, 'cont8')) : null
   const unmet = d.tiles.find((t) => t.label.startsWith('Unmet'))
-  const users = brand ? rows.reduce((s, r) => s + (r.users ?? 0), 0) : null
+  const users = brand ? (summary ? summary.users : rows.reduce((s, r) => s + (r.users ?? 0), 0)) : null
   const items: Kpi[] = brand
     ? [
         { id: 'proven', label: 'Proven products', value: String(proven), unit: `of ${rows.length}`, note: `${rows.filter((r) => r.tier === 'promising').length} Promising` },
@@ -234,13 +245,13 @@ function Kpis({ d, all, rows, brand }: { d: Insights; all: Products | null; rows
           unit: own ? '%' : undefined,
           note: own && market ? `${pts(own.value - market.value)} vs the market’s ${pct(market.value)}` : `Fewer than ${MIN_GROUP} people`,
         },
-        { id: 'cont', label: 'Still using at week 8', value: cont ? pct(cont.value).replace('%', '') : '—', unit: cont ? '%' : undefined, note: cont ? `of ${int(cont.n)} people` : `Fewer than ${MIN_GROUP} people` },
-        { id: 'users', label: 'People using your products', value: int(users), note: kind === 'simulated' ? 'Simulated cohort' : kind === 'mixed' ? 'Mostly simulated' : 'Consented users' },
+        { id: 'cont', label: 'Still using at week 8', value: cont ? pct(cont.value).replace('%', '') : '—', unit: cont ? '%' : undefined, note: cont ? (cont.n !== null ? `of ${int(cont.n)} people` : 'of your users at week 8') : `Fewer than ${MIN_GROUP} people` },
+        { id: 'users', label: 'People using your products', value: users === null ? '—' : int(users), note: users === null ? `Fewer than ${MIN_GROUP} people` : kind === 'simulated' ? 'Simulated cohort' : kind === 'mixed' ? 'Mostly simulated' : 'Consented users' },
       ]
     : [
         { id: 'proven', label: 'Proven products', value: String(proven), unit: `of ${rows.length}`, note: `${rows.filter((r) => r.tier === 'promising').length} Promising, ${rows.filter((r) => r.rate === null).length} without numbers` },
         { id: 'rate', label: 'Visible change by week 8', value: market ? pct(market.value).replace('%', '') : '—', unit: market ? '%' : undefined, note: 'People-weighted, across measured products' },
-        { id: 'unmet', label: 'No visible change yet', value: unmet && unmet.value !== '–' ? unmet.value.replace('%', '') : '—', unit: unmet && unmet.value !== '–' ? '%' : undefined, note: unmet && unmet.value !== '–' ? `of ${int(unmet.n)} people at week ${d.cohort.weeks}` : `Fewer than ${MIN_GROUP} people` },
+        { id: 'unmet', label: 'No visible change yet', value: unmet && unmet.value !== '–' ? unmet.value.replace('%', '') : '—', unit: unmet && unmet.value !== '–' ? '%' : undefined, note: unmet && unmet.value !== '–' ? `of ${int(unmet.n)} people at week ${d.cohort.weeks} have a goal without one` : `Fewer than ${MIN_GROUP} people` },
         { id: 'users', label: kind === 'real' ? 'Consented people' : 'People measured', value: int(d.cohort.synthetic + d.cohort.real), note: kind === 'simulated' ? 'Simulated cohort' : kind === 'mixed' ? `${int(d.cohort.real)} real, the rest simulated` : 'Opted in to sharing' },
       ]
   return <KpiStrip items={items} />

@@ -655,10 +655,10 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             if len(completed) >= MIN_GROUP
             else "–",
             "n": len(completed),
-            "sub": "no real change in a goal metric",
+            "sub": "no visible change in a goal metric",
         },
         {
-            "label": "Median weeks to first real change",
+            "label": "Median weeks to first visible change",
             "value": f"{statistics.median(first_weeks):g}"
             if len(first_weeks) >= MIN_GROUP
             else "–",

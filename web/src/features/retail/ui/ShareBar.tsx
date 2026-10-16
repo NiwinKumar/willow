@@ -1,6 +1,6 @@
 /**
  * A share on a 0–`max` track in neutral ink (never ember: shares of people, routines or conflicts are not a
- * real change). Decorative: the number beside it carries the value and its n for readers.
+ * visible change). Decorative: the number beside it carries the value and its n for readers.
  */
 export function ShareBar({ value, max = 1, className = '' }: { value: number; max?: number; className?: string }) {
   const w = `${Math.max(0, Math.min(100, (value / (max || 1)) * 100))}%`

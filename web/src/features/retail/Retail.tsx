@@ -123,6 +123,8 @@ function Shell() {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
+        // Already open: don't stack another history entry (Back would seem to do nothing).
+        if (new URLSearchParams(window.location.search).get('ask') === '1') return
         setParam({ ask: '1' }, { push: true })
       }
     }

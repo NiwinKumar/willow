@@ -151,7 +151,7 @@ function Body({ d }: { d: Insights }) {
     {
       id: 'rate',
       label: 'Visible change',
-      tip: `Share of people using it who saw a real, visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`,
+      tip: `Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`,
       value: (p) => p.rate,
       better: 'high',
       cell: (p, lead) => (p.rate === null ? <span className="text-proof-small text-ink-2">{noDataReason(p)}</span> : <RateInterval rate={p.rate} lo={p.rate_lo} hi={p.rate_hi} base={p.base_rate} n={p.n} weeks={wk} strong={lead} wide />),
@@ -337,7 +337,7 @@ function Body({ d }: { d: Insights }) {
                       </th>
                       {segs.map((g, i) => (
                         <td key={ids[i]} className={`h-12 border-b border-l border-line px-5 align-middle [tr:last-child>&]:border-b-0 ${lead === i ? 'font-semibold' : ''}`}>
-                          <SegRate seg={g} />
+                          <SegRate seg={g} unmeasured={unmeasured(states[i])} />
                           {lead === i ? <span className="sr-only"> (leads this row)</span> : null}
                         </td>
                       ))}
@@ -407,10 +407,14 @@ function Swatch({ i }: { i: number }) {
 }
 
 /** A skin-type cell: the rate, with n and the 95% interval on hover or focus; suppressed groups say so. */
-function SegRate({ seg }: { seg: Seg | undefined }) {
+/** Not measured at all (its goal has no Willow measure, or nobody uses it): a dash, never "fewer than 10". */
+const unmeasured = (s: { status: string; d?: Detail } | undefined) => s?.status === 'ready' && s.d !== undefined && s.d.product.rate === null && (s.d.product.reason === 'not_measured' || s.d.product.reason === 'unused')
+
+function SegRate({ seg, unmeasured = false }: { seg: Seg | undefined; unmeasured?: boolean }) {
   const ci = seg ? segInterval(seg) : null
   const ok = seg && !seg.suppressed && seg.rate !== null
   const tip = useTooltip(ok ? `${pct(seg.rate)} of ${int(seg.n)} people${ci ? ` · 95% interval ${interval(ci.lo, ci.hi)}` : ''}${seg.base_rate !== null ? ` · non-users ${pct(seg.base_rate)} (${pts(seg.rate! - seg.base_rate)})` : ''}` : '')
+  if (unmeasured) return <span className="text-ink-3">—</span>
   if (!ok) return <Suppressed short />
   return (
     <>

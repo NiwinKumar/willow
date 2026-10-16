@@ -81,7 +81,7 @@ export function CampaignDetail({ c, otherWorkspace, actions }: { c: Campaign; ot
             </div>
           ))}
         </dl>
-        {days.length && s.impressions > 0 ? <Sparkbars days={days} label={`Impressions per day for ${c.product ?? 'this campaign'}`} height={48} /> : <p className="m-0 text-proof-small text-ink-2">No delivery yet. The first impression lands when a matching shopper opens Routine.</p>}
+        {days.length && s.impressions > 0 ? <Sparkbars days={days} label={`Impressions per day for ${c.product ?? 'this campaign'}`} height={48} /> : <p className="m-0 text-proof-small text-ink-2">{c.status === 'ended' ? 'No delivery: it ended before a matching shopper saw the card.' : c.status === 'paused' ? 'No delivery yet. Paused, so no card is shown until it resumes.' : 'No delivery yet. The first impression lands when a matching shopper opens Routine.'}</p>}
         <p className="m-0 text-proof-small text-ink-2">Reach counts each person once; impressions, clicks and adds once per person a day. Never split by goal or skin type.</p>
         <a href="/routine" target="_blank" rel="noopener" className="hit44 inline-flex h-8 items-center gap-1.5 self-start rounded-ctl border border-line bg-surface px-2.5 text-proof-small font-medium text-ink no-underline transition-colors hover:border-line-strong hover:bg-pf-hover">
           See the card in the Willow app
@@ -147,13 +147,13 @@ export function CampaignDetailFooter({ c, actions, confirm, setConfirm }: { c: C
       {c.status !== 'ended' ? (
         <Button kind="secondary" onClick={() => setConfirm('end')} disabled={actions.busy !== null}>
           <Square size={13} strokeWidth={1.8} aria-hidden />
-          End
+          End campaign…
         </Button>
       ) : null}
       <span className="ml-auto">
         <Button kind="ghost" onClick={() => setConfirm('delete')} disabled={actions.busy !== null}>
           <Trash2 size={14} strokeWidth={1.8} aria-hidden />
-          Delete
+          Delete…
         </Button>
       </span>
     </div>
@@ -230,8 +230,8 @@ function Incrementality({ c, holdout }: { c: Campaign; holdout: number }) {
         </>
       ) : (
         <div className="flex flex-col gap-1 rounded-card border border-dashed border-line-strong px-4 py-3.5">
-          <span className="text-proof-body text-ink">Collecting</span>
-          <span className="text-proof-small text-ink-2">The comparison appears once each group has {HOLDOUT_MIN} people. No rate is shown before then.</span>
+          <span className="text-proof-body text-ink">{c.status === 'ended' ? 'Not measured' : 'Collecting'}</span>
+          <span className="text-proof-small text-ink-2">{c.status === 'ended' ? `It ended before each group had ${HOLDOUT_MIN} people, so no rate is shown.` : `The comparison appears once each group has ${HOLDOUT_MIN} people. No rate is shown before then.`}</span>
         </div>
       )}
       <p className="m-0 text-proof-small text-ink-2">{c.stats.incrementality_note}</p>

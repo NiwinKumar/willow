@@ -54,7 +54,7 @@ export function segInterval(s: Pick<Seg, 'rate' | 'n' | 'suppressed'>): { lo: nu
 const measured = (r: ProductRow) => r.rate !== null && r.n !== null
 
 /**
- * The product to compare a row with by default: the highest real-change rate among other measured products in
+ * The product to compare a row with by default: the highest visible-change rate among other measured products in
  * the same category that share a goal (the api's competitor set), ties by n. Null when there is none.
  */
 export function rivalOf(row: ProductRow, rows: ProductRow[]): ProductRow | null {
@@ -72,7 +72,7 @@ export type BrandShare = {
   users: number
   /** users / all measured products' users in the category. */
   routine: number
-  /** People with a real change held to week 8 (summed k = rate × n over products). */
+  /** People with a visible change held to week 8 (summed k = rate × n over products). */
   changed: number
   /** changed / all changes in the category. */
   outcome: number
@@ -83,7 +83,7 @@ export type BrandShare = {
 /**
  * Brand share of routines vs share of outcomes in one category, from the scoreboard rows. Both shares use the
  * same set (measured products only), so a brand with an unmeasured product isn't penalised: footprint is the
- * brand's share of product users, outcomes its share of the people with a real change by week 8.
+ * brand's share of product users, outcomes its share of the people with a visible change by week 8.
  */
 export function brandShares(rows: ProductRow[], category: string): { brands: BrandShare[]; users: number; changed: number } {
   const inCat = rows.filter((r) => r.category === category && measured(r) && r.users !== null)

@@ -508,11 +508,13 @@ def _evidence(f: Facts, pid: str) -> list[dict[str, Any]]:
         (c for c in segs["goal"] if not c["suppressed"]), key=lambda c: (-c["n"], c["id"])
     )[:2]:
         vs = f" (non-users {_pct(g['base_rate'])}%)" if g["base_rate"] is not None else ""
+        goal = g["label"].lower()
+        article = "an" if goal[:1] in "aeiou" else "a"
         out.append(
             item(
                 f"efficacy_{g['id']}",
                 "efficacy",
-                f"Measured in {g['n']} Willow users with a {g['label'].lower()} goal: "
+                f"Measured in {g['n']} Willow users with {article} {goal} goal: "
                 f"{_pct(g['rate'])}% had a visible change held to week 8{vs}. {label}.",
                 g["n"],
             )

@@ -1,7 +1,7 @@
 import { int, interval, pct, SUPPRESSED } from './format'
 
 /**
- * A real-change rate on a 0–`max` track: ember dot at the rate (ember = Real change), its 95% interval as a
+ * A visible-change rate on a 0–`max` track: ember dot at the rate (ember = visible change), its 95% interval as a
  * whisker, a tick at the base rate (non-users), and the n. Null rate: a hatched track and "Fewer than 10
  * people". `baseLabel` names the tick ("market" on Competitors). The visible n keeps the denominator next to every rate; the accessible name says it all in words.
  */
