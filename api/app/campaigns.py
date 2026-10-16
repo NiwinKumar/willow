@@ -94,7 +94,8 @@ def _aware(v: Any) -> datetime | None:
 
 
 def status_of(doc: Doc, at: datetime | None = None) -> str:
-    """Stored active|paused; `ended` once ends_at has passed, whatever was stored."""
+    """Stored active|paused; `ended` once ends_at has passed (or the owner ended it early, which
+    moves ends_at to that moment), whatever was stored."""
     end = _aware(doc.get("ends_at"))
     if end is not None and (at or now()) >= end:
         return "ended"
@@ -191,8 +192,9 @@ def create(
 def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
     """Totals and one row per day from the start to today (or the end). Delivery counts (each
     person counts once a day for each kind) carry no person attribute and are never split by goal
-    or skin type, so they are shown as counted, as standard ad reporting. Only the holdout
-    comparison waits for 10 people per group."""
+    or skin type, so they are shown as counted, as standard ad reporting. `reach` is unique people:
+    members whose first impression of this campaign was recorded (one per person, ever). Only the
+    holdout comparison waits for 10 people per group."""
     rows = {day: d for day, d in store.campaign_days(cid)}
     start = (_aware(doc.get("starts_at")) or now()).date()
     end = (_aware(doc.get("ends_at")) or now()).date()
@@ -214,13 +216,15 @@ def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
             for k in totals:
                 totals[k] += int(d.get(k) or 0)
     imp = totals["impressions"]
+    members = store.campaign_members(cid)
     return {
+        "reach": sum(1 for m in members if m.get("seen")),
         "impressions": imp,
         "clicks": totals["clicks"],
         "adds": totals["adds"],
         "ctr": round(totals["clicks"] / imp, 3) if imp else None,
         "daily": daily,
-        "incrementality": incrementality(store.campaign_members(cid)),
+        "incrementality": incrementality(members),
         "incrementality_note": INCREMENTALITY_NOTE,
     }
 
@@ -276,6 +280,15 @@ def view(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
         "image_url": product.get("image_url"),
         "stats": stats(store, cid, doc),
     }
+
+
+def end(store: Store, cid: str, doc: Doc) -> Doc:
+    """End a campaign early: it stops at once and for good (it cannot be resumed). ends_at moves
+    to now, so its stats and holdout comparison cover exactly the days it ran."""
+    at = now()
+    fields = {"status": "ended", "ends_at": at, "ended_early": True, "updated_at": at}
+    store.campaign_update(cid, fields)
+    return doc | fields
 
 
 def delete_owned(store: Store, uid: str) -> None:
@@ -420,4 +433,13 @@ def record(store: Store, uid: str, cid: str, kind: str) -> bool:
         if doc["product_id"] not in owned:
             return False
     day = today().isoformat()
-    return store.campaign_event(cid, day, seen_id(uid, day), kind)
+    counted = store.campaign_event(cid, day, seen_id(uid, day), kind)
+    if counted and kind == "impression":
+        # reach: the person's first impression of this campaign marks their membership once
+        # (joined here if the card reached them without GET /v1/sponsored, so reach <= people)
+        join(store, cid, doc, uid, day)
+        mid = member_id(uid)
+        member = store.campaign_member_get(cid, mid) or {}
+        if not member.get("seen"):
+            store.campaign_member_update(cid, mid, {"seen": True, "seen_day": day})
+    return counted

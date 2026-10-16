@@ -441,7 +441,7 @@ export const api = {
   eligibility: (token: string) => request<{ products: PromoEligibility[] }>(token, '/v1/retailer/eligibility'),
   createCampaign: (token: string, body: NewCampaign) => request<Campaign>(token, '/v1/retailer/campaigns', { method: 'POST', ...json(body) }),
   listCampaigns: (token: string) => request<{ campaigns: Campaign[] }>(token, '/v1/retailer/campaigns'),
-  updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
+  updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' | 'ended' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
   deleteCampaign: (token: string, id: string) => request<void>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
@@ -491,6 +491,8 @@ export type NewCampaign = {
 export type CampaignDay = { day: string; impressions: number; clicks: number; adds: number }
 export type IncrementalityGroup = { n: number; added: number; rate: number }
 export type CampaignStats = {
+  /** Unique people shown the card at least once (each person once, ever). Missing from older api builds. */
+  reach?: number
   impressions: number
   clicks: number
   adds: number

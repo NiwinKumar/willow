@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, reachRange, ctrText, dateRange, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
+import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, reachRange, ctrText, dateRange, durationText, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
 
 const p = (brand: string, eligible: boolean) => ({ brand, eligible })
 
@@ -26,6 +26,9 @@ test('lists and skin types read as words', () => {
 
 test('dates and time left use UTC days', () => {
   assert.equal(dateRange('2026-10-16T10:00:00+00:00', '2026-10-30T10:00:00+00:00'), '16 Oct – 30 Oct')
+  assert.equal(durationText({ days: 14, status: 'active', starts_at: '2026-10-16T10:00:00+00:00', ends_at: '2026-10-30T10:00:00+00:00' }), '14 days')
+  assert.equal(durationText({ days: 14, status: 'ended', starts_at: '2026-10-16T10:00:00+00:00', ends_at: '2026-10-16T16:00:00+00:00' }), 'ended early after 1 day of 14')
+  assert.equal(durationText({ days: 7, status: 'ended', starts_at: '2026-10-01T10:00:00+00:00', ends_at: '2026-10-08T10:00:00+00:00' }), '7 days')
   const now = new Date('2026-10-16T12:00:00Z')
   assert.equal(timeLeft({ status: 'active', ends_at: '2026-10-30T10:00:00+00:00' }, now), '14 days left')
   assert.equal(timeLeft({ status: 'active', ends_at: '2026-10-17T10:00:00+00:00' }, now), 'Last day')
@@ -104,12 +107,18 @@ test('reach is a range: the largest goal up to every goal added, capped by the s
 })
 
 test('campaign summary and lift words', () => {
-  const st = (impressions: number, lift: number | null) => ({ impressions, clicks: 0, adds: 0, ctr: null, daily: [], incrementality_note: '', incrementality: lift === null ? null : { exposed: { n: 10, added: 1, rate: 0.1 }, holdout: { n: 10, added: 0, rate: 0 }, lift, lift_lo: 0, lift_hi: 0.2 } })
+  const st = (impressions: number, lift: number | null, reach?: number) => ({ reach, impressions, clicks: 0, adds: 0, ctr: null, daily: [], incrementality_note: '', incrementality: lift === null ? null : { exposed: { n: 10, added: 1, rate: 0.1 }, holdout: { n: 10, added: 0, rate: 0 }, lift, lift_lo: 0, lift_hi: 0.2 } })
   const s = campaignSummary([
     { status: 'active', stats: st(1200, 0.06) },
     { status: 'paused', stats: st(40, null) },
   ])
-  assert.deepEqual(s, { active: 1, impressions: 1240, lifts: [0.06] })
+  // an older api sent no reach: the page falls back to impressions
+  assert.deepEqual(s, { active: 1, reach: null, impressions: 1240, lifts: [0.06] })
+  const r = campaignSummary([
+    { status: 'active', stats: st(1200, 0.06, 300) },
+    { status: 'ended', stats: st(40, null, 25) },
+  ])
+  assert.deepEqual(r, { active: 1, reach: 325, impressions: 1240, lifts: [0.06] })
   assert.deepEqual(liftWords(0.06), { figure: '+6 pts', dir: 'above' })
   assert.deepEqual(liftWords(-0.03), { figure: '3 pts', dir: 'below' })
   assert.deepEqual(liftWords(0.001), { figure: '', dir: 'level with' })
