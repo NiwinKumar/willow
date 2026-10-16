@@ -9,6 +9,7 @@ import { Disclaimer } from '../../components/willow/Disclaimer'
 import { WillowLoader } from '../../components/willow/WillowLoader'
 import { useRoutine } from '../../data/hooks'
 import type { CaptureMode, MetricId, Session, Site } from '../../data/types'
+import { SITE_ORDER } from '../../data/live'
 import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { fmtDate, parseDate } from '../../lib/format'
@@ -21,6 +22,8 @@ import { routineNotes, sessionNotes, type Note } from './timeline'
 
 const PLACES: Site[] = ['face_full', 'cheek_macro', 'nose_macro']
 const isPlace = (v: string | null): v is Site => v !== null && (PLACES as string[]).includes(v)
+// A day can be of any site: the forearm results link their day here too (the calendar is for PLACES).
+const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)
 const isMode = (v: string | null): v is CaptureMode => v === 'calibrated_raw' || v === 'uncalibrated'
 
 /**
@@ -35,7 +38,7 @@ export default function Progress() {
   const shell = useShell()
   const routine = useRoutine()
   const qSite = params.get('site')
-  const site: Site = isPlace(qSite) ? qSite : 'face_full'
+  const site: Site = isPlace(qSite) || (day && isSite(qSite)) ? qSite : 'face_full'
   const sessions = useMemo(() => data.series(site)?.sessions ?? [], [data, site])
   const lastDone = [...sessions].reverse().find((s) => s.status === 'done') ?? null
   const qMode = params.get('mode')
@@ -55,7 +58,8 @@ export default function Progress() {
   // Metrics this place has in this mode, in goal order.
   const metricIds = useMemo(() => {
     const ids = new Set<MetricId>()
-    for (const s of chartable(sessions, mode)) for (const m of s.result?.metrics ?? []) ids.add(m.id)
+    // Only metrics with a reading somewhere: a rejected check-in lists every metric, all empty.
+    for (const s of chartable(sessions, mode)) for (const m of s.result?.metrics ?? []) if (m.value !== null) ids.add(m.id)
     return [...ids].sort(byGoalOrder(data.goals))
   }, [sessions, mode, data.goals])
   const qMetric = params.get('metric')
@@ -189,7 +193,7 @@ export default function Progress() {
                 ))}
               </div>
             </div>
-            {series && series.points.length && metric ? (
+            {series && series.points.some((p) => p.value !== null) && metric ? (
               <TimelineChart
                 points={series.points}
                 baseIndex={series.baseIndex}

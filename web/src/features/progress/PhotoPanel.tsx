@@ -106,7 +106,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   }
 
   return (
-    <div className={`grid items-start gap-4 pt-6 ${spotsHere ? 'grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))]' : ''}`}>
+    // Two columns for every site: a forearm photo on its own across a desktop page is taller than the screen.
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 pt-6">
       <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
         <div className={`relative ${canCompare ? 'touch-pan-y select-none [-webkit-touch-callout:none]' : ''}`} {...(canCompare ? hold.bind : {})}>
           <PhotoFrame session={session} box={box} alt={`Your ${MODE_LABEL[session.capture_mode]} photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>

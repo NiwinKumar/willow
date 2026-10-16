@@ -34,7 +34,9 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
   const ex = session.explanation
   const text = useMemo(() => {
     if (!ex) return ''
-    return [ex.headline, ...ex.items.map((i) => i.summary)].filter(Boolean).join(' ')
+    // A headline without its own full stop would run into the first item ("…measured Skin tone…").
+    const head = ex.headline && !/[.!?…:]$/.test(ex.headline.trim()) ? `${ex.headline.trim()}.` : ex.headline
+    return [head, ...ex.items.map((i) => i.summary)].filter(Boolean).join(' ')
   }, [ex])
   const allWords = useMemo(() => (text ? text.split(/\s+/) : []), [text])
   // A long explanation would stretch the hero beside it far past the design's height: the first part shows,
@@ -68,9 +70,10 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
   const busy = shown < words.length
   return (
     <section aria-label="Explanation" className="flex flex-[1_1_320px] flex-col gap-[18px] rounded-[44px] bg-surface p-[clamp(22px,3vw,32px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-      <div className="flex items-center gap-2.5">
+      {/* Wraps the AI tag under the source line when the card is narrow, instead of squeezing the source into a column. */}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
         <span aria-hidden className="size-10 shrink-0 animate-[wBreathe_5s_ease-in-out_infinite] rounded-full shadow-[0_0_20px_rgba(61,123,255,.4)]" style={{ background: 'radial-gradient(circle at 40% 35%, var(--aura-ice), var(--aura-sky) 55%, #1B1F7A)' }} />
-        <span className="flex min-w-0 flex-col">
+        <span className="flex min-w-[min(100%,190px)] flex-1 flex-col">
           <span className="text-[15px]">Explanation</span>
           <span className="font-mono text-[11px] tracking-[.04em] text-ink-2">{source}</span>
         </span>

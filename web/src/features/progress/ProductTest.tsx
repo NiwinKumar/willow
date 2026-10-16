@@ -258,7 +258,7 @@ export default function ProductTest() {
         </span>
         <span className="flex flex-wrap justify-between gap-2 text-[14px] opacity-90">
           <span>{m && base && !isBase ? `from ${deg(base.value, fm)} to ${deg(m.value, fm)}` : m ? '' : 'no photo within 3 hours'}</span>
-          <span>{base?.mdc95 !== null && base?.mdc95 !== undefined ? `band ±${fmtValue(base.mdc95, fm)}` : 'no band yet'}</span>
+          <span>{base?.mdc95 !== null && base?.mdc95 !== undefined ? `normal range ±${fmtValue(base.mdc95, fm)}${look.unit}` : 'no normal range yet'}</span>
         </span>
       </div>
     )
