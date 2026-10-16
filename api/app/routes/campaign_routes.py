@@ -33,7 +33,9 @@ class CampaignCreate(BaseModel):
     product_id: str = Field(min_length=1, max_length=80)
     workspace: str = Field(min_length=1, max_length=80)  # 'retailer' or a catalog brand
     goals: list[Goal] = Field(min_length=1, max_length=8)
-    skin_types: list[SkinType] = Field(default_factory=list, max_length=5)  # [] = everyone
+    skin_types: list[SkinType] = Field(
+        default_factory=list, max_length=5
+    )  # [] = every eligible skin type
     days: Literal[7, 14, 30]
     placement: Literal["routine"] = "routine"
     # randomised holdout share (null: campaigns.HOLDOUT_PCT, 0.2)
@@ -81,7 +83,7 @@ def create_campaign(
             {"code": "bad_request", "message": "Unknown workspace.", "field": "workspace"},
         )
     try:
-        reasons = campaigns.check(product, body.workspace, list(body.goals))
+        reasons = campaigns.check(product, body.workspace, list(body.goals), list(body.skin_types))
     except campaigns.Unavailable as exc:
         raise campaigns.unavailable() from exc
     if reasons:
@@ -135,7 +137,12 @@ def patch_campaign(
         product = catalog.by_id(doc["product_id"])
         try:
             reasons = (
-                campaigns.check(product, doc["workspace"], list(doc.get("goals") or []))
+                campaigns.check(
+                    product,
+                    doc["workspace"],
+                    list(doc.get("goals") or []),
+                    list(doc.get("skin_types") or []),
+                )
                 if product
                 else ["This product is no longer in the catalog."]
             )

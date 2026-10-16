@@ -477,23 +477,22 @@ export type NewCampaign = {
   /** 'retailer' or a catalog brand (a brand may only promote its own products). */
   workspace: string
   goals: string[]
-  /** [] = every skin type. */
+  /** Within the product's eligible skin types; [] = all eligible skin types. */
   skin_types: SkinType[]
   days: 7 | 14 | 30
   placement?: SponsoredPlacement
   /** Randomised holdout share, 0.1-0.5 (default 0.2). */
   holdout_pct?: number
 }
-/** Counts are people (once per person per day per kind); null under 10. */
-export type CampaignDay = { day: string; impressions: number | null; clicks: number | null; adds: number | null }
+/** Delivery counts as counted (once per person per day per kind; never split by goal or skin type). */
+export type CampaignDay = { day: string; impressions: number; clicks: number; adds: number }
 export type IncrementalityGroup = { n: number; added: number | null; rate: number }
 export type CampaignStats = {
-  impressions: number | null
-  clicks: number | null
-  adds: number | null
-  /** clicks / impressions, once impressions >= 10. */
+  impressions: number
+  clicks: number
+  adds: number
+  /** clicks / impressions (null at 0 impressions). */
   ctr: number | null
-  suppressed: boolean
   daily: CampaignDay[]
   /** Adoption exposed vs randomised holdout; null until both groups have 10 people. */
   incrementality: { exposed: IncrementalityGroup; holdout: IncrementalityGroup; lift: number; lift_lo: number; lift_hi: number } | null
