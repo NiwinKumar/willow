@@ -46,8 +46,14 @@ measurements, check their routine and find products from Willow's facts-only cat
   measured_outcomes in tool results are cohort outcome rates; write a rate as a whole percent
   (0.61 -> 61%), quote it only with its n and, when
   synthetic_cohort is true, say they come from a synthetic demo cohort.
-- verdict real_change = changed beyond photo noise; within_noise = no clear change yet;
-  no_baseline = first reading or no noise band yet; a metric marked indicative is a trend.
+- verdict real_change = changed by more than the person's photos usually vary; within_noise =
+  about the same as at their start; no_baseline = first reading, or the baseline needs more
+  photos; a metric marked indicative is a trend.
+- When the question is about a change, answer in everyday words the way a person would: "7 fewer
+  blemishes than at your start, more than your photos usually vary", "a more even tone", using
+  the metric's when_lower / when_higher words for the direction of its delta. Never write delta,
+  noise band, mdc, threshold, variance, a* or ΔL*: delta is "moved by N" or "N fewer / more",
+  mdc95 is "your photos usually vary by about N".
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
 - Routine products with in_use false were stopped: do not treat them as part of the routine.
@@ -189,8 +195,19 @@ def context(store: Store, uid: str) -> dict[str, Any]:
                 {
                     **{k: m.get(k) for k in ("id", "label", "verdict", "confidence")},
                     # The unit as the app writes it (° or a*), never the key ("deg", "a_star").
-                    "unit": explain.unit_of(m),
+                    "unit": explain.plain_unit(m),
                     **explain.shown_numbers(m),
+                    **(
+                        dict(
+                            zip(
+                                ("when_lower", "when_higher"),
+                                explain.DIRECTION_WORDS[m["id"]],
+                                strict=True,
+                            )
+                        )
+                        if m["id"] in explain.DIRECTION_WORDS
+                        else {}
+                    ),
                 }
                 for m in result["metrics"]
             ],

@@ -32,6 +32,36 @@ def _signed(x: float | int) -> str:
     return s if s.startswith("-") or s == "0" else f"+{s}"
 
 
+# Everyday words for a change in each direction, (lower, higher) (web/src/lib/metrics.ts
+# METRIC_META decrease / increase). Skin tone has none: it is descriptive, never a direction.
+DIRECTION_WORDS = {
+    "pigment_spots": ("fewer or fainter dark spots", "more visible dark spots"),
+    "tone_evenness": ("a more even tone", "a less even tone"),
+    "redness": ("calmer skin", "more redness"),
+    "blemishes": ("fewer blemishes", "more blemishes"),
+    "pores": ("less visible pores", "more visible pores"),
+    "texture": ("smoother skin", "rougher skin"),
+    "lines": ("softer lines", "more visible lines"),
+    "dark_circles": ("a darker under-eye", "a brighter under-eye"),
+    "shine": ("less shine", "more shine"),
+    "glow": ("less glow", "more glow"),
+}
+# Words people do not know: never in an explanation (GEMINI_SPEC: plain calm words).
+JARGON = re.compile(
+    r"\b(delta|noise band|noise threshold|mdc\d*|variance|standard deviation|sd|threshold)\b"
+    r"|ΔL\*|\ba\*",
+    re.I,
+)
+
+
+def since_start(metric: dict[str, Any], delta: float) -> str:
+    """'fewer blemishes than at your start'; skin tone only ever 'a shift from your start'."""
+    if metric["id"] == "tone_ita":
+        return "a shift from your start"
+    low, high = DIRECTION_WORDS.get(metric["id"], ("a lower reading", "a higher reading"))
+    return f"{low if delta < 0 else high} than at your start"
+
+
 # The app's names where they differ from the engine's labels (web/src/lib/metrics.ts)
 APP_LABEL = {"dark_circles": "Under-eye", "tone_ita": "Skin tone (ITA°)"}
 
@@ -50,10 +80,11 @@ def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     trend = " (indicative)" if metric["confidence"] == "indicative" else ""
     quoted: list[str] = []
     if verdict == "no_baseline" and delta is not None:
-        quoted = [_signed(delta)]
+        quoted = [_num(abs(delta))]
         summary = (
-            f"{label}: change {quoted[0]}{trend}. Your baseline has too few photos, so there is no "
-            "noise band yet and this cannot be called a real change."
+            f"{label}: {since_start(metric, delta)} (by {quoted[0]})"
+            f"{trend}. Your baseline needs more photos before Willow can tell a real change from "
+            "normal photo-to-photo variation."
         )
     elif verdict == "no_baseline" and first_reading:
         summary = f"{label}: first reading. Future photos are compared to it."
@@ -64,12 +95,20 @@ def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     elif verdict == "low_quality":
         summary = f"{label}: photo quality too low to compare this time."
     elif delta is not None and mdc is not None:
-        quoted = [_signed(delta), _num(mdc)]
-        words = "a real change" if verdict == "real_change" else "within normal photo variation"
-        summary = f"{label}: {words}{trend} (change {quoted[0]}, noise band ±{quoted[1]})."
+        quoted = [_num(abs(delta)), _num(mdc)]
+        if verdict == "real_change":
+            summary = (
+                f"{label}: {since_start(metric, delta)}{trend}. It moved by "
+                f"{quoted[0]}, more than your photos usually vary (about {quoted[1]})."
+            )
+        else:
+            summary = (
+                f"{label}: about the same as at your start{trend}. The difference of {quoted[0]} "
+                f"is within how much your photos usually vary (about {quoted[1]})."
+            )
     elif delta is not None:
-        quoted = [_signed(delta)]
-        summary = f"{label}: no clear change yet{trend} (change {quoted[0]})."
+        quoted = [_num(abs(delta))]
+        summary = f"{label}: no clear change yet{trend} (a difference of {quoted[0]})."
     else:
         summary = f"{label}: no clear change yet{trend}."
     return {"metric_id": metric["id"], "summary": summary, "quoted_numbers": quoted}
@@ -96,7 +135,7 @@ def template(result: dict[str, Any], first_reading: bool = True) -> dict[str, An
         steps = [RETAKE.get(result.get("site", ""), RETAKE_DEFAULT)]
     elif metrics and all(m["verdict"] == "no_baseline" for m in metrics):
         if any(m.get("delta") is not None for m in metrics):
-            headline = "Compared with your baseline (no noise band yet)"
+            headline = "Compared with your baseline (it needs more photos to judge changes)"
             steps = ["Take 5 photos in one session and make it your baseline."]
         elif first_reading:
             headline = "Your first reading"
@@ -147,11 +186,17 @@ def _claims_change(text: str) -> bool:
 
 INSTRUCTIONS = """Explain one skin-measurement session to the person, in plain calm words.
 Rules:
-- Use only the metrics given. Quote numbers exactly as given (value, delta, mdc95, days); never
-  compute new numbers, percentages or estimates. Never quote dates or photo numbers ("photo 3").
-- verdict real_change: say it changed beyond normal photo variation, with the delta and the noise
-  band (mdc95). within_noise: "no clear change yet". no_baseline with a delta: the change is
-  shown but there is no noise band yet, so it cannot be called real. no_baseline without a delta:
+- Write for someone with no science background: everyday words, short sentences. Say what changed
+  the way a person would ("7 fewer blemishes than at your start", "a more even tone"), using each
+  metric's when_lower / when_higher words for the direction of its delta. Never write the words
+  delta, noise band, mdc, threshold, variance, standard deviation, a* or ΔL*: delta is "it moved
+  by N" or "N fewer / more", mdc95 is "your photos usually vary by about N".
+- Use only the metrics given. Quote numbers exactly as given (value, delta without its sign,
+  mdc95, days); never compute new numbers, percentages or estimates. Never quote dates or photo
+  numbers ("photo 3").
+- verdict real_change: say it changed by more than the person's photos usually vary.
+  within_noise: "about the same as at your start". no_baseline with a delta: the change is shown
+  but the baseline needs more photos before it can be called real. no_baseline without a delta:
   this is the first reading, but only when is_baseline is true; on a later session it means
   this one could not be compared with the baseline this time (say so, never "first").
   low_quality: the photo could not be compared.
@@ -205,6 +250,13 @@ def unit_of(metric: dict[str, Any]) -> str:
     """The unit as the app writes it after the number ("" for counts and indexes)."""
     own = METRIC_UNIT_DISPLAY.get(metric["id"])
     return own if own is not None else UNIT_DISPLAY.get(metric["unit"], metric["unit"]).strip()
+
+
+def plain_unit(metric: dict[str, Any]) -> str:
+    """The unit for text people read: none for the colour-science scores (a*, ΔL*), which are
+    plain scores to a reader; the rest as the app writes them."""
+    unit = unit_of(metric)
+    return "" if unit in ("a*", "ΔL*") else unit
 
 
 def decimals(metric: dict[str, Any]) -> int:
@@ -264,8 +316,20 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
                 "verdict": m["verdict"],
                 "direction": m["direction"],
                 "confidence": m["confidence"],
-                # Unit as the app writes it; none for counts and indexes (never "index").
-                "unit": unit_of(m),
+                # Unit as the app writes it; none for counts and indexes (never "index"), and
+                # none for the a* / ΔL* scores (jargon in a sentence)
+                "unit": plain_unit(m),
+                **(
+                    {}
+                    if m["id"] == "tone_ita"
+                    else dict(
+                        zip(
+                            ("when_lower", "when_higher"),
+                            DIRECTION_WORDS.get(m["id"], ("lower", "higher")),
+                            strict=True,
+                        )
+                    )
+                ),
                 **shown_numbers(m),
             }
             for m in result["metrics"]
@@ -325,6 +389,8 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"unknown number in: {text}")
         if BANNED.search(text):
             found.append(f"banned wording in: {text}")
+        if JARGON.search(text):
+            found.append(f"jargon in: {text}")
     for item in exp.items:
         if item.metric_id not in verdicts:
             found.append(f"unknown metric {item.metric_id}")
