@@ -135,7 +135,7 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
           ))}
         </svg>
       </div>
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{title}</caption>
         <thead>
           <tr>
@@ -158,7 +158,7 @@ export function CurveChart({ weeks, series, height = 200, title }: { weeks: numb
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </figure>
   )
 }
