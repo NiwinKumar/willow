@@ -104,9 +104,9 @@ export function DataTable<T>({
     else setSort(defaultSort ?? null)
   }
 
+  const text = (c: Column<T>) => c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)
   const exportCsv = () => {
     if (!csv) return
-    const text = (c: Column<T>) => c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)
     const cols = columns.filter((c) => !c.noCsv)
     downloadCsv(
       csv.name,
@@ -163,19 +163,35 @@ export function DataTable<T>({
                     aria-sort={on ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : c.sortValue ? 'none' : undefined}
                     className={`sticky top-0 z-[1] h-9 whitespace-nowrap border-b border-line bg-surface px-3 align-middle text-proof-small font-normal text-ink-2 first:pl-4 last:pr-4 ${right ? 'text-right' : 'text-left'}`}
                   >
-                    {c.sortValue ? (
+                    {c.sortValue && typeof c.header === 'string' ? (
                       <button
                         type="button"
                         onClick={() => toggle(c)}
                         className={`inline-flex items-center gap-1 rounded-[4px] border-0 bg-transparent p-0 text-inherit hover:text-ink ${on ? 'text-ink' : ''} ${right ? 'flex-row-reverse' : ''}`}
                       >
                         <span>{c.header}</span>
-                        {on ? (
-                          sort!.dir === 'asc' ? <ArrowUp size={12} strokeWidth={1.8} aria-hidden /> : <ArrowDown size={12} strokeWidth={1.8} aria-hidden />
-                        ) : (
-                          <ChevronsUpDown size={12} strokeWidth={1.6} aria-hidden className="opacity-50" />
-                        )}
+                        <SortIcon on={on} dir={sort?.dir} />
                       </button>
+                    ) : c.sortValue ? (
+                      // A rich header (e.g. a glossary Term, itself a button) can't sit inside the sort button:
+                      // the label stays interactive on its own and a separate icon button sorts (the label's
+                      // empty area sorts too, for the mouse).
+                      <span
+                        className={`inline-flex items-center gap-1 ${on ? 'text-ink' : ''} ${right ? 'flex-row-reverse' : ''}`}
+                        onClick={(e) => {
+                          if (!(e.target as HTMLElement).closest('button')) toggle(c)
+                        }}
+                      >
+                        <span className="cursor-default">{c.header}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggle(c)}
+                          aria-label={`Sort by ${text(c)}`}
+                          className="inline-flex rounded-[4px] border-0 bg-transparent p-0 text-inherit hover:text-ink"
+                        >
+                          <SortIcon on={on} dir={sort?.dir} />
+                        </button>
+                      </span>
                     ) : (
                       c.header
                     )}
@@ -226,4 +242,9 @@ export function DataTable<T>({
       </div>
     </div>
   )
+}
+
+function SortIcon({ on, dir }: { on: boolean; dir?: 'asc' | 'desc' }) {
+  if (!on) return <ChevronsUpDown size={12} strokeWidth={1.6} aria-hidden className="opacity-50" />
+  return dir === 'asc' ? <ArrowUp size={12} strokeWidth={1.8} aria-hidden /> : <ArrowDown size={12} strokeWidth={1.8} aria-hidden />
 }
