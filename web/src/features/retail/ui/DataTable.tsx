@@ -143,7 +143,7 @@ export function DataTable<T>({
           ) : null}
         </div>
       ) : null}
-      <div className="overflow-auto overscroll-x-contain" style={{ maxHeight }}>
+      <div className="relative overflow-auto overscroll-x-contain" style={{ maxHeight }}>
         <table className="w-full table-fixed border-separate border-spacing-0 text-proof-body" style={{ minWidth }}>
           <caption className="sr-only">{caption}</caption>
           <colgroup>

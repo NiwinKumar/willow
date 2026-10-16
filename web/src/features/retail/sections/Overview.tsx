@@ -2,7 +2,6 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { AITag } from '../../../components/willow/AITag'
 import { Disclaimer } from '../../../components/willow/Disclaimer'
 import { retailerBrief } from '../../../lib/api'
 import { useRetailData } from '../context'
@@ -10,6 +9,7 @@ import { DATA_STUDIO, outcomes, totalUsers } from '../data'
 import { sectionPath, useRetailState } from '../state'
 import type { Brief, BriefCard, Insights } from '../types'
 import { Bone, cohortKind, EmptyState, EvidenceBar, int, KpiStrip, MIN_GROUP, Panel, pct, pts, SectionHeader, SimBadge, SkeletonHeader, SkeletonKpis, SkeletonPanel, Term, ToolButton, weeks, type Kpi } from '../ui'
+import { briefHref, cardFigure } from '../ui/insight'
 import { InsightsGate, useWorkspaceLabel, YoursTag } from './shared'
 
 /** Overview: the brief (insight cards from GET /v1/retailer/brief), the KPI strip and the headline lists. */
@@ -19,8 +19,8 @@ export default function Overview() {
       skeleton={
         <div className="flex flex-col gap-4">
           <SkeletonHeader />
-          <SkeletonKpis n={5} />
           <SkeletonPanel height={300} />
+          <SkeletonKpis n={5} />
         </div>
       }
     >
@@ -69,8 +69,8 @@ function Body({ d }: { d: Insights }) {
   return (
     <div className="flex flex-col gap-4">
       <SectionHeader eyebrow={eyebrow} title="Overview" answer={answer} />
-      <Kpis d={d} />
       <BriefPanel brand={brand} d={d} />
+      <Kpis d={d} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 min-[1400px]:grid-cols-3">
         <TopProducts d={d} brand={brand} className="lg:col-span-2 min-[1400px]:col-span-1" />
         <GoalsPanel d={d} />
@@ -154,11 +154,11 @@ function BriefPanel({ brand, d, className }: { brand: string | null; d: Insights
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   const state = res.key === key ? res : { status: 'loading' as const, brief: null }
   return (
-    <Panel title="The brief" id="brief-h" meta={<SimBadge cohort={d.cohort} />} className={className} footnote={state.status === 'ready' ? 'Each card is a fixed rule over the aggregates (top proven product, biggest lift, continuation risk, rising goal, largest gap). Open a card for the evidence.' : undefined}>
+    <Panel title="This week’s brief" id="brief-h" meta={<SimBadge cohort={d.cohort} />} className={className} footnote={state.status === 'ready' ? (brand ? `Each card is a fixed rule over the aggregates (best and weakest goal against the market, switching, top product, what can be promoted, continuation). Open a card for the exact view.` : 'Each card is a fixed rule over the aggregates (top proven product, biggest lift by skin type, continuation risk, rising goal, largest gap, most common conflict). Open a card for the exact view.') : undefined}>
       {state.status === 'loading' ? (
         <div role="status" aria-label="Loading the brief" className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="flex h-[148px] flex-col gap-2.5 rounded-xs border border-line p-3.5">
+            <div key={i} className="flex h-[132px] flex-col gap-2.5 rounded-xs border border-line p-3.5">
               <Bone className="h-2.5 w-20" />
               <Bone className="h-3.5 w-[80%]" />
               <Bone className="h-3 w-full" />
@@ -182,10 +182,13 @@ function BriefPanel({ brand, d, className }: { brand: string | null; d: Insights
       ) : (
         <div className="flex flex-col gap-3">
           {state.brief.summary ? (
-            <p className="m-0 flex flex-wrap items-start gap-2 text-proof-answer text-ink">
-              <AITag />
-              <span className="min-w-0 flex-1">{state.brief.summary.text}</span>
-            </p>
+            <div className="flex max-w-[110ch] flex-col gap-0.5">
+              <p className="m-0 text-proof-body text-ink-2">
+                <span className="font-medium text-ink">In short: </span>
+                {state.brief.summary.text}
+              </p>
+              <span className="text-[11px] text-ink-2">Written by Gemini from the cards below; numbers checked.</span>
+            </div>
           ) : null}
           {state.brief.cards.length ? (
             <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 xl:grid-cols-3">
@@ -216,23 +219,24 @@ const SECTION_LABEL: Record<BriefCard['link']['section'], string> = {
 function BriefCardView({ c }: { c: BriefCard }) {
   const { carry } = useRetailState()
   const k = KIND[c.kind]
-  const sub = c.link.section === 'products' && c.link.id ? `products/${c.link.id}` : c.link.section === 'categories' && c.link.id ? `categories/${c.link.id}` : null
-  const to = `${sub ? `/retail/${sub}` : sectionPath(c.link.section === 'segments' ? 'segments' : c.link.section)}${carry}`
+  const fig = cardFigure(c)
   return (
-    <Link to={to} className="group flex min-h-[148px] flex-col gap-1.5 rounded-xs border border-line bg-sunken p-3.5 no-underline transition-colors duration-150 hover:border-line-strong hover:bg-glass">
+    <Link to={briefHref(c, carry)} className="group flex min-h-[132px] flex-col gap-1.5 rounded-xs border border-line bg-sunken p-3.5 no-underline transition-colors duration-150 hover:border-line-strong hover:bg-glass">
       <span className="flex items-center gap-1.5 text-proof-small text-ink-2">
         <span aria-hidden className={c.kind === 'win' ? 'text-proof-leaf' : 'text-ink-2'}>
           {k.glyph}
         </span>
         {k.label}
       </span>
-      <span className="text-proof-h font-medium text-ink">{c.title}</span>
-      <span className="line-clamp-3 text-proof-body text-ink-2">{c.body}</span>
+      <span className="line-clamp-2 text-proof-h font-medium text-ink" title={c.title}>
+        {c.title}
+      </span>
+      <span className="line-clamp-2 text-proof-body text-ink-2">{c.body}</span>
       <span className="mt-auto flex items-end justify-between gap-2 pt-1">
         <span className="flex items-baseline gap-1">
-          {c.value !== null ? <span className="font-mono text-[20px] leading-none text-ink tnum">{c.value}</span> : null}
-          {c.unit ? <span className="text-proof-small text-ink-2">{c.unit}</span> : null}
-          {c.n ? <span className="ml-1.5 font-mono text-[11px] text-ink-2">n={int(c.n)}</span> : null}
+          {fig ? <span className="font-mono text-[20px] leading-none text-ink tnum">{fig.value}</span> : null}
+          {fig?.unit ? <span className="text-proof-small text-ink-2">{fig.unit}</span> : null}
+          {c.n ? <span className="ml-1.5 font-mono text-[11px] text-ink-2 tnum">n={int(c.n)}</span> : null}
         </span>
         <span className="flex items-center gap-1 text-proof-small text-ink-2 group-hover:text-ink">
           {SECTION_LABEL[c.link.section]}
@@ -400,15 +404,23 @@ function About({ d }: { d: Insights }) {
       k: 'Assumptions',
       v: 'Outcomes are associations with product use, not proof of effect: people chose their own products and groups are not randomised. In the simulation each product moves its target metrics by 0.2 to 1.1 times the noise band, about 3 in 10 have no effect, and tone band, skin type and region have no effect.',
     },
+    {
+      k: 'Switching and skin profiles',
+      v: "Two further invented assumptions demonstrate the switching and skin-profile views: about half of the people who stop a product start another in the same category within 2 weeks, leaning strongly toward products that work for others and are popular, and a product's effect size varies by skin type (oil-control products work better on oily and combination skin, barrier and gentle hydrating products on dry and sensitive skin, strong retinoids and acids less on sensitive skin).",
+    },
+    {
+      k: 'Consent and privacy',
+      v: `Aggregates only. Real people are included only after a separate opt-in to anonymised sharing. Groups under ${MIN_GROUP} are hidden, including complementary cells that would let a hidden count be worked out. No images or per-person rows ever leave Willow.`,
+    },
   ]
   return (
     <details className="group rounded-sm border border-line bg-surface">
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-proof-h font-medium text-ink [&::-webkit-details-marker]:hidden">
         About this data
-        <span className="text-proof-small font-normal text-ink-2 group-open:hidden">Cohort, method, suppression, assumptions</span>
+        <span className="text-proof-small font-normal text-ink-2 group-open:hidden">Cohort, method, suppression, assumptions, consent</span>
       </summary>
       <div className="flex flex-col gap-4 border-t border-line px-4 py-4">
-        <dl className="m-0 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <dl className="m-0 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {items.map((p) => (
             <div key={p.k} className="flex flex-col gap-1">
               <dt className="eyebrow">■ {p.k}</dt>
