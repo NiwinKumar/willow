@@ -92,14 +92,20 @@ export function baselineLine(sessions: Session[], mode: CaptureMode): { text: st
 
 export type Check = { title: string; hint: string }
 
-/** The preparation checklist per site and mode (CAP checklistDefs, corrected to the protocol). */
-export function checklist(site: Site, mode: CaptureMode): Check[] {
+/**
+ * The preparation checklist per site and mode (CAP checklistDefs, corrected to the protocol). `firstTime`:
+ * someone's very first session here, with no earlier photos to match, so "Same light as last time" becomes
+ * advice on choosing a light they can repeat.
+ */
+export function checklist(site: Site, mode: CaptureMode, firstTime = false): Check[] {
   const raw = mode === 'calibrated_raw'
   const between = photoSteps(site, mode).between
   switch (kindOf(site)) {
     case 'arm':
       return [
-        { title: 'Same light as last time', hint: 'Same lamp or window, arm in the same spot on the table.' },
+        firstTime
+          ? { title: 'Steady light you can repeat', hint: 'A window or lamp you can use every time, arm in a spot on the table you will remember.' }
+          : { title: 'Same light as last time', hint: 'Same lamp or window, arm in the same spot on the table.' },
         { title: 'Four pen dots on a 4 cm square', hint: 'Mark the corners once and keep all four dots in the frame. A white marker works on deep skin tones.' },
         { title: 'White paper beside the arm', hint: 'Plain white paper in the same light tells Willow the colour of your lamp.' },
         { title: 'Arm flat, phone straight above', hint: `Inner side up, phone level with the skin, about 30 to 40 cm away${raw ? '. A colour card beside the square helps, if you have one' : ''}.` },
@@ -116,7 +122,9 @@ export function checklist(site: Site, mode: CaptureMode): Check[] {
       ]
     default:
       return [
-        { title: 'Same light as last time', hint: 'Face a window or the same lamp. No overhead spotlights.' },
+        firstTime
+          ? { title: 'Face a window or lamp', hint: 'Light from the front, no overhead spotlights. Use the same light every time after this.' }
+          : { title: 'Same light as last time', hint: 'Face a window or the same lamp. No overhead spotlights.' },
         { title: 'Bare skin', hint: 'No makeup, sunscreen or serum for at least 15 minutes.' },
         { title: 'Hair back, glasses off', hint: 'Nothing covering forehead, cheeks or jaw; hands away from your face.' },
         { title: 'Neutral expression', hint: 'Relaxed face, eyes open, looking at the lens. A smile creases the skin into lines that are not there at rest.' },

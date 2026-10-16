@@ -33,7 +33,10 @@ export function GuideStep(props: {
   const raw = mode === 'calibrated_raw'
   const kind = kindOf(site)
   const first = n === 5
-  const items = checklist(site, mode)
+  // Truly new here (not restarting a baseline): nothing earlier to match, so no "as last time" and no
+  // "Anything different today?" (different from what?). Both come back from the next session.
+  const firstTime = first && !baseline
+  const items = checklist(site, mode, firstTime)
   const [ticks, setTicks] = useState<boolean[]>(() => items.map(() => false))
   const [rawOpen, setRawOpen] = useState(!prefs.lightroomDone())
   const [rawDone, setRawDone] = useState(prefs.lightroomDone)
@@ -156,41 +159,43 @@ export function GuideStep(props: {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2 rounded-[28px] bg-surface/[.88] px-[22px] py-[18px]">
-          <label htmlFor="ck-note" className="text-[15px]">
-            Anything different today? <span className="text-ink-2">Optional · saved with this check-in</span>
-          </label>
-          <input
-            id="ck-note"
-            type="text"
-            maxLength={140}
-            placeholder="e.g. new lamp, after a workout, skipped serum"
-            value={note}
-            onChange={(e) => props.onNote(e.target.value)}
-            className="min-h-12 rounded-[14px] border-0 bg-[#EFEEEA] px-3.5 text-[16px] text-ink"
-          />
-          <span className="flex flex-wrap gap-1.5">
-            {NOTE_CHIPS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  props.onNote(note ? `${note}, ${t.toLowerCase()}` : t)
-                  props.onDeviation(true)
-                }}
-                className="min-h-9 rounded-pill border border-ink/10 bg-white px-3 text-[13px]"
-              >
-                + {t}
-              </button>
-            ))}
-          </span>
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
-            <input type="checkbox" checked={deviation} onChange={(e) => props.onDeviation(e.target.checked)} className="size-5 accent-[var(--text-primary)]" />
-            <span>
-              Something is different today <span className="text-ink-2">· shown next to this reading, so a change is never misread</span>
+        {firstTime ? null : (
+          <div className="flex flex-col gap-2 rounded-[28px] bg-surface/[.88] px-[22px] py-[18px]">
+            <label htmlFor="ck-note" className="text-[15px]">
+              Anything different today? <span className="text-ink-2">Optional · saved with this check-in</span>
+            </label>
+            <input
+              id="ck-note"
+              type="text"
+              maxLength={140}
+              placeholder="e.g. new lamp, after a workout, skipped serum"
+              value={note}
+              onChange={(e) => props.onNote(e.target.value)}
+              className="min-h-12 rounded-[14px] border-0 bg-[#EFEEEA] px-3.5 text-[16px] text-ink"
+            />
+            <span className="flex flex-wrap gap-1.5">
+              {NOTE_CHIPS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    props.onNote(note ? `${note}, ${t.toLowerCase()}` : t)
+                    props.onDeviation(true)
+                  }}
+                  className="min-h-9 rounded-pill border border-ink/10 bg-white px-3 text-[13px]"
+                >
+                  + {t}
+                </button>
+              ))}
             </span>
-          </label>
-        </div>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
+              <input type="checkbox" checked={deviation} onChange={(e) => props.onDeviation(e.target.checked)} className="size-5 accent-[var(--text-primary)]" />
+              <span>
+                Something is different today <span className="text-ink-2">· shown next to this reading, so a change is never misread</span>
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5">
           <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>
