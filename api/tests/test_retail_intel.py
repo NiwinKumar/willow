@@ -409,6 +409,31 @@ def test_brief_summary_is_validated_and_cached(proof, monkeypatch):
     assert proof.get("/v1/retailer/brief").json()["summary"] is None
 
 
+def test_brief_cards_never_wait_on_a_slow_summary(proof, monkeypatch):
+    import threading
+
+    cards = retail_intel.brief_cards(_facts())
+    good = f"{cards[0]['title']}: {cards[0]['value']} points (simulated cohort)."
+    release = threading.Event()
+
+    def slow(*a, **k):
+        release.wait(5)
+        return retail_intel.Summary(text=good)
+
+    monkeypatch.setattr(retail_intel, "_summaries", {})
+    monkeypatch.setattr(retail_intel, "_inflight", {})
+    monkeypatch.setattr(retail_intel, "SUMMARY_WAIT_SECONDS", 0.05)
+    monkeypatch.setattr(gemini, "generate_json", slow)
+    first = proof.get("/v1/retailer/brief").json()
+    assert first["cards"] and first["summary"] is None and first["summary_pending"] is True
+    release.set()
+    for t in list(retail_intel._inflight.values()):
+        t.join(5)
+    later = proof.get("/v1/retailer/brief").json()
+    assert later["summary"] == {"text": good, "validated": True}
+    assert later["summary_pending"] is False
+
+
 def test_routes_degrade_to_503_when_rows_are_unavailable(monkeypatch):
     monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": None, "version": 0})
     client = TestClient(app)

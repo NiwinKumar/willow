@@ -144,12 +144,32 @@ function BriefPanel({ brand, d, className }: { brand: string | null; d: Insights
   const [res, setRes] = useState<BriefState>({ key: '', status: 'loading', brief: null })
   useEffect(() => {
     let alive = true
-    retailerBrief({ ...filters, ...(brand ? { brand } : {}) }).then(
-      (brief) => alive && setRes({ key, status: 'ready', brief }),
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const q = { ...filters, ...(brand ? { brand } : {}) }
+    // The cards arrive at once; while Gemini is still writing the summary, ask again a few times.
+    const poll = (tries: number) => {
+      timer = setTimeout(() => {
+        retailerBrief(q).then(
+          (brief) => {
+            if (!alive) return
+            setRes((r) => (r.key === key && r.brief ? { ...r, brief: { ...r.brief, summary: brief.summary, summary_pending: brief.summary_pending } } : r))
+            if (brief.summary_pending && tries > 1) poll(tries - 1)
+          },
+          () => undefined,
+        )
+      }, 3000)
+    }
+    retailerBrief(q).then(
+      (brief) => {
+        if (!alive) return
+        setRes({ key, status: 'ready', brief })
+        if (brief.summary_pending) poll(6)
+      },
       () => alive && setRes({ key, status: 'failed', brief: null }),
     )
     return () => {
       alive = false
+      if (timer) clearTimeout(timer)
     }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   const state = res.key === key ? res : { status: 'loading' as const, brief: null }
@@ -188,6 +208,11 @@ function BriefPanel({ brand, d, className }: { brand: string | null; d: Insights
                 {state.brief.summary.text}
               </p>
               <span className="text-[11px] text-ink-2">Written by Gemini from the cards below; numbers checked.</span>
+            </div>
+          ) : state.brief.summary_pending ? (
+            <div role="status" aria-label="Gemini is writing a short summary of the cards" className="flex max-w-[110ch] flex-col gap-1.5">
+              <Bone className="h-3 w-[70%]" />
+              <span className="text-[11px] text-ink-2">Gemini is writing a short summary of the cards…</span>
             </div>
           ) : null}
           {state.brief.cards.length ? (
