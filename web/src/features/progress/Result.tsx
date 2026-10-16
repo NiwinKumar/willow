@@ -14,6 +14,7 @@ import { useData } from '../../data/useData'
 import type { SpotTrack } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
+import { failureReasons } from '../../lib/warnings'
 import { ExplanationCard, NextAction } from './ExplanationCard'
 import { MetricCard } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
@@ -302,7 +303,7 @@ export default function Result() {
     const changed = ordered.filter((m) => m.verdict === 'real_change').map((m) => `${METRIC_META[m.id].label} ${deltaText(m)}`)
     const q =
       st === 'rejected'
-        ? `My ${SITE_LABEL[site].toLowerCase()} check-in on ${fmtDate(session.created_at)} could not be measured (${(session.result?.quality.reasons ?? []).map((r) => qualityCopy(r, site)?.text ?? r).join(' ')}). How do I take better photos next time?`
+        ? `My ${SITE_LABEL[site].toLowerCase()} check-in on ${fmtDate(session.created_at)} could not be measured (${failureReasons(session.result).join(' ')}). How do I take better photos next time?`
         : `Help me read my ${SITE_LABEL[site].toLowerCase()} result from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${c.changed} changed${changed.length ? ` (${changed.join(', ')})` : ''}, ${c.normal} within normal range. What could explain it?`
     shell.openAdvisor(q, `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`)
   }
@@ -411,7 +412,7 @@ export default function Result() {
               </div>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,270px),1fr))] gap-3.5">
                 {ordered.map((m: Metric, i) => (
-                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : bandOf(baseline, m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
+                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline || st === 'former' ? m.mdc95 : bandOf(baseline, m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
                 ))}
               </div>
             </>
@@ -472,6 +473,8 @@ function FrameThumb({ url, alt }: { url: string | null | undefined; alt: string 
   return <img src={url} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(url)} className="absolute inset-0 size-full object-cover" />
 }
 
+const PEN_DOTS_FIX = 'Mark the corners of a 4 cm square on the forearm, keep all four dots in the frame, and put white paper beside the arm.'
+
 /** One card per photo that did not pass, with the reason and the fix; the photo itself when the api signed it. */
 function RejectedPhotos({ session, frameUrls }: { session: Session; frameUrls?: (string | null)[] }) {
   const frames = session.result?.quality.per_frame?.length ? session.result.quality.per_frame : [{ index: 0, passed: false, reasons: session.result?.quality.reasons ?? [] }]
@@ -480,18 +483,20 @@ function RejectedPhotos({ session, frameUrls }: { session: Session; frameUrls?: 
       {frames
         .filter((f) => !f.passed)
         .map((f) => {
+          // Missing pen dots come as a warning ("photo 2: pen-dot square not found"), not a frame reason.
+          const dots = !f.reasons.length && (session.result?.warnings ?? []).some((w) => new RegExp(`^photo ${f.index + 1}: pen-dot square not found`, 'i').test(w))
           const copy = f.reasons.map((r) => qualityCopy(r, session.site)).filter(Boolean)
           return (
             <div key={f.index} className="flex flex-col gap-3 rounded-[36px] bg-surface p-3.5 squircle">
               <div className="relative aspect-[4/5] overflow-hidden rounded-[26px]" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
-                <FrameThumb url={frameUrls?.[f.index]} alt={`Photo ${f.index + 1}, not used: ${f.reasons.length ? f.reasons.map((r) => REASON_SHORT[r] ?? r).join(', ').toLowerCase() : 'did not pass the quality check'}`} />
+                <FrameThumb url={frameUrls?.[f.index]} alt={`Photo ${f.index + 1}, not used: ${f.reasons.length ? f.reasons.map((r) => REASON_SHORT[r] ?? r).join(', ').toLowerCase() : dots ? 'pen dots not found' : 'did not pass the quality check'}`} />
                 <span className="absolute top-3.5 left-3.5 rounded-pill bg-white/80 px-2 py-0.5 font-mono text-[11px] text-ink-2">PHOTO {f.index + 1}</span>
                 <span aria-hidden className="absolute top-3.5 right-3.5 grid size-[34px] place-items-center rounded-full bg-[var(--aura-coral)] text-white">
                   !
                 </span>
               </div>
-              <span className="px-1.5 text-[17px]">{f.reasons.length ? f.reasons.map((r) => REASON_SHORT[r] ?? r).join(' · ') : 'Did not pass the quality check'}</span>
-              <span className="px-1.5 pb-1.5 text-[14px] leading-[1.45] text-ink-2">{copy.map((x) => x!.text).join(' ') || 'Retake in the same light and position.'}</span>
+              <span className="px-1.5 text-[17px]">{f.reasons.length ? f.reasons.map((r) => REASON_SHORT[r] ?? r).join(' · ') : dots ? 'Pen dots not found' : 'Did not pass the quality check'}</span>
+              <span className="px-1.5 pb-1.5 text-[14px] leading-[1.45] text-ink-2">{copy.map((x) => x!.text).join(' ') || (dots ? PEN_DOTS_FIX : 'Retake in the same light and position.')}</span>
             </div>
           )
         })}

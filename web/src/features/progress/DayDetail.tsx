@@ -40,7 +40,8 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   const nextDay = di >= 0 && di < daysSorted.length - 1 ? daysSorted[di + 1] : null
   const [asking, setAsking] = useState(false)
   const date = parseDate(day)
-  const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(`/progress?site=${site}`))
+  // Forearm days have no calendar of their own: their page is the product test.
+  const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(site.startsWith('forearm') ? '/test' : `/progress?site=${site}`))
   const go = (d: string) => navigate(`/progress/${d}?site=${site}`, { replace: true, state: location.state })
 
   const nav = (
@@ -143,7 +144,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-[36px] bg-surface p-[clamp(22px,3vw,30px)] squircle">
             <span className="flex max-w-[620px] flex-col gap-1.5">
               <span className="text-[20px]">No readings from this day</span>
-              <span className="text-[15px] leading-normal text-ink-2">{st === 'rejected' ? `${rejectNote(session)} Your baseline is unchanged.` : 'This check-in did not finish measuring.'}</span>
+              <span className="text-[15px] leading-normal text-ink-2">{st === 'rejected' ? `${rejectNote(session)}${baseline ? ' Your baseline is unchanged.' : ''}` : 'This check-in did not finish measuring.'}</span>
             </span>
             <Button variant="primary" size="lg" onClick={() => shell.startCheckIn(site, session.capture_mode)} trailing={<span aria-hidden>→</span>}>
               Take new photos
