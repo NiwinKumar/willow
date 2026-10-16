@@ -140,7 +140,7 @@ export function DataTable<T>({
           ) : null}
         </div>
       ) : null}
-      <div className="overflow-auto overscroll-x-contain" style={{ maxHeight }}>
+      <div className="relative overflow-auto overscroll-x-contain" style={{ maxHeight }}>
         <table className="w-full table-fixed border-separate border-spacing-0 text-proof-body" style={{ minWidth }}>
           <caption className="sr-only">{caption}</caption>
           <colgroup>
@@ -160,7 +160,20 @@ export function DataTable<T>({
                     aria-sort={on ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : c.sortValue ? 'none' : undefined}
                     className={`sticky top-0 z-[1] h-9 whitespace-nowrap border-b border-line bg-surface px-3 align-middle text-proof-small font-normal text-ink-2 first:pl-4 last:pr-4 ${right ? 'text-right' : 'text-left'}`}
                   >
-                    {c.sortValue ? (
+                    {c.sortValue && typeof c.header !== 'string' ? (
+                      // A header with its own control (a glossary Term is a button): the label stays as it is and
+                      // a separate icon button sorts, so no button sits inside another.
+                      <span className={`inline-flex items-center gap-1 ${on ? 'text-ink' : ''} ${right ? 'flex-row-reverse' : ''}`}>
+                        <span>{c.header}</span>
+                        <button type="button" onClick={() => toggle(c)} aria-label={`Sort by ${c.headerText ?? c.id}`} className="inline-grid size-4 place-items-center rounded-[4px] border-0 bg-transparent p-0 text-inherit hover:text-ink">
+                          {on ? (
+                            sort!.dir === 'asc' ? <ArrowUp size={12} strokeWidth={1.8} aria-hidden /> : <ArrowDown size={12} strokeWidth={1.8} aria-hidden />
+                          ) : (
+                            <ChevronsUpDown size={12} strokeWidth={1.6} aria-hidden className="opacity-50" />
+                          )}
+                        </button>
+                      </span>
+                    ) : c.sortValue ? (
                       <button
                         type="button"
                         onClick={() => toggle(c)}

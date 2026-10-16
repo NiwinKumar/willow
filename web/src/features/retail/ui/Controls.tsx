@@ -13,8 +13,9 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
     if (j === null) return
     e.preventDefault()
     const next = tabs[(j + tabs.length) % tabs.length]
+    // Every tab is rendered, so focus moves at once (a frame later is skipped in background tabs).
+    ref.current?.querySelector<HTMLElement>(`[data-tab="${next.id}"]`)?.focus()
     onChange(next.id)
-    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>(`[data-tab="${next.id}"]`)?.focus())
   }
   // Keep the selected tab in view when the row scrolls (phones, deep links to a late tab).
   useEffect(() => {
@@ -62,8 +63,10 @@ export function Segmented<T extends string>({ label, options, value, onChange, c
     if (!d) return
     e.preventDefault()
     const i = options.findIndex((o) => o.value === value)
-    onChange(options[(i + d + options.length) % options.length].value)
-    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus())
+    const k = (i + d + options.length) % options.length
+    // Focus moves at once (a frame later is skipped in background tabs); the radios render in option order.
+    ref.current?.querySelectorAll<HTMLElement>('[role="radio"]')[k]?.focus()
+    onChange(options[k].value)
   }
   return (
     <div ref={ref} role="radiogroup" aria-label={label} onKeyDown={move} className={`no-scrollbar flex h-8 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-xs border border-line bg-sunken p-0.5 ${className}`}>
