@@ -1,17 +1,19 @@
 /** Framing a photo for the 4:5 stage, in the engine's pixel coordinates. */
-import type { AnalysisResult, Session, Site } from '../../data/types'
+import type { AnalysisResult, Session, Site, ViewName } from '../../data/types'
+import { candidateView } from './views'
 
 export type Box = { x: number; y: number; w: number; h: number }
 
 /**
  * The part of a photo to show in a 4:5 frame. A face fills only part of an arm's-length selfie, so a face
  * photo is framed around its regions and spots (with room for hair and jaw); other sites keep the whole
- * photo, cropped to the frame's shape around its centre.
+ * photo, cropped to the frame's shape around its centre. Only the spots on this photo count (`view`: a session's
+ * front photo by default; a cheek photo's spots are in its own pixels).
  */
-export function frameFor(site: Site, result: AnalysisResult | null | undefined, size: { width: number; height: number }, aspect = 4 / 5): Box {
+export function frameFor(site: Site, result: AnalysisResult | null | undefined, size: { width: number; height: number }, view: ViewName = 'front', aspect = 4 / 5): Box {
   let box: Box = { x: 0, y: 0, w: size.width, h: size.height }
   if (site === 'face_full' && result?.rois?.length) {
-    const pts = [...result.rois.flatMap((r) => r.polygon), ...(result.candidates ?? []).map((c) => [c.bbox[0] + c.bbox[2] / 2, c.bbox[1] + c.bbox[3] / 2])]
+    const pts = [...result.rois.flatMap((r) => r.polygon), ...(result.candidates ?? []).filter((c) => candidateView(c) === view).map((c) => [c.bbox[0] + c.bbox[2] / 2, c.bbox[1] + c.bbox[3] / 2])]
     const xs = pts.map((p) => p[0])
     const ys = pts.map((p) => p[1])
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]

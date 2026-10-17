@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 
 import { WillowLoader } from '../../components/willow/WillowLoader'
@@ -19,9 +19,13 @@ export default function FrontDoor() {
   const next = params.get('next')
   const [failed, setFailed] = useState(false)
   const agreedNoAccount = !loading && !user && hasConsent()
+  // One guest account per visit (StrictMode runs effects twice in dev).
+  const started = useRef(false)
 
   useEffect(() => {
-    if (agreedNoAccount) continueAsGuest().catch(() => setFailed(true))
+    if (!agreedNoAccount || started.current) return
+    started.current = true
+    continueAsGuest().catch(() => setFailed(true))
   }, [agreedNoAccount, continueAsGuest])
 
   if (loading) return <WillowLoader label="Opening Willow" />

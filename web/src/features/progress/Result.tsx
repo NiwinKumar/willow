@@ -8,14 +8,15 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { WillowLoader } from '../../components/willow/WillowLoader'
 import { useOwner, useSpots } from '../../data/hooks'
-import { SITE_ORDER, stalled } from '../../data/live'
+import { SAME_WAY_COUNTS, SITE_ORDER, stalled } from '../../data/live'
 import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import type { SpotTrack } from '../../lib/api'
-import { fmtDate } from '../../lib/format'
+import { clockOf, fmtDate } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
 import { failureReasons } from '../../lib/warnings'
 import { ExplanationCard, NextAction } from './ExplanationCard'
+import { LAST_LIKE_THIS } from './headline'
 import { MetricCard } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
 import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, referenceFor, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
@@ -310,6 +311,10 @@ export default function Result() {
   const day = dayOf(session)
   const measured = st === 'compared' || st === 'baseline' || st === 'former'
   const c = counts(session)
+  // Blemishes and dark spots may be compared with an earlier check-in taken the same way (the api's counts_ref), not the baseline.
+  const sameWay = (id: MetricId) => SAME_WAY_COUNTS.includes(id) && Boolean(session.counts_ref)
+  const sheetRef = session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, siteSessions) : baseline
+  const sheetRefLabel = sheetRef && sheetRef !== baseline && sheetRef !== session ? `Check-in, ${fmtDate(sheetRef.created_at) === fmtDate(session.created_at) ? clockOf(sheetRef.created_at) : fmtDate(sheetRef.created_at)}` : 'Baseline'
   const ask = () => {
     const changed = ordered.filter((m) => m.verdict === 'real_change').map((m) => `${METRIC_META[m.id].label} ${deltaText(m)}`)
     const q =
@@ -424,7 +429,7 @@ export default function Result() {
               </div>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,270px),1fr))] gap-3.5">
                 {ordered.map((m: Metric, i) => (
-                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline || st === 'former' ? m.mdc95 : bandOf(referenceFor(m.id, session, baseline, siteSessions), m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
+                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline || st === 'former' ? m.mdc95 : bandOf(referenceFor(m.id, session, baseline, siteSessions), m.id)} compared={st === 'compared'} against={sameWay(m.id) ? LAST_LIKE_THIS : undefined} onOpen={() => showMetric(m.id)} delay={i * 60} />
                 ))}
               </div>
             </>
@@ -470,7 +475,7 @@ export default function Result() {
         </Link>
       </p>
       <Disclaimer />
-      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, siteSessions) : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
+      <MetricSheet metric={openMetric} session={session} baseline={sheetRef} baselineLabel={sheetRefLabel} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
           // The sheet is a modal <dialog> (top layer): close it, or the advisor opens hidden behind it.
           closeMetric()
           shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)

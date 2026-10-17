@@ -71,7 +71,7 @@ export function baselineFor(session: Session | null, sessions: Session[]): Sessi
 }
 
 /** Counts the api compares only with a check-in taken the same way (with or without cheek photos). */
-const SAME_WAY_COUNTS: string[] = ['blemishes', 'pigment_spots']
+export const SAME_WAY_COUNTS: string[] = ['blemishes', 'pigment_spots']
 
 /** What one metric of a session was compared with: for its counts, the check-in taken the same way when the api says so; else the baseline. */
 export function referenceFor(metricId: string, session: Session, baseline: Session | null, sessions: Session[]): Session | null {

@@ -48,5 +48,4 @@ export function photoSteps(site: Site, mode: CaptureMode): { same: string; betwe
   }
 }
 
-export const DONT_VARY = 'Keep the angle, distance and light the same on purpose. No burst mode: each photo needs its own setup.'
 export const WHY_FIVE = 'Willow compares the 5 photos to learn how much your photos differ on their own. Later, only a change bigger than that is called real.'

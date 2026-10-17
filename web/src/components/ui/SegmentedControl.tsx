@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 /**
  * White pill on a translucent track; the pill morphs between options. role=radiogroup, arrow keys move. `glass`: the
- * design's glass track (bg-glass, blur, inset highlight) for use over a photo, compact (18px items, 44px touch area).
+ * design's glass track (bg-glass, blur, inset highlight) for use over a photo, compact (18px items, 11px labels, 44px touch area).
  */
 export function SegmentedControl<T extends string>({ options, value, onChange, label, size = 'md', glass = false, className = '' }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; label: string; size?: 'sm' | 'md'; glass?: boolean; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -33,7 +33,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
           aria-checked={o.value === value}
           tabIndex={o.value === value ? 0 : -1}
           onClick={() => onChange(o.value)}
-          className={`hit44 relative z-[1] flex-1 rounded-pill whitespace-nowrap text-ink ${glass ? 'min-h-[18px] px-1.5 text-[8px]' : size === 'sm' ? 'min-h-8 px-3 text-[13px]' : 'min-h-9 px-3 text-[13px]'}`}
+          className={`hit44 relative z-[1] flex-1 rounded-pill whitespace-nowrap text-ink ${glass ? 'min-h-[18px] px-1.5 text-[11px]' : size === 'sm' ? 'min-h-8 px-3 text-[13px]' : 'min-h-9 px-3 text-[13px]'}`}
         >
           {o.label}
         </button>
