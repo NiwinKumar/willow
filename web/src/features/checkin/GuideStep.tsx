@@ -1,10 +1,11 @@
 import { useState } from 'react'
 
+import { Toggle } from '../../components/ui/Toggle'
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { DONT_VARY } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
-import { checklist, GUIDE_BG, kindOf, lightroomSteps, pad2, SITE_NAME } from './model'
+import { canAddCheeks, checklist, GUIDE_BG, kindOf, lightroomSteps, pad2, POSE_NAME, shotPoses, SITE_NAME } from './model'
 
 const NOTE_CHIPS = ['New lamp', 'After a workout', 'Skipped products today']
 
@@ -19,6 +20,9 @@ export function GuideStep(props: {
   n: number
   baseline: Session | null
   thin: boolean
+  /** Face check-ins of 3+ photos: the last two show the left and the right cheek. */
+  cheeks: boolean
+  onCheeks: (v: boolean) => void
   goals: string[]
   note: string
   deviation: boolean
@@ -29,7 +33,11 @@ export function GuideStep(props: {
   onSite: (s: Site) => void
   onChangePlace: () => void
 }) {
-  const { site, mode, n, baseline, thin, goals, note, deviation } = props
+  const { site, mode, n, baseline, thin, cheeks, goals, note, deviation } = props
+  const poses = shotPoses(site, n, cheeks)
+  const total = poses.length
+  const sides = total > n || poses.some((p) => p !== 'front')
+  const baselineFrontOnly = Boolean(baseline && !(baseline.result?.views ?? []).some((v) => v.view !== 'front'))
   const raw = mode === 'calibrated_raw'
   const kind = kindOf(site)
   const first = n === 5
@@ -61,17 +69,18 @@ export function GuideStep(props: {
             ■ {name.toUpperCase()} · {raw ? 'RAW' : 'QUICK'} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
           </span>
           <h1 id="ck-title" tabIndex={-1} className="mt-[18px] mb-0 text-[clamp(30px,3.4vw,44px)] leading-[1.05] font-light tracking-[-0.02em] outline-none">
-            {first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
+            {sides ? `${total} photos: ${total - 2} facing the camera, then each cheek.` : first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
           </h1>
         </div>
-        <div className="flex items-center justify-center gap-[clamp(8px,2vw,18px)]" role="img" aria-label={`${n} photos`}>
-          {Array.from({ length: n }, (_, i) => (
+        <div className="flex items-start justify-center gap-[clamp(8px,2vw,18px)]" role="img" aria-label={sides ? `${total} photos: ${total - 2} facing the camera, then the left and the right cheek` : `${n} photos`}>
+          {poses.map((pose, i) => (
             <span key={i} className="flex flex-col items-center gap-2.5">
               <span
-                className="h-[clamp(52px,8vw,80px)] w-[clamp(40px,6vw,62px)] rounded-full border-[1.5px] border-dashed border-white/65"
-                style={{ background: 'radial-gradient(circle at 50% 40%, rgba(255,255,255,.25), transparent 70%)', rotate: `${(i - (n - 1) / 2) * 6}deg`, animation: `wBreathe 4s ease-in-out ${-i * 0.6}s infinite` }}
+                className={`h-[clamp(52px,8vw,80px)] rounded-full border-[1.5px] border-dashed border-white/65 transition-[width] duration-300 ${pose === 'front' ? 'w-[clamp(40px,6vw,62px)]' : 'w-[clamp(30px,4.5vw,46px)]'}`}
+                style={{ background: `radial-gradient(circle at ${pose === 'left' ? 35 : pose === 'right' ? 65 : 50}% 40%, rgba(255,255,255,.25), transparent 70%)`, rotate: `${(i - (total - 1) / 2) * 6}deg`, animation: `wBreathe 4s ease-in-out ${-i * 0.6}s infinite` }}
               />
               <span className="font-dot text-[20px]">{pad2(i + 1)}</span>
+              {pose !== 'front' ? <span className="-mt-1.5 font-mono text-[10px] tracking-[.08em] opacity-85">{pose === 'left' ? 'LEFT' : 'RIGHT'}</span> : null}
             </span>
           ))}
         </div>
@@ -114,6 +123,18 @@ export function GuideStep(props: {
             ))}
           </div>
         </div>
+
+        {canAddCheeks(site, n) ? (
+          <div className="flex flex-col gap-1.5 rounded-[28px] bg-surface/[.88] px-[22px] py-3">
+            <Toggle
+              label="Cheek photos"
+              checked={cheeks}
+              onChange={props.onCheeks}
+              description={cheeks ? `Photos ${total - 1} and ${total}: turn your head about 45° to show your ${POSE_NAME.left.toLowerCase()}, then your ${POSE_NAME.right.toLowerCase()}. Spots on the cheeks and jaw are counted on them.` : 'Every photo faces the camera. Cheek photos show the spots a front photo misses.'}
+            />
+            {cheeks && baselineFrontOnly ? <span className="pb-1 text-[13px] leading-[1.4] text-ink-2">Your baseline has front photos only, so today’s spot counts won’t compare with it like for like.</span> : null}
+          </div>
+        ) : null}
 
         {raw ? (
           <div className="rounded-[36px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse squircle">
