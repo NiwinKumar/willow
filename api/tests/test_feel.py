@@ -63,6 +63,9 @@ def test_history_keeps_one_answer_a_week():
         (4, "working"),
     ]
     assert feel.week_of(None, date(2026, 10, 1)) == 0
+    stopped = {"started_at": "2026-09-01", "ended_at": "2026-09-16"}
+    feel.record(stopped, "not_for_me", [], datetime(2026, 10, 1, tzinfo=UTC))
+    assert stopped["feel"]["week"] == 2  # counted to the stop day, not the answer day
     assert feel.words(doc["feel"]) == {"verdict": "It's working for me", "feels": [], "week": 4}
 
 

@@ -5,6 +5,7 @@ measured evidence, campaign eligibility or a reading. Brands see it only as tota
 people (app/retail_intel.py), the advisor reads it as the person's own words (app/advisor.py).
 """
 
+from contextlib import suppress
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
@@ -47,10 +48,14 @@ def record(doc: dict[str, Any], verdict: str, tags: list[str], now: datetime | N
     """Set the latest answer and keep one per week in the history (a new answer replaces that
     week's)."""
     now = now or datetime.now(UTC)
+    # a stopped product's weeks of use end on its stop day
+    day = now.date()
+    with suppress(ValueError):
+        day = min(day, date.fromisoformat(doc.get("ended_at") or ""))
     answer = {
         "verdict": verdict,
         "tags": list(dict.fromkeys(tags))[:MAX_TAGS],
-        "week": week_of(doc.get("started_at"), now.date()),
+        "week": week_of(doc.get("started_at"), day),
         "at": now.isoformat(),
     }
     history = [h for h in doc.get("feel_history") or [] if h.get("week") != answer["week"]]
