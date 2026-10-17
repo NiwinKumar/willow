@@ -101,3 +101,30 @@ def test_same_kind_as_the_baseline_keeps_the_engines_comparison():
     r["metrics"][0].update(delta=1.0, verdict="within_noise")
     assert baselines.match_counts(store, "u", "f2", DOC, r, front_base) is None
     assert _metric(r, "blemishes")["delta"] == 1.0 and "warnings" not in r
+
+
+def test_a_side_only_check_in_never_compares_or_becomes_a_reference():
+    store = MemoryStore()
+    cheek_base = baselines.build("b", DOC, _result(14, 0.5, cheeks=True))
+    side = _result(5, 0.1, cheeks=True, sid="s1")
+    side["views"] = _views()[1:2]  # the front photo failed: one cheek only
+    side["metrics"][0].update(delta=-9.0, verdict="real_change", direction="decrease")
+    assert not baselines.with_cheeks(side) and baselines.side_only(side)
+    assert baselines.match_counts(store, "u", "s1", DOC, side, cheek_base) is None
+    assert _metric(side, "blemishes")["verdict"] == "no_baseline"
+    baselines.remember_counts(store, "u", "s1", DOC, side)
+    for cheeks in (True, False):
+        key = baselines.counts_key(baselines.key("face_full", "uncalibrated"), cheeks)
+        assert store.baseline_get("u", key) is None
+
+
+def test_a_poor_photo_keeps_saying_so_and_a_deleted_reference_is_not_used():
+    store = MemoryStore()
+    front_base = baselines.build("b", DOC, _result(3, 0.02, cheeks=False))
+    first = _result(11, 0.9, cheeks=True, sid="c1")
+    baselines.remember_counts(store, "u", "c1", DOC, first)  # c1 is never saved as a session
+    later = _result(15, 0.7, cheeks=True, sid="c2")
+    later["metrics"][1]["verdict"] = "low_quality"
+    assert baselines.match_counts(store, "u", "c2", DOC, later, front_base) is None
+    assert _metric(later, "blemishes")["verdict"] == "no_baseline"  # c1 is gone
+    assert _metric(later, "pigment_spots")["verdict"] == "low_quality"
