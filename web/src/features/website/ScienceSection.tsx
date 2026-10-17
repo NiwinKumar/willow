@@ -1,5 +1,5 @@
 import type { MetricId, Site } from '../../data/types'
-import { METRIC_META } from '../../lib/metrics'
+import { CLOSE_UPS, METRIC_META } from '../../lib/metrics'
 import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { glide } from './scroll'
 
@@ -14,7 +14,7 @@ const name = (id: MetricId) => (id === 'dark_circles' ? 'under-eye darkness' : M
 const measuredAt = (sites: Site[]) => ALL.filter((id) => METRIC_META[id].sites.some((s) => sites.includes(s)))
 
 const FACE = measuredAt(['face_full'])
-const CLOSE_UP = measuredAt(['cheek_macro', 'nose_macro'])
+const CLOSE_UP = measuredAt(CLOSE_UPS)
 const CLOSE_ONLY = CLOSE_UP.filter((id) => !FACE.includes(id))
 const FOREARM = measuredAt(['forearm_treated', 'forearm_control'])
 

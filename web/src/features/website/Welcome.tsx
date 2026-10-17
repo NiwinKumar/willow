@@ -6,7 +6,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } 
 import type { MetricId, Site } from '../../data/types'
 import type { PhotoTime, SkinType } from '../../lib/api'
 import { syncConsent } from '../../lib/consent'
-import { GOALS, MAX_GOALS, METRIC_META, type GoalId } from '../../lib/metrics'
+import { CLOSE_UPS, GOALS, MAX_GOALS, METRIC_META, type GoalId } from '../../lib/metrics'
 import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
@@ -255,12 +255,12 @@ const GOAL_LOOK: Record<GoalId, { bg: string; fg: string }> = {
   oil_glow: { bg: 'radial-gradient(90% 80% at 50% 100%, #F2B53A 0%, #F6DE5C 40%, #F5F0DA 85%)', fg: '#2A2410' },
 }
 
-const PLACE: Record<Site, string> = { face_full: 'FACE', cheek_macro: 'CLOSE-UP', nose_macro: 'CLOSE-UP', forearm_treated: 'ARM', forearm_control: 'ARM' }
+const PLACE: Record<Site, string> = { face_full: 'FACE', cheek_macro: 'CLOSE-UP', left_cheek_macro: 'CLOSE-UP', right_cheek_macro: 'CLOSE-UP', forehead_macro: 'CLOSE-UP', chin_macro: 'CLOSE-UP', nose_macro: 'CLOSE-UP', forearm_treated: 'ARM', forearm_control: 'ARM' }
 
 /** Where a goal's measurements come from, read off the metric table: "FACE · CLOSE-UPS". */
 function goalPlaces(metrics: MetricId[]): string {
   const sites = metrics.flatMap((m) => METRIC_META[m].sites)
-  const order: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+  const order: Site[] = ['face_full', ...CLOSE_UPS, 'forearm_treated', 'forearm_control']
   return [...new Set(order.filter((s) => sites.includes(s)).map((s) => PLACE[s]))].join(' · ')
 }
 

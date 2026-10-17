@@ -23,7 +23,7 @@ import './checkin.css'
 import { addFiles, isDng, recheck, rowsFromShots, usable } from './files'
 import { FilesStep } from './FilesStep'
 import { GuideStep } from './GuideStep'
-import { cheeksByDefault, neededFor, parseMode, parseSite, plural, shotPoses, STEPS, thinBaseline, type Step } from './model'
+import { cheeksByDefault, neededFor, parseMode, parseSite, plural, shotPoses, siteForMode, sitesFor, STEPS, thinBaseline, type Step } from './model'
 import { FlowBackdrop, SampleBanner } from './parts'
 import { outcomeOf } from './outcome'
 import { ProcessingStep } from './ProcessingStep'
@@ -344,9 +344,10 @@ export default function CheckInFlow() {
     return { site: s, mode: m, n: known ? String(neededFor(sessionsOf(s), m)) : null }
   }
 
-  const setSiteMode = (s: Site, m: CaptureMode, replace = true, extra: Record<string, string | null> = {}) => {
+  const setSiteMode = (place: Site, m: CaptureMode, replace = true, extra: Record<string, string | null> = {}) => {
     if (!upload.locked) upload.reset([])
     clearShots()
+    const s = siteForMode(place, m) // RAW is for close-ups and forearms: a face switching to RAW becomes a cheek close-up
     go({ site: s, mode: m, n: known ? String(neededFor(sessionsOf(s), m)) : null, ...extra }, { replace })
   }
 
@@ -355,6 +356,10 @@ export default function CheckInFlow() {
     const anyPhoto = usable(upload.rows).some((r) => r.contentType !== 'image/x-adobe-dng')
     // (not once the session exists, or for a top-up: their capture mode is fixed)
     if (mode === 'uncalibrated' && picked.every(isDng) && !anyPhoto && !upload.locked && !topup) {
+      if (!sitesFor('calibrated_raw').includes(site)) {
+        toast.error(`RAW files are for close-ups and forearms. Pick JPEG or HEIC photos for the ${site === 'face_full' ? 'whole face' : 'cheek'}, or choose a close-up place first.`)
+        return
+      }
       const rawN = known ? neededFor(sessionsOf(site), 'calibrated_raw') : (n ?? 5)
       upload.setRows(addFiles(upload.rows, picked, 'calibrated_raw', rawN))
       go({ mode: 'calibrated_raw', n: String(rawN) }, { replace: true })
