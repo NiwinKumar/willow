@@ -96,3 +96,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Change: `GET /v1/retailer/products/{id}/actions`, `POST /v1/retailer/products/{id}/claims` (rows in `docs/CONTRACT.md`); Ask's Gemini input gains `perception` (no response change). New daily cap `proof_claims` 30 / 1500.
 - Impact: engine none; schemas none; api and web only.
 - Approved by: n/a (api and web, both Niwin's)
+
+## 2026-10-18: Close-ups of one place (proposed by Harshini; #92-#94)
+- What: new sites `left_cheek_macro`, `right_cheek_macro`, `forehead_macro`, `chin_macro` (left and right are the person's own, as in face_full) in `schemas/analyze_request.schema.json`, `schemas/analysis_result.schema.json` and the api's copies. The engine cuts each place from the face landmarks when a face is in view (one cheek only when it faces the camera, the forehead above the brows, the chin below the lower lip), else skin by colour as before; each returns the cheek close-up's metrics. `cheek_macro` and `nose_macro` are unchanged. The api accepts the sites, refuses `calibrated_raw` for `face_full`, and gives each place its retake hint; the web check-in offers the places.
+- Version: engine stays 0.4.0 (no existing number changes; new sites start their own baselines).
+- Impact: engine, schemas, api, web.
+- Approved by: [x] Harshini [x] Niwin (Oct 18)
