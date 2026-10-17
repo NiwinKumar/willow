@@ -3,12 +3,18 @@
  * the names the retail screens use. Shapes: docs/CONTRACT.md section 3.
  */
 export type {
+  RetailerAction as Action,
+  RetailerActions as Actions,
+  RetailerActionSection as ActionSection,
   RetailerBrandDetail as BrandDetail,
   RetailerBrandFlow as BrandFlow,
   RetailerBrandSummary as BrandSummary,
   RetailerBrief as Brief,
   RetailerBriefCard as BriefCard,
   RetailerBriefSection as BriefSection,
+  RetailerClaimChannel as ClaimChannel,
+  RetailerClaims as Claims,
+  RetailerClaimSource as ClaimSource,
   RetailerCohort as Cohort,
   RetailerEvidence as Evidence,
   RetailerFeel as Feel,
