@@ -22,7 +22,7 @@ import { EligibleList } from './promote/EligibleList'
  * the products this workspace can promote; with no campaigns, how proof-gated promotion works in three steps.
  * Eligibility is always the mixed cohort, all time (the evidence shoppers see), whatever the top bar says.
  * Sign-in: a guest account, made on arrival (as Ask does on first question).
- * URL: ?new=<product_id> (or ?new=1, or the older ?product=<id>) opens the create panel; ?campaign=<id> opens a
+ * URL: ?new=<product_id> (or ?new=1, or the older ?product=<id>) opens the create panel (&skins=a,b ticks only those skin types); ?campaign=<id> opens a
  * campaign; ?all=1 lists campaigns from every workspace.
  */
 
@@ -187,8 +187,10 @@ function Body({ uid }: { uid: string }) {
   const workspaceOf = (c: Campaign) => (c.workspace === wsId ? null : c.workspace === 'retailer' ? 'retailer workspace' : `${c.workspace} workspace`)
 
   const target = createTarget(param('new'), param('product'))
-  const openCreate = (productId?: string) => setParam({ new: productId ?? '1', product: null, campaign: null }, { push: true })
-  const closeCreate = () => setParam({ new: null, product: null })
+  // ?skins=a,b (a next step on the product page): the skin types to tick when the sheet opens.
+  const initialSkins = (param('skins') ?? '').split(',').filter(Boolean)
+  const openCreate = (productId?: string) => setParam({ new: productId ?? '1', product: null, campaign: null, skins: null }, { push: true })
+  const closeCreate = () => setParam({ new: null, product: null, skins: null })
   const openCampaign = (id: string) => setParam({ campaign: id }, { push: true })
   const closeCampaign = () => {
     setParam({ campaign: null })
@@ -338,6 +340,7 @@ function Body({ uid }: { uid: string }) {
         rows={rows}
         workspace={{ id: wsId ?? 'retailer', label: wsLabel }}
         initialProduct={target.product}
+        initialSkins={initialSkins}
         running={running}
         onCreated={onCreated}
         onShowCampaigns={showCampaigns}
