@@ -27,9 +27,11 @@ export const TAGS: { id: FeelTag; label: string; good: boolean }[] = [
 ]
 export const MAX_TAGS = 4
 
-/** The nudge asks about a product in use this long, again once the last answer is this old. */
-export const NUDGE_DAYS = 14
-/** A stopped product is asked about once if it was used at least this long and stopped within NUDGE_DAYS. */
+/** The nudge first asks about a product once it has been in use this long. */
+export const NUDGE_DAYS = 7
+/** It asks again once the last answer is this old. */
+export const REASK_DAYS = 14
+/** A stopped product is asked about once if it was used at least this long and stopped within REASK_DAYS. */
 export const STOPPED_MIN_DAYS = 7
 /** "Not now" hides the nudge this long. */
 export const SNOOZE_DAYS = 7
@@ -80,14 +82,14 @@ export type FeelNudge = { entry: RoutineEntry; weeks: number; stopped: boolean }
 
 /**
  * Which product the routine nudge asks about, at most one: in use for NUDGE_DAYS or more with no answer
- * in the last NUDGE_DAYS, or stopped within the last NUDGE_DAYS after STOPPED_MIN_DAYS or more of use and
+ * in the last REASK_DAYS, or stopped within the last REASK_DAYS after STOPPED_MIN_DAYS or more of use and
  * never answered. Oldest start first. `today` is the person's own day (YYYY-MM-DD).
  */
 export function feelNudge(entries: RoutineEntry[], today: string): FeelNudge | null {
   const due = entries.filter((e) => {
-    if (!e.ended_at) return daysBetween(e.started_at, today) >= NUDGE_DAYS && (!e.feel || daysBetween(e.feel.at, today) >= NUDGE_DAYS)
+    if (!e.ended_at) return daysBetween(e.started_at, today) >= NUDGE_DAYS && (!e.feel || daysBetween(e.feel.at, today) >= REASK_DAYS)
     const sinceStop = daysBetween(e.ended_at, today)
-    return !e.feel && sinceStop >= 0 && sinceStop <= NUDGE_DAYS && daysBetween(e.started_at, e.ended_at) >= STOPPED_MIN_DAYS
+    return !e.feel && sinceStop >= 0 && sinceStop <= REASK_DAYS && daysBetween(e.started_at, e.ended_at) >= STOPPED_MIN_DAYS
   })
   const entry = [...due].sort((a, b) => a.started_at.localeCompare(b.started_at))[0]
   if (!entry) return null
