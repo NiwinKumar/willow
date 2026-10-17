@@ -137,7 +137,7 @@ export default function SignIn() {
       {/* Laptop: the bloom and the line on the left. Phone: only the back link above the card, so the form fits. */}
       <div className="relative flex flex-col justify-between overflow-hidden px-[clamp(12px,3vw,40px)] pt-[clamp(10px,2vh,40px)] min-[900px]:pb-[clamp(20px,3vw,40px)]">
         <HeroBloom className="absolute inset-0" mask="radial-gradient(70% 70% at 50% 50%, #000 40%, transparent 85%)" />
-        <Link to="/" className="glass-pill relative flex items-center gap-2.5 self-start rounded-pill py-1.5 pl-1.5 pr-4 text-[14px] text-ink no-underline">
+        <Link to="/about" className="glass-pill relative flex items-center gap-2.5 self-start rounded-pill py-1.5 pl-1.5 pr-4 text-[14px] text-ink no-underline">
           <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white">
             ←
           </span>

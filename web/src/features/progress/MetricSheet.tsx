@@ -26,10 +26,10 @@ function why(m: Metric, s: Session, band: number | null): string {
 
 /**
  * Metric detail (design bottom sheet): what changed in points (StoryCard), what the number is, baseline / this
- * check-in / change / normal range /
- * confidence, the verdict and why, the metric over time in this site and mode, what else moves it.
+ * check-in / change / normal range / confidence, the verdict and why, the metric over time in this site and mode,
+ * what else moves it. `baseline` is what this metric was compared with; `baselineLabel` names it in the table.
  */
-export function MetricSheet({ metric, session, baseline, sessions, onClose, onAsk }: { metric: Metric | null; session: Session; baseline: Session | null; sessions: Session[]; onClose: () => void; onAsk: (m: Metric) => void }) {
+export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseline', sessions, onClose, onAsk }: { metric: Metric | null; session: Session; baseline: Session | null; baselineLabel?: string; sessions: Session[]; onClose: () => void; onAsk: (m: Metric) => void }) {
   const m = metric
   const open = Boolean(m)
   if (!m) return <Sheet open={false} onClose={onClose} title="Metric detail" variant="bottom" size="lg">{null}</Sheet>
@@ -43,7 +43,7 @@ export function MetricSheet({ metric, session, baseline, sessions, onClose, onAs
   const unit = unitOf(m).trim()
   const label = METRIC_META[m.id].label
   const stats: [string, string, boolean][] = [
-    ['Baseline', session.is_baseline ? valueText(m) : bm ? valueText(bm) : '—', false],
+    [baselineLabel, session.is_baseline ? valueText(m) : bm ? valueText(bm) : '—', false],
     ['This check-in', valueText(m), false],
     ['Change', session.is_baseline || m.delta === null ? '—' : deltaText(m), true],
     ['Normal range', band !== null ? bandText(m, band) : 'none yet', false],

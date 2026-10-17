@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import type { Metric } from '../src/data/types.ts'
-import { verdictHeadline } from '../src/features/progress/headline.ts'
+import { LAST_LIKE_THIS, verdictHeadline } from '../src/features/progress/headline.ts'
 
 function metric(p: Partial<Metric>): Metric {
   return { id: 'redness', group: 'redness', label: 'Redness', unit: 'a_star', confidence: 'indicative', value: 12.2, within_session_sd: 0.2, mdc95: 0.8, delta: -0.9, verdict: 'real_change', direction: 'decrease', extras: {}, ...p } as Metric
@@ -13,6 +13,11 @@ const later = { is_baseline: false }
 test('a real change reads in words, numbers before → now', () => {
   assert.deepEqual(verdictHeadline(metric({}), later), { headline: 'Calmer than your start', numbers: '13.1 → 12.2' })
   assert.equal(verdictHeadline(metric({ delta: 0.9, value: 14.0 }), later)?.headline, 'More redness than your start')
+})
+
+test('counts compared with an earlier check-in taken the same way say so', () => {
+  const spots = metric({ id: 'blemishes', group: 'clarity', value: 3, delta: -2 })
+  assert.equal(verdictHeadline(spots, later, LAST_LIKE_THIS)?.headline, 'Fewer blemishes than your last check-in like this')
 })
 
 test('within the normal range: no real change', () => {
