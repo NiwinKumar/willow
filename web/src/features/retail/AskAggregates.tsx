@@ -8,7 +8,7 @@ import type { Filters, Insights } from './types'
 import { cohortKind, MIN_GROUP } from './ui'
 
 /** Starters: each one is answerable from the aggregates (the last is refused: no individuals). */
-const SUGGESTIONS = ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How do outcomes compare with non-users?', 'Which users changed the most?']
+const SUGGESTIONS = ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How do outcomes compare with non-users?', 'Which products do people say are working, and is it measured?', 'Which users changed the most?']
 
 /** The api checks 3 to 300 characters (retailer_routes.py AskRequest); the form does too, so no 422. */
 const MIN_Q = 3
