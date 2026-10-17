@@ -63,6 +63,39 @@ export const GUIDE_BG: Record<Kind, string> = {
   arm: 'radial-gradient(70% 55% at 50% 0%, #8E7BFF 0%, #4B3AA8 35%, #1E1550 65%, #0B0820 100%)',
 }
 
+/** Which way the face points in each photo of a check-in. */
+export type Pose = 'front' | 'left' | 'right'
+export const POSE_NAME: Record<Exclude<Pose, 'front'>, string> = { left: 'Left cheek', right: 'Right cheek' }
+/** Said in the camera while a cheek photo is next (the person's own left and right). */
+export const POSE_HINT: Record<Exclude<Pose, 'front'>, string> = {
+  left: 'Turn your head about 45° to show your left cheek · one eye and the tip of your nose still in view',
+  right: 'Turn your head about 45° to show your right cheek · one eye and the tip of your nose still in view',
+}
+
+/** A face check-in of 3 or more photos can add a left and a right cheek photo. */
+export const canAddCheeks = (site: Site, n: number) => site === 'face_full' && n >= 3
+
+/**
+ * Each photo's pose for a check-in planned as `n` front photos: front photos first, then the left and the right cheek.
+ * With cheek photos 3 face the camera (enough to confirm a mark in a second photo) and 2 show the cheeks, so the
+ * check-in stays within the 5 photos the api takes.
+ */
+export function shotPoses(site: Site, n: number, cheeks: boolean): Pose[] {
+  if (!cheeks || !canAddCheeks(site, n)) return Array.from({ length: n }, () => 'front')
+  return ['front', 'front', 'front', 'left', 'right']
+}
+
+export const hasCheeks = (s: Session | null | undefined) => (s?.result?.views ?? []).some((v) => v.view !== 'front')
+
+/**
+ * Cheek photos the way the last measured face check-in was taken (its counts compare with check-ins taken the same
+ * way), and on for a first one.
+ */
+export function cheeksByDefault(sessions: Session[]): boolean {
+  const last = [...sessions].reverse().find((s) => s.status === 'done' && s.result)
+  return last ? hasCheeks(last) : true
+}
+
 export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'quick')
 
 /**

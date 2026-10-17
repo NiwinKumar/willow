@@ -1,6 +1,7 @@
 import { forwardRef, useMemo, useState, type KeyboardEvent } from 'react'
 
-import type { MetricId, Session } from '../../data/types'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import type { MetricId, Session, ViewName } from '../../data/types'
 import type { SessionView } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
@@ -13,9 +14,10 @@ import { regionItems, type RegionItem } from './regions'
 import { spotItems, spotLabelLine, spotShort, type SpotItem } from './spots'
 import { useHoldCompare } from './useHoldCompare'
 import { useImageStatus } from './useImageStatus'
+import { candidateView, GROUP_LABEL, shownViews, VIEW_LABEL, VIEW_ORDER, viewSession } from './views'
 
 /** A spot diary sighting shown on this photo: its box in this photo's pixels. */
-export type DiaryFocus = { bbox: [number, number, number, number] | null; tag: string; area: string; status: string; backLabel: string; onBack: () => void }
+export type DiaryFocus = { bbox: [number, number, number, number] | null; candidateId?: string | null; tag: string; area: string; status: string; backLabel: string; onBack: () => void }
 
 type Overlay = 'spots' | 'redness' | 'areas' | 'none'
 const OVERLAY_LABEL: Record<Overlay, string> = { spots: 'Spots', redness: 'Redness', areas: 'Areas', none: 'None' }
@@ -35,11 +37,15 @@ type Props = {
   onOpenMetric?: (id: MetricId) => void
 }
 
+/** Side photos measure only the marks on their cheek and jaw; tone, glow and the rest come from the front photo. */
+const SIDE_METRICS: MetricId[] = ['pigment_spots', 'blemishes']
+
 /**
  * The reference photo with what the engine found on it: spot candidates as numbered rings, the redness map
  * (when the engine drew one), the measured regions (tap one for its metrics) or nothing. Hold the photo (or
- * B) to see the baseline photo in place. Beside it the "Detected spots" panel, the mole note and the
- * photo-quality card.
+ * B) to see the baseline photo in place. A check-in with cheek photos has a glass Front face / Left cheek /
+ * Right cheek toggle; each photo shows its own spots, redness and areas. Beside it the "Detected spots" panel
+ * (grouped by photo when there are cheek photos), the mole note and the photo-quality card.
  */
 export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ session, focus, baseline = null, view = null, order = [], onOpenMetric }, ref) {
   const [overlayPick, setOverlay] = useState<Overlay | null>(null)
@@ -47,24 +53,50 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const [picked, setPicked] = useState<{ sid: string; n: number } | null>(null)
   const [region, setRegion] = useState<{ sid: string; key: string } | null>(null)
   const [all, setAll] = useState(false)
-  const items = useMemo(() => spotItems(session), [session])
-  const box = useMemo(() => frameFor(session.site, session.result, photoSize(session)), [session])
-  const regions = useMemo(() => regionItems(session, order), [session, order])
+  const [viewPick, setViewPick] = useState<{ sid: string; focusId: string | null; v: ViewName } | null>(null)
+
+  // The single-session view belongs to this session only (it may still be the previous one while scrubbing).
+  const own = view?.session.id === session.id ? view.session : null
+  const signedViews = useMemo(() => own?.views ?? [], [own])
+  const views = useMemo(() => shownViews(session.result, signedViews), [session.result, signedViews])
+  const multi = views.length > 1
+  const allItems = useMemo(() => spotItems(session), [session])
+  // Which photo is on the stage: the one picked, else the one the diary's spot is on, else the front.
+  const focusId = focus?.candidateId ?? null
+  const focusItem = focusId ? allItems.find((it) => it.c.id === focusId) : undefined
+  const pickedView = viewPick?.sid === session.id && viewPick.focusId === focusId ? viewPick.v : null
+  const wanted = pickedView ?? (focusItem ? candidateView(focusItem.c) : null)
+  const rv = multi ? (views.find((v) => v.view === wanted) ?? views[0]) : null
+  const active: ViewName = rv?.view ?? 'front'
+  const sv = rv ? signedViews.find((v) => v.view === rv.view) : undefined
+  const shown = useMemo(() => (rv && sv ? viewSession(session, rv, sv.preview) : session), [session, rv, sv])
+  const pickView = (v: ViewName) => setViewPick({ sid: session.id, focusId, v })
+
+  const items = multi ? allItems.filter((it) => candidateView(it.c) === active) : allItems
+  const box = useMemo(() => frameFor(shown.site, shown.result, photoSize(shown)), [shown])
+  const regions = useMemo(() => regionItems(shown, order, active === 'front' ? undefined : SIDE_METRICS), [shown, order, active])
   const visible = items.filter((it) => showHidden || !it.hidden)
-  const skin = items.filter((it) => !it.hidden)
-  const labelsMissing = items.length > 0 && !Object.keys(session.label_details ?? {}).length
-  const selN = picked?.sid === session.id ? picked.n : (visible[0]?.n ?? null)
-  const sel = visible.find((it) => it.n === selN) ?? null
+  const listed = allItems.filter((it) => showHidden || !it.hidden)
+  const skin = allItems.filter((it) => !it.hidden)
+  const labelsMissing = allItems.length > 0 && !Object.keys(session.label_details ?? {}).length
+  const selN = picked?.sid === session.id ? picked.n : (visible[0]?.n ?? listed[0]?.n ?? null)
+  const sel = listed.find((it) => it.n === selN) ?? null
+  // Picking a spot in the list shows the photo it is on.
+  const pick = (it: SpotItem) => {
+    setPicked({ sid: session.id, n: it.n })
+    if (multi && candidateView(it.c) !== active) pickView(candidateView(it.c))
+  }
+  const groups = multi ? VIEW_ORDER.filter((v) => views.some((x) => x.view === v)).map((v) => ({ v, items: listed.filter((it) => candidateView(it.c) === v) })) : [{ v: 'front' as ViewName, items: listed }]
   const spotsHere = siteHasSpots(session.site)
   const expired = !session.preview && photoExpired(session)
   const missing = expired ? 'Photos are deleted 30 days after upload. The measurements stay.' : 'No photo preview for this check-in. The numbers are measured from your photos.'
   const caption = `${session.capture_mode === 'uncalibrated' ? 'QUICK PHOTO' : 'MEASURED REFERENCE PHOTO'} · ${fmtDate(session.created_at).toUpperCase()}${session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''}`
-  const focusPos = focus?.bbox ? toPct(box, focus.bbox[0] + focus.bbox[2] / 2, focus.bbox[1] + focus.bbox[3] / 2) : null
+  // The diary's box is in the pixels of the photo its spot was found on.
+  const focusHere = !multi || !focusItem || candidateView(focusItem.c) === active
+  const focusPos = focus?.bbox && focusHere ? toPct(box, focus.bbox[0] + focus.bbox[2] / 2, focus.bbox[1] + focus.bbox[3] / 2) : null
   const focusSize = focus?.bbox ? Math.min(64, Math.max(28, (Math.max(focus.bbox[2], focus.bbox[3]) / box.w) * 420 + 14)) : 0
 
-  // The single-session view belongs to this session only (it may still be the previous one while scrubbing).
-  const own = view?.session.id === session.id ? view.session : null
-  const rednessUrl = own?.overlay_urls?.redness ?? null
+  const rednessUrl = (sv ? sv.redness_url : own?.overlay_urls?.redness) ?? null
   const crops = own?.crop_urls ?? {}
 
   // Overlay choices: only what this photo has. "None" whenever there is something to switch off.
@@ -74,8 +106,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const redFailed = useImageStatus(overlay === 'redness' ? rednessUrl : null) === 'failed'
   const openRegion = overlay === 'areas' ? (regions.find((r) => region?.sid === session.id && r.key === region.key) ?? null) : null
 
-  // Hold to compare with the baseline photo.
-  const canCompare = Boolean(session.preview && baseline && baseline.id !== session.id && baseline.preview && !session.is_baseline)
+  // Hold to compare with the baseline photo (its front photo: only on the front view).
+  const canCompare = Boolean(active === 'front' && session.preview && baseline && baseline.id !== session.id && baseline.preview && !session.is_baseline)
   const hold = useHoldCompare(canCompare, session.id)
   const baseBox = useMemo(() => (baseline ? frameFor(baseline.site, baseline.result, photoSize(baseline)) : null), [baseline])
   const baseDate = baseline ? fmtDate(baseline.created_at) : ''
@@ -89,7 +121,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
       <button
         key={it.n}
         type="button"
-        onClick={() => setPicked({ sid: session.id, n: it.n })}
+        onClick={() => pick(it)}
         aria-label={`Spot ${it.n}: ${it.kind}`}
         aria-pressed={on}
         className="group absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
@@ -109,8 +141,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
     <div className={`grid items-start gap-4 pt-6 ${spotsHere ? 'grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))]' : ''}`}>
       <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
         <div className={`relative ${canCompare ? 'touch-pan-y select-none [-webkit-touch-callout:none]' : ''}`} {...(canCompare ? hold.bind : {})}>
-          <PhotoFrame session={session} box={box} alt={`Your ${MODE_LABEL[session.capture_mode]} photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
-            {overlay === 'redness' && rednessUrl ? <RednessLayer url={rednessUrl} box={box} session={session} /> : null}
+          <PhotoFrame session={shown} box={box} alt={`Your ${multi ? `${VIEW_LABEL[active].toLowerCase()} ` : ''}${MODE_LABEL[session.capture_mode]} photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
+            {overlay === 'redness' && rednessUrl ? <RednessLayer url={rednessUrl} box={box} session={shown} /> : null}
             {overlay === 'areas' ? <RegionLayer regions={regions} box={box} open={openRegion?.key ?? null} onPick={(key) => setRegion(openRegion?.key === key ? null : { sid: session.id, key })} /> : null}
             {overlay === 'spots' ? visible.map(ring) : null}
             {focus && focusPos ? (
@@ -126,12 +158,16 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
               </>
             ) : null}
           </PhotoFrame>
-          <span className="pointer-events-none absolute top-[18px] left-[18px] rounded-pill bg-white/70 px-2 py-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
+          {multi ? (
+            <div className="absolute top-3.5 left-1/2 z-[6] w-max max-w-[calc(100%-24px)] -translate-x-1/2">
+              <SegmentedControl glass label="Which photo" options={views.map((v) => ({ value: v.view, label: VIEW_LABEL[v.view] }))} value={active} onChange={pickView} />
+            </div>
+          ) : null}
           {focus && overlay !== 'areas' ? (
-            <div className="absolute inset-x-3.5 top-11 z-[5] flex animate-[wRise_.35s_both] items-center gap-3 rounded-[22px] bg-surface/90 py-2.5 pr-2.5 pl-4 backdrop-blur-[14px]">
+            <div className={`absolute inset-x-3.5 z-[5] ${multi ? 'top-[62px]' : 'top-3.5'} flex animate-[wRise_.35s_both] items-center gap-3 rounded-[22px] bg-surface/90 py-2.5 pr-2.5 pl-4 backdrop-blur-[14px]`}>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-[15px]">{focus.area}</span>
-                <span className="text-[13px] text-ink-2">{focus.bbox ? focus.status : 'Not seen on this photo'}</span>
+                <span className="text-[13px] text-ink-2">{focus.bbox && focusHere ? focus.status : 'Not seen on this photo'}</span>
               </span>
               <button type="button" onClick={focus.onBack} className="min-h-11 shrink-0 rounded-pill bg-selected px-3.5 text-[13px] text-inverse">
                 Back to {focus.backLabel}
@@ -142,10 +178,6 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             <span className="pointer-events-none absolute bottom-[72px] left-[18px] z-[5] max-w-[calc(100%-36px)] rounded-[16px] bg-white/80 px-3 py-2 text-[12px] leading-[1.35]">
               {redFailed ? 'The redness map could not be loaded. Reload the page to try again.' : 'Marked: where the camera sees more red than your usual skin. Not a medical assessment.'}
             </span>
-          ) : session.preview && overlay === 'areas' && !openRegion ? (
-            <span className="pointer-events-none absolute bottom-[72px] left-[18px] z-[5] max-w-[calc(100%-36px)] rounded-[16px] bg-white/80 px-3 py-2 text-[12px] leading-[1.35]">
-              The areas Willow measured. Tap one to see what is read there.
-            </span>
           ) : null}
           {session.preview && options.length ? <OverlayPicker options={options} value={overlay} onChange={setOverlay} /> : null}
           {hold.armed && baseline && baseBox ? (
@@ -155,6 +187,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             </div>
           ) : null}
         </div>
+        {/* What photo this is, on the card under the photo (over it, it covered the face). */}
+        <span className="px-2 pb-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
         {openRegion ? <RegionCard region={openRegion} onOpen={onOpenMetric} onClose={() => setRegion(null)} /> : null}
         {canCompare ? (
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5 pb-1">
@@ -185,8 +219,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
               </span>
             </div>
             <p className="m-0 text-[14px] leading-[1.45] text-white/75">
-              {!items.length
-                ? 'No spots were found on this photo.'
+              {!allItems.length
+                ? `No spots were found on ${multi ? 'these photos' : 'this photo'}.`
                 : labelsMissing
                   ? 'Found by image measurement. AI labels weren’t available for this check-in, so candidates are shown without appearance labels.'
                   : 'Found by image measurement. Labels are AI suggestions about appearance, not diagnoses.'}
@@ -212,14 +246,23 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                 </span>
               </div>
             ) : null}
-            {visible.length ? (
+            {listed.length ? (
               <div className="flex flex-col gap-1">
-                {(all ? visible : visible.slice(0, LIST_LIMIT)).map((it) => (
+                {groups.map((g) => (
+                  <div key={g.v} role={multi ? 'group' : undefined} aria-label={multi ? `${GROUP_LABEL[g.v]}: ${g.items.length} ${g.items.length === 1 ? 'spot' : 'spots'}` : undefined} className="flex flex-col gap-1">
+                    {multi ? (
+                      <span aria-hidden className="flex items-baseline justify-between px-3 pt-2.5 pb-0.5 font-mono text-[11px] tracking-[.06em] text-white/60">
+                        {GROUP_LABEL[g.v].toUpperCase()}
+                        <span>{String(g.items.length).padStart(2, '0')}</span>
+                      </span>
+                    ) : null}
+                    {multi && !g.items.length ? <span className="px-3 pb-1 text-[13px] text-white/60">No spots found on this photo.</span> : null}
+                {(all ? g.items : g.items.slice(0, LIST_LIMIT)).map((it) => (
                   <button
                     key={it.n}
                     type="button"
                     aria-pressed={it.n === selN}
-                    onClick={() => setPicked({ sid: session.id, n: it.n })}
+                    onClick={() => pick(it)}
                     className={`flex min-h-11 w-full items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-colors ${it.n === selN ? 'bg-white/14' : 'hover:bg-white/6'}`}
                   >
                     <span className="grid size-[30px] shrink-0 place-items-center rounded-full border-2 text-[12px]" style={{ borderColor: it.ring }}>
@@ -231,14 +274,16 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                     </span>
                   </button>
                 ))}
-                {visible.length > LIST_LIMIT ? (
+                  </div>
+                ))}
+                {groups.some((g) => g.items.length > LIST_LIMIT) ? (
                   <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 self-start rounded-pill bg-white/10 px-4 text-[13px]">
-                    {all ? 'Show fewer' : `Show all ${visible.length}`}
+                    {all ? 'Show fewer' : `Show all ${listed.length}`}
                   </button>
                 ) : null}
               </div>
             ) : null}
-            {items.some((it) => it.hidden) ? (
+            {allItems.some((it) => it.hidden) ? (
               <label className="flex min-h-11 cursor-pointer items-center justify-between gap-2.5 rounded-[18px] bg-white/6 px-3 py-2.5 text-[14px]">
                 Show hair and artefacts
                 <input type="checkbox" role="switch" checked={showHidden} onChange={() => setShowHidden((v) => !v)} className="size-[22px] accent-[var(--signal-baseline)]" />

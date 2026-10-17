@@ -1,12 +1,21 @@
 import { useMemo, useState } from 'react'
 
 import { Button } from '../../components/ui/Button'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { FACE_MAP } from '../../data/faceMap'
-import type { SpotDiary as Diary, SpotStatus, SpotTrack, SpotZone } from '../../lib/api'
+import type { Session, ViewName } from '../../data/types'
+import type { SessionView, SpotDiary as Diary, SpotStatus, SpotTrack, SpotZone } from '../../lib/api'
 import { ORDER, STAGE_COLOUR, STATUS_SHAPE, ZONE_NAME, fmtDays, isToday, stageName, statusText } from './diaryText'
 import { fmtDate } from '../../lib/format'
 import { useMediaQuery } from '../../lib/useMediaQuery'
+import { apply, fitAffine, scaleOf, type Affine, type Pt } from './faceFit'
+import { useImageStatus } from './useImageStatus'
+import { shownViews, VIEW_LABEL, viewSession } from './views'
+
+/** The zones a cheek photo shows (engine SIDE_ZONES); the front photo shows the rest. */
+const SIDE_ZONES: Record<Exclude<ViewName, 'front'>, SpotZone[]> = { right: ['right_cheek', 'right_jaw'], left: ['left_cheek', 'left_jaw'] }
+const viewOfZone = (z: SpotZone | null | undefined): ViewName => (z && SIDE_ZONES.right.includes(z) ? 'right' : z && SIDE_ZONES.left.includes(z) ? 'left' : 'front')
 
 function Shape({ status, size = 11, selected }: { status: SpotStatus; size?: number; selected?: boolean }) {
   const s = STATUS_SHAPE[status]
@@ -25,6 +34,8 @@ export function SpotDiary({
   selected,
   onPick,
   onTake,
+  photo = null,
+  photoViews = [],
 }: {
   status: 'idle' | 'loading' | 'ready' | 'error'
   diary: Diary | undefined
@@ -34,9 +45,16 @@ export function SpotDiary({
   selected: string | null
   onPick: (t: SpotTrack) => void
   onTake: (() => void) | null
+  /** The latest face check-in in the diary with a photo: the spots are drawn on it when it can be placed. */
+  photo?: Session | null
+  /** That check-in's photos by view, signed (front, left and right cheek), when it has cheek photos. */
+  photoViews?: NonNullable<SessionView['session']['views']>
 }) {
   const [zone, setZone] = useState<SpotZone | null>(null)
   const [all, setAll] = useState(false)
+  // A status key chip picked: only those spots on the map and in the list (tap it again for all).
+  const [show, setShow] = useState<SpotStatus | null>(null)
+  const [viewPick, setViewPick] = useState<ViewName | null>(null)
   const phone = useMediaQuery('(max-width: 639px)')
   const d = status === 'ready' ? diary : undefined
   const ready = Boolean(d?.enough_data)
@@ -50,8 +68,8 @@ export function SpotDiary({
     const byRecent = [...tracks].sort((a, b) => b.last_seen_index - a.last_seen_index || b.first_seen_index - a.first_seen_index)
     const firsts = ORDER.map((p) => byRecent.find((t) => t.status === p)).filter((t): t is SpotTrack => Boolean(t))
     const list = [...firsts, ...byRecent.filter((t) => !firsts.includes(t))]
-    return zSel ? list.filter((t) => t.zone === zSel) : list
-  }, [tracks, zSel])
+    return list.filter((t) => (!zSel || t.zone === zSel) && (!show || t.status === show))
+  }, [tracks, zSel, show])
   // A selected row stays visible even past the first five.
   const rows = all || ordered.slice(0, 5).some((t) => t.id === selected) || !selected ? (all ? ordered : ordered.slice(0, 5)) : [...ordered.slice(0, 4), ...ordered.filter((t) => t.id === selected)]
   // Columns: the most recent photos that fit (4 on a phone, 6 wider).
@@ -70,6 +88,29 @@ export function SpotDiary({
       : status === 'loading'
         ? 'Matching spots across your face photos…'
         : 'Follows each spot from one face photo to the next.'
+  // The map shows the spots the list shows: the area and the status picked.
+  // With cheek photos: Front face / Left cheek / Right cheek, each with the spots of the zones it shows (picking a
+  // cheek area or a cheek spot turns to its photo).
+  const views = useMemo(() => shownViews(photo?.result, photoViews), [photo, photoViews])
+  const multi = views.length > 1
+  const wanted = viewPick ?? (zSel ? viewOfZone(zSel) : null) ?? 'front'
+  const rv = multi ? (views.find((v) => v.view === wanted) ?? views[0]) : null
+  const active: ViewName = rv?.view ?? 'front'
+  const placed = useMemo(() => {
+    if (!photo) return null
+    if (!rv) return placeOnPhoto(photo, true)
+    const sv = photoViews.find((v) => v.view === rv.view)
+    return sv ? placeOnPhoto(viewSession(photo, rv, sv.preview), false) : null
+  }, [photo, rv, photoViews])
+  const mapped = useMemo(() => {
+    // a cheek with no photo of its own stays on the front photo
+    const inView = (t: SpotTrack) => !multi || viewOfZone(t.zone) === active || (active === 'front' && !views.some((v) => v.view === viewOfZone(t.zone)))
+    return tracks.filter((t) => (!zSel || t.zone === zSel) && (!show || t.status === show) && inView(t))
+  }, [tracks, zSel, show, multi, active, views])
+  const pick = (t: SpotTrack) => {
+    if (multi && viewOfZone(t.zone) !== active && views.some((v) => v.view === viewOfZone(t.zone))) setViewPick(viewOfZone(t.zone))
+    onPick(t)
+  }
   const sum = (k: 'visible_now' | 'appeared' | 'faded' | 'came_back') => (d?.zones ?? []).reduce((a, z) => a + z[k], 0)
   const zs = zSel ? d?.zones.find((z) => z.zone === zSel) : null
   const top = Boolean(zSel && busiest && zSel === busiest.zone && busiest.appeared > 1)
@@ -91,15 +132,31 @@ export function SpotDiary({
           ) : null}
         </div>
         {ready ? (
-          <ul aria-label="Status key" className="m-0 flex list-none flex-wrap gap-1 rounded-[24px] bg-white/55 p-1.5 backdrop-blur-[12px]">
-            {ORDER.map((p) => (
-              <li key={p} className="flex min-h-9 items-center gap-2 rounded-pill bg-surface px-3 text-[13px] whitespace-nowrap">
-                <Shape status={p} size={12} />
-                {STATUS_SHAPE[p].word}
-                <span className="font-dot text-[16px] font-extrabold">{tracks.filter((t) => t.status === p).length}</span>
-              </li>
-            ))}
-          </ul>
+          <div role="group" aria-label="Show spots that are" className="flex flex-wrap gap-1 rounded-[24px] bg-white/55 p-1.5 backdrop-blur-[12px]">
+            {ORDER.map((p) => {
+              const n = tracks.filter((t) => t.status === p).length
+              const on = show === p
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={!n}
+                  onClick={() => {
+                    setShow(on ? null : p)
+                    setAll(false)
+                  }}
+                  className={`hit44 flex min-h-9 items-center gap-2 rounded-pill px-3 text-[13px] whitespace-nowrap transition-colors duration-200 disabled:opacity-45 ${on ? 'bg-selected text-inverse' : 'bg-surface hover:bg-muted'}`}
+                >
+                  <span className={`grid place-items-center rounded-full ${on ? 'bg-white p-[3px]' : ''}`}>
+                    <Shape status={p} size={on ? 10 : 12} />
+                  </span>
+                  {STATUS_SHAPE[p].word}
+                  <span className="font-dot text-[16px] font-extrabold">{n}</span>
+                </button>
+              )
+            })}
+          </div>
         ) : null}
       </div>
 
@@ -188,6 +245,7 @@ export function SpotDiary({
                   onClick={() => {
                     setZone(t.k)
                     setAll(false)
+                    setViewPick(null)
                   }}
                   className={`flex min-h-9 items-center gap-1.5 rounded-pill px-3 text-[13px] transition-[background,box-shadow] ${zSel === t.k ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,.08)]' : ''}`}
                 >
@@ -196,7 +254,24 @@ export function SpotDiary({
                 </button>
               ))}
             </div>
-            <FaceMap diary={d} zone={zSel} selected={selected} onPick={onPick} onZone={(z) => setZone(z)} />
+            <div className="relative">
+              {placed ? <PhotoMap place={placed} tracks={mapped} selected={selected} onPick={pick} /> : <FaceMap diary={d} tracks={mapped} zone={zSel} selected={selected} onPick={pick} onZone={(z) => setZone(z)} />}
+              {multi ? (
+                <div className="absolute top-2.5 left-1/2 z-[2] w-max max-w-[calc(100%-16px)] -translate-x-1/2">
+                  <SegmentedControl
+                    glass
+                    label="Which photo"
+                    options={views.map((v) => ({ value: v.view, label: VIEW_LABEL[v.view] }))}
+                    value={active}
+                    onChange={(v) => {
+                      setViewPick(v)
+                      if (zSel && viewOfZone(zSel) !== v) setZone(null)
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+            {placed ? <span className="-mt-2 px-1 font-mono text-[11px] tracking-[.06em] text-ink-2">ON YOUR PHOTO · {fmtDate(placed.session.created_at).toUpperCase()}</span> : null}
             <div className="flex flex-wrap items-baseline justify-between gap-2.5 px-1">
               <span className="text-[20px] tracking-[-0.01em]">{zSel ? ZONE_NAME[zSel] : 'Whole face'}</span>
               {top ? <span className="font-mono text-[11px] tracking-[.08em]">■ MOST NEW SPOTS</span> : null}
@@ -228,6 +303,8 @@ export function SpotDiary({
           <div className="flex min-w-0 flex-[2_1_460px] animate-[wRise_.5s_.08s_both] flex-col gap-0.5 rounded-[36px] bg-surface p-2.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
             {!tracks.length ? (
               <p className="m-0 p-[18px] text-[15px] leading-normal">No spots followed so far. Spots seen only once are left out.</p>
+            ) : !ordered.length ? (
+              <p className="m-0 p-[18px] text-[15px] leading-normal">No {show ? STATUS_SHAPE[show].word.toLowerCase() : ''} spots{zSel ? ` on the ${ZONE_NAME[zSel].toLowerCase()}` : ''}.</p>
             ) : (
               <>
                 <div aria-hidden className="flex items-end gap-2.5 px-2.5 pt-2 pb-1.5">
@@ -310,7 +387,7 @@ export function SpotDiary({
  * there, one dot per followed mark in its status shape. The face is drawn as seen in a selfie (the
  * subject's right on the left), matching the photo above.
  */
-function FaceMap({ diary, zone, selected, onPick, onZone }: { diary: Diary; zone: SpotZone | null; selected: string | null; onPick: (t: SpotTrack) => void; onZone: (z: SpotZone | null) => void }) {
+function FaceMap({ diary, tracks, zone, selected, onPick, onZone }: { diary: Diary; tracks: SpotTrack[]; zone: SpotZone | null; selected: string | null; onPick: (t: SpotTrack) => void; onZone: (z: SpotZone | null) => void }) {
   const b = FACE_MAP.bounds
   const pad = 6
   const vb = `${b.min_x - pad} ${-b.max_y - pad} ${b.max_x - b.min_x + 2 * pad} ${b.max_y - b.min_y + 2 * pad}`
@@ -338,7 +415,7 @@ function FaceMap({ diary, zone, selected, onPick, onZone }: { diary: Diary; zone
       {Object.values(FACE_MAP.features).map((f, i) =>
         f.closed ? <polygon key={i} points={pts(f.points)} fill="none" stroke="rgba(18,18,18,.35)" strokeWidth={0.8} /> : <polyline key={i} points={pts(f.points)} fill="none" stroke="rgba(18,18,18,.35)" strokeWidth={0.8} />,
       )}
-      {diary.tracks.map((t, i) => {
+      {tracks.map((t, i) => {
         const on = t.id === selected
         const s = STATUS_SHAPE[t.status]
         const r = on ? 6 : t.status === 'gone' ? 3.5 : 4.5
@@ -371,5 +448,134 @@ function FaceMap({ diary, zone, selected, onPick, onZone }: { diary: Diary; zone
         )
       })}
     </svg>
+  )
+}
+
+type Placed = { session: Session; t: Affine; box: { x: number; y: number; w: number; h: number }; size: { width: number; height: number } }
+
+const extent = (poly: Pt[]) => ({ x0: Math.min(...poly.map((p) => p[0])), x1: Math.max(...poly.map((p) => p[0])), y0: Math.min(...poly.map((p) => p[1])), y1: Math.max(...poly.map((p) => p[1])) })
+
+/** Area centroid of a polygon (shoelace). */
+function centroid(poly: Pt[]): Pt | null {
+  let a = 0
+  let cx = 0
+  let cy = 0
+  for (let i = 0; i < poly.length; i++) {
+    const [x0, y0] = poly[i]
+    const [x1, y1] = poly[(i + 1) % poly.length]
+    const k = x0 * y1 - x1 * y0
+    a += k
+    cx += (x0 + x1) * k
+    cy += (y0 + y1) * k
+  }
+  return Math.abs(a) < 1e-6 ? null : [cx / (3 * a), cy / (3 * a)]
+}
+
+/**
+ * The latest photo placed on the canonical face: an affine fit from its front-photo marks (face-map mm -> photo px),
+ * with the face-map zones' centres when the photo has whole-face areas, so a face with marks on one cheek only
+ * still lands. Null when it cannot be placed well (too few points, or they disagree by more than a few mm).
+ */
+function placeOnPhoto(s: Session, frontOnly: boolean): Placed | null {
+  const r = s.result
+  if (!r || !s.preview) return null
+  const pairs: { mm: Pt; px: Pt }[] = []
+  for (const c of r.candidates) {
+    const f = c.features ?? {}
+    if ((frontOnly && f.view) || f.face_x_mm === undefined || f.face_y_mm === undefined) continue
+    pairs.push({ mm: [f.face_x_mm, f.face_y_mm], px: [c.bbox[0] + c.bbox[2] / 2, c.bbox[1] + c.bbox[3] / 2] })
+  }
+  for (const roi of r.rois ?? []) {
+    const zone = FACE_MAP.zones[roi.name]
+    if (!zone?.[0] || roi.polygon.length < 3) continue
+    const mm = centroid(zone[0])
+    const px = centroid(roi.polygon)
+    if (mm && px) pairs.push({ mm, px })
+    // and its extent: the front's own areas run down the middle of the face, so their centres alone cannot
+    // tell how wide the face is (the subject's right, x < 0, is on the photo's left; y is up in mm, down in px)
+    const [a, b] = [extent(zone[0]), extent(roi.polygon)]
+    pairs.push(
+      { mm: [a.x0, a.y1], px: [b.x0, b.y0] },
+      { mm: [a.x1, a.y1], px: [b.x1, b.y0] },
+      { mm: [a.x0, a.y0], px: [b.x0, b.y1] },
+      { mm: [a.x1, a.y0], px: [b.x1, b.y1] },
+    )
+  }
+  const t = fitAffine(pairs)
+  if (!t) return null
+  const scale = scaleOf(t)
+  const rms = Math.sqrt(pairs.reduce((acc, p) => acc + (apply(t, p.mm)[0] - p.px[0]) ** 2 + (apply(t, p.mm)[1] - p.px[1]) ** 2, 0) / pairs.length) / scale
+  // mm: a flat map of a curved face is off by about a centimetre at the hairline and on a turned cheek; more
+  // means the fit is wrong. Spots seen on the photo itself are drawn on their own marks, not with the fit.
+  if (rms > 15) return null
+  const size = r.image_size ?? { width: s.preview.width, height: s.preview.height }
+  // Frame: the face outline in the photo with a little room, 4:5, inside the photo.
+  const out = FACE_MAP.outline.map((p) => apply(t, p))
+  const xs = out.map((p) => p[0])
+  const ys = out.map((p) => p[1])
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+  let w = Math.max(Math.max(...xs) - Math.min(...xs), (Math.max(...ys) - Math.min(...ys)) * 0.8) * 1.12
+  w = Math.min(w, size.width, size.height * 0.8)
+  const h = w / 0.8
+  const x = Math.min(Math.max(cx - w / 2, 0), size.width - w)
+  const y = Math.min(Math.max(cy - h / 2, 0), size.height - h)
+  return { session: s, t, box: { x, y, w, h }, size }
+}
+
+/**
+ * The followed spots on the latest face photo, each where it sits on the face (placed by placeOnPhoto, so a spot
+ * that has faded shows where it was). Same shapes as the drawn face, with a white edge to read on any skin.
+ */
+function PhotoMap({ place, tracks, selected, onPick }: { place: Placed; tracks: SpotTrack[]; selected: string | null; onPick: (t: SpotTrack) => void }) {
+  const { box, size, t } = place
+  const url = place.session.preview!.url
+  const status = useImageStatus(url)
+  const k = scaleOf(t) // px per mm
+  // the marks found on this very photo (a cheek photo carries only its own)
+  const here = useMemo(() => new Set((place.session.result?.candidates ?? []).map((c) => c.id)), [place.session])
+  return (
+    <div className="relative mx-auto aspect-[4/5] w-full max-w-[320px] overflow-hidden rounded-[28px] squircle" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
+      <svg viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" role="group" aria-label={`Followed spots on your photo from ${fmtDate(place.session.created_at)}`}>
+        <image href={url} width={size.width} height={size.height} preserveAspectRatio="xMidYMid slice" className="transition-opacity duration-200" style={{ opacity: status === 'ready' ? 1 : 0 }} />
+        {tracks.map((tr, i) => {
+          // seen on this photo: its own box; else (faded, missed) where the fit puts its place on the face
+          const o = tr.observations.find((q) => q.session_id === place.session.id)
+          const [x, y]: Pt = o?.bbox && here.has(o.candidate_id) ? [o.bbox[0] + o.bbox[2] / 2, o.bbox[1] + o.bbox[3] / 2] : apply(t, [tr.x_mm, tr.y_mm])
+          const on = tr.id === selected
+          const r = (on ? 4.2 : tr.status === 'gone' ? 2.4 : 3) * k
+          const gone = tr.status === 'gone'
+          const dashed = tr.status === 'not_seen_last_time'
+          const fill = gone ? 'none' : dashed ? 'rgba(255,255,255,.35)' : 'var(--text-primary)'
+          const s = STATUS_SHAPE[tr.status]
+          return (
+            <g
+              key={tr.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`${tr.zone ? ZONE_NAME[tr.zone] : 'Spot'}, ${s.word}`}
+              aria-pressed={on}
+              onClick={() => onPick(tr)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onPick(tr)
+                }
+              }}
+              className="cursor-pointer animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both] outline-none"
+              style={{ animationDelay: `${150 + Math.min(i, 30) * 30}ms`, transformBox: 'fill-box', transformOrigin: 'center' }}
+            >
+              <circle cx={x} cy={y} r={Math.max(r * 2, 6 * k)} fill="transparent" />
+              {on ? <circle cx={x} cy={y} r={r + 2.2 * k} fill="rgba(255,255,255,.9)" stroke="var(--text-primary)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
+              {tr.status === 'new' ? <circle cx={x} cy={y} r={r + 1.3 * k} fill="none" stroke="#fff" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
+              {/* dark edge under the light one: visible on any skin tone */}
+              <circle cx={x} cy={y} r={r} fill="none" stroke="rgba(18,18,18,.55)" strokeWidth={3.5} vectorEffect="non-scaling-stroke" />
+              <circle cx={x} cy={y} r={r} fill={fill} stroke="#fff" strokeWidth={1.5} strokeDasharray={dashed ? '3 2.5' : undefined} vectorEffect="non-scaling-stroke" />
+              {tr.status === 'fading' ? <path d={`M${x},${y - r} A${r},${r} 0 0 1 ${x},${y + r} Z`} fill="#fff" /> : null}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
   )
 }
