@@ -48,20 +48,7 @@ export default function Welcome() {
       <header className="relative flex items-center justify-between gap-3 px-[clamp(14px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
         <BackButton step={step} search={search} />
         <Stepper current={STEP_INDEX[step]} />
-        {user && !user.isAnonymous ? (
-          <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">SIGNED IN</span>
-        ) : (
-          // No sign-in page before onboarding: someone with an account (a new phone, a cleared browser) signs in
-          // here and goes straight to their results (or where they were going); everyone else carries on as a
-          // guest on this browser. A phone shows just "Sign in", so the stepper keeps its room.
-          <Link
-            to={`/signin?next=${encodeURIComponent(nextPath(new URLSearchParams(search).get('next'), '/home'))}`}
-            className="inline-flex min-h-11 shrink-0 items-center rounded-pill bg-white/55 px-3.5 text-[13px] whitespace-nowrap text-ink no-underline transition-colors hover:bg-white/80"
-          >
-            <span className="hidden sm:inline">Have an account?&nbsp;</span>
-            <span className="font-medium">Sign in</span>
-          </Link>
-        )}
+        <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
       </header>
       {step === 'goals' ? <Goals key="goals" /> : step === 'about' ? <About key="about" /> : <Consent key="consent" />}
     </div>
@@ -82,7 +69,7 @@ function BackButton({ step, search }: { step: Step; search: string }) {
   // Consent goes back where the person came from (a check-in that asked for consent, or the landing).
   const canGoBack = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0
   return (
-    <button type="button" aria-label="Back" className={backClass} onClick={() => (canGoBack ? navigate(-1) : navigate('/about'))}>
+    <button type="button" aria-label="Back" className={backClass} onClick={() => (canGoBack ? navigate(-1) : navigate('/'))}>
       ←
     </button>
   )
@@ -410,8 +397,8 @@ function About() {
       }
     >
       <div className={`${card} flex flex-col divide-y divide-ink/[.07]`} style={cardStyle}>
-        <Field title="What time of day will you take your check-in photos?" note="Pick one and keep to it: the same light each session makes results comparable">
-          <div role="radiogroup" aria-label="Check-in photo time" className={`${track} self-start`}>
+        <Field title="When do you usually take photos?" note="Same time each session is best">
+          <div role="radiogroup" aria-label="Usual photo time" className={`${track} self-start`}>
             {PHOTO_TIMES.map((t) => (
               <button key={t.id} type="button" role="radio" aria-checked={time === t.id} onClick={() => setTime(t.id)} className={pill(time === t.id)}>
                 {t.label}
