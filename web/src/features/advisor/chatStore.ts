@@ -151,13 +151,13 @@ const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia('(
 function errorFor(e: unknown): { title: string; body: string; retry: boolean } {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return { title: 'You’re offline.', body: 'The question wasn’t sent. Try again when you’re connected.', retry: true }
   if (e instanceof ApiError) {
-    if (e.status === 429) return { title: 'The advisor is busy.', body: `${e.message} This question wasn’t counted towards your limit.`, retry: false }
-    if (e.status === 502) return { title: 'The advisor couldn’t answer that.', body: 'The service didn’t respond. This question wasn’t counted towards today’s limit.', retry: true }
+    if (e.status === 429) return { title: 'Wisp is busy.', body: `${e.message} This question wasn’t counted towards your limit.`, retry: false }
+    if (e.status === 502) return { title: 'Wisp couldn’t answer that.', body: 'The service didn’t respond. This question wasn’t counted towards today’s limit.', retry: true }
     if (e.status === 422 && e.code === 'bad_image') return { title: 'A photo couldn’t be read.', body: 'Try a different photo of the product or its label.', retry: false }
     if (e.status === 422) return { title: 'That question couldn’t be sent.', body: 'Try asking it a different way.', retry: false }
-    return { title: 'The advisor couldn’t answer that.', body: 'Something went wrong on Willow’s side. Try again in a moment.', retry: true }
+    return { title: 'Wisp couldn’t answer that.', body: 'Something went wrong on Willow’s side. Try again in a moment.', retry: true }
   }
-  return { title: 'Willow couldn’t be reached.', body: 'Check your connection. If the question reached the advisor before the connection dropped, it may have counted.', retry: true }
+  return { title: 'Willow couldn’t be reached.', body: 'Check your connection. If the question reached Wisp before the connection dropped, it may have counted.', retry: true }
 }
 
 /** Ask a question, with up to 3 product photos. While an answer is on its way, later asks wait their turn. */
@@ -268,7 +268,7 @@ export function stopWaiting() {
     phase: 'idle',
     thinkingSince: null,
     stages: [],
-    messages: [...state.messages, { id: nextId++, role: 'note', text: 'Stopped waiting. The advisor may still finish this answer in the background, and the question still counts towards today’s limit.' }],
+    messages: [...state.messages, { id: nextId++, role: 'note', text: 'Stopped waiting. Wisp may still finish this answer in the background, and the question still counts towards today’s limit.' }],
   })
   window.setTimeout(() => void refreshUsage(), 1500)
 }
@@ -298,7 +298,7 @@ export function newChat() {
       if (!tokenFn) return
       await api.clearAdvisorHistory(await tokenFn())
     } catch {
-      if (who === owner) set({ messages: [{ id: nextId++, role: 'note', text: 'The saved conversation couldn’t be cleared just now; it may come back next time you open the advisor.' }, ...state.messages] })
+      if (who === owner) set({ messages: [{ id: nextId++, role: 'note', text: 'The saved conversation couldn’t be cleared just now; it may come back next time you open Wisp.' }, ...state.messages] })
     }
   })()
 }

@@ -119,7 +119,7 @@ export default function Terms() {
             ))}
           </dl>
           <p>
-            Label photos you scan and advisor conversations are not stored: a label photo is read once and discarded (what you add to your routine is kept), and the advisor chat lives only in the open page. Like any web service, Google Cloud records standard request logs (time, address, page requested) to run and secure the service. Willow uses no analytics or advertising trackers.
+            Label photos you scan and conversations with Wisp (the assistant) are not stored: a label photo is read once and discarded (what you add to your routine is kept), and the chat with Wisp lives only in the open page. Like any web service, Google Cloud records standard request logs (time, address, page requested) to run and secure the service. Willow uses no analytics or advertising trackers.
           </p>
         </Section>
 
@@ -131,9 +131,9 @@ export default function Terms() {
 
         <Section title="How AI is used">
           <p>
-            Measurements come from classical computer vision. Gemini, Google’s AI model on Vertex AI, is used to explain your measured results in words, name the spots the measurement found (from small close-ups of them), read ingredient labels you photograph, check your routine for clashes, and answer questions in the advisor using your own measurements and routine. It may only quote numbers your measurements produced: an answer containing any other number is rejected. Requests go to Vertex AI’s global endpoint, so Google may process them outside us-central1. Google does not use them to train its models.
+            Measurements come from classical computer vision. Gemini, Google’s AI model on Vertex AI, is used to explain your measured results in words, name the spots the measurement found (from small close-ups of them), read ingredient labels you photograph, check your routine for clashes, and answer your questions as Wisp, using your own measurements and routine. It may only quote numbers your measurements produced: an answer containing any other number is rejected. Requests go to Vertex AI’s global endpoint, so Google may process them outside us-central1. Google does not use them to train its models.
           </p>
-          <p>AI features have daily limits per person (for example 20 advisor questions a day) so the service stays available to everyone.</p>
+          <p>AI features have daily limits per person (for example 20 questions to Wisp a day) so the service stays available to everyone.</p>
         </Section>
 
         <Section title="Sharing with retailers">
@@ -150,7 +150,7 @@ export default function Terms() {
             Willow is free and earns nothing from the store links it shows: links go to the store’s own page. Prices can change; the store’s own page has the current one.
           </p>
           <p>
-            Brands can pay to show one product on Routine, under your own routine, marked “Sponsored” in words. Only a product whose measured results met Willow’s evidence bar for your goals can be shown, and “Why am I seeing this?” on the card says which of your goals matched. Payment never changes your measurements, the advisor’s answers or the order of your own recommendations. Switch sponsored suggestions off at any time in You. If this ever changes, this notice changes first.
+            Brands can pay to show one product on Routine, under your own routine, marked “Sponsored” in words. Only a product whose measured results met Willow’s evidence bar for your goals can be shown, and “Why am I seeing this?” on the card says which of your goals matched. Payment never changes your measurements, Wisp’s answers or the order of your own recommendations. Switch sponsored suggestions off at any time in You. If this ever changes, this notice changes first.
           </p>
         </Section>
 

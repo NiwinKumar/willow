@@ -326,7 +326,7 @@ export default function Result() {
   const checkIn = () => shell.startCheckIn(site, mode)
   const actions = {
     compared: [
-      <NextAction key="a" onClick={ask}>Ask the advisor about this result</NextAction>,
+      <NextAction key="a" onClick={ask}>Ask Wisp about this result</NextAction>,
       <NextAction key="t" to={`/progress?site=${site}&mode=${mode}`}>See this on your timeline</NextAction>,
       ...(session.baseline_ref && !session.baseline_ref.has_noise_band && canBeBaseline(session) && (session.result?.frames_used ?? 0) >= 3
         ? [<NextAction key="b" to={`/progress/${day}?site=${site}&session=${session.id}`}>Make this check-in your baseline</NextAction>]
@@ -340,7 +340,7 @@ export default function Result() {
       <NextAction key="l" to={`/result?site=${site}&mode=${mode}`}>Go to your latest check-in</NextAction>,
       <NextAction key="b" to={`/progress/${day}?site=${site}&session=${session.id}`}>Change your baseline</NextAction>,
     ],
-    rejected: [<NextAction key="c" onClick={checkIn}>Retake this check-in</NextAction>, <NextAction key="a" onClick={ask}>Ask the advisor how to retake it</NextAction>],
+    rejected: [<NextAction key="c" onClick={checkIn}>Retake this check-in</NextAction>, <NextAction key="a" onClick={ask}>Ask Wisp how to retake it</NextAction>],
     unmeasured: [<NextAction key="f" onClick={() => shell.startCheckIn('face_full', mode)}>Take a face check-in instead</NextAction>],
   } as Record<string, ReactNode[]>
 

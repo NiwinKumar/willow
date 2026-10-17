@@ -606,7 +606,7 @@ async function advisorChatStream(token: string, messages: { role: 'user' | 'will
       }
       if (event === 'error') {
         void reader.cancel()
-        throw new ApiError(Number(payload.status) || 500, String(payload.message ?? 'The advisor is unavailable right now.'), typeof payload.code === 'string' ? payload.code : null, payload)
+        throw new ApiError(Number(payload.status) || 500, String(payload.message ?? 'Wisp is unavailable right now.'), typeof payload.code === 'string' ? payload.code : null, payload)
       }
       onStage({ event, ...payload } as AdvisorStage)
     }
