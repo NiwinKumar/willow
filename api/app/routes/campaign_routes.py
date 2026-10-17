@@ -119,7 +119,8 @@ def list_campaigns(
 
 class CampaignPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    status: Literal["active", "paused"]
+    # ended: stop early, for good (ends_at moves to now; it cannot be resumed)
+    status: Literal["active", "paused", "ended"]
 
 
 @router.patch("/retailer/campaigns/{cid}")
@@ -129,10 +130,13 @@ def patch_campaign(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """Pause or resume (owner only). Resuming checks the evidence and the running cap again."""
+    """Pause, resume or end early (owner only). Resuming checks the evidence and the running cap
+    again; ending is final."""
     doc = _owned(store, user.uid, cid)
     if campaigns.status_of(doc) == "ended":
         raise HTTPException(409, {"code": "ended", "message": "This campaign has ended."})
+    if body.status == "ended":
+        return campaigns.view(store, cid, campaigns.end(store, cid, doc))
     if body.status == "active" and doc.get("status") != "active":
         product = catalog.by_id(doc["product_id"])
         try:

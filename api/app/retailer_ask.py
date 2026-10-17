@@ -34,7 +34,7 @@ own photo noise at week 8 (an outcome, not a purchase). "cells" are the same rat
 band, "cells_skin" per self-reported skin type (in "skin_types" order); a suppressed cell had
 fewer than 10 people. "base" is people with the same goal who do not use the product (k of n,
 rate) and "lift" is the product's rate minus theirs. "cont" is the share still using it after
-week 4, "cont8" at week 8. "weeks" is the median weeks to the first real change.
+week 4, "cont8" at week 8. "weeks" is the median weeks to the first visible change.
 "needs_by_month" counts people with each goal among those with a reading that month
 ("share_of_peak" = share of that month's most-chosen goal). "categories[].flows" are, per
 product category and goal, users of the category's products for that goal: "changed" = how many

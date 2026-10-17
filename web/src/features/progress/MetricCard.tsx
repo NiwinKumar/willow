@@ -5,7 +5,7 @@ import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, confidenceOf, verdictKind } from '../../lib/verdict'
 import { EMPTY_CARD, METRIC_LOOK } from './metricLook'
 import { verdictHeadline } from './headline'
-import { bandText, deltaText } from './model'
+import { bandText, deltaText, valueText } from './model'
 
 /** The verdict pill the cards draw: black with the ember ◆ for Changed, frosted otherwise. Glyph + words. */
 function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Session; size?: 'md' | 'sm' }) {
@@ -37,7 +37,7 @@ export function MetricCard({ metric: m, session, band, compared, onOpen, delay =
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : `${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}`}, ${VERDICT_WORDS[kind].label}`}. Open detail`}
+      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : valueText(m)}, ${VERDICT_WORDS[kind].label}`}. Open detail`}
       className="relative flex min-h-[320px] animate-[wRise_.5s_both] flex-col justify-between gap-[18px] rounded-[40px] p-6 text-left shadow-[inset_0_0_40px_8px_rgba(255,255,255,.4),0_30px_60px_-44px_rgba(0,0,0,.5)] transition-transform duration-[400ms] ease-[cubic-bezier(.2,.7,.2,1)] squircle hover:-translate-y-[5px]"
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >

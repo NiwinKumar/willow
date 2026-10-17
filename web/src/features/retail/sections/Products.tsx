@@ -5,12 +5,13 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { GOALS } from '../../../lib/metrics'
 import { useRetailData } from '../context'
 import { csvMeta, csvName } from '../data'
+import { feltText } from '../feel'
 import { useProducts } from '../productData'
 import { filterRows, hintOf, MAX_COMPARE, noDataReason, parseIds, TIER_ORDER, TIER_TABS, toggleId } from '../productModel'
 import { sectionPath, useRetailState } from '../state'
 import type { Insights, ProductRow, ProofTier } from '../types'
 import { Bone, Button, DataTable, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, weeks, type Column, type Sort } from '../ui'
-import { HeadTip, RateInterval } from './productParts'
+import { FeltCell, HeadTip, RateInterval } from './productParts'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
@@ -63,7 +64,7 @@ function ProductsSkeleton() {
   )
 }
 
-const SORTS = ['product', 'tier', 'rate', 'base', 'lift', 'n', 'category', 'weeks', 'cont8', 'share', 'price'] as const
+const SORTS = ['product', 'tier', 'rate', 'base', 'lift', 'n', 'category', 'weeks', 'cont8', 'share', 'felt', 'price'] as const
 const DEFAULT_SORT: Sort = { id: 'lift', dir: 'desc' }
 const TIER_IDS = Object.keys(TIERS) as ProofTier[]
 const PRICE_ORDER = { budget: 0, mid: 1, premium: 2 } as const
@@ -123,14 +124,14 @@ function Body({ d }: { d: Insights }) {
       <strong>
         {proven} of {mine.length}
       </strong>{' '}
-      of your products are Proven.
+      of your {mine.length === 1 ? 'product is' : 'products are'} Proven.
     </>
   ) : (
     <>
       <strong>
         {proven} of {all.length}
       </strong>{' '}
-      products are Proven; {measured} have a measured outcome.
+      products are Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 
@@ -186,7 +187,7 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'rate',
-      header: <HeadTip label="Visible change" tip={`Share of people using it who saw a real, visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`} />,
+      header: <HeadTip label="Visible change" tip={`Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`} />,
       headerText: `Visible change by week ${wk} (%)`,
       width: '196px',
       sortValue: (r) => r.rate,
@@ -270,6 +271,18 @@ function Body({ d }: { d: Insights }) {
       sortValue: (r) => r.routine_share,
       cell: (r) => (r.routine_share === null ? <Suppressed short /> : <span className="tnum text-ink">{pct(r.routine_share)}</span>),
       csv: (r) => (r.routine_share === null ? 'suppressed' : Math.round(r.routine_share * 100)),
+    },
+    {
+      id: 'felt',
+      header: <HeadTip label="Feels it works" tip="Self-reported, never part of the status: share of people who said “It’s working for me”, two weeks in or later. Hover a value for its n." />,
+      headerText: 'Feels it works, self-reported (%)',
+      optional: true,
+      hidden: true,
+      align: 'right',
+      width: '128px',
+      sortValue: (r) => r.felt ?? null,
+      cell: (r) => <FeltCell r={r} />,
+      csv: (r) => (feltText(r) ? Math.round((r.felt ?? 0) * 100) : 'suppressed'),
     },
     {
       id: 'price',

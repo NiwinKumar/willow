@@ -307,11 +307,11 @@ function ColumnsMenu<T>({ columns, hidden, onToggle }: { columns: Column<T>[]; h
         Columns
       </ToolButton>
       {open ? (
-        <div role="group" aria-label="Columns" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-56 flex-col rounded-card border border-line bg-surface p-1 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.12)] animate-[wFadeIn_.12s_ease_both]">
+        <div role="group" aria-label="Columns" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-64 flex-col rounded-card border border-line bg-surface p-1 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.12)] animate-[wFadeIn_.12s_ease_both]">
           {optional.map((c) => {
             const on = !hidden.has(c.id)
             return (
-              <button key={c.id} type="button" role="menuitemcheckbox" aria-checked={on} onClick={() => onToggle(c.id)} className="flex h-9 items-center gap-2 rounded-ctl border-0 bg-transparent px-2.5 text-left text-proof-body text-ink hover:bg-pf-hover">
+              <button key={c.id} type="button" role="menuitemcheckbox" aria-checked={on} onClick={() => onToggle(c.id)} className="flex min-h-9 items-center gap-2 rounded-ctl border-0 bg-transparent px-2.5 py-1.5 text-left text-proof-body text-ink hover:bg-pf-hover">
                 <span className={`grid size-4 shrink-0 place-items-center rounded-[4px] border ${on ? 'border-ink bg-ink text-inverse' : 'border-line-strong'}`}>{on ? <Check size={12} strokeWidth={2.5} aria-hidden /> : null}</span>
                 {c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)}
               </button>

@@ -45,6 +45,8 @@ Proof follows the viewer's theme (system, light or dark, toggle in the top bar, 
 | `--pf-red` | `#D93036` | `#FF6166` | Status only: errors, risk |
 | `--pf-base` | `#B4B4B4` | `#5C5C5C` | Comparison series (non-users, the market) |
 
+Self-reported shares ("How it feels" on the product page) use leaf for "It's working for me" and `--pf-base` at two strengths for "Too soon to tell" and "Not for me", never amber or red; the legend's words and order carry the meaning.
+
 Rules: leaf means "proven / yours / positive", nothing else; amber and red are status, never decoration; colour is never the only signal (tiers carry a dot and a word, suppressed cells carry "n<10"). The data scope (simulated, mixed or real people; period) is stated once, in the top bar's scope control, not on every panel.
 
 ## Type
@@ -73,7 +75,7 @@ Spacing: page column 1200 px; 32 px between page zones, 24 px between panels, 20
 - Don't stretch, rotate, recolour or animate the mark.
 
 ## The Proof pipeline (the hero flow)
-`features/retail/pipeline.tsx` draws one product's path as five steps, read like a deployment's build log: **Measured** (people with 8 weeks of readings) → **Proven** (lift over non-users above zero across its interval, n ≥ 30) → **Claims ready** (claim-ready statements) → **Promoted** (a campaign in the Willow app) → **Lift measured** (adoption against the randomised holdout). Done steps are a leaf check, in-progress ones amber, the rest numbered. Every step is a fact from the api, never a projection. It opens Overview (the spotlight) and the product page, and the Promote step links to the Campaigns create sheet (`/retail/campaigns?new=<product_id>`).
+`features/retail/pipeline.tsx` draws one product's path as five steps, read like a deployment's build log: **Measured** (people with 8 weeks of readings) → **Proven** (lift over non-users above zero across its interval, n ≥ 30) → **Claims ready** (claim-ready statements) → **Promoted** (a campaign in the Willow app; an ended one stays done and offers "Promote again") → **Lift measured** (adoption against the randomised holdout). Done steps are a leaf check, in-progress ones amber, the rest numbered. Every step is a fact from the api, never a projection. It opens Overview (the spotlight) and the product page, and the Promote step links to the Campaigns create sheet (`/retail/campaigns?new=<product_id>`).
 
 ## Components (`web/src/features/retail/ui/`)
 - Layout: `PageHeader` (title, one-line description, actions, optional leading image), `Panel` (title, meta, actions, one-line description, footnote, `flush` for tables), `Button` (primary / secondary / ghost; `to` renders a link), `ToolButton`, `Badge` (gray / green / amber / red / outline).

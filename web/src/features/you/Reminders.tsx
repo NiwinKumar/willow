@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Toggle } from '../../components/ui/Toggle'
-import { useOwner } from '../../data/hooks'
+import { useMe, useOwner } from '../../data/hooks'
 import { useCheckin } from '../../data/useCheckin'
 import { api } from '../../lib/api'
 import { useQuery } from '../../lib/query'
@@ -23,6 +23,9 @@ export function RemindersCard() {
   const { getIdToken } = useAuth()
   const uid = useOwner()
   const checkin = useCheckin()
+  const me = useMe()
+  // The profile is still on its way: no "No check-in days yet" before it has answered.
+  const loadingMe = !me.data && (me.status === 'loading' || me.status === 'idle')
   const location = useLocation()
   const ref = useRef<HTMLElement>(null)
   // enabled false: the api has no VAPID keys (local runs, before setup), so reminders are by calendar only.
@@ -102,11 +105,13 @@ export function RemindersCard() {
   return (
     <section ref={ref} id="reminders" aria-label="Reminders" className="flex scroll-mt-24 flex-col gap-3 rounded-[36px] squircle bg-surface p-6">
       <span className="font-mono text-[12px] text-ink-2">■ REMINDERS</span>
-      <span className="text-[20px]">{checkin ? scheduleText(checkin) : 'No check-in days yet'}</span>
+      <span className="text-[20px]">{checkin ? scheduleText(checkin) : loadingMe ? 'Loading your check-in days…' : 'No check-in days yet'}</span>
       <span className="text-[14px] leading-normal text-[#3E3C38]">
         {checkin
           ? `Check-ins on the same days, at the same time, keep the light and your results comparable.${checkin.tz !== deviceTz ? ` Times are ${checkin.tz.replace(/_/g, ' ')} time.` : ''}`
-          : 'Choose the days and time you check in, then add them to your calendar or turn on notifications here.'}
+          : loadingMe
+            ? ''
+            : 'Choose the days and time you check in, then add them to your calendar or turn on notifications here.'}
       </span>
       <button type="button" onClick={() => void calendar()} disabled={!checkin || busy === 'calendar'} aria-busy={busy === 'calendar' || undefined} className={outline}>
         {busy === 'calendar' ? 'Making the calendar file…' : 'Add to calendar'}

@@ -11,7 +11,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from app import advisor, campaigns, catalog, gemini, label_scan, limits, routine_check, routine_log
+from app import (
+    advisor,
+    campaigns,
+    catalog,
+    feel,
+    gemini,
+    label_scan,
+    limits,
+    routine_check,
+    routine_log,
+)
 from app.auth import AuthUser, current_user
 from app.schedule import Schedule
 from app.store import Store, get_store, iso
@@ -121,6 +131,8 @@ class RoutineEntryPatch(BaseModel):
 def _entry_view(entry_id: str, doc: dict[str, Any]) -> dict[str, Any]:
     view = {"id": entry_id, **{k: iso(v) if isinstance(v, datetime) else v for k, v in doc.items()}}
     view.setdefault("schedule", None)
+    view.setdefault("feel", None)
+    view.setdefault("feel_history", [])
     view.setdefault("updated_at", view.get("created_at"))
     # The catalog packshot, linked where the brand already publishes it (never copied), so the
     # routine shows product photos without a second request per product.
@@ -291,6 +303,30 @@ def routine_patch(
     if doc is None:
         raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
     doc.update(body.model_dump(mode="json", exclude_unset=True))
+    doc["updated_at"] = datetime.now(UTC)
+    store.routine_set(user.uid, entry_id, doc)
+    return _entry_view(entry_id, doc)
+
+
+class FeelIn(BaseModel):
+    verdict: feel.Verdict
+    tags: list[feel.Tag] = Field(default_factory=list, max_length=feel.MAX_TAGS)
+
+
+@router.put("/routine/{entry_id}/feel")
+def routine_feel(
+    entry_id: str,
+    body: FeelIn,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """The person's own verdict on a product (current or stopped) and how it feels; one answer
+    a week is kept. Self-reported: never part of a measurement (app/feel.py)."""
+    _check_entry_id(entry_id)
+    doc = store.routine_get(user.uid, entry_id)
+    if doc is None:
+        raise HTTPException(404, {"code": "not_found", "message": "routine entry not found"})
+    feel.record(doc, body.verdict, list(body.tags))
     doc["updated_at"] = datetime.now(UTC)
     store.routine_set(user.uid, entry_id, doc)
     return _entry_view(entry_id, doc)

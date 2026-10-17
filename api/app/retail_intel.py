@@ -37,7 +37,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app import catalog, cohort, gemini, numbers, retailer
+from app import catalog, cohort, feel, gemini, numbers, retailer
 from app.explain import BANNED
 
 log = logging.getLogger("willow.retail_intel")
@@ -313,7 +313,13 @@ def _stats(f: Facts, pid: str) -> dict[str, Any]:
         "tier_label": TIER_LABEL["too_few"],
         "reason": None,
         "to_proven": None,
+        "felt": None,
+        "felt_n": None,
     }
+    said = _answers(f, pid, members)
+    if len(said) >= MIN:
+        row["felt"] = _r2(sum(1 for a in said if a["feel"] == "working") / len(said))
+        row["felt_n"] = len(said)
     el = [uh for uh in members if f.eligible(uh)]
     out = {"row": row, "el": el, "base": [], "metrics": metrics, "members": members}
     if not metrics:
@@ -508,11 +514,13 @@ def _evidence(f: Facts, pid: str) -> list[dict[str, Any]]:
         (c for c in segs["goal"] if not c["suppressed"]), key=lambda c: (-c["n"], c["id"])
     )[:2]:
         vs = f" (non-users {_pct(g['base_rate'])}%)" if g["base_rate"] is not None else ""
+        goal = g["label"].lower()
+        article = "an" if goal[:1] in "aeiou" else "a"
         out.append(
             item(
                 f"efficacy_{g['id']}",
                 "efficacy",
-                f"Measured in {g['n']} Willow users with a {g['label'].lower()} goal: "
+                f"Measured in {g['n']} Willow users with {article} {goal} goal: "
                 f"{_pct(g['rate'])}% had a visible change held to week 8{vs}. {label}.",
                 g["n"],
             )
@@ -604,6 +612,66 @@ def eligibility(f: Facts, pid: str) -> dict[str, Any]:
         "reasons": reasons,
         "goals": goals,
         "skin_types": skins,
+    }
+
+
+def _answers(f: Facts, pid: str, members: list[str]) -> list[dict[str, Any]]:
+    """Each user's latest self-reported answer on the product, given two weeks or more into it."""
+    rows = (f.rows_of[(uh, pid)] for uh in members)
+    return [r for r in rows if r.get("feel") and (r.get("feel_week") or 0) >= feel.MIN_WEEK]
+
+
+FEEL_NOTE = (
+    "Self-reported by people using it. Shown next to the measurements, never part of the Proof "
+    "tier or the measured evidence."
+)
+
+
+def _feel(f: Facts, pid: str) -> dict[str, Any] | None:
+    """How it feels to the people using it (self-reported; app/feel.py), and how that lines up
+    with what was measured. Groups under 10 are left out."""
+    s = _stats(f, pid)
+    said = _answers(f, pid, s["members"])
+    n = len(said)
+    if n < MIN:
+        return None
+    verdicts = Counter(a["feel"] for a in said)
+    tags = Counter(t for a in said for t in a.get("feel_tags") or [] if t in feel.TAGS)
+    agree = None
+    if s["row"]["tier"] != "too_few":
+        both = Counter()
+        for uh in s["el"]:
+            a = f.rows_of[(uh, pid)]
+            if not a.get("feel") or (a.get("feel_week") or 0) < feel.MIN_WEEK:
+                continue
+            felt = a["feel"] == "working"
+            measured = f.outcome(uh, s["metrics"]) is not None
+            both[(felt, measured)] += 1
+        k = sum(both.values())
+        if k >= MIN:
+            agree = {
+                "n": k,
+                "both": _r2(both[(True, True)] / k),
+                "felt_only": _r2(both[(True, False)] / k),
+                "measured_only": _r2(both[(False, True)] / k),
+                "neither": _r2(both[(False, False)] / k),
+            }
+    return {
+        "n": n,
+        **{v: _r2(verdicts[v] / n) for v in feel.VERDICTS},
+        "tags": [
+            {
+                "tag": t,
+                "label": feel.TAGS[t][0],
+                "good": feel.TAGS[t][1],
+                "n": c,
+                "share": _r2(c / n),
+            }
+            for t, c in sorted(tags.items(), key=lambda kv: (-kv[1], kv[0]))
+            if c >= MIN
+        ],
+        "agree": agree,
+        "note": FEEL_NOTE,
     }
 
 
@@ -727,6 +795,7 @@ def product_view(f: Facts, pid: str) -> dict[str, Any] | None:
         "evidence": _evidence(f, pid),
         "evidence_caveat": CAVEAT,
         "eligibility": eligibility(f, pid),
+        "feel": _feel(f, pid),
     }
 
 
@@ -1109,6 +1178,41 @@ def _name(r: dict[str, Any]) -> str:
     return f"{r['brand']} {r['product']}"
 
 
+def _feel_gap_card(f: Facts, brand: str | None = None) -> dict[str, Any] | None:
+    """The product whose users most often had a visible change without feeling it working
+    (self-reported): the people most likely to stop too early."""
+    best = None
+    for pid, p in _catalog()[0].items():
+        if brand and p["brand"] != brand:
+            continue
+        a = (_feel(f, pid) or {}).get("agree")
+        if (
+            a
+            and a["measured_only"] >= 0.15
+            and (best is None or a["measured_only"] > best[1]["measured_only"])
+        ):
+            best = (pid, a)
+    if best is None:
+        return None
+    pid, a = best
+    r = _stats(f, pid)["row"]
+    when = (
+        f" Changes typically show around week {r['weeks']}: say so on pack." if r["weeks"] else ""
+    )
+    return _card(
+        "feel_gap",
+        "risk",
+        f"People don't feel {r['product']} working yet",
+        f"{_pct(a['measured_only'])}% of users asked had a visible change but didn't say it was "
+        f"working (self-reported, n={a['n']}).{when}",
+        _pct(a["measured_only"]),
+        "percent",
+        a["n"],
+        "products",
+        pid,
+    )
+
+
 def _retailer_cards(f: Facts) -> list[dict[str, Any]]:
     rs = [r for r in rows(f) if r["tier"] != "too_few"]
     cards = []
@@ -1212,6 +1316,9 @@ def _retailer_cards(f: Facts) -> list[dict[str, Any]]:
                 "demand",
             )
         )
+    gap = _feel_gap_card(f)
+    if gap:
+        cards.insert(min(len(cards), 3), gap)
     return cards[:6]
 
 
@@ -1430,6 +1537,9 @@ def _brand_cards(f: Facts, brand: str) -> list[dict[str, Any]]:
                     r["product_id"],
                 )
             )
+    gap = _feel_gap_card(f, brand)
+    if gap:
+        cards.insert(min(len(cards), 3), gap)
     return cards[:6]
 
 
@@ -1447,6 +1557,7 @@ English, for a business reader: the most important win, the main risk and one ne
 - Use only numbers that appear in CARDS, exactly as written there. Never compute new numbers.
 - Observational, cosmetic language. Never say "clinically proven", "proven to treat", "cures"
   or name a skin condition. Never rank or compare people by skin tone.
+- A card that says "self-reported" is what people said, not a measurement: call it that.
 - If the cohort label says simulated, end with "(simulated cohort)"."""
 
 

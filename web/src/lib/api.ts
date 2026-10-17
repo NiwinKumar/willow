@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
+import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
 import { DEV_UID } from './devAuth'
 import type { LabelDetail } from './spotLabels'
 
@@ -404,6 +404,8 @@ export const api = {
   patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[]; schedule?: RoutineSchedule | null }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
+  /** How the product feels to the person (self-reported): a verdict and up to 4 look-and-feel tags. Answers the entry. */
+  putFeel: (token: string, id: string, body: { verdict: FeelVerdict; tags: FeelTag[] }) => request<RoutineEntry>(token, `/v1/routine/${id}/feel`, { method: 'PUT', ...json(body) }),
   /** Routine use ticks; days are the person's own calendar days (YYYY-MM-DD, see localDay). Default range: last 14 days. */
   routineLog: (token: string, range: { from?: string; to?: string } = {}) => {
     const qs = new URLSearchParams(Object.entries(range).filter((e): e is [string, string] => Boolean(e[1])))
@@ -459,7 +461,7 @@ export const api = {
   eligibility: (token: string) => request<{ products: PromoEligibility[] }>(token, '/v1/retailer/eligibility'),
   createCampaign: (token: string, body: NewCampaign) => request<Campaign>(token, '/v1/retailer/campaigns', { method: 'POST', ...json(body) }),
   listCampaigns: (token: string) => request<{ campaigns: Campaign[] }>(token, '/v1/retailer/campaigns'),
-  updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
+  updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' | 'ended' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
   deleteCampaign: (token: string, id: string) => request<void>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
@@ -509,6 +511,8 @@ export type NewCampaign = {
 export type CampaignDay = { day: string; impressions: number; clicks: number; adds: number }
 export type IncrementalityGroup = { n: number; added: number; rate: number }
 export type CampaignStats = {
+  /** Unique people shown the card at least once (each person once, ever). Missing from older api builds. */
+  reach?: number
   impressions: number
   clicks: number
   adds: number
@@ -676,6 +680,10 @@ export type RetailerProductRow = {
   tier_label?: string
   /** Promising only: about how many more people at week 8 would make it Proven if the rates hold. */
   to_proven?: number | null
+  /** Self-reported (never part of the tier): share of `felt_n` who said "It's working for me", 2 dp; null under 10. */
+  felt?: number | null
+  /** People who said how it feels at week 2 or later (latest answer each); null under 10. */
+  felt_n?: number | null
 }
 type RetailerHead = { filters: { cohort: RetailerCohort; range: RetailerRange; since: string | null; today: string }; cohort: RetailerInsights['cohort'] }
 export type RetailerProducts = RetailerHead & {
@@ -695,6 +703,24 @@ export type RetailerProductDetail = RetailerHead & {
   evidence: RetailerEvidence[]
   evidence_caveat?: string
   eligibility: { eligible: boolean; tier: RetailerProofTier; reasons: string[]; goals: string[]; skin_types: string[] }
+  /** How it feels to the people using it (self-reported, shown next to the measurements); null under 10 people. */
+  feel?: RetailerFeel | null
+}
+export type RetailerFeelVerdict = 'working' | 'unsure' | 'not_for_me'
+export type RetailerFeelTag = { tag: string; label: string; good: boolean; n: number; share: number }
+/**
+ * Self-reported answers on a product, each person's latest at week 2 or later. Shares are of `n`, 2 dp; tags
+ * with 10+ people only, most first. `agree`: people at week 8 with an answer on a measured product, felt
+ * ("It's working for me") against measured (a visible change in what it targets); null under 10 or unmeasured.
+ */
+export type RetailerFeel = {
+  n: number
+  working: number
+  unsure: number
+  not_for_me: number
+  tags: RetailerFeelTag[]
+  agree: { n: number; both: number; felt_only: number; measured_only: number; neither: number } | null
+  note: string
 }
 /** A switching flow by brand (people, >= 10); the product's own brand reads "Same brand, other product". */
 export type RetailerBrandFlow = { brand: string; label: string; same_brand: boolean; n: number }

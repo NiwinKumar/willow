@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { retailerProducts } from '../../../lib/api'
@@ -50,10 +50,14 @@ function Page({ d }: { d: Insights }) {
 
   // Anchors land once the matrix is in (it sets the height above them); an old `view=demand` link lands on
   // What people want. Scrolled in the effect itself: a frame callback is skipped in background tabs.
-  const target = hash ? hash.slice(1) : param('view') === 'demand' ? 'demand' : null
+  // The old key places the page once: opening a panel later must not scroll the page there again.
+  const legacyDone = useRef(false)
+  const target = hash ? hash.slice(1) : param('view') === 'demand' && !legacyDone.current ? 'demand' : null
   const ready = seg.status !== 'loading'
   useEffect(() => {
-    if (target && ready) document.getElementById(target)?.scrollIntoView({ block: 'start' })
+    if (!target || !ready) return
+    document.getElementById(target)?.scrollIntoView({ block: 'start' })
+    legacyDone.current = true
   }, [target, ready])
 
   const s = seg.status === 'ready' ? seg.data : null

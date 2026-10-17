@@ -166,7 +166,7 @@ function BrandsInCategory({ cat, ranked, mine, className }: { cat: Category; ran
 }
 
 function BrandRow({ b, i, max, mine }: { b: Category['brands'][number]; i: number; max: number; mine: boolean }) {
-  const tip = useTooltip(`${b.brand}: ${pct(b.rate)} of ${int(b.n)} people · 95% interval ${pct(b.lo).replace('%', '')}–${pct(b.hi)} · ${pct(b.cont)} still using`)
+  const tip = useTooltip(`${b.brand}: ${pct(b.rate)} of ${int(b.n)} people · 95% interval ${pct(b.lo).replace('%', '')}–${pct(b.hi)} · ${pct(b.cont)} still using after week 4`)
   return (
     <li className={`grid min-h-12 grid-cols-[16px_minmax(0,172px)_minmax(0,1fr)_auto] items-center gap-3 border-b border-line last:border-b-0 ${mine ? '-mx-5 bg-proof-leaf-soft px-5' : ''}`}>
       <span className="text-proof-small text-ink-2 tnum">{i + 1}</span>
@@ -207,8 +207,8 @@ function TopProducts({ cat, d, mine }: { cat: Category; d: Insights; mine: strin
     { id: 'product', header: 'Product', rowHeader: true, cell: (r) => <ProductCell p={r} size={28} tag={mine === r.brand ? <YoursTag /> : null} />, csv: (r) => `${r.product} (${r.brand})` },
     { id: 'tier', header: 'Proof', headerText: 'Proof status', width: '150px', cell: (r) => <ProofTierChip tier={r.tier} size="sm" />, csv: (r) => TIERS[r.tier].label },
     { id: 'rate', header: 'Visible change', headerText: 'Visible change by week 8 (%)', align: 'right', width: '140px', cell: (r) => (r.rate === null ? <span className="text-proof-small text-ink-2">{r.reason === 'not_measured' ? 'Not measured' : r.reason === 'unused' ? 'No users yet' : `n<${MIN_GROUP}`}</span> : <RateCell rate={r.rate} n={r.n} lo={r.rate_lo} hi={r.rate_hi} />), csv: (r) => (r.rate === null ? (r.reason ?? 'suppressed') : Math.round(r.rate * 100)) },
-    { id: 'lift', header: 'vs non-users', headerText: 'Lift vs non-users (pts)', align: 'right', width: '110px', cell: (r) => <LiftValue lift={r.lift} lo={r.lift_lo} hi={r.lift_hi} />, csv: (r) => (r.lift === null ? '' : Math.round(r.lift * 100)) },
-    { id: 'cont8', header: 'Still using', headerText: 'Still using at week 8 (%)', align: 'right', width: '96px', cell: (r) => (r.cont8 === null ? <Suppressed short /> : <span className="tnum">{pct(r.cont8)}</span>), csv: (r) => (r.cont8 === null ? 'suppressed' : Math.round(r.cont8 * 100)) },
+    { id: 'lift', header: 'vs non-users', headerText: 'Lift vs non-users (pts)', align: 'right', width: '110px', cell: (r) => (r.rate === null ? <span className="text-ink-3">—</span> : <LiftValue lift={r.lift} lo={r.lift_lo} hi={r.lift_hi} />), csv: (r) => (r.lift === null ? '' : Math.round(r.lift * 100)) },
+    { id: 'cont8', header: 'Still using', headerText: 'Still using at week 8 (%)', align: 'right', width: '96px', cell: (r) => (r.rate === null ? <span className="text-ink-3">—</span> : r.cont8 === null ? <Suppressed short /> : <span className="tnum">{pct(r.cont8)}</span>), csv: (r) => (r.rate === null ? '' : r.cont8 === null ? 'suppressed' : Math.round(r.cont8 * 100)) },
   ]
   return (
     <Panel flush>
