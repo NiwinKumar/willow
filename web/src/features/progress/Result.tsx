@@ -106,6 +106,8 @@ export default function Result() {
     }
     return null
   }, [spots.data, siteSessions])
+  // Its front and cheek photos, signed (only the single-session view signs them).
+  const diaryPhotoView = useSessionView(diaryPhoto?.id ?? null)
   const trackId = params.get('track')
   const track = diaryOn && spots.data?.enough_data ? (spots.data.tracks.find((t) => t.id === trackId) ?? null) : null
   const stageRef = useRef<HTMLElement>(null)
@@ -455,6 +457,7 @@ export default function Result() {
               onPick={pickTrack}
               onTake={() => shell.startCheckIn('face_full', mode)}
               photo={diaryPhoto}
+              photoViews={diaryPhotoView?.session.views ?? []}
             />
           ) : null}
         </>
