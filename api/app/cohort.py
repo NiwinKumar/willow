@@ -254,6 +254,7 @@ def finding_kinds(entries: list[dict[str, Any]]) -> list[str]:
 # synthetic number moves.
 FEEL_ANSWER = 0.6
 FEEL_WORKING = {"measured": 0.68, "later": 0.42, "none": 0.24}
+_TINGLE = ("acid", "ascorb", "retin", "peroxide")  # actives people often feel tingle
 _GOOD_TAGS = {
     "moisturizer": ["softer", "absorbs", "feels_nice"],
     "sunscreen": ["absorbs", "feels_nice"],
@@ -289,13 +290,16 @@ def synthetic_feel(
     else:
         early = week - started < 4 and stopped is None
         verdict = "unsure" if r.random() < (0.7 if early else 0.4) else "not_for_me"
+        acids = any(w in a["name"].lower() for a in p["key_actives"] for w in _TINGLE)
         bad = (
-            (["stings"] if "strong" in traits else [])
+            (["stings"] if "strong" in traits or acids else [])
             + (["drying"] if "oil_control" in traits else [])
             + (["heavy"] if p["category"] in ("moisturizer", "sunscreen") else [])
-        ) or ["breakouts"]
+        )
         k = r.choice([0, 1, 1, 2]) if verdict == "not_for_me" else r.choice([0, 0, 1])
         tags = r.sample(bad, k=min(len(bad), k))
+        if verdict == "not_for_me" and r.random() < 0.12:
+            tags.append("breakouts")
     return {"feel": verdict, "feel_week": week - started, "feel_tags": tags}
 
 
