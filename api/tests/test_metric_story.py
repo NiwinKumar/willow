@@ -86,7 +86,7 @@ def _story(store, sid="s_20261030_cccccccc"):
 def test_points_compare_with_last_week_and_name_the_routine():
     s = _story(_world())
     assert s["points"][0] == "Last check-in (23 Oct): 7.95."
-    assert s["points"][1] == "This check-in (30 Oct): 7.35: more even tone than last time."
+    assert s["points"][1] == "This check-in (30 Oct): 7.35, more even tone than last time."
     assert "real change" in s["points"][2]
     assert s["points"][3] == (
         "In your routine for this: Minimalist Alpha Arbutin 2% Serum "
@@ -141,6 +141,34 @@ def test_no_real_change_may_not_be_claimed(monkeypatch):
     _gemini(monkeypatch, ["Your tone evenness shows a real change since last week."])
     s = _story(_world(), "s_20261023_bbbbbbbb")  # within_noise against the baseline
     assert s["source"] == "facts"
+
+
+def test_years_causes_and_the_wrong_direction_fall_back_to_the_facts(monkeypatch):
+    for bad in (
+        "Your tone is more even than in 2026.",  # a year is not a measurement
+        "The serum caused the more even tone.",
+        "At 7.35 it is a less even tone than last time.",  # the value went down: more even
+    ):
+        _gemini(monkeypatch, [*GOOD_POINTS[:2], bad])
+        assert _story(_world())["source"] == "facts", bad
+
+
+def test_skin_tone_is_never_written_by_gemini(monkeypatch):
+    store, calls = _world(), []
+    _gemini(monkeypatch, ["Your skin tone is a better result."], calls=calls)
+    m = _metric(55.0, 2.0, "real_change") | {"id": "tone_ita", "label": "Skin tone", "unit": "deg"}
+    _session(store, "s_20261031_dddddddd", "2026-10-31", m)
+    s = metric_story.story(
+        store, UID, "s_20261031_dddddddd", store.session_get(UID, "s_20261031_dddddddd"), "tone_ita"
+    )
+    assert s["source"] == "facts" and calls == []
+
+
+def test_past_the_daily_cap_the_story_comes_from_the_facts(monkeypatch):
+    store, calls = _world(), []
+    _gemini(monkeypatch, GOOD_POINTS, calls=calls)
+    monkeypatch.setitem(metric_story.limits.CAPS, "metric_story", (0, 10))
+    assert _story(store)["source"] == "facts" and calls == []
 
 
 def test_no_reading_gives_none():
