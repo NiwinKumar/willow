@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app import limits, retail_intel, retailer, retailer_ask
+from app import limits, proof_ai, retail_intel, retailer, retailer_ask
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store
 
@@ -40,6 +40,7 @@ def ask(
     limits.take(store, user.uid, "retailer_ask")
     try:
         data = retailer.insights(body.cohort, body.range)
+        data = {**data, "perception": proof_ai.perception_rows(body.cohort, body.range)}
     except Exception as exc:
         limits.refund(store, user.uid, "retailer_ask")
         raise HTTPException(
@@ -135,4 +136,49 @@ def proof_brief(
     out = _proof(retail_intel.brief, cohort, range_, brand or None)
     if out is None:
         raise HTTPException(404, {"code": "unknown_brand", "message": "No such brand."})
+    return out
+
+
+# ── AI in Willow Proof (app/proof_ai.py) ───────────────────────────────────────────────────
+
+
+def _view(product_id: str, cohort: str, range_: str) -> dict[str, Any]:
+    out = _proof(retail_intel.product, product_id, cohort, range_)
+    if out is None:
+        raise HTTPException(404, {"code": "unknown_product", "message": "No such product."})
+    return out
+
+
+@router.get("/products/{product_id}/actions")
+def proof_actions(
+    product_id: str,
+    cohort: retailer.Cohort = Query("mixed", description="simulated | mixed | real"),
+    range_: retailer.Range = Query("all", alias="range", description="30d | 90d | all"),
+) -> dict[str, Any]:
+    """The three next steps for this product, from the facts on its page (Gemini picks and
+    explains; the fixed priority without it)."""
+    view = _view(product_id, cohort, range_)
+    return proof_ai.actions(view, (product_id, cohort, range_))
+
+
+class ClaimsRequest(BaseModel):
+    channel: proof_ai.Channel = "pdp"
+    cohort: retailer.Cohort = "mixed"
+    range: retailer.Range = "all"
+
+
+@router.post("/products/{product_id}/claims")
+def proof_claims(
+    product_id: str,
+    body: ClaimsRequest,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Claim drafts for one channel, each citing the evidence statements it rests on and checked
+    (numbers, overclaims, self-reported wording). Sign-in and a daily cap: it calls Gemini."""
+    view = _view(product_id, body.cohort, body.range)
+    limits.take(store, user.uid, "proof_claims")
+    out = proof_ai.claims(view, body.channel)
+    if out["source"] != "gemini":
+        limits.refund(store, user.uid, "proof_claims")
     return out

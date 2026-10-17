@@ -40,7 +40,8 @@ week 4, "cont8" at week 8. "weeks" is the median weeks to the first visible chan
 product category and goal, users of the category's products for that goal: "changed" = how many
 had a real change by weeks 2, 4 and 8, "using" = how many still used one at those weeks, "base" =
 people with the goal using none of them. "conflicts" are rule-table findings, as a share of
-"routines_checked".
+"routines_checked". "perception" is self-reported: per product, "felt" is the share of "n" people
+who said it is working for them; quote it only as what people said, never as a measured result.
 - Quote numbers exactly as they appear; a fraction may be written as a whole percent (0.36 -> 36%).
   Never compute new numbers (no differences, sums, averages or ratios you derive yourself).
 - refused: true when the question asks about individual people (who, which user, a named
