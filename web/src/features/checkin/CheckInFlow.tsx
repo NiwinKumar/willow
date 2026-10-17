@@ -23,7 +23,7 @@ import './checkin.css'
 import { addFiles, isDng, recheck, rowsFromShots, usable } from './files'
 import { FilesStep } from './FilesStep'
 import { GuideStep } from './GuideStep'
-import { baselineOf, cheeksByDefault, neededFor, parseMode, parseSite, plural, shotPoses, STEPS, thinBaseline, type Step } from './model'
+import { cheeksByDefault, neededFor, parseMode, parseSite, plural, shotPoses, STEPS, thinBaseline, type Step } from './model'
 import { FlowBackdrop, SampleBanner } from './parts'
 import { outcomeOf } from './outcome'
 import { ProcessingStep } from './ProcessingStep'
@@ -387,7 +387,7 @@ export default function CheckInFlow() {
 
   // ---- render ----
   // Face check-ins: the pose of every photo (front, then the cheeks when cheek photos are on).
-  const cheeks = cheeksPick ?? cheeksByDefault(baselineOf(sessionsOf(site), mode))
+  const cheeks = cheeksPick ?? cheeksByDefault(sessionsOf(site).filter((s) => s.capture_mode === mode))
   const poses = n === null ? [] : shotPoses(site, n, cheeks)
   const shotsN = poses.length || (n ?? 0)
   let content: ReactNode

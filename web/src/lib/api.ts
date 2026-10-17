@@ -46,6 +46,8 @@ export type SessionView = {
     explanation_source: 'template' | 'gemini' | null
     preview: { url: string; width: number | null; height: number | null } | null
     overlay_urls: Record<string, string>
+    /** Blemish and dark-spot counts compared with this check-in (taken the same way, with or without cheek photos) instead of the baseline. */
+    counts_compared_with?: { session_id: string; session_created_at: string | null; frames: number | null } | null
     /** Check-ins with cheek photos: each photo (front, left, right) signed, with its redness map. */
     views?: { view: ViewName; frame_index: number; preview: { url: string; width: number | null; height: number | null }; redness_url: string | null }[]
     hours_since_baseline: number | null

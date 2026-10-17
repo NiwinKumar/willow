@@ -139,6 +139,8 @@ export type Session = {
   measured?: boolean | null
   /** Live: the baseline this session is compared with (same site and capture mode). */
   baseline_ref?: { session_id: string; frames: number | null; has_noise_band: boolean } | null
+  /** Face check-ins with or without cheek photos: the check-in taken the same way that the blemish and dark-spot counts were compared with, when it is not the baseline. */
+  counts_ref?: { session_id: string } | null
   /** Live: the hosted sample these photos were copied from (judge sample runs), else null. */
   sample_id?: string | null
   /** Live, while processing: the analysis stage (received, engine, explaining). */

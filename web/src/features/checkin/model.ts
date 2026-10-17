@@ -85,19 +85,15 @@ export function shotPoses(site: Site, n: number, cheeks: boolean): Pose[] {
   return ['front', 'front', 'front', 'left', 'right']
 }
 
-/** The baseline set for these sessions and mode, if any. */
-export function baselineOf(sessions: Session[], mode: CaptureMode): Session | null {
-  const st = baselineState(sessions, mode)
-  return st.state === 'set' ? st.session : null
-}
+export const hasCheeks = (s: Session | null | undefined) => (s?.result?.views ?? []).some((v) => v.view !== 'front')
 
 /**
- * Cheek photos by default for a first face check-in, or when the baseline had them: a check-in compares best with
- * one taken the same way, so a front-only baseline keeps front-only check-ins unless the person turns them on.
+ * Cheek photos the way the last measured face check-in was taken (its counts compare with check-ins taken the same
+ * way), and on for a first one.
  */
-export function cheeksByDefault(baseline: Session | null): boolean {
-  if (!baseline) return true
-  return (baseline.result?.views ?? []).some((v) => v.view !== 'front')
+export function cheeksByDefault(sessions: Session[]): boolean {
+  const last = [...sessions].reverse().find((s) => s.status === 'done' && s.result)
+  return last ? hasCheeks(last) : true
 }
 
 export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'quick')

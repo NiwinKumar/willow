@@ -5,7 +5,7 @@ import type { CaptureMode, Session, Site } from '../../data/types'
 import { DONT_VARY } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
-import { canAddCheeks, checklist, GUIDE_BG, kindOf, lightroomSteps, pad2, POSE_NAME, shotPoses, SITE_NAME } from './model'
+import { canAddCheeks, checklist, hasCheeks, GUIDE_BG, kindOf, lightroomSteps, pad2, POSE_NAME, shotPoses, SITE_NAME } from './model'
 
 const NOTE_CHIPS = ['New lamp', 'After a workout', 'Skipped products today']
 
@@ -37,7 +37,8 @@ export function GuideStep(props: {
   const poses = shotPoses(site, n, cheeks)
   const total = poses.length
   const sides = total > n || poses.some((p) => p !== 'front')
-  const baselineFrontOnly = Boolean(baseline && !(baseline.result?.views ?? []).some((v) => v.view !== 'front'))
+  // A baseline taken the other way: the counts compare with the check-ins taken this way instead.
+  const otherWay = Boolean(baseline && hasCheeks(baseline) !== cheeks)
   const raw = mode === 'calibrated_raw'
   const kind = kindOf(site)
   const first = n === 5
@@ -132,7 +133,7 @@ export function GuideStep(props: {
               onChange={props.onCheeks}
               description={cheeks ? `Photos ${total - 1} and ${total}: turn your head about 45° to show your ${POSE_NAME.left.toLowerCase()}, then your ${POSE_NAME.right.toLowerCase()}. Spots on the cheeks and jaw are counted on them.` : 'Every photo faces the camera. Cheek photos show the spots a front photo misses.'}
             />
-            {cheeks && baselineFrontOnly ? <span className="pb-1 text-[13px] leading-[1.4] text-ink-2">Your baseline has front photos only, so today’s spot counts won’t compare with it like for like.</span> : null}
+            {otherWay ? <span className="pb-1 text-[13px] leading-[1.4] text-ink-2">Blemish and dark-spot counts are compared with your earlier check-ins taken {cheeks ? 'with' : 'without'} cheek photos. Everything else is compared with your baseline.</span> : null}
           </div>
         ) : null}
 

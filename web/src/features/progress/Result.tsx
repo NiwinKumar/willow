@@ -17,7 +17,7 @@ import { METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
 import { ExplanationCard, NextAction } from './ExplanationCard'
 import { MetricCard } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
-import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
+import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, referenceFor, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
 import { Crumb, Page, Pills, StatusCard, TomorrowSheet } from './parts'
 import { PhotoPanel, type DiaryFocus } from './PhotoPanel'
 import { heroFor } from './hero'
@@ -412,7 +412,7 @@ export default function Result() {
               </div>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,270px),1fr))] gap-3.5">
                 {ordered.map((m: Metric, i) => (
-                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : bandOf(baseline, m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
+                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : bandOf(referenceFor(m.id, session, baseline, siteSessions), m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
                 ))}
               </div>
             </>
@@ -456,7 +456,7 @@ export default function Result() {
         </Link>
       </p>
       <Disclaimer />
-      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
+      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, siteSessions) : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
           // The sheet is a modal <dialog> (top layer): close it, or the advisor opens hidden behind it.
           closeMetric()
           shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)
