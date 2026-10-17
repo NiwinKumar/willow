@@ -183,6 +183,7 @@ function LiveRoutine() {
                 sessions={sessions}
                 faceMeasured={faceMeasured}
                 onOpen={(e) => setInfo({ entry: e })}
+                onFeel={(e) => setInfo({ entry: e, focus: 'feel' })}
                 onStop={(e) => void writes.stop(e)}
                 onAdd={() => setAdd({ mode: 'search', slot })}
               />

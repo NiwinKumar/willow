@@ -69,8 +69,10 @@ test('"You said" names the week, and the first week in words', () => {
   assert.equal(saidLine({ verdict: 'working', week: 3 }), 'You said “It\'s working for me” in week 3.')
 })
 
-test('nudge: in use 14 days or more, no answer in the last 14 days', () => {
-  assert.equal(feelNudge([entry('a', '2026-10-04')], TODAY), null, '13 days is too early')
+test('nudge: in use 7 days or more, no answer in the last 14 days', () => {
+  assert.equal(feelNudge([entry('a', '2026-10-11')], TODAY), null, '6 days is too early')
+  assert.equal(feelNudge([entry('a', '2026-10-10')], TODAY)?.entry.id, 'a', '7 days')
+  assert.equal(feelNudge([entry('a', '2026-10-10')], TODAY)?.weeks, 1)
   assert.equal(feelNudge([entry('a', '2026-10-03')], TODAY)?.entry.id, 'a')
   assert.equal(feelNudge([entry('a', '2026-09-01', said('2026-10-04'))], TODAY), null, 'answered 13 days ago')
   assert.equal(feelNudge([entry('a', '2026-09-01', said('2026-10-03'))], TODAY)?.entry.id, 'a', 'answered 14 days ago')
