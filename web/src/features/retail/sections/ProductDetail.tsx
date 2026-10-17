@@ -3,25 +3,31 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { useRetailData } from '../context'
+import { retailerActions } from '../../../lib/api'
 import { csvMeta } from '../data'
 import { KIND_LABEL, packCsv, packHtml, packMarkdown, packName, statementLine } from '../evidencePack'
 import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipeline'
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail } from '../productData'
 import { hintOf, money, segInterval } from '../productModel'
+import { ANCHOR, channelOf, CLAIM_TIERS, DEFAULT_CHANNEL, type ActionTarget } from '../proofAi'
 import { sectionPath, useRetailState } from '../state'
-import type { BrandFlow, Insights, ProductDetail as Detail, Seg } from '../types'
+import type { Actions, BrandFlow, Filters, Insights, ProductDetail as Detail, Seg } from '../types'
+import { useView } from '../useView'
 import { Badge, Bone, Button, copyText, CurveChart, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, ProofTierChip, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
+import { ClaimStudio } from './ClaimStudio'
 import { FeelPanel } from './FeelPanel'
+import { NextSteps } from './NextSteps'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
  * Product proof page (/retail/products/:id) on GET /v1/retailer/products/{id}. Read top to bottom it is the
- * demo's story: the Proof pipeline (measured → proven → claims → promoted → lift), the outcome against
+ * demo's story: the Proof pipeline (measured → proven → claims → promoted → lift), next steps (Gemini picks up to
+ * three from what the data supports; each goes where it is done), the outcome against
  * non-users with the same goals, where it works, the claim-ready statements, how it ranks, and the routine
- * context (used alongside, switching, conflicts). "How it feels" (self-reported, never part of the tier or the
+ * context (used alongside, switching, conflicts). Claim drafts (Gemini, checked) sit under the statements. "How it feels" (self-reported, never part of the tier or the
  * evidence) sits after the evidence; brief cards link to it with #feel. Promote opens the campaign sheet prefilled
- * (/retail/campaigns?new=<id>). Deep links: ?seg=skin|goal|tone, ?ctx=co|switch|conflicts.
+ * (/retail/campaigns?new=<id>). Deep links: ?seg=skin|goal|tone, ?ctx=co|switch|conflicts, ?claim=pack|listing|social.
  */
 
 export default function ProductDetail() {
@@ -75,10 +81,20 @@ function Body({ d }: { d: Insights }) {
   if (state.status === 'loading') return <DetailSkeleton />
   if (state.status === 'missing') return <EmptyState title="This product isn’t in the catalog" body="The link may be old or mistyped. Every catalog product is on the Products list, with its status." action={{ label: 'Open products', to: `${sectionPath('products')}${carry}` }} />
   if (state.status === 'failed') return <ErrorState title="The product couldn’t load" body="The products service didn’t answer. No partial numbers are shown." onRetry={() => window.location.reload()} />
-  return <Page x={state.d} weeksN={d.cohort.weeks} brandView={workspace.kind === 'brand' ? workspace.brand : null} />
+  return <Page x={state.d} weeksN={d.cohort.weeks} brandView={workspace.kind === 'brand' ? workspace.brand : null} filters={filters} />
 }
 
-function Page({ x, weeksN, brandView }: { x: Detail; weeksN: number; brandView: string | null }) {
+/** Scroll a panel (by its heading id) under the sticky header and move focus there, for keyboard and screen readers. */
+function goTo(anchor: string) {
+  const el = document.getElementById(anchor)
+  if (!el) return
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1')
+  el.focus({ preventScroll: true })
+}
+
+function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; brandView: string | null; filters: Filters }) {
   const { param, setParam, carry } = useRetailState()
   const p = x.product
   const measured = p.rate !== null
@@ -91,6 +107,14 @@ function Page({ x, weeksN, brandView }: { x: Detail; weeksN: number; brandView: 
   const facts = [p.category_label, `${tierWord(p.price_tier)} price`, p.size, money(p.price)].filter(Boolean).join(' · ')
   const campaign = campaignFor(useCampaigns(), p.product_id)
   const steps = pipelineSteps({ p, weeksN, statements: x.evidence.length, eligible: x.eligibility.eligible, campaign, promoteTo })
+  const actions = useView<Actions>(`actions|${p.product_id}|${filters.cohort}|${filters.range}`, () => retailerActions(p.product_id, filters))
+  const hasSteps = actions.status === 'ready' && actions.data.actions.length > 0
+  const channel = channelOf(param('claim'))
+  // A next step on this page: pick its tab or channel, then scroll there once the new tab has rendered.
+  const scrollTo = (t: Extract<ActionTarget, { kind: 'scroll' }>) => {
+    if (Object.keys(t.params).length) setParam(t.params)
+    window.setTimeout(() => goTo(t.anchor), 60)
+  }
   // Brief cards link to #feel; the panel exists only once the product is in, so scroll then.
   const { hash } = useLocation()
   useEffect(() => {
@@ -157,12 +181,14 @@ function Page({ x, weeksN, brandView }: { x: Detail; weeksN: number; brandView: 
         </div>
       </div>
 
-      <section aria-labelledby="pipe-h" className="rounded-card border border-line bg-surface px-5 py-5">
+      <section id={ANCHOR.pipeline} aria-labelledby="pipe-h" className="rounded-card border border-line bg-surface px-5 py-5 outline-none">
         <h2 id="pipe-h" className="sr-only">
           Proof pipeline
         </h2>
         <ProofPipeline steps={steps} />
       </section>
+
+      <NextSteps view={actions} campaigns={`${sectionPath('campaigns')}${carry}`} claimable={CLAIM_TIERS.includes(p.tier) && x.evidence.length > 0} onScroll={scrollTo} />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <Panel title="Outcome" id="outcome-h" className="lg:col-span-7" description={`People using it against non-users with the same goals, by week of the ${weeksN}-week window.`}>
@@ -200,6 +226,8 @@ function Page({ x, weeksN, brandView }: { x: Detail; weeksN: number; brandView: 
           <Competitors x={x} brandView={brandView} carry={carry} />
         </Panel>
       </div>
+
+      <ClaimStudio key={p.product_id} x={x} filters={filters} channel={channel} onChannel={(c) => setParam({ claim: c === DEFAULT_CHANNEL ? null : c })} onNextSteps={hasSteps ? () => goTo(ANCHOR.next) : null} />
 
       <FeelPanel x={x} />
 
