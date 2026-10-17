@@ -13,6 +13,7 @@ import Landing from './features/website/Landing'
 // The landing page (/about) is the only eager screen: the app shell and every destination load on first visit.
 const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({ default: m.AppShell })))
 const SignIn = lazy(() => import('./features/website/SignIn'))
+const WaysIn = lazy(() => import('./features/website/WaysIn'))
 const FrontDoor = lazy(() => import('./features/website/FrontDoor'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
@@ -43,8 +44,9 @@ export default function App() {
           {/* While the check-in draws over a page, that page is inert (no focus, no clicks behind the sheet). */}
           <div inert={overlay || undefined}>
           <Routes location={background ?? location}>
-            {/* No sign-in page first: / opens the app (or onboarding for someone new). */}
-            <Route path="/" element={<FrontDoor />} />
+            {/* The first page: customers or retailers, no sign-in. Customers go on through the front door (/start). */}
+            <Route path="/" element={<WaysIn />} />
+            <Route path="/start" element={<FrontDoor />} />
             <Route path="/about" element={<Landing />} />
             <Route path="/science" element={<Landing />} />
             <Route path="/signin" element={<SignIn />} />
@@ -71,7 +73,6 @@ export default function App() {
             <Route path="/advisor" element={<Navigate to="/home?advisor=1" replace />} />
             <Route path="/retailer" element={<Navigate to="/retail" replace />} />
             <Route path="/privacy" element={<Navigate to="/terms" replace />} />
-            <Route path="/start" element={<Navigate to="/welcome" replace />} />
             <Route path="/goals" element={<Navigate to="/welcome/goals" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
