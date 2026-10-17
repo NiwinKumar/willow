@@ -87,12 +87,14 @@ export function downloadText(file: string, body: string, type: string) {
   }
 }
 
-/** Copy text to the clipboard with a toast either way (claim statements). */
-export async function copyText(text: string, what = 'Copied') {
+/** Copy text to the clipboard with a toast either way (claim statements); true when it was copied. */
+export async function copyText(text: string, what = 'Copied'): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
     toast(what)
+    return true
   } catch {
     toast('Copy is blocked in this browser. Select the text instead.')
+    return false
   }
 }
