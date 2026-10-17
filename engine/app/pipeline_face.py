@@ -8,6 +8,7 @@ import time
 import cv2
 import numpy as np
 from jsonschema import validate
+from scipy import ndimage
 
 from app import config, facemap
 from app.aggregate import summarize
@@ -16,6 +17,10 @@ from app.color import linear_srgb_to_lab
 from app.errors import EngineError
 from app.io import save_jpegs, save_png, save_preview
 from app.landmarks import (
+    LEFT_BROW,
+    LEFT_EYE,
+    RIGHT_BROW,
+    RIGHT_EYE,
     Face,
     FaceNotFound,
     detect_face,
@@ -317,6 +322,7 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "face": face,
         "view": face.view,
         "polygons": polys,
+        "areas": _area_outlines(face, box, face_skin, polys),
         "shape": srgb8.shape,
         "face_skin": (box, face_skin),
         "blemishes": blemishes,
@@ -584,6 +590,54 @@ def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -
     return face_area & ~hair
 
 
+def _area_outlines(
+    face: Face, box: Box, face_skin: np.ndarray, polys: dict[str, np.ndarray]
+) -> dict[str, np.ndarray]:
+    """What the app's "Areas" view draws (result.rois): the whole measured face skin split into the
+    face map's zones (config.FACE_ZONES, the same rule that places marks), one outline each in
+    photo pixels, then the under-eye patches (dark circles are read only there). The small ROI
+    patches alone showed a fifth of the face, though spots, blemishes, lines and shine are searched
+    over all of it. Skin past the mesh (hairline, jaw edge) joins its nearest zone. Without the face
+    model: the ROI patches, as before."""
+    zones = facemap.zone_map(face.points - [box.x, box.y], face_skin.shape)
+    if zones is None or not face_skin.any():
+        return dict(polys)
+    covered = zones > 0
+    if not covered.any():
+        return dict(polys)
+    _, (iy, ix) = ndimage.distance_transform_edt(~covered, return_indices=True)
+    label = np.where(face_skin, zones[iy, ix], 0).astype(np.uint8)
+    # each eye with its brow cut out, so a cheek outline stops under the eye instead of wrapping
+    # round it up to the brow (an outline cannot have a hole: the eye looked measured)
+    for eye, brow in ((RIGHT_EYE, RIGHT_BROW), (LEFT_EYE, LEFT_BROW)):
+        pts = (face.points[eye + brow] - [box.x, box.y]).astype(np.float32)
+        label[polygon_mask(label.shape, cv2.convexHull(pts).reshape(-1, 2))] = 0
+    r = max(round(config.AREA_SMOOTH_MM * face.px_per_mm), 1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    eps = config.AREA_OUTLINE_MM * face.px_per_mm
+    min_px = config.AREA_MIN_MM2 * face.px_per_mm**2
+    out: dict[str, np.ndarray] = {}
+    for code, name in enumerate(facemap.ZONES, start=1):
+        # smoothed: zone edges follow the mesh's triangles and looked jagged
+        mask = cv2.morphologyEx((label == code).astype(np.uint8), cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            continue
+        big = max(contours, key=cv2.contourArea)  # one outline per zone: its main piece
+        if cv2.contourArea(big) < min_px:
+            continue
+        outline = cv2.approxPolyDP(big, eps, True).reshape(-1, 2).astype(np.float64)
+        if len(outline) >= 3:
+            out[name] = outline + [box.x, box.y]
+    if not out:  # no zone found any skin (landmarks off the face mesh): the ROI patches
+        return dict(polys)
+    for name in ("right_under_eye", "left_under_eye"):
+        if name in polys:
+            out[name] = polys[name]
+    return out
+
+
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """Drop the ROI's own darkest 1% and brightest 1% (shadow, shine, stray hair)."""
     lo, hi = np.percentile(l_star[mask], [config.SKIN_LOW_PCT, config.SKIN_HIGH_PCT])
@@ -752,9 +806,9 @@ def analyze_face(
         "metrics": metrics,
         "candidates": candidates,
         "overlays": overlays,
-        # ROIs of the first photo; cross-frame alignment comes with overlays
+        # the reference photo's areas: the whole face in zones, plus the under-eye patches
         "rois": (
-            [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in ref["polygons"].items()]
+            [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in ref["areas"].items()]
             if ref
             else []
         ),

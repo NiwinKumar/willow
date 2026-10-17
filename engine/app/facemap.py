@@ -112,6 +112,32 @@ def _barycentric(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> 
     return np.stack([1 - w1 - w2, w1, w2], -1)
 
 
+def zone_map(points: np.ndarray, shape: tuple[int, int]) -> np.ndarray | None:
+    """Per pixel of a (h, w) image whose landmarks are `points`: 1-based index into FACE_ZONES of
+    the face mesh triangle covering it (0 = off the mesh), each triangle in the zone of its
+    centre on the canonical face (zone_of, as marks are placed). Only triangles facing the
+    camera are drawn. None without the model."""
+    mesh = canonical()
+    if mesh is None:
+        return None
+    verts, tris = mesh
+    img = np.asarray(points, dtype=np.float64)[: len(verts)]
+    a, b, c = (img[tris[:, k]] for k in range(3))
+    ref = verts[:, :2] * [1, -1]
+    ra, rb, rc = (ref[tris[:, k]] for k in range(3))
+    area_img = (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
+    area_ref = (rb[:, 0] - ra[:, 0]) * (rc[:, 1] - ra[:, 1]) - (rb[:, 1] - ra[:, 1]) * (
+        rc[:, 0] - ra[:, 0]
+    )
+    facing = (np.sign(area_img) == np.sign(area_ref)) & (np.abs(area_img) > 1e-6)
+    centre = verts[tris].mean(axis=1)
+    out = np.zeros(shape, np.uint8)
+    for t in np.flatnonzero(facing):
+        code = ZONES.index(zone_of(float(centre[t, 0]), float(centre[t, 1]))) + 1
+        cv2.fillConvexPoly(out, np.round(img[tris[t]]).astype(np.int32), code)
+    return out
+
+
 def locate(points: np.ndarray, xy: np.ndarray) -> list[dict | None]:
     """For each (x, y) photo-pixel point: {"face_x_mm", "face_y_mm", "zone", "mm_per_px"} on
     the canonical face, or None (off the face mesh by more than FACEMAP_MAX_OUTSIDE_MM,

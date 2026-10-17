@@ -15,8 +15,10 @@ export function frameFor(site: Site, result: AnalysisResult | null | undefined, 
     const xs = pts.map((p) => p[0])
     const ys = pts.map((p) => p[1])
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
-    // Regions run from the forehead band to the chin; 1.8x leaves the hairline and jaw in view.
-    const side = Math.max(x1 - x0, y1 - y0) * 1.8
+    // Whole-face areas (engine face-map zones) already reach the hairline and jaw: a little room around them.
+    // Older sessions' small patches ran from the forehead band to the chin: 1.8x leaves hairline and jaw in view.
+    const whole = result.rois.some((r) => r.name === 'around_mouth' || r.name.endsWith('_jaw'))
+    const side = Math.max(x1 - x0, y1 - y0) * (whole ? 1.2 : 1.8)
     box = { x: (x0 + x1) / 2 - side / 2, y: (y0 + y1) / 2 - side / 2, w: side, h: side }
   }
   // Grow to the frame's shape, never past the largest such box inside the photo, then keep it inside.
