@@ -1,7 +1,7 @@
 /** Spot candidates of one session, named as the design names them, from real engine candidates and Gemini labels. */
-import type { Candidate, Session } from '../../data/types'
-import { HIDDEN_RINGS, SPOT_NAME, type LabelDetail } from '../../lib/spotLabels'
-import { candidateView, VIEW_ORDER } from './views'
+import type { Candidate, Session } from '../../data/types.ts'
+import { HIDDEN_RINGS, SPOT_NAME, type LabelDetail } from '../../lib/spotLabels.ts'
+import { candidateView, VIEW_ORDER } from './views.ts'
 
 export type SpotItem = {
   n: number
@@ -19,9 +19,9 @@ export type SpotItem = {
 export function spotItems(s: Session): SpotItem[] {
   const r = s.result
   if (!r) return []
-  // With cheek photos (one per side), "seen in" compares the front photos only; a cheek mark has no second photo.
-  const sides = Math.max(0, (r.views?.length ?? 1) - 1)
-  const frames = r.frames_used - sides
+  // "Seen in X of N": N is the photos of the mark's own view (front, or that cheek's). Engines before
+  // features.frames_in_view: frames_used, which counts the front photos only, so a cheek mark gets no count.
+  const photos = (c: Candidate) => c.features?.frames_in_view ?? (c.features?.view ? 0 : r.frames_used)
   // Numbered in the order the list shows them: front photo, then left cheek, then right cheek.
   const rank = (c: Candidate) => VIEW_ORDER.indexOf(candidateView(c))
   const ordered = [...r.candidates].sort((a, b) => rank(a) - rank(b))
@@ -31,6 +31,7 @@ export function spotItems(s: Session): SpotItem[] {
     const mole = d?.label === 'mole'
     const kind = hidden ? 'Hair or artefact' : mole ? 'Mole-like mark' : c.kind === 'spot' ? 'Dark spot' : 'Blemish candidate'
     const f = c.features?.seen_in_fraction
+    const of = photos(c)
     return {
       n: i + 1,
       c,
@@ -40,7 +41,7 @@ export function spotItems(s: Session): SpotItem[] {
       mole,
       // Ring hues tell the kinds apart on the photo; the list says the kind in words.
       ring: hidden ? 'var(--signal-noise)' : mole ? 'var(--aura-violet)' : c.kind === 'spot' ? 'var(--aura-apricot)' : 'var(--willow-400)',
-      agree: frames >= 2 && f !== undefined && !c.features?.view ? { seen: Math.round(f * frames), of: frames } : null,
+      agree: of >= 2 && f !== undefined ? { seen: Math.round(f * of), of } : null,
     }
   })
 }
