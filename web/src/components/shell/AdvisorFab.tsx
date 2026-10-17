@@ -9,15 +9,16 @@ const DOZE_MS = 90_000
 const HAPPY_MS = 1600
 
 /**
- * The advisor's own floating button, bottom left: the shadow cat (components/assistant). It opens and closes
+ * The advisor's own floating button, bottom right: the shadow cat (components/assistant). It opens and closes
  * the advisor panel and shows what the advisor is doing:
  *   thinking while a question is out → speaking while the answer is revealed → a happy hop when it lands,
  *   listening while the pointer is on it or the person is typing a question, sleepy after a long quiet spell,
  *   idle otherwise.
- * Wide screens: just right of the sidebar (it follows the sidebar's collapse). Phones: above the dock, and
- * out of the way while the full-screen advisor is open.
+ * Wide screens: in the corner, and beside the advisor panel while it is open (the panel takes the right edge),
+ * so the cat stays in view thinking and speaking next to the chat. Phones: above the dock, and out of the way
+ * while the full-screen advisor is open.
  */
-export function AdvisorFab({ open, onToggle, wide, sidebarWidth, covered }: { open: boolean; onToggle: () => void; wide: boolean; sidebarWidth: number; covered: boolean }) {
+export function AdvisorFab({ open, onToggle, wide, beside, covered }: { open: boolean; onToggle: () => void; wide: boolean; beside: boolean; covered: boolean }) {
   const { phase, messages } = useChat()
   const answered = messages.at(-1)?.role === 'willow'
   const [hover, setHover] = useState(false)
@@ -90,11 +91,12 @@ export function AdvisorFab({ open, onToggle, wide, sidebarWidth, covered }: { op
       aria-pressed={open}
       title={open ? 'Close the advisor' : 'Ask Willow'}
       tabIndex={hidden ? -1 : undefined}
-      className="fixed z-[36] grid place-items-center rounded-full transition-[left,opacity,scale,translate] duration-[450ms] ease-spring hover:scale-[1.05] active:scale-[.94] active:duration-100 motion-reduce:hover:scale-100"
+      className="fixed z-[36] grid place-items-center rounded-full transition-[right,opacity,scale,translate] duration-[450ms] ease-spring hover:scale-[1.05] active:scale-[.94] active:duration-100 motion-reduce:hover:scale-100"
       style={{
         width: size,
         height: size,
-        left: wide ? sidebarWidth + 12 + 16 : 16,
+        // beside the open panel: its 12px inset + 440px width + a 16px gap
+        right: wide ? (beside ? 12 + 440 + 16 : 24) : 16,
         bottom: wide ? 20 : 'calc(max(14px, env(safe-area-inset-bottom)) + 76px)',
         opacity: hidden ? 0 : 1,
         translate: hidden ? '0 12px' : '0 0',
@@ -104,7 +106,7 @@ export function AdvisorFab({ open, onToggle, wide, sidebarWidth, covered }: { op
       }}
     >
       <AssistantAvatar state={state} size={size} />
-      {open ? <span aria-hidden className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-selected shadow-[0_0_0_2px_rgba(250,250,248,.95)]" /> : null}
+      {open ? <span aria-hidden className="absolute -bottom-0.5 -left-0.5 size-3 rounded-full bg-selected shadow-[0_0_0_2px_rgba(250,250,248,.95)]" /> : null}
     </button>
   )
 }
