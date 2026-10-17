@@ -28,7 +28,8 @@ export function useCheckinDue(): Due | null {
   const face = data.series('face_full')?.sessions ?? EMPTY
   return useMemo(() => {
     if (data.mode !== 'live' || !checkin) return null
-    const days = face.filter(counts).map((s) => parseDate(s.created_at))
+    // judge sample runs (hosted photos, sample_id) are not the person's own check-ins
+    const days = face.filter((s) => counts(s) && !s.sample_id).map((s) => parseDate(s.created_at))
     return days.length ? dueOf(checkin, days) : null
   }, [data.mode, checkin, face])
 }

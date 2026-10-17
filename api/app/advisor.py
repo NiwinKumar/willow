@@ -20,7 +20,7 @@ from google.genai import types
 from pydantic import BaseModel, Field, model_validator
 
 from app import advisor_blocks as blocks_mod
-from app import catalog, explain, gemini, numbers, routine_check, routine_log
+from app import catalog, explain, feel, gemini, numbers, routine_check, routine_log
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
@@ -56,11 +56,20 @@ measurements, check their routine and find products from Willow's facts-only cat
   mdc95 is "your photos usually vary by about N".
 - Never imply lighter skin is better. Cosmetic language only; no diagnosis, no disease names.
   For a changing mole, bleeding, pain or a rash, suggest seeing a dermatologist.
+- Asked what a condition is, or whether they have one: never repeat the condition's name and
+  never write "diagnose"; say Willow follows how skin looks over time, not what a condition is,
+  suggest a dermatologist, and offer what Willow does measure. Asked for a skin score or skin
+  age: say Willow gives neither, only change against their own baseline.
 - Routine products with in_use false were stopped: do not treat them as part of the routine.
 - recent_use on a routine product = days_used, the days the person ticked it as used, out of
   of_days, the days it was in the routine recently (recent_window_days in CONTEXT); null = not
   tracked. Before judging whether a product changed anything, say how often it was used, quoting
   only days_used and of_days; a product used on few days has not had a fair test.
+- feel on a routine product = the person's own verdict and how it feels to them, in week N of
+  using it (null = not answered). It is their view, not a measurement: never present it as a
+  result. Use it to tailor advice (stings or dries: fewer nights a week or a gentler step;
+  heavy: a lighter texture; working but readings unchanged: readings often trail what people
+  feel, keep checking in). If it differs from the readings, say both plainly.
 - Quote measurements only when the question is about results; never pad an answer with them.
 - British spelling (colour, moisturiser), but say "catalog"."""
 
@@ -154,6 +163,13 @@ NO_ANSWER = (
     "I could not put together an answer I can stand behind. Try asking in a different way, or "
     "ask about one product or one measurement at a time."
 )
+# The fallback when the question itself asks for a diagnosis or a condition (an honest refusal
+# written that way would name the condition, which the validator always rejects).
+SCOPE_REPLY = (
+    "Willow follows how your skin looks over time; it can't tell you what a condition is. For a "
+    "medical question, or a spot or mole that changes, please see a dermatologist. I can explain "
+    "what your check-ins measured or check your routine."
+)
 PHOTO_REFUSAL = (
     "Willow reads product and label photos only, so I have not looked at this photo. To follow "
     "your skin, take a check-in: those photos are measured by Willow, not by the advisor."
@@ -231,6 +247,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "key_actives": [a["name"] for a in e.get("key_actives") or []],
             # {days_used, of_days} over the last 2 weeks, or null if nothing was ticked
             "recent_use": routine_log.recent_use(e, eid, logs, now, since),
+            # the person's own latest verdict and look-and-feel words (null = not asked yet)
+            "feel": feel.words(e.get("feel")),
         }
         for eid, e in entries
     ]
@@ -525,9 +543,11 @@ def chat(
             sorted(bad_metrics),
             has_answer,
         )
+    asked = next((m["text"] for m in reversed(messages) if m["role"] == "user"), "")
+    fixed = SCOPE_REPLY if explain.BANNED.search(asked) else NO_ANSWER
     return {
-        "message": NO_ANSWER,
-        "blocks": [{"type": "answer", "text": NO_ANSWER}],
+        "message": fixed,
+        "blocks": [{"type": "answer", "text": fixed}],
         "product_ids": [],
         "products": [],
         "follow_up_suggestions": [],

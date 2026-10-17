@@ -8,7 +8,7 @@ import { CONSENT_VERSION } from '../../lib/prefs'
 import { backButton, Lockup, SoftBackdrop } from './Decor'
 
 /** The date this notice last changed. Change it with every edit to the wording below. */
-const UPDATED = '2026-10-15'
+const UPDATED = '2026-10-16'
 const ISSUES = 'https://github.com/NiwinKumar/willow/issues'
 
 const BACKDROP = 'radial-gradient(40% 40% at 12% 18%, rgba(156,211,255,.55), transparent 70%), radial-gradient(40% 45% at 88% 82%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
@@ -54,7 +54,7 @@ export default function Terms() {
               'Original photos, previews and spot close-ups are deleted 30 days after upload. Measurements stay until you delete them.',
               'Every number comes from computer vision. Gemini explains and reads labels; it never produces a measurement.',
               'Sharing anonymized numbers with retailers is off unless you switch it on, and groups under 10 people are never shown.',
-              'No ads. You can delete everything at any time from You.',
+              'Your results carry no ads. Routine can show one product marked Sponsored, only one that met Willow’s evidence bar; switch it off in You. You can delete everything at any time from You.',
             ].map((t) => (
               <li key={t} className="flex gap-3">
                 <span aria-hidden className="mt-[9px] size-2 flex-none rounded-full bg-willow-400" />
@@ -103,7 +103,8 @@ export default function Terms() {
                 ['Previews, spot close-ups and overlays', 'Small images made from your photos for your results.', 'Deleted automatically 30 days after they are made, so with the photos.'],
                 ['Measurements', 'The numbers, verdicts and spot locations for each check-in, your baselines, and notes you add.', 'Kept until you delete them, so your history keeps working.'],
                 ['Routine', 'Products you add (from the catalog, a label scan or typed in), the days you tick them, and product tests.', 'Kept until you remove them or delete everything.'],
-                ['Profile', 'Your goals, usual photo time, check-in days and time zone, display name and, if you give it, skin type.', 'Kept until you change it or delete everything.'],
+                ['Profile', 'Your goals, usual photo time, check-in days and time zone, display name, whether sponsored suggestions are shown and, if you give it, skin type.', 'Kept until you change it or delete everything.'],
+                ['Sponsored suggestions', 'If a brand’s campaign matches your goals: whether you were shown its card or held back as the comparison group, the day that was decided, and whether you added the product. Stored under a one-way code instead of your account.', 'Kept with that campaign’s results; it cannot be traced back to you.'],
                 ['Consent', 'Which version of the photo consent you agreed to, when, and whether aggregate sharing is on.', 'Kept until you delete everything.'],
                 ['Daily usage counts', 'How many AI requests you made each day, to enforce daily limits.', 'Kept until you delete everything.'],
               ] as const
@@ -146,7 +147,10 @@ export default function Terms() {
 
         <Section title="Money">
           <p>
-            Willow is free, shows no ads, and earns nothing from the store links it shows: links go to the store’s own page, and the order products appear in is never sold. Prices can change; the store’s own page has the current one. If this ever changes, this notice changes first.
+            Willow is free and earns nothing from the store links it shows: links go to the store’s own page. Prices can change; the store’s own page has the current one.
+          </p>
+          <p>
+            Brands can pay to show one product on Routine, under your own routine, marked “Sponsored” in words. Only a product whose measured results met Willow’s evidence bar for your goals can be shown, and “Why am I seeing this?” on the card says which of your goals matched. Payment never changes your measurements, the advisor’s answers or the order of your own recommendations. Switch sponsored suggestions off at any time in You. If this ever changes, this notice changes first.
           </p>
         </Section>
 

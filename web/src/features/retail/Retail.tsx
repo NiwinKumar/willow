@@ -49,6 +49,7 @@ function useProofTheme(): [ThemePref, (t: ThemePref) => void] {
     const html = document.documentElement
     const before = html.dataset.theme
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    html.classList.remove('proof-boot-dark') // the pre-app dark paint from index.html; the tokens take over now
     const apply = () => {
       html.dataset.proof = '1'
       html.dataset.theme = pref === 'system' ? (mq.matches ? 'dark' : 'light') : pref
@@ -123,6 +124,8 @@ function Shell() {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
+        // Already open: don't stack another history entry (Back would seem to do nothing).
+        if (new URLSearchParams(window.location.search).get('ask') === '1') return
         setParam({ ask: '1' }, { push: true })
       }
     }

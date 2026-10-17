@@ -23,7 +23,7 @@ export type HeatCell = {
 /**
  * A matrix as a real <table> (so it is its own accessible fallback): row headers, column headers, each cell
  * filled at alpha = value × 0.6 of one tone (docs/DESIGN.md heat table). `tone="signal"` (ember) only when the
- * value is a real-change rate; `neutral` (white) for everything else, such as demand. Suppressed cells are
+ * value is a visible-change rate; `neutral` (white) for everything else, such as demand. Suppressed cells are
  * hatched and say so. `onCell` makes cells buttons (drill-down).
  */
 export function Heatmap<R extends { id: string; label: ReactNode }, C extends { id: string; label: ReactNode }>({

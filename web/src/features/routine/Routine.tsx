@@ -20,6 +20,7 @@ import { SlotCard } from './SlotCard'
 import { SponsoredCard } from './SponsoredCard'
 import { ProductTestCard, Suggestions } from './Suggestions'
 import { AvailableInOwnAccount } from './OwnAccountNotice'
+import { FeelNudge } from './FeelCard'
 import { useRoutineWrites } from './writes'
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
@@ -108,6 +109,7 @@ function LiveRoutine() {
       </div>
 
       {!loading && !failed ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
+      {!loading && !failed ? <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} /> : null}
       {!loading && !failed && current.length ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : null}
 
       {loading ? (

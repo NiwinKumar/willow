@@ -30,7 +30,23 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
               ['uncalibrated', 'Quick photo'],
             ] as const
           ).map(([m, label]) => (
-            <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => onMode(m)} className={`min-h-[46px] rounded-pill px-5 text-[15px] transition-[background] duration-200 ${mode === m ? 'bg-selected text-inverse' : 'text-ink'}`}>
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              tabIndex={mode === m ? 0 : -1}
+              onClick={() => onMode(m)}
+              onKeyDown={(e) => {
+                // a radio group moves with the arrow keys (one tab stop for the group)
+                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
+                e.preventDefault()
+                const next = m === 'calibrated_raw' ? 'uncalibrated' : 'calibrated_raw'
+                onMode(next)
+                const group = e.currentTarget.parentElement
+                window.setTimeout(() => group?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus(), 0)
+              }}
+              className={`min-h-[46px] rounded-pill px-5 text-[15px] transition-[background] duration-200 ${mode === m ? 'bg-selected text-inverse' : 'text-ink'}`}>
               {label}
             </button>
           ))}

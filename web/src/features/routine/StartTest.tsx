@@ -58,6 +58,7 @@ export function StartTest({ preset, onCancel, onStarted }: { preset: TestPreset;
             </Chip>
           ))}
         </div>
+        {days < VERDICT_AFTER_DAYS ? <span className="text-[13px] opacity-80">A {days}-day test ends before day {VERDICT_AFTER_DAYS}, so Willow won’t give a verdict for it. Choose {VERDICT_AFTER_DAYS} days or more for one.</span> : null}
       </div>
       {error ? (
         <p role="alert" className="rounded-md bg-avoid-bg px-3.5 py-2.5 text-[13px] text-avoid">

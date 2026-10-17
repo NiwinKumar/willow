@@ -540,7 +540,12 @@ export default function CheckInFlow() {
       {typeof document !== 'undefined' ? createPortal(<div aria-hidden className="fixed inset-0 z-[60]" onClick={() => requestRef.current()} />, document.body) : null}
       {dark ? null : <FlowBackdrop />}
       {sampleParam !== null ? <SampleBanner /> : null}
-      {dark ? null : (
+      {dark ? (
+        // The camera view hides the header; keep a way out besides Esc and Back.
+        <button type="button" onClick={requestClose} aria-label="Close check-in" title="Close check-in" className="absolute right-[clamp(16px,4vw,40px)] top-[calc(env(safe-area-inset-top,0px)+16px)] z-30 grid size-12 place-items-center rounded-full bg-white/15 text-white backdrop-blur-[14px] hover:bg-white/25">
+          <X size={18} strokeWidth={1.8} aria-hidden />
+        </button>
+      ) : (
         <header className="relative z-20 flex flex-none items-center justify-between gap-3 px-[clamp(16px,4vw,40px)] py-4">
           <span className="flex items-center gap-2.5">
             <LogoMark size={32} />

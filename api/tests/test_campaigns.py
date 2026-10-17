@@ -218,7 +218,7 @@ def test_owner_only_patch_and_delete(client, fake):
     res = client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "paused"})
     assert res.status_code == 200 and res.json()["status"] == "paused"
     assert (
-        client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "ended"}).status_code == 422
+        client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "deleted"}).status_code == 422
     )
     assert (
         client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "active"}).json()["status"]
@@ -375,6 +375,44 @@ def _event(c: TestClient, cid: str, kind: str) -> int:
     return c.post(f"/v1/sponsored/{cid}/events", json={"kind": kind}).status_code
 
 
+def test_end_early_stops_for_good(client, fake):
+    cid = _create(client).json()["id"]
+    s = _shopper()
+    assert s.get("/v1/sponsored").json()["item"]["campaign_id"] == cid
+    res = client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": "ended"})
+    assert res.status_code == 200
+    row = res.json()
+    assert row["status"] == "ended" and row["ends_at"] <= campaigns.now().isoformat()
+    assert len(row["stats"]["daily"]) == 1  # the day it ran
+    assert campaigns.active_count(fake.store, "u_test") == 0  # frees a slot under the cap
+    assert _shopper("shopper2").get("/v1/sponsored").json()["item"] is None
+    for status in ("active", "paused", "ended"):
+        res = client.patch(f"/v1/retailer/campaigns/{cid}", json={"status": status})
+        assert res.status_code == 409 and res.json()["detail"]["code"] == "ended"
+    assert (
+        _as("other").patch(f"/v1/retailer/campaigns/{cid}", json={"status": "ended"}).status_code
+        == 404
+    )
+
+
+def test_reach_counts_people_once_ever(client, fake, monkeypatch):
+    cid = _create(client).json()["id"]
+    a, b = _shopper("a"), _shopper("b")
+    for c in (a, b):
+        assert c.get("/v1/sponsored").json()["item"]["campaign_id"] == cid
+        _event(c, cid, "impression")
+        _event(c, cid, "impression")  # same day: one impression, one person
+    st = client.get("/v1/retailer/campaigns").json()["campaigns"][0]["stats"]
+    assert (st["reach"], st["impressions"]) == (2, 2)
+    # the next day the same two people count as impressions again, not as new reach
+    tomorrow = campaigns.today() + timedelta(days=1)
+    monkeypatch.setattr(campaigns, "today", lambda: tomorrow)
+    _event(a, cid, "impression")
+    st = client.get("/v1/retailer/campaigns").json()["campaigns"][0]["stats"]
+    assert (st["reach"], st["impressions"]) == (2, 3)
+    assert "shopper" not in str(fake.store.campaign_member)  # members are hashed, never the uid
+
+
 def test_impressions_count_once_per_person_per_day(client, fake):
     cid = _create(client).json()["id"]
     s = _shopper()
@@ -418,7 +456,7 @@ def test_delivery_counts_are_shown_as_counted(client, fake):
     _event(s, cid, "impression")
     st = client.get("/v1/retailer/campaigns").json()["campaigns"][0]["stats"]
     # a judge sees "1 impression" right after viewing the card
-    assert st["impressions"] == 1 and st["clicks"] == 0 and st["ctr"] == 0.0
+    assert st["impressions"] == 1 and st["reach"] == 1 and st["clicks"] == 0 and st["ctr"] == 0.0
     assert st["daily"][-1] == {
         "day": st["daily"][-1]["day"],
         "impressions": 1,

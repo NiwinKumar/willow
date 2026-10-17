@@ -186,11 +186,14 @@ export function AppShell() {
 function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }: { open: boolean; mounted: boolean; phone: boolean; onClose: () => void; seed: AdvisorSeed | null; full: boolean; onToggleFull: () => void }) {
   const panel = useRef<HTMLDivElement>(null)
   const back = useRef<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
   useEffect(() => {
     const el = panel.current
     if (!el) return
     if (open) {
-      back.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      wasOpen.current = true
+      // <body> is no opener (Safari never focuses a clicked button; ?advisor=1 has none): the Advisor button then.
+      back.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
       // The panel content may still be loading (first open): focus the panel now and its composer once it is there.
       el.focus({ preventScroll: true })
       let tries = 0
@@ -201,6 +204,9 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
       }, 80)
       return () => window.clearInterval(t)
     }
+    // Only a real close hands focus back (on first render the panel was never open: leave focus alone).
+    if (!wasOpen.current) return
+    wasOpen.current = false
     // Closing makes the panel inert, which may already have dropped focus to <body>.
     const a = document.activeElement
     if (!a || a === document.body || el.contains(a)) {

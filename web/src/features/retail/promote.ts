@@ -186,10 +186,15 @@ export function reachRange(cells: { skin: string; goal: string; users: number | 
   return hi ? { lo, hi } : null
 }
 
-/** Totals for the page's one-line answer: running campaigns, impressions so far, and each measured holdout lift. */
-export function campaignSummary(cs: Pick<Campaign, 'status' | 'stats'>[]): { active: number; impressions: number; lifts: number[] } {
+/** A campaign's reach in people (older api builds sent impressions only: null). */
+export const reachOf = (c: Pick<Campaign, 'stats'>): number | null => c.stats.reach ?? null
+
+/** Totals for the page's one-line answer: running campaigns, people reached (each campaign's unique people, summed: a person two campaigns reached counts in both), impressions, and each measured holdout lift. */
+export function campaignSummary(cs: Pick<Campaign, 'status' | 'stats'>[]): { active: number; reach: number | null; impressions: number; lifts: number[] } {
+  const reaches = cs.map(reachOf)
   return {
     active: runningCount(cs),
+    reach: reaches.every((r) => r !== null) ? reaches.reduce((sum: number, r) => sum + (r ?? 0), 0) : null,
     impressions: cs.reduce((sum, c) => sum + c.stats.impressions, 0),
     lifts: cs.flatMap((c) => (c.stats.incrementality ? [c.stats.incrementality.lift] : [])),
   }
@@ -199,4 +204,14 @@ export function campaignSummary(cs: Pick<Campaign, 'status' | 'stats'>[]): { act
 export function liftWords(lift: number): { figure: string; dir: 'above' | 'below' | 'level with' } {
   const p = Math.round(lift * 100)
   return { figure: p > 0 ? `+${p} pts` : p < 0 ? `${-p} pts` : '', dir: p > 0 ? 'above' : p < 0 ? 'below' : 'level with' }
+}
+
+/** The planned length ("14 days"), or how long it ran when it was ended early ("ended early after 1 day of 14"). */
+export function durationText(c: Pick<Campaign, 'days' | 'starts_at' | 'ends_at' | 'status'>): string {
+  const planned = c.days ?? null
+  const start = c.starts_at ? Date.parse(c.starts_at) : NaN
+  const end = c.ends_at ? Date.parse(c.ends_at) : NaN
+  const ran = Number.isFinite(start) && Number.isFinite(end) ? Math.max(1, Math.ceil((end - start) / 86_400_000)) : null
+  if (c.status === 'ended' && planned !== null && ran !== null && ran < planned) return `ended early after ${ran} ${ran === 1 ? 'day' : 'days'} of ${planned}`
+  return planned !== null ? `${planned} days` : ''
 }

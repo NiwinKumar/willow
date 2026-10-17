@@ -4,7 +4,7 @@ import { api, type Campaign } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/useAuth'
 import { promoError, type PromoError } from '../../promote'
 
-/** Pause, resume and delete with the api's refusals in words. A refusal can mean the list is stale: `onStale` reloads it. */
+/** Pause, resume, end early and delete with the api's refusals in words. A refusal can mean the list is stale: `onStale` reloads it. */
 export function useCampaignActions(c: Campaign, { onChanged, onDeleted, onStale }: { onChanged: (c: Campaign) => void; onDeleted: (id: string) => void; onStale: () => void }) {
   const { getIdToken } = useAuth()
   const [busy, setBusy] = useState<null | 'status' | 'delete'>(null)
@@ -15,7 +15,7 @@ export function useCampaignActions(c: Campaign, { onChanged, onDeleted, onStale 
     if (err.kind === 'too_many' || err.kind === 'ended' || (e as { status?: number }).status === 404) onStale()
     return err
   }
-  const setStatus = async (status: 'active' | 'paused'): Promise<PromoError | null> => {
+  const setStatus = async (status: 'active' | 'paused' | 'ended'): Promise<PromoError | null> => {
     setBusy('status')
     setError(null)
     try {

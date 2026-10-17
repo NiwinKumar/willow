@@ -35,6 +35,10 @@ export function campaignFor(list: Campaign[], productId: string): Campaign | nul
 export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promoteTo }: { p: Pick<ProductRow, 'n' | 'tier' | 'lift' | 'lift_lo' | 'lift_hi' | 'to_proven'>; weeksN: number; statements: number | null; eligible: boolean; campaign: Campaign | null; promoteTo: string }): Step[] {
   const measured = p.n !== null && p.n >= 10
   const inc = campaign?.stats.incrementality ?? null
+  const ended = campaign?.status === 'ended'
+  // Reach in people; older api builds sent impressions only.
+  const reached = campaign ? (campaign.stats.reach ?? campaign.stats.impressions) : 0
+  const reachText = `${int(reached)} ${campaign?.stats.reach === undefined ? (reached === 1 ? 'impression' : 'impressions') : reached === 1 ? 'person reached' : 'people reached'}`
   return [
     {
       id: 'measured',
@@ -52,7 +56,7 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
           : p.tier === 'promising'
             ? p.to_proven
               ? `About ${int(p.to_proven)} more people to settle it`
-              : 'Positive, interval still includes zero'
+              : 'Positive lift; needs more people'
             : p.tier === 'unclear'
               ? 'No lift over non-users yet'
               : 'Not enough data',
@@ -66,15 +70,16 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
     {
       id: 'promoted',
       title: 'Promoted',
-      state: campaign?.status === 'active' ? 'done' : campaign ? 'partial' : 'todo',
-      detail: campaign ? (campaign.status === 'active' ? `Live · ${int(campaign.stats.impressions)} reached` : `Campaign ${campaign.status}`) : eligible ? 'Ready to promote' : 'Opens once Proven',
-      ...(eligible && !campaign ? { to: promoteTo, cta: 'Promote' } : {}),
+      // An ended campaign was a promotion (its results stay); the product can be promoted again.
+      state: campaign?.status === 'active' || ended ? 'done' : campaign ? 'partial' : 'todo',
+      detail: campaign ? (campaign.status === 'active' ? `Live · ${reachText}` : ended ? `Campaign ended · ${reachText}` : 'Campaign paused') : eligible ? 'Ready to promote' : 'Opens once Proven',
+      ...(eligible && (!campaign || ended) ? { to: promoteTo, cta: ended ? 'Promote again' : 'Promote' } : {}),
     },
     {
       id: 'lift',
       title: 'Lift measured',
-      state: inc ? 'done' : campaign ? 'partial' : 'todo',
-      detail: inc ? `${pts(inc.lift)} adoption vs holdout` : campaign ? 'Collecting: 10 per group' : 'Randomised holdout after launch',
+      state: inc ? 'done' : campaign && !ended ? 'partial' : 'todo',
+      detail: inc ? `${pts(inc.lift)} adoption vs holdout` : ended ? 'Ended before each group had 10 people' : campaign ? 'Collecting: 10 per group' : 'Randomised holdout after launch',
     },
   ]
 }

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import type { Campaign } from '../../../../lib/api'
 import { audienceText, ctrText, dateRange, HOLDOUT_MIN, timeLeft } from '../../promote'
 import { DataTable, int, LiftValue, ProductCell, useTooltip, type Column } from '../../ui'
-import { StatusBadge } from './CampaignCard'
+import { StatusBadge, type Confirm } from './CampaignCard'
 import { useCampaignActions } from './useCampaignActions'
 
 /*
@@ -30,14 +30,15 @@ export function HeadTip({ label, tip }: { label: string; tip: ReactNode }) {
   )
 }
 
-export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen, onDelete, onChanged, onDeleted, onStale, workspaceOf }: {
+export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen, onConfirm, onChanged, onDeleted, onStale, workspaceOf }: {
   campaigns: Campaign[]
   heading: ReactNode
   toolbar?: ReactNode
   highlight: string | null
   onOpen: (id: string) => void
   /** Open the campaign's panel with the delete confirmation showing. */
-  onDelete: (id: string) => void
+  /** Opens the campaign's panel asking to end or delete it. */
+  onConfirm: (id: string, kind: Confirm) => void
   onChanged: (c: Campaign) => void
   onDeleted: (id: string) => void
   onStale: () => void
@@ -89,10 +90,21 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
     },
     {
       id: 'reach',
-      header: <HeadTip label="Reach" tip="Impressions: the card at least half on screen, each person counted once a day." />,
-      headerText: 'Reach (impressions)',
+      header: <HeadTip label="Reach" tip="People shown the card at least once, each counted once." />,
+      headerText: 'Reach (people)',
       align: 'right',
       width: '88px',
+      sortValue: (c) => c.stats.reach ?? c.stats.impressions,
+      cell: (c) => <span className="text-ink tnum">{c.stats.reach !== undefined ? int(c.stats.reach) : '—'}</span>,
+    },
+    {
+      id: 'impressions',
+      header: <HeadTip label="Impressions" tip="The card at least half on screen, each person counted once a day." />,
+      headerText: 'Impressions',
+      align: 'right',
+      width: '104px',
+      optional: true,
+      hidden: true,
       sortValue: (c) => c.stats.impressions,
       cell: (c) => <span className="text-ink tnum">{int(c.stats.impressions)}</span>,
     },
@@ -147,14 +159,18 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
     {
       id: 'lift',
       header: <HeadTip label="Incremental lift" tip={`Adoption among people who could see the card minus adoption in the randomised holdout, who never see it. Shown once both groups have ${HOLDOUT_MIN} people; hover a figure for its 95% interval.`} />,
-      headerText: 'Incremental lift vs holdout',
+      headerText: 'Incremental lift vs holdout (pts)',
       align: 'right',
       width: '212px',
       sortValue: (c) => c.stats.incrementality?.lift ?? null,
       cell: (c) => {
         const inc = c.stats.incrementality
         if (!inc)
-          return (
+          return c.status === 'ended' ? (
+            <span className="whitespace-nowrap text-proof-small text-ink-2">
+              Not measured<span className="max-[1279px]:hidden"> · under {HOLDOUT_MIN} per group</span>
+            </span>
+          ) : (
             <span className="whitespace-nowrap text-proof-small text-ink-2">
               Collecting<span className="max-[1279px]:hidden"> · needs {HOLDOUT_MIN} per group</span>
             </span>
@@ -168,7 +184,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
           </span>
         )
       },
-      csv: (c) => c.stats.incrementality?.lift ?? 'collecting',
+      csv: (c) => (c.stats.incrementality ? Math.round(c.stats.incrementality.lift * 100) : c.status === 'ended' ? 'not measured' : 'collecting'),
     },
     {
       id: 'menu',
@@ -177,7 +193,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
       align: 'right',
       width: '60px',
       noCsv: true,
-      cell: (c) => <RowMenu c={c} onOpen={onOpen} onDelete={onDelete} onChanged={onChanged} onDeleted={onDeleted} onStale={onStale} />,
+      cell: (c) => <RowMenu c={c} onOpen={onOpen} onConfirm={onConfirm} onChanged={onChanged} onDeleted={onDeleted} onStale={onStale} />,
     },
   ]
   return (
@@ -198,7 +214,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
 }
 
 /** ⋯ on a row: Open, Pause or Resume, Delete (which opens the panel to confirm). Esc or a click outside closes it. */
-function RowMenu({ c, onOpen, onDelete, onChanged, onDeleted, onStale }: { c: Campaign; onOpen: (id: string) => void; onDelete: (id: string) => void; onChanged: (c: Campaign) => void; onDeleted: (id: string) => void; onStale: () => void }) {
+function RowMenu({ c, onOpen, onConfirm, onChanged, onDeleted, onStale }: { c: Campaign; onOpen: (id: string) => void; onConfirm: (id: string, kind: Confirm) => void; onChanged: (c: Campaign) => void; onDeleted: (id: string) => void; onStale: () => void }) {
   // The menu is portalled with fixed coordinates, so the table's scroll box never clips it.
   const [at, setAt] = useState<{ top: number; left: number } | null>(null)
   const open = at !== null
@@ -280,7 +296,12 @@ function RowMenu({ c, onOpen, onDelete, onChanged, onDeleted, onStale }: { c: Ca
                   Resume
                 </button>
               ) : null}
-              <button type="button" role="menuitem" className={`${item} text-pf-red`} onClick={() => run(() => onDelete(c.id))}>
+              {c.status !== 'ended' ? (
+                <button type="button" role="menuitem" className={item} onClick={() => run(() => onConfirm(c.id, 'end'))}>
+                  End campaign…
+                </button>
+              ) : null}
+              <button type="button" role="menuitem" className={`${item} text-pf-red`} onClick={() => run(() => onConfirm(c.id, 'delete'))}>
                 Delete…
               </button>
             </div>,

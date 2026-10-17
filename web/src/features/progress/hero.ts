@@ -3,7 +3,7 @@ import type { Metric, Session } from '../../data/types'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
-import { REASON_SHORT, bandOf, bandText, counts, deltaText, leadMetric, noBand, sessionState, usableLine, usedFrames } from './model'
+import { REASON_SHORT, bandOf, bandText, counts, deltaText, leadMetric, noBand, sessionState, usedFrames } from './model'
 
 const G = {
   orange: 'radial-gradient(52% 62% at 50% 52%, #FF6A00 0%, #FF8A2A 20%, #F7A866 40%, #E4BFA9 58%, #C4C3D2 78%, #AEB8CC 100%)',
@@ -22,13 +22,14 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export function heroFor(s: Session, baseline: Session | null, ordered: Metric[]): Hero {
   const st = sessionState(s)
   const c = counts(s)
-  const photos = usableLine(s)
   const bDay = baseline ? fmtDate(baseline.created_at).toUpperCase() : ''
   const lead = leadMetric(ordered, s)
   const leadBand = lead ? bandOf(baseline, lead.id) : null
   const chipsFor = (kinds: VerdictKind[]): Chip[] => kinds.filter((k) => c[k] > 0).map((k) => ({ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }))
   if (st === 'rejected') {
-    const reasons = [...new Set(s.result?.quality.reasons ?? [])]
+    // Missing pen dots are the engine's warnings, not a reason: name them instead of "No photo passed".
+    const dots = (s.result?.warnings ?? []).some((w) => /pen-dot square not found/i.test(w))
+    const reasons = [...new Set(s.result?.quality.reasons ?? [])].filter((r) => !(dots && r === 'too_few_frames'))
     return {
       bg: G.coral,
       shadow: 'rgba(224,69,42,.6)',
@@ -37,9 +38,9 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
       kicker: 'This check-in couldn’t be measured',
       big: pad(usedFrames(s)),
       bigLabel: `of ${s.n_frames} ${s.n_frames === 1 ? 'photo' : 'photos'} passed the quality checks`,
-      chips: reasons.map((r) => ({ g: 'text', mark: '!', t: REASON_SHORT[r] ?? r })),
+      chips: [...(dots ? ['Pen dots not found'] : []), ...reasons.map((r) => REASON_SHORT[r] ?? r)].map((t) => ({ g: 'text', mark: '!', t })),
       ruler: null,
-      text: 'Nothing was compared and your baseline is unchanged. The reasons and fixes are below.',
+      text: `${baseline ? 'Nothing was compared and your baseline is unchanged.' : 'No baseline was set: the first check-in with usable photos becomes it.'} The reasons and fixes are below.`,
     }
   }
   if (st === 'unmeasured')
@@ -63,7 +64,8 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
       fg: 'var(--text-primary)',
       grey: true,
       eyebrow: 'AN EARLIER BASELINE',
-      kicker: photos,
+      // (the photo count is already on the hero's badge)
+      kicker: 'Kept for reference',
       big: '—',
       bigLabel: 'not compared',
       chips: [],
@@ -122,7 +124,14 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
         ? { ratio: leadBand ? lead.delta / leadBand : null, label: `${METRIC_META[lead.id].label} · ${deltaText(lead)} vs baseline${leadBand !== null ? ` · range ${bandText(lead, leadBand)}` : ''}` }
         : null,
     text: n
-      ? `${n === 1 ? 'One reading' : `${n} readings`} moved further than your normal photo-to-photo variation. ${c.normal ? 'The others stayed within it.' : ''}`.trim()
+      ? `${n === 1 ? 'One reading' : `${n} readings`} moved further than your normal photo-to-photo variation. ${othersLine(c.normal, (s.result?.metrics.length ?? 0) - n)}`.trim()
       : 'That is common in the first weeks of a routine. Keep light, pose and distance the same.',
   }
+}
+
+/** "The other stayed within it." / "2 others stayed within it.": counted, so one other is never "the others". */
+function othersLine(normal: number, others: number): string {
+  if (!normal) return ''
+  if (normal === others) return normal === 1 ? 'The other stayed within it.' : 'The others stayed within it.'
+  return normal === 1 ? 'One other stayed within it.' : `${normal} others stayed within it.`
 }

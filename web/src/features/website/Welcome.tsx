@@ -39,8 +39,8 @@ export default function Welcome() {
     window.scrollTo(0, 0)
   }, [step])
 
-  // Goals and the rest come after consent: someone who skipped it is sent back.
-  if (step !== 'consent' && !hasConsent()) return <Navigate to={`/welcome${search}`} replace />
+  // Goals and the rest come after consent: someone who skipped it is sent back. An unknown step is consent too.
+  if ((raw && step === 'consent') || (step !== 'consent' && !hasConsent())) return <Navigate to={`/welcome${search}`} replace />
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
