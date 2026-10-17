@@ -7,7 +7,7 @@ import { useAuth } from '../../lib/useAuth'
 import { hasConsent, isReturning } from './entry'
 
 /**
- * The front door (/start, the first page's "For customers"): no sign-in page first. Someone who has been here before (an account, or a guest who
+ * The front door (/): no sign-in page first. Someone who has been here before (an account, or a guest who
  * already agreed on this device) goes straight into the app; a guest whose sign-in was lost but who agreed
  * here gets a new guest account and goes in too; anyone new starts onboarding (consent, goals), which makes
  * their guest account at its last step. Signing in with Google stays optional (You, /signin) for keeping
