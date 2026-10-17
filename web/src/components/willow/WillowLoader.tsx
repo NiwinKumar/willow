@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
+
+import { AuthContext } from '../../lib/auth'
 
 /**
  * Willow's loading moment, ported from the design's intro loader (Willow.dc.html): a 64×64 dot-matrix
@@ -199,9 +201,34 @@ export function WillowLoader({ label = 'Loading', inline = false }: { label?: st
     )
   // Fades in after a beat, so a page that opens quickly never flashes white.
   return (
-    <div role="status" aria-live="polite" className="fixed inset-0 z-[10001] grid animate-[wFadeIn_.3s_ease_.25s_both] place-items-center bg-white [.proof-boot-dark_&]:bg-[#0a0a0a]">
+    <div role="status" aria-live="polite" className="fixed inset-0 z-[10001] flex animate-[wFadeIn_.3s_ease_.25s_both] flex-col items-center justify-center gap-6 bg-white px-6 [.proof-boot-dark_&]:bg-[#0a0a0a]">
       <canvas ref={canvas} width={S} height={S} aria-hidden className="size-[min(58vw,250px)] [.proof-boot-dark_&]:invisible" />
       <span className="sr-only">{label}</span>
+      <StuckHelp />
+    </div>
+  )
+}
+
+const SLOW_MS = 12_000
+
+/**
+ * A full-screen loader never waits forever: when sign-in could not start, or after SLOW_MS, it offers a reload
+ * (a reload always fetches the newest version of the app, which is what fixes a broken or stale page).
+ */
+function StuckHelp() {
+  const failed = useContext(AuthContext)?.failed ?? false
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), SLOW_MS)
+    return () => window.clearTimeout(t)
+  }, [])
+  if (!failed && !slow) return null
+  return (
+    <div className="flex max-w-[34ch] flex-col items-center gap-3 text-center text-[15px] text-ink-2 [.proof-boot-dark_&]:text-white/70" style={{ animation: 'wFadeIn .4s both' }}>
+      <p className="m-0">{failed ? 'Willow couldn’t start. Reloading gets the latest version.' : 'This is taking longer than usual.'}</p>
+      <button type="button" onClick={() => window.location.reload()} className="inline-flex min-h-11 items-center rounded-pill bg-selected px-[22px] text-[15px] font-medium text-inverse">
+        Reload
+      </button>
     </div>
   )
 }
