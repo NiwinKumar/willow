@@ -308,6 +308,10 @@ def test_blemish_candidates_with_crops(tmp_path, fake_landmarks):
     assert c["kind"] == "blemish" and abs(c["bbox"][0] + c["bbox"][2] / 2 - 500) < 6
     assert Image.open(c["crop_uri"]).size[0] >= config.CROP_MIN_OUT_PX
     assert Image.open(c["context_crop_uri"]).size[0] >= Image.open(c["crop_uri"]).size[0]
+    # a front-only session uploads no per-view copies of its photo or redness map
+    assert "views" not in r
+    assert not (tmp_path / "out" / "views").exists()
+    assert not (tmp_path / "out" / "overlays" / "redness_front.png").exists()
 
 
 def test_crop_stays_centred_on_a_spot_at_the_photo_edge():
@@ -346,6 +350,8 @@ def test_spot_persistence_across_photos(tmp_path, fake_landmarks):
         for c in r["candidates"]
     }
     assert seen == {500.0: 1.0, 400.0: 0.33}
+    assert {c["features"]["frames_in_view"] for c in r["candidates"]} == {3.0}  # "of 3 photos"
+    assert "views" not in r  # front photos only: one view, as before cheek photos
 
 
 def test_raw_face_without_a_colour_reference_is_indicative(tmp_path, fake_landmarks, monkeypatch):

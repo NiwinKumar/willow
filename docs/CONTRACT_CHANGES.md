@@ -90,3 +90,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Change: `PUT /v1/routine/{id}/feel`; `feel` / `feel_history` on routine entries (Firestore and responses); `routine_flat` gains `feel`, `feel_week`, `feel_tags`; Proof product rows gain `felt`, `felt_n`; the product view gains `feel`; brief card `feel_gap`. Self-reported answers never change a tier, the evidence pack, campaign eligibility or a measurement. Rows in `docs/CONTRACT.md`.
 - Impact: engine none; schemas none; api and web only.
 - Approved by: n/a (api and web, both Niwin's)
+
+## 2026-10-18: AI in Willow Proof (proposed by Niwin; api/web only)
+- Why: Proof showed what works; brands still had to work out what to do about it. Gemini now drafts claims a brand can use (each citing its measured evidence, checked) and picks the next steps for a product from the facts on its page.
+- Change: `GET /v1/retailer/products/{id}/actions`, `POST /v1/retailer/products/{id}/claims` (rows in `docs/CONTRACT.md`); Ask's Gemini input gains `perception` (no response change). New daily cap `proof_claims` 30 / 1500.
+- Impact: engine none; schemas none; api and web only.
+- Approved by: n/a (api and web, both Niwin's)
