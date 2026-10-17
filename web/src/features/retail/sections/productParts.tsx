@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 
-import { int, interval, pct, useTooltip } from '../ui'
+import { feltText } from '../feel'
+import type { ProductRow } from '../types'
+import { int, interval, pct, Suppressed, useTooltip } from '../ui'
 
 /*
  * Small pieces shared by Products and Compare: a column header that carries its definition in a tooltip, and
@@ -40,6 +42,21 @@ export function RateInterval({ rate, lo, hi, base, n, weeks, strong = false, wid
           {base !== null ? <span className="absolute top-0 block h-3 w-px -translate-x-1/2 bg-[var(--pf-base)]" style={{ left: x(base) }} /> : null}
           <span className="absolute top-1/2 block size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-proof-leaf" style={{ left: x(rate) }} />
         </span>
+      </span>
+      {tip.node}
+    </>
+  )
+}
+
+/** "Feels it works" (self-reported) in a table cell: the whole percent, its n on hover or focus; n<10 when suppressed. */
+export function FeltCell({ r }: { r: Pick<ProductRow, 'felt' | 'felt_n'> }) {
+  const t = feltText(r)
+  const tip = useTooltip(t?.tip ?? '')
+  if (!t) return <Suppressed short />
+  return (
+    <>
+      <span {...tip.trigger} tabIndex={0} className="cursor-help tnum text-ink">
+        {t.value}
       </span>
       {tip.node}
     </>
