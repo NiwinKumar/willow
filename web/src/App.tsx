@@ -10,10 +10,9 @@ import { DataProvider } from './data/store'
 import { useAuth } from './lib/useAuth'
 import Landing from './features/website/Landing'
 
-// The landing page (/about) is the only eager screen: the app shell and every destination load on first visit.
+// The landing page is the only eager screen: the app shell and every destination load on first visit.
 const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({ default: m.AppShell })))
 const SignIn = lazy(() => import('./features/website/SignIn'))
-const FrontDoor = lazy(() => import('./features/website/FrontDoor'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
 const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
@@ -44,9 +43,7 @@ export default function App() {
           {/* While the check-in draws over a page, that page is inert (no focus, no clicks behind the sheet). */}
           <div inert={overlay || undefined}>
           <Routes location={background ?? location}>
-            {/* No sign-in page first: / opens the app (or onboarding for someone new). */}
-            <Route path="/" element={<FrontDoor />} />
-            <Route path="/about" element={<Landing />} />
+            <Route path="/" element={<Landing />} />
             <Route path="/science" element={<Landing />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/welcome" element={<Welcome />} />
@@ -138,7 +135,6 @@ function NotFound() {
 
 const TITLES: [RegExp, string][] = [
   [/^\/science/, 'Science and limits'],
-  [/^\/about/, 'About'],
   [/^\/judge/, 'Judge tour'],
   [/^\/terms/, 'Terms and privacy'],
   [/^\/signin/, 'Sign in'],

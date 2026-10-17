@@ -37,7 +37,7 @@ export function ModeBanner() {
           </button>
         </>
       ) : data.mode === 'demo' ? (
-        <Link to="/about" onClick={() => leaveDemo()} className={action}>
+        <Link to="/" onClick={() => leaveDemo()} className={action}>
           Leave demo
         </Link>
       ) : null}
