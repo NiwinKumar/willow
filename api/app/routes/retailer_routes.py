@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app import limits, proof_ai, retail_intel, retailer, retailer_ask
+from app import buying, limits, proof_ai, retail_intel, retailer, retailer_ask
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store
 
@@ -93,6 +93,16 @@ def proof_product(
     if out is None:
         raise HTTPException(404, {"code": "unknown_product", "message": "No such product."})
     return out
+
+
+@router.get("/buying-list")
+def proof_buying_list(
+    cohort: retailer.Cohort = Query("mixed", description="simulated | mixed | real"),
+    range_: retailer.Range = Query("all", alias="range", description="30d | 90d | all"),
+) -> dict[str, Any]:
+    """Assortment gaps as buying briefs (people x severity), each with under-used catalog
+    products to look at first (app/buying.py). Candidates are never presented as proven."""
+    return _proof(buying.buying_list, cohort, range_)
 
 
 @router.get("/segments")
