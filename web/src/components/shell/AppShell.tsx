@@ -166,7 +166,7 @@ export function AppShell() {
         </div>
         {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} />}
         </div>
-        <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} sidebarWidth={collapsed ? 65 : 212} covered={covered} />
+        <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} beside={advisor.open && wide && !advisorFull} covered={covered} />
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />
         {checkIn.open ? (
           <Suspense fallback={null}>
