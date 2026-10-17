@@ -471,10 +471,13 @@ function centroid(poly: Pt[]): Pt | null {
   return Math.abs(a) < 1e-6 ? null : [cx / (3 * a), cy / (3 * a)]
 }
 
+/** Marks with a face-map place enough to place the photo on their own. */
+const MARKS_FOR_FIT = 6
+
 /**
- * The latest photo placed on the canonical face: an affine fit from its front-photo marks (face-map mm -> photo px),
- * with the face-map zones' centres when the photo has whole-face areas, so a face with marks on one cheek only
- * still lands. Null when it cannot be placed well (too few points, or they disagree by more than a few mm).
+ * The latest photo placed on the canonical face: an affine fit from its marks (face-map mm -> photo px), and, with
+ * fewer than MARKS_FOR_FIT of them, the face-map zones of a photo with whole-face areas too. Null when it cannot be
+ * placed well (too few points, or they disagree by more than about a centimetre).
  * `frontOnly`: the session's own front photo, so its cheek photos' marks (in their own pixels) are left out.
  */
 function placeOnPhoto(s: Session, frontOnly: boolean): Placed | null {
@@ -487,7 +490,11 @@ function placeOnPhoto(s: Session, frontOnly: boolean): Placed | null {
     if (f.face_x_mm === undefined || f.face_y_mm === undefined) continue
     pairs.push({ mm: [f.face_x_mm, f.face_y_mm], px: [c.bbox[0] + c.bbox[2] / 2, c.bbox[1] + c.bbox[3] / 2] })
   }
-  for (const roi of r.rois ?? []) {
+  // The marks' own places fit within a couple of mm. The areas only help when there are too few marks, and
+  // only whole-face zones: older check-ins have small patches (mid-cheek, mid-forehead) whose outline is not
+  // the zone's, and fitting those put spots a few cm off (so the photo was never used).
+  const whole = (r.rois ?? []).some((x) => x.name === 'around_mouth' || x.name.endsWith('_jaw'))
+  for (const roi of pairs.length >= MARKS_FOR_FIT || !whole ? [] : (r.rois ?? [])) {
     const zone = FACE_MAP.zones[roi.name]
     if (!zone?.[0] || roi.polygon.length < 3) continue
     const mm = centroid(zone[0])
