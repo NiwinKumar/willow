@@ -337,6 +337,7 @@ export default function Result() {
     track && diary
       ? {
           bbox: obs?.bbox ?? null,
+          candidateId: obs?.candidate_id ?? null,
           tag: tagText(track, sIdx, diary),
           area: track.zone ? ZONE_NAME[track.zone] : 'Spot',
           status: statusText(track, diary),

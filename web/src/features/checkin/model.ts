@@ -63,6 +63,43 @@ export const GUIDE_BG: Record<Kind, string> = {
   arm: 'radial-gradient(70% 55% at 50% 0%, #8E7BFF 0%, #4B3AA8 35%, #1E1550 65%, #0B0820 100%)',
 }
 
+/** Which way the face points in each photo of a check-in. */
+export type Pose = 'front' | 'left' | 'right'
+export const POSE_NAME: Record<Exclude<Pose, 'front'>, string> = { left: 'Left cheek', right: 'Right cheek' }
+/** Said in the camera while a cheek photo is next (the person's own left and right). */
+export const POSE_HINT: Record<Exclude<Pose, 'front'>, string> = {
+  left: 'Turn your head about 45° to show your left cheek · one eye and the tip of your nose still in view',
+  right: 'Turn your head about 45° to show your right cheek · one eye and the tip of your nose still in view',
+}
+
+/** A face check-in of 3 or more photos can add a left and a right cheek photo. */
+export const canAddCheeks = (site: Site, n: number) => site === 'face_full' && n >= 3
+
+/**
+ * Each photo's pose for a check-in planned as `n` front photos: front photos first, then the left and the right cheek.
+ * With cheek photos 3 face the camera (enough to confirm a mark in a second photo) and 2 show the cheeks, so the
+ * check-in stays within the 5 photos the api takes.
+ */
+export function shotPoses(site: Site, n: number, cheeks: boolean): Pose[] {
+  if (!cheeks || !canAddCheeks(site, n)) return Array.from({ length: n }, () => 'front')
+  return ['front', 'front', 'front', 'left', 'right']
+}
+
+/** The baseline set for these sessions and mode, if any. */
+export function baselineOf(sessions: Session[], mode: CaptureMode): Session | null {
+  const st = baselineState(sessions, mode)
+  return st.state === 'set' ? st.session : null
+}
+
+/**
+ * Cheek photos by default for a first face check-in, or when the baseline had them: a check-in compares best with
+ * one taken the same way, so a front-only baseline keeps front-only check-ins unless the person turns them on.
+ */
+export function cheeksByDefault(baseline: Session | null): boolean {
+  if (!baseline) return true
+  return (baseline.result?.views ?? []).some((v) => v.view !== 'front')
+}
+
 export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'quick')
 
 /**

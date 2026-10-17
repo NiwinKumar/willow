@@ -23,7 +23,7 @@ import './checkin.css'
 import { addFiles, isDng, recheck, rowsFromShots, usable } from './files'
 import { FilesStep } from './FilesStep'
 import { GuideStep } from './GuideStep'
-import { neededFor, parseMode, parseSite, plural, STEPS, thinBaseline, type Step } from './model'
+import { baselineOf, cheeksByDefault, neededFor, parseMode, parseSite, plural, shotPoses, STEPS, thinBaseline, type Step } from './model'
 import { FlowBackdrop, SampleBanner } from './parts'
 import { outcomeOf } from './outcome'
 import { ProcessingStep } from './ProcessingStep'
@@ -83,6 +83,8 @@ export default function CheckInFlow() {
   const [shots, setShots] = useState<Shot[]>([])
   const [note, setNote] = useState('')
   const [deviation, setDeviation] = useState(false)
+  // Face check-ins: end with a left and a right cheek photo (null: follow the baseline, cheeksByDefault).
+  const [cheeksPick, setCheeks] = useState<boolean | null>(null)
   // The session this flow created (upload done, or sample copied): from then on the flow is measuring it.
   const [held, setHeld] = useState<string | null>(null)
   const [exiting, setExiting] = useState(false)
@@ -359,7 +361,7 @@ export default function CheckInFlow() {
       toast('RAW files: this becomes a RAW check-in, with its own baseline.')
       return
     }
-    upload.setRows(addFiles(upload.rows, picked, mode, n ?? 5))
+    upload.setRows(addFiles(upload.rows, picked, mode, shotsN || 5))
   }
   const dropThumb = (id: string) => {
     const r = upload.rows.find((x) => x.id === id)
@@ -384,6 +386,10 @@ export default function CheckInFlow() {
   }
 
   // ---- render ----
+  // Face check-ins: the pose of every photo (front, then the cheeks when cheek photos are on).
+  const cheeks = cheeksPick ?? cheeksByDefault(baselineOf(sessionsOf(site), mode))
+  const poses = n === null ? [] : shotPoses(site, n, cheeks)
+  const shotsN = poses.length || (n ?? 0)
   let content: ReactNode
   if (exiting || needConsent || authLoading) content = <WillowLoader inline label="Opening check-in" />
   else if (signedOut && sampleParam === null) content = <SignInGate onGuest={continueAsGuest} onGoogle={signInWithGoogle} />
@@ -460,6 +466,8 @@ export default function CheckInFlow() {
         n={n}
         baseline={baseline}
         thin={baseline ? thinBaseline(baseline) : false}
+        cheeks={cheeks}
+        onCheeks={setCheeks}
         goals={data.goals}
         note={note}
         deviation={deviation}
@@ -475,10 +483,11 @@ export default function CheckInFlow() {
     content = (
       <CameraStep
         site={site}
-        n={n}
+        n={shotsN}
+        poses={poses}
         first={n === 5}
         shots={shots}
-        onShot={(file, url) => setShots((s) => (s.length >= n ? s : [...s, { file, url }]))}
+        onShot={(file, url) => setShots((s) => (s.length >= shotsN ? s : [...s, { file, url }]))}
         onRetakeLast={() => setShots((s) => s.slice(0, -1))}
         onReview={() => go({ step: 'review' })}
         onBack={() => (nav.prev === 'guide' ? navigate(-1) : go({ step: 'guide' }))}
@@ -489,7 +498,7 @@ export default function CheckInFlow() {
     content = (
       <ReviewStep
         shots={shots}
-        n={n}
+        n={shotsN}
         soft={softShots}
         onRetake={(i) => {
           setShots((s) => s.filter((_, j) => j !== i))
@@ -506,7 +515,7 @@ export default function CheckInFlow() {
     content = (
       <FilesStep
         mode={mode}
-        n={n}
+        n={shotsN}
         first={n === 5}
         upload={upload}
         camera={shots.length > 0}
@@ -514,8 +523,8 @@ export default function CheckInFlow() {
         topup={topup ? { date: topup.date } : null}
         dupLabel={dupLabel}
         onPick={onPick}
-        onRemove={(id) => removeRow(id, (rest) => recheck(rest, mode, n))}
-        onReplace={(id, file) => removeRow(id, (rest) => addFiles(rest, [file], mode, n))}
+        onRemove={(id) => removeRow(id, (rest) => recheck(rest, mode, shotsN))}
+        onReplace={(id, file) => removeRow(id, (rest) => addFiles(rest, [file], mode, shotsN))}
         onStartOver={() => {
           const camera = shots.length > 0
           upload.reset([])

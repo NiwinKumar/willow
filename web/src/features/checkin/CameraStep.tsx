@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { Site } from '../../data/types'
 import { photoSteps, WHY_FIVE } from '../../lib/baselineGuide'
 import { isCloseUp } from '../../lib/metrics'
-import { SITE_NAME } from './model'
+import { POSE_NAME, SITE_NAME, type Pose } from './model'
 import { useCamera } from './useCamera'
 
 type Shot = { file: File; url: string }
@@ -15,8 +15,11 @@ const DARK_BTN = 'grid flex-none place-items-center rounded-full bg-black/35 tex
  * Step "camera" (CAP 06): ask for the camera, explain a blocked or missing one, then the live viewfinder
  * with the framing checks, auto-capture, the manual shutter and the 3 s timer. Dark, edge to edge.
  */
-export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onReview, onBack, onFiles }: { site: Site; n: number; first: boolean; shots: Shot[]; onShot: (file: File, url: string) => void; onRetakeLast: () => void; onReview: () => void; onBack: () => void; onFiles: () => void }) {
-  const { video, ...cam } = useCamera({ site, n, taken: shots.length, onShot })
+export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast, onReview, onBack, onFiles }: { site: Site; n: number; poses: Pose[]; first: boolean; shots: Shot[]; onShot: (file: File, url: string) => void; onRetakeLast: () => void; onReview: () => void; onBack: () => void; onFiles: () => void }) {
+  // The pose of the next photo: front, or a cheek photo (head turned about 45°) at the end of a face check-in.
+  const pose = poses[Math.min(shots.length, n - 1)] ?? 'front'
+  const sides = poses.some((p) => p !== 'front')
+  const { video, ...cam } = useCamera({ site, n, taken: shots.length, pose, onShot })
   // The previous photo at 30% helps line the next one up (old web: always on); the design lets it be turned off.
   const [ghost, setGhost] = useState(true)
   const arm = site.startsWith('forearm')
@@ -25,6 +28,7 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
   const all = taken >= n
   const last = shots[shots.length - 1]
   const name = SITE_NAME[site]
+  const shotName = pose === 'front' ? name : POSE_NAME[pose]
 
   if (cam.phase !== 'live' && cam.phase !== 'done') {
     const blocked = cam.phase === 'denied' || cam.phase === 'unavailable' || cam.phase === 'ended'
@@ -35,7 +39,7 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
             <ArrowLeft size={20} aria-hidden />
           </button>
           <span className="text-center text-[clamp(18px,2.4vw,26px)] tracking-[-0.01em]" aria-live="polite">
-            {name} · photo {Math.min(taken + 1, n)} of {n}
+            {shotName} · photo {Math.min(taken + 1, n)} of {n}
           </span>
           <span className="size-[52px]" aria-hidden />
         </div>
@@ -100,6 +104,7 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
                 <li>Laptop camera? Raise it to eye level and sit facing a window. Soft or tilted photos are left out of the measurement.</li>
               </>
             )}
+            {sides ? <li>The last two photos show each cheek: turn your head about 45° to your right, then to your left, keeping one eye and the tip of your nose in view.</li> : null}
             <li>Between photos: {photoSteps(site, 'uncalibrated').between.charAt(0).toLowerCase() + photoSteps(site, 'uncalibrated').between.slice(1)}</li>
             {first ? <li>{WHY_FIVE}</li> : null}
           </ul>
@@ -139,7 +144,7 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
             </button>
             <div className="flex flex-col items-center gap-2 rounded-[22px] bg-black/35 px-4 py-2.5 backdrop-blur-[16px]">
               <span aria-live="polite" className="font-mono text-[11px] tracking-[.1em] whitespace-nowrap">
-                {all ? `ALL ${n} TAKEN` : `${name.toUpperCase()} · ${taken + 1} OF ${n}`}
+                {all ? `ALL ${n} TAKEN` : `${shotName.toUpperCase()} · ${taken + 1} OF ${n}`}
               </span>
               <span aria-hidden className="flex items-center gap-1">
                 {Array.from({ length: n }, (_, i) => (
@@ -196,7 +201,7 @@ export function CameraStep({ site, n, first, shots, onShot, onRetakeLast, onRevi
             Review {n} photos →
           </button>
         ) : (
-          <button type="button" onClick={cam.shoot} disabled={!cam.canShoot} aria-label={`Take photo ${taken + 1} of ${n}`} className="grid size-20 place-items-center rounded-full border-[3px] border-white p-[5px] transition-[scale] active:scale-[.92]">
+          <button type="button" onClick={cam.shoot} disabled={!cam.canShoot} aria-label={`Take photo ${taken + 1} of ${n}${pose === 'front' ? '' : `, ${shotName.toLowerCase()}`}`} className="grid size-20 place-items-center rounded-full border-[3px] border-white p-[5px] transition-[scale] active:scale-[.92]">
             <span aria-hidden className="size-full rounded-full transition-[background] duration-300" style={{ background: cam.allPass ? '#fff' : 'rgba(255,255,255,.55)' }} />
           </button>
         )}

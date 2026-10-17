@@ -71,6 +71,18 @@ export type Candidate = {
 
 export type Roi = { name: string; polygon: [number, number][] }
 
+/** A face check-in's photos by view (front, and each cheek turned about 45°). Sides are the person's own. */
+export type ViewName = 'front' | 'right' | 'left'
+/** One photo of a check-in with cheek photos: its size, and the areas it measured (contract result.views). */
+export type ResultView = {
+  view: ViewName
+  frame_index: number
+  image_size: { width: number; height: number }
+  preview_uri: string
+  redness_uri?: string | null
+  rois: Roi[]
+}
+
 export type AnalysisResult = {
   schema_version: '1.0'
   engine_version: string
@@ -85,6 +97,8 @@ export type AnalysisResult = {
   overlays: { metric_id: MetricId; uri: string }[]
   rois?: Roi[]
   image_size?: { width: number; height: number }
+  /** Check-ins with cheek photos: each photo's areas; candidates carry features.frame_index and features.view. */
+  views?: ResultView[]
   timings_ms?: Record<string, number>
   warnings?: string[]
 }
