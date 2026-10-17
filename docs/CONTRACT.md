@@ -72,7 +72,7 @@ Timeouts: the api waits up to 120 s. Target per request: < 20 s for 5 frames.
   "options": {"compute_overlays": true, "max_candidates": 40}
 }
 ```
-- `site`: one of `face_full`, `cheek_macro`, `nose_macro`, `forearm_treated`, `forearm_control`.
+- `site`: one of `face_full`, `cheek_macro`, `left_cheek_macro`, `right_cheek_macro`, `forehead_macro`, `chin_macro`, `nose_macro`, `forearm_treated`, `forearm_control`. The place close-ups (Oct 18) cut their region from the face landmarks when a face is in view (left and right are the person's own); `calibrated_raw` is for close-ups and forearms only (the api refuses a RAW `face_full` session).
 - `capture_mode`: `calibrated_raw` (DNG + color card) or `uncalibrated` (browser JPEG/HEIC, no card).
 - `frames`: 1-5. The baseline session uses 5 frames (repositioned between shots) so the engine can measure noise.
 - `baseline`: optional map of metric_id -> stored baseline. If absent, verdicts are `no_baseline`.
@@ -154,6 +154,8 @@ Gate defaults (tunable in `engine/app/config.py`): card ΔE mean <= 6 for calibr
 | `shine` | oil_glow | pct_area | face_full | indicative |
 | `glow` | oil_glow | index | face_full | indicative |
 
+The place close-ups `left_cheek_macro`, `right_cheek_macro`, `forehead_macro` and `chin_macro` return the same metrics as `cheek_macro` (tone_ita, pigment_spots, redness, blemishes, pores, texture).
+
 `extras` per metric:
 - `tone_ita`: `{l_star, b_star, ita_band, monk_estimate}`
 - `pigment_spots`: `{count, mean_contrast}`
@@ -209,7 +211,7 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | PATCH | `/v1/routine/{id}` | `{ended_at?, slots?, schedule?}`; `schedule` = `{kind: daily\|alternate\|days, days?: int[] (0=Mon), anchor: YYYY-MM-DD}` or null (every day); stamps `updated_at`. GET `/v1/routine` entries also carry `schedule`, `updated_at`, and the catalog `image_url` / `image_source` (null for own products) |
 | POST | `/v1/label-scan` (Oct 15 additions) | `scan.inci` items are `{name, confidence: high\|low}` (plain strings still accepted from the model), `scan.failure: glare\|blurry\|no_label\|cut_off\|null`; a scan with a failure and nothing read is not counted against the daily cap |
 | GET | `/v1/sessions/{id}/story/{metric_id}` (Oct 17) | `{metric_id, points[], reasons[] (0-2), source: gemini\|facts, products[{name, brand, use {days_used, of_days} \| null}], has_previous}`; 404 unknown session or metric. Facts (this and the previous check-in of the same site and capture mode, the verdict against the baseline, routine products aimed at the metric and their use) are computed by the api; Gemini only words them (`api/app/metric_story.py`), checked for numbers (dates count only as a day of the month), jargon, causes and direction, else written from the facts. Skin tone is always written from the facts. Kept on the session as `stories {metric_id: {key, points, reasons}}`; daily cap `metric_story` 60 / 3000 (past it, the facts version) |
-| — | Three-view face sessions (Oct 17) | `AnalysisResult.views[]` (optional, schema; front and cheek photos). `SessionView` adds `views[] {view: front\|right\|left, preview {url, width, height}, redness_url}` and `counts_compared_with {session_id, session_created_at, frames} \| null`: blemish and dark-spot counts with cheek photos compare only with the first passing check-in taken the same way (`baselines/{site}__{mode}__counts_cheeks\|front`), never with a side-only session; candidate `features.view` 0 front, 1 right, 2 left (bbox in that photo's pixels) |
+| — | Three-view face sessions (Oct 17) | `AnalysisResult.views[]` (optional, schema; front and cheek photos; since Oct 18 only when the session has cheek photos or only side photos, never for a front-only session). Each candidate's `features.frames_in_view` (Oct 18) is the number of photos of its own view, and `max_candidates` is per session (front first, the rest shared by the cheeks). `SessionView` adds `views[] {view: front\|right\|left, preview {url, width, height}, redness_url}` and `counts_compared_with {session_id, session_created_at, frames} \| null`: blemish and dark-spot counts with cheek photos compare only with the first passing check-in taken the same way (`baselines/{site}__{mode}__counts_cheeks\|front`), never with a side-only session; candidate `features.view` 0 front, 1 right, 2 left (bbox in that photo's pixels) |
 | PUT | `/v1/routine/{id}/feel` (Oct 17) | `{verdict: working\|unsure\|not_for_me, tags?: (feels_nice\|absorbs\|softer\|looks_better\|heavy\|stings\|drying\|breakouts)[] (0-4)}` -> the entry; the person's own verdict on a product (current or stopped), self-reported, never part of a measurement (`api/app/feel.py`). Routine entries carry `feel: {verdict, tags[], week, at} \| null` (latest; `week` = whole weeks from `started_at`) and `feel_history[]` (one per week, a new answer replaces that week's, at most 26). 404 unknown entry, 422 bad verdict or tag |
 | GET/POST | `/v1/product-tests` | list (`{tests[]}`, running one first) / start `{entry_id?, product_id?, name?, length_days? (7-56, default 28), started_at?}`; 409 while another test runs |
 | PATCH/DELETE | `/v1/product-tests/{id}` | `{name?, length_days?, ended_at?}` (end, or null to resume) / remove a test (its forearm sessions stay) |
