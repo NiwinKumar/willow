@@ -56,7 +56,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
       firstDir: 'asc',
       cell: (c) => {
         const other = workspaceOf(c)
-        return <ProductCell p={{ product: c.product ?? c.product_id, brand: c.brand ?? '', category: c.category ?? '', image_url: c.image_url }} sub={other ? `· ${other}` : undefined} />
+        return <ProductCell p={{ product: c.product ?? c.product_id, brand: c.brand ?? '', category: c.category ?? '', image_url: c.image_url }} sub={[c.rule ? `· Auto · ${c.rule.name}` : null, other ? `· ${other}` : null].filter(Boolean).join(' ') || undefined} />
       },
       csv: (c) => `${c.product ?? c.product_id} (${c.brand ?? ''})`,
     },

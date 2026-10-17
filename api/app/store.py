@@ -65,6 +65,18 @@ class Store(Protocol):
     def campaign_member_get(self, cid: str, member_id: str) -> Doc | None: ...
     def campaign_member_update(self, cid: str, member_id: str, fields: Doc) -> None: ...
     def campaign_members(self, cid: str) -> list[Doc]: ...
+    # AutoCampaign (app/autopilot.py): campaign_rules/{id}, autopilot_activity/{id}.
+    def rule_set(self, rid: str, doc: Doc) -> None: ...
+    def rule_get(self, rid: str) -> Doc | None: ...
+    def rule_update(self, rid: str, fields: Doc) -> None: ...
+    def rule_delete(self, rid: str) -> None: ...
+    def rules_of(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def rules_all(self) -> list[tuple[str, Doc]]: ...
+    def activity_add(self, aid: str, doc: Doc) -> bool: ...
+    def activity_get(self, aid: str) -> Doc | None: ...
+    def activity_update(self, aid: str, fields: Doc) -> None: ...
+    def activities_of(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def activity_delete(self, aid: str) -> None: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -326,6 +338,51 @@ class FirestoreStore:
     def campaign_members(self, cid: str) -> list[Doc]:
         return [s.to_dict() for s in self._db().collection(f"campaigns/{cid}/members").stream()]
 
+    def rule_set(self, rid: str, doc: Doc) -> None:
+        self._db().document(f"campaign_rules/{rid}").set(doc)
+
+    def rule_get(self, rid: str) -> Doc | None:
+        snap = self._db().document(f"campaign_rules/{rid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def rule_update(self, rid: str, fields: Doc) -> None:
+        self._db().document(f"campaign_rules/{rid}").update(fields)
+
+    def rule_delete(self, rid: str) -> None:
+        self._db().document(f"campaign_rules/{rid}").delete()
+
+    def rules_of(self, uid: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("campaign_rules").where("owner_uid", "==", uid)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def rules_all(self) -> list[tuple[str, Doc]]:
+        q = self._db().collection("campaign_rules").where("enabled", "==", True)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def activity_add(self, aid: str, doc: Doc) -> bool:
+        """Create once: an id already written (the same action on the same day) is left alone."""
+        from google.api_core.exceptions import AlreadyExists
+
+        try:
+            self._db().document(f"autopilot_activity/{aid}").create(doc)
+        except AlreadyExists:
+            return False
+        return True
+
+    def activity_get(self, aid: str) -> Doc | None:
+        snap = self._db().document(f"autopilot_activity/{aid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def activity_update(self, aid: str, fields: Doc) -> None:
+        self._db().document(f"autopilot_activity/{aid}").update(fields)
+
+    def activity_delete(self, aid: str) -> None:
+        self._db().document(f"autopilot_activity/{aid}").delete()
+
+    def activities_of(self, uid: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("autopilot_activity").where("owner_uid", "==", uid)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -343,6 +400,8 @@ class MemoryStore:
         self.campaign_daily: dict[tuple[str, str], Doc] = {}
         self.campaign_seen: dict[tuple[str, str], Doc] = {}
         self.campaign_member: dict[tuple[str, str], Doc] = {}
+        self.rules: dict[str, Doc] = {}
+        self.activity: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -520,6 +579,42 @@ class MemoryStore:
 
     def campaign_members(self, cid: str) -> list[Doc]:
         return [copy.deepcopy(d) for (c, _), d in self.campaign_member.items() if c == cid]
+
+    def rule_set(self, rid: str, doc: Doc) -> None:
+        self.rules[rid] = copy.deepcopy(doc)
+
+    def rule_get(self, rid: str) -> Doc | None:
+        return copy.deepcopy(self.rules.get(rid))
+
+    def rule_update(self, rid: str, fields: Doc) -> None:
+        self.rules[rid].update(copy.deepcopy(fields))
+
+    def rule_delete(self, rid: str) -> None:
+        self.rules.pop(rid, None)
+
+    def rules_of(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(r, copy.deepcopy(d)) for r, d in self.rules.items() if d["owner_uid"] == uid]
+
+    def rules_all(self) -> list[tuple[str, Doc]]:
+        return [(r, copy.deepcopy(d)) for r, d in self.rules.items() if d.get("enabled")]
+
+    def activity_add(self, aid: str, doc: Doc) -> bool:
+        if aid in self.activity:
+            return False
+        self.activity[aid] = copy.deepcopy(doc)
+        return True
+
+    def activity_get(self, aid: str) -> Doc | None:
+        return copy.deepcopy(self.activity.get(aid))
+
+    def activity_update(self, aid: str, fields: Doc) -> None:
+        self.activity[aid].update(copy.deepcopy(fields))
+
+    def activity_delete(self, aid: str) -> None:
+        self.activity.pop(aid, None)
+
+    def activities_of(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(a, copy.deepcopy(d)) for a, d in self.activity.items() if d["owner_uid"] == uid]
 
 
 @lru_cache
