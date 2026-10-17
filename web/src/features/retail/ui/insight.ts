@@ -37,6 +37,8 @@ export function briefHref(card: Pick<BriefCard, 'id' | 'link'>, carry = ''): str
   switch (section) {
     case 'products':
       path = id ? sectionPath('products', id) : sectionPath('products')
+      // "People don't feel it working yet" lands on the product's How it feels panel.
+      if (id && card.id === 'feel_gap') hash = '#feel'
       break
     case 'categories':
       path = sectionPath('market')

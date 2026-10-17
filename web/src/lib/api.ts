@@ -662,6 +662,10 @@ export type RetailerProductRow = {
   tier_label?: string
   /** Promising only: about how many more people at week 8 would make it Proven if the rates hold. */
   to_proven?: number | null
+  /** Self-reported (never part of the tier): share of `felt_n` who said "It's working for me", 2 dp; null under 10. */
+  felt?: number | null
+  /** People who said how it feels at week 2 or later (latest answer each); null under 10. */
+  felt_n?: number | null
 }
 type RetailerHead = { filters: { cohort: RetailerCohort; range: RetailerRange; since: string | null; today: string }; cohort: RetailerInsights['cohort'] }
 export type RetailerProducts = RetailerHead & {
@@ -681,6 +685,24 @@ export type RetailerProductDetail = RetailerHead & {
   evidence: RetailerEvidence[]
   evidence_caveat?: string
   eligibility: { eligible: boolean; tier: RetailerProofTier; reasons: string[]; goals: string[]; skin_types: string[] }
+  /** How it feels to the people using it (self-reported, shown next to the measurements); null under 10 people. */
+  feel?: RetailerFeel | null
+}
+export type RetailerFeelVerdict = 'working' | 'unsure' | 'not_for_me'
+export type RetailerFeelTag = { tag: string; label: string; good: boolean; n: number; share: number }
+/**
+ * Self-reported answers on a product, each person's latest at week 2 or later. Shares are of `n`, 2 dp; tags
+ * with 10+ people only, most first. `agree`: people at week 8 with an answer on a measured product, felt
+ * ("It's working for me") against measured (a visible change in what it targets); null under 10 or unmeasured.
+ */
+export type RetailerFeel = {
+  n: number
+  working: number
+  unsure: number
+  not_for_me: number
+  tags: RetailerFeelTag[]
+  agree: { n: number; both: number; felt_only: number; measured_only: number; neither: number } | null
+  note: string
 }
 /** A switching flow by brand (people, >= 10); the product's own brand reads "Same brand, other product". */
 export type RetailerBrandFlow = { brand: string; label: string; same_brand: boolean; n: number }
