@@ -315,6 +315,7 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "glow": glow_extras,
         "lines": lines_extras,
     }
+    zone_label = _zone_labels(face, box, face_skin)
     return {
         "values": values,
         "extras": extras,
@@ -322,7 +323,16 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "face": face,
         "view": face.view,
         "polygons": polys,
-        "areas": _area_outlines(face, box, face_skin, polys),
+        "areas": _area_outlines(face, box, zone_label, polys),
+        # which zone each mark sits in, and each zone's skin (px): a session with side photos
+        # takes each zone from the photo that faces it (_combine_views)
+        "mark_zones": _mark_zones(zone_label, [*blemishes, *spots]),
+        "mark_depth_mm": _mark_depth_mm(face_skin, [*blemishes, *spots], face.px_per_mm),
+        "zone_px": (
+            {n: int((zone_label == c).sum()) for c, n in enumerate(facemap.ZONES, start=1)}
+            if zone_label is not None
+            else {}
+        ),
         "shape": srgb8.shape,
         "face_skin": (box, face_skin),
         "blemishes": blemishes,
@@ -426,6 +436,7 @@ def _count_confirmed(good: list[dict]) -> None:
             continue
         others = [o for o in partners if len(o)]
         seen = [any(float(np.min(np.hypot(*(o - p).T))) <= gap for o in others) for p in mapped[i]]
+        f["confirmed"] = seen
         n_b = len(f["blemishes"])
         f["values"]["blemishes"] = float(sum(seen[:n_b]))
         spots = [s for s, ok in zip(f["spots"], seen[n_b:], strict=True) if ok]
@@ -433,20 +444,96 @@ def _count_confirmed(good: list[dict]) -> None:
         f["values"]["pigment_spots"], f["extras"]["pigment_spots"] = pct, extras
 
 
+# Which view's photo measures each face-map zone in a session with side photos (docs/CAPTURE:
+# front, left cheek, right cheek): each cheek and jaw from the photo that faces it, the rest
+# from the front. A side with no photo of its own is measured on the front.
+SIDE_ZONES = {"right": {"right_cheek", "right_jaw"}, "left": {"left_cheek", "left_jaw"}}
+VIEW_CODE = {"front": 0.0, "right": 1.0, "left": 2.0}  # candidate feature `view` (numbers only)
+
+
+def _owns(view: str, zone: str | None, sides: set[str]) -> bool:
+    """Whether a mark in `zone` found on a `view` photo is counted (each zone once a session)."""
+    if view in SIDE_ZONES:
+        return zone in SIDE_ZONES[view]
+    taken = set().union(*(SIDE_ZONES[v] for v in sides)) if sides else set()
+    return zone not in taken  # front: everything a side photo does not measure (and unzoned)
+
+
+def _keeps(f: dict, sides: set[str]) -> list[bool]:
+    """Per mark (blemishes then spots): in a zone this photo measures. On a side photo the mark
+    must also sit SIDE_MARK_DEPTH_MM inside the face skin: at the jaw edge, hairline and lid
+    corners a turned face throws shadows that read as marks."""
+    side = f["view"] in SIDE_ZONES
+    return [
+        _owns(f["view"], z, sides) and (not side or d >= config.SIDE_MARK_DEPTH_MM)
+        for z, d in zip(f["mark_zones"], f["mark_depth_mm"], strict=True)
+    ]
+
+
+def _owned_marks(f: dict, sides: set[str]) -> list[bool]:
+    """_keeps, and confirmed by another photo of the same view when there was one."""
+    confirmed = f.get("confirmed") or [True] * len(f["mark_zones"])
+    return [ok and k for ok, k in zip(confirmed, _keeps(f, sides), strict=True)]
+
+
+def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
+    """A session with front and side photos: each front photo's blemish count and dark-spot area
+    become its own zones' plus the side photos' cheeks and jaws, so the noise band still comes
+    from the front photos' spread. Dark-spot area is in mm2 (the photos differ in scale)."""
+    sides = set(side_refs)
+
+    def part(f: dict) -> tuple[int, float, float]:
+        own = _owned_marks(f, sides)
+        n_b, mm2 = len(f["blemishes"]), f["face"].px_per_mm ** 2
+        blem = sum(own[:n_b])
+        spot_mm2 = sum(s.area_px for s, ok in zip(f["spots"], own[n_b:], strict=True) if ok) / mm2
+        zones = SIDE_ZONES.get(f["view"])
+        skin = sum(
+            px
+            for z, px in f["zone_px"].items()
+            if (z in zones if zones else _owns("front", z, sides))
+        )
+        return blem, spot_mm2, skin / mm2
+
+    extra = [part(r) for r in side_refs.values()]
+    for f in front:
+        b, spot, skin = part(f)
+        b += sum(e[0] for e in extra)
+        spot += sum(e[1] for e in extra)
+        skin += sum(e[2] for e in extra)
+        n_spots = sum(_owned_marks(f, sides)[len(f["blemishes"]) :]) + sum(
+            sum(_owned_marks(r, sides)[len(r["blemishes"]) :]) for r in side_refs.values()
+        )
+        f["values"]["blemishes"] = float(b)
+        f["values"]["pigment_spots"] = 100.0 * spot / skin if skin else 0.0
+        f["extras"]["pigment_spots"] = {**f["extras"]["pigment_spots"], "count": n_spots}
+
+
 def _candidates(
-    frame: dict, output_prefix: str | None, limit: int, seen: list[float] | None = None
+    frame: dict,
+    output_prefix: str | None,
+    limit: int,
+    seen: list[float] | None = None,
+    keep: list[bool] | None = None,
+    start: int = 1,
 ) -> list[dict]:
     """Contract candidates (docs/CONTRACT.md 2.6), blemishes then dark spots of one photo:
     bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label."""
     box, srgb8 = frame["box"], frame["srgb8"]
     px_per_mm = frame["face"].px_per_mm
     found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
+    seen_all = seen
+    if keep is not None:  # only the marks of zones this photo measures (_owns)
+        idx = [i for i, ok in enumerate(keep) if ok]
+        found = [found[i] for i in idx]
+        seen_all = [seen[i] for i in idx] if seen else None
     found = found[:limit]
+    seen = seen_all
     # where each mark sits on the canonical face, so the api can follow it across sessions
     places = facemap.locate(frame["face"].points, [(box.x + b.x, box.y + b.y) for _, b in found])
     out, uploads = [], []
     for i, (kind, b) in enumerate(found, start=1):
-        cid = f"c_{i:03d}"
+        cid = f"c_{start + i - 1:03d}"
         cx, cy = box.x + b.x, box.y + b.y
         side = 2 * b.radius * 1.5
         bbox = [round(cx - side / 2, 1), round(cy - side / 2, 1), round(side, 1), round(side, 1)]
@@ -479,6 +566,9 @@ def _candidates(
                     "area_px": float(b.area_px),
                     "score": round(b.score, 2),
                     **({"seen_in_fraction": seen[i - 1]} if seen else {}),
+                    # which photo of the session the bbox is in, and its view (VIEW_CODE)
+                    "frame_index": float(frame["index"]),
+                    "view": VIEW_CODE.get(frame["view"], 0.0),
                     **_place_features(places[i - 1], b.radius),
                 },
             }
@@ -590,8 +680,47 @@ def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -
     return face_area & ~hair
 
 
+def _zone_labels(face: Face, box: Box, face_skin: np.ndarray) -> np.ndarray | None:
+    """Per pixel of the face crop: 1-based index into FACE_ZONES (0 = not face skin), the whole
+    face skin in the face map's zones (skin past the mesh joins its nearest zone). None without
+    the face model or when no zone reaches the skin."""
+    zones = facemap.zone_map(face.points - [box.x, box.y], face_skin.shape)
+    if zones is None or not face_skin.any():
+        return None
+    covered = zones > 0
+    if not covered.any():
+        return None
+    _, (iy, ix) = ndimage.distance_transform_edt(~covered, return_indices=True)
+    return np.where(face_skin, zones[iy, ix], 0).astype(np.uint8)
+
+
+def _mark_depth_mm(face_skin: np.ndarray, marks: list, px_per_mm: float) -> list[float]:
+    """How far inside the face skin each mark's rim is (mm, crop pixels in)."""
+    if not marks:
+        return []
+    depth = ndimage.distance_transform_edt(face_skin)
+    h, w = depth.shape
+    return [
+        (float(depth[min(max(int(m.y), 0), h - 1), min(max(int(m.x), 0), w - 1)]) - m.radius)
+        / px_per_mm
+        for m in marks
+    ]
+
+
+def _mark_zones(label: np.ndarray | None, marks: list) -> list[str | None]:
+    """The zone of each mark's centre (crop pixels), None without zones."""
+    if label is None:
+        return [None] * len(marks)
+    h, w = label.shape
+    out = []
+    for m in marks:
+        code = int(label[min(max(int(m.y), 0), h - 1), min(max(int(m.x), 0), w - 1)])
+        out.append(facemap.ZONES[code - 1] if code else None)
+    return out
+
+
 def _area_outlines(
-    face: Face, box: Box, face_skin: np.ndarray, polys: dict[str, np.ndarray]
+    face: Face, box: Box, label: np.ndarray | None, polys: dict[str, np.ndarray]
 ) -> dict[str, np.ndarray]:
     """What the app's "Areas" view draws (result.rois): the whole measured face skin split into the
     face map's zones (config.FACE_ZONES, the same rule that places marks), one outline each in
@@ -599,14 +728,9 @@ def _area_outlines(
     patches alone showed a fifth of the face, though spots, blemishes, lines and shine are searched
     over all of it. Skin past the mesh (hairline, jaw edge) joins its nearest zone. Without the face
     model: the ROI patches, as before."""
-    zones = facemap.zone_map(face.points - [box.x, box.y], face_skin.shape)
-    if zones is None or not face_skin.any():
+    if label is None:
         return dict(polys)
-    covered = zones > 0
-    if not covered.any():
-        return dict(polys)
-    _, (iy, ix) = ndimage.distance_transform_edt(~covered, return_indices=True)
-    label = np.where(face_skin, zones[iy, ix], 0).astype(np.uint8)
+    label = label.copy()
     # each eye with its brow cut out, so a cheek outline stops under the eye instead of wrapping
     # round it up to the brow (an outline cannot have a hole: the eye looked measured)
     for eye, brow in ((RIGHT_EYE, RIGHT_BROW), (LEFT_EYE, LEFT_BROW)):
@@ -635,6 +759,39 @@ def _area_outlines(
     for name in ("right_under_eye", "left_under_eye"):
         if name in polys:
             out[name] = polys[name]
+    return out
+
+
+def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list[dict]:
+    """result.views: per view of the session (front, right, left), its reference photo (index,
+    size, a preview and redness map when output_prefix is given) and the areas it measures. The
+    top-level preview / rois / image_size stay the front's, for apps that show one photo."""
+    out = []
+    for f in refs:
+        v = f["view"]
+        preview = redness = None
+        if output_prefix:
+            preview = save_preview(f["srgb8"], output_prefix, name=f"views/{v}.jpg")
+            if f.get("redness_map") is not None:
+                rgba = redness_rgba(f["redness_map"], f["face"].px_per_mm)
+                if rgba is not None:
+                    dest = f"{output_prefix.rstrip('/')}/overlays/redness_{v}.png"
+                    redness = save_png(rgba, dest)
+        rois = [
+            {"name": n, "polygon": np.round(p, 1).tolist()}
+            for n, p in f["areas"].items()
+            if _owns(v, n, sides)  # the under-eye patches go with the front
+        ]
+        out.append(
+            {
+                "view": v,
+                "frame_index": f["index"],
+                "image_size": {"width": int(f["shape"][1]), "height": int(f["shape"][0])},
+                "preview_uri": preview,
+                "redness_uri": redness,
+                "rois": rois,
+            }
+        )
     return out
 
 
@@ -688,12 +845,24 @@ def analyze_face(
             {"index": i, "passed": q.passed, "reasons": q.reasons, "regions": f["regions"]}
         )
     passed = [f for f in frames if f["quality"].passed]
-    # one view per summary: front photos if any passed, else the side views (each measures
-    # different skin, so they are not averaged together)
+    passed.sort(key=lambda f: -f["quality"].sharpness)  # the sharpest of each view leads it
+    # the measurements come from the front photos (they give the noise band); a session with only
+    # side views is measured on those (each measures different skin: not averaged together)
     good = [f for f in passed if f["view"] == "front"] or passed
-    # the sharpest photo is the reference: spots, crops, regions and the preview come from it
-    good.sort(key=lambda f: -f["quality"].sharpness)
+    # a session with front AND side photos (front, left cheek, right cheek): each cheek and jaw
+    # is counted on the photo that faces it, everything else on the front
+    side_groups = (
+        {v: [f for f in passed if f["view"] == v] for v in ("right", "left")}
+        if good and good[0]["view"] == "front"
+        else {}
+    )
+    side_groups = {v: g for v, g in side_groups.items() if g}
     _count_confirmed(good)
+    for group in side_groups.values():
+        _count_confirmed(group)
+    side_refs = {v: g[0] for v, g in side_groups.items()}
+    if side_refs:
+        _combine_views(good, side_refs)
 
     metrics = []
     _session_lines(good)
@@ -755,7 +924,13 @@ def analyze_face(
             + " and ".join(f"{v} cheek" for v in sides)
             + "); tone, redness and evenness come from that cheek"
         )
-    if len(good) < len(passed):
+    if side_refs:
+        warnings.append(
+            "cheeks and jaw from the "
+            + " and ".join(f"{v} cheek photo" for v in sorted(side_refs))
+            + "; forehead, nose and chin from the front: compare with check-ins taken the same way"
+        )
+    elif len(good) < len(passed):
         warnings.append("side views were left out: front-view photos in the same session")
     ref = good[0] if good else (frames[0] if frames else None)
     if ref and output_prefix:  # the photo rois, candidate bboxes and image_size describe
@@ -768,12 +943,24 @@ def analyze_face(
             dest = f"{output_prefix.rstrip('/')}/overlays/redness.png"
             overlays.append({"metric_id": "redness", "uri": save_png(rgba, dest)})
         overlay_ms += (time.perf_counter() - t_o) * 1000
-    candidates = []
+    candidates, views = [], []
     if good:
         mapped, align_warnings = _align(good[0], good[1:])
         warnings.extend(align_warnings)
         seen = _seen_in(good[0], mapped) if len(good) > 1 else None
-        candidates = _candidates(good[0], output_prefix, max_candidates, seen)
+        sides = set(side_refs)
+        keep = _keeps(good[0], sides) if sides else None
+        candidates = _candidates(good[0], output_prefix, max_candidates, seen, keep)
+        for group in side_groups.values():
+            ref_v = group[0]
+            m_v, w_v = _align(ref_v, group[1:])
+            warnings.extend(w_v)
+            seen_v = _seen_in(ref_v, m_v) if len(group) > 1 else None
+            keep_v = _keeps(ref_v, sides)
+            candidates += _candidates(
+                ref_v, output_prefix, max_candidates, seen_v, keep_v, start=len(candidates) + 1
+            )
+        views = _views([good[0], *side_refs.values()], sides, output_prefix)
     for f in frames:
         f.pop("srgb8", None)  # free the full-size photos
         f.pop("redness_map", None)
@@ -806,6 +993,7 @@ def analyze_face(
         "metrics": metrics,
         "candidates": candidates,
         "overlays": overlays,
+        **({"views": views} if views else {}),
         # the reference photo's areas: the whole face in zones, plus the under-eye patches
         "rois": (
             [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in ref["areas"].items()]

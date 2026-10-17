@@ -54,6 +54,21 @@
         "properties": {"metric_id": {"$ref": "#/$defs/metric_id"}, "uri": {"type": "string"}}
       }
     },
+    "views": {
+      "description": "Face sessions with side photos (front, left cheek, right cheek): per view, its reference photo and the areas it measures. Optional; the top-level rois and image_size (and preview.jpg) are the front's.",
+      "type": "array", "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["view", "frame_index", "image_size", "rois"],
+        "properties": {
+          "view": {"enum": ["front", "right", "left"]},
+          "frame_index": {"type": "integer", "minimum": 0},
+          "image_size": {"type": "object", "additionalProperties": false, "properties": {"width": {"type": "integer"}, "height": {"type": "integer"}}},
+          "preview_uri": {"type": ["string", "null"]},
+          "redness_uri": {"type": ["string", "null"]},
+          "rois": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "polygon"], "properties": {"name": {"type": "string"}, "polygon": {"type": "array", "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}}}}}
+        }
+      }
+    },
     "rois": {
       "type": "array",
       "items": {
