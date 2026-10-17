@@ -33,7 +33,7 @@ function resetTime(resetsAt?: string): string {
 
 /**
  * The advisor (design: Willow App Routine, view="advisor"), drawn inside the shell's glass panel: header
- * (close + "■ WISP" + what it reads), the one chat, and the composer. Gemini answers from the person's
+ * (close, expand, what it reads), the one chat, and the composer. Gemini answers from the person's
  * own sessions, routine and the catalog (api/app/advisor.py); every number is checked there.
  */
 export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull }: { seed: AdvisorSeed | null; onClose: () => void; full?: boolean; onToggleFull?: () => void }) {
@@ -51,7 +51,6 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
             {full ? 'Collapse' : 'Expand'}
           </button>
         ) : null}
-        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ WISP</span>
         {data.mode === 'live' ? <ContextChip /> : null}
       </div>
       {data.mode === 'demo' ? (
