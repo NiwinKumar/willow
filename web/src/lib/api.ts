@@ -422,6 +422,9 @@ export const api = {
   routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
   retailerAsk: (token: string, question: string, filters?: { cohort: RetailerCohort; range: RetailerRange }) =>
     request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question, ...filters }) }),
+  /** Claim drafts for one channel (api proof_ai.claims): sign-in, 30 a day; 429 `daily_limit`. */
+  retailerClaims: (token: string, productId: string, body: { channel: RetailerClaimChannel } & RetailerFilters) =>
+    request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
@@ -788,3 +791,36 @@ export const retailerBrands = (filters?: RetailerFilters) => retailerGet<{ brand
 export const retailerBrand = (brand: string, filters?: RetailerFilters) =>
   retailerGet<RetailerBrandDetail>(`/v1/retailer/brands/${encodeURIComponent(brand)}${retailerQs(filters)}`)
 export const retailerBrief = (filters?: RetailerFilters & { brand?: string }) => retailerGet<RetailerBrief>(`/v1/retailer/brief${retailerQs(filters)}`)
+
+/* ───────────── AI in Willow Proof (api proof_ai.py): next steps and claim drafts on the product page ───────────── */
+
+export type RetailerActionId = 'promote_segment' | 'set_expectations' | 'answer_feedback' | 'keep_users' | 'reach_proven' | 'avoid_segment' | 'educate_routine' | 'bundle' | 'draft_claims'
+export type RetailerActionSection = 'campaigns' | 'claims' | 'feel' | 'switching' | 'pipeline' | 'segments' | 'conflicts' | 'co_used'
+export type RetailerClaimChannel = 'pack' | 'pdp' | 'listing' | 'social'
+/** One next step: the title, why (only numbers from the facts, checked) and where in Proof it is done. */
+export type RetailerAction = {
+  id: RetailerActionId
+  title: string
+  why: string
+  link: { section: RetailerActionSection; id: string; skin_types?: string[]; channel?: RetailerClaimChannel }
+}
+/** GET /v1/retailer/products/{id}/actions: 0-3 steps; `considered` = how many the data supports. */
+export type RetailerActions = { product_id: string; source: 'gemini' | 'rules'; considered: number; actions: RetailerAction[] }
+/** What a claim may rest on: the measured evidence statements, then possibly `perception` (self-reported). */
+export type RetailerClaimSource = { id: string; kind: string; text: string; n: number; measured: boolean }
+/**
+ * POST /v1/retailer/products/{id}/claims. `source`: gemini (checked drafts), statements (Gemini unavailable: the
+ * evidence statements themselves), none (blocked). `blocked`: why claims aren't available for this product.
+ */
+export type RetailerClaims = {
+  product_id: string
+  channel: RetailerClaimChannel
+  caveat: string | null
+  sources: RetailerClaimSource[]
+  drafts: { text: string; sources: string[] }[]
+  source: 'gemini' | 'statements' | 'none'
+  blocked: string | null
+}
+
+export const retailerActions = (productId: string, filters?: RetailerFilters) =>
+  retailerGet<RetailerActions>(`/v1/retailer/products/${encodeURIComponent(productId)}/actions${retailerQs(filters)}`)

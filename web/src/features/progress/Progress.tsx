@@ -13,6 +13,7 @@ import { SITE_ORDER } from '../../data/live'
 import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { fmtDate, parseDate } from '../../lib/format'
+import { prefs } from '../../lib/prefs'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
 import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, usableLine, usedFrames } from './model'
@@ -52,6 +53,8 @@ export default function Progress() {
   }, [sessions])
   const months = useMemo(() => [...new Set([...[...byDay.keys()].map((d) => d.slice(0, 7)), today.slice(0, 7)])].sort(), [byDay, today])
   const [monthPick, setMonthPick] = useState<string | null>(null)
+  // One quiet line under the calendar until the person has opened a day from it once (per device).
+  const [tapHint] = useState(() => !prefs.coachSeen('calendarDay'))
   const month = monthPick && months.includes(monthPick) ? monthPick : (lastDone ? dayOf(lastDone) : today).slice(0, 7)
   const mi = months.indexOf(month)
 
@@ -113,7 +116,10 @@ export default function Progress() {
       bg: DAY_BG[st],
       dots: [...(started.length ? ['var(--willow-500)'] : []), ...(note ? ['var(--text-primary)'] : [])],
       label: `${when}, ${list.length > 1 ? `${list.length} check-ins, latest ` : ''}${MODE_LONG[s.capture_mode]}, ${DAY_WORDS[st]}, ${usableLine(s)}${started.length ? `, started ${started.join(' and ')}` : ''}${note ? ', you added a note' : ''}. Open details`,
-      onPick: () => navigate(`/progress/${d}?site=${site}`, { state: { fromCalendar: true } }),
+      onPick: () => {
+        prefs.setCoachSeen('calendarDay')
+        navigate(`/progress/${d}?site=${site}`, { state: { fromCalendar: true } })
+      },
     }
   }
   const routineDots: Record<string, string[]> = Object.fromEntries(Object.keys(routineDays).map((d) => [d, ['var(--willow-500)']]))
@@ -179,7 +185,11 @@ export default function Progress() {
                 </>
               }
             />
-            {!sessions.length ? <p className="m-0 text-[14px] text-ink-2">No check-ins of your {SITE_LABEL[site].toLowerCase()} yet. Tap today to take one.</p> : null}
+            {!sessions.length ? (
+              <p className="m-0 text-[14px] text-ink-2">No check-ins of your {SITE_LABEL[site].toLowerCase()} yet. Tap today to take one.</p>
+            ) : tapHint ? (
+              <p className="m-0 text-[13px] text-ink-2">Tap a coloured day to open it.</p>
+            ) : null}
           </section>
 
           <section aria-label="Metric over time" className="flex flex-col justify-between gap-4 rounded-[44px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse shadow-[0_40px_80px_-50px_rgba(0,0,0,.7)] squircle">

@@ -85,7 +85,7 @@ def signed_get_url(object_name: str) -> str:
     return url
 
 
-DISPLAYABLE = ("**/preview.jpg", "**/overlays/*")
+DISPLAYABLE = ("**/preview.jpg", "**/overlays/*", "**/views/*")
 
 
 def list_names(prefix: str, globs: tuple[str, ...] = DISPLAYABLE) -> set[str]:

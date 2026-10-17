@@ -21,7 +21,7 @@ const THEME = {
  * category orb) is its "used today" tick, as on Home: full colour with ✓ when ticked, faded when not, fainter
  * still on a day its schedule rests it ("RESTS ☾").
  */
-export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen, onStop, onAdd }: { slot: 'am' | 'pm'; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; faceMeasured: boolean; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onAdd: () => void }) {
+export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen, onFeel, onStop, onAdd }: { slot: 'am' | 'pm'; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; faceMeasured: boolean; onOpen: (e: RoutineEntry) => void; onFeel: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onAdd: () => void }) {
   const t = THEME[slot]
   const setUse = useSetRoutineUse()
   const today = localDay()
@@ -109,6 +109,17 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
                   <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }} title={`${saidLine(e.feel)} Your own view, not a measurement.`}>
                     You: {VERDICT_LABEL[e.feel.verdict]}
                   </span>
+                ) : !starts ? (
+                  // Not answered yet: the same quiet outline, a little fainter, opening the sheet at "How does it feel?".
+                  <button
+                    type="button"
+                    onClick={() => onFeel(e)}
+                    aria-label={`How does ${name} feel? Add your view`}
+                    className="hit44 cursor-pointer rounded-pill px-2.5 py-1 text-[12px] opacity-75 transition-[opacity,scale] duration-150 ease-standard hover:opacity-100 active:scale-[.96] motion-reduce:active:scale-100"
+                    style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }}
+                  >
+                    How does it feel?
+                  </button>
                 ) : null}
                 {e.recent_use ? (
                   <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ background: t.chip }} title="From your ticks over the last two weeks">
