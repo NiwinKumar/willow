@@ -93,8 +93,8 @@ QUERIES = {
         ARRAY_AGG(weeks_since_baseline ORDER BY weeks_since_baseline) AS improved_weeks
         FROM `{ds}.sessions_flat` WHERE improved AND weeks_since_baseline <= {weeks}
         GROUP BY user_hash, metric_id""",
-    "routine": """SELECT user_hash, product_id, brand, category, started_week, stopped_week
-        FROM `{ds}.routine_flat`""",
+    "routine": """SELECT user_hash, product_id, brand, category, started_week, stopped_week,
+        feel, feel_week, feel_tags FROM `{ds}.routine_flat`""",
     "conflicts": """SELECT user_hash, kind FROM `{ds}.routine_conflicts`""",
 }
 
@@ -150,6 +150,9 @@ def raw_from_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, list[d
                     "category",
                     "started_week",
                     "stopped_week",
+                    "feel",
+                    "feel_week",
+                    "feel_tags",
                 )
             }
             for r in tables["routine_flat"]

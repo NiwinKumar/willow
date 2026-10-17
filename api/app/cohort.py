@@ -248,6 +248,57 @@ def finding_kinds(entries: list[dict[str, Any]]) -> list[str]:
     return sorted(kinds) or ["none"]
 
 
+# Self-reported feel (app/feel.py): about 6 in 10 answer once a product has had two weeks. A
+# visible change by then makes "working" likelier, but people also feel products that photos do
+# not show, and miss changes that photos do. Drawn from each person's own stream, so no other
+# synthetic number moves.
+FEEL_ANSWER = 0.6
+FEEL_WORKING = {"measured": 0.68, "later": 0.42, "none": 0.24}
+_GOOD_TAGS = {
+    "moisturizer": ["softer", "absorbs", "feels_nice"],
+    "sunscreen": ["absorbs", "feels_nice"],
+    "serum": ["looks_better", "absorbs", "feels_nice"],
+    "treatment": ["looks_better", "feels_nice"],
+    "cleanser": ["feels_nice", "softer"],
+}
+
+
+def synthetic_feel(
+    uh: str,
+    p: dict[str, Any],
+    started: int,
+    stopped: int | None,
+    last_week: int,
+    improved_at: dict[str, int],
+) -> dict[str, Any]:
+    """One synthetic person's latest answer on one product: {feel, feel_week, feel_tags}."""
+    none: dict[str, Any] = {"feel": None, "feel_week": None, "feel_tags": []}
+    r = random.Random(f"{SEED}:feel:{uh}:{p['product_id']}")
+    end = stopped if stopped is not None else last_week
+    if end - started < 2 or r.random() >= FEEL_ANSWER:
+        return none
+    week = min(end, started + r.randint(2, 8))
+    targets = {m for c in p["concerns"] for m in CONCERN_METRICS.get(c, [])}
+    seen = [w for m, w in improved_at.items() if m in targets and w > started]
+    state = "measured" if any(w <= week for w in seen) else "later" if seen else "none"
+    traits = product_traits(p)
+    if r.random() < FEEL_WORKING[state] * (0.6 if stopped is not None else 1.0):
+        verdict = "working"
+        pool = _GOOD_TAGS.get(p["category"], ["feels_nice", "looks_better"])
+        tags = r.sample(pool, k=min(len(pool), r.choice([0, 1, 1, 2])))
+    else:
+        early = week - started < 4 and stopped is None
+        verdict = "unsure" if r.random() < (0.7 if early else 0.4) else "not_for_me"
+        bad = (
+            (["stings"] if "strong" in traits else [])
+            + (["drying"] if "oil_control" in traits else [])
+            + (["heavy"] if p["category"] in ("moisturizer", "sunscreen") else [])
+        ) or ["breakouts"]
+        k = r.choice([0, 1, 1, 2]) if verdict == "not_for_me" else r.choice([0, 0, 1])
+        tags = r.sample(bad, k=min(len(bad), k))
+    return {"feel": verdict, "feel_week": week - started, "feel_tags": tags}
+
+
 def generate(
     today: date | datetime | None = None, *, switching: bool = True, skin_effects: bool = True
 ) -> dict[str, list[dict[str, Any]]]:
@@ -295,6 +346,7 @@ def generate(
     sessions, routine, conflicts, users, monthly = [], [], [], [], []
     for i in range(USERS):
         uh = user_hash(i)
+        mine = len(routine)  # this person's routine rows start here
         month = rng.choices([m for m, _ in START_MONTHS], [w for _, w in START_MONTHS])[0]
         start = datetime(YEAR, month, rng.randint(1, _days_in(month)), 8, tzinfo=UTC)
         region = rng.choices([r for r, _ in REGIONS], [w for _, w in REGIONS])[0]
@@ -434,6 +486,7 @@ def generate(
         # Weekly face sessions: metric deltas = drift from the products targeting it + noise.
         months: dict[str, dict[str, Any]] = {}
         first_ts = last_ts = None
+        improved_at: dict[str, int] = {}  # metric -> first week it improved
         for week in weeks:
             ts = start + timedelta(weeks=week, hours=hours[week - 1])
             now_goals = goals + ([added_goal] if added_week and week >= added_week else [])
@@ -467,11 +520,24 @@ def generate(
                         "improved": (delta > 0) == (metric in UP_IS_GOOD) and abs(delta) > mdc,
                     }
                 )
+                if sessions[-1]["improved"]:
+                    improved_at.setdefault(metric, week)
             m = months.setdefault(_month_key(ts), {"goals": [], "last_ts": ts})
             m["goals"] = sorted(set(m["goals"]) | set(now_goals))
             m["last_ts"] = ts
             first_ts = first_ts or ts
             last_ts = ts
+        for row in routine[mine:]:
+            row.update(
+                synthetic_feel(
+                    uh,
+                    live[row["product_id"]][0],
+                    row["started_week"],
+                    row["stopped_week"],
+                    last_week,
+                    improved_at,
+                )
+            )
         users.append(
             {
                 "user_hash": uh,

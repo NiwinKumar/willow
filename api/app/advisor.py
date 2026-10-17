@@ -20,7 +20,7 @@ from google.genai import types
 from pydantic import BaseModel, Field, model_validator
 
 from app import advisor_blocks as blocks_mod
-from app import catalog, explain, gemini, numbers, routine_check, routine_log
+from app import catalog, explain, feel, gemini, numbers, routine_check, routine_log
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
@@ -59,6 +59,11 @@ measurements, check their routine and find products from Willow's facts-only cat
   of_days, the days it was in the routine recently (recent_window_days in CONTEXT); null = not
   tracked. Before judging whether a product changed anything, say how often it was used, quoting
   only days_used and of_days; a product used on few days has not had a fair test.
+- feel on a routine product = the person's own verdict and how it feels to them, in week N of
+  using it (null = not answered). It is their view, not a measurement: never present it as a
+  result. Use it to tailor advice (stings or dries: fewer nights a week or a gentler step;
+  heavy: a lighter texture; working but readings unchanged: readings often trail what people
+  feel, keep checking in). If it differs from the readings, say both plainly.
 - Quote measurements only when the question is about results; never pad an answer with them.
 - British spelling (colour, moisturiser), but say "catalog"."""
 
@@ -225,6 +230,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "key_actives": [a["name"] for a in e.get("key_actives") or []],
             # {days_used, of_days} over the last 2 weeks, or null if nothing was ticked
             "recent_use": routine_log.recent_use(e, eid, logs, now, since),
+            # the person's own latest verdict and look-and-feel words (null = not asked yet)
+            "feel": feel.words(e.get("feel")),
         }
         for eid, e in entries
     ]
