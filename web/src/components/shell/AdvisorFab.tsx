@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { useChat } from '../../features/advisor/chatStore'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import { AssistantAvatar, type AvatarState } from '../assistant/AssistantAvatar'
 
 // No input anywhere for this long (panel closed, nothing pending): the cat dozes off. Any input wakes it.
@@ -14,11 +15,11 @@ const HAPPY_MS = 1600
  *   thinking while a question is out → speaking while the answer is revealed → a happy hop when it lands,
  *   listening while the pointer is on it or the person is typing a question, sleepy after a long quiet spell,
  *   idle otherwise.
- * Wide screens: in the corner, and beside the advisor panel while it is open (the panel takes the right edge),
- * so the cat stays in view thinking and speaking next to the chat. Phones: above the dock, and out of the way
- * while the full-screen advisor is open.
+ * Bottom right (phones: above the dock). Opening: the cat shrinks away as the advisor grows out of its spot;
+ * closing: the advisor folds back into the corner and the cat pops out again (AppShell's AdvisorHost does the
+ * panel's half). Reduced motion: both only fade.
  */
-export function AdvisorFab({ open, onToggle, wide, beside, covered }: { open: boolean; onToggle: () => void; wide: boolean; beside: boolean; covered: boolean }) {
+export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; onToggle: () => void; wide: boolean; covered: boolean }) {
   const { phase, messages } = useChat()
   const answered = messages.at(-1)?.role === 'willow'
   const [hover, setHover] = useState(false)
@@ -78,35 +79,44 @@ export function AdvisorFab({ open, onToggle, wide, beside, covered }: { open: bo
   const state: AvatarState =
     phase === 'thinking' ? 'thinking' : phase === 'revealing' ? 'speaking' : happy ? 'happy' : hover || typing ? 'listening' : dozing && !open ? 'sleepy' : 'idle'
   const size = wide ? 64 : 58
+  const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const hidden = covered
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      onPointerEnter={() => setHover(true)}
-      onPointerLeave={() => setHover(false)}
-      onFocus={() => setHover(true)}
-      onBlur={() => setHover(false)}
-      aria-label="Advisor"
-      aria-pressed={open}
-      title={open ? 'Close the advisor' : 'Ask Willow'}
-      tabIndex={hidden ? -1 : undefined}
-      className="fixed z-[36] grid place-items-center rounded-full transition-[right,opacity,scale,translate] duration-[450ms] ease-spring hover:scale-[1.05] active:scale-[.94] active:duration-100 motion-reduce:hover:scale-100"
+    // The holder shows and hides the cat: it shrinks away as the advisor grows out of its spot, and pops back
+    // (a little overshoot) once the advisor has folded back into it. The button inside keeps hover and press.
+    <div
+      className="fixed z-[36]"
       style={{
         width: size,
         height: size,
-        // beside the open panel: its 12px inset + 440px width + a 16px gap
-        right: wide ? (beside ? 12 + 440 + 16 : 24) : 16,
+        right: wide ? 24 : 16,
         bottom: wide ? 20 : 'calc(max(14px, env(safe-area-inset-bottom)) + 76px)',
         opacity: hidden ? 0 : 1,
-        translate: hidden ? '0 12px' : '0 0',
+        scale: hidden && !reduced ? '0.4' : '1',
         pointerEvents: hidden ? 'none' : undefined,
-        // a soft shadow under the glass, tinted like its rim
-        boxShadow: '0 18px 34px -16px rgba(72,56,150,.5), 0 4px 10px -6px rgba(0,0,0,.25)',
+        transition: hidden
+          ? 'scale .2s var(--ease-exit), opacity .16s ease'
+          : // back once the panel has nearly folded away
+            'scale .55s var(--ease-bounce) .24s, opacity .2s ease .24s',
       }}
     >
-      <AssistantAvatar state={state} size={size} />
-      {open ? <span aria-hidden className="absolute -bottom-0.5 -left-0.5 size-3 rounded-full bg-selected shadow-[0_0_0_2px_rgba(250,250,248,.95)]" /> : null}
-    </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        onPointerEnter={() => setHover(true)}
+        onPointerLeave={() => setHover(false)}
+        onFocus={() => setHover(true)}
+        onBlur={() => setHover(false)}
+        aria-label="Advisor"
+        aria-expanded={open}
+        title="Ask Willow"
+        tabIndex={hidden ? -1 : undefined}
+        className="grid size-full place-items-center rounded-full transition-[scale] duration-300 ease-spring hover:scale-[1.05] active:scale-[.94] active:duration-100 motion-reduce:hover:scale-100"
+        // a soft shadow under the button, tinted like the cat's rim light
+        style={{ boxShadow: '0 18px 34px -16px rgba(72,56,150,.5), 0 4px 10px -6px rgba(0,0,0,.25)' }}
+      >
+        <AssistantAvatar state={state} size={size} />
+      </button>
+    </div>
   )
 }
