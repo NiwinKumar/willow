@@ -42,8 +42,11 @@ export const REGION_NAME: Record<string, string> = {
 
 export type RegionItem = { key: string; name: string; label: string; points: string; metrics: MetricId[] }
 
-/** The regions of a session's photo, each with the metrics this session actually measured there (in `order`). */
-export function regionItems(s: Session, order: MetricId[]): RegionItem[] {
+/**
+ * The regions of a session's photo, each with the metrics this session actually measured there (in `order`).
+ * `only`: the metrics this photo adds (a cheek photo of a check-in with cheek photos: its marks).
+ */
+export function regionItems(s: Session, order: MetricId[], only?: MetricId[]): RegionItem[] {
   const r = s.result
   if (!r?.rois?.length) return []
   const map = s.site === 'cheek_macro' || s.site === 'nose_macro' ? CLOSE_UP : s.site.startsWith('forearm') ? FOREARM : FACE
@@ -52,7 +55,7 @@ export function regionItems(s: Session, order: MetricId[]): RegionItem[] {
   return r.rois
     .filter((roi) => roi.polygon.length >= 3)
     .map((roi, i) => {
-      const own = map[roi.name] ?? []
+      const own = (map[roi.name] ?? []).filter((id) => !only || only.includes(id))
       const name = REGION_NAME[roi.name] ?? roi.name.replace(/_/g, ' ')
       // Close-ups can send several outlines with the same name: number them so each has its own label.
       const twins = r.rois!.filter((x) => x.name === roi.name).length

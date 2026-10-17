@@ -19,7 +19,7 @@ import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
 import { frameFor, photoSize } from './frame'
 import { MetricTile } from './MetricCard'
-import { DAY_HERO, MODE_LONG, bandOf, baselineFor, canBeBaseline, counts, daySession, dayStatus, optionLabel, orderMetrics, photoExpired, sessionState, usableLine, usedFrames } from './model'
+import { DAY_HERO, MODE_LONG, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, optionLabel, orderMetrics, photoExpired, sessionState, usableLine, usedFrames } from './model'
 import { Page, Pills } from './parts'
 import { PhotoFrame } from './PhotoFrame'
 import { NOTE_DOT, productName, rejectNote, sessionNotes } from './timeline'
@@ -153,9 +153,11 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
 
         {measured && ordered.length ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
-            {ordered.map((m, i) => (
-              <MetricTile key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : st === 'compared' ? bandOf(baseline, m.id) : null} baselineDay={baseline ? (fmtDate(baseline.created_at) === fmtDate(session.created_at) ? `baseline, ${clockOf(baseline.created_at)}` : fmtDate(baseline.created_at)) : null} delay={i * 60} />
-            ))}
+            {ordered.map((m, i) => {
+              // counts of a check-in with (or without) cheek photos compare with one taken the same way
+              const ref = referenceFor(m.id, session, baseline, sessions)
+              return <MetricTile key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null} baselineDay={ref ? (fmtDate(ref.created_at) === fmtDate(session.created_at) ? `${ref === baseline ? 'baseline' : 'check-in'}, ${clockOf(ref.created_at)}` : fmtDate(ref.created_at)) : null} delay={i * 60} />
+            })}
           </div>
         ) : null}
 

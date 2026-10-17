@@ -1,6 +1,7 @@
 /** Spot candidates of one session, named as the design names them, from real engine candidates and Gemini labels. */
 import type { Candidate, Session } from '../../data/types'
 import { HIDDEN_RINGS, SPOT_NAME, type LabelDetail } from '../../lib/spotLabels'
+import { candidateView, VIEW_ORDER } from './views'
 
 export type SpotItem = {
   n: number
@@ -18,8 +19,13 @@ export type SpotItem = {
 export function spotItems(s: Session): SpotItem[] {
   const r = s.result
   if (!r) return []
-  const frames = r.frames_used
-  return r.candidates.map((c, i) => {
+  // With cheek photos (one per side), "seen in" compares the front photos only; a cheek mark has no second photo.
+  const sides = Math.max(0, (r.views?.length ?? 1) - 1)
+  const frames = r.frames_used - sides
+  // Numbered in the order the list shows them: front photo, then left cheek, then right cheek.
+  const rank = (c: Candidate) => VIEW_ORDER.indexOf(candidateView(c))
+  const ordered = [...r.candidates].sort((a, b) => rank(a) - rank(b))
+  return ordered.map((c, i) => {
     const d = s.label_details?.[c.id] ?? null
     const hidden = Boolean(d && HIDDEN_RINGS.includes(d.label))
     const mole = d?.label === 'mole'
@@ -34,7 +40,7 @@ export function spotItems(s: Session): SpotItem[] {
       mole,
       // Ring hues tell the kinds apart on the photo; the list says the kind in words.
       ring: hidden ? 'var(--signal-noise)' : mole ? 'var(--aura-violet)' : c.kind === 'spot' ? 'var(--aura-apricot)' : 'var(--willow-400)',
-      agree: frames >= 2 && f !== undefined ? { seen: Math.round(f * frames), of: frames } : null,
+      agree: frames >= 2 && f !== undefined && !c.features?.view ? { seen: Math.round(f * frames), of: frames } : null,
     }
   })
 }

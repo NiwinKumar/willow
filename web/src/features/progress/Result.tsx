@@ -17,7 +17,7 @@ import { METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
 import { ExplanationCard, NextAction } from './ExplanationCard'
 import { MetricCard } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
-import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
+import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, referenceFor, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
 import { Crumb, Page, Pills, StatusCard, TomorrowSheet } from './parts'
 import { PhotoPanel, type DiaryFocus } from './PhotoPanel'
 import { heroFor } from './hero'
@@ -97,6 +97,17 @@ export default function Result() {
   // Spot diary (face only, live only).
   const diaryOn = site === 'face_full' && Boolean(owner) && Boolean(session) && state !== 'pending'
   const spots = useSpots()
+  // The spot diary draws its spots on the latest face photo it covers (with a preview).
+  const diaryPhoto = useMemo(() => {
+    const ids = spots.data?.sessions.map((x) => x.id) ?? []
+    for (const id of [...ids].reverse()) {
+      const s = siteSessions.find((x) => x.id === id)
+      if (s?.preview && s.result) return s
+    }
+    return null
+  }, [spots.data, siteSessions])
+  // Its front and cheek photos, signed (only the single-session view signs them).
+  const diaryPhotoView = useSessionView(diaryPhoto?.id ?? null)
   const trackId = params.get('track')
   const track = diaryOn && spots.data?.enough_data ? (spots.data.tracks.find((t) => t.id === trackId) ?? null) : null
   const stageRef = useRef<HTMLElement>(null)
@@ -337,6 +348,7 @@ export default function Result() {
     track && diary
       ? {
           bbox: obs?.bbox ?? null,
+          candidateId: obs?.candidate_id ?? null,
           tag: tagText(track, sIdx, diary),
           area: track.zone ? ZONE_NAME[track.zone] : 'Spot',
           status: statusText(track, diary),
@@ -411,7 +423,7 @@ export default function Result() {
               </div>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,270px),1fr))] gap-3.5">
                 {ordered.map((m: Metric, i) => (
-                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : bandOf(baseline, m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
+                  <MetricCard key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : bandOf(referenceFor(m.id, session, baseline, siteSessions), m.id)} compared={st === 'compared'} onOpen={() => showMetric(m.id)} delay={i * 60} />
                 ))}
               </div>
             </>
@@ -444,6 +456,8 @@ export default function Result() {
               selected={track?.id ?? null}
               onPick={pickTrack}
               onTake={() => shell.startCheckIn('face_full', mode)}
+              photo={diaryPhoto}
+              photoViews={diaryPhotoView?.session.views ?? []}
             />
           ) : null}
         </>
@@ -455,7 +469,7 @@ export default function Result() {
         </Link>
       </p>
       <Disclaimer />
-      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
+      <MetricSheet metric={openMetric} session={session} baseline={session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, siteSessions) : baseline} sessions={siteSessions} onClose={closeMetric} onAsk={(m) => {
           // The sheet is a modal <dialog> (top layer): close it, or the advisor opens hidden behind it.
           closeMetric()
           shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)

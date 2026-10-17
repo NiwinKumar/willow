@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Site } from '../../data/types'
 import { photoSteps } from '../../lib/baselineGuide'
 import { isCloseUp } from '../../lib/metrics'
+import { POSE_HINT, type Pose } from './model'
 
 export type CamPhase = 'ask' | 'starting' | 'live' | 'denied' | 'unavailable' | 'ended' | 'done'
 export type Facing = 'user' | 'environment'
@@ -47,9 +48,11 @@ async function holdCamera(track: MediaStreamTrack): Promise<void> {
  * 4 s live (or 8 s nearly passing) because laptop cameras often never pass, and the design's 3 s timer.
  * The checks only help framing: nothing is measured in the browser.
  */
-export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; taken: number; onShot: (file: File, url: string) => void }) {
+export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Site; n: number; taken: number; pose?: Pose; onShot: (file: File, url: string) => void }) {
   const faceSite = !site.startsWith('forearm')
   const closeUp = isCloseUp(site)
+  // A cheek photo (head turned about 45°) is lit unevenly by its shape: judged like a close-up.
+  const turned = pose !== 'front'
   const [phase, setPhase] = useState<CamPhase>('ask')
   const [facing, setFacing] = useState<Facing>(faceSite ? 'user' : 'environment')
   const [gates, setGates] = useState<Gates>({ light: false, even: false, still: false })
@@ -219,7 +222,7 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
       const motion = prev.current ? diff / N : 99
       prev.current = new Uint8ClampedArray(d)
       // A close-up shows one side of the face (often hair or background at an edge): only strong side light fails it.
-      const even = closeUp ? ratio > 0.6 && ratio < 1.6 : ratio > 0.8 && ratio < 1.25
+      const even = closeUp || turned ? ratio > 0.6 && ratio < 1.6 : ratio > 0.8 && ratio < 1.25
       const g: Gates = { light: mean > 0.32 && mean < 0.75 && clipped / N < 0.02, even, still: motion < 6 }
       // Same gates as last tick: keep the old object, so the camera view does not redraw five times a second.
       setGates((p) => (p.light === g.light && p.even === g.even && p.still === g.still ? p : g))
@@ -227,11 +230,11 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
       const now = performance.now()
       const settling = liveSince.current !== null && now - liveSince.current <= SETTLE_MS
       if (!g.light) setHint(mean <= 0.32 ? 'Find brighter light' : 'Too bright · turn away from the lamp')
-      else if (!g.even) setHint(closeUp ? 'Turn toward the light so it isn’t coming from one side' : 'One side is darker · face the light')
+      else if (!g.even) setHint(closeUp || turned ? 'Turn toward the light so it isn’t coming from one side' : 'One side is darker · face the light')
       else if (!g.still) setHint('Hold still')
       else if (settling) setHint('One moment · the camera is adjusting to the light')
       else if (takenRef.current > 0 && !movedSinceShot.current) setHint(between)
-      else setHint(closeUp ? (site === 'nose_macro' ? 'Nose in the middle, one eye still in view' : 'Cheek fills the frame, one eye still in view') : faceSite ? 'Good light · fill the oval, eyes on the lens' : 'Good light · all four dots and the paper in frame')
+      else setHint(turned ? POSE_HINT[pose as Exclude<Pose, 'front'>] : closeUp ? (site === 'nose_macro' ? 'Nose in the middle, one eye still in view' : 'Cheek fills the frame, one eye still in view') : faceSite ? 'Good light · fill the oval, eyes on the lens' : 'Good light · all four dots and the paper in frame')
       const all = g.light && g.even && g.still
       if (g.light && g.even) nearSince.current ??= now
       else nearSince.current = null
@@ -245,7 +248,7 @@ export function useCamera({ site, n, taken, onShot }: { site: Site; n: number; t
       }
     }, 200)
     return () => window.clearInterval(id)
-  }, [phase, faceSite, closeUp, site, between])
+  }, [phase, faceSite, closeUp, turned, pose, site, between])
 
   // Countdown: 1 s for auto-capture, 3 s for the design's timer; then the photo.
   useEffect(() => {

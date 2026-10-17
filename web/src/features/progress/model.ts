@@ -2,7 +2,7 @@
  * What a session is, in the words and shapes the Result, Progress and Product test screens draw. Every value
  * is derived from the api's sessions; verdict words only come from lib/verdict.ts.
  */
-import { baselineFor } from '../../data/live'
+import { baselineFor, referenceFor } from '../../data/live'
 import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
 import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
@@ -194,7 +194,7 @@ export function shortWhen(s: Session, all: Session[]): string {
   return day
 }
 
-export { baselineFor }
+export { baselineFor, referenceFor }
 
 /** Words for the advisor question about one metric, built only from measured values. */
 export function metricQuestion(m: Metric, s: Session, baseline: Session | null): string {
