@@ -128,3 +128,55 @@ def test_a_poor_photo_keeps_saying_so_and_a_deleted_reference_is_not_used():
     assert baselines.match_counts(store, "u", "c2", DOC, later, front_base) is None
     assert _metric(later, "blemishes")["verdict"] == "no_baseline"  # c1 is gone
     assert _metric(later, "pigment_spots")["verdict"] == "low_quality"
+
+
+def test_the_session_route_signs_each_view_photo(fake, client, monkeypatch):
+    # through the bucket listing: the views/ photos must be listed to be signed (they were not)
+    import json
+    from datetime import UTC, datetime
+
+    from app import storage
+
+    monkeypatch.setattr(
+        storage, "name_from_uri", lambda uri: uri.removeprefix("gs://test-bucket/") or None
+    )
+    vs = [
+        {
+            "view": v,
+            "frame_index": i,
+            "image_size": {"width": 1200, "height": 1600},
+            "preview_uri": f"gs://test-bucket/results/u_test/s_20261017_ab12cd34/views/{v}.jpg",
+            "redness_uri": f"gs://test-bucket/results/u_test/s_20261017_ab12cd34/overlays/redness_{v}.png",
+            "rois": [],
+        }
+        for i, v in enumerate(("front", "right", "left"))
+    ]
+    result = {
+        "site": "face_full",
+        "quality": {"passed": True},
+        "frames_used": 5,
+        "metrics": [],
+        "candidates": [],
+        "overlays": [],
+        "views": vs,
+    }
+    doc = {
+        "site": "face_full",
+        "status": "done",
+        "capture_mode": "uncalibrated",
+        "n_frames": 5,
+        "created_at": datetime(2026, 10, 17, tzinfo=UTC),
+        "result_json": json.dumps(result),
+        "measured": True,
+    }
+    fake.store.session_set("u_test", "s_20261017_ab12cd34", doc)
+    fake.put("results/u_test/s_20261017_ab12cd34/preview.jpg", content_type="image/jpeg")
+    for v in ("front", "right", "left"):
+        fake.put(f"results/u_test/s_20261017_ab12cd34/views/{v}.jpg", content_type="image/jpeg")
+        fake.put(
+            f"results/u_test/s_20261017_ab12cd34/overlays/redness_{v}.png", content_type="image/png"
+        )
+    body = client.get("/v1/sessions/s_20261017_ab12cd34").json()
+    got = body["session"]["views"]
+    assert [v["view"] for v in got] == ["front", "right", "left"]
+    assert all(v["preview"]["url"] and v["redness_url"] for v in got)
