@@ -123,6 +123,14 @@ RETAKE = {
     "facing a window or lamp.",
     "nose_macro": "Retake with the phone about 10 cm from your nose, one eye still in the photo, "
     "facing a window or lamp.",
+    "left_cheek_macro": "Retake with the phone about 10 cm from your left cheek, one eye still in "
+    "the photo, facing a window or lamp.",
+    "right_cheek_macro": "Retake with the phone about 10 cm from your right cheek, one eye still "
+    "in the photo, facing a window or lamp.",
+    "forehead_macro": "Retake with the phone about 10 cm from your forehead, hair back and your "
+    "brows still in the photo, facing a window or lamp.",
+    "chin_macro": "Retake with the phone about 10 cm from your chin, your lower lip still in the "
+    "photo, facing a window or lamp.",
 }
 RETAKE_DEFAULT = "Retake in the same light, holding the phone steady."
 
@@ -202,8 +210,9 @@ Rules:
   low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
 - Face sessions (site face_full) with frames_used of 2 or more: blemishes and dark spots count
-  only marks seen in at least two of the photos; say so if the count is low. Close-ups (cheek_macro,
-  nose_macro) average each photo's own count. Pores and texture come only from close-ups.
+  only marks seen in at least two of the photos; say so if the count is low. Close-ups (the
+  *_macro sites: cheek, left or right cheek, forehead, chin, nose) average each photo's own
+  count. Pores and texture come only from close-ups.
 - Never attribute causation with certainty; at most "may be linked to" a routine product, and only
   if it started before this session.
 - Skin tone (tone_ita) is descriptive: never better or worse, never lighter or darker as a goal.
