@@ -6,6 +6,7 @@ import { useAuth } from '../../../../lib/useAuth'
 import { blockedReasons, DAYS, DEFAULT_HOLDOUT, goalLabel, HOLDOUT_RANGE, MAX_ACTIVE, promoError, reachRange, skinLabel, type Days, type PromoError } from '../../promote'
 import type { ProductRow, Segments } from '../../types'
 import { Button, int, LiftValue, pct, ProductCell, ProofTierChip, SearchField, Segmented, SidePanel } from '../../ui'
+import { prefillSkins } from '../../proofAi'
 import { useView } from '../../useView'
 import { ErrorBox } from './CampaignCard'
 import { ShopperPreview } from './ShopperPreview'
@@ -17,9 +18,9 @@ const endDate = (days: number) => new Date(Date.now() + days * 86_400_000).toLoc
  * greyed with the reason on hover), 2 audience (the goals and skin types the evidence covers, all ticked; they
  * can only be narrowed), 3 duration and holdout, 4 the exact card a shopper will see. The api checks everything
  * again; its refusals (422 reasons, 429 cap) show above the footer. `?new=<product_id>` opens it with the
- * product chosen, or with the reasons it can't be promoted.
+ * product chosen (`&skins=` narrows the skin types, from a next step), or with the reasons it can't be promoted.
  */
-export function CreateCampaign({ open, onClose, eligible, blocked, all, brand, rows, workspace, initialProduct, running, onCreated, onShowCampaigns }: {
+export function CreateCampaign({ open, onClose, eligible, blocked, all, brand, rows, workspace, initialProduct, initialSkins = [], running, onCreated, onShowCampaigns }: {
   open: boolean
   onClose: () => void
   /** Products this workspace may promote. */
@@ -32,6 +33,8 @@ export function CreateCampaign({ open, onClose, eligible, blocked, all, brand, r
   rows: Map<string, ProductRow>
   workspace: { id: string; label: string }
   initialProduct: string | null
+  /** Skin types to tick for the link's product (a next step's segment); empty or uncovered = every covered one. */
+  initialSkins?: string[]
   running: number
   onCreated: (c: Campaign) => void
   /** Close and go to the campaigns list (the way out of a 429: pause one first). */
@@ -47,21 +50,24 @@ export function CreateCampaign({ open, onClose, eligible, blocked, all, brand, r
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<PromoError | null>(null)
 
-  const choose = (p: PromoEligibility | undefined) => {
+  const choose = (p: PromoEligibility | undefined, wanted: string[] = []) => {
     setProductId(p?.product_id ?? null)
     setGoals(p ? [...p.goals] : [])
-    setSkins(p ? [...p.skin_types] : [])
+    setSkins(p ? prefillSkins(p.skin_types, wanted) : [])
     setPicking(!p)
     setError(null)
   }
   // Each opening starts fresh, with the link's product when it can be promoted. (Adjusted while rendering, when
   // the panel opens or its product changes, rather than in an effect: no extra render with stale values.)
-  const opening = open ? `open|${initialProduct ?? ''}` : 'closed'
+  const opening = open ? `open|${initialProduct ?? ''}|${initialSkins.join(',')}` : 'closed'
   const [seen, setSeen] = useState('closed')
   if (opening !== seen) {
     setSeen(opening)
     if (open) {
-      choose(eligible.find((p) => p.product_id === initialProduct))
+      choose(
+        eligible.find((p) => p.product_id === initialProduct),
+        initialSkins,
+      )
       setDays(14)
       setHoldout(DEFAULT_HOLDOUT)
     }
