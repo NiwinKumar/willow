@@ -13,7 +13,7 @@ import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/ty
 import { useData } from '../../data/useData'
 import type { SpotTrack } from '../../lib/api'
 import { clockOf, fmtDate } from '../../lib/format'
-import { METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
+import { CLOSE_UPS, METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
 import { failureReasons } from '../../lib/warnings'
 import { ExplanationCard, NextAction } from './ExplanationCard'
 import { LAST_LIKE_THIS } from './headline'
@@ -223,7 +223,7 @@ export default function Result() {
   // ---- header controls ----
   const sitesWith = SITE_ORDER.filter((s) => (data.series(s)?.sessions.length ?? 0) > 0)
   const siteOptions: { value: SitePill; label: string }[] = [
-    ...(['face_full', 'cheek_macro', 'nose_macro'] as Site[]).filter((s) => s === 'face_full' || sitesWith.includes(s) || s === site).map((s) => ({ value: s as SitePill, label: SITE_LABEL[s] })),
+    ...(['face_full', ...CLOSE_UPS] as Site[]).filter((s) => s === 'face_full' || sitesWith.includes(s) || s === site).map((s) => ({ value: s as SitePill, label: SITE_LABEL[s] })),
     ...(sitesWith.some((s) => s.startsWith('forearm')) || site.startsWith('forearm') ? [{ value: 'forearm' as SitePill, label: 'Forearms' }] : []),
   ]
   const sitePill: SitePill = site.startsWith('forearm') ? 'forearm' : site

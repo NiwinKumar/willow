@@ -6,7 +6,7 @@ import type { LabelDetail } from './spotLabels'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
 
-export type Site = 'face_full' | 'cheek_macro' | 'nose_macro' | 'forearm_treated' | 'forearm_control'
+export type Site = 'face_full' | 'cheek_macro' | 'left_cheek_macro' | 'right_cheek_macro' | 'forehead_macro' | 'chin_macro' | 'nose_macro' | 'forearm_treated' | 'forearm_control'
 export type CaptureMode = 'calibrated_raw' | 'uncalibrated'
 
 export type UploadTarget = { index: number; object_uri: string; url: string; headers: Record<string, string> }

@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 import type { Site } from '../../data/types'
 import { photoSteps, WHY_FIVE } from '../../lib/baselineGuide'
-import { isCloseUp } from '../../lib/metrics'
+import { closeUpPlace, isCloseUp } from '../../lib/metrics'
 import { POSE_NAME, SITE_NAME, type Pose } from './model'
 import { useCamera } from './useCamera'
 
@@ -93,7 +93,7 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
               <>
                 <li>Hold the phone about 10 cm from your face (a hand’s width), much closer than a selfie: pores need that much detail.</li>
                 <li>Keep one eye in the photo: Willow measures size from your iris.</li>
-                <li>{site === 'nose_macro' ? 'Nose' : 'Cheek'} in the middle, facing a window or lamp. Hair back, nothing on the skin.</li>
+                <li>{closeUpPlace(site, true)} in the middle, facing a window or lamp. Hair back, nothing on the skin.</li>
                 <li>Use a phone: a laptop camera is too far away and too soft to show pores.</li>
               </>
             ) : (

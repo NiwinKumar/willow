@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { Site } from '../../data/types'
 import { photoSteps } from '../../lib/baselineGuide'
-import { isCloseUp } from '../../lib/metrics'
+import { closeUpPlace, isCloseUp } from '../../lib/metrics'
 import { POSE_HINT, type Pose } from './model'
 
 export type CamPhase = 'ask' | 'starting' | 'live' | 'denied' | 'unavailable' | 'ended' | 'done'
@@ -234,7 +234,7 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
       else if (!g.still) setHint('Hold still')
       else if (settling) setHint('One moment · the camera is adjusting to the light')
       else if (takenRef.current > 0 && !movedSinceShot.current) setHint(between)
-      else setHint(turned ? POSE_HINT[pose as Exclude<Pose, 'front'>] : closeUp ? (site === 'nose_macro' ? 'Nose in the middle, one eye still in view' : 'Cheek fills the frame, one eye still in view') : faceSite ? 'Good light · fill the oval, eyes on the lens' : 'Good light · all four dots and the paper in frame')
+      else setHint(turned ? POSE_HINT[pose as Exclude<Pose, 'front'>] : closeUp ? (site === 'nose_macro' ? 'Nose in the middle, one eye still in view' : `${closeUpPlace(site, true)} fills the frame, one eye still in view`) : faceSite ? 'Good light · fill the oval, eyes on the lens' : 'Good light · all four dots and the paper in frame')
       const all = g.light && g.even && g.still
       if (g.light && g.even) nearSince.current ??= now
       else nearSince.current = null

@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { MEASURED_SITES } from '../../lib/metrics'
-import { baselineLine, modeFacts, neededFor, pad2, SITE_CARD, SITE_MEASURES, SITE_NAME, SITES } from './model'
+import { baselineLine, modeFacts, neededFor, pad2, SITE_CARD, SITE_MEASURES, SITE_NAME, sitesFor } from './model'
 import { MonoEyebrow, SerifTitle } from './parts'
 
 /**
@@ -65,7 +65,7 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3.5">
-        {SITES.map((s) => {
+        {sitesFor(mode).map((s) => {
           const on = s === site
           const line = known ? baselineLine(sessionsOf(s), mode).text : 'Checking…'
           return (

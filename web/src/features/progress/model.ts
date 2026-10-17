@@ -6,7 +6,7 @@ import { baselineFor, referenceFor } from '../../data/live'
 import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
 import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
-import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, unitOf } from '../../lib/metrics'
+import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, isCloseUp, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
 
 export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick' }
@@ -207,7 +207,7 @@ export function metricQuestion(m: Metric, s: Session, baseline: Session | null):
 }
 
 export function siteHasSpots(site: Site): boolean {
-  return site === 'face_full' || site === 'cheek_macro' || site === 'nose_macro'
+  return site === 'face_full' || isCloseUp(site)
 }
 
 /** A session can become the baseline when it was analysed, measured and passed the quality check (api 409 otherwise). */
