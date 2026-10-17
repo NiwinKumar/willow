@@ -1773,3 +1773,66 @@ def product_eligibility(product_id: str) -> dict[str, Any] | None:
         return None
     f, _, _ = facts("mixed", "all")
     return _eligibility_entry(f, product_id)
+
+
+# ── AutoCampaign signals (app/autopilot.py) ───────────────────────────────────────────────
+
+
+def rising_goals(f: Facts) -> dict[str, dict[str, Any]]:
+    """Every goal whose share of people with a reading rose from the second-last to the last
+    month (both months 10+ people, the goal 10+ people in each): {goal: {from, to, n}}, whole
+    percents, as the brief's `rising_goal` card."""
+    people: dict[str, set[str]] = defaultdict(set)
+    goal_month: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for r in f.months:
+        people[r["month"]].add(r["user_hash"])
+        for g in cohort.goals_of(r["goals"]):
+            goal_month[(g, r["month"])].add(r["user_hash"])
+    months = [m for m in sorted(people) if len(people[m]) >= MIN]
+    if len(months) < 2:
+        return {}
+    a, b = months[-2], months[-1]
+    out = {}
+    for g in cohort.GOALS:
+        ka, kb = len(goal_month[(g, a)]), len(goal_month[(g, b)])
+        if ka < MIN or kb < MIN:
+            continue
+        sa, sb = _pct(ka / len(people[a])), _pct(kb / len(people[b]))
+        if sb > sa:
+            out[g] = {"from": sa, "to": sb, "n": len(people[b])}
+    return out
+
+
+def autopilot_signals() -> dict[str, Any]:
+    """What AutoCampaign rules watch, on cohort=mixed, range=all (the evidence shoppers see, as
+    campaign eligibility): per product its eligibility with tier, n and lift; the goals rising
+    month on month; and every skin type x goal group's unmet share. Raises when the rows are
+    unavailable."""
+    f, version, _ = facts("mixed", "all")
+    products = []
+    for pid in sorted(_catalog()[0]):
+        row = _stats(f, pid)["row"]
+        entry = _eligibility_entry(f, pid)
+        products.append(
+            entry
+            | {
+                "category": row["category"],
+                "n": row.get("n"),
+                "lift": row.get("lift"),
+                "lift_lo": row.get("lift_lo"),
+                "rate": row.get("rate"),
+                "base_rate": row.get("base_rate"),
+            }
+        )
+    cells = segments_view(f)["cells"]
+    return {
+        "version": version,
+        "cohort": cohort_label(f.cohort),
+        "products": products,
+        "rising": rising_goals(f),
+        "unmet": [
+            {"skin": c["skin"], "goal": c["goal"], "unmet": c["unmet"], "users": c["users"]}
+            for c in cells
+            if c["unmet"] is not None
+        ],
+    }

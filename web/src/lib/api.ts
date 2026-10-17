@@ -466,7 +466,65 @@ export const api = {
   listCampaigns: (token: string) => request<{ campaigns: Campaign[] }>(token, '/v1/retailer/campaigns'),
   updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' | 'ended' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
   deleteCampaign: (token: string, id: string) => request<void>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** AutoCampaign (api autopilot_routes.py): standing rules, their activity feed and the check that runs them. */
+  autopilot: (token: string) => request<AutopilotView>(token, '/v1/retailer/autopilot'),
+  createRule: (token: string, body: RuleBody) => request<AutoRule>(token, '/v1/retailer/autopilot/rules', { method: 'POST', ...json(body) }),
+  replaceRule: (token: string, id: string, body: RuleBody) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PUT', ...json(body) }),
+  toggleRule: (token: string, id: string, enabled: boolean) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PATCH', ...json({ enabled }) }),
+  deleteRule: (token: string, id: string) => request<void>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  parseRule: (token: string, text: string, workspace: string) => request<{ rule: RuleBody; sentence: string; missed: string[] }>(token, '/v1/retailer/autopilot/parse', { method: 'POST', ...json({ text, workspace }) }),
+  /** "Run check now"; `ifStale`: only when the last check is over 30 minutes old (the Campaigns page on open). */
+  runAutopilot: (token: string, ifStale = false) => request<AutopilotView & { result: AutopilotResult | null }>(token, `/v1/retailer/autopilot/run${ifStale ? '?if_stale=true' : ''}`, { method: 'POST' }),
+  autopilotAct: (token: string, activityId: string, act: 'approve' | 'dismiss' | 'undo') => request<AutopilotView & { campaign_id?: string; outcome?: string }>(token, `/v1/retailer/autopilot/activity/${encodeURIComponent(activityId)}/${act}`, { method: 'POST' }),
 }
+
+/** AutoCampaign (docs/RETAILER_INSIGHTS.md "AutoCampaign"). */
+export type RuleTrigger = 'proven' | 'new_segment' | 'rising_demand' | 'unmet_need'
+export type RuleLevel = 'suggest' | 'auto' | 'autopilot'
+export type RuleBody = {
+  name: string
+  /** 'retailer' or a catalog brand (a brand rule only touches its own products). */
+  workspace: string
+  enabled: boolean
+  level: RuleLevel
+  /** category null: every category; product_ids []: every product. */
+  scope: { category: string | null; product_ids: string[] }
+  /** goals []: any goal. unmet_min: unmet_need's share with no visible change by week 8 (0.3-0.9). */
+  trigger: { kind: RuleTrigger; goals: string[]; unmet_min: number }
+  conditions: { in_store: boolean; start_on: string | null; stop_after: string | null; monthly_cap: number | null }
+  action: { days: 7 | 14 | 30; holdout_pct: number; max_running: number }
+}
+export type AutopilotKind = 'proposed' | 'started' | 'paused' | 'resumed' | 'ended' | 'extended' | 'narrowed' | 'held' | 'undone' | 'summary'
+export type AutopilotActivity = {
+  id: string
+  at: string
+  kind: AutopilotKind
+  /** proposals: open | approved | dismissed; others: done | undone. */
+  status: string
+  text: string
+  rule_id: string | null
+  rule_name: string | null
+  level: RuleLevel | null
+  product_id: string | null
+  product: string | null
+  brand: string | null
+  image_url: string | null
+  campaign_id: string | null
+  proposal: ({ action: 'start' | 'pause' | 'resume' | 'end' | 'extend' | 'narrow' } & Record<string, unknown>) | null
+  numbers: { lift?: number | null; lift_lo?: number | null; n?: number | null }
+  can_undo: boolean
+}
+export type AutoRule = RuleBody & {
+  id: string
+  sentence: string
+  running: number
+  started: number
+  last_run_at: string | null
+  last_action: AutopilotActivity | null
+  created_at: string
+}
+export type AutopilotView = { rules: AutoRule[]; activity: AutopilotActivity[] }
+export type AutopilotResult = { ran_at: string; rules: number; started: number; proposed: number; paused: number; resumed: number; ended: number; extended: number; narrowed: number; held: number }
 
 /** Proof-gated promotion types (docs/CONTRACT.md section 3, docs/RETAILER_INSIGHTS.md). */
 export type SponsoredPlacement = 'routine'
@@ -540,6 +598,8 @@ export type Campaign = {
   starts_at: string
   ends_at: string
   created_at: string
+  /** Started by an AutoCampaign rule; null for one a person created. Missing from older api builds. */
+  rule?: { id: string; name: string } | null
   product: string | null
   brand: string | null
   category: string | null
