@@ -133,6 +133,7 @@ SIDE_HAIR_CHROMA = 0.9  # fill smaller holes (a 10 mm mark that lost colour stay
 SIDE_HAIR_MAX_LIGHTER_L = 2.0  # and at most this much lighter than the cheek (shine is lighter)
 SIDE_LIP_GUARD_MM = 4.0  # side views: band around the lips skipped by both mark searches
 SIDE_FOLD_GUARD_MM = 3.0  # side views: half-width of the nose-wing-to-mouth-corner fold guard
+SIDE_MARK_DEPTH_MM = 3.0  # side views: a mark's rim this far inside the face skin to count
 SIDE_SPOT_GUARD_OVERLAP = 0.2  # side views: a spot this much inside a shadow guard is shadow
 MAX_ABS_PITCH = 15.0  # laptop / webcam selfies sit at 8-12° (camera above the screen); ROIs stay on
 # the same skin up to 15° (canonical-mesh test in tests/test_pose.py), same as SIDE_MAX_PITCH
