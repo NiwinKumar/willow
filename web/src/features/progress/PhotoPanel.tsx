@@ -163,9 +163,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
               <SegmentedControl glass label="Which photo" options={views.map((v) => ({ value: v.view, label: VIEW_LABEL[v.view] }))} value={active} onChange={pickView} />
             </div>
           ) : null}
-          <span className={`pointer-events-none absolute left-[18px] rounded-pill bg-white/70 px-2 py-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2 ${multi ? 'top-[66px]' : 'top-[18px]'}`}>{caption}</span>
           {focus && overlay !== 'areas' ? (
-            <div className={`absolute inset-x-3.5 z-[5] ${multi ? 'top-[62px]' : 'top-11'} flex animate-[wRise_.35s_both] items-center gap-3 rounded-[22px] bg-surface/90 py-2.5 pr-2.5 pl-4 backdrop-blur-[14px]`}>
+            <div className={`absolute inset-x-3.5 z-[5] ${multi ? 'top-[62px]' : 'top-3.5'} flex animate-[wRise_.35s_both] items-center gap-3 rounded-[22px] bg-surface/90 py-2.5 pr-2.5 pl-4 backdrop-blur-[14px]`}>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-[15px]">{focus.area}</span>
                 <span className="text-[13px] text-ink-2">{focus.bbox && focusHere ? focus.status : 'Not seen on this photo'}</span>
@@ -179,10 +178,6 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             <span className="pointer-events-none absolute bottom-[72px] left-[18px] z-[5] max-w-[calc(100%-36px)] rounded-[16px] bg-white/80 px-3 py-2 text-[12px] leading-[1.35]">
               {redFailed ? 'The redness map could not be loaded. Reload the page to try again.' : 'Marked: where the camera sees more red than your usual skin. Not a medical assessment.'}
             </span>
-          ) : session.preview && overlay === 'areas' && !openRegion ? (
-            <span className="pointer-events-none absolute bottom-[72px] left-[18px] z-[5] max-w-[calc(100%-36px)] rounded-[16px] bg-white/80 px-3 py-2 text-[12px] leading-[1.35]">
-              The areas Willow measured. Tap one to see what is read there.
-            </span>
           ) : null}
           {session.preview && options.length ? <OverlayPicker options={options} value={overlay} onChange={setOverlay} /> : null}
           {hold.armed && baseline && baseBox ? (
@@ -192,6 +187,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             </div>
           ) : null}
         </div>
+        {/* What photo this is, on the card under the photo (over it, it covered the face). */}
+        <span className="px-2 pb-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
         {openRegion ? <RegionCard region={openRegion} onOpen={onOpenMetric} onClose={() => setRegion(null)} /> : null}
         {canCompare ? (
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5 pb-1">
