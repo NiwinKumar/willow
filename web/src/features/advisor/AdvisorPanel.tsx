@@ -20,7 +20,7 @@ import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
 import { ask, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
-import { AnswerOrb, Water } from './Water'
+import { useComposing, WispMark, wispState } from './Wisp'
 
 const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
 
@@ -33,7 +33,7 @@ function resetTime(resetsAt?: string): string {
 
 /**
  * The advisor (design: Willow App Routine, view="advisor"), drawn inside the shell's glass panel: header
- * (close + "■ ADVISOR" + what it reads), the one chat, and the composer. Gemini answers from the person's
+ * (close + "■ WISP" + what it reads), the one chat, and the composer. Gemini answers from the person's
  * own sessions, routine and the catalog (api/app/advisor.py); every number is checked there.
  */
 export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull }: { seed: AdvisorSeed | null; onClose: () => void; full?: boolean; onToggleFull?: () => void }) {
@@ -42,7 +42,7 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className={`relative z-[3] flex min-h-[52px] flex-none items-center gap-2.5 px-3.5 pt-3 ${full ? 'mx-auto w-full max-w-[960px]' : ''}`}>
-        <button type="button" onClick={onClose} aria-label="Close advisor" title="Close · Esc" className="hit44 grid size-10 place-items-center rounded-[16px] bg-ink/5 transition-colors hover:bg-ink/10 squircle">
+        <button type="button" onClick={onClose} aria-label="Close Wisp" title="Close · Esc" className="hit44 grid size-10 place-items-center rounded-[16px] bg-ink/5 transition-colors hover:bg-ink/10 squircle">
           <X size={16} strokeWidth={1.8} aria-hidden />
         </button>
         {onToggleFull && !phone ? (
@@ -51,12 +51,12 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
             {full ? 'Collapse' : 'Expand'}
           </button>
         ) : null}
-        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ ADVISOR</span>
+        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ WISP</span>
         {data.mode === 'live' ? <ContextChip /> : null}
       </div>
       {data.mode === 'demo' ? (
         <div className="p-4">
-          <AvailableInOwnAccount compact what="The advisor reads your own results and routine, so it and your routine" />
+          <AvailableInOwnAccount compact what="Wisp reads your own results and routine, so it and your routine" />
         </div>
       ) : (
         <Chat seed={seed} full={full} onExitFull={full ? onToggleFull : undefined} />
@@ -117,7 +117,7 @@ function ContextChip() {
             {chat.aiDown ? 'AI off right now · standard explanations' : chat.remaining !== null ? `${chat.remaining} question${chat.remaining === 1 ? '' : 's'} left today` : 'A daily question limit applies.'}
             <span className="text-ink-2">Resets daily at {resetTime(chat.usage?.resets_at)} your time.</span>
           </span>
-          <span className="text-[12px] leading-[1.45] text-ink-2">The advisor can’t diagnose and won’t quote a number Willow didn’t measure.</span>
+          <span className="text-[12px] leading-[1.45] text-ink-2">Wisp can’t diagnose and won’t quote a number Willow didn’t measure.</span>
         </div>
       ) : null}
     </div>
@@ -259,11 +259,11 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-4 pt-2">
       {started ? (
         <div className={`flex items-center gap-2.5 py-1 ${column}`}>
-          <div className="relative h-[34px] w-7 flex-none">
-            <Water small busy={busy} />
-          </div>
+          <span className="flex-none">
+            <WispMark size={40} state={wispState(chat.phase)} />
+          </span>
           <div className="flex flex-1 flex-col gap-0.5">
-            <span className="text-[15px]">Advisor</span>
+            <span className="text-[15px]">Wisp</span>
             <span className="text-[12px] text-ink-2" aria-live="polite">
               {status}
             </span>
@@ -290,11 +290,9 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
         >
           {started ? null : (
             <div className="flex flex-col items-center gap-3 text-center" style={{ animation: 'wRise .5s both' }}>
-              <div className="relative h-[min(29vw,110px,12vh)] w-[min(24vw,92px,10vh)]">
-                <Water busy={false} />
-              </div>
+              <EmptyWisp />
               <h2 className="font-serif text-[26px] leading-none font-normal">Ask about your results</h2>
-              <p className="max-w-[440px] leading-[1.5] text-ink-2">Answers use your measured results, your routine and the product catalog. The advisor can’t diagnose, and it won’t quote a number Willow didn’t measure.</p>
+              <p className="max-w-[440px] leading-[1.5] text-ink-2">Answers use your measured results, your routine and the product catalog. Wisp can’t diagnose, and won’t quote a number Willow didn’t measure.</p>
               {chat.history === 'loading' ? (
                 <span role="status" className="text-[12px] text-ink-2">
                   Loading your earlier conversation…
@@ -327,7 +325,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
               <div role="status" className="flex items-center gap-2.5 rounded-[18px] bg-cta px-3.5 py-3">
                 <span className="font-dot text-[32px]">{chat.usage ? String(chat.usage.cap).padStart(2, '0') : '00'}</span>
                 <span className="text-[13.5px] leading-[1.45]">
-                  {chat.capMessage} The advisor resets daily at {resetTime(chat.usage?.resets_at)} your time. Results, routine and the compatibility check still work.
+                  {chat.capMessage} Wisp resets daily at {resetTime(chat.usage?.resets_at)} your time. Results, routine and the compatibility check still work.
                 </span>
               </div>
             ) : null}
@@ -382,7 +380,7 @@ function Thinking({ stages }: { stages: AdvisorStage[] }) {
   const done = steps.slice(0, -1)
   return (
     <div role="status" className="flex items-start gap-3" style={{ animation: 'wRise .3s both' }}>
-      <AnswerOrb breathing />
+      <WispMark size={34} state="thinking" />
       <div className="flex min-w-[220px] flex-col gap-1.5 rounded-[8px_24px_24px_24px] bg-surface px-3.5 py-3">
         {done.map((w) => (
           <span key={w} className="flex items-center gap-2 text-[12.5px] text-ink-2" style={{ animation: 'advIn .35s both' }}>
@@ -610,4 +608,10 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
       {left < 100 ? <span className="px-4 text-right text-[11px] text-ink-2">{left} characters left</span> : null}
     </div>
   )
+}
+
+/** Wisp on the empty chat: idle, and listening while the person writes a question. */
+function EmptyWisp() {
+  const composing = useComposing()
+  return <WispMark size={112} state={composing ? 'listening' : 'idle'} />
 }

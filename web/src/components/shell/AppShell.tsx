@@ -191,7 +191,7 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
   // Scale about the cat button's centre (the panel's layout box, offsetLeft/Top, ignores the scale itself).
   useLayoutEffect(() => {
     const el = panel.current
-    const cat = document.querySelector<HTMLElement>('button[aria-label="Advisor"]')?.parentElement
+    const cat = document.querySelector<HTMLElement>('button[aria-label="Wisp"]')?.parentElement
     if (!el || !cat) return
     const r = cat.getBoundingClientRect()
     el.style.transformOrigin = `${r.left + r.width / 2 - el.offsetLeft}px ${r.top + r.height / 2 - el.offsetTop}px`
@@ -221,7 +221,7 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
     const a = document.activeElement
     if (!a || a === document.body || el.contains(a)) {
       // The opener may be gone (an "Ask" inside a sheet that closed): fall back to the Advisor button.
-      const trigger = [...document.querySelectorAll<HTMLElement>('button[aria-label="Advisor"]')].find((b) => b.getClientRects().length > 0)
+      const trigger = [...document.querySelectorAll<HTMLElement>('button[aria-label="Wisp"]')].find((b) => b.getClientRects().length > 0)
       ;(back.current?.isConnected ? back.current : trigger)?.focus({ preventScroll: true })
     }
   }, [open])
@@ -230,7 +230,7 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
     <div
       ref={panel}
       role="dialog"
-      aria-label="Advisor"
+      aria-label="Wisp"
       aria-modal={phone || full || undefined}
       aria-hidden={!open}
       inert={!open}
@@ -256,7 +256,7 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
       }}
     >
       {mounted ? (
-        <Suspense fallback={<WillowLoader inline label="Opening the advisor" />}>
+        <Suspense fallback={<WillowLoader inline label="Opening Wisp" />}>
           <AdvisorPanel seed={seed} onClose={onClose} full={full} onToggleFull={onToggleFull} />
         </Suspense>
       ) : null}

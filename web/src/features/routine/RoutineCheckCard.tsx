@@ -133,7 +133,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                       </button>
                     ) : null}
                     <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-11 rounded-pill bg-white/[.16] px-4 text-[13px] transition-colors hover:bg-white/[.26]">
-                      Ask the advisor why →
+                      Ask Wisp why →
                     </button>
                   </span>
                 </article>

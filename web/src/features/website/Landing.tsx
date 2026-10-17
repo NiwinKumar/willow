@@ -279,7 +279,7 @@ function WaysIn({ returning }: { returning: boolean }) {
           className={`${wayCard} text-white hover:text-white`}
           style={{ background: 'radial-gradient(60% 50% at 50% 20%, #B8B4FF 0%, transparent 70%), linear-gradient(180deg, #5E64D6 0%, #2B2E8C 55%, #0E0F33 100%)' }}
         >
-          <WayText tag={`JUDGE TOUR · ${JUDGE_STOPS.length} STOPS`} title="Guided tour, guest access" body="Sample run, proof journey, advisor, routine scan, retailer insights." />
+          <WayText tag={`JUDGE TOUR · ${JUDGE_STOPS.length} STOPS`} title="Guided tour, guest access" body="Sample run, proof journey, Wisp the assistant, routine scan, retailer insights." />
         </Link>
       </div>
     </section>
