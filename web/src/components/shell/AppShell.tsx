@@ -10,6 +10,7 @@ import { prefs } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
 import { WillowLoader } from '../willow/WillowLoader'
 import { CanvasBlobs } from './CanvasBlobs'
+import { AdvisorFab } from './AdvisorFab'
 import { Dock } from './Dock'
 import { Header } from './Header'
 import { ModeBanner } from './ModeBanner'
@@ -140,7 +141,7 @@ export function AppShell() {
   const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   return (
     <ShellContext.Provider value={api}>
-      <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-10" style={pad}>
+      <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
         <CanvasBlobs />
         <div inert={covered || undefined}>
         <ModeBanner />
@@ -154,8 +155,6 @@ export function AppShell() {
             }}
             onCheckIn={() => setCheckIn({ open: true })}
             due={due}
-            advisorOpen={advisor.open}
-            onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())}
             name={me.short}
             initials={me.initials}
           />
@@ -165,8 +164,9 @@ export function AppShell() {
         <div className="relative z-[1]">
           <Outlet />
         </div>
-        {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} onAdvisor={() => (advisor.open ? closeAdvisor() : openAdvisor())} advisorOpen={advisor.open} />}
+        {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} />}
         </div>
+        <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} sidebarWidth={collapsed ? 65 : 212} covered={covered} />
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />
         {checkIn.open ? (
           <Suspense fallback={null}>
