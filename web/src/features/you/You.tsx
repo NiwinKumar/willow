@@ -640,7 +640,7 @@ function DeleteCard() {
         <button
           type="button"
           onClick={() => {
-            void removeAccount().then(() => navigate('/', { replace: true }))
+            void removeAccount().then(() => navigate('/about', { replace: true }))
           }}
           className={`${btn} self-start bg-white text-ink`}
         >

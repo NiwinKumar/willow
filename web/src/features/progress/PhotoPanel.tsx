@@ -72,8 +72,9 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const shown = useMemo(() => (rv && sv ? viewSession(session, rv, sv.preview) : session), [session, rv, sv])
   const pickView = (v: ViewName) => setViewPick({ sid: session.id, focusId, v })
 
-  const items = multi ? allItems.filter((it) => candidateView(it.c) === active) : allItems
-  const box = useMemo(() => frameFor(shown.site, shown.result, photoSize(shown)), [shown])
+  // Only the marks on the photo shown: without the cheek photos (still loading, failed, older sessions) that is the front.
+  const items = allItems.filter((it) => candidateView(it.c) === active)
+  const box = useMemo(() => frameFor(shown.site, shown.result, photoSize(shown), active), [shown, active])
   const regions = useMemo(() => regionItems(shown, order, active === 'front' ? undefined : SIDE_METRICS), [shown, order, active])
   const visible = items.filter((it) => showHidden || !it.hidden)
   const listed = allItems.filter((it) => showHidden || !it.hidden)
@@ -92,7 +93,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const missing = expired ? 'Photos are deleted 30 days after upload. The measurements stay.' : 'No photo preview for this check-in. The numbers are measured from your photos.'
   const caption = `${session.capture_mode === 'uncalibrated' ? 'QUICK PHOTO' : 'MEASURED REFERENCE PHOTO'} · ${fmtDate(session.created_at).toUpperCase()}${session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''}`
   // The diary's box is in the pixels of the photo its spot was found on.
-  const focusHere = !multi || !focusItem || candidateView(focusItem.c) === active
+  const focusHere = !focusItem || candidateView(focusItem.c) === active
   const focusPos = focus?.bbox && focusHere ? toPct(box, focus.bbox[0] + focus.bbox[2] / 2, focus.bbox[1] + focus.bbox[3] / 2) : null
   const focusSize = focus?.bbox ? Math.min(64, Math.max(28, (Math.max(focus.bbox[2], focus.bbox[3]) / box.w) * 420 + 14)) : 0
 

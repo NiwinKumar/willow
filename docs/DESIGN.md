@@ -511,7 +511,7 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 
 | # | Screen | Built reference | Components (in order) | Layout |
 |---|---|---|---|---|
-| 01 | Landing | `Willow.dc.html` | Logo → Hero (greeting serif + display-xl, blurred floral aura) → Button primary “Explore a real journey” → Button glass “Try with sample photos” → Button glass “Try your own selfie” → Sign-in row: Google · Continue as guest → How it works (3 cards) → Disclaimer | Phone: stacked, buttons full-width 52px. Desktop: hero left 7 cols, ways-in card right 5 cols. |
+| 01 | Landing (`/about`; `/` is the front door: returning people go to Home, new people to onboarding `/welcome`) | `Willow.dc.html` | Logo → Hero (greeting serif + display-xl, blurred floral aura) → Button primary “Explore a real journey” → Button glass “Try with sample photos” → Button glass “Try your own selfie” → Sign-in row: Google · Continue as guest → How it works (3 cards) → Disclaimer | Phone: stacked, buttons full-width 52px. Desktop: hero left 7 cols, ways-in card right 5 cols. |
 | 02 | Consent | `Willow.dc.html#consent` | ProgressStepper → h1 → ConsentBlock × 3 (photos stored, used for measuring, optional anonymised research) → Button primary Continue (disabled until required) → Disclaimer | Single column max 560px at all widths. |
 | 03 | Goal picker | `Willow.dc.html#goals` | ProgressStepper → h1 “Choose up to 3 goals” → GoalTile × 7 (groups) → Live count text → Button primary | Phone 2 cols; tablet 3; desktop 4 within 880px. |
 | 04 | Capture guide | `Willow Capture.dc.html#guide` | ModePicker → CaptureChecklistItem × 7 (line illustrations) → Button primary “Open camera” | Phone: full-screen flow, no dock. Desktop: centred sheet 720px. |
