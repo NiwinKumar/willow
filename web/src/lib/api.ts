@@ -119,6 +119,18 @@ export type SpotZoneSummary = {
   /** Only once 3+ marks here have faded; null before that. */
   typical_days_visible: { at_least: number; at_most: number; from: number } | null
 }
+/** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
+ * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
+ * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
+export type MetricStory = {
+  metric_id: string
+  points: string[]
+  reasons: string[]
+  source: 'gemini' | 'facts'
+  products: { name: string; brand: string; use: { days_used: number; of_days: number } | null }[]
+  has_previous: boolean
+}
+
 export type SpotDiary = {
   sessions: { id: string; created_at: string; day: number; photo_url: string | null; marks: number }[]
   tracks: SpotTrack[]
@@ -357,6 +369,8 @@ export const api = {
   listSessions: (token: string, site?: Site) =>
     request<{ sessions: SessionView[] }>(token, `/v1/sessions${site ? `?site=${site}` : ''}`),
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
+  /** What changed for one metric since the previous check-in, in points (api app/metric_story.py). */
+  metricStory: (token: string, sessionId: string, metricId: string) => request<MetricStory>(token, `/v1/sessions/${sessionId}/story/${metricId}`),
   patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
   /** `force`: measure a done session again with every frame (counts as an analysis). */
