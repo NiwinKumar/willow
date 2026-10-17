@@ -24,7 +24,7 @@ const HONEST = [
   ['Numbers come from computer vision only.', 'Gemini never measures, scores skin, guesses age or tone, or diagnoses.'],
   ['Every Gemini answer is structured JSON checked against a schema.', 'A reply that does not fit is retried, then replaced by a plain template.'],
   ['Every number Gemini writes is checked.', 'A digit that is not in your measurements, your routine or a tool result rejects the answer.'],
-  ['Products come only from tool calls.', 'The advisor can name a product only if the catalog search or comparison returned it.'],
+  ['Products come only from tool calls.', 'Wisp can name a product only if the catalog search or comparison returned it.'],
   ['Routine clashes come from a rule table in code.', 'Gemini may add a finding, marked as AI-suggested, never remove one.'],
   ['The retailer assistant sees aggregates only.', 'No rows, groups under 10 people hidden; chart labels and values must exist in the data.'],
 ] as const
@@ -181,7 +181,7 @@ export default function Judge() {
     },
     {
       id: 'advisor',
-      title: 'Advisor',
+      title: 'Wisp',
       tag: 'LIVE AI · TOOL CALLS',
       body: 'Gemini reads your results and routine, calls the catalog and the routine checker as tools, and may quote only measured numbers. The steps it took are shown with each answer.',
       cta: 'Ask a question',

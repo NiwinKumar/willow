@@ -117,7 +117,7 @@ export function NextStepCard({ title, body, onRoutine, onAsk, className }: { tit
       <div className="mt-auto flex flex-wrap gap-1.5">
         <Pill onClick={onRoutine}>Look at routine</Pill>
         <Pill tone="outline" onClick={onAsk}>
-          Ask the advisor
+          Ask Wisp
         </Pill>
       </div>
     </HomeCard>

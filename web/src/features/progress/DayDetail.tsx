@@ -196,7 +196,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
                   )
                 }
               >
-                Ask the advisor about this day
+                Ask Wisp about this day
               </button>
             </section>
           </div>

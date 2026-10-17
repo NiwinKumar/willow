@@ -373,7 +373,7 @@ function PrivacyCard() {
     // Same retention as the consent (Welcome): previews and spot close-ups live under results/, which the bucket deletes at 30 days.
     ['Original photos and previews', 'Deleted 30 days after upload'],
     ['Measurements', 'Kept until you delete them'],
-    ['AI use', 'Explanations, spot labels, label reading, routine check, advisor'],
+    ['AI use', 'Explanations, spot labels, label reading, routine check, Wisp (the assistant)'],
     ['Scope', 'Cosmetic appearance only'],
   ]
   return (
@@ -400,7 +400,7 @@ function PrivacyCard() {
       <details className="text-[14px] leading-[1.55]">
         <summary className="flex min-h-11 cursor-pointer items-center">{consent ? 'Read the consent you agreed to' : 'Read the consent'}</summary>
         <p className="mt-1.5 mb-0 text-[#3E3C38]">
-          Willow stores your original photos privately for 30 days, then deletes them, with their small previews and spot close-ups. Measurements, verdicts and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers the advisor; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
+          Willow stores your original photos privately for 30 days, then deletes them, with their small previews and spot close-ups. Measurements, verdicts and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers your questions to Wisp; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
         </p>
       </details>
     </Panel>
