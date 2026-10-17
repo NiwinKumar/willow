@@ -97,6 +97,15 @@ export default function Result() {
   // Spot diary (face only, live only).
   const diaryOn = site === 'face_full' && Boolean(owner) && Boolean(session) && state !== 'pending'
   const spots = useSpots()
+  // The spot diary draws its spots on the latest face photo it covers (with a preview).
+  const diaryPhoto = useMemo(() => {
+    const ids = spots.data?.sessions.map((x) => x.id) ?? []
+    for (const id of [...ids].reverse()) {
+      const s = siteSessions.find((x) => x.id === id)
+      if (s?.preview && s.result) return s
+    }
+    return null
+  }, [spots.data, siteSessions])
   const trackId = params.get('track')
   const track = diaryOn && spots.data?.enough_data ? (spots.data.tracks.find((t) => t.id === trackId) ?? null) : null
   const stageRef = useRef<HTMLElement>(null)
@@ -445,6 +454,7 @@ export default function Result() {
               selected={track?.id ?? null}
               onPick={pickTrack}
               onTake={() => shell.startCheckIn('face_full', mode)}
+              photo={diaryPhoto}
             />
           ) : null}
         </>
