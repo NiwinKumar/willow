@@ -84,3 +84,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Web: Campaigns shows Reach (people) by default with Impressions as an optional column; the header says "N people reached" (each campaign's people summed); the row menu and the campaign panel offer "End campaign…" with an in-page confirm; an ended-early campaign reads "ended early after 1 day of 14". Older api builds without `reach` fall back to impressions.
 - Existing campaigns: impressions before this change carry no `seen` mark, so their reach starts counting from now.
 - Approved by: n/a (api and web are both Niwin's)
+
+## 2026-10-17: How a product feels, self-reported (proposed by Niwin; api/web only)
+- Why: people judge a product by look and feel weeks before photos can show a change, and that is when they keep or drop it. Brands want consumer perception next to measured change, and the advisor can tailor advice to it.
+- Change: `PUT /v1/routine/{id}/feel`; `feel` / `feel_history` on routine entries (Firestore and responses); `routine_flat` gains `feel`, `feel_week`, `feel_tags`; Proof product rows gain `felt`, `felt_n`; the product view gains `feel`; brief card `feel_gap`. Self-reported answers never change a tier, the evidence pack, campaign eligibility or a measurement. Rows in `docs/CONTRACT.md`.
+- Impact: engine none; schemas none; api and web only.
+- Approved by: n/a (api and web, both Niwin's)
