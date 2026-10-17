@@ -19,7 +19,10 @@ gcloud run deploy willow-api --source api --region us-central1 \
 # once the reminders block of setup.sh has run, add (secrets mounted as env vars, not in the yaml):
 #   --update-secrets=VAPID_PRIVATE_KEY=willow-vapid-private:latest,VAPID_PUBLIC_KEY=willow-vapid-public:latest
 
-# web (VITE_API_URL is the api's Cloud Run URL)
+# web (VITE_API_URL is the api's Cloud Run URL). The Firebase web config (VITE_FIREBASE_*) is not in the repo:
+# put web/.env.local (from the team) in place first, or the build ships without it and sign-in fails
+# (auth/invalid-api-key, the app stuck on "Opening Willow"). App routes are served no-cache (firebase.json),
+# so a new deploy reaches everyone on their next load; hashed /assets are cached for a year.
 cd web && VITE_API_URL=https://willow-api-hrlt7lqdwa-uc.a.run.app npm run build && cd .. && firebase deploy --only hosting
 ```
 
