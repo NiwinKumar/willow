@@ -1,10 +1,10 @@
 import { useState } from 'react'
 
+import { Toggle } from '../../components/ui/Toggle'
 import type { CaptureMode, Session, Site } from '../../data/types'
-import { DONT_VARY } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
-import { checklist, GUIDE_BG, kindOf, lightroomSteps, pad2, SITE_NAME } from './model'
+import { canAddCheeks, checklist, hasCheeks, GUIDE_BG, kindOf, lightroomSteps, pad2, POSE_NAME, shotPoses, SITE_NAME } from './model'
 
 const NOTE_CHIPS = ['New lamp', 'After a workout', 'Skipped products today']
 
@@ -19,6 +19,9 @@ export function GuideStep(props: {
   n: number
   baseline: Session | null
   thin: boolean
+  /** Face check-ins of 3+ photos: the last two show the left and the right cheek. */
+  cheeks: boolean
+  onCheeks: (v: boolean) => void
   goals: string[]
   note: string
   deviation: boolean
@@ -29,11 +32,19 @@ export function GuideStep(props: {
   onSite: (s: Site) => void
   onChangePlace: () => void
 }) {
-  const { site, mode, n, baseline, thin, goals, note, deviation } = props
+  const { site, mode, n, baseline, thin, cheeks, goals, note, deviation } = props
+  const poses = shotPoses(site, n, cheeks)
+  const total = poses.length
+  const sides = total > n || poses.some((p) => p !== 'front')
+  // A baseline taken the other way: the counts compare with the check-ins taken this way instead.
+  const otherWay = Boolean(baseline && hasCheeks(baseline) !== cheeks)
   const raw = mode === 'calibrated_raw'
   const kind = kindOf(site)
   const first = n === 5
-  const items = checklist(site, mode)
+  // Truly new here (not restarting a baseline): nothing earlier to match, so no "as last time" and no
+  // "Anything different today?" (different from what?). Both come back from the next session.
+  const firstTime = first && !baseline
+  const items = checklist(site, mode, firstTime)
   const [ticks, setTicks] = useState<boolean[]>(() => items.map(() => false))
   const [rawOpen, setRawOpen] = useState(!prefs.lightroomDone())
   const [rawDone, setRawDone] = useState(prefs.lightroomDone)
@@ -41,10 +52,13 @@ export function GuideStep(props: {
   const name = SITE_NAME[site]
   const modeName = raw ? 'RAW' : 'quick'
 
+  // First sessions: just how to take the photos, in plain words (why 5 photos is explained elsewhere).
+  const again = kind === 'arm' ? 'point it at the four dots again' : kind === 'close' ? 'bring it back a hand’s width from your face' : 'line your face up in the oval again'
+  const howTo = `Take one photo at a time. After each one, lower the phone, then ${again}. Same spot, same light.`
   const body = first
     ? thin && baseline
-      ? `Your ${modeName} baseline from ${fmtDate(baseline.created_at)} has too few usable photos to know your normal range. Take ${n} today; from its result you can make this check-in your baseline.`
-      : `Moving the phone away and back between shots shows how much a reading wobbles on its own. That spread becomes your personal noise band; later a change only counts if it is bigger. ${name} in ${modeName} mode keeps its own baseline.`
+      ? `Your last baseline had too few clear photos, so let’s take ${n} new ones. ${howTo}`
+      : howTo
     : baseline
       ? `Your ${modeName} baseline for ${name.toLowerCase()} is from ${fmtDate(baseline.created_at)}. Matching its light, pose and distance keeps today’s reading comparable.${kind === 'arm' ? ' Check in the other arm right after this one.' : ''}`
       : `Your earlier ${modeName} photos for ${name.toLowerCase()} are saved. Matching their light, pose and distance keeps today’s reading comparable.`
@@ -61,23 +75,23 @@ export function GuideStep(props: {
             ■ {name.toUpperCase()} · {raw ? 'RAW' : 'QUICK'} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
           </span>
           <h1 id="ck-title" tabIndex={-1} className="mt-[18px] mb-0 text-[clamp(30px,3.4vw,44px)] leading-[1.05] font-light tracking-[-0.02em] outline-none">
-            {first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
+            {sides ? `${total} photos: ${total - 2} facing the camera, then each cheek.` : first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
           </h1>
         </div>
-        <div className="flex items-center justify-center gap-[clamp(8px,2vw,18px)]" role="img" aria-label={`${n} photos`}>
-          {Array.from({ length: n }, (_, i) => (
+        <div className="flex items-start justify-center gap-[clamp(8px,2vw,18px)]" role="img" aria-label={sides ? `${total} photos: ${total - 2} facing the camera, then the left and the right cheek` : `${n} photos`}>
+          {poses.map((pose, i) => (
             <span key={i} className="flex flex-col items-center gap-2.5">
               <span
-                className="h-[clamp(52px,8vw,80px)] w-[clamp(40px,6vw,62px)] rounded-full border-[1.5px] border-dashed border-white/65"
-                style={{ background: 'radial-gradient(circle at 50% 40%, rgba(255,255,255,.25), transparent 70%)', rotate: `${(i - (n - 1) / 2) * 6}deg`, animation: `wBreathe 4s ease-in-out ${-i * 0.6}s infinite` }}
+                className={`h-[clamp(52px,8vw,80px)] rounded-full border-[1.5px] border-dashed border-white/65 transition-[width] duration-300 ${pose === 'front' ? 'w-[clamp(40px,6vw,62px)]' : 'w-[clamp(30px,4.5vw,46px)]'}`}
+                style={{ background: `radial-gradient(circle at ${pose === 'left' ? 35 : pose === 'right' ? 65 : 50}% 40%, rgba(255,255,255,.25), transparent 70%)`, rotate: `${(i - (total - 1) / 2) * 6}deg`, animation: `wBreathe 4s ease-in-out ${-i * 0.6}s infinite` }}
               />
               <span className="font-dot text-[20px]">{pad2(i + 1)}</span>
+              {pose !== 'front' ? <span className="-mt-1.5 font-mono text-[10px] tracking-[.08em] opacity-85">{pose === 'left' ? 'LEFT' : 'RIGHT'}</span> : null}
             </span>
           ))}
         </div>
         <div className="flex flex-col gap-2.5">
           <p className="m-0 text-[16px] leading-[1.55]">{body}</p>
-          {first ? <p className="m-0 text-[14px] leading-[1.5] opacity-80">{DONT_VARY}</p> : null}
           <button type="button" onClick={props.onChangePlace} className="min-h-11 self-start text-[14px] underline underline-offset-4 opacity-90">
             Change place or mode
           </button>
@@ -114,6 +128,18 @@ export function GuideStep(props: {
             ))}
           </div>
         </div>
+
+        {canAddCheeks(site, n) ? (
+          <div className="flex flex-col gap-1.5 rounded-[28px] bg-surface/[.88] px-[22px] py-3">
+            <Toggle
+              label="Cheek photos"
+              checked={cheeks}
+              onChange={props.onCheeks}
+              description={cheeks ? `Photos ${total - 1} and ${total}: turn your head about 45° to show your ${POSE_NAME.left.toLowerCase()}, then your ${POSE_NAME.right.toLowerCase()}. Spots on the cheeks and jaw are counted on them.` : 'Every photo faces the camera. Cheek photos show the spots a front photo misses.'}
+            />
+            {otherWay ? <span className="pb-1 text-[13px] leading-[1.4] text-ink-2">Blemish and dark-spot counts are compared with your earlier check-ins taken {cheeks ? 'with' : 'without'} cheek photos. Everything else is compared with your baseline.</span> : null}
+          </div>
+        ) : null}
 
         {raw ? (
           <div className="rounded-[36px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse squircle">
@@ -156,41 +182,43 @@ export function GuideStep(props: {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2 rounded-[28px] bg-surface/[.88] px-[22px] py-[18px]">
-          <label htmlFor="ck-note" className="text-[15px]">
-            Anything different today? <span className="text-ink-2">Optional · saved with this check-in</span>
-          </label>
-          <input
-            id="ck-note"
-            type="text"
-            maxLength={140}
-            placeholder="e.g. new lamp, after a workout, skipped serum"
-            value={note}
-            onChange={(e) => props.onNote(e.target.value)}
-            className="min-h-12 rounded-[14px] border-0 bg-[#EFEEEA] px-3.5 text-[16px] text-ink"
-          />
-          <span className="flex flex-wrap gap-1.5">
-            {NOTE_CHIPS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  props.onNote(note ? `${note}, ${t.toLowerCase()}` : t)
-                  props.onDeviation(true)
-                }}
-                className="min-h-9 rounded-pill border border-ink/10 bg-white px-3 text-[13px]"
-              >
-                + {t}
-              </button>
-            ))}
-          </span>
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
-            <input type="checkbox" checked={deviation} onChange={(e) => props.onDeviation(e.target.checked)} className="size-5 accent-[var(--text-primary)]" />
-            <span>
-              Something is different today <span className="text-ink-2">· shown next to this reading, so a change is never misread</span>
+        {firstTime ? null : (
+          <div className="flex flex-col gap-2 rounded-[28px] bg-surface/[.88] px-[22px] py-[18px]">
+            <label htmlFor="ck-note" className="text-[15px]">
+              Anything different today? <span className="text-ink-2">Optional · saved with this check-in</span>
+            </label>
+            <input
+              id="ck-note"
+              type="text"
+              maxLength={140}
+              placeholder="e.g. new lamp, after a workout, skipped serum"
+              value={note}
+              onChange={(e) => props.onNote(e.target.value)}
+              className="min-h-12 rounded-[14px] border-0 bg-[#EFEEEA] px-3.5 text-[16px] text-ink"
+            />
+            <span className="flex flex-wrap gap-1.5">
+              {NOTE_CHIPS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    props.onNote(note ? `${note}, ${t.toLowerCase()}` : t)
+                    props.onDeviation(true)
+                  }}
+                  className="min-h-9 rounded-pill border border-ink/10 bg-white px-3 text-[13px]"
+                >
+                  + {t}
+                </button>
+              ))}
             </span>
-          </label>
-        </div>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
+              <input type="checkbox" checked={deviation} onChange={(e) => props.onDeviation(e.target.checked)} className="size-5 accent-[var(--text-primary)]" />
+              <span>
+                Something is different today <span className="text-ink-2">· shown next to this reading, so a change is never misread</span>
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5">
           <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>

@@ -34,6 +34,7 @@ export function toSession(v: SessionView): Session {
     live: true,
     measured: v.session.measured,
     baseline_ref: v.session.baseline,
+    counts_ref: v.session.counts_compared_with ? { session_id: v.session.counts_compared_with.session_id } : null,
     sample_id: v.session.sample_id ?? null,
     stage: v.session.stage ?? null,
     // only detail views (GET one session, analyze) carry these
@@ -67,6 +68,15 @@ export function baselineFor(session: Session | null, sessions: Session[]): Sessi
   // this my baseline") has no baseline; never borrow today's, which may be newer than it.
   if (session.live && !session.is_baseline && session.baseline_ref === null && session.measured !== false) return null
   return sessions.find((s) => s.is_baseline && s.capture_mode === session.capture_mode) ?? sessions.find((s) => s.is_baseline) ?? null
+}
+
+/** Counts the api compares only with a check-in taken the same way (with or without cheek photos). */
+const SAME_WAY_COUNTS: string[] = ['blemishes', 'pigment_spots']
+
+/** What one metric of a session was compared with: for its counts, the check-in taken the same way when the api says so; else the baseline. */
+export function referenceFor(metricId: string, session: Session, baseline: Session | null, sessions: Session[]): Session | null {
+  const id = SAME_WAY_COUNTS.includes(metricId) ? session.counts_ref?.session_id : undefined
+  return (id && sessions.find((s) => s.id === id)) || baseline
 }
 
 /** An upload or analysis this old has stopped (the tab closed mid-upload, or the server restarted). */

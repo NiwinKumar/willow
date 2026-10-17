@@ -1,0 +1,27 @@
+import type { Metric, Session } from '../../data/types.ts'
+import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics.ts'
+import { verdictKind } from '../../lib/verdict.ts'
+
+/**
+ * What a measurement card says first after the baseline: the verdict in words ("Calmer than your start",
+ * "No real change"), with the numbers as a small "before → now" line. The verdict is the api's own (a change
+ * only when it is bigger than this person's normal photo-to-photo range). The baseline session itself keeps
+ * its number up front (null here): there is nothing to compare yet.
+ */
+export function verdictHeadline(m: Metric, session: Pick<Session, 'is_baseline'>): { headline: string; numbers: string | null } | null {
+  if (session.is_baseline || m.value === null) return null
+  const kind = verdictKind(m, session)
+  const unit = unitOf(m).trim()
+  const fmt = (v: number) => `${fmtValue(v, m)}${unit === '°' ? '°' : unit ? ` ${unit}` : ''}`
+  const numbers = m.delta !== null && m.delta !== undefined ? `${fmt(m.value - m.delta)} → ${fmt(m.value)}` : fmt(m.value)
+  if (kind === 'changed') {
+    const meta = METRIC_META[m.id]
+    // Skin tone is descriptive: a change is reported, never a better or worse direction.
+    if (m.id === 'tone_ita' || m.delta === null || m.delta === undefined) return { headline: 'Changed since your start', numbers }
+    const words = m.delta < 0 ? meta.decrease : meta.increase
+    return { headline: `${words.charAt(0).toUpperCase()}${words.slice(1)} than your start`, numbers }
+  }
+  if (kind === 'normal') return { headline: 'No real change', numbers }
+  if (kind === 'notEnough') return { headline: 'Too early to tell', numbers }
+  return { headline: 'Not compared this time', numbers }
+}

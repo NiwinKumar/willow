@@ -83,7 +83,7 @@ export function SoftBackdrop({ background }: { background: string }) {
 /** The website header lockup: 38px mark, 34px light wordmark. */
 export function Lockup() {
   return (
-    <Link to="/" aria-label="Willow home" className="flex items-center gap-3 text-ink no-underline">
+    <Link to="/about" aria-label="Willow home" className="flex items-center gap-3 text-ink no-underline">
       <LogoMark size={38} />
       <span className="text-[34px] font-light tracking-[-0.03em]">willow</span>
     </Link>

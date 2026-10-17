@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule } from '../data/types'
+import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
 import { DEV_UID } from './devAuth'
 import type { LabelDetail } from './spotLabels'
 
@@ -46,6 +46,10 @@ export type SessionView = {
     explanation_source: 'template' | 'gemini' | null
     preview: { url: string; width: number | null; height: number | null } | null
     overlay_urls: Record<string, string>
+    /** Blemish and dark-spot counts compared with this check-in (taken the same way, with or without cheek photos) instead of the baseline. */
+    counts_compared_with?: { session_id: string; session_created_at: string | null; frames: number | null } | null
+    /** Check-ins with cheek photos: each photo (front, left, right) signed, with its redness map. */
+    views?: { view: ViewName; frame_index: number; preview: { url: string; width: number | null; height: number | null }; redness_url: string | null }[]
     hours_since_baseline: number | null
     /** Judge mode: the hosted sample these photos were copied from. */
     sample_id?: string | null
@@ -119,6 +123,18 @@ export type SpotZoneSummary = {
   /** Only once 3+ marks here have faded; null before that. */
   typical_days_visible: { at_least: number; at_most: number; from: number } | null
 }
+/** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
+ * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
+ * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
+export type MetricStory = {
+  metric_id: string
+  points: string[]
+  reasons: string[]
+  source: 'gemini' | 'facts'
+  products: { name: string; brand: string; use: { days_used: number; of_days: number } | null }[]
+  has_previous: boolean
+}
+
 export type SpotDiary = {
   sessions: { id: string; created_at: string; day: number; photo_url: string | null; marks: number }[]
   tracks: SpotTrack[]
@@ -357,6 +373,8 @@ export const api = {
   listSessions: (token: string, site?: Site) =>
     request<{ sessions: SessionView[] }>(token, `/v1/sessions${site ? `?site=${site}` : ''}`),
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
+  /** What changed for one metric since the previous check-in, in points (api app/metric_story.py). */
+  metricStory: (token: string, sessionId: string, metricId: string) => request<MetricStory>(token, `/v1/sessions/${sessionId}/story/${metricId}`),
   patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
   /** `force`: measure a done session again with every frame (counts as an analysis). */

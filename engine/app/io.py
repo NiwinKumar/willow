@@ -86,7 +86,7 @@ def preview_size(height: int, width: int) -> tuple[int, int]:
     return (round(width / k), round(height / k)) if k > 1 else (width, height)
 
 
-def save_preview(srgb8: np.ndarray, output_prefix: str) -> str:
+def save_preview(srgb8: np.ndarray, output_prefix: str, name: str = "preview.jpg") -> str:
     """{output_prefix}/preview.jpg: the reference photo that rois, candidate bboxes and
     image_size describe (CONTRACT_CHANGES proposal 1b). Browsers cannot show DNG or (outside
     Safari) HEIC. Shrunk by a whole factor when the long edge is over PREVIEW_MAX_SIDE."""
@@ -96,7 +96,7 @@ def save_preview(srgb8: np.ndarray, output_prefix: str) -> str:
     size = preview_size(h, w)
     if size != (w, h):
         srgb8 = cv2.resize(srgb8, size, interpolation=cv2.INTER_AREA)
-    dest = f"{output_prefix.rstrip('/')}/preview.jpg"
+    dest = f"{output_prefix.rstrip('/')}/{name}"
     return save_jpeg(np.ascontiguousarray(srgb8), dest, quality=config.PREVIEW_QUALITY)
 
 
