@@ -129,8 +129,7 @@ export function AppShell() {
 
   if (data.mode === 'live') {
     if (loading) return <WillowLoader label="Opening Willow" />
-    // No account yet: the first page (customers on to the front door: a new guest if this device already agreed, else onboarding).
-    if (!user) return <Navigate to={`/?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
+    if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
   }
 
   const panelOpen = advisor.open && wide && roomy
