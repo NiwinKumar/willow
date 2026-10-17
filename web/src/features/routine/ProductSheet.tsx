@@ -181,7 +181,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
               onClose()
             }}
           >
-            Ask the advisor
+            Ask Wisp
           </Button>
         ) : null}
       </div>

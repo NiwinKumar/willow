@@ -115,7 +115,7 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
             How this is measured
           </Link>
           <button type="button" onClick={() => onAsk(m)} className="flex min-h-11 items-center text-[15px] underline">
-            Ask the advisor about this
+            Ask Wisp about this
           </button>
         </div>
       </div>

@@ -75,7 +75,7 @@ export function feelVsReadings(verdict: FeelVerdict, kind: Outcome['kind']): str
     return kind === 'real' ? 'Your readings changed too, in step with how it feels to you. Timing is an association, not proof of cause.' : 'Readings often trail what you feel. Keep checking in weekly to see if they catch up.'
   if (verdict === 'unsure')
     return kind === 'real' ? 'Your readings show a change even though it feels too soon to tell. Keep checking in to see if it holds.' : 'Your readings are within your normal range too. Most changes take several weeks to show.'
-  return kind === 'real' ? 'Your readings show a change, and how it feels to use matters too. The advisor can suggest other ways to use it or alternatives.' : 'Your readings haven’t moved beyond your normal range either.'
+  return kind === 'real' ? 'Your readings show a change, and how it feels to use matters too. Wisp can suggest other ways to use it or alternatives.' : 'Your readings haven’t moved beyond your normal range either.'
 }
 
 export type FeelNudge = { entry: RoutineEntry; weeks: number; stopped: boolean }

@@ -12,7 +12,7 @@ import { metaLine } from '../routine/routineModel'
 import { retry, type ChatMessage } from './chatStore'
 import { Markup, type MarkupLinks } from './markup'
 import { plainText } from './markupParse'
-import { AnswerOrb } from './Water'
+import { WispMark } from './Wisp'
 import { Widget, type WidgetLinks } from './widgets'
 
 /** "gemini-3.8-flash" -> "Gemini 3.8 Flash" for the info popover. */
@@ -158,8 +158,8 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
   const widgetLinks: WidgetLinks = { go: actions.go, onProduct: actions.onProduct, onAdd: actions.onAdd, product: (id) => byId.get(id) ?? null }
   return (
     <div className="group flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }} aria-busy={revealing}>
-      <span className="mt-1.5">
-        <AnswerOrb />
+      <span className="-mt-0.5 -ml-1">
+        <WispMark size={34} state={revealing ? 'speaking' : 'idle'} still={!revealing} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 flex-col gap-3 rounded-[8px_28px_28px_28px] bg-surface px-4 pt-3.5 pb-2 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
@@ -263,15 +263,15 @@ export function StandardCard({ m, busy }: { m: Extract<ChatMessage, { role: 'sta
   const s = m.standard
   return (
     <div className="flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }}>
-      <span className="mt-1.5">
-        <AnswerOrb />
+      <span className="-mt-0.5 -ml-1">
+        <WispMark size={34} still />
       </span>
       <div role="status" className="flex min-w-0 flex-1 flex-col gap-2.5 rounded-[8px_32px_32px_32px] bg-surface p-4 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
         <span className="font-mono text-[10px] leading-[1.5] tracking-[.05em] text-ink-2">STANDARD EXPLANATION · AI UNAVAILABLE · NO NEW ANALYSIS</span>
         {s ? (
           <>
             <p className="m-0 text-[14.5px] leading-[1.55] text-pretty">
-              The AI advisor is unavailable right now, so here is the standard summary of your latest {(SITE_LABEL[s.site] ?? 'check-in').toLowerCase()} check-in, from {fmtDate(s.created_at, { day: 'numeric', month: 'short' })}. Product questions will work again when the advisor is back.
+              Wisp is unavailable right now, so here is the standard summary of your latest {(SITE_LABEL[s.site] ?? 'check-in').toLowerCase()} check-in, from {fmtDate(s.created_at, { day: 'numeric', month: 'short' })}. Product questions will work again when the advisor is back.
             </p>
             <span className="text-[15px]">{s.explanation.headline}</span>
             {s.explanation.items.length ? (
@@ -290,10 +290,10 @@ export function StandardCard({ m, busy }: { m: Extract<ChatMessage, { role: 'sta
             <Disclaimer />
           </>
         ) : (
-          <p className="m-0 text-[14.5px] leading-[1.55] text-pretty">The AI advisor is unavailable right now, and there is no measured check-in yet to summarise. Your results, routine and the compatibility check still work.</p>
+          <p className="m-0 text-[14.5px] leading-[1.55] text-pretty">Wisp is unavailable right now, and there is no measured check-in yet to summarise. Your results, routine and the compatibility check still work.</p>
         )}
         <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse">
-          Ask the advisor again
+          Ask Wisp again
         </button>
       </div>
     </div>

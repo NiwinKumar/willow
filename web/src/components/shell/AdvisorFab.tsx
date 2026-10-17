@@ -107,9 +107,9 @@ export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; o
         onPointerLeave={() => setHover(false)}
         onFocus={() => setHover(true)}
         onBlur={() => setHover(false)}
-        aria-label="Advisor"
+        aria-label="Wisp"
         aria-expanded={open}
-        title="Ask Willow"
+        title="Ask Wisp"
         tabIndex={hidden ? -1 : undefined}
         className="grid size-full place-items-center rounded-full transition-[scale] duration-300 ease-spring hover:scale-[1.05] active:scale-[.94] active:duration-100 motion-reduce:hover:scale-100"
         // a soft shadow under the button, tinted like the cat's rim light
