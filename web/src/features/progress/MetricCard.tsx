@@ -24,14 +24,14 @@ function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Sessi
  * reading's number in Doto or, after the baseline, the verdict in words ("Calmer than your start") with the
  * numbers small below it; the band bar (the white block is the baseline's normal range) and the change.
  */
-export function MetricCard({ metric: m, session, band, compared, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; compared: boolean; onOpen: () => void; delay?: number }) {
+export function MetricCard({ metric: m, session, band, compared, against, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; compared: boolean; against?: string; onOpen: () => void; delay?: number }) {
   const look = METRIC_LOOK[m.id]
   const none = m.value === null
   const kind = verdictKind(m, session)
   const unit = unitOf(m).trim()
   const ratio = compared && band && m.delta !== null ? m.delta / band : null
   const deltaLabel = none ? 'No reading' : session.is_baseline ? 'Baseline value' : !compared ? VERDICT_WORDS.notCompared.short : `Δ ${deltaText(m)}`
-  const said = verdictHeadline(m, session)
+  const said = verdictHeadline(m, session, against)
   const bandLabel = band !== null ? `range ${bandText(m, band)} · ${confidenceOf(m, session).label.toLowerCase()}` : 'no normal range yet'
   return (
     <button

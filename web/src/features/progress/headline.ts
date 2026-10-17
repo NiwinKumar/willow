@@ -6,9 +6,12 @@ import { verdictKind } from '../../lib/verdict.ts'
  * What a measurement card says first after the baseline: the verdict in words ("Calmer than your start",
  * "No real change"), with the numbers as a small "before → now" line. The verdict is the api's own (a change
  * only when it is bigger than this person's normal photo-to-photo range). The baseline session itself keeps
- * its number up front (null here): there is nothing to compare yet.
+ * its number up front (null here): there is nothing to compare yet. `against` names what it was compared with: the
+ * start, or (blemishes and dark spots) the last check-in taken the same way (LAST_LIKE_THIS).
  */
-export function verdictHeadline(m: Metric, session: Pick<Session, 'is_baseline'>): { headline: string; numbers: string | null } | null {
+export const LAST_LIKE_THIS = 'your last check-in like this'
+
+export function verdictHeadline(m: Metric, session: Pick<Session, 'is_baseline'>, against = 'your start'): { headline: string; numbers: string | null } | null {
   if (session.is_baseline || m.value === null) return null
   const kind = verdictKind(m, session)
   const unit = unitOf(m).trim()
@@ -17,9 +20,9 @@ export function verdictHeadline(m: Metric, session: Pick<Session, 'is_baseline'>
   if (kind === 'changed') {
     const meta = METRIC_META[m.id]
     // Skin tone is descriptive: a change is reported, never a better or worse direction.
-    if (m.id === 'tone_ita' || m.delta === null || m.delta === undefined) return { headline: 'Changed since your start', numbers }
+    if (m.id === 'tone_ita' || m.delta === null || m.delta === undefined) return { headline: `Changed since ${against}`, numbers }
     const words = m.delta < 0 ? meta.decrease : meta.increase
-    return { headline: `${words.charAt(0).toUpperCase()}${words.slice(1)} than your start`, numbers }
+    return { headline: `${words.charAt(0).toUpperCase()}${words.slice(1)} than ${against}`, numbers }
   }
   if (kind === 'normal') return { headline: 'No real change', numbers }
   if (kind === 'notEnough') return { headline: 'Too early to tell', numbers }

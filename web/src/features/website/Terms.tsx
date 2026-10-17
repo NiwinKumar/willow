@@ -31,7 +31,7 @@ export default function Terms() {
     <div className="relative flex min-h-dvh flex-col gap-5 overflow-x-clip p-[clamp(16px,3vw,32px)]">
       <SoftBackdrop background={BACKDROP} />
       <header className="relative flex items-center justify-between gap-3">
-        <button type="button" aria-label="Back" className={backButton} onClick={() => (canGoBack ? navigate(-1) : navigate('/'))}>
+        <button type="button" aria-label="Back" className={backButton} onClick={() => (canGoBack ? navigate(-1) : navigate('/about'))}>
           ←
         </button>
         <Lockup />
@@ -178,7 +178,7 @@ export default function Terms() {
         </Section>
 
         <div className="flex flex-wrap gap-3 px-1">
-          <Link to="/" className="flex min-h-[52px] items-center rounded-pill bg-selected px-6 text-[15px] text-inverse no-underline">
+          <Link to="/about" className="flex min-h-[52px] items-center rounded-pill bg-selected px-6 text-[15px] text-inverse no-underline">
             Back to Willow
           </Link>
           <Link to="/science" className="flex min-h-[52px] items-center rounded-pill bg-white/70 px-6 text-[15px] text-ink no-underline shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]">

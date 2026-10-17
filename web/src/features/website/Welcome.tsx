@@ -52,9 +52,14 @@ export default function Welcome() {
           <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">SIGNED IN</span>
         ) : (
           // No sign-in page before onboarding: someone with an account (a new phone, a cleared browser) signs in
-          // here and goes straight to their results; everyone else carries on as a guest on this browser.
-          <Link to="/signin?next=%2Fhome" className="rounded-pill bg-white/55 px-3.5 py-2 text-[13px] text-ink no-underline transition-colors hover:bg-white/80">
-            Have an account? <span className="font-medium">Sign in</span>
+          // here and goes straight to their results (or where they were going); everyone else carries on as a
+          // guest on this browser. A phone shows just "Sign in", so the stepper keeps its room.
+          <Link
+            to={`/signin?next=${encodeURIComponent(nextPath(new URLSearchParams(search).get('next'), '/home'))}`}
+            className="inline-flex min-h-11 shrink-0 items-center rounded-pill bg-white/55 px-3.5 text-[13px] whitespace-nowrap text-ink no-underline transition-colors hover:bg-white/80"
+          >
+            <span className="hidden sm:inline">Have an account?&nbsp;</span>
+            <span className="font-medium">Sign in</span>
           </Link>
         )}
       </header>

@@ -11,7 +11,7 @@ import { fmtDate } from '../../lib/format'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { apply, fitAffine, scaleOf, type Affine, type Pt } from './faceFit'
 import { useImageStatus } from './useImageStatus'
-import { shownViews, VIEW_LABEL, viewSession } from './views'
+import { candidateView, shownViews, VIEW_LABEL, viewSession } from './views'
 
 /** The zones a cheek photo shows (engine SIDE_ZONES); the front photo shows the rest. */
 const SIDE_ZONES: Record<Exclude<ViewName, 'front'>, SpotZone[]> = { right: ['right_cheek', 'right_jaw'], left: ['left_cheek', 'left_jaw'] }
@@ -304,7 +304,7 @@ export function SpotDiary({
             {!tracks.length ? (
               <p className="m-0 p-[18px] text-[15px] leading-normal">No spots followed so far. Spots seen only once are left out.</p>
             ) : !ordered.length ? (
-              <p className="m-0 p-[18px] text-[15px] leading-normal">No {show ? STATUS_SHAPE[show].word.toLowerCase() : ''} spots{zSel ? ` on the ${ZONE_NAME[zSel].toLowerCase()}` : ''}.</p>
+              <p className="m-0 p-[18px] text-[15px] leading-normal">No {show ? `${STATUS_SHAPE[show].word.toLowerCase()} ` : ''}spots{zSel ? ` on the ${ZONE_NAME[zSel].toLowerCase()}` : ''}.</p>
             ) : (
               <>
                 <div aria-hidden className="flex items-end gap-2.5 px-2.5 pt-2 pb-1.5">
@@ -475,14 +475,16 @@ function centroid(poly: Pt[]): Pt | null {
  * The latest photo placed on the canonical face: an affine fit from its front-photo marks (face-map mm -> photo px),
  * with the face-map zones' centres when the photo has whole-face areas, so a face with marks on one cheek only
  * still lands. Null when it cannot be placed well (too few points, or they disagree by more than a few mm).
+ * `frontOnly`: the session's own front photo, so its cheek photos' marks (in their own pixels) are left out.
  */
 function placeOnPhoto(s: Session, frontOnly: boolean): Placed | null {
   const r = s.result
   if (!r || !s.preview) return null
+  const candidates = frontOnly ? r.candidates.filter((c) => candidateView(c) === 'front') : r.candidates
   const pairs: { mm: Pt; px: Pt }[] = []
-  for (const c of r.candidates) {
+  for (const c of candidates) {
     const f = c.features ?? {}
-    if ((frontOnly && f.view) || f.face_x_mm === undefined || f.face_y_mm === undefined) continue
+    if (f.face_x_mm === undefined || f.face_y_mm === undefined) continue
     pairs.push({ mm: [f.face_x_mm, f.face_y_mm], px: [c.bbox[0] + c.bbox[2] / 2, c.bbox[1] + c.bbox[3] / 2] })
   }
   for (const roi of r.rois ?? []) {
@@ -520,7 +522,7 @@ function placeOnPhoto(s: Session, frontOnly: boolean): Placed | null {
   const h = w / 0.8
   const x = Math.min(Math.max(cx - w / 2, 0), size.width - w)
   const y = Math.min(Math.max(cy - h / 2, 0), size.height - h)
-  return { session: s, t, box: { x, y, w, h }, size }
+  return { session: frontOnly ? { ...s, result: { ...r, candidates } } : s, t, box: { x, y, w, h }, size }
 }
 
 /**
