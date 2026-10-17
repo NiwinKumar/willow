@@ -424,11 +424,15 @@ def _decide(
     rule_campaigns = [(c, d) for c, d in mine if d.get("rule_id") == rid]
     busy = {d["product_id"] for _, d in mine if campaigns.status_of(d, at) in ("active", "paused")}
     no_lift = {d["product_id"] for _, d in rule_campaigns if d.get("ended_reason") == "no_lift"}
-    open_props = {
-        d.get("product_id")
+    props = [
+        d
         for _, d in store.activities_of(uid)
         if d.get("rule_id") == rid and d["kind"] == "proposed" and d.get("status") == "open"
-    }
+    ]
+    open_props = {d.get("product_id") for d in props}
+    # proposals still waiting to be approved hold their slot: approving them all stays in the
+    # rule's limit
+    waiting = sum(1 for d in props if (d.get("proposal") or {}).get("action") == "start")
     wants = []
     for p in sig["products"]:
         if not _proven(p) or not _in_scope(rdoc, p):
@@ -442,10 +446,10 @@ def _decide(
     wants.sort(key=lambda w: -(w[0].get("lift_lo") or 0))
 
     running = sum(1 for _, d in rule_campaigns if campaigns.status_of(d, at) == "active")
-    slots = a["max_running"] - running
+    slots = a["max_running"] - running - waiting
     cap = rdoc["conditions"].get("monthly_cap")
     if cap:
-        slots = min(slots, cap - _month_count(rule_campaigns, at))
+        slots = min(slots, cap - _month_count(rule_campaigns, at) - waiting)
     day = at.date().isoformat()
     for i, (p, m) in enumerate(wants):
         pid, name = p["product_id"], f"{p['brand']} {p['product']}"
@@ -454,7 +458,7 @@ def _decide(
             left = len(wants) - i
             limit = (
                 f"its limit of {a['max_running']} at a time"
-                if running + i >= a["max_running"]
+                if running + waiting + i >= a["max_running"]
                 else f"its limit of {cap} new a month"
             )
             if _log(
@@ -760,6 +764,16 @@ def approve(store: Store, uid: str, aid: str) -> dict[str, Any]:
     product = catalog.by_id(doc["product_id"]) or {}
     name = f"{product.get('brand', '')} {product.get('name', doc['product_id'])}".strip()
     if prop["action"] == "start":
+        limit = rule[1]["action"]["max_running"]
+        live = sum(
+            1
+            for _, d in store.campaigns_of(uid)
+            if d.get("rule_id") == rule[0] and campaigns.status_of(d, at) == "active"
+        )
+        if live >= limit:
+            raise Refused(
+                f"This rule already runs {live} of its {limit} at a time. Pause or end one first."
+            )
         sig_p = {"product_id": doc["product_id"]}
         cid, reasons = _start(store, uid, rule, sig_p, prop["goals"], prop["skin_types"])
         if cid is None:

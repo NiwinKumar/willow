@@ -398,3 +398,30 @@ def test_every_web_template_is_read_back_as_written(text, want):
     got = (r["level"], r["action"]["days"], r["action"]["max_running"], r["trigger"]["goals"])
     assert (r["trigger"]["kind"], *got) == want
     assert r["action"]["holdout_pct"] == 0.2 and out["missed"] == []
+
+
+def test_open_proposals_hold_their_slot_and_approval_keeps_the_rule_limit(client, fake, sig):
+    sig["products"].append(
+        _p("clinique-even-better-clinical-dark-spot-clearing-serum", "Clinique", "serum")
+    )
+    _rule(client)  # suggest, max 2 at a time; three Proven serums match
+    first = _run(client)
+    assert first["result"]["proposed"] == 2 and first["result"]["held"] == 1
+    props = [a for a in first["activity"] if a["kind"] == "proposed"]
+    client.post(f"/v1/retailer/autopilot/activity/{props[0]['id']}/approve")
+    # one running + one still waiting = the limit: nothing new is proposed
+    assert _run(client)["result"]["proposed"] == 0
+    assert client.post(f"/v1/retailer/autopilot/activity/{props[1]['id']}/approve").is_success
+    running = [d for d in fake.store.campaigns.values() if campaigns.status_of(d) == "active"]
+    assert len(running) == 2  # the limit, never more
+
+
+def test_approving_past_the_rule_limit_is_refused(client, fake, sig):
+    rule = _rule(client)  # max 2: two proposals
+    props = [a for a in _run(client)["activity"] if a["kind"] == "proposed"]
+    keep = ("name", "workspace", "scope", "trigger", "conditions", "level")
+    body = {k: rule[k] for k in keep} | {"action": {**rule["action"], "max_running": 1}}
+    assert client.put(f"/v1/retailer/autopilot/rules/{rule['id']}", json=body).is_success
+    assert client.post(f"/v1/retailer/autopilot/activity/{props[0]['id']}/approve").is_success
+    res = client.post(f"/v1/retailer/autopilot/activity/{props[1]['id']}/approve")
+    assert res.status_code == 409 and "1 of its 1 at a time" in res.json()["detail"]["message"]
