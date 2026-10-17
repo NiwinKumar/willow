@@ -100,7 +100,7 @@ def test_placeholder_results_are_never_shown_or_used_as_a_baseline(client, fake,
         return result
 
     monkeypatch.setattr(engine, "analyze", placeholder)
-    created = _create(client, site="face_full", n=1)
+    created = _create(client, site="face_full", mode="uncalibrated", n=1)
     _upload_all(fake, created)
     view = client.post(f"/v1/sessions/{created['session_id']}/analyze").json()
     assert view["session"]["status"] == "done"
@@ -115,14 +115,14 @@ def test_placeholder_results_are_never_shown_or_used_as_a_baseline(client, fake,
 
 
 def test_sessions_analysed_before_the_measured_flag_hide_placeholders(client, fake):
-    created = _create(client, site="face_full", n=1)
+    created = _create(client, site="face_full", mode="uncalibrated", n=1)
     result = engine.fixture_result(
         {
             "schema_version": "1.0",
             "session_id": created["session_id"],
             "user_id": "u_test",
             "site": "face_full",
-            "capture_mode": "calibrated_raw",
+            "capture_mode": "uncalibrated",
             "frames": [{"uri": "gs://b/x"}],
         }
     )
@@ -159,7 +159,7 @@ def test_engine_failure_marks_the_session_failed(client, fake, monkeypatch):
 
 
 def test_list_detail_preview_and_overlays(client, fake):
-    created = _create(client, site="face_full")
+    created = _create(client, site="face_full", mode="uncalibrated")
     _upload_all(fake, created)
     sid = created["session_id"]
     client.post(f"/v1/sessions/{sid}/analyze")
@@ -298,19 +298,22 @@ def test_saved_sessions_are_measured_again_oldest_first(client, fake, monkeypatc
         return result
 
     monkeypatch.setattr(engine, "analyze", placeholder)
-    first = _create(client, site="face_full", n=5)
-    second = _create(client, site="face_full", n=3)
+    first = _create(client, site="face_full", mode="uncalibrated", n=5)
+    second = _create(client, site="face_full", mode="uncalibrated", n=3)
     for created in (first, second):
         _upload_all(fake, created)
         client.post(f"/v1/sessions/{created['session_id']}/analyze")
-    assert fake.store.baseline_get("u_test", "face_full") is None
+    assert fake.store.baseline_get("u_test", "face_full__uncalibrated") is None
 
     monkeypatch.setattr(engine, "analyze", real_analyze)
     dry = analysis.remeasure(fake.store, "b", "u_test")
     assert len(dry) == 2 and all(line.endswith("would measure") for line in dry)
     lines = analysis.remeasure(fake.store, "b", "u_test", apply=True)
     assert lines[0].endswith("measured, now the baseline")
-    assert fake.store.baseline_get("u_test", "face_full")["session_id"] == first["session_id"]
+    assert (
+        fake.store.baseline_get("u_test", "face_full__uncalibrated")["session_id"]
+        == first["session_id"]
+    )
     later = fake.store.session_get("u_test", second["session_id"])
     assert later["measured"] is True and later["compared_with"]["session_id"] == first["session_id"]
     assert analysis.remeasure(fake.store, "b", "u_test", apply=True) == []
@@ -549,7 +552,7 @@ def test_remeasuring_the_baseline_refreshes_or_clears_it(client, fake, monkeypat
 def test_analyzing_a_finished_session_again_shows_it_and_runs_nothing(client, fake, monkeypatch):
     from app import analysis
 
-    created = _create(client, site="face_full")
+    created = _create(client, site="face_full", mode="uncalibrated")
     _upload_all(fake, created)
     sid = created["session_id"]
     first = client.post(f"/v1/sessions/{sid}/analyze")

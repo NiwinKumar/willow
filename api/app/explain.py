@@ -112,6 +112,14 @@ RETAKE = {
     "facing a window or lamp.",
     "nose_macro": "Retake with the phone about 10 cm from your nose, one eye still in the photo, "
     "facing a window or lamp.",
+    "left_cheek_macro": "Retake with the phone about 10 cm from your left cheek, one eye still in "
+    "the photo, facing a window or lamp.",
+    "right_cheek_macro": "Retake with the phone about 10 cm from your right cheek, one eye still "
+    "in the photo, facing a window or lamp.",
+    "forehead_macro": "Retake with the phone about 10 cm from your forehead, hair back and your "
+    "brows still in the photo, facing a window or lamp.",
+    "chin_macro": "Retake with the phone about 10 cm from your chin, your lower lip still in the "
+    "photo, facing a window or lamp.",
 }
 RETAKE_DEFAULT = "Retake in the same light, holding the phone steady."
 
