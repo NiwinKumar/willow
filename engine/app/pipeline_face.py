@@ -323,7 +323,8 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "face": face,
         "view": face.view,
         "polygons": polys,
-        "areas": _area_outlines(face, box, zone_label, polys),
+        # the "Areas" outlines are drawn for the reference photos only: worked out on demand (_areas)
+        "zone_label": zone_label,
         # which zone each mark sits in, and each zone's skin (px): a session with side photos
         # takes each zone from the photo that faces it (_combine_views)
         "mark_zones": _mark_zones(zone_label, [*blemishes, *spots]),
@@ -482,31 +483,34 @@ def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
     from the front photos' spread. Dark-spot area is in mm2 (the photos differ in scale)."""
     sides = set(side_refs)
 
-    def part(f: dict) -> tuple[int, float, float]:
+    def part(f: dict) -> tuple[int, list, float, float]:
         own = _owned_marks(f, sides)
         n_b, mm2 = len(f["blemishes"]), f["face"].px_per_mm ** 2
         blem = sum(own[:n_b])
-        spot_mm2 = sum(s.area_px for s, ok in zip(f["spots"], own[n_b:], strict=True) if ok) / mm2
+        kept = [s for s, ok in zip(f["spots"], own[n_b:], strict=True) if ok]
+        spot_mm2 = sum(s.area_px for s in kept) / mm2
         zones = SIDE_ZONES.get(f["view"])
         skin = sum(
             px
             for z, px in f["zone_px"].items()
             if (z in zones if zones else _owns("front", z, sides))
         )
-        return blem, spot_mm2, skin / mm2
+        return blem, kept, spot_mm2, skin / mm2
 
     extra = [part(r) for r in side_refs.values()]
     for f in front:
-        b, spot, skin = part(f)
+        b, kept, spot, skin = part(f)
         b += sum(e[0] for e in extra)
-        spot += sum(e[1] for e in extra)
-        skin += sum(e[2] for e in extra)
-        n_spots = sum(_owned_marks(f, sides)[len(f["blemishes"]) :]) + sum(
-            sum(_owned_marks(r, sides)[len(r["blemishes"]) :]) for r in side_refs.values()
-        )
+        kept = [*kept, *(s for e in extra for s in e[1])]
+        spot += sum(e[2] for e in extra)
+        skin += sum(e[3] for e in extra)
         f["values"]["blemishes"] = float(b)
         f["values"]["pigment_spots"] = 100.0 * spot / skin if skin else 0.0
-        f["extras"]["pigment_spots"] = {**f["extras"]["pigment_spots"], "count": n_spots}
+        # count and mean darkness of the spots kept across the views (the % is the mm2 one above)
+        f["extras"]["pigment_spots"] = {
+            **f["extras"]["pigment_spots"],
+            **pigment_spots(kept, 1)[1],
+        }
 
 
 def _candidates(
@@ -516,9 +520,11 @@ def _candidates(
     seen: list[float] | None = None,
     keep: list[bool] | None = None,
     start: int = 1,
+    frames: int = 1,
 ) -> list[dict]:
     """Contract candidates (docs/CONTRACT.md 2.6), blemishes then dark spots of one photo:
-    bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label."""
+    bbox in photo pixels, plus a crop and a 3x context crop for Gemini to label. frames: the
+    photos of this photo's view, which seen_in_fraction is a share of."""
     box, srgb8 = frame["box"], frame["srgb8"]
     px_per_mm = frame["face"].px_per_mm
     found = [("blemish", b) for b in frame["blemishes"]] + [("spot", s) for s in frame["spots"]]
@@ -569,11 +575,24 @@ def _candidates(
                     # which photo of the session the bbox is in, and its view (VIEW_CODE)
                     "frame_index": float(frame["index"]),
                     "view": VIEW_CODE.get(frame["view"], 0.0),
+                    "frames_in_view": float(frames),
                     **_place_features(places[i - 1], b.radius),
                 },
             }
         )
     save_jpegs(uploads)  # all crops in parallel (network-bound)
+    return out
+
+
+def _shares(slots: int, wants: list[int]) -> list[int]:
+    """Candidate slots per cheek view: `slots` split evenly, each view at most what it `wants`
+    (its marks, in its own ranking); a view that needs fewer passes the rest on."""
+    out = [0] * len(wants)
+    while slots > 0 and any(o < w for o, w in zip(out, wants, strict=True)):
+        for i, w in enumerate(wants):
+            if slots > 0 and out[i] < w:
+                out[i] += 1
+                slots -= 1
     return out
 
 
@@ -762,6 +781,13 @@ def _area_outlines(
     return out
 
 
+def _areas(f: dict) -> dict[str, np.ndarray]:
+    """A photo's area outlines (_area_outlines), worked out once, only for the photos drawn."""
+    if "areas" not in f:
+        f["areas"] = _area_outlines(f["face"], f["box"], f["zone_label"], f["polygons"])
+    return f["areas"]
+
+
 def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list[dict]:
     """result.views: per view of the session (front, right, left), its reference photo (index,
     size, a preview and redness map when output_prefix is given) and the areas it measures. The
@@ -779,7 +805,7 @@ def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list
                     redness = save_png(rgba, dest)
         rois = [
             {"name": n, "polygon": np.round(p, 1).tolist()}
-            for n, p in f["areas"].items()
+            for n, p in _areas(f).items()
             if _owns(v, n, sides)  # the under-eye patches go with the front
         ]
         out.append(
@@ -950,17 +976,30 @@ def analyze_face(
         seen = _seen_in(good[0], mapped) if len(good) > 1 else None
         sides = set(side_refs)
         keep = _keeps(good[0], sides) if sides else None
-        candidates = _candidates(good[0], output_prefix, max_candidates, seen, keep)
-        for group in side_groups.values():
+        candidates = _candidates(
+            good[0], output_prefix, max_candidates, seen, keep, frames=len(good)
+        )
+        # max_candidates is the session's: the front's marks first, the rest shared by the cheeks
+        keeps = {v: _keeps(side_refs[v], sides) for v in side_groups}
+        shares = _shares(max_candidates - len(candidates), [sum(k) for k in keeps.values()])
+        for (v, group), limit in zip(side_groups.items(), shares, strict=True):
             ref_v = group[0]
             m_v, w_v = _align(ref_v, group[1:])
             warnings.extend(w_v)
             seen_v = _seen_in(ref_v, m_v) if len(group) > 1 else None
-            keep_v = _keeps(ref_v, sides)
             candidates += _candidates(
-                ref_v, output_prefix, max_candidates, seen_v, keep_v, start=len(candidates) + 1
+                ref_v,
+                output_prefix,
+                limit,
+                seen_v,
+                keeps[v],
+                start=len(candidates) + 1,
+                frames=len(group),
             )
-        views = _views([good[0], *side_refs.values()], sides, output_prefix)
+        # views: only a session with cheek photos (or only side photos, which the api tells
+        # apart by its views); a front-only session is one photo, as before views
+        if side_refs or good[0]["view"] != "front":
+            views = _views([good[0], *side_refs.values()], sides, output_prefix)
     for f in frames:
         f.pop("srgb8", None)  # free the full-size photos
         f.pop("redness_map", None)
@@ -996,7 +1035,7 @@ def analyze_face(
         **({"views": views} if views else {}),
         # the reference photo's areas: the whole face in zones, plus the under-eye patches
         "rois": (
-            [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in ref["areas"].items()]
+            [{"name": n, "polygon": np.round(p, 1).tolist()} for n, p in _areas(ref).items()]
             if ref
             else []
         ),
