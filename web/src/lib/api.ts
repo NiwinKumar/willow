@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule } from '../data/types'
+import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule } from '../data/types'
 import { DEV_UID } from './devAuth'
 import type { LabelDetail } from './spotLabels'
 
@@ -386,6 +386,8 @@ export const api = {
   patchRoutine: (token: string, id: string, body: { ended_at?: string | null; slots?: ('am' | 'pm')[]; schedule?: RoutineSchedule | null }) =>
     request<RoutineEntry>(token, `/v1/routine/${id}`, { method: 'PATCH', ...json(body) }),
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
+  /** How the product feels to the person (self-reported): a verdict and up to 4 look-and-feel tags. Answers the entry. */
+  putFeel: (token: string, id: string, body: { verdict: FeelVerdict; tags: FeelTag[] }) => request<RoutineEntry>(token, `/v1/routine/${id}/feel`, { method: 'PUT', ...json(body) }),
   /** Routine use ticks; days are the person's own calendar days (YYYY-MM-DD, see localDay). Default range: last 14 days. */
   routineLog: (token: string, range: { from?: string; to?: string } = {}) => {
     const qs = new URLSearchParams(Object.entries(range).filter((e): e is [string, string] => Boolean(e[1])))

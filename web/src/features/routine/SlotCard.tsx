@@ -6,6 +6,7 @@ import type { RoutineEntry, Session } from '../../data/types'
 import { ApiError, localDay } from '../../lib/api'
 import { fmtDate, plural } from '../../lib/format'
 import { outcomeFor } from '../../lib/outcome'
+import { VERDICT_LABEL, saidLine } from './feel'
 import { ProductImage } from './productUi'
 import { activeLabel, entryName, imageOf, metaLine, OUTCOME_GLYPH } from './routineModel'
 import { dayNote, restsOn, scheduleWords } from './schedule'
@@ -104,6 +105,11 @@ export function SlotCard({ slot, entries, ticked, sessions, faceMeasured, onOpen
                 <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ background: t.chip }}>
                   {starts ? 'from' : 'since'} {fmtDate(e.started_at)}
                 </span>
+                {e.feel ? (
+                  <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }} title={`${saidLine(e.feel)} Your own view, not a measurement.`}>
+                    You: {VERDICT_LABEL[e.feel.verdict]}
+                  </span>
+                ) : null}
                 {e.recent_use ? (
                   <span className="rounded-pill px-2.5 py-1 text-[12px]" style={{ background: t.chip }} title="From your ticks over the last two weeks">
                     used {e.recent_use.days_used} of {plural(e.recent_use.of_days, 'day', 'days')}

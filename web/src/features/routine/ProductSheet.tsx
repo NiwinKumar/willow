@@ -1,5 +1,5 @@
 import { ExternalLink, FlaskConical, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useMaybeShell } from '../../components/shell/ShellContext'
@@ -22,9 +22,11 @@ import { activeLabel, categoryOf, entryName, metaLine, OUTCOME_GLYPH, useOutcome
 import { addDays, scheduleWords, usedOn, weekdayOf, WEEKDAYS } from './schedule'
 import { RoutineSheet } from './RoutineSheet'
 import { StartTest } from './StartTest'
+import { FeelCard } from './FeelCard'
 import { failureText, useRoutineWrites } from './writes'
 
-export type ProductTarget = { entry: RoutineEntry } | { product: Product } | { productId: string }
+/** `focus: 'feel'` opens the sheet scrolled to "How does it feel?" (from the routine's quick check). */
+export type ProductTarget = { entry: RoutineEntry; focus?: 'feel' } | { product: Product } | { productId: string }
 
 const WHEN = [
   { value: 'am', label: 'Morning' },
@@ -72,6 +74,14 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   const [testing, setTesting] = useState(false)
   const tests = useProductTests()
   const navigate = useNavigate()
+  const feelRef = useRef<HTMLElement>(null)
+  const toFeel = 'entry' in target && target.focus === 'feel'
+  useEffect(() => {
+    if (!toFeel) return
+    // after the sheet's slide-in, so the scroll lands where the person can see it
+    const t = window.setTimeout(() => feelRef.current?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }), 380)
+    return () => window.clearTimeout(t)
+  }, [toFeel])
 
   const category = product?.category ?? entry?.category ?? 'other'
   const brand = product?.brand ?? entry?.brand ?? ''
@@ -318,6 +328,9 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
           </details>
         ) : null}
       </div>
+
+      {/* the person's own view, current or stopped; the felt-vs-readings line only beside visible readings */}
+      {entry ? <FeelCard ref={feelRef} entry={entry} outcome={inUse ? outcome : null} /> : null}
 
       {inUse && outcome ? (
         <div className="card flex flex-col gap-1.5 bg-sunken px-5 py-4">
