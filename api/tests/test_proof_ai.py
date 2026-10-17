@@ -136,6 +136,7 @@ def test_next_steps_come_from_the_facts_with_a_link_each():
     unclear = retail_intel.product_view(_facts(), _rows("unclear")[0]["product_id"])
     ids = {a["id"] for a in proof_ai.candidates(unclear)}
     assert not ids & {"promote_segment", "draft_claims"}
+    assert all(a["link"]["section"] != "claims" for a in proof_ai.candidates(unclear))
 
 
 def numbers_only_from(action):

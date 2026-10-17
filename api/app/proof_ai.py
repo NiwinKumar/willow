@@ -49,6 +49,12 @@ OVERCLAIM = re.compile(
 SAID = re.compile(r"\b(said|say|says|agreed|reported|self-reported|told us)\b", re.I)
 CLAIMS_TIERS = ("proven", "promising")
 PERCEPTION_MIN = 0.5
+# the evidence pack's caveat says no self-reported results are included; drafts may cite one
+CLAIMS_CAVEAT = (
+    "Observational real-world data, not a controlled trial. Do not present as clinical "
+    "substantiation. Drafts citing Self-reported use what users said, labelled as such; every "
+    "other number is measured."
+)
 
 
 def _allowed(texts: list[str]) -> set[str]:
@@ -142,7 +148,9 @@ def claims(view: dict[str, Any], channel: str) -> dict[str, Any]:
         "product_id": row["product_id"],
         "channel": channel,
         "sources": src,
-        "caveat": view.get("evidence_caveat"),
+        "caveat": CLAIMS_CAVEAT
+        if any(not s["measured"] for s in src)
+        else view.get("evidence_caveat"),
     }
     if row["tier"] not in CLAIMS_TIERS or not any(s["measured"] for s in src):
         return base | {
@@ -250,7 +258,10 @@ def candidates(view: dict[str, Any]) -> list[dict[str, Any]]:
             "had a visible change but didn't say it was working: they may stop too early."
             + (f" Changes typically begin around week {weeks:g}." if weeks else ""),
             {"measured_only": agree["measured_only"], "n": agree["n"], "weeks": weeks},
-            {"section": "claims", "id": pid, "channel": "pack"},
+            # where the expectation is written: on pack once claims are allowed, else the feel panel
+            {"section": "claims", "id": pid, "channel": "pack"}
+            if row["tier"] in CLAIMS_TIERS
+            else {"section": "feel", "id": pid},
         )
     bad = [t for t in feel.get("tags") or [] if not t["good"] and t["share"] >= 0.15]
     if bad:
