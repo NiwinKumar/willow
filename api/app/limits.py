@@ -17,6 +17,7 @@ GLOBAL_UID = "_global"
 CAPS: dict[str, tuple[int, int]] = {
     "advisor": (20, 3000),
     "retailer_ask": (20, 1500),
+    "proof_claims": (30, 1500),  # Willow Proof claim drafts (app/proof_ai.py)
     "label_scan": (30, 1500),
     "analyze": (60, 2000),
     "metric_story": (60, 3000),  # one Gemini call per new story; past it, the facts version
@@ -31,6 +32,7 @@ MESSAGES = {
     "advisor": "That is 20 questions for today.",
     "retailer_ask": "That is 20 questions for today.",
     "campaign_create": "That is 20 new campaigns for today.",
+    "proof_claims": "That is 30 sets of claim drafts for today.",
 }
 
 
