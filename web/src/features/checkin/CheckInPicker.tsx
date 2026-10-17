@@ -8,7 +8,7 @@ import { baselineState } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
 import './checkin.css'
-import { baselineLine, neededFor, quickChecks, SITE_NAME, SITE_SWATCH, SITES, whenCaps } from './model'
+import { baselineLine, neededFor, quickChecks, SITE_NAME, SITE_SWATCH, siteForMode, sitesFor, whenCaps } from './model'
 
 /**
  * The "Check in" side sheet (Willow App.dc.html, capOpen): which place, Camera or RAW upload, three
@@ -18,8 +18,13 @@ import { baselineLine, neededFor, quickChecks, SITE_NAME, SITE_SWATCH, SITES, wh
 export default function CheckInPicker({ open, onClose, preset, onStart }: { open: boolean; onClose: () => void; preset?: { site?: Site; mode?: CaptureMode }; onStart: (site: Site, mode: CaptureMode) => void }) {
   const data = useData()
   const ref = useRef<HTMLDialogElement>(null)
-  const [site, setSite] = useState<Site>(preset?.site ?? 'face_full')
-  const [mode, setMode] = useState<CaptureMode>(preset?.mode ?? 'uncalibrated')
+  const [mode, setModeOnly] = useState<CaptureMode>(preset?.mode ?? 'uncalibrated')
+  const [site, setSite] = useState<Site>(siteForMode(preset?.site ?? 'face_full', preset?.mode ?? 'uncalibrated'))
+  // RAW is for close-ups of one place and the forearms: switching mode keeps the place if that mode has it.
+  const setMode = (m: CaptureMode) => {
+    setModeOnly(m)
+    setSite((s) => siteForMode(s, m))
+  }
 
   const opener = useRef<HTMLElement | null>(null)
   useEffect(() => {
@@ -52,7 +57,7 @@ export default function CheckInPicker({ open, onClose, preset, onStart }: { open
   const last = live ? data.all[data.all.length - 1] : undefined
 
   const note = raw
-    ? `${n ?? 'The'} DNG files from Lightroom${site.startsWith('forearm') ? ', with pen dots and white paper' : site === 'face_full' ? ', with a colour card' : ''}. RAW keeps its own baseline, apart from quick photos.`
+    ? `${n ?? 'The'} DNG files from Lightroom${site.startsWith('forearm') ? ', with pen dots and white paper' : ', phone about 10 cm away'}. RAW is for close-ups and the forearms; take your whole face with the camera.`
     : first
       ? `${n ?? 5} photos with this device’s camera. They become your quick-photo baseline.`
       : `${n ?? 3} photos with this device’s camera, compared with your quick-photo baseline.`
@@ -93,7 +98,7 @@ export default function CheckInPicker({ open, onClose, preset, onStart }: { open
               <p className="m-0 rounded-[18px] bg-sunken px-3.5 py-3 text-[13px] leading-[1.45] text-ink-2">You’re looking at the sample journey. Checking in switches to your own account and your own photos.</p>
             ) : null}
             <div role="radiogroup" aria-label="What are you photographing" className="flex flex-col gap-1.5">
-              {SITES.map((s) => {
+              {sitesFor(mode).map((s) => {
                 const on = s === site
                 const meta = !live ? null : !known ? 'Checking…' : baselineLine(sessionsOf(s), mode).text
                 return (

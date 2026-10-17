@@ -1,17 +1,35 @@
 import type { Metric, MetricGroup, MetricId, Site, Unit, Verdict } from '../data/types'
 
+/** Close-ups (engine pipeline_macro REGIONS). One cheek, forehead and chin are RAW close-ups; sides are the person's own. */
+export const CLOSE_UPS: Site[] = ['cheek_macro', 'left_cheek_macro', 'right_cheek_macro', 'forehead_macro', 'chin_macro', 'nose_macro']
+/** Close-ups measured like a cheek (tone, spots, redness, blemishes, pores, texture): all but the nose. */
+const SKIN_CLOSE_UPS = CLOSE_UPS.filter((s) => s !== 'nose_macro')
+/** The close-up's place in a sentence ("Too little forehead skin in view"). */
+export const CLOSE_UP_WORD: Partial<Record<Site, string>> = {
+  cheek_macro: 'cheek',
+  left_cheek_macro: 'left cheek',
+  right_cheek_macro: 'right cheek',
+  forehead_macro: 'forehead',
+  chin_macro: 'chin',
+  nose_macro: 'nose',
+}
+export const closeUpPlace = (site: Site, capital = false) => {
+  const w = CLOSE_UP_WORD[site] ?? 'cheek'
+  return capital ? w[0].toUpperCase() + w.slice(1) : w
+}
+
 /** Per-metric wording from docs/UX_SPEC.md. Never "better/worse" for tone. */
 export const METRIC_META: Record<
   MetricId,
   { label: string; group: MetricGroup; decrease: string; increase: string; note?: string; sites: Site[] }
 > = {
-  tone_ita: { label: 'Skin tone (ITA°)', group: 'tone_pigment', decrease: 'change detected', increase: 'change detected', note: 'Descriptive only. No direction is better.', sites: ['face_full', 'cheek_macro', 'forearm_treated', 'forearm_control'] },
-  pigment_spots: { label: 'Dark spots', group: 'tone_pigment', decrease: 'fewer / fainter spots', increase: 'more visible spots', sites: ['face_full', 'cheek_macro'] },
+  tone_ita: { label: 'Skin tone (ITA°)', group: 'tone_pigment', decrease: 'change detected', increase: 'change detected', note: 'Descriptive only. No direction is better.', sites: ['face_full', ...SKIN_CLOSE_UPS, 'forearm_treated', 'forearm_control'] },
+  pigment_spots: { label: 'Dark spots', group: 'tone_pigment', decrease: 'fewer / fainter spots', increase: 'more visible spots', sites: ['face_full', ...SKIN_CLOSE_UPS] },
   tone_evenness: { label: 'Tone evenness', group: 'tone_pigment', decrease: 'more even', increase: 'less even', note: 'Lower is more even.', sites: ['face_full'] },
-  redness: { label: 'Redness', group: 'redness', decrease: 'calmer', increase: 'more redness', note: 'Harder to read on deep skin tones.', sites: ['face_full', 'cheek_macro', 'forearm_treated', 'forearm_control'] },
-  blemishes: { label: 'Blemishes', group: 'clarity', decrease: 'fewer blemishes', increase: 'more blemishes', sites: ['face_full', 'cheek_macro', 'nose_macro'] },
-  pores: { label: 'Pores', group: 'texture_pores', decrease: 'less visible pores', increase: 'more visible pores', sites: ['cheek_macro', 'nose_macro'] },
-  texture: { label: 'Texture', group: 'texture_pores', decrease: 'smoother', increase: 'rougher', sites: ['cheek_macro'] },
+  redness: { label: 'Redness', group: 'redness', decrease: 'calmer', increase: 'more redness', note: 'Harder to read on deep skin tones.', sites: ['face_full', ...SKIN_CLOSE_UPS, 'forearm_treated', 'forearm_control'] },
+  blemishes: { label: 'Blemishes', group: 'clarity', decrease: 'fewer blemishes', increase: 'more blemishes', sites: ['face_full', ...CLOSE_UPS] },
+  pores: { label: 'Pores', group: 'texture_pores', decrease: 'less visible pores', increase: 'more visible pores', sites: CLOSE_UPS },
+  texture: { label: 'Texture', group: 'texture_pores', decrease: 'smoother', increase: 'rougher', sites: SKIN_CLOSE_UPS },
   lines: { label: 'Lines', group: 'lines', decrease: 'softer lines', increase: 'more visible lines', sites: ['face_full'] },
   dark_circles: { label: 'Under-eye', group: 'eye_area', decrease: 'darker under-eye', increase: 'brighter under-eye', sites: ['face_full'] },
   shine: { label: 'Shine', group: 'oil_glow', decrease: 'less shine', increase: 'more shine', sites: ['face_full'] },
@@ -51,14 +69,18 @@ export const UNIT_LABEL: Record<Unit, string> = {
  * Sites the deployed engine measures today. Other sites are saved and marked "not measured yet"
  * (the api never shows the engine's placeholder numbers). Update when the engine adds a site.
  */
-export const MEASURED_SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+export const MEASURED_SITES: Site[] = ['face_full', ...CLOSE_UPS, 'forearm_treated', 'forearm_control']
 
 /** Close-ups: size comes from the iris, so one eye stays in the photo, phone about 10 cm away. */
-export const isCloseUp = (site: Site) => site === 'cheek_macro' || site === 'nose_macro'
+export const isCloseUp = (site: Site) => CLOSE_UPS.includes(site)
 
 export const SITE_LABEL: Record<Site, string> = {
   face_full: 'Face',
   cheek_macro: 'Cheek close-up',
+  left_cheek_macro: 'Left cheek close-up',
+  right_cheek_macro: 'Right cheek close-up',
+  forehead_macro: 'Forehead close-up',
+  chin_macro: 'Chin close-up',
   nose_macro: 'Nose close-up',
   forearm_treated: 'Treated forearm',
   forearm_control: 'Control forearm',
@@ -173,7 +195,7 @@ const CLOSE_UP_COPY: Partial<Record<string, { text: string; action: string }>> =
 /** QUALITY_COPY for this site: close-ups get their own wording for face and skin checks. */
 export function qualityCopy(reason: string, site?: Site | null): { text: string; action: string } | undefined {
   if (site && isCloseUp(site)) {
-    if (reason === 'occlusion_suspected') return { text: `Too little ${site === 'nose_macro' ? 'nose' : 'cheek'} skin in view. Put it in the middle of the photo, with hair and hands out of the way.`, action: 'Retake one frame' }
+    if (reason === 'occlusion_suspected') return { text: `Too little ${closeUpPlace(site)} skin in view. Put it in the middle of the photo, with hair and hands out of the way.`, action: 'Retake one frame' }
     if (CLOSE_UP_COPY[reason]) return CLOSE_UP_COPY[reason]
   }
   return QUALITY_COPY[reason]

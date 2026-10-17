@@ -14,14 +14,14 @@ import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { fmtDate, parseDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
-import { METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
+import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
 import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, usableLine, usedFrames } from './model'
 import { Page, Pills } from './parts'
 import { metricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
 
-const PLACES: Site[] = ['face_full', 'cheek_macro', 'nose_macro']
+const PLACES: Site[] = ['face_full', ...CLOSE_UPS]
 const isPlace = (v: string | null): v is Site => v !== null && (PLACES as string[]).includes(v)
 // A day can be of any site: the forearm results link their day here too (the calendar is for PLACES).
 const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)

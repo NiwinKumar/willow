@@ -2,7 +2,7 @@ import type { LabelDetail } from '../lib/spotLabels'
 
 /** Types mirroring docs/CONTRACT.md. Keep field names identical to the JSON. */
 
-export type Site = 'face_full' | 'cheek_macro' | 'nose_macro' | 'forearm_treated' | 'forearm_control'
+export type Site = 'face_full' | 'cheek_macro' | 'left_cheek_macro' | 'right_cheek_macro' | 'forehead_macro' | 'chin_macro' | 'nose_macro' | 'forearm_treated' | 'forearm_control'
 export type CaptureMode = 'calibrated_raw' | 'uncalibrated'
 export type MetricId =
   | 'tone_ita'

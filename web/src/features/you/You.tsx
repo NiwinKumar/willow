@@ -535,7 +535,7 @@ function DeleteCard() {
   const count = (pred: (site: string) => boolean) => data.all.filter((s) => pred(s.site)).length
   const parts = [
     [count((s) => s === 'face_full'), 'face check-in', 'face check-ins'],
-    [count((s) => s === 'cheek_macro' || s === 'nose_macro'), 'close-up', 'close-ups'],
+    [count((s) => s.endsWith('_macro')), 'close-up', 'close-ups'],
     [count((s) => s.startsWith('forearm')), 'forearm photo session', 'forearm photo sessions'],
   ]
     .filter(([n]) => (n as number) > 0)

@@ -2,7 +2,7 @@ import { baselineFor } from '../data/live'
 import type { MetricId, RoutineEntry, Session, Site } from '../data/types'
 import { CONCERN_METRICS } from './catalog'
 import { parseDate } from './format'
-import { METRIC_META, fmtSigned, fmtValue, unitOf } from './metrics'
+import { CLOSE_UPS, METRIC_META, fmtSigned, fmtValue, unitOf } from './metrics'
 import { VERDICT_WORDS } from './verdict'
 
 export type Outcome =
@@ -11,8 +11,8 @@ export type Outcome =
   | { kind: 'early'; text: string; detail: string }
   | { kind: 'unmeasured'; text: string; detail: string }
 
-/** Sites a face product can show up on: the full face and the two close-ups. */
-export const OUTCOME_SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro']
+/** Sites a face product can show up on: the full face and the close-ups. */
+export const OUTCOME_SITES: Site[] = ['face_full', ...CLOSE_UPS]
 
 const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
 const hasValue = (s: Session, t: MetricId) => (s.result?.metrics ?? []).some((m) => m.id === t && m.value !== null)
