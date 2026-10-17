@@ -123,8 +123,20 @@ COUNTS_FIRST_FRONT = (
 )
 
 
+def _view_kinds(result: dict[str, Any]) -> set[str]:
+    return {v.get("view") for v in result.get("views") or []}
+
+
 def with_cheeks(result: dict[str, Any]) -> bool:
-    return any(v.get("view") != "front" for v in result.get("views") or [])
+    """A front photo plus at least one cheek photo (the counts then include the cheeks)."""
+    kinds = _view_kinds(result)
+    return "front" in kinds and len(kinds) > 1
+
+
+def side_only(result: dict[str, Any]) -> bool:
+    """Only cheek photos passed (the front one failed): its counts cover one side of the face."""
+    kinds = _view_kinds(result)
+    return bool(kinds) and "front" not in kinds
 
 
 def counts_key(base_key: str, cheeks: bool) -> str:
@@ -143,7 +155,9 @@ def _counts_doc(doc: dict[str, Any]) -> dict[str, Any]:
 
 def _compare(m: dict[str, Any], ref: dict[str, Any] | None) -> None:
     """The engine's comparison (engine aggregate.summarize) of one metric with another reference."""
-    if not ref or m.get("value") is None or m.get("verdict") == "low_quality":
+    if m.get("verdict") == "low_quality":
+        return  # the photo was too poor to compare: keep saying so
+    if not ref or m.get("value") is None:
         m.update(delta=None, verdict="no_baseline", direction="none")
         return
     delta = round(m["value"] - ref["mean"], 3) + 0.0
@@ -171,12 +185,17 @@ def match_counts(
     photos). Returns what they were compared with when that is not the baseline, else None."""
     if result.get("site") != "face_full" or not baseline or baseline["session_id"] == session_id:
         return None
+    if side_only(result):  # one cheek's counts compare with nothing
+        for m in result.get("metrics", []):
+            if m["id"] in CONFIRMED_COUNTS:
+                _compare(m, None)
+        return None
     cheeks = with_cheeks(result)
     if bool(baseline.get("cheeks")) == cheeks:
         return None
     ref = store.baseline_get(uid, counts_key(key(doc["site"], doc["capture_mode"]), cheeks))
-    if ref and ref["session_id"] == session_id:
-        ref = None
+    if ref and (ref["session_id"] == session_id or not store.session_get(uid, ref["session_id"])):
+        ref = None  # itself, or a check-in that was deleted
     if ref and _minor(ref.get("engine_version")) != _minor(result.get("engine_version")):
         ref = None
     for m in result.get("metrics", []):
@@ -195,7 +214,7 @@ def remember_counts(
 ) -> None:
     """The first passing face check-in of each kind (with or without cheek photos) is what later
     ones of that kind compare their counts with."""
-    if result.get("site") != "face_full" or not qualifies(result):
+    if result.get("site") != "face_full" or not qualifies(result) or side_only(result):
         return
     k = counts_key(key(doc["site"], doc["capture_mode"]), with_cheeks(result))
     ref = store.baseline_get(uid, k)
