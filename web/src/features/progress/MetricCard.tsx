@@ -4,6 +4,7 @@ import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, confidenceOf, verdictKind } from '../../lib/verdict'
 import { EMPTY_CARD, METRIC_LOOK } from './metricLook'
+import { verdictHeadline } from './headline'
 import { bandText, deltaText } from './model'
 
 /** The verdict pill the cards draw: black with the ember ◆ for Changed, frosted otherwise. Glyph + words. */
@@ -19,8 +20,9 @@ function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Sessi
 }
 
 /**
- * A measurement card (design "Measurements"): verdict pill, name and what the number is, the number in Doto,
- * the band bar (the white block is the baseline's normal range) and the change against the baseline.
+ * A measurement card (design "Measurements"): verdict pill, name and what the number is, then the baseline
+ * reading's number in Doto or, after the baseline, the verdict in words ("Calmer than your start") with the
+ * numbers small below it; the band bar (the white block is the baseline's normal range) and the change.
  */
 export function MetricCard({ metric: m, session, band, compared, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; compared: boolean; onOpen: () => void; delay?: number }) {
   const look = METRIC_LOOK[m.id]
@@ -29,12 +31,13 @@ export function MetricCard({ metric: m, session, band, compared, onOpen, delay =
   const unit = unitOf(m).trim()
   const ratio = compared && band && m.delta !== null ? m.delta / band : null
   const deltaLabel = none ? 'No reading' : session.is_baseline ? 'Baseline value' : !compared ? VERDICT_WORDS.notCompared.short : `Δ ${deltaText(m)}`
+  const said = verdictHeadline(m, session)
   const bandLabel = band !== null ? `range ${bandText(m, band)} · ${confidenceOf(m, session).label.toLowerCase()}` : 'no normal range yet'
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`${METRIC_META[m.id].label}: ${none ? 'not measured' : `${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}`}, ${VERDICT_WORDS[kind].label}. Open detail`}
+      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : `${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}`}, ${VERDICT_WORDS[kind].label}`}. Open detail`}
       className="relative flex min-h-[320px] animate-[wRise_.5s_both] flex-col justify-between gap-[18px] rounded-[40px] p-6 text-left shadow-[inset_0_0_40px_8px_rgba(255,255,255,.4),0_30px_60px_-44px_rgba(0,0,0,.5)] transition-transform duration-[400ms] ease-[cubic-bezier(.2,.7,.2,1)] squircle hover:-translate-y-[5px]"
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >
@@ -45,10 +48,17 @@ export function MetricCard({ metric: m, session, band, compared, onOpen, delay =
           <span className="text-[13px] opacity-85">{look.unitLabel}</span>
         </span>
       </span>
-      <span className="flex items-baseline gap-2">
-        <span className="font-dot text-[clamp(39px,3.9vw,49px)] leading-[.9] tnum">{none ? '—' : fmtValue(m.value, m)}</span>
-        {!none && unit ? <span className="text-[16px] opacity-85">{unit}</span> : null}
-      </span>
+      {said ? (
+        <span className="flex flex-col gap-1.5">
+          <span className="text-[clamp(24px,2.3vw,30px)] font-medium leading-[1.1] tracking-[-0.01em]">{said.headline}</span>
+          {said.numbers ? <span className="text-[14px] opacity-85 tnum">{said.numbers}</span> : null}
+        </span>
+      ) : (
+        <span className="flex items-baseline gap-2">
+          <span className="font-dot text-[clamp(39px,3.9vw,49px)] leading-[.9] tnum">{none ? '—' : fmtValue(m.value, m)}</span>
+          {!none && unit ? <span className="text-[16px] opacity-85">{unit}</span> : null}
+        </span>
+      )}
       <span className="flex flex-col gap-2.5">
         <BandBar ratio={ratio} hasBand={band !== null && compared} hasValue={!none} />
         <span className="flex flex-wrap justify-between gap-2 text-[14px]">
