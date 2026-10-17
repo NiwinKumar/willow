@@ -15,12 +15,14 @@ or a routine change makes a new one; reopening the same one never calls Gemini a
 import hashlib
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from app import cohort, explain, gemini, numbers, schedule
+from app import baselines, cohort, explain, gemini, limits, numbers, schedule
 from app.results import measured_result
 from app.store import Store
 
@@ -96,6 +98,15 @@ def _metric(result: dict[str, Any], metric_id: str) -> dict[str, Any] | None:
     return next((m for m in result.get("metrics", []) if m["id"] == metric_id), None)
 
 
+def _same_way(doc: dict[str, Any], other_result: dict[str, Any], metric_id: str) -> bool:
+    """Blemish and dark-spot counts include the cheeks only when cheek photos were taken: such
+    counts are only compared with a check-in taken the same way (app/baselines.match_counts)."""
+    if metric_id not in baselines.CONFIRMED_COUNTS:
+        return True
+    this = measured_result(doc) or {}
+    return baselines.with_cheeks(this) == baselines.with_cheeks(other_result)
+
+
 def _previous(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str):
     """The latest earlier measured session of the same site and capture mode with this metric."""
     this_at = doc.get("created_at")
@@ -109,7 +120,7 @@ def _previous(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: 
             continue
         result = measured_result(other)
         m = _metric(result, metric_id) if result else None
-        if m is None or m.get("value") is None:
+        if m is None or m.get("value") is None or not _same_way(doc, result, metric_id):
             continue
         if best is None or other["created_at"] > best[1]["created_at"]:
             best = (other_id, other, m)
@@ -131,7 +142,7 @@ def _history(
             continue
         result = measured_result(other)
         om = _metric(result, metric_id) if result else None
-        if om is None or om.get("value") is None:
+        if om is None or om.get("value") is None or not _same_way(doc, result, metric_id):
             continue
         value = explain.shown_numbers({**om, "mdc95": m.get("mdc95")})["value"]
         rows.append(
@@ -241,7 +252,7 @@ def _points(f: dict[str, Any]) -> list[str]:
     elif f["metric_id"] == "tone_ita":
         pts.append(f"{now}, a shift from last time (skin tone is descriptive only).")
     else:
-        pts.append(f"{now}: {down if d < 0 else up} than last time.")
+        pts.append(f"{now}, {down if d < 0 else up} than last time.")
     verdict = f.get("verdict_vs_baseline")
     if f.get("is_baseline"):
         pts.append("This is your baseline: later check-ins are compared with it.")
@@ -268,6 +279,38 @@ def _fingerprint(f: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(f, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+DATE_KEYS = {"this_day", "previous_day", "day", "started", "stopped"}
+CAUSE = re.compile(r"\b(caus\w*|due to|thanks to|because of|result of|made your)\b", re.I)
+
+
+def _without_dates(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _without_dates(v) for k, v in obj.items() if k not in DATE_KEYS}
+    if isinstance(obj, list):
+        return [_without_dates(v) for v in obj]
+    return obj
+
+
+def _dates(obj: Any) -> list[str]:
+    if isinstance(obj, dict):
+        return [v for k, v in obj.items() if k in DATE_KEYS and isinstance(v, str)] + [
+            d for v in obj.values() for d in _dates(v)
+        ]
+    if isinstance(obj, list):
+        return [d for v in obj for d in _dates(v)]
+    return []
+
+
+def _allowed(f: dict[str, Any]) -> set[str]:
+    """Numbers a sentence may quote: the measured ones, and a date only as its day of the month
+    ("12 Oct"), never a year or a month number that could pass for a measurement."""
+    allowed = numbers.collect(_without_dates(f))
+    for d in _dates(f):
+        if len(d) >= 10 and d[8:10].isdigit():
+            allowed.add(str(int(d[8:10])))
+    return allowed
+
+
 def _problem(text: str, f: dict[str, Any], allowed: set[str]) -> str | None:
     if not numbers.only_known(text, allowed):
         return "unknown number"
@@ -275,6 +318,14 @@ def _problem(text: str, f: dict[str, Any], allowed: set[str]) -> str | None:
         return "banned or jargon word"
     if f.get("verdict_vs_baseline") != "real_change" and explain._claims_change(text):
         return "change claimed without a real change"
+    if CAUSE.search(text):
+        return "claims a cause"
+    d = f.get("change_vs_previous")
+    words = WORDS.get(f["metric_id"])
+    if d and words:
+        wrong = words[1] if d < 0 else words[0]  # the phrase for the other direction
+        if wrong.split(" / ")[0].lower() in text.lower():
+            return "wrong direction"
     return None
 
 
@@ -292,7 +343,7 @@ def _gemini_story(f: dict[str, Any]) -> tuple[list[str], list[str]] | None:
         )
     except gemini.GeminiError:
         return None
-    allowed = numbers.collect(f)
+    allowed = _allowed(f)
     points = [p.strip() for p in out.points if p.strip()]
     bad = [(p, why) for p in points if (why := _problem(p, f, allowed))]
     if not points or bad:
@@ -302,7 +353,17 @@ def _gemini_story(f: dict[str, Any]) -> tuple[list[str], list[str]] | None:
     return points, reasons[:2]
 
 
+def _within_cap(store: Store, uid: str) -> bool:
+    """One Gemini story counts against the person's daily cap; past it, the facts version."""
+    try:
+        limits.take(store, uid, "metric_story")
+    except HTTPException:
+        return False
+    return True
+
+
 def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str) -> dict | None:
+    """Skin tone is always written from the facts (descriptive only, never judged by Gemini)."""
     f = facts(store, uid, sid, doc, metric_id)
     if f is None:
         return None
@@ -310,7 +371,7 @@ def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
     cached = (doc.get("stories") or {}).get(metric_id)
     if cached and cached.get("key") == key and cached.get("points"):
         points, reasons, source = cached["points"], cached.get("reasons") or [], "gemini"
-    elif got := _gemini_story(f):
+    elif f["metric_id"] != "tone_ita" and _within_cap(store, uid) and (got := _gemini_story(f)):
         points, reasons, source = got[0], got[1], "gemini"
         stories = dict(doc.get("stories") or {})
         stories[metric_id] = {"key": key, "points": points, "reasons": reasons}
