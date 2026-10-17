@@ -6,12 +6,14 @@
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { baselineState, photoSteps } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
-import { isCloseUp, SITE_LABEL } from '../../lib/metrics'
+import { closeUpPlace, isCloseUp, SITE_LABEL } from '../../lib/metrics'
 
 export type Step = 'site' | 'guide' | 'camera' | 'review' | 'files' | 'processing' | 'samples'
 export const STEPS: Step[] = ['site', 'guide', 'camera', 'review', 'files', 'processing', 'samples']
 
-export const SITES: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+export const SITES: Site[] = ['face_full', 'cheek_macro', 'left_cheek_macro', 'right_cheek_macro', 'forehead_macro', 'chin_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+
+export { siteForMode, sitesFor } from './places'
 
 /** ?mode= accepts the api names and the old/short ones (quick, raw). */
 export function parseMode(raw: string | null): CaptureMode {
@@ -33,6 +35,10 @@ export const SITE_NAME = SITE_LABEL
 export const SITE_SWATCH: Record<Site, string> = {
   face_full: 'radial-gradient(80% 80% at 50% 90%, #FF8A2A, #F7C6A0 70%)',
   cheek_macro: 'radial-gradient(80% 80% at 50% 90%, #E7A07A, #F4DCCB 70%)',
+  left_cheek_macro: 'radial-gradient(80% 80% at 35% 90%, #E7A07A, #F4DCCB 70%)',
+  right_cheek_macro: 'radial-gradient(80% 80% at 65% 90%, #E7A07A, #F4DCCB 70%)',
+  forehead_macro: 'radial-gradient(80% 80% at 50% 10%, #EDB37E, #F6E0CA 70%)',
+  chin_macro: 'radial-gradient(80% 80% at 50% 95%, #DC9A86, #F3D8CF 70%)',
   nose_macro: 'radial-gradient(80% 80% at 50% 90%, #E58FB8, #F6D9E8 70%)',
   forearm_treated: 'radial-gradient(80% 80% at 50% 90%, #9C84FF, #DCCCFF 70%)',
   forearm_control: 'radial-gradient(80% 80% at 50% 90%, #7FB6FF, #CFE4FF 70%)',
@@ -42,6 +48,10 @@ export const SITE_SWATCH: Record<Site, string> = {
 export const SITE_CARD: Record<Site, { bg: string; fg: string }> = {
   face_full: { bg: 'radial-gradient(90% 80% at 50% 100%, #FF8A3D 0%, #FFB27A 40%, #F4E5D8 80%)', fg: '#2A1206' },
   cheek_macro: { bg: 'radial-gradient(90% 80% at 50% 100%, #E9A27E 0%, #F6CDB4 45%, #F4EDE6 85%)', fg: '#2A1206' },
+  left_cheek_macro: { bg: 'radial-gradient(90% 80% at 30% 100%, #E9A27E 0%, #F6CDB4 45%, #F4EDE6 85%)', fg: '#2A1206' },
+  right_cheek_macro: { bg: 'radial-gradient(90% 80% at 70% 100%, #E9A27E 0%, #F6CDB4 45%, #F4EDE6 85%)', fg: '#2A1206' },
+  forehead_macro: { bg: 'radial-gradient(90% 80% at 50% 0%, #EDB37E 0%, #F7D9BD 45%, #F5EEE6 85%)', fg: '#2A1606' },
+  chin_macro: { bg: 'radial-gradient(90% 80% at 50% 100%, #DC9A86 0%, #F3CFC3 45%, #F4ECE8 85%)', fg: '#2A100A' },
   nose_macro: { bg: 'radial-gradient(90% 80% at 50% 100%, #E27FB0 0%, #F5C7DD 45%, #F4ECF0 85%)', fg: '#3A0A24' },
   forearm_treated: { bg: 'radial-gradient(90% 80% at 50% 100%, #7A5CFF 0%, #D8B8FF 45%, #EEE8F6 85%)', fg: '#1C0F4A' },
   forearm_control: { bg: 'radial-gradient(90% 80% at 50% 100%, #3D7BFF 0%, #9CD3FF 45%, #E6EEF6 85%)', fg: '#0A1840' },
@@ -51,6 +61,10 @@ export const SITE_CARD: Record<Site, { bg: string; fg: string }> = {
 export const SITE_MEASURES: Record<Site, string> = {
   face_full: 'Tone, dark spots, evenness, redness, blemishes, lines, dark circles, shine and glow.',
   cheek_macro: 'Tone, dark spots, redness, blemishes, pores and texture, up close.',
+  left_cheek_macro: 'Tone, dark spots, redness, blemishes, pores and texture on your left cheek, up close.',
+  right_cheek_macro: 'Tone, dark spots, redness, blemishes, pores and texture on your right cheek, up close.',
+  forehead_macro: 'Tone, dark spots, redness, blemishes, pores and texture on your forehead, up close.',
+  chin_macro: 'Tone, dark spots, redness, blemishes, pores and texture on your chin, up close.',
   nose_macro: 'Blemishes and pores, up close.',
   forearm_treated: 'Skin tone and redness on the marked square, against its own baseline.',
   forearm_control: 'The untreated arm. Shows the drift both arms share.',
@@ -149,7 +163,7 @@ export function checklist(site: Site, mode: CaptureMode, firstTime = false): Che
       return [
         { title: 'Phone about 10 cm away', hint: 'A hand’s width from your face, much closer than a selfie: pores need that much detail.' },
         { title: 'One eye still in the photo', hint: 'Willow measures size from your iris, so no spacer or ruler is needed.' },
-        { title: site === 'nose_macro' ? 'Nose in the middle' : 'Same cheek, same patch', hint: site === 'nose_macro' ? 'Centred in the frame, every time.' : 'The same side in the middle of the frame every time.' },
+        site === 'nose_macro' ? { title: 'Nose in the middle', hint: 'Centred in the frame, every time.' } : { title: `Same ${closeUpPlace(site)}, same patch`, hint: site === 'cheek_macro' ? 'The same side in the middle of the frame every time.' : 'The same patch in the middle of the frame every time.' },
         { title: 'Bare skin, facing the light', hint: 'Nothing applied for 15 minutes. Face a window or the same lamp.' },
         { title: 'Reposition between shots', hint: between },
       ]

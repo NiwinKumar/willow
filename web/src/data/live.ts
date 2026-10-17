@@ -2,7 +2,7 @@
 import type { SessionView, Site } from '../lib/api'
 import type { Session, SiteSeries } from './types'
 
-export const SITE_ORDER: Site[] = ['face_full', 'cheek_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
+export const SITE_ORDER: Site[] = ['face_full', 'cheek_macro', 'left_cheek_macro', 'right_cheek_macro', 'forehead_macro', 'chin_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
 
 /** Short series (the self-tanner run) label ticks in hours; anything longer reads better as dates. */
 const HOURS_LABEL_LIMIT = 120

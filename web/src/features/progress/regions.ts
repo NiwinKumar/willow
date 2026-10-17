@@ -1,5 +1,6 @@
 /** The engine's measured regions (result.rois) in words, and which metrics each one is read on. */
 import type { MetricId, Session } from '../../data/types'
+import { isCloseUp } from '../../lib/metrics'
 
 /**
  * Region name (face: the whole face in the face map's zones, engine config FACE_ZONES, plus the under-eye
@@ -20,6 +21,10 @@ const FACE: Record<string, MetricId[]> = {
 }
 const CLOSE_UP: Record<string, MetricId[]> = {
   cheek: ['tone_ita', 'pigment_spots', 'redness', 'blemishes', 'pores', 'texture'],
+  left_cheek: ['tone_ita', 'pigment_spots', 'redness', 'blemishes', 'pores', 'texture'],
+  right_cheek: ['tone_ita', 'pigment_spots', 'redness', 'blemishes', 'pores', 'texture'],
+  forehead: ['tone_ita', 'pigment_spots', 'redness', 'blemishes', 'pores', 'texture'],
+  chin: ['tone_ita', 'pigment_spots', 'redness', 'blemishes', 'pores', 'texture'],
   nose: ['blemishes', 'pores'],
 }
 const FOREARM: Record<string, MetricId[]> = { forearm_square: ['tone_ita', 'redness'], square: ['tone_ita', 'redness'] }
@@ -49,7 +54,7 @@ export type RegionItem = { key: string; name: string; label: string; points: str
 export function regionItems(s: Session, order: MetricId[], only?: MetricId[]): RegionItem[] {
   const r = s.result
   if (!r?.rois?.length) return []
-  const map = s.site === 'cheek_macro' || s.site === 'nose_macro' ? CLOSE_UP : s.site.startsWith('forearm') ? FOREARM : FACE
+  const map = isCloseUp(s.site) ? CLOSE_UP : s.site.startsWith('forearm') ? FOREARM : FACE
   const measured = new Set(r.metrics.filter((m) => m.value !== null).map((m) => m.id))
   const ranked = order.filter((id) => measured.has(id))
   return r.rois
