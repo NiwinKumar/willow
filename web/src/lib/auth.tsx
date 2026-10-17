@@ -11,6 +11,8 @@ const loadSdk = () => (sdk ??= import('./firebase'))
 export type AuthState = {
   user: User | null
   loading: boolean
+  /** sign-in could not start (the SDK failed to load or to initialise): only a reload can recover */
+  failed: boolean
   continueAsGuest: () => Promise<void>
   signInWithGoogle: () => Promise<void>
   signOutUser: () => Promise<void>
@@ -27,6 +29,7 @@ const devUser = DEV_UID ? ({ uid: DEV_UID, isAnonymous: true, email: null } as u
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(devUser)
   const [loading, setLoading] = useState(!devUser)
+  const [failed, setFailed] = useState(false)
   // Linking Google to a guest keeps the same User object (only isAnonymous flips): re-render.
   const [linked, setLinked] = useState(0)
 
@@ -34,13 +37,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (devUser) return
     let unsubscribe: (() => void) | undefined
     let alive = true
-    void loadSdk().then(({ firebaseAuth, onAuthStateChanged }) => {
-      if (!alive) return
-      unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
-        setUser(u)
-        setLoading(false)
-      })
-    })
+    loadSdk().then(
+      ({ firebaseAuth, onAuthStateChanged }) => {
+        if (!alive) return
+        unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
+          setUser(u)
+          setLoading(false)
+        })
+      },
+      (e: unknown) => {
+        // A broken or stale build (the SDK chunk is gone, the config is invalid): say so instead of loading forever.
+        console.error('Willow could not start sign-in', e)
+        sdk = null
+        if (alive) setFailed(true)
+      },
+    )
     return () => {
       alive = false
       unsubscribe?.()
@@ -51,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      failed,
       continueAsGuest: async () => {
         // Local test mode is already "signed in" as the fixed test person; never make a real Firebase guest.
         if (devUser) return
@@ -92,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- linked forces a new value after linking
-    [user, loading, linked],
+    [user, loading, failed, linked],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
