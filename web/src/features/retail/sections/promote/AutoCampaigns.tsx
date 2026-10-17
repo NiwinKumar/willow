@@ -46,6 +46,7 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
   const rules = (q.data?.rules ?? []).filter((r) => r.workspace === workspace.id)
   const feed = feedOrder((q.data?.activity ?? []).filter((a) => !a.rule_id || rules.some((r) => r.id === a.rule_id) || !q.data?.rules.some((r) => r.id === a.rule_id)))
   const waiting = openProposals(feed).length
+  const lastRun = rules.map((r) => r.last_run_at).filter((x): x is string => Boolean(x)).sort().pop() ?? null
 
   const runNow = async () => {
     setRunning(true)
@@ -111,7 +112,16 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
         title="AutoCampaign"
         id="proof-auto-h"
         meta={rules.length ? <Badge tone={rules.some((r) => r.enabled) ? 'green' : 'gray'}>{rules.filter((r) => r.enabled).length} on</Badge> : null}
-        description="Standing rules. Willow watches the evidence every night and starts, adjusts or stops campaigns when a rule’s conditions are met."
+        description={
+          <>
+            Standing rules. Willow watches the evidence every night and starts, adjusts or stops campaigns when a rule’s conditions are met.
+            {rules.some((r) => r.enabled) ? (
+              <span className="block pt-1 text-ink-3" title="Checked on their own when this page opens and on the nightly run; Run check now does it at once.">
+                Checks run on their own{lastRun ? ` · last check ${agoText(lastRun)}` : ''}. Run check now does one at once.
+              </span>
+            ) : null}
+          </>
+        }
         actions={
           <>
             <ToolButton onClick={() => void runNow()} disabled={running || !rules.some((r) => r.enabled)} label="Run check now">
