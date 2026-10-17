@@ -87,7 +87,33 @@ def wanted_urls(
             name = storage.name_from_uri(overlay["uri"])
             if name and name in existing:
                 names.append(name)
+        for v in result.get("views") or []:
+            for key in ("preview_uri", "redness_uri"):
+                name = storage.name_from_uri(v.get(key) or "")
+                if name and name in existing:
+                    names.append(name)
     return names
+
+
+def view_photos(result: dict[str, Any] | None, signed: dict[str, str]) -> list[dict[str, Any]]:
+    """Per photo of a session with cheek photos (result.views): its signed preview and redness
+    map, and the size its rois and candidate bboxes (features.frame_index) are drawn in. Views
+    whose preview is not signed are left out."""
+    out = []
+    for v in (result or {}).get("views") or []:
+        url = signed.get(storage.name_from_uri(v.get("preview_uri") or "") or "")
+        if not url:
+            continue
+        size = v.get("image_size") or {}
+        out.append(
+            {
+                "view": v["view"],
+                "frame_index": v["frame_index"],
+                "preview": {"url": url, "width": size.get("width"), "height": size.get("height")},
+                "redness_url": signed.get(storage.name_from_uri(v.get("redness_uri") or "") or ""),
+            }
+        )
+    return out
 
 
 # Frames a browser can draw (DNG cannot be shown, so its entry in frame_urls is null).
@@ -197,6 +223,8 @@ def session_view(
             "explanation_source": doc.get("explanation_source"),
             "preview": preview,
             "overlay_urls": overlay_urls,
+            # front / right / left photos of the session, each with its own marks and areas
+            "views": view_photos(result, signed),
             "hours_since_baseline": hours,
             # Judge mode: which hosted sample these photos were copied from (else None).
             "sample_id": doc.get("sample_id"),
