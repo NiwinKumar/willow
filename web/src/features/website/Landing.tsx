@@ -119,8 +119,8 @@ function Hero({ returning, bloomRef }: { returning: boolean; bloomRef: Ref<HTMLD
           <Link to="/retail" className={`text-[15px] text-ink no-underline transition-opacity hover:opacity-60 ${returning ? 'max-[439px]:hidden' : ''}`}>
             For business
           </Link>
-          <Link to={returning ? '/home' : '/signin'} className="cta-yellow rounded-pill px-6 py-[13px] text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
-            {returning ? 'Open Willow →' : 'Sign in'}
+          <Link to={returning ? '/home' : '/welcome'} className="cta-yellow rounded-pill px-6 py-[13px] text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
+            {returning ? 'Open Willow →' : 'Get started →'}
           </Link>
         </div>
       </header>
