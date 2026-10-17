@@ -51,7 +51,11 @@ def days(later: datetime, earlier: datetime) -> float:
 
 
 def is_front(result: dict[str, Any]) -> bool:
-    """Side-view sessions measure one cheek: they cannot say a mark elsewhere is gone."""
+    """Side-view sessions measure one cheek: they cannot say a mark elsewhere is gone. A session
+    with a front photo (alone or with cheek photos) measures the whole face. Engines before
+    result.views: the front view is the one with a forehead patch."""
+    if result.get("views"):
+        return any(v.get("view") == "front" for v in result["views"])
     return any(r.get("name") == "forehead" for r in result.get("rois") or [])
 
 
