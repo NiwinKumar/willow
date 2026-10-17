@@ -59,6 +59,11 @@ export function Calendar({
   const monthName = first.toLocaleDateString('en-GB', { month: 'long' })
   const week = compact ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
   const cell = 'aspect-[4/3] min-h-[42px] rounded-[clamp(12px,1.6vw,18px)] p-[clamp(5px,.9vw,9px)] flex flex-col justify-between text-left'
+  // Days that open are real buttons that answer the finger: a 2px lift on hover, a 0.96 press, 150ms. The
+  // entrance holds only `backwards` so its end state does not pin `scale` and the press can still play.
+  // Reduced motion keeps the press as a dim instead of movement. Plain days stay flat, hairline-outlined spans.
+  const tap =
+    'cursor-pointer animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_backwards] transition-[translate,scale,opacity] duration-150 ease-standard hover:-translate-y-0.5 active:scale-[.96] motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 motion-reduce:active:opacity-80'
   const dotRow = (list: string[] | undefined) => (
     <span aria-hidden className="flex min-h-1.5 gap-[3px]">
       {(list ?? []).map((c, i) => (
@@ -130,7 +135,7 @@ export function Calendar({
                 onClick={day.onPick}
                 aria-label={day.label}
                 aria-current={iso === current ? 'date' : undefined}
-                className={`${cell} animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both] text-ink transition-[translate,box-shadow] duration-200 hover:-translate-y-[3px]`}
+                className={`${cell} ${tap} text-ink`}
                 style={{ ...delay, background: day.bg, boxShadow: iso === current ? '0 0 0 2px var(--bg-surface), 0 0 0 3.5px var(--text-primary)' : 'inset 0 0 0 1px rgba(255,255,255,.5), 0 10px 22px -16px rgba(0,0,0,.45)' }}
               >
                 <span className={`text-[clamp(12px,1.3vw,15px)] ${isToday ? 'font-semibold' : ''}`}>{d}</span>
@@ -139,7 +144,7 @@ export function Calendar({
             )
           if (isToday && onToday)
             return (
-              <button key={iso} type="button" onClick={onToday} aria-label={todayLabel} aria-current="date" className={`${cell} animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both] border-[1.5px] border-dashed border-ink bg-white/40`} style={delay}>
+              <button key={iso} type="button" onClick={onToday} aria-label={todayLabel} aria-current="date" className={`${cell} ${tap} border-[1.5px] border-dashed border-ink bg-white/40`} style={delay}>
                 <span className="text-[clamp(12px,1.3vw,15px)] font-semibold">{d}</span>
                 {dotRow(dots[iso])}
               </button>
