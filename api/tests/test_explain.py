@@ -59,7 +59,8 @@ def test_trend_wording_for_indicative_metrics():
         "mdc95": 1.9,
     }
     assert explain.item(m)["summary"] == (
-        "Shine: within normal photo variation (indicative) (change +0.4, noise band ±1.9)."
+        "Shine: about the same as at your start (indicative). The difference of 0.4 is within "
+        "how much your photos usually vary (about 1.9)."
     )
 
 
@@ -100,7 +101,7 @@ def test_gemini_explanation_used_when_it_passes(monkeypatch):
             {
                 "metric_id": "redness",
                 "summary": f"Redness changed by {round(red['delta'], 1):g}, "
-                "beyond the noise threshold of 0.9.",
+                "more than your photos usually vary (about 0.9).",
                 "quoted_numbers": [],
             }
         ],
@@ -157,9 +158,9 @@ def test_one_photo_baseline_comparison_is_not_called_a_first_reading():
         "delta": 0.4,
         "mdc95": None,
     }
-    assert "no noise band yet" in explain.item(m)["summary"]
+    assert "needs more photos" in explain.item(m)["summary"]
     exp = explain.template({"metrics": [m], "quality": {"passed": True}})
-    assert exp["headline"] == "Compared with your baseline (no noise band yet)"
+    assert exp["headline"] == "Compared with your baseline (it needs more photos to judge changes)"
 
 
 def test_hedged_mentions_of_real_change_are_not_claims():
@@ -271,9 +272,9 @@ def test_a_change_quoted_with_the_wrong_sign_or_direction_is_rejected():
 
 def test_the_right_sign_and_direction_pass():
     data = _data(-0.8, routine=[{"product": "Minimalist Retinol 0.3%", "started_at": "2026-10-01"}])
-    ok = _exp("Redness went down by -0.8 a*, within normal photo variation (2.5).")
+    ok = _exp("Redness went down by -0.8, within how much your photos usually vary (2.5).")
     assert explain.problems(ok, data) == []
-    named = _exp("Redness is 13.4 a*, no clear change yet while using Minimalist Retinol 0.3%.")
+    named = _exp("Redness is 13.4, no clear change yet while using Minimalist Retinol 0.3%.")
     assert explain.problems(named, data) == []
 
 
@@ -318,4 +319,24 @@ def test_no_band_change_is_quoted_as_the_app_shows_it():
         "value": 27.21,
     }
     out = explain.item(m, first_reading=False)
-    assert "change +0.8 " in out["summary"] and out["quoted_numbers"] == ["+0.8"]
+    assert "a shift from your start (by 0.8)" in out["summary"] and out["quoted_numbers"] == ["0.8"]
+
+
+def test_jargon_falls_back_to_plain_words(monkeypatch):
+    result = _result_with_change()
+    jargon = {
+        "headline": "One change",
+        "items": [
+            {
+                "metric_id": "redness",
+                "summary": "A delta beyond the noise band.",
+                "quoted_numbers": [],
+            }
+        ],
+        "next_steps": [],
+        "disclaimer": "x",
+    }
+    _fake_gemini(monkeypatch, [jargon, jargon])
+    exp, source = explain.generate(result, {"days_since_baseline": 21})
+    assert source == "template"
+    assert not any(explain.JARGON.search(i["summary"]) for i in exp["items"])

@@ -80,9 +80,12 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         raise
 
     measured = not engine.is_placeholder(result)
+    counts_with = None
     if measured and baseline_map:
         baselines.guard_engine_version(result, current)
-        baselines.guard_counts(result, current)
+        # with and without cheek photos: counts compare with a check-in taken the same way
+        counts_with = baselines.match_counts(store, uid, session_id, doc, result, current)
+        baselines.guard_counts(result, counts_with or current)
     explanation, source, details = (None, None, {})
     if measured:
         _stage(store, uid, session_id, "explaining")
@@ -109,6 +112,8 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
             "explanation": explanation,
             "explanation_source": source,
             "compared_with": baselines.compared_with(current) if baseline_map else None,
+            # blemish and dark-spot counts, when compared with another check-in than the baseline
+            "counts_compared_with": counts_with,
             # CONTRACT.md: labels = {candidate_id: label}; the rest is for the "AI-suggested" UI.
             "labels": {cid: d["label"] for cid, d in details.items()},
             "label_details": details,
@@ -116,6 +121,11 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
         },
     )
     doc = store.session_get(uid, session_id) or doc
+    if measured:
+        try:
+            baselines.remember_counts(store, uid, session_id, doc, result)
+        except Exception:
+            log.exception("could not record the counts reference for %s/%s", uid, session_id)
     if measured and current is not None and current["session_id"] == session_id:
         # Measured again (a fix or a new engine): the baseline keeps up with its own session,
         # and stops being one if it no longer passes (a square found in hair, for example).

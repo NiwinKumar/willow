@@ -213,7 +213,7 @@ export default function Judge() {
     <div className="relative flex min-h-dvh flex-col gap-[18px] overflow-x-clip p-[clamp(16px,3vw,32px)]">
       <SoftBackdrop background={BACKDROP} />
       <header className="relative flex flex-wrap items-center justify-between gap-3">
-        <Link to="/" aria-label="Back to start" className={backButton}>
+        <Link to="/about" aria-label="Back to start" className={backButton}>
           ←
         </Link>
         <div className="glass-pill flex items-center gap-2.5 rounded-pill py-1.5 pl-1.5 pr-4" style={{ background: 'rgba(255,255,255,.55)' }}>
