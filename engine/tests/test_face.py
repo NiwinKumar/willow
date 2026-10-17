@@ -250,7 +250,10 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
     assert m["blemishes"]["value"] == 0 and m["blemishes"]["confidence"] == "indicative"
     assert m["pigment_spots"]["extras"]["count"] == 0  # plain synthetic skin has no spots
     assert m["tone_evenness"]["value"] < 2.0  # every ROI is the same colour
-    assert {p["name"] for p in r["rois"]} == set(SQUARES)
+    # areas: face-map zones (the fake landmarks place them anywhere) plus the under-eye patches
+    names = {p["name"] for p in r["rois"]}
+    assert {"right_under_eye", "left_under_eye"} <= names
+    assert names <= set(config.FACE_ZONES) | set(SQUARES)
     assert r["quality"]["pose"] == {"yaw": 1.0, "pitch": -2.0, "roll": 0.5}
 
 
