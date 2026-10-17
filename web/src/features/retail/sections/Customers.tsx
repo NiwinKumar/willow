@@ -8,6 +8,7 @@ import type { Insights, Products, ProductRow, Segments } from '../types'
 import { Bone, ErrorState, int, MIN_GROUP, PageHeader, pct, SkeletonPanel } from '../ui'
 import { topUnmet } from '../ui/insight'
 import { useSegments, useView } from '../useView'
+import { BuyingList } from './customers/BuyingList'
 import { Conflicts, Gaps, WhatPeopleWant } from './customers/Demand'
 import { MatrixPanel } from './customers/Matrix'
 import { cellKey, ownForGoal, parseMode } from './customers/model'
@@ -20,7 +21,7 @@ import { InsightsGate } from './shared'
  * are not being served. Hero: the skin type × goal matrix (GET /v1/retailer/segments); below: skin types, demand
  * by goal, routine conflicts and assortment gaps (GET /v1/retailer/insights). URL keys: `show` (matrix reading),
  * `cell` ("oily.lines", the group drawer), `skin` (the skin-type drawer), `goal` (highlights a goal). Anchors
- * #unmet, #demand, #conflicts, #gaps (brief cards link to them; `view=demand` from old links lands on #demand).
+ * #unmet, #demand, #conflicts, #gaps, #buying (the retailer's buying list; brief cards link to them; `view=demand` from old links lands on #demand).
  */
 export default function Customers() {
   return <InsightsGate skeleton={<Skeleton />}>{(d) => <Page d={d} />}</InsightsGate>
@@ -100,6 +101,8 @@ function Page({ d }: { d: Insights }) {
         </section>
       </div>
       <Gaps d={d} />
+      {/* buying is the store's job: the retailer workspace only */}
+      {workspace.kind === 'retailer' ? <BuyingList /> : null}
       {s ? (
         <>
           <CellPanel cell={cell} s={s} catalog={products} mine={mine} onClose={() => setParam({ cell: null })} />

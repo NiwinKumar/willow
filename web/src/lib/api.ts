@@ -787,6 +787,42 @@ export const retailerProducts = (filters?: RetailerFilters) => retailerGet<Retai
 export const retailerProduct = (productId: string, filters?: RetailerFilters) =>
   retailerGet<RetailerProductDetail>(`/v1/retailer/products/${encodeURIComponent(productId)}${retailerQs(filters)}`)
 export const retailerSegments = (filters?: RetailerFilters) => retailerGet<RetailerSegments>(`/v1/retailer/segments${retailerQs(filters)}`)
+/** Buying list (api buying.py): assortment gaps as buying briefs, with under-used catalog products as candidates. */
+export const retailerBuyingList = (filters?: RetailerFilters) => retailerGet<BuyingList>(`/v1/retailer/buying-list${retailerQs(filters)}`)
+export type BuyingCandidate = {
+  product_id: string
+  product: string
+  brand: string
+  image_url: string | null
+  category: string
+  tier: 'budget' | 'mid' | 'premium'
+  price: { amount: number; currency: string }
+  /** few: sold for the goal, too few users to measure; fit: an ingredient fits the goal, not sold or measured for it. */
+  kind: 'few' | 'fit'
+  /** The INCI name the match rests on (fit only). */
+  ingredient: string | null
+  /** "Too few users to measure yet" or "Not measured for <goal> yet": never proven. */
+  label: string
+  why: string
+}
+export type BuyingItem = {
+  id: string
+  goal_id: string
+  goal: string
+  /** null: every tier (low_everywhere). */
+  tier: 'budget' | 'mid' | 'premium' | null
+  tier_label: string
+  /** "under ₹700", "₹700–₹2,000", "₹2,000 or more"; null for every tier. */
+  price: string | null
+  kind: 'missing' | 'weak' | 'low_everywhere' | 'unmeasured' | 'thin'
+  /** People with the goal in this filter. */
+  demand: number
+  title: string
+  brief: string
+  candidates: BuyingCandidate[]
+}
+/** `source` gemini: the candidates' ingredient reasons were read by Gemini and checked; rules: the fixed ingredient table. */
+export type BuyingList = RetailerHead & { items: BuyingItem[]; source: 'gemini' | 'rules'; caveat: string }
 export const retailerBrands = (filters?: RetailerFilters) => retailerGet<{ brands: RetailerBrandSummary[]; note?: string }>(`/v1/retailer/brands${retailerQs(filters)}`)
 export const retailerBrand = (brand: string, filters?: RetailerFilters) =>
   retailerGet<RetailerBrandDetail>(`/v1/retailer/brands/${encodeURIComponent(brand)}${retailerQs(filters)}`)
