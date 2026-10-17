@@ -58,10 +58,8 @@ def test_trend_wording_for_indicative_metrics():
         "delta": 0.4,
         "mdc95": 1.9,
     }
-    assert explain.item(m)["summary"] == (
-        "Shine: about the same as at your start (indicative). The difference of 0.4 is within "
-        "how much your photos usually vary (about 1.9)."
-    )
+    # no number for a metric that did not change: people read words, not figures
+    assert explain.item(m)["summary"] == "Shine: about the same as at your start (indicative)."
 
 
 def _result_with_change():
@@ -100,8 +98,7 @@ def test_gemini_explanation_used_when_it_passes(monkeypatch):
         "items": [
             {
                 "metric_id": "redness",
-                "summary": f"Redness changed by {round(red['delta'], 1):g}, "
-                "more than your photos usually vary (about 0.9).",
+                "summary": f"Redness changed by {round(red['delta'], 1):g}: calmer skin.",
                 "quoted_numbers": [],
             }
         ],
@@ -272,9 +269,9 @@ def test_a_change_quoted_with_the_wrong_sign_or_direction_is_rejected():
 
 def test_the_right_sign_and_direction_pass():
     data = _data(-0.8, routine=[{"product": "Minimalist Retinol 0.3%", "started_at": "2026-10-01"}])
-    ok = _exp("Redness went down by -0.8, within how much your photos usually vary (2.5).")
-    assert explain.problems(ok, data) == []
-    named = _exp("Redness is 13.4, no clear change yet while using Minimalist Retinol 0.3%.")
+    ok = _exp("Redness went down by -0.8: about the same as at your start.")
+    assert [i for i in explain.problems(ok, data) if "sign" in i or "direction" in i] == []
+    named = _exp("Redness: no clear change yet while using Minimalist Retinol.")
     assert explain.problems(named, data) == []
 
 
@@ -319,7 +316,8 @@ def test_no_band_change_is_quoted_as_the_app_shows_it():
         "value": 27.21,
     }
     out = explain.item(m, first_reading=False)
-    assert "a shift from your start (by 0.8)" in out["summary"] and out["quoted_numbers"] == ["0.8"]
+    assert "a shift from your start" in out["summary"] and out["quoted_numbers"] == []
+    assert not explain.NUMBER.search(out["summary"])
 
 
 def test_jargon_falls_back_to_plain_words(monkeypatch):
@@ -340,3 +338,26 @@ def test_jargon_falls_back_to_plain_words(monkeypatch):
     exp, source = explain.generate(result, {"days_since_baseline": 21})
     assert source == "template"
     assert not any(explain.JARGON.search(i["summary"]) for i in exp["items"])
+
+
+def test_items_say_at_most_one_number_and_only_for_a_real_change():
+    data = _data(-0.8)
+    wordy = _exp("Redness is 13.4 now, down by 0.8 against the usual 2.5 variation.")
+    assert any("too many numbers" in i for i in explain.problems(wordy, data))
+    plain = _exp("Redness: about the same as at your start.")
+    assert not any("numbers" in i for i in explain.problems(plain, data))
+
+
+def test_saved_explanations_with_jargon_or_many_numbers_are_flagged_for_a_rewrite():
+    old = {
+        "headline": "Clear trends",
+        "items": [
+            {"summary": "Blemish count changed, with a delta of -7 against a noise band of 2."}
+        ],
+    }
+    assert not explain.plain_enough(old)
+    new = {
+        "headline": "Fewer blemishes",
+        "items": [{"summary": "7 fewer blemishes than at your start."}],
+    }
+    assert explain.plain_enough(new) and explain.plain_enough(None)

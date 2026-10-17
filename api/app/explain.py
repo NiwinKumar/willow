@@ -79,12 +79,11 @@ def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     # the app's confidence word for these readings (web lib/verdict.ts confidenceOf)
     trend = " (indicative)" if metric["confidence"] == "indicative" else ""
     quoted: list[str] = []
+    # one number at most (the size of a real change), the rest in words
     if verdict == "no_baseline" and delta is not None:
-        quoted = [_num(abs(delta))]
         summary = (
-            f"{label}: {since_start(metric, delta)} (by {quoted[0]})"
-            f"{trend}. Your baseline needs more photos before Willow can tell a real change from "
-            "normal photo-to-photo variation."
+            f"{label}: {since_start(metric, delta)}{trend}. Your baseline needs more photos before "
+            "Willow can say if this is a real change."
         )
     elif verdict == "no_baseline" and first_reading:
         summary = f"{label}: first reading. Future photos are compared to it."
@@ -94,21 +93,11 @@ def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
         summary = f"{label}: not compared with your baseline this time."
     elif verdict == "low_quality":
         summary = f"{label}: photo quality too low to compare this time."
-    elif delta is not None and mdc is not None:
-        quoted = [_num(abs(delta)), _num(mdc)]
-        if verdict == "real_change":
-            summary = (
-                f"{label}: {since_start(metric, delta)}{trend}. It moved by "
-                f"{quoted[0]}, more than your photos usually vary (about {quoted[1]})."
-            )
-        else:
-            summary = (
-                f"{label}: about the same as at your start{trend}. The difference of {quoted[0]} "
-                f"is within how much your photos usually vary (about {quoted[1]})."
-            )
-    elif delta is not None:
+    elif verdict == "real_change" and delta is not None:
         quoted = [_num(abs(delta))]
-        summary = f"{label}: no clear change yet{trend} (a difference of {quoted[0]})."
+        summary = f"{label}: {since_start(metric, delta)} (by {quoted[0]}){trend}."
+    elif delta is not None and mdc is not None:
+        summary = f"{label}: about the same as at your start{trend}."
     else:
         summary = f"{label}: no clear change yet{trend}."
     return {"metric_id": metric["id"], "summary": summary, "quoted_numbers": quoted}
@@ -186,24 +175,26 @@ def _claims_change(text: str) -> bool:
 
 INSTRUCTIONS = """Explain one skin-measurement session to the person, in plain calm words.
 Rules:
-- Write for someone with no science background: everyday words, short sentences. Say what changed
-  the way a person would ("7 fewer blemishes than at your start", "a more even tone"), using each
+- Write for someone with no science background: everyday words, short sentences, the way a friend
+  would say it ("7 fewer blemishes than at your start", "your tone looks more even"), using each
   metric's when_lower / when_higher words for the direction of its delta. Never write the words
-  delta, noise band, mdc, threshold, variance, standard deviation, a* or ΔL*: delta is "it moved
-  by N" or "N fewer / more", mdc95 is "your photos usually vary by about N".
-- Use only the metrics given. Quote numbers exactly as given (value, delta without its sign,
-  mdc95, days); never compute new numbers, percentages or estimates. Never quote dates or photo
-  numbers ("photo 3").
-- verdict real_change: say it changed by more than the person's photos usually vary.
-  within_noise: "about the same as at your start". no_baseline with a delta: the change is shown
-  but the baseline needs more photos before it can be called real. no_baseline without a delta:
-  this is the first reading, but only when is_baseline is true; on a later session it means
-  this one could not be compared with the baseline this time (say so, never "first").
+  delta, noise band, mdc, threshold, variance, standard deviation, value, reading, index, a* or ΔL*.
+- At most ONE number per item, and only for a real_change: the size of the change for counts
+  ("7 fewer blemishes"); for every other metric say it in words, with no number ("your tone looks
+  more even"). Never quote the measured value itself, how much photos usually vary, degrees,
+  percentages or scores. The headline has no numbers except the days since the start.
+- Each item is one sentence of at most 25 words. Lead with what it means for the person.
+- Use only the metrics given. Quote numbers exactly as given (delta without its sign, days); never
+  compute new numbers, percentages or estimates. Never quote dates or photo numbers ("photo 3").
+- verdict real_change: say it changed (no need to explain how this is judged).
+  within_noise: "about the same as at your start", with no number. no_baseline with a delta:
+  the change is shown but the baseline needs more photos before it can be called real.
+  no_baseline without a delta: this is the first reading, but only when is_baseline is true;
+  on a later session it means this one could not be compared with the baseline this time (say
+  so, never "first").
   low_quality: the photo could not be compared.
 - confidence indicative: call it a trend.
-- Face sessions (site face_full) with frames_used of 2 or more: blemishes and dark spots count
-  only marks seen in at least two of the photos; say so if the count is low. Close-ups (cheek_macro,
-  nose_macro) average each photo's own count. Pores and texture come only from close-ups.
+- Never explain how counting or measuring works (photos compared, marks confirmed, averages).
 - Never attribute causation with certainty; at most "may be linked to" a routine product, and only
   if it started before this session.
 - Skin tone (tone_ita) is descriptive: never better or worse, never lighter or darker as a goal.
@@ -219,7 +210,7 @@ Rules:
 
 class _Item(BaseModel):
     metric_id: str
-    summary: str = Field(max_length=320)
+    summary: str = Field(max_length=200)
     quoted_numbers: list[str] = Field(default_factory=list, max_length=6)
 
 
@@ -378,6 +369,28 @@ def _direction_problem(summary: str, metric: dict[str, Any]) -> str | None:
     return None
 
 
+NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def too_many_numbers(text: str, most: int) -> bool:
+    """People read words, not figures: an item says at most one number (the change)."""
+    return len(NUMBER.findall(text)) > most
+
+
+def plain_enough(explanation: dict[str, Any] | None) -> bool:
+    """A saved explanation that today's rules would still accept on wording (no jargon, few
+    numbers); older ones are rewritten by scripts/reexplain.py."""
+    if not explanation:
+        return True
+    texts = [
+        explanation.get("headline", ""),
+        *(i.get("summary", "") for i in explanation.get("items", [])),
+    ]
+    if any(JARGON.search(t) for t in texts):
+        return False
+    return not any(too_many_numbers(i.get("summary", ""), 1) for i in explanation.get("items", []))
+
+
 def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
     allowed = _allowed(data)
     verdicts = {m["id"]: m["verdict"] for m in data["metrics"]}
@@ -391,6 +404,13 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"banned wording in: {text}")
         if JARGON.search(text):
             found.append(f"jargon in: {text}")
+    if too_many_numbers(exp.headline, 1):
+        found.append(f"numbers in headline: {exp.headline}")
+    for item in exp.items:
+        if too_many_numbers(
+            item.summary, 1 if verdicts.get(item.metric_id) == "real_change" else 0
+        ):
+            found.append(f"too many numbers in: {item.summary}")
     for item in exp.items:
         if item.metric_id not in verdicts:
             found.append(f"unknown metric {item.metric_id}")
