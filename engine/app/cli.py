@@ -42,6 +42,10 @@ def main(argv: list[str] | None = None) -> None:
             "forearm_control",
             "face_full",
             "cheek_macro",
+            "left_cheek_macro",
+            "right_cheek_macro",
+            "forehead_macro",
+            "chin_macro",
             "nose_macro",
         ],
     )

@@ -227,7 +227,7 @@ CROP_MIN_MM = 6.0
 CROP_MIN_OUT_PX = 128
 CROP_CONTEXT = 3  # context crop is 3x the candidate crop
 
-# Close-up sites (cheek_macro, nose_macro). Scale: the width of skin a close-up covers, so
+# Close-up sites (*_macro). Scale: the width of skin a close-up covers, so
 # it holds when the app shrinks the photo. MEASURE IT with scripts/macro_scale.py (a mm
 # ruler shot at the usual close-up distance); until then MACRO_SCALE_CALIBRATED is False,
 # pores/texture are indicative and the result says the scale is assumed. 30 mm is roughly

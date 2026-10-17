@@ -10,7 +10,7 @@
     "engine_version": {"type": "string"},
     "session_id": {"type": "string"},
     "user_id": {"type": "string"},
-    "site": {"enum": ["face_full", "cheek_macro", "nose_macro", "forearm_treated", "forearm_control"]},
+    "site": {"enum": ["face_full", "cheek_macro", "left_cheek_macro", "right_cheek_macro", "forehead_macro", "chin_macro", "nose_macro", "forearm_treated", "forearm_control"]},
     "capture_mode": {"enum": ["calibrated_raw", "uncalibrated"]},
     "frames_used": {"type": "integer", "minimum": 0},
     "quality": {
