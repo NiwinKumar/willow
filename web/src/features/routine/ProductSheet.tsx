@@ -296,38 +296,40 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
         </div>
       ) : null}
 
-      <div className="card flex flex-col gap-2.5 bg-sunken px-5 py-4">
-        {concerns.length ? (
-          <>
-            <span className="text-[14px] text-ink-2">Concerns</span>
-            <span className="flex flex-wrap gap-1.5">
-              {concerns.map((c) => (
-                <span key={c} className="rounded-pill bg-canvas px-3 py-1.5 text-[13px]">
-                  {(CONCERN_LABEL[c] ?? c).replace(/^./, (x) => x.toUpperCase())}
-                </span>
-              ))}
-            </span>
-          </>
-        ) : null}
-        {actives.length ? (
-          <>
-            <span className="text-[14px] text-ink-2">Actives</span>
-            <span className="flex flex-wrap gap-1.5">
-              {actives.map((a) => (
-                <span key={a.name} className="rounded-pill bg-lime px-3 py-1.5 text-[13px]">
-                  {activeLabel(a)}
-                </span>
-              ))}
-            </span>
-          </>
-        ) : null}
-        {inci.length ? (
-          <details className="text-[14px] leading-[1.55]">
-            <summary className="flex min-h-10 cursor-pointer items-center">Full ingredient list · {product ? 'from catalog' : 'as saved'}</summary>
-            <p className="mt-1.5 text-ink-2">{inci.join(', ')}</p>
-          </details>
-        ) : null}
-      </div>
+      {concerns.length || actives.length || inci.length ? (
+        <div className="card flex flex-col gap-2.5 bg-sunken px-5 py-4">
+          {concerns.length ? (
+            <>
+              <span className="text-[14px] text-ink-2">Concerns</span>
+              <span className="flex flex-wrap gap-1.5">
+                {concerns.map((c) => (
+                  <span key={c} className="rounded-pill bg-canvas px-3 py-1.5 text-[13px]">
+                    {(CONCERN_LABEL[c] ?? c).replace(/^./, (x) => x.toUpperCase())}
+                  </span>
+                ))}
+              </span>
+            </>
+          ) : null}
+          {actives.length ? (
+            <>
+              <span className="text-[14px] text-ink-2">Actives</span>
+              <span className="flex flex-wrap gap-1.5">
+                {actives.map((a) => (
+                  <span key={a.name} className="rounded-pill bg-lime px-3 py-1.5 text-[13px]">
+                    {activeLabel(a)}
+                  </span>
+                ))}
+              </span>
+            </>
+          ) : null}
+          {inci.length ? (
+            <details className="text-[14px] leading-[1.55]">
+              <summary className="flex min-h-10 cursor-pointer items-center">Full ingredient list · {product ? 'from catalog' : 'as saved'}</summary>
+              <p className="mt-1.5 text-ink-2">{inci.join(', ')}</p>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* the person's own view, current or stopped; the felt-vs-readings line only beside visible readings */}
       {entry ? <FeelCard ref={feelRef} entry={entry} outcome={inUse ? outcome : null} /> : null}
