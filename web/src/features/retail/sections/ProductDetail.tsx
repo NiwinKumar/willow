@@ -1,6 +1,6 @@
 import { ChevronDown, Columns3, Copy, Download, Megaphone } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { useRetailData } from '../context'
 import { csvMeta } from '../data'
@@ -12,13 +12,15 @@ import { hintOf, money, segInterval } from '../productModel'
 import { sectionPath, useRetailState } from '../state'
 import type { BrandFlow, Insights, ProductDetail as Detail, Seg } from '../types'
 import { Badge, Bone, Button, copyText, CurveChart, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, ProofTierChip, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
+import { FeelPanel } from './FeelPanel'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
  * Product proof page (/retail/products/:id) on GET /v1/retailer/products/{id}. Read top to bottom it is the
  * demo's story: the Proof pipeline (measured → proven → claims → promoted → lift), the outcome against
  * non-users with the same goals, where it works, the claim-ready statements, how it ranks, and the routine
- * context (used alongside, switching, conflicts). Promote opens the campaign sheet prefilled
+ * context (used alongside, switching, conflicts). "How it feels" (self-reported, never part of the tier or the
+ * evidence) sits after the evidence; brief cards link to it with #feel. Promote opens the campaign sheet prefilled
  * (/retail/campaigns?new=<id>). Deep links: ?seg=skin|goal|tone, ?ctx=co|switch|conflicts.
  */
 
@@ -89,6 +91,11 @@ function Page({ x, weeksN, brandView }: { x: Detail; weeksN: number; brandView: 
   const facts = [p.category_label, `${tierWord(p.price_tier)} price`, p.size, money(p.price)].filter(Boolean).join(' · ')
   const campaign = campaignFor(useCampaigns(), p.product_id)
   const steps = pipelineSteps({ p, weeksN, statements: x.evidence.length, eligible: x.eligibility.eligible, campaign, promoteTo })
+  // Brief cards link to #feel; the panel exists only once the product is in, so scroll then.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (hash === '#feel') document.getElementById('feel')?.scrollIntoView({ block: 'start' })
+  }, [hash, p.product_id])
 
   return (
     <div className="flex flex-col gap-8">
@@ -193,6 +200,8 @@ function Page({ x, weeksN, brandView }: { x: Detail; weeksN: number; brandView: 
           <Competitors x={x} brandView={brandView} carry={carry} />
         </Panel>
       </div>
+
+      <FeelPanel x={x} />
 
       <Panel title="In people’s routines" id="ctx-h" description={p.users ? `Among its ${int(p.users)} users. Groups under ${MIN_GROUP} people are left out.` : undefined}>
         <div className="flex flex-col gap-4">
