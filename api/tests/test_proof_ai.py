@@ -28,12 +28,19 @@ def test_sources_are_the_evidence_then_one_labelled_self_reported_line():
     src = proof_ai.sources(view)
     assert [s["id"] for s in src if s["measured"]] == [e["id"] for e in view["evidence"]]
     said = [s for s in src if not s["measured"]]
+    assert len(said) == (1 if view["feel"]["working"] >= proof_ai.PERCEPTION_MIN else 0)
+    low = {**view, "feel": {**view["feel"], "working": 0.32}}
+    assert all(s["measured"] for s in proof_ai.sources(low))  # a minority share is not a claim
+    said = [s for s in proof_ai.sources({**view, "feel": {**view["feel"], "working": 0.6}})]
+    said = [s for s in said if not s["measured"]]
     assert len(said) == 1 and said[0]["id"] == "perception"
     assert "said" in said[0]["text"] and "self-reported" in said[0]["text"]
 
 
 def test_a_draft_must_cite_quote_and_word_its_sources_honestly():
-    by_id = {s["id"]: s for s in proof_ai.sources(_view())}
+    view = _view()
+    view = {**view, "feel": {**view["feel"], "working": 0.6}}
+    by_id = {s["id"]: s for s in proof_ai.sources(view)}
     eff = by_id["efficacy"]["text"]
     n = eff.split("Measured in ")[1].split(" ")[0]
     pct = eff.split(": ")[1].split("%")[0]
@@ -52,6 +59,7 @@ def test_a_draft_must_cite_quote_and_word_its_sources_honestly():
     assert "number" in problem(f"{pct}% of 1000 Willow users had a visible change.")
     assert "overclaim" in problem(f"Clinically proven: {pct}% of {n} users.")
     assert "overclaim" in problem(f"Works for everyone: {pct}% of {n} users.")
+    assert "overclaim" in problem(f"In our study, {pct}% of {n} users had a visible change.")
     assert "too long" in problem(good.text, limit=20)
 
     said = by_id["perception"]["text"]
