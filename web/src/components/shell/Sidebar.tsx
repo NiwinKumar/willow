@@ -15,9 +15,9 @@ const NAV: { id: Exclude<Destination, 'you' | null>; label: string; to: string; 
 
 /**
  * Wide screens (≥900px): the glass sidebar from the design, 212px open / 65px collapsed. A black pill
- * slides to the current destination; Advisor toggles the right panel; You sits at the foot.
+ * slides to the current destination; You sits at the foot. (The advisor has its own floating button: AdvisorFab.)
  */
-export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, advisorOpen, onAdvisor, name, initials }: { current: Destination; collapsed: boolean; onToggle: () => void; onCheckIn: () => void; due?: string | null; advisorOpen: boolean; onAdvisor: () => void; name: string; initials: string }) {
+export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, name, initials }: { current: Destination; collapsed: boolean; onToggle: () => void; onCheckIn: () => void; due?: string | null; name: string; initials: string }) {
   const nav = useRef<HTMLElement>(null)
   const [pill, setPill] = useState<{ top: number; on: boolean }>({ top: 0, on: false })
   const { pathname } = useLocation()
@@ -57,11 +57,6 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, advisorO
               </Link>
             )
           })}
-          <button type="button" onClick={onAdvisor} aria-pressed={advisorOpen} aria-label="Advisor" title="Advisor" className={`${row} text-ink hover:bg-ink/6`}>
-            <NavIcon name="advisor" active={false} />
-            <span className={`relative ${label}`}>Advisor</span>
-            {advisorOpen ? <span aria-hidden className={`ml-auto text-[12px] text-ink-2 ${label}`}>●</span> : null}
-          </button>
         </nav>
         <div className="min-h-2.5 flex-1" />
       </div>

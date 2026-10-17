@@ -17,6 +17,7 @@ const WaysIn = lazy(() => import('./features/website/WaysIn'))
 const FrontDoor = lazy(() => import('./features/website/FrontDoor'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
+const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
 const Terms = lazy(() => import('./features/website/Terms'))
 const Retail = lazy(() => import('./features/retail/Retail'))
 const Home = lazy(() => import('./features/home/Home'))
@@ -54,6 +55,8 @@ export default function App() {
             <Route path="/welcome/:step" element={<Welcome />} />
             <Route path="/judge" element={<Judge />} />
             <Route path="/terms" element={<Terms />} />
+            {/* The assistant avatar in every state (not linked; for checking the motion). */}
+            <Route path="/lab/avatar" element={<AvatarLab />} />
             <Route path="/retail/*" element={<Retail />} />
             <Route element={<AppShell />}>
               <Route path="/home" element={<Page><Home /></Page>} />
