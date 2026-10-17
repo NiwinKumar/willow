@@ -19,7 +19,7 @@ Goal: the same light, distance, angle and camera settings every time, so changes
 2. Card in frame next to the cheek (face) or next to the square (forearm), same plane as the skin, not shadowed.
 3. Neutral expression, eyes open, hair off forehead, glasses off.
 4. **Baseline sessions: 5 frames per site, fully reposition phone and body between frames.** Normal sessions: 3 frames.
-5. Sites: `face_full`, `cheek_macro` (left cheek, same spot every time), `nose_macro` (optional), `forearm_treated`, `forearm_control`.
+5. Sites: `face_full`, `cheek_macro` (left cheek, same spot every time), the place close-ups `left_cheek_macro`, `right_cheek_macro`, `forehead_macro`, `chin_macro` (Oct 18: about 10 cm away, one eye, the brows or the lower lip still in the photo), `nose_macro` (optional), `forearm_treated`, `forearm_control`. RAW is for close-ups and forearms; the whole face is quick photos.
 6. Transfer DNGs via AirDrop / Files to the laptop. Do not send via WhatsApp or Photos sharing (converts to JPEG).
 7. Upload to `gs://<PROJECT_ID>-captures/team/{person}/{yyyymmdd_hhmm}_{site}/frame_{n}.dng` and add a row to the capture log.
 
