@@ -95,9 +95,9 @@ def test_analysis_stores_labels_next_to_the_result(client, fake, monkeypatch):
         "/v1/sessions",
         json={
             "site": "face_full",
-            "capture_mode": "calibrated_raw",
+            "capture_mode": "uncalibrated",
             "n_frames": 1,
-            "content_types": ["image/x-adobe-dng"],
+            "content_types": ["image/jpeg"],
         },
     ).json()
     fake.put(res["upload_urls"][0]["object_uri"].split("/", 3)[3])

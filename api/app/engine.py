@@ -33,7 +33,16 @@ SITE_METRICS: dict[str, tuple[str, ...]] = {
         "shine",
         "glow",
     ),
-    "cheek_macro": ("tone_ita", "pigment_spots", "redness", "blemishes", "pores", "texture"),
+    **{
+        site: ("tone_ita", "pigment_spots", "redness", "blemishes", "pores", "texture")
+        for site in (
+            "cheek_macro",
+            "left_cheek_macro",
+            "right_cheek_macro",
+            "forehead_macro",
+            "chin_macro",
+        )
+    },
     "nose_macro": ("blemishes", "pores"),
     "forearm_treated": ("tone_ita", "redness"),
     "forearm_control": ("tone_ita", "redness"),
@@ -238,7 +247,7 @@ def fixture_result(request: dict[str, Any]) -> dict[str, Any]:
                 "context_crop_uri": f"{prefix}crops/{c['id']}_ctx.jpg",
             }
             for c in base["candidates"]
-            if site in ("face_full", "cheek_macro")
+            if "pigment_spots" in SITE_METRICS[site]  # not the nose or the forearms
         ],
         overlays=[
             {"metric_id": o["metric_id"], "uri": f"{prefix}overlays/{o['metric_id']}.png"}

@@ -39,7 +39,17 @@ METRIC_LABELS = {
     "shine": "shine",
     "glow": "glow",
 }
-SITES = ("face_full", "cheek_macro", "nose_macro", "forearm_treated", "forearm_control")
+SITES = (
+    "face_full",
+    "cheek_macro",
+    "left_cheek_macro",
+    "right_cheek_macro",
+    "forehead_macro",
+    "chin_macro",
+    "nose_macro",
+    "forearm_treated",
+    "forearm_control",
+)
 WIDGET_KINDS = (
     "metric_trend",
     "session_summary",

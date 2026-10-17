@@ -4,7 +4,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-Site = Literal["face_full", "cheek_macro", "nose_macro", "forearm_treated", "forearm_control"]
+Site = Literal[
+    "face_full",
+    "cheek_macro",
+    "left_cheek_macro",
+    "right_cheek_macro",
+    "forehead_macro",
+    "chin_macro",
+    "nose_macro",
+    "forearm_treated",
+    "forearm_control",
+]
+# RAW (Lightroom DNG) is for close-ups and the forearm squares; a whole face is a quick photo.
+RAW_SITES = frozenset(s for s in Site.__args__ if s != "face_full")
 CaptureMode = Literal["calibrated_raw", "uncalibrated"]
 
 # Content type the browser will PUT with -> file extension in GCS.
@@ -28,6 +40,10 @@ class CreateSessionRequest(BaseModel):
         bad = [c for c in self.content_types if c not in allowed]
         if bad:
             raise ValueError(f"content type not allowed for {self.capture_mode}: {bad[0]}")
+        if self.capture_mode == "calibrated_raw" and self.site not in RAW_SITES:
+            raise ValueError(
+                "RAW is for close-ups and forearms; take the whole face as quick photos"
+            )
         return self
 
 
