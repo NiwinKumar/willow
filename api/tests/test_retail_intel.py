@@ -506,6 +506,12 @@ BEFORE = "2116406a73a0b96f14068c8980abcd76acc96bc226dff5a7d914c52de478eee5"
 def _digest(t):
     first = {u["user_hash"] for u in t["users_flat"][:50]}
     body = {k: t[k] for k in ("users_flat", "routine_flat", "routine_conflicts", "goals_monthly")}
+    # self-reported feel came later from its own stream (tests/test_feel.py): every draw before it
+    # must still match
+    feel_keys = ("feel", "feel_week", "feel_tags")
+    body["routine_flat"] = [
+        {k: v for k, v in r.items() if k not in feel_keys} for r in body["routine_flat"]
+    ]
     body["sessions_first_50"] = [r for r in t["sessions_flat"] if r["user_hash"] in first]
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 

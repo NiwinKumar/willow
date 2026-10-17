@@ -11,7 +11,7 @@ running it twice gives the same tables. Tables:
 - sessions_flat: one row per reading x metric (goals and skin type at that reading)
 - users_flat: one row per person (current goals, skin type, first and last reading, last week)
 - goals_monthly: one row per person x month with a reading (the goals they had that month)
-- routine_flat: one row per person x product (started / stopped week)
+- routine_flat: one row per person x product (started / stopped week, latest self-reported feel)
 - routine_conflicts: the rule-table findings of each person's routine ("none" if clear)
 Each holds the synthetic cohort (is_synthetic = true; api/app/cohort.py, generated up to
 `--today`) plus people who opted in to aggregate insights (users/{uid}.consent), under a one-way
@@ -93,6 +93,10 @@ def _schemas() -> dict[str, list]:
             S("tier", "STRING"),
             S("started_week", "INT64"),
             S("stopped_week", "INT64"),
+            # self-reported (app/feel.py): latest verdict, weeks into use, look-and-feel tags
+            S("feel", "STRING"),
+            S("feel_week", "INT64"),
+            S("feel_tags", "STRING", mode="REPEATED"),
         ],
         "routine_conflicts": [
             S("user_hash", "STRING"),
@@ -251,6 +255,9 @@ def real_rows(store) -> dict[str, list[dict]]:
                     "stopped_week": max(0, (ended.date() - start.date()).days // 7)
                     if ended
                     else None,
+                    "feel": (e.get("feel") or {}).get("verdict"),
+                    "feel_week": (e.get("feel") or {}).get("week"),
+                    "feel_tags": list((e.get("feel") or {}).get("tags") or []),
                 }
             )
         out["routine_conflicts"] += [
