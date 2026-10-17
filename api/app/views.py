@@ -223,6 +223,9 @@ def session_view(
             "explanation_source": doc.get("explanation_source"),
             "preview": preview,
             "overlay_urls": overlay_urls,
+            # blemish and dark-spot counts compared with this check-in instead of the baseline
+            # (one taken the same way, with or without cheek photos), else None
+            "counts_compared_with": doc.get("counts_compared_with") if measured else None,
             # front / right / left photos of the session, each with its own marks and areas
             "views": view_photos(result, signed),
             "hours_since_baseline": hours,
