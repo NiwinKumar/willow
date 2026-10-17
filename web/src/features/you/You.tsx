@@ -157,8 +157,7 @@ function AccountCard() {
       clearQueries()
       resetChat()
       prefs.clearAll()
-      // Not / (that would start onboarding as a new guest): the about page, with Sign in and Get started.
-      navigate('/about', { replace: true })
+      navigate('/', { replace: true })
     } catch {
       setLeaving(false)
       toast.error('Signing out didn’t finish. Try again.')
@@ -256,13 +255,13 @@ function GoalsCard({ demo }: { demo: boolean }) {
       <span className="text-[13px] text-ink-2">Goals put their measures first in your results{demo ? ', the demo journey included' : ''}.</span>
       {demo ? null : (
         <>
-          <span className="text-[14px] text-ink-2">Check-in photo time</span>
+          <span className="text-[14px] text-ink-2">Usual photo time</span>
           <SegmentedControl
-            label="Check-in photo time"
+            label="Usual photo time"
             className="self-start"
             options={PHOTO_TIMES.map((t) => ({ value: t.id as string, label: t.label }))}
             value={profile.photo_time ?? ''}
-            onChange={(v) => void saveOne({ photo_time: v as PhotoTime }, `Check-in photo time: ${v}`)}
+            onChange={(v) => void saveOne({ photo_time: v as PhotoTime }, `Usual photo time: ${v}`)}
           />
           <span className="text-[13px] text-ink-2">The same time of day keeps the light comparable.</span>
           <span id="skin-type-label" className="text-[14px] text-ink-2">
@@ -640,7 +639,7 @@ function DeleteCard() {
         <button
           type="button"
           onClick={() => {
-            void removeAccount().then(() => navigate('/about', { replace: true }))
+            void removeAccount().then(() => navigate('/', { replace: true }))
           }}
           className={`${btn} self-start bg-white text-ink`}
         >
