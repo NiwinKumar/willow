@@ -5,7 +5,7 @@ import { sizedImage } from './productVisual'
 
 /**
  * A product's packshot, linked from the brand or retailer page it is already published on (never copied),
- * on a round white plate in a fixed box; the category orb when there is none (own and label-scan products)
+ * filling a round frame (cropped to the circle, like an avatar); the category orb when there is none (own and label-scan products)
  * or it fails to load. `muted` is the routine's "not ticked yet" look, `rest` the fainter "rests today".
  * No referrer is sent, so the brand's CDN serves it as it would a direct visit.
  */
@@ -44,7 +44,7 @@ export function ProductImage({ product, size, muted = false, rest = false, breat
         decoding="async"
         referrerPolicy="no-referrer"
         onError={() => setFailed(src)}
-        className="size-full object-contain p-[12%] mix-blend-multiply"
+        className="size-full object-cover"
       />
     </span>
   )
