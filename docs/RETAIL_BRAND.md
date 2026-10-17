@@ -45,6 +45,8 @@ Proof follows the viewer's theme (system, light or dark, toggle in the top bar, 
 | `--pf-red` | `#D93036` | `#FF6166` | Status only: errors, risk |
 | `--pf-base` | `#B4B4B4` | `#5C5C5C` | Comparison series (non-users, the market) |
 
+Self-reported shares ("How it feels" on the product page) use leaf for "It's working for me" and `--pf-base` at two strengths for "Too soon to tell" and "Not for me", never amber or red; the legend's words and order carry the meaning.
+
 Rules: leaf means "proven / yours / positive", nothing else; amber and red are status, never decoration; colour is never the only signal (tiers carry a dot and a word, suppressed cells carry "n<10"). The data scope (simulated, mixed or real people; period) is stated once, in the top bar's scope control, not on every panel.
 
 ## Type
