@@ -161,7 +161,16 @@ export type RoutineEntry = {
   /** The catalog packshot (catalog products only), joined by GET /v1/routine. */
   image_url?: string | null
   image_source?: string | null
+  /** The person's own latest verdict on the product (self-reported, never a measurement). PUT /v1/routine/{id}/feel. */
+  feel?: FeelAnswer | null
+  /** One answer per week, oldest first (a new answer in the same week replaces it), at most 26. */
+  feel_history?: FeelAnswer[]
 }
+
+export type FeelVerdict = 'working' | 'unsure' | 'not_for_me'
+export type FeelTag = 'feels_nice' | 'absorbs' | 'softer' | 'looks_better' | 'heavy' | 'stings' | 'drying' | 'breakouts'
+/** `week`: whole weeks from started_at to the answer day (0 = the first week); `at`: ISO datetime. */
+export type FeelAnswer = { verdict: FeelVerdict; tags: FeelTag[]; week: number; at: string }
 
 /** Every day (null or daily), every other day counted from `anchor` (a use day), or chosen weekdays (0 = Monday). */
 export type RoutineSchedule = { kind: 'daily' | 'alternate' | 'days'; days?: number[] | null; anchor: string }

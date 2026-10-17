@@ -2,10 +2,12 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 
 import { refreshRoutine, useOwner, useRoutine, useRoutineLog } from '../../data/hooks'
-import type { RoutineEntry, RoutineSchedule } from '../../data/types'
+import type { FeelTag, FeelVerdict, RoutineEntry, RoutineSchedule } from '../../data/types'
 import { ApiError, api, localDay, type NewRoutineEntry } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
+import { getQueryData, setQueryData } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
+import { weekOf } from './feel'
 import { entryName, slotWords } from './routineModel'
 import { alternatePair, scheduleWords } from './schedule'
 
@@ -110,7 +112,31 @@ export function useRoutineWrites() {
     [getIdToken, refresh],
   )
 
-  return { add, stop, remove, setSlots, setSchedule, alternate }
+  /**
+   * How it feels (the person's own verdict and tags). Optimistic: the routine shows the answer at once, the
+   * api's entry replaces it, and a failure puts the old routine back and reaches the caller.
+   */
+  const setFeel = useCallback(
+    async (e: RoutineEntry, verdict: FeelVerdict, tags: FeelTag[]) => {
+      const key = ['routine', uid]
+      const prev = getQueryData<RoutineEntry[]>(key)
+      const swap = (next: (x: RoutineEntry) => RoutineEntry) => (list: RoutineEntry[] | undefined) => (list ?? []).map((x) => (x.id === e.id ? next(x) : x))
+      setQueryData<RoutineEntry[]>(key, swap((x) => ({ ...x, feel: { verdict, tags, week: weekOf(x.started_at, localDay()), at: new Date().toISOString() } })))
+      let saved: RoutineEntry
+      try {
+        saved = await api.putFeel(await getIdToken(), e.id, { verdict, tags })
+      } catch (err) {
+        if (prev) setQueryData<RoutineEntry[]>(key, prev)
+        throw err
+      }
+      setQueryData<RoutineEntry[]>(key, swap((x) => ({ ...x, feel: saved.feel ?? null, feel_history: saved.feel_history ?? [], updated_at: saved.updated_at ?? x.updated_at })))
+      await refresh()
+      return saved
+    },
+    [uid, getIdToken, refresh],
+  )
+
+  return { add, stop, remove, setSlots, setSchedule, alternate, setFeel }
 }
 
 /** Honest words for a failed write or read. */
