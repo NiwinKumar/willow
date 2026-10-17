@@ -1,4 +1,6 @@
-import { Copy, Sparkles } from 'lucide-react'
+import { ChevronDown, Copy, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { retailerBuyingList, type BuyingItem, type BuyingList as List } from '../../../../lib/api'
@@ -18,6 +20,23 @@ import { useView } from '../../useView'
 /** Some packs print INCI in capitals ("NIACINAMIDE"): shown as Niacinamide. */
 const inciCase = (s: string) => (s === s.toUpperCase() ? s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()) : s)
 
+/** Open or folded, remembered per browser (a convenience only: storage may be blocked). */
+const OPEN_KEY = 'willow.proof.buying.open'
+function readOpen(): boolean {
+  try {
+    return localStorage.getItem(OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function saveOpen(v: boolean) {
+  try {
+    localStorage.setItem(OPEN_KEY, v ? '1' : '0')
+  } catch {
+    /* storage blocked: it just won't be remembered */
+  }
+}
+
 const copy = (text: string, what: string) =>
   void navigator.clipboard?.writeText(text).then(
     () => toast(`${what} copied`),
@@ -28,6 +47,13 @@ export function BuyingList() {
   const { filters, insights } = useRetailData()
   const q = useView<List>(`buying|${filters.cohort}|${filters.range}`, () => retailerBuyingList(filters))
   const d = insights.status === 'ready' || insights.status === 'empty' ? insights.d : null
+  // Folded by default (it is long); a #buying link opens it.
+  const { hash } = useLocation()
+  const [open, setOpenState] = useState(() => hash === '#buying' || readOpen())
+  const setOpen = (v: boolean) => {
+    setOpenState(v)
+    saveOpen(v)
+  }
   const cohortLabel: string = d ? ({ real: 'consented users', mixed: 'mixed cohort', simulated: 'simulated cohort' } as const)[cohortKind(d.cohort)] : 'Willow cohort'
 
   if (q.status === 'loading')
@@ -55,19 +81,40 @@ export function BuyingList() {
             </Badge>
           ) : null
         }
-        description="The gaps worth acting on, ranked by how many people want the goal and how big the gap is, with under-used products already in the catalog to look at first."
+        description={
+          open || !list.items.length ? (
+            'The gaps worth acting on, ranked by how many people want the goal and how big the gap is, with under-used products already in the catalog to look at first.'
+          ) : (
+            <>
+              <strong>
+                {list.items.length} {list.items.length === 1 ? 'gap' : 'gaps'}
+              </strong>{' '}
+              worth acting on. First: {list.items[0].title.toLowerCase()} ({list.items[0].demand.toLocaleString('en-GB')} people).
+            </>
+          )
+        }
         actions={
           list.items.length ? (
-            <ToolButton onClick={() => copy(listText(list, cohortLabel), 'Buying list')}>
-              <Copy size={14} strokeWidth={1.7} aria-hidden />
-              Copy all briefs
-            </ToolButton>
+            <>
+              {open ? (
+                <ToolButton onClick={() => copy(listText(list, cohortLabel), 'Buying list')}>
+                  <Copy size={14} strokeWidth={1.7} aria-hidden />
+                  Copy all briefs
+                </ToolButton>
+              ) : null}
+              <ToolButton onClick={() => setOpen(!open)} label={open ? 'Hide the buying list' : 'Show the buying list'}>
+                <span aria-hidden className="contents">
+                  <ChevronDown size={14} strokeWidth={1.8} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                  {open ? 'Hide' : 'Show list'}
+                </span>
+              </ToolButton>
+            </>
           ) : null
         }
-        footnote={list.caveat}
+        footnote={open ? list.caveat : undefined}
         flush
       >
-        {list.items.length ? (
+        {!open && list.items.length ? null : list.items.length ? (
           <ol className="m-0 list-none p-0">
             {list.items.map((it, i) => (
               <Item key={it.id} it={it} n={i + 1} />
