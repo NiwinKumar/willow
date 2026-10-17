@@ -1,12 +1,16 @@
 """Close-up sites (docs/METRICS.md A5, A6, B2): a phone photo taken close to one part of the
 face. When enough of the face is in view (a nose close-up shows an eye), face landmarks give
-the region (cheek or nose; brows, eyes, lips and nostrils left out) and the
+the region (cheek, one cheek, forehead, chin or nose; brows, eyes, lips and nostrils left out)
+and the
 iris (CLOSEUP_IRIS_MM across) gives the scale. A pure macro shot with no face in view falls
 back to skin by colour over the whole photo and the assumed MACRO_FIELD_WIDTH_MM (measured
 once with scripts/macro_scale.py).
 
-cheek_macro   : tone_ita, pigment_spots, redness, blemishes, pores, texture
+cheek_macro, left_cheek_macro, right_cheek_macro, forehead_macro, chin_macro
+              : tone_ita, pigment_spots, redness, blemishes, pores, texture
 nose_macro    : blemishes, pores
+
+Left and right are the person's own (left_cheek_macro: their left cheek), as in face_full.
 """
 
 import dataclasses
@@ -40,13 +44,22 @@ from app.quality import check_frame, laplacian_variance
 from app.roi import Box
 
 REGIONS = {
-    "cheek_macro": "cheek",
+    "cheek_macro": "cheek",  # either or both cheeks (older check-ins)
+    "left_cheek_macro": "left_cheek",
+    "right_cheek_macro": "right_cheek",
+    "forehead_macro": "forehead",
+    "chin_macro": "chin",
     "nose_macro": "nose",
 }
+# skin pieces kept per region: both cheeks (each may be split by a crease), one cheek, ...
+PIECES = {"cheek": 4, "left_cheek": 2, "right_cheek": 2, "forehead": 2, "chin": 1, "nose": 1}
+REGION_WORDS = {"left_cheek": "left cheek", "right_cheek": "right cheek"}
 MACRO_SITES = set(REGIONS)
 # face mesh points the close-up regions are cut along
 LOWER_LIDS = (145, 374)  # right, left
 MOUTH_CORNERS = (61, 291)
+LOWER_LIP = 17  # middle of the lower lip's lower edge
+BROW_TOPS = (105, 334)  # upper edge of the right and the left brow
 NOSE_WINGS = (129, 358)  # right, left
 NO_LANDMARKS = np.full((478, 2), np.nan)
 IRIS = ([468, 469, 470, 471, 472], [473, 474, 475, 476, 477])  # centre, then 4 edge points
@@ -58,8 +71,8 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
     "pores": ("texture_pores", "Pores", "per_cm2"),
     "texture": ("texture_pores", "Texture", "index"),
 }
-SITE_METRICS = {
-    "cheek_macro": ("tone_ita", "pigment_spots", "redness", "blemishes", "pores", "texture"),
+SKIN_METRICS = ("tone_ita", "pigment_spots", "redness", "blemishes", "pores", "texture")
+SITE_METRICS = {site: SKIN_METRICS for site in REGIONS if site != "nose_macro"} | {
     "nose_macro": ("blemishes", "pores"),
 }
 SCALE_METRICS = {"pores", "texture"}  # need the mm scale; measured only once it is calibrated
@@ -160,7 +173,7 @@ def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
     """The site's region of the face, without eyes, lids, lips, brows (and their margins)."""
     if region == "nose":  # nostril openings are cut by colour (too dark for skin)
         area = face.nose_mask(shape)
-    else:  # cheek: a wide area of the face outline, cut along face lines
+    else:  # a wide area of the face outline, cut along face lines
         across, up = _axes(face)
         yy, xx = np.mgrid[: shape[0], : shape[1]].astype(np.float32)
         origin = face.points[1]  # nose tip
@@ -173,14 +186,21 @@ def _region(face: Face, region: str, shape: tuple[int, int]) -> np.ndarray:
         def t_of(*idx):
             return float(np.mean([(face.points[i] - origin) @ up for i in idx]))
 
-        # lower lids to mouth corners, side of the nose wing to the face edge
-        band = (t_px < t_of(*LOWER_LIDS)) & (t_px > t_of(*MOUTH_CORNERS))
-        sides = np.zeros(shape, bool)
-        if "right_cheek" in face.cheeks:
-            sides |= s_px < s_of(NOSE_WINGS[0])
-        if "left_cheek" in face.cheeks:
-            sides |= s_px > s_of(NOSE_WINGS[1])
-        area = polygon_mask(shape, face.outline()) & band & sides & ~face.nose_mask(shape)
+        if region == "forehead":  # above the brows (hair above is cut by colour)
+            part = t_px > t_of(*BROW_TOPS)
+        elif region == "chin":  # below the lower lip, between the jaw lines
+            part = t_px < t_of(LOWER_LIP)
+        else:  # cheeks: lower lids to mouth corners, side of the nose wing to the face edge
+            band = (t_px < t_of(*LOWER_LIDS)) & (t_px > t_of(*MOUTH_CORNERS))
+            part = np.zeros(shape, bool)
+            # one cheek's site keeps only that cheek, and only when it faces the camera
+            wanted = face.cheeks if region == "cheek" else [c for c in face.cheeks if c == region]
+            if "right_cheek" in wanted:
+                part |= s_px < s_of(NOSE_WINGS[0])
+            if "left_cheek" in wanted:
+                part |= s_px > s_of(NOSE_WINGS[1])
+            part &= band
+        area = polygon_mask(shape, face.outline()) & part & ~face.nose_mask(shape)
     guard = face.brow_guard(shape) | face.eye_corner_guard(shape)
     return area & face.skin_mask(shape) & ~guard & _edges(shape)
 
@@ -252,7 +272,7 @@ def _front_camera(path: str) -> bool:
 
 def _frame(path: str, site: str, overlays: bool = False) -> dict:
     """Everything measured on one close-up. overlays: also keep its a* on the preview grid
-    for the redness overlay (cheek_macro only: nose_macro has no redness metric)."""
+    for the redness overlay (not nose_macro: it has no redness metric)."""
     linear, srgb8 = _load(path)
     h, w = srgb8.shape[:2]
     face = _find_face(srgb8)
@@ -275,7 +295,7 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
         region = _region(
             dataclasses.replace(face, points=face.points * scale), REGIONS[site], lab.shape[:2]
         )
-        pieces = 4 if REGIONS[site] == "cheek" else 1  # cheeks: both, even if split by a crease
+        pieces = PIECES[REGIONS[site]]
         nose = REGIONS[site] == "nose"
         skin = _region_skin(lab, region, px, pieces, nose) if region.any() else region
     else:
@@ -295,7 +315,7 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
     blems_w = _clean_marks(find_blemishes(lab, skin, px), skin, px) if enough else []
     spots_w = (
         _clean_marks(find_spots(lab, skin, skin, px), skin, px)
-        if site == "cheek_macro" and enough
+        if "pigment_spots" in SITE_METRICS[site] and enough
         else []
     )
     # pores need detail the photo may not have (taken too far away); texture, at a coarser
@@ -310,7 +330,7 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
     pores_val, pores_extras = pores_per_cm2(pores, int(skin.sum()), px) if detailed else (None, {})
     blems = [_scaled(b, back) for b in blems_w]
     values, extras = {}, {}
-    if site == "cheek_macro":
+    if "tone_ita" in SITE_METRICS[site]:
         spots = [_scaled(s, back) for s in spots_w]
         l_star = float(np.median(lab[..., 0][skin])) if skin.any() else 0.0
         b_star = float(np.median(lab[..., 2][skin])) if skin.any() else 0.0
@@ -339,7 +359,7 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
     )
     t_map = time.perf_counter()
     redness_map = None
-    if overlays and site == "cheek_macro" and enough:  # the redness metric's a* and skin
+    if overlays and "redness" in SITE_METRICS[site] and enough:  # the redness metric's a* and skin
         redness_map = to_preview(lab[..., 1], skin, (h, w), scale=(size[0] / w, size[1] / h))
     map_ms = (time.perf_counter() - t_map) * 1000
     contours = cv2.findContours(skin.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[
@@ -383,8 +403,8 @@ def analyze_macro(
     max_candidates: int = 40,
     compute_overlays: bool = True,
 ) -> dict:
-    """Analyze 1-5 close-ups of the same patch of skin (site cheek_macro or nose_macro).
-    With output_prefix and compute_overlays, a cheek close-up's redness overlay is written
+    """Analyze 1-5 close-ups of the same patch of skin (a site of REGIONS).
+    With output_prefix and compute_overlays, a close-up's redness overlay is written
     to overlays/redness.png (same photo and size as preview.jpg)."""
     if site not in MACRO_SITES:
         raise EngineError("bad_request", f"macro pipeline got site {site!r}")
@@ -477,7 +497,8 @@ def analyze_macro(
             "photo so the area and its size can be measured"
         )
     if frames and all(f["face_found"] and not f["enough_skin"] for f in frames):
-        warnings.append(f"no {REGIONS[site]} skin found in the photos")
+        what = REGION_WORDS.get(REGIONS[site], REGIONS[site])
+        warnings.append(f"no {what} skin found in the photos")
     ref = good[0] if good else (frames[0] if frames else None)
     if ref and output_prefix:
         save_preview(ref["srgb8"], output_prefix)

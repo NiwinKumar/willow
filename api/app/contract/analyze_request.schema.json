@@ -43,6 +43,6 @@
     }
   },
   "$defs": {
-    "site": {"enum": ["face_full", "cheek_macro", "nose_macro", "forearm_treated", "forearm_control"]}
+    "site": {"enum": ["face_full", "cheek_macro", "left_cheek_macro", "right_cheek_macro", "forehead_macro", "chin_macro", "nose_macro", "forearm_treated", "forearm_control"]}
   }
 }

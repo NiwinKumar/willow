@@ -1,7 +1,7 @@
 """Willow engine HTTP service (docs/CONTRACT.md section 2).
 
 Every contract site runs a real pipeline: forearm sites (pipeline), face_full
-(pipeline_face) and the close-ups cheek_macro / nose_macro (pipeline_macro).
+(pipeline_face) and the close-ups *_macro (pipeline_macro).
 """
 
 import json
