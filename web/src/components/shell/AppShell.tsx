@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { CaptureMode, Site } from '../../data/types'
@@ -166,7 +166,7 @@ export function AppShell() {
         </div>
         {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} />}
         </div>
-        <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} beside={advisor.open && wide && !advisorFull} covered={covered} />
+        <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} covered={advisor.open} />
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />
         {checkIn.open ? (
           <Suspense fallback={null}>
@@ -180,12 +180,23 @@ export function AppShell() {
 
 /**
  * The advisor's glass panel: a floating right panel from 640px, full screen on phones (as drawn). Mounted on
- * first open, then kept. It slides fully out when closed and stays visible until the slide has finished.
+ * first open, then kept. It grows out of the advisor's cat button (scaled from the cat's centre, rounding
+ * out to a soft pill as it shrinks) and folds back into it on close, staying visible until the fold has
+ * finished. Reduced motion: a fade.
  * Focus moves into it on open and back to where it was on close.
  */
 function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }: { open: boolean; mounted: boolean; phone: boolean; onClose: () => void; seed: AdvisorSeed | null; full: boolean; onToggleFull: () => void }) {
   const panel = useRef<HTMLDivElement>(null)
   const back = useRef<HTMLElement | null>(null)
+  const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
+  // Scale about the cat button's centre (the panel's layout box, offsetLeft/Top, ignores the scale itself).
+  useLayoutEffect(() => {
+    const el = panel.current
+    const cat = document.querySelector<HTMLElement>('button[aria-label="Advisor"]')?.parentElement
+    if (!el || !cat) return
+    const r = cat.getBoundingClientRect()
+    el.style.transformOrigin = `${r.left + r.width / 2 - el.offsetLeft}px ${r.top + r.height / 2 - el.offsetTop}px`
+  }, [open, phone, full])
   const wasOpen = useRef(false)
   useEffect(() => {
     const el = panel.current
@@ -231,15 +242,18 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
         right: inset,
         bottom: inset,
         width: phone || full ? '100vw' : 'min(440px, calc(100vw - 24px))',
-        borderRadius: phone || full ? 0 : 32,
+        borderRadius: !open && !reduced ? 160 : phone || full ? 0 : 32,
         background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.92)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.75), 0 40px 80px -30px rgba(0,0,0,.4)',
-        translate: open ? '0 0' : phone ? '0 40px' : 'calc(100% + 24px) 0',
+        scale: open || reduced ? '1' : '0.3',
         opacity: open ? 1 : 0,
         visibility: open ? 'visible' : 'hidden',
         pointerEvents: open ? 'auto' : 'none',
-        // Hidden only after the slide out, so closing animates too.
-        transition: open ? 'translate .5s var(--ease-spring), opacity .3s ease, visibility 0s, width .45s var(--ease-spring), top .45s var(--ease-spring), right .45s var(--ease-spring), bottom .45s var(--ease-spring), border-radius .45s ease' : 'translate .45s var(--ease-spring), opacity .3s ease, visibility 0s linear .45s',
+        // Opening springs out of the cat; closing is quicker and accelerates into it. Hidden only after the
+        // fold, so closing animates too.
+        transition: open
+          ? 'scale .55s var(--ease-spring), opacity .22s ease, border-radius .45s var(--ease-spring), visibility 0s, width .45s var(--ease-spring), top .45s var(--ease-spring), right .45s var(--ease-spring), bottom .45s var(--ease-spring)'
+          : 'scale .34s cubic-bezier(.55,0,.8,.3), opacity .2s ease .14s, border-radius .34s ease-in, visibility 0s linear .34s',
       }}
     >
       {mounted ? (
