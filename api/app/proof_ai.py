@@ -43,11 +43,12 @@ OVERCLAIM = re.compile(
     r"\b(clinically|clinical|proven to|scientifically proven|guarantee\w*|cures?|cured|heals?|"
     r"treats?|treatment for|repairs? damage|dermatologist[- ](approved|recommended|tested)|"
     r"medical|miracle|instant\w*|permanent\w*|100 ?%|every(one| user)|all users|acne|"
-    r"anti-?ageing|anti-?aging|reverses?)\b",
+    r"anti-?ageing|anti-?aging|reverses?|stud(y|ies)|trials?|tested|testing|lab)\b",
     re.I,
 )
 SAID = re.compile(r"\b(said|say|says|agreed|reported|self-reported|told us)\b", re.I)
 CLAIMS_TIERS = ("proven", "promising")
+PERCEPTION_MIN = 0.5
 
 
 def _allowed(texts: list[str]) -> set[str]:
@@ -64,7 +65,8 @@ def sources(view: dict[str, Any]) -> list[dict[str, Any]]:
         for e in view.get("evidence") or []
     ]
     feel = view.get("feel")
-    if feel and feel.get("working") is not None:
+    # a perception claim only when most people said so (a minority share is not a claim)
+    if feel and feel.get("working") is not None and feel["working"] >= PERCEPTION_MIN:
         out.append(
             {
                 "id": "perception",
@@ -97,6 +99,7 @@ to week 8) and possibly one self-reported line. Write 3 drafts for CHANNEL, each
 - Measured wording: "had a visible change", "measured in N Willow users". The self-reported line
   may only be used as what people said ("said it is working for them"), never as a measurement,
   and never in the same sentence as a measured number.
+- Willow users tracked their own skin with photos: never call it a study, trial, test or lab.
 - Never: clinically, clinically proven, proven to, cures, treats, heals, repairs, guaranteed,
   dermatologist-approved, miracle, instant, permanent, 100%, everyone, anti-ageing, any skin
   condition or disease name, or anything about skin tone or lightness.
