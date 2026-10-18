@@ -675,6 +675,102 @@ def _feel(f: Facts, pid: str) -> dict[str, Any] | None:
     }
 
 
+# ── the journey (a flow from trying a product to how it feels) ─────────────────────────────
+
+# id -> (column, label, lane, children). A tree: every group splits once into its own parts, so a
+# link is always a real count of people (never two separate totals drawn as if they overlapped).
+# Users flow left to right; non-users with the same goals are one band beside them that ends in the
+# same outcome. "kept" = still using at week 8; "mixed" = not sure yet or not for me.
+JOURNEY: dict[str, tuple[int, str, str, list[str]]] = {
+    "used": (0, "Tried it", "users", ["w8", "early"]),
+    "non": (0, "Not using it, same goals", "non", []),
+    "w8": (1, "Reached week 8", "users", ["change", "none"]),
+    "early": (1, "Not at week 8 yet", "users", ["early_using", "early_stopped"]),
+    "change": (2, "Visible change", "users", ["ch_kept", "ch_stopped"]),
+    "none": (2, "No visible change", "users", ["no_kept", "no_stopped"]),
+    "early_using": (3, "Still using", "users", []),
+    "early_stopped": (3, "Stopped", "users", []),
+    "ch_kept": (3, "Still using at week 8", "users", ["ch_working", "ch_mixed", "ch_quiet"]),
+    "ch_stopped": (3, "Stopped by week 8", "users", []),
+    "no_kept": (3, "Still using at week 8", "users", ["no_working", "no_mixed", "no_quiet"]),
+    "no_stopped": (3, "Stopped by week 8", "users", []),
+    "ch_working": (4, "Working for me", "users", []),
+    "ch_mixed": (4, "Not sure or not for me", "users", []),
+    "ch_quiet": (4, "No answer", "users", []),
+    "no_working": (4, "Working for me", "users", []),
+    "no_mixed": (4, "Not sure or not for me", "users", []),
+    "no_quiet": (4, "No answer", "users", []),
+}
+
+
+def _journey(f: Facts, pid: str) -> dict[str, Any] | None:
+    """How people move through a measured product: tried it, reached week 8, saw a change or not,
+    kept using it or stopped, and how it feels. Non-users with the same goals are one group
+    beside it, from the market, with no outcome of their own (that sits in the outcome figures).
+    Null when
+    the product has no measured outcome. A part under 10 people is left out (with the smallest part
+    beside it when it alone would give it back), and its parent is flagged `more`: a group over 10
+    can stay shown, since its total reveals no small group."""
+    s = _stats(f, pid)
+    if s["row"]["tier"] == "too_few":
+        return None
+    members, el, base, metrics = s["members"], set(s["el"]), s["base"], s["metrics"]
+    count: Counter = Counter()
+    count["used"] = len(members)
+    count["non"] = len(base)
+    for uh in members:
+        r = f.rows_of[(uh, pid)]
+        if uh not in el:
+            count["early"] += 1
+            count["early_stopped" if r.get("stopped_week") is not None else "early_using"] += 1
+            continue
+        count["w8"] += 1
+        head = "ch" if f.outcome(uh, metrics) is not None else "no"
+        count["change" if head == "ch" else "none"] += 1
+        if not retailer._using(r, WEEKS):
+            count[f"{head}_stopped"] += 1
+            continue
+        count[f"{head}_kept"] += 1
+        said = r.get("feel") if (r.get("feel_week") or 0) >= feel.MIN_WEEK else None
+        count[f"{head}_{'working' if said == 'working' else 'mixed' if said else 'quiet'}"] += 1
+
+    nodes: list[dict[str, Any]] = []
+    links: list[dict[str, Any]] = []
+
+    def grow(parent: str) -> None:
+        kids = JOURNEY[parent][3]
+        ns = [count[k] for k in kids]
+        gone = suppress(ns)
+        more = any(ns[i] > 0 for i in gone)
+        for i, kid in enumerate(kids):
+            if ns[i] == 0 or i in gone:
+                continue
+            col, label, lane, _ = JOURNEY[kid]
+            nodes.append(
+                {"id": kid, "col": col, "label": label, "lane": lane, "n": ns[i], "more": False}
+            )
+            links.append({"source": parent, "target": kid, "n": ns[i]})
+            grow(kid)
+        if more:
+            next(n for n in nodes if n["id"] == parent)["more"] = True
+
+    for root in ("used", "non"):
+        if count[root] >= MIN:
+            col, label, lane, _ = JOURNEY[root]
+            nodes.append(
+                {
+                    "id": root,
+                    "col": col,
+                    "label": label,
+                    "lane": lane,
+                    "n": count[root],
+                    "more": False,
+                }
+            )
+            grow(root)
+    return {"weeks": WEEKS, "nodes": nodes, "links": links}
+
+
 def product_view(f: Facts, pid: str) -> dict[str, Any] | None:
     products, _, pgoals = _catalog()
     if pid not in products:
@@ -796,6 +892,7 @@ def product_view(f: Facts, pid: str) -> dict[str, Any] | None:
         "evidence_caveat": CAVEAT,
         "eligibility": eligibility(f, pid),
         "feel": _feel(f, pid),
+        "journey": _journey(f, pid),
     }
 
 

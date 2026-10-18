@@ -733,6 +733,11 @@ class MemoryStore:
 
 @lru_cache
 def get_store() -> Store:
+    from app.settings import get_settings
+
+    s = get_settings()
+    if s.auth_mode == "dev" and s.dev_store == "memory":
+        return MemoryStore()  # local only: nothing reaches the project's Firestore
     return FirestoreStore()
 
 

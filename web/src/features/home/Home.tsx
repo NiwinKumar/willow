@@ -8,7 +8,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
 import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
-import type { CaptureMode, RoutineEntry, Session } from '../../data/types'
+import type { RoutineEntry, Session } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
 import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
@@ -37,7 +37,6 @@ import { ProductTestTile, SpotDiaryTile } from './Tiles'
 
 const POLL_MS = 10_000
 const EMPTY: Session[] = []
-const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera' }
 
 /**
  * Home (Willow App.dc.html, isHome): greeting, today's check-in, what changed, routine today, product test,
@@ -332,7 +331,6 @@ function leadFor({
   placeChips: string[]
   todayLine: string
 }): Lead {
-  const baseMode = read.baseline?.capture_mode
   if (demo) {
     const s = read.lead
     if (!s) return { title: 'Demo journey', sub: 'This journey has no measured face check-in to show.', aura: 'violet', note: 'Check-ins are available in your own account' }
@@ -394,7 +392,7 @@ function leadFor({
           big: `${f}/${BAND_FRAMES}`,
           bigLabel: 'usable baseline photos',
           prog: Math.min(1, f / BAND_FRAMES),
-          chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : []), `${plural(need, 'photo')} left`],
+          chips: ['Face', `${plural(need, 'photo')} left`],
           cta: { label: 'Check in', onClick: checkIn },
           secondary: { label: 'See baseline', onClick: () => openResult(b) },
           aura: 'coral',
@@ -407,7 +405,7 @@ function leadFor({
         big: `${f}/${BAND_FRAMES}`,
         bigLabel: 'usable baseline photos',
         prog: Math.min(1, f / BAND_FRAMES),
-        chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
+        chips: ['Face'],
         cta: { label: 'Check in', onClick: checkIn },
         secondary: read.baseline ? { label: 'See baseline', onClick: () => openResult(read.baseline!) } : undefined,
         aura: 'coral',

@@ -7,7 +7,7 @@ import { fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
 import { MOLE_NOTE } from '../../lib/spotLabels'
 import { leftOutPhotos, readableWarnings } from '../../lib/warnings'
-import { MODE_LABEL, photoExpired, siteHasSpots } from './model'
+import { photoExpired, siteHasSpots } from './model'
 import { frameFor, photoSize, toPct, type Box } from './frame'
 import { PhotoFrame } from './PhotoFrame'
 import { regionItems, type RegionItem } from './regions'
@@ -91,7 +91,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const spotsHere = siteHasSpots(session.site)
   const expired = !session.preview && photoExpired(session)
   const missing = expired ? 'Photos are deleted 30 days after upload. The measurements stay.' : 'No photo preview for this check-in. The numbers are measured from your photos.'
-  const caption = `${session.capture_mode === 'uncalibrated' ? 'CAMERA PHOTO' : 'MEASURED REFERENCE PHOTO'} · ${fmtDate(session.created_at).toUpperCase()}${session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''}`
+  const caption = `YOUR PHOTO · ${fmtDate(session.created_at).toUpperCase()}`
   // The diary's box is in the pixels of the photo its spot was found on.
   const focusHere = !focusItem || candidateView(focusItem.c) === active
   const focusPos = focus?.bbox && focusHere ? toPct(box, focus.bbox[0] + focus.bbox[2] / 2, focus.bbox[1] + focus.bbox[3] / 2) : null
@@ -143,7 +143,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 pt-6">
       <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
         <div className={`relative ${canCompare ? 'touch-pan-y select-none [-webkit-touch-callout:none]' : ''}`} {...(canCompare ? hold.bind : {})}>
-          <PhotoFrame session={shown} box={box} alt={`Your ${multi ? `${VIEW_LABEL[active].toLowerCase()} ` : ''}${MODE_LABEL[session.capture_mode]} photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
+          <PhotoFrame session={shown} box={box} alt={`Your ${multi ? `${VIEW_LABEL[active].toLowerCase()} ` : ''}photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
             {overlay === 'redness' && rednessUrl ? <RednessLayer url={rednessUrl} box={box} session={shown} /> : null}
             {overlay === 'areas' ? <RegionLayer regions={regions} box={box} open={openRegion?.key ?? null} onPick={(key) => setRegion(openRegion?.key === key ? null : { sid: session.id, key })} /> : null}
             {overlay === 'spots' ? visible.map(ring) : null}

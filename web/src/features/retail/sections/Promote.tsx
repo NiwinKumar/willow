@@ -1,5 +1,6 @@
 import { Plus, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { api, retailerProducts, type Campaign } from '../../../lib/api'
@@ -9,12 +10,10 @@ import { useRetailData } from '../context'
 import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, runningCount, workspaceId } from '../promote'
 import { sectionPath, useRetailState } from '../state'
 import type { ProductRow, Products } from '../types'
-import { Bone, Button, EmptyState, ErrorState, int, PageHeader, pts, SidePanel, SkeletonTable, ToolButton } from '../ui'
-import { CampaignDetail, CampaignDetailFooter, type Confirm } from './promote/CampaignCard'
+import { Bone, Button, EmptyState, ErrorState, int, PageHeader, pts, SkeletonTable, ToolButton } from '../ui'
 import { AutoCampaigns } from './promote/AutoCampaigns'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
-import { useCampaignActions } from './promote/useCampaignActions'
 import { EligibleList } from './promote/EligibleList'
 
 /*
@@ -23,9 +22,10 @@ import { EligibleList } from './promote/EligibleList'
  * the products this workspace can promote; with no campaigns, how proof-gated promotion works in three steps.
  * Eligibility is always the mixed cohort, all time (the evidence shoppers see), whatever the top bar says.
  * Sign-in: a guest account, made on arrival (as Ask does on first question).
- * URL: ?new=<product_id> (or ?new=1, or the older ?product=<id>) opens the create panel (&skins=a,b ticks only those skin types); ?campaign=<id> opens a
- * campaign; ?all=1 lists campaigns from every workspace. AutoCampaign (standing rules and their activity) sits under
- * the campaigns (#autocampaign).
+ * URL: ?new=<product_id> (or ?new=1, or the older ?product=<id>) opens the create panel (&skins=a,b ticks only those skin types);
+ * ?all=1 lists campaigns from every workspace. A campaign opens on its own page, /retail/campaigns/<id> (CampaignDashboard);
+ * the older ?campaign=<id> link redirects there. AutoCampaign (standing rules and their activity) sits under the
+ * campaigns (#autocampaign).
  */
 
 const REFRESH_MS = 30_000
@@ -151,15 +151,12 @@ function Body({ uid }: { uid: string }) {
     el?.focus({ preventScroll: true })
   }, [highlight])
 
-  const [confirm, setConfirm] = useState<{ id: string; kind: Confirm } | null>(null)
-  // The open campaign's panel keeps its last campaign while it slides out.
-  const openId = param('campaign')
+  const navigate = useNavigate()
   const all = elig.data ?? []
   const campaigns = camps.data?.list ?? []
-  const current = openId ? (campaigns.find((c) => c.id === openId) ?? null) : null
-  const [lastShown, setLastShown] = useState<Campaign | null>(null)
-  if (current && current !== lastShown) setLastShown(current)
-  const shown = current ?? lastShown
+  // A campaign opens on its own page; the older ?campaign=<id> link lands there too.
+  const openId = param('campaign')
+  if (openId) return <Navigate to={`${sectionPath('campaigns', openId)}${carry}`} replace />
 
   if (workspace.kind === 'brand' && !brand)
     return (
@@ -193,11 +190,7 @@ function Body({ uid }: { uid: string }) {
   const initialSkins = (param('skins') ?? '').split(',').filter(Boolean)
   const openCreate = (productId?: string) => setParam({ new: productId ?? '1', product: null, campaign: null, skins: null }, { push: true })
   const closeCreate = () => setParam({ new: null, product: null, skins: null })
-  const openCampaign = (id: string) => setParam({ campaign: id }, { push: true })
-  const closeCampaign = () => {
-    setParam({ campaign: null })
-    setConfirm(null)
-  }
+  const openCampaign = (id: string, confirm?: 'end' | 'delete') => navigate(`${sectionPath('campaigns', id)}${carry}${confirm ? `${carry ? '&' : '?'}confirm=${confirm}` : ''}`)
 
   const onCreated = (c: Campaign) => {
     editList((l) => [c, ...l.filter((x) => x.id !== c.id)])
@@ -219,7 +212,6 @@ function Body({ uid }: { uid: string }) {
   const onChanged = (c: Campaign) => editList((l) => l.map((x) => (x.id === c.id ? c : x)))
   const onDeleted = (id: string) => {
     editList((l) => l.filter((x) => x.id !== id))
-    closeCampaign()
     toast('Campaign deleted')
   }
 
@@ -299,10 +291,7 @@ function Body({ uid }: { uid: string }) {
             }
             highlight={highlight}
             onOpen={openCampaign}
-            onConfirm={(id, kind) => {
-              setConfirm({ id, kind })
-              openCampaign(id)
-            }}
+            onConfirm={(id, kind) => openCampaign(id, kind)}
             onChanged={onChanged}
             onDeleted={onDeleted}
             onStale={() => void refetch()}
@@ -349,21 +338,6 @@ function Body({ uid }: { uid: string }) {
         onCreated={onCreated}
         onShowCampaigns={showCampaigns}
       />
-
-      {shown ? (
-        <CampaignPanel
-          key={shown.id}
-          c={shown}
-          open={Boolean(current)}
-          onClose={closeCampaign}
-          otherWorkspace={workspaceOf(shown)}
-          confirm={confirm?.id === shown.id ? confirm.kind : null}
-          setConfirm={(kind) => setConfirm(kind ? { id: shown.id, kind } : null)}
-          onChanged={onChanged}
-          onDeleted={onDeleted}
-          onStale={() => void refetch()}
-        />
-      ) : null}
     </div>
   )
 }
@@ -424,32 +398,5 @@ function HowItWorks() {
       </ol>
       <Rules />
     </section>
-  )
-}
-
-function CampaignPanel({ c, open, onClose, otherWorkspace, confirm, setConfirm, onChanged, onDeleted, onStale }: {
-  c: Campaign
-  open: boolean
-  onClose: () => void
-  otherWorkspace: string | null
-  confirm: Confirm | null
-  setConfirm: (kind: Confirm | null) => void
-  onChanged: (c: Campaign) => void
-  onDeleted: (id: string) => void
-  onStale: () => void
-}) {
-  const actions = useCampaignActions(c, { onChanged, onDeleted, onStale })
-  return (
-    <SidePanel
-      open={open}
-      onClose={onClose}
-      title={c.product ?? c.product_id}
-      subtitle={c.brand ?? undefined}
-      width={560}
-      labelledBy="proof-campaign-panel"
-      footer={<CampaignDetailFooter c={c} actions={actions} confirm={confirm} setConfirm={setConfirm} />}
-    >
-      <CampaignDetail c={c} otherWorkspace={otherWorkspace} actions={actions} />
-    </SidePanel>
   )
 }
