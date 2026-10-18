@@ -73,8 +73,9 @@ export function InsightsCard({ session, measured, actions, place }: { session: S
   }, [instant, more, words.length, session.id])
 
   const busy = shown < words.length
+  const hasActions = Array.isArray(actions) ? actions.length > 0 : Boolean(actions)
   return (
-    <section aria-label="Insights" className="flex flex-col gap-3 rounded-[28px] bg-surface p-4 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+    <section aria-label="Insights" className="flex flex-col gap-2.5 rounded-[28px] bg-surface p-4 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
       <div className="flex items-center gap-2.5">
         <span aria-hidden className="size-7 shrink-0 animate-[wBreathe_5s_ease-in-out_infinite] rounded-full shadow-[0_0_14px_rgba(61,123,255,.4)]" style={{ background: 'radial-gradient(circle at 40% 35%, var(--aura-ice), var(--aura-sky) 55%, #1B1F7A)' }} />
         <h2 className="m-0 flex-1 text-[16px] font-normal">{place ? `Insights · ${place}` : 'Insights'}</h2>
@@ -92,11 +93,6 @@ export function InsightsCard({ session, measured, actions, place }: { session: S
             ))}
             {busy ? <span className="inline-block h-[14px] w-[7px] animate-[wBlink_1s_steps(2)_infinite] rounded-[3px] bg-[var(--aura-sky)] align-[-2px]" /> : null}
           </p>
-          {long && !busy ? (
-            <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="mt-0.5 min-h-9 text-[13px] underline underline-offset-4">
-              {more ? 'Show less' : 'Read more'}
-            </button>
-          ) : null}
         </div>
       ) : (
         <p className="m-0 text-[14.5px] leading-[1.55] text-ink-2">{measured ? 'No insights were written for this check-in. The numbers below are measured from your photos.' : 'Nothing was measured on this check-in, so there are no insights yet.'}</p>
@@ -111,7 +107,19 @@ export function InsightsCard({ session, measured, actions, place }: { session: S
           ))}
         </ul>
       ) : null}
-      <div className="mt-auto flex flex-wrap justify-end gap-2 pt-1">{actions}</div>
+      {/* One footer line: Read more on the left, the next steps on the right (no empty band above them). */}
+      {(long && !busy) || hasActions ? (
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
+        {long && !busy ? (
+          <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="min-h-9 text-[13px] underline underline-offset-4">
+            {more ? 'Show less' : 'Read more'}
+          </button>
+        ) : (
+          <span />
+        )}
+        {hasActions ? <div className="ml-auto flex flex-wrap justify-end gap-2">{actions}</div> : null}
+      </div>
+      ) : null}
     </section>
   )
 }
