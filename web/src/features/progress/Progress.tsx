@@ -169,6 +169,8 @@ export default function Progress() {
               days={days}
               today={today}
               dots={routineDots}
+              nudge={tapHint ? [...byDay.keys()].filter((d) => d.startsWith(month)).sort().pop() : undefined}
+              hint={tapHint && all.length ? 'Tap a coloured day to open that check-in' : undefined}
               onToday={() => shell.openCheckIn()}
               canPrev={mi > 0}
               canNext={mi < months.length - 1}
@@ -195,8 +197,6 @@ export default function Progress() {
             />
             {!all.length ? (
               <p className="m-0 text-[14px] text-ink-2">No check-ins yet. Tap today to take one.</p>
-            ) : tapHint ? (
-              <p className="m-0 text-[13px] text-ink-2">Tap a coloured day to open it.</p>
             ) : null}
           </section>
 
