@@ -46,7 +46,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
   return (
     <section
       aria-label="Today's check-in"
-      className="relative flex min-h-[320px] min-w-0 animate-[wRise_.55s_.06s_both] flex-col gap-3.5 overflow-hidden rounded-[36px] squircle text-ink transition-[background] duration-[600ms]"
+      className="relative flex min-h-[260px] min-w-0 animate-[wRise_.55s_.06s_both] flex-col gap-3.5 overflow-hidden rounded-[36px] squircle text-ink transition-[background] duration-[600ms]"
       style={{ padding: 'clamp(20px,2.4vw,28px)', background: a.bg, boxShadow: `inset 0 0 0 1px rgba(255,255,255,.35), inset 0 0 70px 18px rgba(255,255,255,.28), 0 34px 70px -46px ${a.shadow}` }}
     >
       <span aria-hidden className="pointer-events-none absolute -top-[50px] -right-[50px] size-[220px] animate-[wBreathe_6s_ease-in-out_infinite] rounded-full blur-[8px]" style={{ background: 'radial-gradient(circle, rgba(255,255,255,.75), rgba(255,255,255,0) 68%)' }} />
