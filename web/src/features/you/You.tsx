@@ -315,7 +315,7 @@ function PlacesCard() {
         })}
       </div>
       <span className="text-[13px] text-ink-2">
-        Every check-in covers {places.length === 1 ? 'this place' : `these ${places.length} places`}, about {minutesFor(places)} min. Close-ups use the back camera; RAW files can still be uploaded for one place from the check-in.
+        Every check-in covers {places.length === 1 ? 'this place' : `these ${places.length} places`}, about {minutesFor(places)} min. Close-ups use the back camera. Photos you already took can be uploaded instead.
       </span>
     </Panel>
   )

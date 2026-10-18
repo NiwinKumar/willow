@@ -12,25 +12,29 @@ import type { CaptureMode, MetricId, Session, Site } from '../../data/types'
 import { SITE_ORDER } from '../../data/live'
 import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
-import { fmtDate, parseDate } from '../../lib/format'
+import { fmtDate, parseDate, plural } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
 import { routineMarkers } from './markers'
-import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, usableLine, usedFrames } from './model'
-import { MetricSwitcher, Page, Pills } from './parts'
+import { DAY_BG, DAY_WORDS, bandText, chartable, currentBaseline, dayOf, dayStatus, usedFrames, type DayStatus } from './model'
+import { MetricSwitcher, Page } from './parts'
 import { metricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
 
+// The places charted here; the forearms are a product test (/test) and only show in the calendar.
 const PLACES: Site[] = ['face_full', ...CLOSE_UPS]
-const isPlace = (v: string | null): v is Site => v !== null && (PLACES as string[]).includes(v)
-// A day can be of any site: the forearm results link their day here too (the calendar is for PLACES).
 const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)
-const isMode = (v: string | null): v is CaptureMode => v === 'calibrated_raw' || v === 'uncalibrated'
+// The day colour is the most telling session of the day: a change outranks a baseline, a normal day and so on.
+const DAY_RANK: DayStatus[] = ['changed', 'baseline', 'normal', 'notEnough', 'rejected', 'other']
+
+/** One metric of one place, charted against that place's current baseline (the capture mode of its latest check-in). */
+type Track = { site: Site; mode: CaptureMode; metric: MetricId; label: string }
 
 /**
- * Progress (design "History and compare"): /progress is the calendar and a metric over time for one place
- * (?site=, ?mode=, ?metric=); /progress/:day (YYYY-MM-DD) is that day's detail.
+ * Progress (design "History and compare"): /progress is one calendar of every place and a metric over time
+ * (?metric=, ?site= when a metric is read at more than one place); /progress/:day (YYYY-MM-DD) is that day.
+ * Each place keeps its own baseline, so a metric is always charted against the baseline of the place it was read at.
  */
 export default function Progress() {
   const { day } = useParams()
@@ -39,19 +43,16 @@ export default function Progress() {
   const data = useData()
   const shell = useShell()
   const routine = useRoutine()
-  const qSite = params.get('site')
-  const site: Site = isPlace(qSite) || (day && isSite(qSite)) ? qSite : 'face_full'
-  const sessions = useMemo(() => data.series(site)?.sessions ?? [], [data, site])
-  const lastDone = [...sessions].reverse().find((s) => s.status === 'done') ?? null
-  const qMode = params.get('mode')
-  const mode: CaptureMode = isMode(qMode) ? qMode : (lastDone?.capture_mode ?? 'uncalibrated')
   const today = localDay()
 
+  // Every check-in of every place, oldest first.
+  const all = useMemo(() => SITE_ORDER.flatMap((p) => data.series(p)?.sessions ?? []).sort((a, b) => a.created_at.localeCompare(b.created_at)), [data])
+  const lastDone = [...all].reverse().find((s) => s.status === 'done') ?? null
   const byDay = useMemo(() => {
     const m = new Map<string, Session[]>()
-    for (const s of sessions) m.set(dayOf(s), [...(m.get(dayOf(s)) ?? []), s])
+    for (const s of all) m.set(dayOf(s), [...(m.get(dayOf(s)) ?? []), s])
     return m
-  }, [sessions])
+  }, [all])
   const months = useMemo(() => [...new Set([...[...byDay.keys()].map((d) => d.slice(0, 7)), today.slice(0, 7)])].sort(), [byDay, today])
   const [monthPick, setMonthPick] = useState<string | null>(null)
   // One quiet line under the calendar until the person has opened a day from it once (per device).
@@ -59,17 +60,36 @@ export default function Progress() {
   const month = monthPick && months.includes(monthPick) ? monthPick : (lastDone ? dayOf(lastDone) : today).slice(0, 7)
   const mi = months.indexOf(month)
 
-  // Metrics this place has in this mode, in goal order.
-  const metricIds = useMemo(() => {
-    const ids = new Set<MetricId>()
-    // Only metrics with a reading somewhere: a rejected check-in lists every metric, all empty.
-    for (const s of chartable(sessions, mode)) for (const m of s.result?.metrics ?? []) if (m.value !== null) ids.add(m.id)
-    return [...ids].sort(byGoalOrder(data.goals))
-  }, [sessions, mode, data.goals])
+  // Each place with readings, against its current baseline: the capture mode of its latest analysed check-in.
+  const places = useMemo(
+    () =>
+      PLACES.flatMap((p) => {
+        const list = data.series(p)?.sessions ?? []
+        const last = [...list].reverse().find((s) => s.status === 'done')
+        return last ? [{ site: p, mode: last.capture_mode, sessions: list }] : []
+      }),
+    [data],
+  )
+  // Metrics with a reading somewhere (a rejected check-in lists every metric, all empty), in goal order.
+  const tracks = useMemo<Track[]>(() => {
+    const raw: Omit<Track, 'label'>[] = []
+    for (const p of places) {
+      const ids = new Set<MetricId>()
+      for (const s of chartable(p.sessions, p.mode)) for (const m of s.result?.metrics ?? []) if (m.value !== null) ids.add(m.id)
+      for (const id of ids) raw.push({ site: p.site, mode: p.mode, metric: id })
+    }
+    const cmp = byGoalOrder(data.goals)
+    const twice = (id: MetricId) => raw.filter((t) => t.metric === id).length > 1
+    return raw
+      .sort((a, b) => cmp(a.metric, b.metric) || PLACES.indexOf(a.site) - PLACES.indexOf(b.site))
+      .map((t) => ({ ...t, label: twice(t.metric) ? `${METRIC_META[t.metric].label} · ${SITE_LABEL[t.site].toLowerCase()}` : METRIC_META[t.metric].label }))
+  }, [places, data.goals])
   const qMetric = params.get('metric')
-  const metric: MetricId | null = qMetric && metricIds.includes(qMetric as MetricId) ? (qMetric as MetricId) : (metricIds[0] ?? null)
-  const series = useMemo(() => (metric ? metricSeries(sessions, mode, metric) : null), [sessions, mode, metric])
-  const baseline = currentBaseline(sessions, mode)
+  const qSite = params.get('site')
+  const track = tracks.find((t) => t.metric === qMetric && (!isSite(qSite) || t.site === qSite)) ?? tracks.find((t) => t.metric === qMetric) ?? tracks.find((t) => t.site === qSite) ?? tracks[0] ?? null
+  const metric = track?.metric ?? null
+  const trackSessions = useMemo(() => places.find((p) => p.site === track?.site)?.sessions ?? [], [places, track])
+  const series = useMemo(() => (track ? metricSeries(trackSessions, track.mode, track.metric) : null), [trackSessions, track])
   const entries = useMemo(() => routine.data ?? [], [routine.data])
   const routineDays = useMemo(() => {
     const m: Record<string, string[]> = {}
@@ -100,60 +120,44 @@ export default function Progress() {
       </Page>
     )
 
-  if (day) return <DayDetail day={day} site={site} sessions={sessions} byDay={byDay} entries={entries} />
+  if (day) return <DayDetail day={day} byDay={byDay} entries={entries} />
 
-  const places = PLACES.filter((p) => p === site || (data.series(p)?.sessions.length ?? 0) > 0)
-  const hasForearm = data.sites.some((s) => s.startsWith('forearm'))
 
   // ---- calendar cells ----
   const days: Record<string, CalendarDay> = {}
   for (const [d, list] of byDay) {
-    const s = daySession(list)
-    const st = dayStatus(s)
+    const st = DAY_RANK.find((k) => list.some((x) => dayStatus(x) === k)) ?? 'other'
     const started = routineDays[d] ?? []
     const note = list.some((x) => x.note)
     const when = parseDate(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    const where = [...new Set(list.map((x) => SITE_LABEL[x.site].toLowerCase()))].join(', ')
     days[d] = {
       bg: DAY_BG[st],
       dots: [...(started.length ? ['var(--willow-500)'] : []), ...(note ? ['var(--text-primary)'] : [])],
-      label: `${when}, ${list.length > 1 ? `${list.length} check-ins, latest ` : ''}${MODE_LONG[s.capture_mode]}, ${DAY_WORDS[st]}, ${usableLine(s)}${started.length ? `, started ${started.join(' and ')}` : ''}${note ? ', you added a note' : ''}. Open details`,
+      label: `${when}, ${list.length > 1 ? `${list.length} check-ins` : 'check-in'} of your ${where}, ${DAY_WORDS[st]}${started.length ? `, started ${started.join(' and ')}` : ''}${note ? ', you added a note' : ''}. Open details`,
       onPick: () => {
         prefs.setCoachSeen('calendarDay')
-        navigate(`/progress/${d}?site=${site}`, { state: { fromCalendar: true } })
+        navigate(`/progress/${d}`, { state: { fromCalendar: true } })
       },
     }
   }
   const routineDots: Record<string, string[]> = Object.fromEntries(Object.keys(routineDays).map((d) => [d, ['var(--willow-500)']]))
 
   // ---- chart ----
-  const label = metric ? METRIC_META[metric].label : ''
+  const label = track?.label ?? ''
   const sample = metric ? (series?.sessions.map((s) => s.result?.metrics.find((m) => m.id === metric)).find(Boolean) ?? null) : null
   const unit = sample ? unitOf(sample).trim() : ''
 
   // ---- notes ----
-  const notes: Note[] = [...routineNotes(entries), ...sessions.filter((s) => s.capture_mode === mode).flatMap(sessionNotes)].sort((a, b) => a.day.localeCompare(b.day))
+  const multi = new Set(all.map((s) => s.site)).size > 1
+  const notes: Note[] = [...routineNotes(entries), ...all.flatMap((s) => sessionNotes(s).map((n) => (multi && n.kind !== 'note' ? { ...n, text: `${SITE_LABEL[s.site]} · ${n.text}` } : n)))].sort((a, b) => a.day.localeCompare(b.day))
 
   return (
     <Page label="Progress">
       <div className="flex animate-[wInL_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-4 pt-[clamp(8px,2vw,24px)] pb-2">
-          <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">{SITE_LABEL[site]}, over time</h1>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {places.length > 1 ? <Pills label="Place" tone="white" options={places.map((p) => ({ value: p, label: SITE_LABEL[p] }))} value={site} onChange={(v) => setQuery({ site: v, metric: null, mode: null })} /> : null}
-            <Pills label="Capture mode" size="lg" options={(['calibrated_raw', 'uncalibrated'] as CaptureMode[]).map((m) => ({ value: m, label: MODE_LONG[m] }))} value={mode} onChange={(v) => setQuery({ mode: v })} />
-          </div>
+          <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Your skin, over time</h1>
         </div>
-        <p className="-mt-1 mb-1 text-[15px] text-ink-2">
-          {mode === 'uncalibrated' ? 'Camera check-ins have their own baseline. They are never mixed with RAW.' : 'RAW check-ins, compared with your RAW baseline only.'} The calendar shows both.
-          {hasForearm ? (
-            <>
-              {' '}
-              <Link to="/test" className="text-ink">
-                Forearm product test →
-              </Link>
-            </>
-          ) : null}
-        </p>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4">
           <section aria-label="Calendar" className="flex flex-col gap-3.5 rounded-[44px] bg-surface p-[clamp(16px,2.6vw,28px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
@@ -186,15 +190,23 @@ export default function Progress() {
                 </>
               }
             />
-            {!sessions.length ? (
-              <p className="m-0 text-[14px] text-ink-2">No check-ins of your {SITE_LABEL[site].toLowerCase()} yet. Tap today to take one.</p>
+            {!all.length ? (
+              <p className="m-0 text-[14px] text-ink-2">No check-ins yet. Tap today to take one.</p>
             ) : tapHint ? (
               <p className="m-0 text-[13px] text-ink-2">Tap a coloured day to open it.</p>
             ) : null}
           </section>
 
           <section aria-label="Metric over time" className="flex flex-col justify-between gap-4 rounded-[44px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse shadow-[0_40px_80px_-50px_rgba(0,0,0,.7)] squircle">
-            <MetricSwitcher ids={metricIds} value={metric} label={label || 'Over time'} onChange={(id) => setQuery({ metric: id })} />
+            <MetricSwitcher
+              options={tracks.map((t) => ({ key: `${t.site}.${t.metric}`, label: t.label }))}
+              value={track ? `${track.site}.${track.metric}` : null}
+              label={label || 'Over time'}
+              onChange={(key) => {
+                const t = tracks.find((x) => `${x.site}.${x.metric}` === key)
+                if (t) setQuery({ metric: t.metric, site: t.site })
+              }}
+            />
             {series && series.points.some((p) => p.value !== null) && metric ? (
               <TimelineChart
                 points={series.points}
@@ -204,11 +216,11 @@ export default function Progress() {
                 format={series.format}
                 unit={unit}
                 glow
-                caption={`${label} by check-in, ${MODE_LONG[mode]}`}
-                summary={`${label} across ${series.points.length} ${MODE_LONG[mode]} check-ins${series.band !== null && sample ? `, normal range ${bandText(sample, series.band)} around the baseline` : ', no normal range yet'}.`}
+                caption={`${metric ? METRIC_META[metric].label : label} by check-in${track ? `, ${SITE_LABEL[track.site].toLowerCase()}` : ''}`}
+                summary={`${label} across ${series.points.length} check-ins${series.band !== null && sample ? `, normal range ${bandText(sample, series.band)} around the baseline` : ', no normal range yet'}.`}
               />
             ) : (
-              <p className="m-0 py-16 text-center text-[15px] text-white/70">No {MODE_LONG[mode]} check-ins of your {SITE_LABEL[site].toLowerCase()} with readings yet.</p>
+              <p className="m-0 py-16 text-center text-[15px] text-white/70">No check-ins with readings yet.</p>
             )}
             <div className="flex flex-wrap gap-4 text-[13px] text-white/70">
               <span className="flex items-center gap-2">
@@ -232,7 +244,7 @@ export default function Progress() {
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-4">
-          <BaselineCard baseline={baseline} mode={mode} site={site} onCheckIn={() => shell.openCheckIn()} />
+          <BaselinesCard places={places} onCheckIn={() => shell.openCheckIn()} />
           <NotesCard notes={notes} />
         </div>
         <Disclaimer />
@@ -249,40 +261,48 @@ function useMarkers(sessions: Session[], entries: { started_at: string; custom_n
   }, [sessions, entries])
 }
 
-function BaselineCard({ baseline, mode, site, onCheckIn }: { baseline: Session | null; mode: CaptureMode; site: Site; onCheckIn: () => void }) {
-  const used = baseline ? usedFrames(baseline) : 0
+/** Every place's current baseline: each place is compared only with its own. */
+function BaselinesCard({ places, onCheckIn }: { places: { site: Site; mode: CaptureMode; sessions: Session[] }[]; onCheckIn: () => void }) {
+  const rows = places.map((p) => ({ site: p.site, baseline: currentBaseline(p.sessions, p.mode) }))
+  const set = rows.filter((r): r is { site: Site; baseline: Session } => r.baseline !== null)
+  const thin = set.some((r) => usedFrames(r.baseline) < 3)
   return (
     <section
-      aria-label="Baseline"
+      aria-label="Your baselines"
       className="relative flex flex-col gap-[18px] overflow-hidden rounded-[44px] p-[clamp(22px,3vw,32px)] text-ink squircle"
       style={{ background: 'radial-gradient(70% 90% at 92% 100%, #C8E62E 0%, var(--signal-baseline) 30%, rgba(220,242,75,.25) 60%, transparent 80%), #F3F5E6', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.6), inset 0 0 70px rgba(255,255,255,.4), 0 30px 70px -50px rgba(140,170,20,.6)' }}
     >
-      <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ YOUR {MODE_LONG[mode].toUpperCase()} BASELINE</span>
-      {baseline ? (
+      <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {rows.length > 1 ? 'YOUR BASELINES' : 'YOUR BASELINE'}</span>
+      {set.length ? (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <span className="font-serif text-[clamp(28px,2.86vw,39px)] leading-[.95]">{fmtDate(baseline.created_at, { day: 'numeric', month: 'long' })}</span>
-            <span className="flex flex-col items-end gap-1">
-              <span className="font-dot text-[44px] leading-[.9] font-extrabold">{String(used).padStart(2, '0')}</span>
-              <span className="text-[12px] text-ink-2">usable {used === 1 ? 'photo' : 'photos'}</span>
-            </span>
-          </div>
-          <p className="m-0 max-w-[420px] text-[15px] leading-normal">
-            {used >= 3
-              ? 'Every later reading is compared with this day. A change counts only when it goes beyond your normal photo-to-photo range.'
-              : 'Later check-ins are compared with this day, but with fewer than 3 usable photos there is no normal range: changes are shown, never called real. A check-in with more photos can become your baseline.'}
+          <ul className="m-0 flex list-none flex-col p-0">
+            {rows.map(({ site, baseline }) => (
+              <li key={site} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-ink/10 py-3 last:border-b-0">
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[13px] text-ink-2">{SITE_LABEL[site]}</span>
+                  <span className="font-serif text-[clamp(22px,2.2vw,30px)] leading-none">{baseline ? fmtDate(baseline.created_at, { day: 'numeric', month: 'long' }) : 'Not set yet'}</span>
+                </span>
+                {baseline ? (
+                  <span className="flex items-center gap-3">
+                    <span className="text-[13px] text-ink-2">{plural(usedFrames(baseline), 'usable photo')}</span>
+                    <Link to={`/progress/${dayOf(baseline)}?session=${baseline.id}`} state={{ fromCalendar: true }} aria-label={`Open the ${SITE_LABEL[site].toLowerCase()} baseline`} className="flex min-h-11 items-center rounded-pill bg-selected px-4 text-[13px] text-inverse no-underline">
+                      Open →
+                    </Link>
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <p className="m-0 max-w-[460px] text-[15px] leading-normal">
+            Every later reading of a place is compared with that place’s baseline. A change counts only when it goes beyond your normal photo-to-photo range.
+            {thin ? ' A baseline with fewer than 3 usable photos has no normal range yet: changes are shown, never called real.' : ''}
           </p>
-          <div className="flex flex-wrap items-center gap-3.5">
-            <Link to={`/progress/${dayOf(baseline)}?site=${site}&session=${baseline.id}`} state={{ fromCalendar: true }} className="flex min-h-12 items-center rounded-pill bg-selected px-5 text-[14px] text-inverse no-underline">
-              Open this day →
-            </Link>
-            <span className="text-[13px] text-ink-2">To change it, open another day.</span>
-          </div>
+          <span className="text-[13px] text-ink-2">To change a baseline, open another day.</span>
         </>
       ) : (
         <>
           <span className="font-serif text-[clamp(28px,2.86vw,39px)] leading-[.95]">Not set yet</span>
-          <p className="m-0 max-w-[420px] text-[15px] leading-normal">Your first usable {MODE_LONG[mode]} check-in of this place becomes your baseline. Take 3 or more photos so Willow can measure your normal range.</p>
+          <p className="m-0 max-w-[420px] text-[15px] leading-normal">Your first usable check-in becomes your baseline. Take 3 or more photos of each place so Willow can measure your normal range.</p>
           <Button variant="ink" onClick={onCheckIn} className="self-start">
             Check in
           </Button>
