@@ -190,9 +190,9 @@ export default function Judge() {
     },
     {
       id: 'routine',
-      title: 'Routine and label scan',
+      title: 'Routine and product photos',
       tag: 'LIVE AI · RULE TABLE',
-      body: `${routineAdded ? 'Your guest routine pairs a retinoid with a BHA at night and has no sunscreen; the check finds both.' : 'The check runs on the routine in this account.'} Scan any ingredient label and Gemini reads it into a product.`,
+      body: `${routineAdded ? 'Your guest routine pairs a retinoid with a BHA at night and has no sunscreen; the check finds both.' : 'The check runs on the routine in this account.'} Request a product with a photo of its pack and Gemini reads the brand and name, or finds it in the catalog.`,
       cta: 'Open routine',
       disabled: ready ? undefined : needsGuest,
       act: () => go('routine', '/routine'),

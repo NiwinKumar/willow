@@ -157,7 +157,7 @@ export function RoutineEmpty({ demo, onRoutine, className }: { demo?: boolean; o
       <div className="flex max-w-[380px] flex-col gap-1">
         <h2 className="m-0 text-h3 font-normal">{demo ? 'Routine' : 'Add your routine'}</h2>
         <span className="text-[13px] leading-[1.45] text-ink-2">
-          {demo ? 'The demo journey has no routine to tick. Routines, ticks and the routine check are available in your own account.' : 'Scan a label or search the catalog. Willow marks each start date on your progress.'}
+          {demo ? 'The demo journey has no routine to tick. Routines, ticks and the routine check are available in your own account.' : 'Search the catalog for what you use. Willow marks each start date on your progress.'}
         </span>
       </div>
       {demo ? null : <Pill onClick={onRoutine}>Add a product</Pill>}

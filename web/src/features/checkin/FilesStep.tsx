@@ -99,7 +99,7 @@ export function FilesStep({
       ) : null}
 
       {canPick ? (
-        <label className="relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-2 rounded-[32px] border-[1.5px] border-dashed border-ink/25 bg-surface/60 p-5 text-center transition-[background] hover:bg-surface/95 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-focus">
+        <label className="relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-2 rounded-[32px] border-[1.5px] border-dashed border-ink/25 bg-surface/60 p-5 text-center transition-[background] hover:bg-surface/95">
           <input
             type="file"
             multiple
