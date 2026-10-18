@@ -65,6 +65,10 @@ class Store(Protocol):
     def campaign_member_get(self, cid: str, member_id: str) -> Doc | None: ...
     def campaign_member_update(self, cid: str, member_id: str, fields: Doc) -> None: ...
     def campaign_members(self, cid: str) -> list[Doc]: ...
+    # Shelf vs results (app/shelf.py): shelf/{uid}, the retailer's uploaded facings or stock.
+    def shelf_get(self, uid: str) -> Doc | None: ...
+    def shelf_set(self, uid: str, doc: Doc) -> None: ...
+    def shelf_delete(self, uid: str) -> None: ...
     # AutoCampaign (app/autopilot.py): campaign_rules/{id}, autopilot_activity/{id}.
     def rule_set(self, rid: str, doc: Doc) -> None: ...
     def rule_get(self, rid: str) -> Doc | None: ...
@@ -354,6 +358,16 @@ class FirestoreStore:
     def campaign_members(self, cid: str) -> list[Doc]:
         return [s.to_dict() for s in self._db().collection(f"campaigns/{cid}/members").stream()]
 
+    def shelf_get(self, uid: str) -> Doc | None:
+        snap = self._db().document(f"shelf/{uid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def shelf_set(self, uid: str, doc: Doc) -> None:
+        self._db().document(f"shelf/{uid}").set(doc)
+
+    def shelf_delete(self, uid: str) -> None:
+        self._db().document(f"shelf/{uid}").delete()
+
     def rule_set(self, rid: str, doc: Doc) -> None:
         self._db().document(f"campaign_rules/{rid}").set(doc)
 
@@ -456,6 +470,7 @@ class MemoryStore:
         self.campaign_daily: dict[tuple[str, str], Doc] = {}
         self.campaign_seen: dict[tuple[str, str], Doc] = {}
         self.campaign_member: dict[tuple[str, str], Doc] = {}
+        self.shelf: dict[str, Doc] = {}
         self.rules: dict[str, Doc] = {}
         self.activity: dict[str, Doc] = {}
         self.product_requests: dict[tuple[str, str], Doc] = {}
@@ -643,6 +658,15 @@ class MemoryStore:
 
     def campaign_members(self, cid: str) -> list[Doc]:
         return [copy.deepcopy(d) for (c, _), d in self.campaign_member.items() if c == cid]
+
+    def shelf_get(self, uid: str) -> Doc | None:
+        return copy.deepcopy(self.shelf.get(uid))
+
+    def shelf_set(self, uid: str, doc: Doc) -> None:
+        self.shelf[uid] = copy.deepcopy(doc)
+
+    def shelf_delete(self, uid: str) -> None:
+        self.shelf.pop(uid, None)
 
     def rule_set(self, rid: str, doc: Doc) -> None:
         self.rules[rid] = copy.deepcopy(doc)

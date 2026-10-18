@@ -19,6 +19,7 @@ from app.routes.products_routes import router as products_router
 from app.routes.reminders_routes import router as reminders_router
 from app.routes.retailer_routes import router as retailer_router
 from app.routes.sessions_routes import router as sessions_router
+from app.routes.shelf_routes import router as shelf_router
 from app.settings import get_settings
 
 settings = get_settings()
@@ -79,6 +80,7 @@ app.include_router(demo_router)
 app.include_router(product_tests_router)
 app.include_router(reminders_router)
 app.include_router(campaign_router)
+app.include_router(shelf_router)
 app.include_router(autopilot_router)
 app.include_router(product_requests_router)
 if storage.dev_uploads_enabled():

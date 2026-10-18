@@ -164,6 +164,7 @@ def delete_me(
     Records first, so the app forgets them at once even if removing many files takes a while."""
     store.delete_user(user.uid)
     campaigns.delete_owned(store, user.uid)
+    store.shelf_delete(user.uid)  # a retailer's shelf upload (app/shelf.py)
     storage.delete_prefix(f"uploads/{user.uid}/")
     storage.delete_prefix(f"results/{user.uid}/")
     return Response(status_code=204)
