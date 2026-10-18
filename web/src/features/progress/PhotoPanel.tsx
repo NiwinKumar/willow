@@ -129,7 +129,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
 
   return (
     // Two columns for every site: a forearm photo on its own across a desktop page is taller than the screen.
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 pt-6">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4 pt-6">
       <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
         <div className={`relative ${canCompare ? 'touch-pan-y select-none [-webkit-touch-callout:none]' : ''}`} {...(canCompare ? hold.bind : {})}>
           <PhotoFrame session={shown} box={box} alt={`Your ${multi ? `${VIEW_LABEL[active].toLowerCase()} ` : ''}photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
@@ -159,7 +159,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
         <span className="px-2 pb-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
         {openRegion ? <RegionCard region={openRegion} onOpen={onOpenMetric} onClose={() => setRegion(null)} /> : null}
         {canCompare ? (
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5 pb-1">
+          // Pinned to the card's foot, so the photo card and the spots column end on one line.
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5 pb-1">
             <button
               type="button"
               aria-pressed={hold.pinned}
@@ -179,7 +180,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
 
       <section aria-label={spotsHere ? 'Detected spots' : 'Photo quality'} className="flex flex-col gap-3">
         {spotsHere ? (
-          <div className="flex flex-col gap-3.5 rounded-[36px] bg-selected p-[clamp(20px,3vw,28px)] text-inverse squircle">
+          <div className="flex flex-1 flex-col gap-3.5 rounded-[36px] bg-selected p-[clamp(20px,3vw,28px)] text-inverse squircle">
             <div className="flex flex-wrap items-baseline justify-between gap-2.5">
               <h3 className="m-0 text-[24px] font-normal">Detected spots</h3>
               <span className="font-dot text-[30px] font-extrabold text-lime" aria-label={`${skin.length} skin ${skin.length === 1 ? 'finding' : 'findings'}`}>
