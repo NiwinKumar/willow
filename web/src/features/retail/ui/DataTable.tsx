@@ -253,7 +253,7 @@ export function DataTable<T>({
                     aria-current={selected || undefined}
                     onClick={onRowClick ? () => onRowClick(r) : undefined}
                     onKeyDown={onRowClick ? (e) => onRowKey(e, r) : undefined}
-                    className={`group ${onRowClick ? 'cursor-pointer' : ''} ${selected ? 'bg-pf-hover' : onRowClick ? 'hover:bg-pf-hover' : ''} transition-colors duration-100 focus-visible:outline-offset-[-2px] ${rowClassName?.(r) ?? ''}`}
+                    className={`group ${onRowClick ? 'cursor-pointer' : ''} ${selected ? 'bg-pf-hover' : onRowClick ? 'hover:bg-pf-hover' : ''} transition-colors duration-100 ${rowClassName?.(r) ?? ''}`}
                   >
                     {columns.map((c) => {
                       const cls = `h-[var(--proof-row)] border-b border-line px-4 py-2 align-middle first:pl-5 last:pr-5 group-last:border-b-0 ${c.align === 'right' ? 'text-right' : 'text-left'}`

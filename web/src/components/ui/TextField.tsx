@@ -12,7 +12,7 @@ export function TextField({ label, hint, error, className = '', ...rest }: { lab
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={hint || error ? `${id}-d` : undefined}
-        className={`min-h-12 rounded-sm bg-sunken px-4 text-[16px] outline-none transition-shadow focus-visible:shadow-[0_0_0_2px_var(--focus-ring)] ${error ? 'shadow-[inset_0_0_0_1px_var(--state-avoid-fg)]' : 'shadow-[inset_0_0_0_1px_var(--line-subtle)]'}`}
+        className={`min-h-12 rounded-sm bg-sunken px-4 text-[16px] outline-none transition-shadow ${error ? 'shadow-[inset_0_0_0_1px_var(--state-avoid-fg)]' : 'shadow-[inset_0_0_0_1px_var(--line-subtle)]'}`}
         {...rest}
       />
       {error ? (

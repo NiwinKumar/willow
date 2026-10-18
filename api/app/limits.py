@@ -26,6 +26,7 @@ CAPS: dict[str, tuple[int, int]] = {
     # Proof-gated promotion (app/campaigns.py): Firestore writes, not paid calls; bounded anyway.
     "campaign_create": (20, 2000),
     "sponsored_event": (60, 100000),  # a person counts once a day per campaign and kind
+    "product_request": (10, 2000),  # requests for products the catalog lacks (Firestore + photo)
 }
 
 MESSAGES = {
@@ -33,6 +34,7 @@ MESSAGES = {
     "retailer_ask": "That is 20 questions for today.",
     "campaign_create": "That is 20 new campaigns for today.",
     "proof_claims": "That is 30 sets of claim drafts for today.",
+    "product_request": "That is 10 product requests for today.",
 }
 
 

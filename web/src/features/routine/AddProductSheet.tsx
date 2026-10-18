@@ -1,15 +1,17 @@
-import { X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Camera, Search, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Button } from '../../components/ui/Button'
 import { Chip } from '../../components/ui/Chip'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { AITag } from '../../components/willow/AITag'
+import { useOwner, useProductRequests } from '../../data/hooks'
 import type { Product } from '../../data/types'
-import { ApiError, api, localDay, type LabelScan, type LabelScanFailure, type NewRoutineEntry } from '../../lib/api'
-import { CATEGORY_LABEL, CONCERN_LABEL, categoryLabel } from '../../lib/catalog'
-import { fmtPrice } from '../../lib/format'
+import { ApiError, api, localDay, type ProductRequest } from '../../lib/api'
+import { CONCERN_LABEL, categoryLabel } from '../../lib/catalog'
+import { fmtPrice, plural } from '../../lib/format'
 import { toJpegBase64 } from '../../lib/image'
+import { setQueryData } from '../../lib/query'
 import { sampleLabelFile } from '../../lib/sampleLabel'
 import { useAuth } from '../../lib/useAuth'
 import './routine.css'
@@ -18,34 +20,10 @@ import { activeLabel } from './routineModel'
 import { RoutineSheet } from './RoutineSheet'
 import { failureText, useRoutineWrites } from './writes'
 
-/** What the confirm step saves: a catalog product, or what a label scan read, or what the person typed. */
-type Draft = {
-  product_id: string | null
-  brand: string
-  name: string
-  category: string
-  key_actives: { name: string; pct: number | null }[]
-  inci: string[]
-  /** Label scans: which ingredients were hard to read (same order as inci). */
-  inciLow?: boolean[]
-  concerns: string[]
-  source: 'catalog' | 'label_scan' | 'manual'
-  /** Present when this draft came from a label photo (Gemini read it: AI-written). */
-  scan: { confidence: LabelScan['confidence']; matched: boolean; failure?: LabelScanFailure | null } | null
-}
+/** What the confirm step saves: always a catalog product (found by search, or matched from a pack photo). */
+type Draft = { product: Product; source: 'catalog' | 'label_scan' }
 
-/** Why a label photo could not be read, and what to do about it (the api's scan.failure). */
-const FAILURE_ADVICE: Record<LabelScanFailure, { what: string; retry: string }> = {
-  glare: { what: 'glare across the label', retry: 'Flatten it, tilt it away from the light and try again' },
-  blurry: { what: 'the photo is blurry', retry: 'Hold the phone steady, tap to focus on the ingredient list and try again' },
-  no_label: { what: 'no product label in the photo', retry: 'Point the camera at the ingredient list and try again' },
-  cut_off: { what: 'part of the ingredient list is outside the photo', retry: 'Fit the whole list in the frame and try again' },
-}
-
-/** Older api answers sent plain strings: those read as legible. */
-const ingredients = (scan: LabelScan) => scan.inci.map((i) => (typeof i === 'string' ? { name: i, confidence: 'high' as const } : i))
-
-export type AddPreset = { mode?: 'search' | 'scan'; slot?: 'am' | 'pm'; category?: string; q?: string; product?: Product }
+export type AddPreset = { mode?: 'search' | 'request'; slot?: 'am' | 'pm'; category?: string; q?: string; product?: Product }
 
 type When = 'am' | 'pm' | 'both'
 const WHEN: { value: When; label: string }[] = [
@@ -57,43 +35,21 @@ const WHEN: { value: When; label: string }[] = [
 const defaultWhen = (category: string): When => (category === 'sunscreen' ? 'am' : category === 'cleanser' || category === 'moisturizer' ? 'both' : 'pm')
 const slotsOf = (w: When): ('am' | 'pm')[] => (w === 'both' ? ['am', 'pm'] : [w])
 
-const fromProduct = (p: Product, source: Draft['source'], scan: Draft['scan'] = null): Draft => ({
-  product_id: p.product_id,
-  brand: p.brand,
-  name: p.name,
-  category: p.category,
-  key_actives: p.key_actives,
-  inci: p.inci,
-  concerns: p.concerns,
-  source,
-  scan,
-})
+const MAX_B64 = 8_000_000 // api photo data_base64 max_length
 
-const MAX_B64 = 8_000_000 // api LabelImage.data_base64 max_length
-
-/** Shrink a label photo until it fits the api's limit (big phone photos first go to 1600 px). */
-async function labelImage(file: File) {
+/** Shrink a pack photo until it fits the api's limit (big phone photos first go to 1600 px). */
+async function packImage(file: File) {
   let img = await toJpegBase64(file)
   if (img.data_base64.length > MAX_B64) img = await toJpegBase64(file, 1100, 0.75)
   if (img.data_base64.length > MAX_B64) throw new Error('too big')
   return img
 }
 
-function scanError(e: unknown): string {
-  if (!navigator.onLine) return "You're offline. Connect and try again, or search the catalog instead."
-  if (e instanceof ApiError) {
-    if (e.status === 429) return `${e.message} Search the catalog instead.`
-    if (e.status === 422) return 'That photo could not be opened. Try another photo of the ingredient list, or search instead.'
-    if (e.status === 502) return "The label couldn't be read just now, and this scan wasn't counted. Try again in a moment, or search instead."
-  }
-  if (e instanceof Error && e.message === 'too big') return 'That photo is too large to send. Try a closer, smaller photo of the ingredient list.'
-  return "The label couldn't be read. Flatten it, tilt it away from the light and try again, or search instead."
-}
-
 /**
  * "Add a product" bottom sheet (design: Willow App Routine, addOpen; it rises from the bottom at every width):
- * search the catalog or scan a label, then confirm when you use it and since when. Everything saved comes
- * from the catalog or the label.
+ * search the catalog, then confirm when you use it and since when. A product the catalog does not have yet is
+ * requested instead: Willow checks it and adds it with its real ingredients, so everything in a routine comes
+ * from the catalog.
  */
 export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: boolean; preset: AddPreset | null; inRoutine: Set<string>; onClose: () => void }) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick')
@@ -104,49 +60,36 @@ export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: bo
     if (open) setStep(preset?.product ? 'confirm' : 'pick')
   }
   return (
-    <RoutineSheet open={open} onClose={onClose} kind="bottom" title={step === 'confirm' ? 'Confirm details' : 'Add a product'} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
+    <RoutineSheet open={open} onClose={onClose} kind="bottom" fixedHeight title={step === 'confirm' ? 'Confirm details' : 'Add a product'} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
       {open ? <AddFlow preset={preset ?? {}} inRoutine={inRoutine} onClose={onClose} step={step} setStep={setStep} /> : null}
     </RoutineSheet>
   )
 }
 
 function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPreset; inRoutine: Set<string>; onClose: () => void; step: 'pick' | 'confirm'; setStep: (s: 'pick' | 'confirm') => void }) {
-  const { getIdToken } = useAuth()
   const writes = useRoutineWrites()
-  const [mode, setMode] = useState<'search' | 'scan'>(preset.mode ?? 'search')
-  const [draft, setDraft] = useState<Draft | null>(preset.product ? fromProduct(preset.product, 'catalog') : null)
+  const [mode, setMode] = useState<'search' | 'request'>(preset.mode ?? 'search')
+  // what was typed into search, handed to the request form when the catalog has nothing
+  const [asked, setAsked] = useState('')
+  const [draft, setDraft] = useState<Draft | null>(preset.product ? { product: preset.product, source: 'catalog' } : null)
   const [when, setWhen] = useState<When>(preset.slot ?? (preset.product ? defaultWhen(preset.product.category) : 'am'))
   const [startedAt, setStartedAt] = useState(localDay)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const pick = (d: Draft) => {
-    setDraft(d)
-    setWhen(preset.slot ?? defaultWhen(d.category))
+  const pick = (product: Product, source: Draft['source'] = 'catalog') => {
+    setDraft({ product, source })
+    setWhen(preset.slot ?? defaultWhen(product.category))
     setSaveError(null)
     setStep('confirm')
   }
 
   const save = async () => {
     if (!draft) return
-    const entry: NewRoutineEntry = draft.product_id
-      ? { product_id: draft.product_id, slots: slotsOf(when), started_at: startedAt, source: draft.source }
-      : {
-          // Clamp what a label scan read (or the person typed) to what the api accepts.
-          custom_name: draft.name.trim().slice(0, 120),
-          brand: draft.brand.trim().slice(0, 80),
-          category: (draft.category || 'other').slice(0, 40),
-          key_actives: draft.key_actives.slice(0, 20).map((a) => ({ name: a.name.slice(0, 80), pct: a.pct !== null && a.pct >= 0 && a.pct <= 100 ? a.pct : null })),
-          inci: draft.inci.slice(0, 120),
-          concerns: draft.concerns,
-          slots: slotsOf(when),
-          started_at: startedAt,
-          source: draft.source,
-        }
     setSaving(true)
     setSaveError(null)
     try {
-      await writes.add(entry)
+      await writes.add({ product_id: draft.product.product_id, slots: slotsOf(when), started_at: startedAt, source: draft.source })
       onClose()
     } catch (e) {
       setSaveError(failureText(e, "Couldn't save. Your details are still here; try again."))
@@ -155,88 +98,106 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
     }
   }
 
+  const switcher = (
+    <SegmentedControl
+      label="How to add"
+      className="shrink-0 self-start"
+      options={[
+        { value: 'search', label: 'Search catalog' },
+        { value: 'request', label: 'Request a product' },
+      ]}
+      value={mode}
+      onChange={setMode}
+    />
+  )
+
   return (
     <div className="flex flex-col gap-4">
       {step === 'pick' ? (
-        <>
-          <SegmentedControl
-            label="How to add"
-            className="self-start"
-            options={[
-              { value: 'search', label: 'Search catalog' },
-              { value: 'scan', label: 'Scan label' },
-            ]}
-            value={mode}
-            onChange={setMode}
+        mode === 'search' ? (
+          <CatalogSearch
+            switcher={switcher}
+            initial={preset}
+            inRoutine={inRoutine}
+            onPick={(p) => pick(p)}
+            onRequest={(q) => {
+              setAsked(q)
+              setMode('request')
+            }}
           />
-          {mode === 'search' ? (
-            <CatalogSearch
-              initial={preset}
-              inRoutine={inRoutine}
-              onPick={(p) => pick(fromProduct(p, 'catalog'))}
-              onScan={() => setMode('scan')}
-              onManual={() => pick({ product_id: null, brand: '', name: '', category: 'other', key_actives: [], inci: [], concerns: [], source: 'manual', scan: null })}
-            />
-          ) : (
-            <LabelScanner
-              getIdToken={getIdToken}
-              onRead={pick}
-              onSearch={() => setMode('search')}
-            />
-          )}
-        </>
+        ) : (
+          <>
+            {switcher}
+            <RequestProduct asked={asked} inRoutine={inRoutine} onPick={pick} />
+          </>
+        )
       ) : draft ? (
-        <Confirm draft={draft} setDraft={setDraft} when={when} setWhen={setWhen} startedAt={startedAt} setStartedAt={setStartedAt} saving={saving} saveError={saveError} onSave={() => void save()} />
+        <Confirm draft={draft} when={when} setWhen={setWhen} startedAt={startedAt} setStartedAt={setStartedAt} saving={saving} saveError={saveError} onSave={() => void save()} />
       ) : null}
     </div>
   )
 }
 
-function CatalogSearch({ initial, inRoutine, onPick, onScan, onManual }: { initial: AddPreset; inRoutine: Set<string>; onPick: (p: Product) => void; onScan: () => void; onManual: () => void }) {
+function CatalogSearch({ switcher, initial, inRoutine, onPick, onRequest }: { switcher: ReactNode; initial: AddPreset; inRoutine: Set<string>; onPick: (p: Product) => void; onRequest: (q: string) => void }) {
   const { getIdToken } = useAuth()
   const [query, setQuery] = useState(initial.q ?? '')
   const [category, setCategory] = useState(initial.category ?? '')
-  const [concern, setConcern] = useState('')
-  const [answer, setAnswer] = useState<{ key: string; status: 'ready' | 'error'; products: Product[] } | null>(null)
+  // several concerns: products made for all of them
+  const [concerns, setConcerns] = useState<string[]>([])
+  const [answer, setAnswer] = useState<{ key: string; status: 'ready' | 'error'; products: Product[]; total: number; size: number | null } | null>(null)
   const [retry, setRetry] = useState(0)
   const seq = useRef(0)
   const q = query.trim()
 
   // Debounced, latest query wins. An empty query lists the catalog (alphabetical by brand: no ranking).
-  const key = JSON.stringify([q, category, concern, retry])
+  const key = JSON.stringify([q, category, concerns, retry])
   useEffect(() => {
     const mine = ++seq.current
     const t = window.setTimeout(async () => {
       try {
-        const res = await api.catalogSearch(await getIdToken(), { q: q.slice(0, 100) || undefined, category: category || undefined, concern: concern || undefined, limit: 60 })
-        if (mine === seq.current) setAnswer({ key, status: 'ready', products: res.products })
+        const res = await api.catalogSearch(await getIdToken(), { q: q.slice(0, 100) || undefined, category: category || undefined, concern: concerns, limit: 200 })
+        if (mine === seq.current) setAnswer({ key, status: 'ready', products: res.products, total: res.total ?? res.products.length, size: res.catalog_size ?? null })
       } catch {
-        if (mine === seq.current) setAnswer((s) => ({ key, status: 'error', products: s?.products ?? [] }))
+        if (mine === seq.current) setAnswer((s) => ({ key, status: 'error', products: s?.products ?? [], total: s?.total ?? 0, size: s?.size ?? null }))
       }
     }, 300)
     return () => window.clearTimeout(t)
-  }, [key, q, category, concern, getIdToken])
+  }, [key, q, category, concerns, getIdToken])
   // Until the answer for these words arrives, the last list stays (dimmed) under "Searching…".
   const state = { status: answer?.key === key ? answer.status : 'loading', products: answer?.products ?? [] }
+  // Products already in the routine go to the end, so they never sit between the ones to choose from.
+  const listed = [...state.products.filter((p) => !inRoutine.has(p.product_id)), ...state.products.filter((p) => inRoutine.has(p.product_id))]
 
   const n = state.products.length
-  const filtered = Boolean(category || concern)
-  const meta = state.status === 'loading' ? 'Searching…' : state.status === 'error' ? '' : q ? `${n} result${n === 1 ? '' : 's'} for “${q}”` : filtered ? `${n} product${n === 1 ? '' : 's'} in the catalog` : `From the catalog · ${n} products`
+  const total = answer?.total ?? n
+  const filtered = Boolean(q || category || concerns.length)
+  const count = state.status === 'loading' ? 'Searching…' : state.status === 'error' ? '' : !filtered ? (answer?.size ? plural(answer.size, 'product', 'products') : '') : q ? `${plural(total, 'result', 'results')} for “${q}”` : `${plural(total, 'match', 'matches')}`
+  const toggle = (id: string) => setConcerns((cs) => (cs.includes(id) ? cs.filter((c) => c !== id) : [...cs, id]))
 
   return (
     <div className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
-        Search the catalog
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          maxLength={100}
-          placeholder="Product, brand or key ingredient"
-          className="min-h-[54px] rounded-md bg-canvas px-[18px] text-[16px] text-ink outline-none focus-visible:shadow-[0_0_0_2px_var(--focus-ring)]"
-        />
-      </label>
-      <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label="Filter by concern">
+      <div className="flex flex-wrap items-center gap-2.5">
+        {switcher}
+        <label className="relative min-w-[min(100%,240px)] flex-1">
+          <span className="sr-only">Search the catalog</span>
+          <Search aria-hidden size={18} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-ink-2" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            maxLength={100}
+            placeholder="Product, brand or key ingredient"
+            className="min-h-11 w-full rounded-pill bg-canvas pr-4 pl-11 text-[16px] text-ink outline-none"
+          />
+        </label>
+      </div>
+      <div className="flex items-baseline gap-2 text-[14px]">
+        <span>Search the catalog</span>
+        <span className="text-ink-2 tabular-nums" aria-live="polite">
+          {count}
+        </span>
+      </div>
+      <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label="Filter by concern (pick any)">
         {category ? (
           <Chip tone="ink" onToggle={() => setCategory('')} selected>
             {categoryLabel(category)} <X size={13} aria-hidden />
@@ -244,14 +205,17 @@ function CatalogSearch({ initial, inRoutine, onPick, onScan, onManual }: { initi
           </Chip>
         ) : null}
         {Object.entries(CONCERN_LABEL).map(([id, label]) => (
-          <Chip key={id} onToggle={() => setConcern(concern === id ? '' : id)} selected={concern === id}>
+          <Chip key={id} onToggle={() => toggle(id)} selected={concerns.includes(id)}>
             {label}
           </Chip>
         ))}
+        {concerns.length > 1 ? (
+          <button type="button" onClick={() => setConcerns([])} className="min-h-10 shrink-0 px-2 text-[13px] text-ink-2 underline underline-offset-4">
+            Clear
+          </button>
+        ) : null}
       </div>
-      <span className="text-[13px] text-ink-2" aria-live="polite">
-        {meta}
-      </span>
+      {concerns.length > 1 ? <span className="-mt-1 text-[13px] text-ink-2">Showing products made for all {concerns.length}.</span> : null}
 
       {state.status === 'loading' && n === 0 ? (
         <div aria-busy aria-label="Searching" className="flex flex-col gap-2">
@@ -274,19 +238,16 @@ function CatalogSearch({ initial, inRoutine, onPick, onScan, onManual }: { initi
         </div>
       ) : n === 0 ? (
         <div className="flex flex-col items-start gap-2.5 rounded-md bg-sunken p-[18px]">
-          <span className="leading-[1.5]">{q ? `Nothing in the catalog matches “${q}”.` : 'Nothing in the catalog matches these filters.'}</span>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="ink" size="sm" onClick={onScan}>
-              Scan the label instead
+          <span className="leading-[1.5]">{q ? `Nothing in the catalog matches “${q}” yet.` : 'Nothing in the catalog matches these filters.'}</span>
+          {q ? (
+            <Button variant="ink" size="sm" onClick={() => onRequest(q)}>
+              Request it
             </Button>
-            <Button variant="outline" size="sm" onClick={onManual}>
-              Add it yourself
-            </Button>
-          </div>
+          ) : null}
         </div>
       ) : (
         <ul className={`flex flex-col gap-2 transition-opacity ${state.status === 'loading' ? 'opacity-60' : ''}`}>
-          {state.products.map((p, i) => {
+          {listed.map((p, i) => {
             const has = inRoutine.has(p.product_id)
             return (
               <li key={p.product_id}>
@@ -312,94 +273,153 @@ function CatalogSearch({ initial, inRoutine, onPick, onScan, onManual }: { initi
         </ul>
       )}
       {n > 0 ? (
-        <button type="button" onClick={onManual} className="min-h-11 self-start text-[14px] text-ink-2 underline underline-offset-4">
-          Not here? Add it yourself
+        <button type="button" onClick={() => onRequest(q)} className="min-h-11 self-start text-[14px] text-ink-2 underline underline-offset-4">
+          Not here? Request it
         </button>
       ) : null}
     </div>
   )
 }
 
-function LabelScanner({ getIdToken, onRead, onSearch }: { getIdToken: () => Promise<string>; onRead: (d: Draft) => void; onSearch: () => void }) {
-  const [status, setStatus] = useState<'idle' | 'reading' | 'failed'>('idle')
-  const [failure, setFailure] = useState('')
+/**
+ * Ask Willow to add a product the catalog lacks: a photo of the pack, or its brand and name. Gemini reads the
+ * photo first; when that finds a catalog product, it is offered right away instead of a request.
+ */
+function RequestProduct({ asked, inRoutine, onPick }: { asked: string; inRoutine: Set<string>; onPick: (p: Product, source: Draft['source']) => void }) {
+  const { getIdToken } = useAuth()
+  const uid = useOwner()
+  const requests = useProductRequests()
+  const [brand, setBrand] = useState('')
+  const [name, setName] = useState(asked)
+  const [photo, setPhoto] = useState<{ mime_type: 'image/jpeg'; data_base64: string } | null>(null)
+  const [reading, setReading] = useState(false)
+  const [readNote, setReadNote] = useState<string | null>(null)
+  const [found, setFound] = useState<Product | null>(null)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState<ProductRequest | null>(null)
 
-  const read = async (files: File[]) => {
-    if (!files.length) return
-    setStatus('reading')
+  const choose = async (file: File | undefined) => {
+    if (!file) return
+    setError(null)
+    setFound(null)
+    setReadNote(null)
+    let img
+    try {
+      img = await packImage(file)
+    } catch {
+      setError('That photo could not be opened. Try another photo of the pack.')
+      return
+    }
+    setPhoto(img)
+    // Gemini reads the pack so the form fills itself in; if it finds the product, the catalog already has it.
+    setReading(true)
     try {
       const token = await getIdToken()
-      const images = await Promise.all(files.slice(0, 2).map(labelImage))
-      const res = await api.labelScan(token, images)
+      const res = await api.labelScan(token, [img])
       if (res.match) {
-        const product = await api.catalogProduct(token, res.match.product_id)
-        onRead(fromProduct(product, 'label_scan', { confidence: res.scan.confidence, matched: true, failure: res.scan.failure }))
+        setFound(await api.catalogProduct(token, res.match.product_id))
         return
       }
-      const items = ingredients(res.scan)
-      if (res.scan.failure && !items.length && !res.scan.brand && !res.scan.product_name) {
-        // Nothing usable came back: retake (the api did not count this scan).
-        const a = FAILURE_ADVICE[res.scan.failure]
-        setFailure(`The label wasn't readable: ${a.what}. ${a.retry}, or search instead. This photo wasn't counted against your scans.`)
-        setStatus('failed')
-        return
-      }
-      onRead({
-        product_id: null,
-        brand: res.scan.brand ?? '',
-        name: res.scan.product_name ?? '',
-        category: res.scan.category || 'other',
-        key_actives: res.scan.key_actives,
-        inci: items.map((i) => i.name),
-        inciLow: items.map((i) => i.confidence === 'low'),
-        concerns: [],
-        source: 'label_scan',
-        scan: { confidence: res.scan.confidence, matched: false, failure: res.scan.failure },
-      })
-    } catch (e) {
-      setFailure(scanError(e))
-      setStatus('failed')
+      if (res.scan.brand) setBrand(res.scan.brand)
+      if (res.scan.product_name) setName(res.scan.product_name)
+      setReadNote(res.scan.brand || res.scan.product_name ? 'Read from your photo. Check the brand and name.' : 'We couldn’t read the name from the photo. Type it below, or send the photo as it is.')
+    } catch {
+      setReadNote('We couldn’t read the photo just now. Type the name below, or send the photo as it is.')
+    } finally {
+      setReading(false)
     }
   }
 
-  const reading = status === 'reading'
-  const corner = 'absolute size-9 border-white'
+  const ready = Boolean(photo) || Boolean(brand.trim() && name.trim())
+  const send = async () => {
+    if (!ready || sending) return
+    setSending(true)
+    setError(null)
+    try {
+      const made = await api.requestProduct(await getIdToken(), { brand: brand.trim(), name: name.trim(), ...(photo ? { photo } : {}) })
+      setSent(made)
+      setQueryData<ProductRequest[]>(['product-requests', uid], (prev) => [made, ...(prev ?? [])])
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'in_catalog' && e.detail?.product) setFound(e.detail.product as Product)
+      else setError(failureText(e, "Couldn't send the request. Try again."))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (sent) {
+    const what = [sent.brand, sent.name].filter(Boolean).join(' ') || 'your product'
+    const others = (sent.askers ?? 1) - 1
+    return (
+      <div className="flex flex-col gap-4">
+        <div role="status" className="flex flex-col gap-2 rounded-[24px] bg-sunken p-5">
+          <span className="text-[20px] leading-tight">Requested</span>
+          <span className="leading-[1.5] text-ink-2">
+            We’ll check {what}, add it with its real ingredients and let you know when it’s in the catalog.
+            {others > 0 ? ` ${plural(others, 'other person has', 'other people have')} asked for it too, so it moves up the list.` : ''}
+          </span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => {
+            setSent(null)
+            setBrand('')
+            setName('')
+            setPhoto(null)
+            setReadNote(null)
+          }}
+        >
+          Request another
+        </Button>
+        <RequestList requests={requests.data ?? []} inRoutine={inRoutine} onPick={onPick} />
+      </div>
+    )
+  }
+
+  const field = 'min-h-[50px] rounded-[16px] bg-canvas px-3.5 text-[16px] text-ink outline-none'
   return (
     <div className="flex flex-col gap-4">
-      <div
-        className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[32px] squircle"
-        style={{ background: 'radial-gradient(60% 60% at 50% 50%, rgba(255,178,122,.6), transparent 70%), radial-gradient(50% 50% at 30% 70%, rgba(242,95,168,.45), transparent 70%), #F3EEE9' }}
-      >
-        <span className="absolute top-[18px] left-5 font-mono text-[11px] tracking-[.06em] text-ink-2">LABEL PHOTO</span>
-        <span aria-hidden className={`${corner} top-[14%] left-[18%] rounded-tl-[14px] border-t-2 border-l-2`} />
-        <span aria-hidden className={`${corner} top-[14%] right-[18%] rounded-tr-[14px] border-t-2 border-r-2`} />
-        <span aria-hidden className={`${corner} bottom-[14%] left-[18%] rounded-bl-[14px] border-b-2 border-l-2`} />
-        <span aria-hidden className={`${corner} right-[18%] bottom-[14%] rounded-br-[14px] border-r-2 border-b-2`} />
-        {reading ? <span aria-hidden className="absolute inset-x-[18%] h-[3px] rounded-[3px] bg-white shadow-[0_0_24px_6px_rgba(255,255,255,.8)] motion-safe:animate-[rtScan_1.1s_ease-in-out_infinite_alternate]" style={{ top: '48%' }} /> : null}
-        <span aria-live="polite" className="glass-pill relative rounded-pill px-[18px] py-3 text-center text-[16px]">
-          {reading ? 'Reading the label…' : status === 'failed' ? 'Couldn’t read the label' : 'Point at the ingredient list'}
-        </span>
-      </div>
+      <p className="leading-[1.55] text-ink-2">
+        Can’t find it? Send a photo of the pack, or its brand and name. We check the product, add it to the catalog with its real ingredients, and let you know when it’s in. The more people ask for a product, the sooner it’s added.
+      </p>
 
-      {reading ? (
-        <p role="status" className="text-[14px] leading-[1.5] text-ink-2">
-          Gemini is reading the ingredient list and Willow is looking for it in the catalog. This takes a few seconds.
-        </p>
-      ) : status === 'failed' ? (
-        <p role="alert" className="rounded-md bg-cta px-[18px] py-3.5 leading-[1.5]">
-          {failure}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1.5 text-[15px]">
-          <span>○ Whole ingredient list in frame</span>
-          <span>○ Label flat, no glare on the text</span>
-          <span>○ Up to 2 photos: front and ingredient list</span>
+      {found ? (
+        <div className="flex flex-col gap-3 rounded-[24px] bg-sunken p-4">
+          <span className="text-[14px] text-ink-2">Good news: it’s already in the catalog</span>
+          <div className="flex items-center gap-3.5">
+            <ProductImage product={found} size={50} decorative />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-[13px] text-ink-2">
+                {found.brand} · {categoryLabel(found.category)}
+              </span>
+              <span className="text-[16px] leading-snug">{found.name}</span>
+            </span>
+          </div>
+          {inRoutine.has(found.product_id) ? (
+            <span className="text-[14px]">✓ Already in your routine</span>
+          ) : (
+            <Button variant="ink" size="sm" className="self-start" onClick={() => onPick(found, photo ? 'label_scan' : 'catalog')}>
+              Add to routine
+            </Button>
+          )}
         </div>
-      )}
+      ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <label className={`${reading ? 'pointer-events-none opacity-55' : 'cursor-pointer'} relative flex min-h-[54px] flex-1 items-center justify-center rounded-pill bg-selected px-5 text-[15px] text-inverse focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-focus`}>
-          {reading ? 'Scanning…' : status === 'failed' ? 'Try again' : 'Take label photo'}
+      <div className="flex flex-wrap items-center gap-3">
+        {photo ? (
+          <span className="relative">
+            <img src={`data:${photo.mime_type};base64,${photo.data_base64}`} alt="Your photo of the pack" className="size-[72px] rounded-[18px] object-cover" />
+            <button type="button" aria-label="Remove photo" onClick={() => setPhoto(null)} disabled={reading} className="hit44 absolute -top-1.5 -right-1.5 grid size-6 place-items-center rounded-full bg-selected text-inverse">
+              <X size={13} aria-hidden />
+            </button>
+          </span>
+        ) : null}
+        <label className={`${reading ? 'pointer-events-none opacity-55' : 'cursor-pointer'} relative inline-flex min-h-11 items-center gap-2 rounded-pill bg-white px-[18px] text-[15px] shadow-[inset_0_0_0_1px_var(--line-subtle)]`}>
+          <Camera size={17} aria-hidden />
+          {reading ? 'Reading the pack…' : photo ? 'Retake photo' : 'Photo of the pack'}
           <input
             type="file"
             accept="image/*"
@@ -407,131 +427,122 @@ function LabelScanner({ getIdToken, onRead, onSearch }: { getIdToken: () => Prom
             disabled={reading}
             className="sr-only"
             onChange={(e) => {
-              const files = [...(e.target.files ?? [])]
+              const file = e.target.files?.[0]
               e.target.value = ''
-              void read(files)
+              void choose(file)
             }}
           />
         </label>
-        <label className={`${reading ? 'pointer-events-none opacity-55' : 'cursor-pointer'} relative flex min-h-[54px] items-center justify-center rounded-pill bg-white px-5 text-[15px] shadow-[inset_0_0_0_1px_var(--line-subtle)] focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-focus`}>
-          Choose photos
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            disabled={reading}
-            className="sr-only"
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])]
-              e.target.value = ''
-              void read(files)
-            }}
-          />
-        </label>
-        {status === 'failed' ? (
-          <Button variant="outline" size="lg" onClick={onSearch}>
-            Search instead
-          </Button>
+        {!photo ? (
+          <button type="button" disabled={reading} onClick={() => void sampleLabelFile().then(choose)} className="min-h-11 text-[14px] text-ink-2 underline underline-offset-4 disabled:opacity-50">
+            Try a sample photo
+          </button>
         ) : null}
       </div>
-      <div className="flex flex-col gap-1 text-[13px] text-ink-2">
-        <button type="button" disabled={reading} onClick={() => void sampleLabelFile().then((f) => read([f]))} className="min-h-11 self-start text-ink underline underline-offset-4 disabled:opacity-50">
-          No product to hand? Try a sample label
-        </button>
-        <span>Label photos are used only to read the ingredients and are not kept. Up to 30 scans a day.</span>
+      {readNote ? (
+        <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
+          <AITag label="AI-read" />
+          {readNote}
+        </span>
+      ) : null}
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
+          Brand
+          <input type="text" value={brand} maxLength={80} onChange={(e) => setBrand(e.target.value)} className={field} />
+        </label>
+        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
+          Product name
+          <input type="text" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} className={field} />
+        </label>
       </div>
+
+      {error ? (
+        <p role="alert" className="rounded-[18px] bg-avoid-bg px-4 py-3 text-[14px] text-avoid">
+          {error}
+        </p>
+      ) : null}
+      <button type="button" onClick={() => void send()} disabled={!ready || sending || reading} aria-busy={sending} className="min-h-[54px] rounded-[24px] bg-selected text-[16px] text-inverse disabled:opacity-50">
+        {sending ? 'Sending…' : 'Send request'}
+      </button>
+      <span className="-mt-1 text-[13px] text-ink-2">A photo, or both the brand and the name. We keep the photo only until the product is checked.</span>
+
+      <RequestList requests={requests.data ?? []} inRoutine={inRoutine} onPick={onPick} />
     </div>
   )
 }
 
-function Confirm({ draft, setDraft, when, setWhen, startedAt, setStartedAt, saving, saveError, onSave }: { draft: Draft; setDraft: (d: Draft) => void; when: When; setWhen: (w: When) => void; startedAt: string; setStartedAt: (d: string) => void; saving: boolean; saveError: string | null; onSave: () => void }) {
-  const matched = draft.product_id !== null
-  const custom = !matched
-  const field = 'min-h-[50px] rounded-[16px] bg-canvas px-3.5 text-[16px] text-ink outline-none read-only:text-ink-2 focus-visible:shadow-[0_0_0_2px_var(--focus-ring)]'
-  const note = matched
-    ? draft.scan
-      ? `Catalog match: ${draft.brand} ${draft.name}. Catalog facts are used over anything read from the label.`
-      : 'From the catalog: ingredients, price and store links come from there.'
-    : draft.source === 'label_scan'
-      ? 'No catalog match. This will be saved as your own product. Check what was read from the label and correct the name if it is wrong.'
-      : 'Not in the catalog. Saved as your own product with the details you give.'
-  const canSave = Boolean(draft.name.trim()) && !saving
+const STATUS_WORDS: Record<ProductRequest['status'], string> = { pending: 'Checking', added: 'Added', declined: 'Couldn’t add' }
+
+function RequestList({ requests, inRoutine, onPick }: { requests: ProductRequest[]; inRoutine: Set<string>; onPick: (p: Product, source: Draft['source']) => void }) {
+  if (!requests.length) return null
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[14px] text-ink-2">Your requests</span>
+      <ul className="flex flex-col gap-2">
+        {requests.map((r) => (
+          <li key={r.id} className="flex items-center gap-3 rounded-[20px] bg-sunken px-4 py-3">
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-[15px]">{[r.brand, r.name].filter(Boolean).join(' ') || 'Photo request'}</span>
+              <span className="text-[13px] text-ink-2">
+                {STATUS_WORDS[r.status]}
+                {r.status === 'pending' && (r.askers ?? 0) > 1 ? ` · ${r.askers} people asked` : ''}
+                {r.status === 'declined' ? ' · we couldn’t verify its ingredients' : ''}
+              </span>
+            </span>
+            {r.status === 'added' && r.product ? (
+              inRoutine.has(r.product.product_id) ? (
+                <span className="text-[14px]">✓ In routine</span>
+              ) : (
+                <Button variant="ink" size="sm" onClick={() => onPick(r.product!, 'catalog')}>
+                  Add
+                </Button>
+              )
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveError, onSave }: { draft: Draft; when: When; setWhen: (w: When) => void; startedAt: string; setStartedAt: (d: string) => void; saving: boolean; saveError: string | null; onSave: () => void }) {
+  const p = draft.product
+  const field = 'min-h-[50px] rounded-[16px] bg-canvas px-3.5 text-[16px] text-ink outline-none'
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="rounded-[18px] px-4 py-3 text-[14px] leading-[1.45]" style={{ background: matched ? 'var(--action-tag)' : 'var(--action-primary)' }}>
-        {note}
-      </p>
-      {draft.scan ? (
-        <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
-          <AITag label="AI-read" />
-          Label read with {draft.scan.confidence} confidence
-          {draft.scan.failure ? `: ${FAILURE_ADVICE[draft.scan.failure].what}, so check the details against the pack.` : draft.scan.confidence === 'low' ? ': parts were hard to read, so check the details against the pack.' : '.'}
+      <div className="flex items-center gap-3.5 rounded-[24px] bg-sunken p-3">
+        <ProductImage product={p} size={56} decorative />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-[13px] text-ink-2">
+            {p.brand} · {categoryLabel(p.category)}
+          </span>
+          <span className="text-[17px] leading-snug">{p.name}</span>
         </span>
-      ) : null}
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
-          Brand
-          <input type="text" value={draft.brand} readOnly={matched} maxLength={80} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={field} />
-        </label>
-        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
-          Product name
-          <input type="text" value={draft.name} readOnly={matched} maxLength={120} required onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={field} />
-        </label>
       </div>
-      {custom ? (
-        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
-          Category
-          <select value={CATEGORY_LABEL[draft.category] ? draft.category : 'other'} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className={`${field} appearance-none`}>
-            {Object.entries(CATEGORY_LABEL).map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+      <p className="-mt-1 text-[13px] text-ink-2">{draft.source === 'label_scan' ? 'Matched from your photo. Ingredients, price and store links come from the catalog.' : 'Ingredients, price and store links come from the catalog.'}</p>
 
-      {draft.inci.length ? (
+      {p.inci.length ? (
         <div className="flex flex-col gap-1.5">
-          <span className="text-[14px] text-ink-2">{matched ? 'Ingredients · from catalog' : 'Ingredients · read from your label photo'}</span>
+          <span className="text-[14px] text-ink-2">Ingredients</span>
           <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-[16px] bg-canvas p-3">
-            {draft.inci.map((ing, i) =>
-              !matched && draft.inciLow?.[i] ? (
-                <span key={`${ing}-${i}`} title="Read with low confidence" className="rounded-pill border-[1.5px] border-dashed border-ink/40 bg-white/60 px-2.5 py-1 text-[13px]">
-                  {ing}?<span className="sr-only"> (hard to read)</span>
-                </span>
-              ) : (
-                <span key={`${ing}-${i}`} className="rounded-pill bg-white px-2.5 py-1 text-[13px]">
-                  {ing}
-                </span>
-              ),
-            )}
+            {p.inci.map((ing, i) => (
+              <span key={`${ing}-${i}`} className="rounded-pill bg-white px-2.5 py-1 text-[13px]">
+                {ing}
+              </span>
+            ))}
           </div>
-          {!matched && draft.inciLow?.some(Boolean) ? <span className="text-[12px] text-ink-2">Dashed with “?” = read with low confidence. Check those against the pack.</span> : null}
         </div>
       ) : null}
-      {draft.key_actives.length ? (
+      {p.key_actives.length ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[14px] text-ink-2">Key actives</span>
-          {draft.key_actives.map((a) => (
+          {p.key_actives.map((a) => (
             <span key={a.name} className="rounded-pill bg-lime px-3 py-1 text-[13px]">
               {activeLabel(a)}
             </span>
           ))}
-        </div>
-      ) : null}
-
-      {custom ? (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[14px] text-ink-2">What do you use it for? (links it to the right measurements)</span>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Concerns">
-            {Object.entries(CONCERN_LABEL).map(([id, label]) => (
-              <Chip key={id} selected={draft.concerns.includes(id)} onToggle={() => setDraft({ ...draft, concerns: draft.concerns.includes(id) ? draft.concerns.filter((c) => c !== id) : [...draft.concerns, id] })}>
-                {label}
-              </Chip>
-            ))}
-          </div>
         </div>
       ) : null}
 
@@ -567,7 +578,7 @@ function Confirm({ draft, setDraft, when, setWhen, startedAt, setStartedAt, savi
           {saveError}
         </p>
       ) : null}
-      <button type="button" onClick={onSave} disabled={!canSave} aria-busy={saving} className="min-h-[58px] rounded-[24px] bg-selected text-[16px] text-inverse">
+      <button type="button" onClick={onSave} disabled={saving} aria-busy={saving} className="min-h-[58px] rounded-[24px] bg-selected text-[16px] text-inverse">
         {saving ? 'Saving…' : 'Save to routine'}
       </button>
     </div>

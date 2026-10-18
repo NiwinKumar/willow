@@ -30,7 +30,7 @@ export function Sparkbars({ days, label, height = 36 }: { days: SparkDay[]; labe
         onKeyDown={move}
         onMouseLeave={() => setActive(null)}
         onBlur={() => setActive(null)}
-        className="flex items-end gap-[2px] rounded-xs focus-visible:outline-offset-2"
+        className="flex items-end gap-[2px] rounded-xs"
         style={{ height }}
       >
         {days.map((d, i) => {
