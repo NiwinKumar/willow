@@ -91,9 +91,10 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
           {read ? (
             <>
               <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.01em] text-pretty">{read.name ?? 'Treated arm vs control arm'}</span>
-              <span className="flex items-baseline gap-2">
+              {/* Centred on the dot numeral: its glyphs sit above the text baseline, so baseline alignment looked off. */}
+              <span className="flex items-center gap-2.5">
                 <span className="text-[15px]">Day</span>
-                <span className="font-dot text-[56px] leading-[.9]">{read.day}</span>
+                <span className="font-dot text-[56px] leading-none">{read.day}</span>
                 <span className="text-[15px]">{read.of ? `of ${read.of} days` : 'since the baseline'}</span>
               </span>
               <span aria-hidden className="grid max-w-[460px] gap-[5px]" style={{ gridTemplateColumns: 'repeat(14, minmax(0, 1fr))' }}>
@@ -105,7 +106,9 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
                 <span aria-hidden>{read.standing.g} </span>
                 {read.standing.t}.
               </span>
-              <OpenTest onClick={() => navigate('/test')} />
+              <div className="mt-auto flex justify-end pt-1">
+                <OpenTest onClick={() => navigate('/test')} />
+              </div>
             </>
           ) : (
             <>

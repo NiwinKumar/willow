@@ -102,3 +102,18 @@ export const METRIC_LOOK: Record<MetricId, Look> = {
 
 /** The grey card for a metric with no value this time (design: value null). */
 export const EMPTY_CARD = { bg: 'linear-gradient(180deg, #F4F3F0, #E3E2DD)', fg: 'var(--text-secondary)' }
+
+/** The info button on each reading: what it is and what Willow measures, in everyday words (no jargon, no "better"). */
+export const METRIC_ABOUT: Record<MetricId, string> = {
+  pigment_spots: 'Small patches darker than the skin around them, like sun spots or marks left after a breakout. Willow measures how much of your skin they cover.',
+  tone_evenness: 'How even your skin colour looks across your face. Willow compares your forehead, cheeks, nose and chin with each other; a lower number means a more even look.',
+  redness: 'How red your skin looks compared with your own usual skin. It is only ever compared with you, because redness shows differently on every skin tone.',
+  tone_ita: 'Your skin tone as a number, from how light and how warm your skin looks in the photo. It describes you; no number is better than another. Sun and tanning can move it.',
+  blemishes: 'Small red or raised spots, like pimples or bumps, that Willow finds in your photos. It counts how many it can see.',
+  pores: 'The tiny openings in your skin you can see up close. Willow counts how many are visible in each square centimetre of your close-up.',
+  texture: 'How smooth or bumpy your skin surface looks up close. A lower number means a smoother look.',
+  lines: 'Fine lines and wrinkles where they usually form, like the forehead and around the eyes. Willow measures how much line it can see.',
+  dark_circles: 'How much darker or lighter the skin under your eyes is than your cheek. Below zero means darker than your cheek; above zero, lighter.',
+  shine: 'How much of your forehead, nose and chin looks shiny from oil or sweat.',
+  glow: 'How bright, colourful and smooth your cheeks look together, compared only with your own earlier photos.',
+}

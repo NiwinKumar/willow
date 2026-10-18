@@ -334,7 +334,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                     })}
                   </span>
                 </h1>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-col items-start gap-1.5">
                   {chips.map((ch) => (
                     <span key={ch.t} className="flex min-h-[34px] items-center gap-[7px] rounded-pill bg-white/60 px-[13px] text-[13px]">
                       {ch.g ? <VerdictGlyph kind={ch.g} way={ch.way} /> : <span aria-hidden>○</span>}
