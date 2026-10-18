@@ -143,6 +143,17 @@ function HomeBody() {
   const latestFace = latest(face, (s) => s.status === 'done')
   const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
+  // The hero's question follows what the lines above it are about: a check-in from today, an earlier
+  // one (the lines still describe it), or no baseline yet.
+  const heroAsk =
+    read.person === 'new' || read.person === 'noBand'
+      ? { label: 'How to start', run: () => ask('How do I take a good face baseline?', 'Today') }
+      : latestFace && dayOf(latestFace.created_at) === day
+        ? { label: 'Ask about today', run: () => ask('Explain today’s read: what changed and what should I do today?', 'Today') }
+        : {
+            label: 'Ask about these',
+            run: () => ask('Explain my last check-in: what changed, and what should I do until the next one?', latestFace ? `Face check-in · ${shortDay(latestFace.created_at)}` : 'Today'),
+          }
   const showSetup = !demo && (read.person === 'new' || read.person === 'noBand')
 
   const setupRows: SetupRow[] = [
@@ -249,7 +260,8 @@ function HomeBody() {
             name={me.guest ? null : me.first}
             next={heroNext}
             lines={heroLines}
-            onAsk={demo ? undefined : () => (read.person === 'new' || read.person === 'noBand' ? ask('How do I take a good face baseline?', 'Today') : ask('Explain today’s read: what changed and what should I do today?', 'Today'))}
+            onAsk={demo ? undefined : heroAsk.run}
+            askLabel={heroAsk.label}
           />
         </div>
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
