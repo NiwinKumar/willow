@@ -1,5 +1,5 @@
 /**
- * Demo mode shows the team's own consented journey, measured by the live engine (api /v1/demo/journey).
+ * Demo mode shows Mei's journey, a simulated person (generated photos), measured by the live engine (api /v1/demo/journey).
  * There is no illustrative fallback: when the journey cannot be read, demo mode says so.
  * The journey is read once per entry and held, so a report never swaps its data while someone looks at it.
  */
