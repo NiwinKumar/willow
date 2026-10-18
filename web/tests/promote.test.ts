@@ -123,3 +123,38 @@ test('campaign summary and lift words', () => {
   assert.deepEqual(liftWords(-0.03), { figure: '3 pts', dir: 'below' })
   assert.deepEqual(liftWords(0.001), { figure: '', dir: 'level with' })
 })
+
+test('the campaign page: day of the run, funnel and boosted adds', async () => {
+  const { runDay, funnelSteps, boostedAdds, shareText } = await import('../src/features/retail/promote.ts')
+  const c = { status: 'active' as const, days: 14 as const, starts_at: '2026-10-16T10:00:00+00:00', ends_at: '2026-10-30T10:00:00+00:00' }
+  assert.deepEqual(runDay(c, new Date('2026-10-18T12:00:00Z')), { day: 3, of: 14 })
+  assert.equal(runDay(c, new Date('2026-10-31T00:00:00Z')), null)
+  assert.equal(runDay({ ...c, status: 'ended' }, new Date('2026-10-18T12:00:00Z')), null)
+  const f = funnelSteps({ impressions: 200, clicks: 20, adds: 5 })
+  assert.deepEqual(f.map((s) => s.value), [200, 20, 5])
+  assert.deepEqual(f.map((s) => s.share), [1, 0.1, 0.025])
+  assert.equal(funnelSteps({ impressions: 0, clicks: 0, adds: 0 })[1].share, null)
+  assert.equal(shareText(0.033), '3.3%')
+  assert.equal(shareText(0.0004), '<0.1%')
+  assert.equal(shareText(null), '—')
+  assert.equal(boostedAdds(null), null)
+  const inc = { exposed: { n: 80, added: 20, rate: 0.25 }, holdout: { n: 20, added: 2, rate: 0.1 }, lift: 0.15, lift_lo: 0.05, lift_hi: 0.25 }
+  assert.deepEqual(boostedAdds(inc), { n: 12, lo: 4, hi: 20 })
+})
+
+test('campaign insight words the verdict only when it is measured', async () => {
+  const { campaignInsight, cumulativeDays, ownRecordInsight } = await import('../src/features/retail/promote.ts')
+  const base = { status: 'active' as const, stats: { reach: 34, impressions: 34, clicks: 9, adds: 3, ctr: 0.26, daily: [], incrementality: null, incrementality_note: '' } }
+  assert.equal(campaignInsight({ ...base, stats: { ...base.stats, impressions: 0, reach: 0 } }).tone, 'wait')
+  const wait = campaignInsight(base)
+  assert.equal(wait.tone, 'wait')
+  assert.match(wait.detail, /34 people have seen the card; 9 clicked through and 3 added it to their routine/)
+  const g = (lift: number, lo: number, hi: number) => ({ ...base, stats: { ...base.stats, incrementality: { exposed: { n: 80, added: 20, rate: 0.25 }, holdout: { n: 20, added: 2, rate: 0.1 }, lift, lift_lo: lo, lift_hi: hi } } })
+  assert.equal(campaignInsight(g(0.15, 0.05, 0.25)).tone, 'good')
+  assert.match(campaignInsight(g(0.15, 0.05, 0.25)).detail, /25 in 100 .* against 10 in 100/)
+  assert.equal(campaignInsight(g(0.05, -0.04, 0.14)).tone, 'wait')
+  assert.equal(campaignInsight(g(-0.1, -0.2, -0.01)).tone, 'neutral')
+  assert.deepEqual(cumulativeDays([{ day: 'a', impressions: 5, clicks: 1, adds: 0 }, { day: 'b', impressions: 7, clicks: 2, adds: 1 }]).map((d) => d.values), [[5, 1, 0], [12, 3, 1]])
+  assert.equal(ownRecordInsight({ rate: null, base_rate: 0.3, n: 40 }), null)
+  assert.match(ownRecordInsight({ rate: 0.64, base_rate: 0.29, n: 67 })!, /^64 in 100 of its users .* 29 in 100 non-users/)
+})

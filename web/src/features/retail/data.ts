@@ -75,7 +75,7 @@ export function csvMeta(d: Pick<Insights, 'cohort' | 'filters'>, extra?: string)
   const kind = cohortKind(d.cohort)
   const range = RANGES.find((r) => r.value === d.filters?.range)?.caps ?? 'ALL TIME'
   return [
-    `Willow Proof aggregate export · ${COHORT_LINE[kind]} · ${d.cohort.synthetic} simulated + ${d.cohort.real} real users · ${range}${d.filters ? ` to ${d.filters.today}` : ''} · groups under ${MIN_GROUP} suppressed${extra ? ` · ${extra}` : ''}`,
+    `Proof by Willow aggregate export · ${COHORT_LINE[kind]} · ${d.cohort.synthetic} simulated + ${d.cohort.real} real users · ${range}${d.filters ? ` to ${d.filters.today}` : ''} · groups under ${MIN_GROUP} suppressed${extra ? ` · ${extra}` : ''}`,
     'Cosmetic outcome associations from photos, not proof of effect. Not a medical assessment.',
   ]
 }

@@ -467,12 +467,12 @@ function About({ d }: { d: Insights }) {
     { k: 'Consent and privacy', v: `Aggregates only. Real people are included only after a separate opt-in. Groups under ${MIN_GROUP} are hidden, including cells that would let a hidden count be worked out. No images or per-person rows leave Willow.` },
   ]
   return (
-    <details className="group rounded-card border border-line bg-surface">
-      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 text-proof-body font-medium text-ink [&::-webkit-details-marker]:hidden">
+    <details className="group">
+      <summary className="hit44 inline-flex h-8 w-fit cursor-pointer list-none items-center gap-1.5 rounded-ctl border border-line bg-surface px-3 text-proof-small text-ink-2 hover:border-line-strong hover:text-ink [&::-webkit-details-marker]:hidden">
         About this data
-        <ChevronRight size={16} strokeWidth={1.6} aria-hidden className="text-ink-2 transition-transform group-open:rotate-90" />
+        <ChevronRight size={14} strokeWidth={1.6} aria-hidden className="transition-transform group-open:rotate-90" />
       </summary>
-      <div className="flex flex-col gap-5 border-t border-line px-5 py-5">
+      <div className="mt-3 flex flex-col gap-5 rounded-card border border-line bg-surface px-5 py-5">
         <dl className="m-0 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {items.map((p) => (
             <div key={p.k} className="flex flex-col gap-1">

@@ -27,6 +27,7 @@ const Compare = lazy(() => import('./sections/Compare'))
 const Customers = lazy(() => import('./sections/Customers'))
 const Market = lazy(() => import('./sections/Market'))
 const Campaigns = lazy(() => import('./sections/Promote'))
+const CampaignDashboard = lazy(() => import('./sections/CampaignDashboard'))
 const Explore = lazy(() => import('./sections/Explore'))
 
 /* ───────────────────────────── theme ───────────────────────────── */
@@ -99,7 +100,7 @@ function Shell() {
   const askOpen = param('ask') === '1'
 
   useEffect(() => {
-    document.title = `${section.label} · Willow Proof`
+    document.title = `${section.label} · Proof by Willow`
   }, [section.label])
   // A new page starts at the top (filters and tabs change the query string, not the path, so they keep it).
   useEffect(() => {
@@ -158,6 +159,7 @@ function Shell() {
                   <Route path="customers" element={<Customers />} />
                   <Route path="market" element={<Market />} />
                   <Route path="campaigns" element={<Campaigns />} />
+                  <Route path="campaigns/:campaignId" element={<CampaignDashboard />} />
                   <Route path="explore" element={<Explore />} />
                   <Route path=":legacy/*" element={<Legacy />} />
                 </Routes>
@@ -299,9 +301,12 @@ function TopBar({ d, loading, theme, onTheme, onAsk }: { d: Insights | null; loa
   const { carry } = useRetailState()
   return (
     <header className="flex h-[var(--proof-topbar)] items-center gap-2 px-4 sm:px-6">
-      <Link to={`/retail${carry}`} aria-label="Willow Proof, Overview" className="flex shrink-0 items-center gap-2 rounded-ctl text-ink no-underline">
+      <Link to={`/retail${carry}`} aria-label="Proof by Willow, Overview" className="flex shrink-0 items-center gap-2 rounded-ctl text-ink no-underline">
         <ProofMark size={26} />
-        <span className="hidden text-[15px] font-semibold tracking-[-0.01em] md:inline">Proof</span>
+        <span className="hidden items-baseline gap-1.5 text-[15px] tracking-[-0.01em] md:inline-flex">
+          <span className="font-semibold">Proof</span>
+          <span className="text-ink-2">by Willow</span>
+        </span>
       </Link>
       <span aria-hidden className="mx-1 text-[20px] font-light text-line-strong">
         /
@@ -329,7 +334,7 @@ function SectionTabs() {
   const { pathname } = useLocation()
   const current = sectionOf(pathname)
   return (
-    <nav aria-label="Willow Proof sections" className="no-scrollbar flex gap-1 overflow-x-auto px-2 sm:px-4">
+    <nav aria-label="Proof by Willow sections" className="no-scrollbar flex gap-1 overflow-x-auto px-2 sm:px-4">
       {SECTIONS.map((s) => {
         const on = s.id === current.id
         return (

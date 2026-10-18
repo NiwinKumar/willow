@@ -53,7 +53,7 @@ export function packMarkdown(d: PackInput): string {
   d.evidence.forEach((e, i) => {
     lines.push(`${i + 1}. **${KIND_LABEL[e.kind]}.** ${e.text}`, `   - n=${e.n}${e.window ? ` · window ${e.window}` : ''}${e.cohort_label ? ` · ${e.cohort_label}` : ''}`)
   })
-  lines.push('', '---', 'Willow Proof · Retail intelligence by Willow. Aggregates only; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.', '')
+  lines.push('', '---', 'Proof by Willow · Retail intelligence. Aggregates only; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.', '')
   return lines.join('\n')
 }
 
@@ -85,7 +85,7 @@ ol{padding-left:20px}li{margin:0 0 14px;break-inside:avoid}.k{font-size:11px;let
 ${method ? `<p class="method"><strong>Method.</strong> ${esc(method)}</p>` : ''}
 <h2>Statements</h2>
 ${d.evidence.length ? `<ol>\n${items}\n</ol>` : '<p>No statement: fewer than 10 people reached week 8 with this product.</p>'}
-<footer>Willow Proof · Retail intelligence by Willow. Aggregates only; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.</footer>
+<footer>Proof by Willow · Retail intelligence. Aggregates only; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.</footer>
 </body></html>
 `
 }

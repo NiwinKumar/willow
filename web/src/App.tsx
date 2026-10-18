@@ -152,7 +152,7 @@ const TITLES: [RegExp, string][] = [
 function PageTitle() {
   const { pathname } = useLocation()
   useEffect(() => {
-    // Willow Proof names its own tabs ("Willow Proof · <Section>", features/retail/Retail.tsx).
+    // Proof by Willow names its own tabs ("<Section> · Proof by Willow", features/retail/Retail.tsx).
     if (pathname.startsWith('/retail')) return
     const t = TITLES.find(([re]) => re.test(pathname))?.[1]
     document.title = t ? `${t} · Willow` : 'Willow: did your serum actually work?'
