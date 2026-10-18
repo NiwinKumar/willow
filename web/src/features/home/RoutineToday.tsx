@@ -28,6 +28,18 @@ const PANEL: Record<Slot, { name: string; bg: string; fg: string; line: string; 
 }
 
 /**
+ * How a slot's products fit its panel: up to four share one row; more wrap into two (three past ten) so the
+ * card keeps the height of its neighbour however many products are added, and the orbs shrink with the columns.
+ * Past ten the names drop (they stay in the tooltip and the accessible label) so three rows still fit.
+ */
+function fit(n: number): { rows: number; cols: number; px: number } {
+  const rows = n <= 4 ? 1 : n <= 10 ? 2 : 3
+  const cols = Math.max(1, Math.ceil(n / rows))
+  const px = rows === 3 ? 32 : cols <= 3 ? 48 : cols === 4 ? 42 : 36
+  return { rows, cols, px }
+}
+
+/**
  * Routine today: the products in today's morning and evening routine, as their photos (or orbs for products
  * without one). Tapping one ticks it as used today (saved to the api, optimistic). A product its schedule
  * rests today is drawn fainter with "RESTS ☾" and is not counted as due. A dashed Sunscreen slot appears only
@@ -58,13 +70,14 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           </button>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-1 flex-wrap gap-2.5">
         {(['am', 'pm'] as const).map((slot) => {
           const list = slot === 'am' ? am : pm
           const p = PANEL[slot]
           const ticked = list.filter((e) => used(e.id, slot)).length
           // Due today: everything not resting on its schedule (a resting product used anyway counts too).
           const due = list.filter((e) => !restsOn(e) || used(e.id, slot)).length
+          const { rows, cols, px } = fit(list.length + (slot === 'am' && missingSunscreen ? 1 : 0))
           return (
             <div key={slot} className={`relative flex min-w-0 flex-[1_1_250px] flex-col gap-2.5 overflow-hidden rounded-[24px] squircle px-3.5 pt-3.5 pb-3 ${p.fg}`} style={{ background: p.bg }}>
               <div className="flex items-baseline justify-between">
@@ -78,17 +91,17 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                   Nothing in your {slot === 'am' ? 'morning' : 'evening'} routine yet
                 </button>
               ) : (
-                <div className="relative flex flex-wrap justify-between gap-x-1 gap-y-3">
-                  <span aria-hidden className="absolute top-[22px] right-[34px] left-[34px] h-[1.5px]" style={{ background: p.line }} />
+                <div className="relative my-auto grid justify-items-center gap-x-1 gap-y-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+                  {rows === 1 ? <span aria-hidden className="absolute h-[1.5px]" style={{ background: p.line, top: px / 2 - 1, left: `${50 / cols}%`, right: `${50 / cols}%` }} /> : null}
                   {list.map((e) => (
-                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
+                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
-                    <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex min-w-0 flex-[0_1_68px] flex-col items-center gap-1.5 p-0 text-inherit">
-                      <span aria-hidden className="grid size-11 place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-white/50 text-[16px]">
+                    <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
+                      <span aria-hidden className="grid place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-white/50 text-[16px]" style={{ width: px, height: px }}>
                         +
                       </span>
-                      <span className="text-center text-[11.5px] leading-[1.2]">Sunscreen</span>
+                      <span className="text-center text-[11px] leading-[1.2]">Sunscreen</span>
                       <span className="font-mono text-[9.5px] tracking-[.05em] opacity-75">MISSING</span>
                     </button>
                   ) : null}
@@ -102,7 +115,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   )
 }
 
-function Orb({ entry, slot, on, ring, badgeRing, onToggle }: { entry: RoutineEntry; slot: Slot; on: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
+function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry: RoutineEntry; slot: Slot; on: boolean; px: number; named: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
   const [c0, c1, c2] = orbColours(entry)
   const full = [entry.custom_name, entry.brand].filter(Boolean).join(' · ')
   const rest = restsOn(entry)
@@ -114,22 +127,24 @@ function Orb({ entry, slot, on, ring, badgeRing, onToggle }: { entry: RoutineEnt
       aria-pressed={on}
       aria-label={`${on ? 'Used today' : 'Mark used today'}: ${full}${rest && !on ? ' (rests today)' : ''}`}
       title={full}
-      className="group relative flex min-w-0 flex-[0_1_68px] flex-col items-center gap-1.5 p-0 text-inherit"
+      className="group relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit"
     >
       <span
         aria-hidden
-        className="relative size-11 rounded-full transition-[box-shadow,scale] duration-[350ms] ease-bounce group-hover:scale-[1.08] group-active:scale-[.92]"
-        style={{ outline: `1.5px solid ${on ? ring : 'transparent'}`, outlineOffset: 3 }}
+        className="relative rounded-full transition-[box-shadow,scale] duration-[350ms] ease-bounce group-hover:scale-[1.08] group-active:scale-[.92]"
+        style={{ width: px, height: px, outline: `1.5px solid ${on ? ring : 'transparent'}`, outlineOffset: 3 }}
       >
         <ProductImage
           product={imageOf(entry)}
-          size={44}
+          size={px}
           muted={!on}
           rest={rest}
           fallback={
             <span
-              className="block size-11 rounded-full transition-[opacity,filter,box-shadow] duration-[350ms]"
+              className="block rounded-full transition-[opacity,filter,box-shadow] duration-[350ms]"
               style={{
+                width: px,
+                height: px,
                 background: `radial-gradient(circle at 34% 28%, #FFFFFF 0%, ${c0} 34%, ${c1} 72%, ${c2} 100%)`,
                 opacity: on ? 1 : rest ? 0.32 : 0.55,
                 filter: on ? 'none' : 'saturate(.35)',
@@ -139,14 +154,14 @@ function Orb({ entry, slot, on, ring, badgeRing, onToggle }: { entry: RoutineEnt
           }
         />
         <span
-          className="absolute -right-1 -bottom-1 grid size-[18px] place-items-center rounded-full bg-selected text-[9px] text-inverse transition-[opacity,scale] duration-[400ms] ease-bounce"
-          style={{ boxShadow: `0 0 0 2px ${badgeRing}`, opacity: on ? 1 : 0, scale: on ? '1' : '.4' }}
+          className="absolute -right-1 -bottom-1 grid place-items-center rounded-full bg-selected text-[9px] text-inverse transition-[opacity,scale] duration-[400ms] ease-bounce"
+          style={{ width: Math.max(14, Math.round(px * 0.4)), height: Math.max(14, Math.round(px * 0.4)), boxShadow: `0 0 0 2px ${badgeRing}`, opacity: on ? 1 : 0, scale: on ? '1' : '.4' }}
         >
           ✓
         </span>
       </span>
-      <span className="line-clamp-2 text-center text-[11.5px] leading-[1.2]">{shortName(entry)}</span>
-      {note ? <span className="min-h-[11px] font-mono text-[9.5px] tracking-[.05em] opacity-75">{note}</span> : null}
+      {named ? <span className={`line-clamp-2 text-center leading-[1.2] ${px >= 42 ? 'text-[11.5px]' : 'text-[10.5px]'}`}>{shortName(entry)}</span> : null}
+      {note && named ? <span className="min-h-[11px] font-mono text-[9.5px] tracking-[.05em] opacity-75">{note}</span> : null}
     </button>
   )
 }
