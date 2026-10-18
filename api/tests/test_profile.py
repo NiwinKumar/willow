@@ -43,7 +43,8 @@ def test_duplicate_goals_collapse(client, fake):
     "body",
     [
         {"goals": ["clearer"]},  # an old local id
-        {"goals": ["dark_spots", "even_tone", "redness", "lines"]},  # more than 3
+        # more than 5
+        {"goals": ["dark_spots", "even_tone", "redness", "lines", "blemishes", "under_eye"]},
         {"photo_time": "night"},
         {"skin_type": "very_dry"},
         {"display_name": "x" * 61},
