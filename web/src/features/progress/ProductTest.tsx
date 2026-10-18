@@ -110,7 +110,7 @@ export default function ProductTest() {
   if ((data.status === 'loading' || data.status === 'idle') && !data.all.length) return <WillowLoader inline label="Loading your product test" />
 
   const crumb = <Crumb to="/routine" back="Routine" here="Product test" />
-  const photograph = () => shell.openCheckIn({ add: ['forearm_treated', 'forearm_control'] })
+  const photograph = () => shell.openCheckIn()
   const td = test ? testDay(test) : null
   const dots = test ? planDots(test, treatedAll) : []
 

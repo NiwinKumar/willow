@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom'
 import type { Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import { placesOf } from '../../lib/profile'
-import { minutesFor, type TrackPlace } from '../../lib/track'
+import { minutesFor, withArms, type TrackPlace } from '../../lib/track'
+import { useProductTests } from '../routine/productTests'
 import './checkin.css'
 import { baselineLine, SITE_NAME, SITE_SWATCH, whenCaps } from './model'
 
@@ -21,7 +22,9 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
   const data = useData()
   const navigate = useNavigate()
   const ref = useRef<HTMLDialogElement>(null)
-  const places = placesOf(data.profile)
+  // The tracked places, plus both forearms while a product test is running.
+  const tests = useProductTests()
+  const places = withArms(placesOf(data.profile), Boolean(tests.running))
   const live = data.mode === 'live'
   const known = live && data.status !== 'loading'
   const sessionsOf = (s: Site) => data.series(s)?.sessions ?? []
