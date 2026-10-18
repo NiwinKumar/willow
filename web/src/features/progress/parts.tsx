@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -116,5 +117,48 @@ export function TomorrowSheet({ open, onClose }: { open: boolean; onClose: () =>
         </Button>
       </div>
     </Sheet>
+  )
+}
+
+/**
+ * Which measure the over-time chart shows: the measure's name as the title with a chevron (a native select, so
+ * it is keyboard, screen-reader and phone friendly) and small previous / next arrows, instead of a pill for
+ * every measure. The measures arrive in the person's goal order, so their goals are the first steps.
+ */
+export function MetricSwitcher({ options, value, label, onChange }: { options: { key: string; label: string }[]; value: string | null; label: string; onChange: (key: string) => void }) {
+  const i = value ? options.findIndex((o) => o.key === value) : -1
+  const step = (d: number) => {
+    const next = options[i + d]
+    if (next) onChange(next.key)
+  }
+  const arrow = 'hit44 grid size-9 shrink-0 place-items-center rounded-full text-white transition-colors enabled:hover:bg-white/12 disabled:opacity-30'
+  return (
+    <div className="flex items-center gap-1.5">
+      <label className="relative flex min-w-0 items-center">
+        <span className="sr-only">Measure shown over time</span>
+        <select
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label="Measure shown over time"
+          className="min-h-11 max-w-full cursor-pointer appearance-none truncate field-sizing-content rounded-pill border-0 bg-transparent py-0 pr-9 pl-0 text-[24px] font-normal text-inherit outline-offset-4"
+        >
+          {options.map((o) => (
+            <option key={o.key} value={o.key} className="text-ink">
+              {o.label}
+            </option>
+          ))}
+          {value === null ? <option value="">{label}</option> : null}
+        </select>
+        <ChevronDown aria-hidden size={18} strokeWidth={1.8} className="pointer-events-none absolute right-2.5 text-white/70" />
+      </label>
+      <span className="ml-auto flex gap-1">
+        <button type="button" onClick={() => step(-1)} disabled={i <= 0} aria-label="Previous measure" className={arrow}>
+          <ChevronLeft aria-hidden size={18} strokeWidth={1.8} />
+        </button>
+        <button type="button" onClick={() => step(1)} disabled={i < 0 || i >= options.length - 1} aria-label="Next measure" className={arrow}>
+          <ChevronRight aria-hidden size={18} strokeWidth={1.8} />
+        </button>
+      </span>
+    </div>
   )
 }

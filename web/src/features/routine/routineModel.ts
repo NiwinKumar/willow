@@ -12,6 +12,7 @@ export { categoryOf, orbGradient } from '../../components/willow/productVisual'
 export const imageOf = (e: Pick<RoutineEntry, 'image_url' | 'category' | 'custom_name' | 'brand'>) => ({ image_url: e.image_url ?? null, category: e.category, name: entryName(e) })
 
 export const entryName = (e: Pick<RoutineEntry, 'custom_name' | 'brand'>) => e.custom_name || e.brand || 'Unnamed product'
+export { compactName } from './names'
 export const activeLabel = (a: { name: string; pct: number | null }) => {
   const n = a.name.charAt(0).toUpperCase() + a.name.slice(1)
   return a.pct !== null ? `${n} ${a.pct}%` : n

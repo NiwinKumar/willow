@@ -653,3 +653,34 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 - Your goals replaced Recent: up to three goal measures as small trends against the person's normal range. The buttons and the chart legend sit in the header (no footer), so the rows can be taller. It leads the small-card row (where What changed used to be); What changed now sits beside Routine today. With no measured check-in after the baseline, Routine today takes its row.
 - Check-in card: the big number (days since baseline) sits middle-left; the title and subtext sit bottom-left and the Check in button bottom-right.
 - Routine today fills the height of its row. Products scale to the panel, not the card: up to four share one row, five to ten wrap into two (orbs shrink with the columns), eleven or more into three with the names dropped (tooltip and accessible label keep them), so the card never grows with the routine.
+
+### Progress: timeline markers and notes
+- Routine-change markers on a metric's timeline are one per start day: products started together read "3 PRODUCTS STARTED · 18 OCT" instead of stacking, and labels near the right edge are right-aligned so they stay inside the chart.
+- "Notes and routine changes": the Show all / Show the latest 8 button sits top right of the card as a solid ink pill.
+
+### Routine page (compact)
+- Order: asks that need an answer first (Request notice, the Quick check), then the Routine check beside Suggested today (or the Product test strip when there is nothing to suggest), then Morning and Evening beside the Product test strip and the sponsored card.
+- The Routine check is plain text on the blue card: severity and kind are words (no pills), a small icon button re-runs it, and each finding's actions sit bottom right (Ask Wisp why last).
+- Routine check layout: the top right holds a small "How this was checked" ghost button (info icon) beside the icon-only re-run button; it opens a calm full-width note under the header. Each finding is its own soft inset panel (label, title, one row of products at 26px, one muted line, then a hairline and the actions bottom right), in a 2-column grid on wide containers and 1 column on narrow, with the action rows aligned across a row.
+- Product rows use `compactName` (cut at the first qualifier, brand and strengths dropped, type word kept); the full name is in the tooltip and the accessible label. Schedule notes and the ◆ change are plain text, not pills.
+- Product tests tab: the page title reads "Test a product" (with a one-line subtitle) instead of "Your routine". The "How it works" card and the "Start a test" card share one row height (stretch); the product rows are compact (30px images, one-line names, a muted brand · type line), the list scrolls past about six rows, and "Something else" stays pinned last below it. The two cards stack on narrow screens.
+
+### Progress: measure switcher
+- The over-time chart shows one measure at a time: its name is a select (title with a chevron) with previous / next arrows, in the person's goal order, instead of a pill per measure.
+
+### Progress: day detail actions, photos and notes
+- The day's actions (Ask Wisp about this day, Use this day as baseline, Open the full report) are compact buttons in the top bar, to the left of the previous / next day switchers; the report link is the one ink button.
+- There is no photo or notes section at the bottom. "Compare photos" and "Notes" (with a count) are two small glass buttons at the top right of the day summary card (on the eyebrow row; they wrap right-aligned on narrow widths); each opens a popup (modal sheet).
+- "Compare photos" is disabled, with "· no photos" beside it, when none of the check-in photos loads (no preview, deleted after 30 days, or a failed load). The popup has the Earlier / Later selects over the split view, sized to fit the viewport height.
+- The before/after split has no slider underneath: the white round handle on the divider is the control (drag with mouse or touch; focused, arrows move it by 2%, Shift+arrows by 10%, Home/End jump to the ends).
+- Routine check: one or two findings are side-by-side panels; three or more are compact row cards (one soft card per finding). In a row the issue and its suggested fix read as one paragraph, the fix marked like a highlighter pen (soft periwinkle, white text); a small plain label ("Moderate conflict", "AI suggestion" with a sparkle) sits above; the products are small pills in one row at the top right and the actions below them on the right (from 700px of card width, stacked below on narrower cards). Never a grid with empty cells. More than five stay behind "Show N more".
+- The Routine header controls (switcher, History, Add product) share one 8px gap.
+- Routine header: the Routine / Product tests switcher sits on the design's glass track (`SegmentedControl frosted`: bg-glass, blur, white inset ring) and History is a glass button, like the other header controls over the gradient; no grey track and no brown outline.
+- Routine bottom row: Morning, Evening and the Product test card are always the same height (the tallest of them), so a 3-product slot beside a 4-product slot still lines up; the test card spreads its content top to bottom.
+- Cards that share a row with a taller card fill it instead of leaving empty space: "Suggested today" spreads its rows evenly down the card, and the Product test card puts its icon at the top and its button at the bottom right.
+
+### Day page (the one result page, compact)
+- /result redirects to the day page (`/progress/:day`), which is the one result page; the Spot diary and the big hero are gone. Small by default: the whole top of the page fits one screen.
+- "Explanation" is now "Insights" (`InsightsCard`): a short read that ends on a full sentence, "Read more" for the rest, and the next steps as small buttons (Ask Wisp is the ink one). No source line, no "standard explanation" wording; the AI tag shows only when Gemini wrote it.
+- The day summary card carries the buttons: Compare (photo comparison popup, disabled when no photo loads) and Notes (popup with the day's notes and editor), top right. Ask Wisp and "Use as baseline" sit in the top bar, left of the previous / next day.
+- The minimal check-in scrubber (thin rail, small ticks and thumb) is kept in `components/charts/Scrubber.tsx`.

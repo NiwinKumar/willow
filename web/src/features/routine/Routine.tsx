@@ -23,6 +23,7 @@ import { SponsoredCard } from './SponsoredCard'
 import { ProductTests, TestStrip } from './TestsTab'
 import { RoutineHistory } from './RoutineHistory'
 import { Suggestions } from './Suggestions'
+import { suggestionsOf } from './suggestedToday'
 import { AvailableInOwnAccount } from './OwnAccountNotice'
 import { FeelNudge } from './FeelCard'
 import { RequestNotice } from './RequestNotice'
@@ -103,15 +104,16 @@ function LiveRoutine() {
   }
 
   const testRead = readForearm(treated, controls, tests.running)
+  const suggested = suggestionsOf(findings, current, sessions, usedLastNight)
   const showTests = tab === 'tests' && !loading && !failed
   const attention = !loading && !failed
 
   return (
     <main className="relative mx-auto flex max-w-[1320px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-2">
-      <div className="flex flex-wrap items-start gap-x-4 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
+      <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">Your routine</h1>
-          <span className="text-[14px] text-ink-2">{meta}</span>
+          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{tab === 'tests' ? 'Test a product' : 'Your routine'}</h1>
+          <span className="text-[14px] text-ink-2">{tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : meta}</span>
         </div>
         <button type="button" onClick={() => setAdd({ mode: 'search' })} className="order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
           Add product
@@ -121,6 +123,7 @@ function LiveRoutine() {
         </button>
         <div className="order-3 flex basis-full flex-wrap items-center gap-2 sm:order-2 sm:basis-auto">
           <SegmentedControl
+            frosted
             label="Routine or product tests"
             size="sm"
             value={tab}
@@ -130,20 +133,30 @@ function LiveRoutine() {
               { value: 'tests', label: tests.running ? 'Product test · running' : 'Product tests' },
             ]}
           />
-          <button type="button" onClick={() => setHistory(true)} className="hit44 flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-colors hover:bg-ink/5">
+          <button type="button" onClick={() => setHistory(true)} className="hit44 glass-pill flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-colors hover:bg-white/80">
             <History size={15} strokeWidth={1.7} aria-hidden />
             History{stopped.length ? <span className="font-mono text-[11px] text-ink-2">{stopped.length}</span> : null}
           </button>
         </div>
       </div>
 
-      {attention && !showTests && current.length ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
-
+      {/* Asks that need an answer come first, above the check. */}
       {attention && !showTests ? (
         <>
           <RequestNotice onAdd={(p) => setAdd({ product: p })} />
           <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} />
         </>
+      ) : null}
+
+      {attention && !showTests && current.length ? (
+        <div className="@container">
+          <div className="grid items-stretch gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_360px]">
+            <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} />
+            <div className="flex min-w-0 flex-col gap-3 empty:hidden [&>section]:flex-1">
+              {suggested.any ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : <TestStrip read={testRead} onStart={() => setTab('tests')} />}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {showTests ? (
@@ -214,7 +227,7 @@ function LiveRoutine() {
         </div>
       ) : (
         <div className="@container flex flex-col gap-3">
-          <div className="grid gap-3 @min-[620px]:grid-cols-2">
+          <div className="grid items-stretch gap-3 @min-[620px]:grid-cols-2 @min-[1020px]:has-[.side>*]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
             {(['am', 'pm'] as const).map((slot) => (
               <SlotCard
                 key={slot}
@@ -227,13 +240,8 @@ function LiveRoutine() {
                 onAdd={() => setAdd({ mode: 'search', slot })}
               />
             ))}
-          </div>
-          <div className="grid gap-3 @min-[760px]:grid-cols-1 @min-[760px]:has-[.sug>*]:grid-cols-2 @min-[760px]:items-start">
-            <div className="sug empty:hidden">
-              <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <TestStrip read={testRead} onStart={() => setTab('tests')} />
+            <div className="side flex min-w-0 flex-col gap-3 empty:hidden @min-[620px]:col-span-2 @min-[1020px]:col-span-1">
+              {suggested.any ? <TestStrip read={testRead} onStart={() => setTab('tests')} /> : null}
               <SponsoredCard inRoutine={everAdded} onView={(productId) => setInfo({ productId })} />
             </div>
           </div>
