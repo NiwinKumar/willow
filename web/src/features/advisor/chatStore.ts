@@ -72,8 +72,13 @@ export function useChat(): ChatState {
   )
 }
 
-/** Whose chat this is: a different person signed in on this tab (sign-out, Google switch, delete) starts empty. */
+/**
+ * Whose chat this is: a different person signed in on this tab (sign-out, Google switch, delete) starts empty.
+ * DEMO_OWNER is the demo journey: Mei's stored chat, and questions answered from her data, never stored.
+ */
 let owner: string | null = null
+export const DEMO_OWNER = 'demo'
+const inDemo = () => owner === DEMO_OWNER
 
 /** The panel hands over how to get a token (it can change after sign-in) and whose chat it is. */
 export function setTokenSource(fn: () => Promise<string>, uid: string | null) {
@@ -102,7 +107,7 @@ export function resetChat() {
 /** Today's advisor count (no question is counted by reading it). Quietly keeps the last count on failure. */
 export async function refreshUsage() {
   const who = owner
-  if (!tokenFn || !who) return
+  if (!tokenFn || !who || inDemo()) return
   try {
     const u = (await api.usage(await tokenFn())).advisor
     if (who !== owner) return
@@ -130,7 +135,7 @@ async function loadHistory(uid: string) {
   if (!tokenFn) return
   set({ history: 'loading' })
   try {
-    const { messages } = await api.advisorHistory(await tokenFn())
+    const { messages } = inDemo() ? await api.demoAdvisorHistory() : await api.advisorHistory(await tokenFn())
     if (uid !== owner) return
     // Anything asked while it loaded comes after the stored conversation (its turn is stored after this read).
     set({ history: 'ready', messages: [...messages.map(fromHistory), ...state.messages] })
@@ -183,15 +188,16 @@ export function ask(text: string, context?: string, images: Attachment[] = []) {
   set({ messages: [...state.messages, user], phase: 'thinking', thinkingSince: Date.now(), stages: [] })
   void (async () => {
     try {
-      if (!tokenFn) throw new Error('not signed in')
-      const token = await tokenFn()
+      const demo = who === DEMO_OWNER
+      if (!tokenFn && !demo) throw new Error('not signed in')
+      const token = demo ? '' : await tokenFn!()
       let reply: AdvisorReply
       try {
-        reply = await api.advisorChatStream(token, history, sent, (s) => mine === request && set({ stages: [...state.stages, s] }), signal)
+        reply = await api.advisorChatStream(token, history, sent, (s) => mine === request && set({ stages: [...state.stages, s] }), signal, demo)
       } catch (e) {
         if (!(e instanceof StreamUnavailable)) throw e
         // Nothing reached the api: the same question on the plain endpoint (no progress events).
-        reply = await api.advisorChat(token, history, sent)
+        reply = demo ? await api.demoAdvisorChat(history, sent) : await api.advisorChat(token, history, sent)
       }
       if (who !== owner) return // asked by the person before (signed out since)
       // Stopped waiting: the answer still counted, so keep its usage, not its text (history has it).
@@ -286,12 +292,13 @@ export function retry(messageId: number) {
   ask(err.question, context, photos)
 }
 
-/** Start again: this tab's chat and the stored conversation on the account are both cleared. */
+/** Start again: this tab's chat and the stored conversation on the account are both cleared (demo: the tab's only). */
 export function newChat() {
   if (state.phase !== 'idle') return
   window.clearTimeout(revealTimer)
   queued = []
   set({ messages: [], aiDown: false })
+  if (inDemo()) return
   const who = owner
   void (async () => {
     try {

@@ -6,12 +6,17 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
-from app import demo, limits, routine_check
+from app import advisor, demo, limits, routine_check
 from app.auth import AuthUser, current_user
 from app.routes.products_routes import (
+    ChatRequest,
     RoutineEntryIn,
+    _chat_answer,
+    _chat_start,
     add_routine_entry,
+    chat_stream,
     routine_entries,
     routine_log_days,
 )
@@ -119,6 +124,31 @@ def journey_routine_check(store: Store = Depends(get_store)) -> dict[str, Any]:
         return routine_check.check(entries)
 
     return demo._cached(f"routine-check:{uid}", 3600, run)
+
+
+@router.get("/advisor/history")
+def journey_advisor_history(store: Store = Depends(get_store)) -> dict[str, Any]:
+    """Mei's stored Wisp chat, read-only."""
+    uid = get_settings().demo_user_id
+    return {"messages": advisor.history(store, uid), "keep": advisor.HISTORY_KEEP}
+
+
+@router.post("/advisor/chat")
+def journey_advisor_chat(body: ChatRequest, store: Store = Depends(get_store)) -> dict[str, Any]:
+    """Ask Wisp about the demo journey: answered from Mei's data, never stored, one shared cap."""
+    uid = get_settings().demo_user_id
+    images, used = _chat_start(body, uid, store, "demo_advisor")
+    return _chat_answer(body, uid, store, images, used, action="demo_advisor", keep=False)
+
+
+@router.post("/advisor/chat/stream")
+def journey_advisor_chat_stream(
+    body: ChatRequest, store: Store = Depends(get_store)
+) -> StreamingResponse:
+    """The streamed form of /advisor/chat (the same events as /v1/advisor/chat/stream)."""
+    uid = get_settings().demo_user_id
+    images, used = _chat_start(body, uid, store, "demo_advisor")
+    return chat_stream(body, uid, store, images, used, action="demo_advisor", keep=False)
 
 
 @router.get("/status")

@@ -413,6 +413,14 @@ export const api = {
   pushTest: (token: string) => request<{ sent: number; removed: number; failed: number }>(token, '/v1/me/push/test', { method: 'POST' }),
   /** Today's counts for the paid actions (read without counting). */
   usage: (token: string) => request<Usage>(token, '/v1/me/usage'),
+  /** Wisp on the demo journey: Mei's stored chat, and questions answered from her data (never stored, no sign-in). */
+  demoAdvisorHistory: () => publicGet<{ messages: AdvisorHistoryMessage[]; keep: number }>('/v1/demo/advisor/history'),
+  demoAdvisorChat: async (messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) => {
+    const res = await fetch(`${API_URL}/v1/demo/advisor/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(images.length ? { messages, images } : { messages }) })
+    const body = (await res.json().catch(() => null)) as { detail?: { message?: string; code?: string } } | null
+    if (!res.ok) throw new ApiError(res.status, body?.detail?.message ?? 'Wisp is unavailable right now.', body?.detail?.code ?? null, (body?.detail as Record<string, unknown>) ?? null)
+    return body as unknown as AdvisorReply
+  },
   advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
   clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
   advisorChatStream,
@@ -577,13 +585,21 @@ export class StreamUnavailable extends Error {}
  * text). Errors before any work (422, 429) are plain HTTP errors (ApiError); a failure during the turn arrives as
  * an `error` event and is thrown as ApiError with its detail. StreamUnavailable means "use the plain endpoint".
  */
-async function advisorChatStream(token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[], onStage: (s: AdvisorStage) => void, signal?: AbortSignal): Promise<AdvisorReply> {
+async function advisorChatStream(
+  token: string,
+  messages: { role: 'user' | 'willow'; text: string }[],
+  images: ChatImage[],
+  onStage: (s: AdvisorStage) => void,
+  signal?: AbortSignal,
+  demo = false,
+): Promise<AdvisorReply> {
   let res: Response
   try {
-    res = await fetch(`${API_URL}/v1/advisor/chat/stream`, {
+    // demo: Wisp on the demo journey (Mei's data, never stored, no sign-in)
+    res = await fetch(`${API_URL}${demo ? '/v1/demo/advisor/chat/stream' : '/v1/advisor/chat/stream'}`, {
       method: 'POST',
       signal,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) },
+      headers: { ...(demo ? {} : { Authorization: `Bearer ${token}` }), 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) },
       body: JSON.stringify(images.length ? { messages, images } : { messages }),
     })
   } catch (e) {
