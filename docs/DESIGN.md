@@ -224,7 +224,7 @@ Spacing (4px base): `0`=0, `0.5`=2, `1`=4, `1.5`=6, `2`=8, `2.5`=10, `3`=12, `3.
 - 12 columns, gap 14px (space-3.5) at every width.
 - Page padding: clamp(16px, 4vw, 40px).
 - Cards in a row stretch to equal height (align-items: stretch). Never leave a hole in a row: if a card is absent, the neighbour spans the space.
-- Home rows (active user, desktop; Oct 18): [Hero 6 | Check-in 6] · [Your goals | Is your routine working? | Routine today] (sharing the row) · [Since your baseline 6 | Product test (compact) over Your baseline, stacked, 6]. Without a measured check-in the two small tiles sit side by side. Tablet: pairs. Phone: span 12.
+- Home rows (active user, desktop; Oct 19): [Hero 6 | Check-in 6] · three columns of stacked cards, each at its own height, with one card per column taking up the slack so the columns end level: [Your goals (or Getting started) over Is your routine working?] [Last photos over Since your baseline (four readings; its rows grow)] [Routine today (grows), then Product test and Your baseline]. *Last photos* is the latest check-in's photos: place and date, photos used of taken, four checks (Colour card, Sharp, Even light, Steady pose; ✓ or △) and one tip from the first failed check, or a line on keeping the next one comparable. Tablet: two columns, then the third full width. Phone: span 12.
 - Touch targets ≥ 44×44px; buttons are 48px tall on phone.
 
 | Radius | px | Use |
