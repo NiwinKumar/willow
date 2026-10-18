@@ -46,14 +46,16 @@ Concern = Literal[
 @router.get("/catalog/search")
 def catalog_search(
     q: str | None = Query(default=None, max_length=100),
-    concern: Concern | None = None,
+    concern: list[Concern] = Query(default=[], max_length=10),
     category: str | None = None,
     max_price: float | None = Query(default=None, ge=0),
     currency: str | None = Query(default=None, max_length=3),
-    limit: int = Query(default=8, ge=1, le=60),
+    limit: int = Query(default=8, ge=1, le=200),
     user: AuthUser = Depends(current_user),
 ) -> dict[str, Any]:
-    return {"products": catalog.search(q, concern, category, max_price, currency, limit=limit)}
+    """`concern` may repeat: products made for every one given. `total` counts every match."""
+    found = catalog.search_all(q, concern, category, max_price, currency)
+    return {"products": found[:limit], "total": len(found), "catalog_size": len(catalog.products())}
 
 
 @router.get("/catalog/{product_id}")

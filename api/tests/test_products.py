@@ -79,6 +79,16 @@ def test_search_filters_by_concern_price_query_and_excluded_ingredients(client, 
     assert client.get("/v1/catalog/search", params={"concern": "glowing"}).status_code == 422
 
 
+def test_several_concerns_find_products_made_for_all_of_them_with_totals(client, fake):
+    both = client.get(
+        "/v1/catalog/search", params=[("concern", "acne_blemishes"), ("concern", "oiliness_shine")]
+    ).json()
+    assert [p["product_id"] for p in both["products"]] == ["the-ordinary-niacinamide-10-zinc-1"]
+    assert both["total"] == 1 and both["catalog_size"] == len(CATALOG)
+    one = client.get("/v1/catalog/search", params={"concern": "texture_pores", "limit": 1}).json()
+    assert len(one["products"]) == 1 and one["total"] == 2  # the total counts past the limit
+
+
 def test_match_needs_the_same_brand_and_a_close_name():
     hit = catalog.match("The Ordinary", "Niacinamide 10% + Zinc 1% serum")
     assert hit and hit[0]["product_id"] == "the-ordinary-niacinamide-10-zinc-1"

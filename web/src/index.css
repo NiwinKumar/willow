@@ -230,9 +230,10 @@
   a {
     color: inherit;
   }
+  /* No focus rings anywhere (owner decision, Oct 18): focus is not outlined on any element. */
+  :focus,
   :focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 3px;
+    outline: none;
   }
   h1,
   h2,

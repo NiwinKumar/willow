@@ -3,7 +3,7 @@
 Facts only: names, ingredients (INCI), concerns, prices, store links. No marketing copy, no review text, no scraped ratings. Efficacy comes only from Willow measurements (team data + labeled synthetic cohort).
 
 ## Size and mix
-40-60 real SKUs, global + regional brands, 3 price tiers (budget / mid / premium), across categories and concerns. Suggested brands (pick what you can verify quickly): The Ordinary, CeraVe, La Roche-Posay, Paula's Choice, COSRX, Beauty of Joseon, Neutrogena, Bioderma, Minimalist, The Derma Co, Dot & Key, Plum, Some By Mi, Round Lab, Kiehl's, Clinique. At least 2 options per concern per tier where possible.
+Oct 18: about 150 products, Asia-Pacific first (K-beauty, J-beauty, India, SEA/ANZ, and global brands sold there); grows after submission, and with product requests (below). The synthetic retailer cohort stays drawn over the Oct 15 catalog (`api/seed/cohort_products.json`, 48 products): products added later have real data only. Originally 40-60 real SKUs, global + regional brands, 3 price tiers (budget / mid / premium), across categories and concerns. Suggested brands (pick what you can verify quickly): The Ordinary, CeraVe, La Roche-Posay, Paula's Choice, COSRX, Beauty of Joseon, Neutrogena, Bioderma, Minimalist, The Derma Co, Dot & Key, Plum, Some By Mi, Round Lab, Kiehl's, Clinique. At least 2 options per concern per tier where possible.
 
 ## Enums
 `category`: cleanser, toner, serum, treatment, exfoliant, moisturizer, sunscreen, eye_care, mask.
@@ -63,3 +63,6 @@ The api serves search, match and product facts from the bundled `seed/products.j
 
 ## Status (Oct 13)
 48 SKUs in `api/seed/products.json` (18 global, 16 Indian, 14 Korean brands), every concern and category covered, with the clash-check actives the demo needs (retinoids, AHA/BHA, benzoyl peroxide, L-ascorbic acid, niacinamide, azelaic acid, alpha arbutin, sunscreens). `api/seed/catalog.csv` is the same data in sheet columns, to import into the Google Sheet. Every product has a verified packshot (`image_url`, 47 from the brand's own site, Clinique's from Ulta). `api/seed/VERIFY.md` lists, per product, what came from search results only and any formula or naming caveat; check those before Friday.
+
+## Product requests (Oct 18)
+People ask for products the catalog lacks from the add sheet ("Request a product": a pack photo, or brand + name). Requests never add anything by themselves. Work the queue most-asked first: `uv run python scripts/product_requests.py list`, look at the photos with `photo <key> <dir>`, add the product here by the rules above, deploy the api, then `added <key> <product_id>` (everyone who asked sees it on Routine and gets a push; their photos are deleted) or `declined <key>`.

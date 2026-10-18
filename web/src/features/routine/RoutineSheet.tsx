@@ -18,10 +18,11 @@ const CLOSE_DRAG_PX = 120
  * inert page), over the design's blurred scrim:
  *   bottom – "Add product": rises from the bottom at every width (centred, up to 760px wide, 92dvh tall),
  *            rounded top, drag handle (drag it down to close), large serif title, round back and close.
+ *            `fixedHeight`: always as tall as it can be, so it never jumps as its content changes.
  *   side   – "Product information": a full-height panel from the right, up to 540px, on the canvas colour;
  *            headless (the content draws its hero), with a round close button over the hero's corner.
  */
-export function RoutineSheet({ open, onClose, kind, title, onBack, children }: { open: boolean; onClose: () => void; kind: 'bottom' | 'side'; title: string; onBack?: () => void; children: ReactNode }) {
+export function RoutineSheet({ open, onClose, kind, title, onBack, fixedHeight = false, children }: { open: boolean; onClose: () => void; kind: 'bottom' | 'side'; title: string; onBack?: () => void; fixedHeight?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const drag = useRef<{ y: number; dy: number } | null>(null)
@@ -65,7 +66,7 @@ export function RoutineSheet({ open, onClose, kind, title, onBack, children }: {
   const round = 'grid shrink-0 place-items-center rounded-full transition-[background,scale] active:scale-95'
   const shape =
     kind === 'bottom'
-      ? 'mx-auto mt-auto mb-0 w-full max-w-[760px] max-h-[92dvh] overflow-y-auto rounded-t-[44px] bg-surface p-[clamp(20px,3vw,32px)] motion-safe:animate-[rtSheet_.45s_cubic-bezier(.2,.7,.2,1)_both]'
+      ? `mx-auto mt-auto mb-0 w-full max-w-[760px] max-h-[92dvh] ${fixedHeight ? 'h-[92dvh]' : ''} overflow-y-auto rounded-t-[44px] bg-surface p-[clamp(20px,3vw,32px)] motion-safe:animate-[rtSheet_.45s_cubic-bezier(.2,.7,.2,1)_both]`
       : 'my-0 mr-0 ml-auto h-dvh max-h-none w-full max-w-[540px] overflow-y-auto bg-canvas p-[clamp(16px,3vw,24px)] motion-safe:animate-[rtSlide_.4s_cubic-bezier(.2,.7,.2,1)_both]'
   return (
     <dialog

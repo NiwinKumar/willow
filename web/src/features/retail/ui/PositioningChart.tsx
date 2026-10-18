@@ -136,7 +136,7 @@ export function PositioningChart({ points, onSelect, caption, height = 320 }: { 
                 stroke={on ? 'var(--bg-surface)' : 'var(--pf-base)'}
                 strokeOpacity={on ? 1 : 0.9}
                 strokeWidth={on ? 2 : 1}
-                className={`${onSelect ? 'cursor-pointer' : ''} outline-none focus-visible:stroke-[var(--focus-ring)] focus-visible:[stroke-width:3]`}
+                className={`${onSelect ? 'cursor-pointer' : ''} outline-none`}
               />
             )
           })}
