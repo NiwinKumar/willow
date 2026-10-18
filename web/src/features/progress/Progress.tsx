@@ -16,6 +16,7 @@ import { fmtDate, parseDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
+import { routineMarkers } from './markers'
 import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, usableLine, usedFrames } from './model'
 import { Page, Pills } from './parts'
 import { metricSeries } from './series'
@@ -249,14 +250,11 @@ export default function Progress() {
   )
 }
 
-/** Routine starts placed between the check-ins around them. */
+/** Routine starts placed between the check-ins around them; products started the same day share one marker. */
 function useMarkers(sessions: Session[], entries: { started_at: string; custom_name: string; brand: string }[]) {
   return useMemo(() => {
     const times = sessions.map((s) => new Date(s.created_at).getTime())
-    return entries
-      .map((e) => ({ at: fractionalIndex(times, parseDate(e.started_at.slice(0, 10)).getTime()), label: `${(e.custom_name || e.brand).toUpperCase().slice(0, 18)} · ${fmtDate(e.started_at.slice(0, 10)).toUpperCase()}` }))
-      .filter((m): m is { at: number; label: string } => m.at !== null)
-      .slice(0, 6)
+    return routineMarkers(entries, (day) => fractionalIndex(times, parseDate(day).getTime()), (day) => fmtDate(day))
   }, [sessions, entries])
 }
 
@@ -308,12 +306,14 @@ function NotesCard({ notes }: { notes: Note[] }) {
   const list = all ? notes : notes.slice(-8)
   return (
     <section aria-label="Notes and routine changes" className="flex flex-col gap-1.5 rounded-[44px] bg-surface/70 p-[clamp(22px,3vw,32px)] squircle">
-      <span className="mb-2 font-mono text-[12px] text-ink-2">■ NOTES AND ROUTINE CHANGES</span>
-      {notes.length > 8 ? (
-        <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="min-h-11 self-start rounded-pill bg-sunken px-4 text-[13px] hover:bg-muted">
-          {all ? 'Show the latest 8' : `Show all ${notes.length}`}
-        </button>
-      ) : null}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <span className="font-mono text-[12px] text-ink-2">■ NOTES AND ROUTINE CHANGES</span>
+        {notes.length > 8 ? (
+          <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="min-h-11 rounded-pill bg-selected px-4 text-[13px] text-inverse transition-[background] duration-300 hover:bg-[#2a2a2a]">
+            {all ? 'Show the latest 8' : `Show all ${notes.length}`}
+          </button>
+        ) : null}
+      </div>
       {list.length ? (
         <ul className="m-0 list-none p-0">
           {list.map((n, i) => (
