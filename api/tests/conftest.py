@@ -46,6 +46,10 @@ def no_real_gemini(monkeypatch: pytest.MonkeyPatch):
         raise gemini.GeminiError("offline in tests")
 
     monkeypatch.setattr(gemini, "generate_json", offline)
+    # the AutoCampaign agent's tool loop calls the model directly: offline too (its tests script it)
+    from app import autopilot_agent
+
+    monkeypatch.setattr(autopilot_agent, "model_round", offline)
 
 
 @pytest.fixture(autouse=True)

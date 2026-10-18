@@ -1,4 +1,4 @@
-import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Pencil, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -55,8 +55,9 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
       put(v)
       onCampaignsChanged()
       const r = v.result
-      const did = r ? [r.started && `${r.started} started`, r.proposed && `${r.proposed} proposed`, r.paused && `${r.paused} paused`, r.resumed && `${r.resumed} resumed`, r.ended && `${r.ended} ended`, r.extended && `${r.extended} extended`, r.narrowed && `${r.narrowed} narrowed`].filter(Boolean) : []
-      toast(did.length ? `Check done · ${did.join(', ')}` : 'Check done · nothing new to do')
+      const did = r ? [r.started && `${r.started} started`, r.proposed && `${r.proposed} proposed`, r.held && `${r.held} held`, r.paused && `${r.paused} paused`, r.resumed && `${r.resumed} resumed`, r.ended && `${r.ended} ended`, r.extended && `${r.extended} extended`, r.narrowed && `${r.narrowed} narrowed`].filter(Boolean) : []
+      const how = r?.source === 'rules' ? ' (Gemini was unavailable: fixed logic ran)' : ''
+      toast(did.length ? `Check done · ${did.join(', ')}${how}` : `Check done · nothing new to do${how}`)
     } catch (e) {
       toast.error(e instanceof ApiError && e.status === 503 ? 'The evidence is unavailable right now, so nothing was changed.' : 'The check didn’t run. Try again.')
     } finally {
@@ -114,7 +115,7 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
         meta={rules.length ? <Badge tone={rules.some((r) => r.enabled) ? 'green' : 'gray'}>{rules.filter((r) => r.enabled).length} on</Badge> : null}
         description={
           <>
-            Standing rules. Willow watches the evidence every night and starts, adjusts or stops campaigns when a rule’s conditions are met.
+            Standing rules, run by Gemini. On every check it reads the evidence, decides what to start, adjust or stop for each rule, and says why; the guardrails stay in code.
             {rules.some((r) => r.enabled) ? (
               <span className="block pt-1 text-ink-3" title="Checked on their own when this page opens and on the nightly run; Run check now does it at once.">
                 Checks run on their own{lastRun ? ` · last check ${agoText(lastRun)}` : ''}. Run check now does one at once.
@@ -227,6 +228,11 @@ function ActivityRow({ a, busy, onAct }: { a: AutopilotActivity; busy: boolean; 
     <li className={`flex flex-col gap-2 border-t border-line px-5 py-3.5 ${open ? 'bg-pf-amber-soft/40' : ''}`}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={k.tone}>{k.word}</Badge>
+        {a.by === 'gemini' ? (
+          <Badge tone="outline" title="Decided and written by Gemini; checked against the evidence and the guardrails">
+            <Sparkles size={11} strokeWidth={1.8} aria-hidden /> Gemini
+          </Badge>
+        ) : null}
         {handled ? <Badge tone="outline">{handled}</Badge> : null}
         <span className="text-proof-label text-ink-3">
           {a.rule_name ? `${a.rule_name} · ` : ''}

@@ -129,6 +129,7 @@ export const KIND: Record<AutopilotKind, { word: string; tone: 'green' | 'amber'
   held: { word: 'Held', tone: 'outline' },
   undone: { word: 'Undone', tone: 'gray' },
   summary: { word: 'Weekly summary', tone: 'outline' },
+  reviewed: { word: 'Reviewed', tone: 'outline' },
 }
 
 /** Open proposals first (they need you), then newest first. */
