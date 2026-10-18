@@ -96,7 +96,7 @@ export function Scrubber({ ticks, index, onChange, label = 'Check-in' }: { ticks
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="relative h-12 w-full cursor-grab touch-none rounded-pill outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] active:cursor-grabbing"
+        className="relative h-12 w-full cursor-grab touch-none rounded-pill outline-none select-none active:cursor-grabbing"
       >
         <span aria-hidden className="absolute top-1/2 h-0.5 -translate-y-1/2 text-ink opacity-40" style={{ left: PAD, right: PAD, backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.4px)', backgroundSize: '7px 2px' }} />
         {width
