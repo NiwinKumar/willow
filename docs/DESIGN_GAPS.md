@@ -73,7 +73,7 @@ This file lists both directions so they can be planned. Line-level notes per are
 - The advisor doesn't stream; the daily cap resets at UTC midnight; the catalog has 48 products, priced in their own currency.
 - "21-day replay", "20 seconds", "6 stops", consent "v1.3", "spot diary starts on day 3 / two good photos in a row" (it counts check-ins: 3 over 2+ days), "No absolute lightness threshold anywhere" (ITA bands exist for description).
 - Retail: pores/texture *is* measured (dryness isn't); "Quick-photo readings are excluded" isn't enforced; "Still using wk 8" is "after week 4".
-- Verdict words: the app uses APP_PLAN's set everywhere — ◆ Changed · ○ Within normal range · · Baseline · ◌ Not enough data yet · — Could not compare.
+- Verdict words: the app uses APP_PLAN's set everywhere, except that a change says its direction (Oct 18): ◆ Improved · ◇ Moved the other way · ◆ Shifted (skin tone) · ○ Within normal range · · Baseline · ◌ Not enough data yet · — Could not compare.
 
 ## 5. Open items found in review
 

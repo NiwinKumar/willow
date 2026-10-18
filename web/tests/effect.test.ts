@@ -45,7 +45,7 @@ const outcome: EffectDeps['outcome'] = (e, sessions): Outcome => {
   if (after.length < 2) return { kind: 'early', text: 'Not enough data yet', detail: '' }
   const latest = after[after.length - 1]
   const m = latest.result!.metrics[0]
-  return m.verdict === 'real_change' ? { kind: 'real', metric: 'redness', site: 'face_full', session: latest, band: 0.5, text: 'Changed', detail: '' } : { kind: 'none', text: 'Within normal range so far', detail: '' }
+  return m.verdict === 'real_change' ? { kind: 'real', metric: 'redness', site: 'face_full', way: 'improved', session: latest, band: 0.5, text: 'Redness improved', detail: '' } : { kind: 'none', text: 'Within normal range so far', detail: '' }
 }
 const deps: EffectDeps = {
   outcome,

@@ -7,6 +7,7 @@ import { ApiError, localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
 import { outcomeFor } from '../../lib/outcome'
+import { CHANGE_WORDS } from '../../lib/verdict'
 import { ProductImage } from './productUi'
 import { compactName, entryName, imageOf, metaLine } from './routineModel'
 import { dayNote, restsOn, scheduleWords } from './schedule'
@@ -102,7 +103,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
                 ) : null}
                 {o.kind === 'real' ? (
                   <span className="shrink-0 text-[11.5px]" title={`${o.text}, an association and not proof. ${o.detail}`}>
-                    <span aria-hidden>◆ </span>
+                    <span aria-hidden>{CHANGE_WORDS[o.way].glyph} </span>
                     {METRIC_META[o.metric].label}
                     <span className="sr-only">: {o.text}, an association, not proof</span>
                   </span>

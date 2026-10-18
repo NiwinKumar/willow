@@ -3,10 +3,10 @@ import type { MetricId, RoutineEntry, Session, Site } from '../data/types'
 import { CONCERN_METRICS } from './catalog'
 import { parseDate } from './format'
 import { CLOSE_UPS, METRIC_META, fmtSigned, fmtValue, unitOf } from './metrics'
-import { VERDICT_WORDS } from './verdict'
+import { VERDICT_WORDS, changeTitle, changeWay, type ChangeWay } from './verdict'
 
 export type Outcome =
-  | { kind: 'real'; metric: MetricId; site: Site; text: string; detail: string; session: Session; band: number | null }
+  | { kind: 'real'; metric: MetricId; site: Site; way: ChangeWay; text: string; detail: string; session: Session; band: number | null }
   | { kind: 'none'; text: string; detail: string }
   | { kind: 'early'; text: string; detail: string }
   | { kind: 'unmeasured'; text: string; detail: string }
@@ -74,7 +74,9 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
         site,
         session: latest,
         band,
-        text: `${VERDICT_WORDS.changed.label}: ${METRIC_META[m.id].label.toLowerCase()}`,
+        way: changeWay(m),
+        // "Redness improved", or gently "Redness moved the other way"; skin tone "shifted".
+        text: changeTitle([m], (x) => METRIC_META[x.id].label),
         detail: `Started ${weeks} weeks ago. Latest reading vs your baseline: ${METRIC_META[m.id].label.toLowerCase()} ${delta}${band !== null ? `, normal range ±${fmtValue(band, m)}` : ''}. The change may be linked to this product; other products or habits could also contribute.`,
       }
     }
