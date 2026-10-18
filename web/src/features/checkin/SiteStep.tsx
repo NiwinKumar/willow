@@ -2,15 +2,14 @@ import { useState } from 'react'
 
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { MEASURED_SITES } from '../../lib/metrics'
-import { baselineLine, modeFacts, neededFor, pad2, SITE_CARD, SITE_MEASURES, SITE_NAME, sitesFor } from './model'
+import { baselineLine, neededFor, pad2, SITE_CARD, SITE_MEASURES, SITE_NAME, sitesFor } from './model'
 import { MonoEyebrow, SerifTitle } from './parts'
 
 /**
- * Step "site" (CAP 04): mode, the five places with their real baseline line, and the photo count this
+ * Step "site" (CAP 04): the places with their real baseline line, and the photo count this
  * check-in needs. Reached from the guide's ← or when the check-in opens without a place.
  */
-export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onContinue }: { site: Site; mode: CaptureMode; sessionsOf: (s: Site) => Session[]; known: boolean; onSite: (s: Site) => void; onMode: (m: CaptureMode) => void; onContinue: () => void }) {
-  const raw = mode === 'calibrated_raw'
+export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: { site: Site; mode: CaptureMode; sessionsOf: (s: Site) => Session[]; known: boolean; onSite: (s: Site) => void; onContinue: () => void }) {
   const n = known ? neededFor(sessionsOf(site), mode) : null
   const first = n === 5
   const [today] = useState(() => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase())
@@ -23,45 +22,6 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
             <SerifTitle id="ck-title">What are you photographing?</SerifTitle>
           </div>
         </div>
-        <div role="radiogroup" aria-label="Capture mode" className="flex gap-1 rounded-pill bg-white/55 p-[5px] backdrop-blur-[14px]">
-          {(
-            [
-              ['calibrated_raw', 'RAW · calibrated'],
-              ['uncalibrated', 'Camera'],
-            ] as const
-          ).map(([m, label]) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              tabIndex={mode === m ? 0 : -1}
-              onClick={() => onMode(m)}
-              onKeyDown={(e) => {
-                // a radio group moves with the arrow keys (one tab stop for the group)
-                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
-                e.preventDefault()
-                const next = m === 'calibrated_raw' ? 'uncalibrated' : 'calibrated_raw'
-                onMode(next)
-                const group = e.currentTarget.parentElement
-                window.setTimeout(() => group?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus(), 0)
-              }}
-              className={`min-h-[46px] rounded-pill px-5 text-[15px] transition-[background] duration-200 ${mode === m ? 'bg-selected text-inverse' : 'text-ink'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3">
-        {modeFacts(mode).map((f) => (
-          <div key={f.t} className="flex items-start gap-3 rounded-[24px] bg-surface/70 px-[18px] py-4">
-            <span aria-hidden className="mt-px flex-none text-[15px]">
-              {f.g}
-            </span>
-            <span className="text-[14px] leading-[1.45] text-[#3E3C38]">{f.t}</span>
-          </div>
-        ))}
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3.5">
@@ -100,7 +60,7 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
           <span className="flex flex-col gap-0.5">
             <span className="text-[17px]">{n === null ? 'Checking your baselines…' : first ? `First session · ${n} photos for a baseline` : `Later session · ${n} photos`}</span>
             <span className="text-[14px] text-ink-2">
-              {SITE_NAME[site]} · {raw ? 'RAW' : 'Camera'}
+              {SITE_NAME[site]}
             </span>
           </span>
         </span>

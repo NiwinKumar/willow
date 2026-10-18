@@ -31,7 +31,7 @@ export function SampleStep({ busy, error, onRun, onOwn }: { busy: string | null;
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="text-[17px]">{s.title}</span>
                 <span className="text-[13px] text-ink-2">
-                  {SITE_NAME[s.site]} · {plural(s.n_frames, s.capture_mode === 'calibrated_raw' ? 'RAW photo' : 'phone photo')}
+                  {SITE_NAME[s.site]} · {plural(s.n_frames, 'photo')}
                   {s.note ? ` · ${s.note}` : ''}
                 </span>
                 {s.credit ? <span className="text-[12px] text-ink-2">{s.credit}</span> : null}

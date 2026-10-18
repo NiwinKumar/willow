@@ -18,10 +18,9 @@ import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
 import { PlanDotMark } from '../home/Tiles'
 import { MAX_TEST_DAYS, MIN_TEST_DAYS, VERDICT_AFTER_DAYS, planDots, testDay, useProductTestWrites, useProductTests } from '../routine/productTests'
 import { StartTest } from '../routine/StartTest'
-import { MODE_LABEL, baselineFor, dayOf, metricOf, sessionState } from './model'
+import { baselineFor, dayOf, metricOf, sessionState } from './model'
 import { Crumb, Page, Pills } from './parts'
 
-const isMode = (v: string | null): v is CaptureMode => v === 'calibrated_raw' || v === 'uncalibrated'
 
 /** What the test compares: skin tone (ITA°, descriptive) or redness (each arm against its own baseline). */
 type ArmMetric = 'tone_ita' | 'redness'
@@ -84,9 +83,8 @@ export default function ProductTest() {
   const controlAll = useMemo(() => data.series('forearm_control')?.sessions ?? [], [data])
   const measured = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
   const latestT = [...treatedAll].reverse().find(measured) ?? null
-  const qMode = params.get('mode')
-  const mode: CaptureMode = isMode(qMode) ? qMode : (latestT?.capture_mode ?? 'uncalibrated')
-  const modes = (['calibrated_raw', 'uncalibrated'] as CaptureMode[]).filter((m) => treatedAll.some((s) => s.capture_mode === m && measured(s)))
+  // Each arm is compared with its own baseline, taken the way its latest check-in was (camera photo or RAW).
+  const mode: CaptureMode = latestT?.capture_mode ?? 'uncalibrated'
   const treated = useMemo(() => treatedAll.filter((s) => s.capture_mode === mode && measured(s)), [treatedAll, mode])
   const current = treated[treated.length - 1] ?? null
   const tBase = baselineFor(current, treatedAll)
@@ -296,7 +294,7 @@ export default function ProductTest() {
       <div className="flex flex-wrap items-end justify-between gap-3 pt-[clamp(8px,2vw,24px)] pb-2">
         <div className="flex flex-col gap-2.5">
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">
-            ■ {test ? test.name.toUpperCase() : 'TREATED VS CONTROL'} · {MODE_LABEL[mode].toUpperCase()} · {td ? `DAY ${td.day} OF ${td.of}` : `DAY ${dayN}`} · {look.short}
+            ■ {test ? test.name.toUpperCase() : 'TREATED VS CONTROL'} · {td ? `DAY ${td.day} OF ${td.of}` : `DAY ${dayN}`} · {look.short}
           </span>
           <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Treated arm vs control arm</h1>
         </div>
@@ -309,7 +307,6 @@ export default function ProductTest() {
               onChange={(m) => setParam('metric', m)}
             />
           ) : null}
-          {modes.length > 1 ? <Pills label="Capture mode" tone="white" options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} value={mode} onChange={(m) => setParam('mode', m)} /> : null}
         </div>
       </div>
       {plan}

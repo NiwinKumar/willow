@@ -75,7 +75,7 @@ export function FilesStep({
     <div className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <MonoEyebrow>{raw ? 'RAW · DNG originals only · up to 120 MB each' : 'Photos · JPEG, HEIC or HEIF · up to 120 MB each'}</MonoEyebrow>
+          <MonoEyebrow>{raw ? 'DNG originals · up to 120 MB each' : 'Photos · JPEG, HEIC or HEIF · up to 120 MB each'}</MonoEyebrow>
           <div className="mt-3">
             <SerifTitle id="ck-title" size="md">
               {allUp && held ? 'Photos you’ve uploaded before' : allUp ? 'All photos uploaded' : busy ? 'Uploading' : topup ? 'Add to your baseline' : 'Review your photos'}
@@ -179,7 +179,7 @@ export function FilesStep({
                     <div className="flex flex-wrap justify-between gap-x-2.5">
                       <span className="max-w-full truncate font-mono text-[14px]">{r.file.name}</span>
                       <span className="text-[13px] text-ink-2">
-                        {formatBytes(r.file.size)} · {r.contentType === 'image/x-adobe-dng' ? 'RAW' : 'JPEG/HEIC'}
+                        {formatBytes(r.file.size)} · {r.contentType === 'image/x-adobe-dng' ? 'DNG' : 'JPEG/HEIC'}
                       </span>
                     </div>
                     <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${r.file.name} upload progress`} className="h-1.5 overflow-hidden rounded-[6px] bg-[#E4E3DE]">
