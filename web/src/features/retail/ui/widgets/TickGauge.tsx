@@ -15,6 +15,7 @@ const R_OUT = 120
  */
 export function TickGauge({
   title,
+  caption,
   value,
   display,
   legend,
@@ -23,6 +24,8 @@ export function TickGauge({
   ariaLabel,
 }: {
   title: string
+  /** One line under the title saying what the share is of. */
+  caption?: string
   /** 0–1. */
   value: number
   display: string
@@ -40,9 +43,12 @@ export function TickGauge({
   const right = Math.cos(ang(lit)) > 0.15
   return (
     <Widget label={ariaLabel} className="wg-gauge" head={false}>
+      <div className="flex min-w-0 flex-col gap-1">
+        <h3 className="wg-title !pt-0">{title}</h3>
+        {caption ? <p className="wg-cap">{caption}</p> : null}
+      </div>
       <div className="wg-gauge-row">
         <div className="wg-gauge-copy">
-          <h3 className="wg-title !pt-0">{title}</h3>
           <ul className="wg-legend">
             {legend.map((l, i) => (
               <li key={l.label}>

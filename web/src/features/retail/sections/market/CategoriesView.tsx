@@ -8,7 +8,7 @@ import { useProducts } from '../../productData'
 import { TIER_ORDER } from '../../productModel'
 import { sectionPath, useRetailState } from '../../state'
 import type { ProductRow } from '../../types'
-import { Button, DataTable, EmptyState, EvidenceBar, int, LiftValue, MIN_GROUP, Panel, pct, ProductCell, ProofTierChip, pts, RateCell, Select, Suppressed, TIERS, useTooltip, type Column } from '../../ui'
+import { Button, DataTable, EmptyState, EvidenceBar, int, LiftValue, MIN_GROUP, Panel, pct, ProductCell, ProofTierChip, pts, RateCell, Segmented, Suppressed, TIERS, useTooltip, type Column } from '../../ui'
 import { useView } from '../../useView'
 import { YoursTag } from '../shared'
 import { MarketFrame, PanelBone } from './Frame'
@@ -61,11 +61,11 @@ export function CategoriesView({ d }: { d: Insights }) {
     )
 
   return (
-    <MarketFrame
-      view="categories"
-      description={description}
-      actions={<Select label="Category" value={cat.category} onChange={(c) => setParam({ category: c, goal: null })} options={cats.map((c) => ({ value: c.category, label: c.label }))} />}
-    >
+    <MarketFrame view="categories" description={description}>
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="shrink-0 text-proof-body font-medium text-ink">Product type</span>
+        <Segmented label="Product type" value={cat.category} onChange={(c) => setParam({ category: c, goal: null })} options={cats.map((c) => ({ value: c.category, label: c.label }))} />
+      </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 xl:items-start">
         <Panel title="Visible change by goal" id="flows-h" description={<FlowLegend />} className="xl:col-span-7" footnote={`Share of ${cat.label.toLowerCase()} users with the goal whose visible change (held to week ${top.weeks.at(-1)}) had begun by each week; non-users are people with the goal not using the category, at week ${top.weeks.at(-1)}.`}>
           <ul className="-mx-3 my-0 grid list-none grid-cols-1 gap-x-2 gap-y-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
