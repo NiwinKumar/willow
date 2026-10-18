@@ -181,43 +181,47 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
 
         <section
           aria-label="Day summary"
-          className="relative grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] items-end gap-6 overflow-hidden rounded-[48px] p-[clamp(24px,4vw,44px)] text-ink squircle"
+          className="relative flex flex-col gap-5 overflow-hidden rounded-[48px] p-[clamp(24px,4vw,44px)] text-ink squircle"
           style={{
             background: heroBg,
             boxShadow: `inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 90px rgba(255,255,255,.35), 0 40px 80px -50px ${heroGlow}`,
           }}
         >
-          <div className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
             <span className="font-mono text-[11px] tracking-[.08em]">
               ■ {MODE_LONG[session.capture_mode].toUpperCase()}
               {session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''} · {usableLine(session).toUpperCase()}
             </span>
-            <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,48px)] leading-[.9] font-normal tracking-[-0.01em]">
-              {date.toLocaleDateString('en-GB', { weekday: 'long' })},
-              <br />
-              <span className="italic">
-                {date.toLocaleDateString('en-GB', {
-                  day: 'numeric',
-                  month: 'long',
-                })}
-              </span>
-            </h1>
-            <div className="flex flex-wrap gap-1.5">
-              {chips.map((ch) => (
-                <span key={ch.t} className="flex min-h-[34px] items-center gap-[7px] rounded-pill bg-white/60 px-[13px] text-[13px]">
-                  {ch.g ? <VerdictGlyph kind={ch.g} /> : <span aria-hidden>○</span>}
-                  {ch.t}
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="ml-auto flex flex-wrap justify-end gap-2">
               {measured ? <CompareButton session={session} sessions={sessions} baseline={baseline} /> : null}
               <NotesButton session={session} notes={notes} />
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1.5 justify-self-end text-right">
-            <span className="font-dot text-[clamp(62px,6.5vw,84px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
-            <span className="max-w-[220px] text-[15px]">{bigLabel}</span>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] items-end gap-6">
+            <div className="flex min-w-0 flex-col gap-4">
+              <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,48px)] leading-[.9] font-normal tracking-[-0.01em]">
+                {date.toLocaleDateString('en-GB', { weekday: 'long' })},
+                <br />
+                <span className="italic">
+                  {date.toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                </span>
+              </h1>
+              <div className="flex flex-wrap gap-1.5">
+                {chips.map((ch) => (
+                  <span key={ch.t} className="flex min-h-[34px] items-center gap-[7px] rounded-pill bg-white/60 px-[13px] text-[13px]">
+                    {ch.g ? <VerdictGlyph kind={ch.g} /> : <span aria-hidden>○</span>}
+                    {ch.t}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1.5 justify-self-end text-right">
+              <span className="font-dot text-[clamp(62px,6.5vw,84px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
+              <span className="max-w-[220px] text-[15px]">{bigLabel}</span>
+            </div>
           </div>
         </section>
 
