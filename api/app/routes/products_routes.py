@@ -150,13 +150,18 @@ def routine_list(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    entries = sorted(store.routine_list(user.uid), key=lambda e: e[1].get("started_at") or "")
+    return routine_entries(store, user.uid, today)
+
+
+def routine_entries(store: Store, uid: str, today: str | None) -> dict[str, Any]:
+    """A person's routine with each product's recent use (also the demo journey's, read-only)."""
+    entries = sorted(store.routine_list(uid), key=lambda e: e[1].get("started_at") or "")
     # each product's recent use, from the person's ticks (Home's "routine today"), counted up to
     # the person's own day (the app sends it; a day either side of UTC)
     now = routine_log.local_today(today)
     first = now - timedelta(days=routine_log.RECENT_DAYS)
-    logs = store.routine_logs(user.uid, first.isoformat(), now.isoformat()) if entries else []
-    since = (store.user_get(user.uid) or {}).get("routine_log_since") if entries else None
+    logs = store.routine_logs(uid, first.isoformat(), now.isoformat()) if entries else []
+    since = (store.user_get(uid) or {}).get("routine_log_since") if entries else None
     return {
         "entries": [
             {
@@ -175,6 +180,10 @@ def routine_log_list(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
+    return routine_log_days(store, user.uid, first, last)
+
+
+def routine_log_days(store: Store, uid: str, first: str | None, last: str | None) -> dict[str, Any]:
     """Ticked routine use per day, oldest first (default: the last 14 days). Days with no ticks
     are left out."""
     utc_today = routine_log.today()
@@ -193,7 +202,7 @@ def routine_log_list(
                 "message": f"from must be before to, at most {routine_log.MAX_RANGE_DAYS} days",
             },
         )
-    docs = store.routine_logs(user.uid, start.isoformat(), end.isoformat())
+    docs = store.routine_logs(uid, start.isoformat(), end.isoformat())
     days = [v for v in (routine_log.day_view(d) for d in docs) if v["used"]]
     return {"from": start.isoformat(), "to": end.isoformat(), "days": days}
 
