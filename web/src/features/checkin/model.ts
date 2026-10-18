@@ -68,7 +68,7 @@ export const SITE_MEASURES: Record<Site, string> = {
   chin_macro: 'Tone, dark spots, redness, blemishes, pores and texture on your chin, up close.',
   nose_macro: 'Blemishes and pores, up close.',
   forearm_treated: 'Skin tone and redness on the marked square, against its own baseline.',
-  forearm_control: 'The untreated arm. Shows the drift both arms share.',
+  forearm_control: 'The arm without the product. Shows the change both arms share.',
 }
 
 /** The guide hero's gradient per kind (CAP guideBg). */

@@ -40,7 +40,7 @@ export function ProductTestTile({ read, onOpen, className = '' }: { read: Forear
         ))}
       </span>
       <span className="flex flex-col">
-        <span className="line-clamp-2 text-[14px]">{name ? `${name} on your forearm` : 'Treated vs control forearm'}</span>
+        <span className="line-clamp-2 text-[14px]">{name ? `${name} on your forearm` : 'Arm with product vs arm without'}</span>
         <span className="text-[12px]">
           <span aria-hidden>{standing.g} </span>
           {standing.t}

@@ -297,7 +297,7 @@ export default function Result() {
           title={`Your first ${isMode(qMode) ? MODE_LABEL[qMode] + ' ' : ''}check-in of your ${SITE_LABEL[site].toLowerCase()} becomes your baseline.`}
           body="Follow the light and distance checklist. With 3 or more usable photos, Willow measures how much your readings wobble on their own. Results appear here."
           action={
-            <Button variant="ink" size="lg" onClick={() => shell.startCheckIn(site, isMode(qMode) ? qMode : 'uncalibrated')}>
+            <Button variant="ink" size="lg" onClick={() => shell.openCheckIn()}>
               Start my baseline
             </Button>
           }
@@ -323,7 +323,7 @@ export default function Result() {
         : `Help me read my ${SITE_LABEL[site].toLowerCase()} result from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${c.changed} changed${changed.length ? ` (${changed.join(', ')})` : ''}, ${c.normal} within normal range. What could explain it?`
     shell.openAdvisor(q, `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`)
   }
-  const checkIn = () => shell.startCheckIn(site, mode)
+  const checkIn = () => shell.openCheckIn()
   const actions = {
     compared: [
       <NextAction key="a" onClick={ask}>Ask Wisp about this result</NextAction>,
@@ -341,7 +341,7 @@ export default function Result() {
       <NextAction key="b" to={`/progress/${day}?site=${site}&session=${session.id}`}>Change your baseline</NextAction>,
     ],
     rejected: [<NextAction key="c" onClick={checkIn}>Retake this check-in</NextAction>, <NextAction key="a" onClick={ask}>Ask Wisp how to retake it</NextAction>],
-    unmeasured: [<NextAction key="f" onClick={() => shell.startCheckIn('face_full', mode)}>Take a face check-in instead</NextAction>],
+    unmeasured: [<NextAction key="f" onClick={() => shell.openCheckIn()}>Check in instead</NextAction>],
   } as Record<string, ReactNode[]>
 
   // Spot diary focus on the photo stage.
@@ -375,7 +375,7 @@ export default function Result() {
           body={<>{session.status === 'uploading' ? 'The photos never finished uploading, so nothing was measured.' : 'Measuring stopped before a result came back. The photos are saved, so it can be measured again.'}</>}
           action={
             session.status === 'uploading' ? (
-              <Button variant="ink" size="lg" onClick={() => shell.startCheckIn(session.site, session.capture_mode)}>
+              <Button variant="ink" size="lg" onClick={() => shell.openCheckIn()}>
                 Take a new check-in
               </Button>
             ) : (
@@ -461,7 +461,7 @@ export default function Result() {
               stageSessionId={session.id}
               selected={track?.id ?? null}
               onPick={pickTrack}
-              onTake={() => shell.startCheckIn('face_full', mode)}
+              onTake={() => shell.openCheckIn()}
               photo={diaryPhoto}
               photoViews={diaryPhotoView?.session.views ?? []}
             />

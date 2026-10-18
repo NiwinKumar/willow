@@ -112,7 +112,7 @@ export default function ProductTest() {
   if ((data.status === 'loading' || data.status === 'idle') && !data.all.length) return <WillowLoader inline label="Loading your product test" />
 
   const crumb = <Crumb to="/routine" back="Routine" here="Product test" />
-  const photograph = () => shell.startCheckIn('forearm_treated', mode)
+  const photograph = () => shell.openCheckIn({ add: ['forearm_treated', 'forearm_control'] })
   const td = test ? testDay(test) : null
   const dots = test ? planDots(test, treatedAll) : []
 
@@ -314,8 +314,8 @@ export default function ProductTest() {
       </div>
       {plan}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3.5">
-        {arm('Treated forearm', t, tb, current, 'radial-gradient(80% 60% at 50% 0%, #F567B5 0%, #8E3A9E 40%, #2A0F36 80%)', 'rgba(245,103,181,.25)')}
-        {arm('Control forearm', c, cb, control, 'radial-gradient(80% 60% at 50% 0%, #6E8BFF 0%, #2B3A9E 40%, #0B0F33 80%)', 'rgba(110,139,255,.25)')}
+        {arm('Arm with product', t, tb, current, 'radial-gradient(80% 60% at 50% 0%, #F567B5 0%, #8E3A9E 40%, #2A0F36 80%)', 'rgba(245,103,181,.25)')}
+        {arm('Arm without product', c, cb, control, 'radial-gradient(80% 60% at 50% 0%, #6E8BFF 0%, #2B3A9E 40%, #0B0F33 80%)', 'rgba(110,139,255,.25)')}
         <div className="flex min-h-[320px] flex-col justify-between gap-4 rounded-[44px] bg-surface p-[26px] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
           <span className="text-[20px]">Difference between the changes</span>
           <span className="flex flex-col items-center gap-1.5">
