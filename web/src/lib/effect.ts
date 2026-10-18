@@ -49,7 +49,7 @@ export type EffectRow = {
   e: RoutineEntry
   o: Outcome
   effect: Effect
-  /** Short line under the name: "Redness: calmer", "Too early to tell". */
+  /** Short line under the name: how the product is doing ("Helping"); what is measured is in `reading`. */
   line: string
   days: number
   metric: MetricId | null
@@ -99,11 +99,11 @@ function trend(entry: RoutineEntry, sessions: Session[], deps: EffectDeps, prefe
   return best ? make(best.t, best.site, best.used) : null
 }
 
-/** "Redness · lower is calmer": which way the line should go, in the metric's own words. */
+/** "Redness · lower means calmer": which way the line should go, in the metric's own words. */
 function readingOf(metric: MetricId, deps: EffectDeps): string | null {
   const w = deps.words(metric)
   const wanted = WANTED[metric]
-  return wanted === undefined ? null : `${w.label} · ${wanted < 0 ? `lower is ${w.decrease}` : `higher is ${w.increase}`}`
+  return wanted === undefined ? null : `${w.label} · ${wanted < 0 ? `lower means ${w.decrease}` : `higher means ${w.increase}`}`
 }
 
 export function routineEffect(entries: RoutineEntry[], sessions: Session[], check: RoutineCheck | undefined, deps: EffectDeps, now = Date.now()): RoutineEffect {
@@ -121,11 +121,10 @@ export function routineEffect(entries: RoutineEntry[], sessions: Session[], chec
       const delta = o.session.result?.metrics.find((m) => m.id === o.metric)?.delta ?? 0
       const wanted = WANTED[o.metric]
       effect = wanted === undefined ? 'changed' : Math.sign(delta) === wanted ? 'helping' : 'away'
-      const w = deps.words(o.metric)
-      line = `${w.label}: ${delta < 0 ? w.decrease : w.increase}`
+      line = effect === 'helping' ? 'Helping' : effect === 'away' ? 'Moving the other way' : 'Changed'
     } else if (o.kind === 'none') {
       effect = 'steady'
-      line = metric ? `${deps.words(metric).label}: no change beyond your normal range` : 'No change beyond your normal range'
+      line = 'No change beyond your normal range'
     }
     const weeks = Math.floor(days / 7)
     let flag: EffectFlag | null = null
