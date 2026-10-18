@@ -13,7 +13,7 @@ import { ProofLockup } from '../retail/brand'
 import { HeroBloom, Lockup } from './Decor'
 import { FIRST_CHECKIN, isReturning } from './entry'
 import { journeyLine, journeyUnavailableLine, useEntryActions, useJourney } from './hooks'
-import { ScienceSection } from './ScienceSection'
+import { Figures, LiveStatus, MethodCards, ScienceSection } from './ScienceSection'
 import { SectionRail } from './SectionRail'
 import { glide, SECTIONS, setupReveal } from './scroll'
 
@@ -317,6 +317,7 @@ function How() {
           </div>
         </div>
       </div>
+      <MethodCards className="mt-4" />
     </section>
   )
 }
@@ -349,6 +350,7 @@ function Limits() {
           </div>
         ))}
       </div>
+      <Figures className="mt-4" />
     </section>
   )
 }
@@ -445,7 +447,8 @@ function Footer() {
           </div>
         ))}
       </div>
-      <div className="mt-14 flex flex-wrap justify-between gap-3 border-t border-line pt-5 text-[13px] text-ink-2">
+      <LiveStatus className="mt-12" />
+      <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-line pt-5 text-[13px] text-ink-2">
         <span>© 2026 Willow · Cosmetic appearance tracking, not a medical device</span>
         <span>Built on Firebase, Cloud Run, Firestore, BigQuery and Gemini on Vertex AI</span>
         <span>Compared with your own baseline, on any skin tone</span>

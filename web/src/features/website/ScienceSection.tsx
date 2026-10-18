@@ -27,11 +27,11 @@ const STATS: [string, string][] = [
 ]
 
 /** The services answering right now, read live from GET /v1/demo/status, so this is never stale. */
-function LiveStatus() {
+export function LiveStatus({ className = '' }: { className?: string }) {
   const { status: s, failed, waking, gaveUp } = useDemoStatus()
   const pending = !s && !failed
   return (
-    <div className="flex w-full max-w-[1080px] flex-col gap-3 rounded-[28px] bg-surface p-[clamp(18px,2.4vw,26px)] shadow-[0_24px_60px_-44px_rgba(0,0,0,.3)] sm:flex-row sm:items-center sm:gap-6">
+    <div className={`flex flex-col gap-3 rounded-[28px] bg-surface p-[clamp(18px,2.4vw,26px)] sm:flex-row sm:items-center sm:gap-6 ${className}`}>
       <div className="flex shrink-0 flex-col gap-0.5">
         <span className="text-[15px] font-medium text-ink">Running right now</span>
         <span className="text-[12.5px] text-ink-2">Web {__APP_VERSION__}, checked live</span>
@@ -55,18 +55,58 @@ function LiveStatus() {
   )
 }
 
+/** The method in four figures, one slim row (shown with "what is measured"). */
+export function Figures({ className = '' }: { className?: string }) {
+  return (
+    <dl className={`m-0 grid grid-cols-2 gap-px overflow-hidden rounded-[28px] bg-line lg:grid-cols-4 ${className}`}>
+      {STATS.map(([v, l]) => (
+        <div key={l} className="flex flex-col gap-2 bg-surface p-5">
+          <dt className="font-dot text-[34px] leading-none">{v}</dt>
+          <dd className="m-0 text-[13px] leading-snug text-ink-2">{l}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** The two rules behind "real change": the noise band (with its formula) and the spot diary (shown with "how it works"). */
+export function MethodCards({ className = '' }: { className?: string }) {
+  return (
+    <div className={`grid gap-4 md:grid-cols-2 ${className}`}>
+      <article className="flex flex-col gap-3 rounded-[28px] bg-surface p-[clamp(20px,2.4vw,28px)]">
+        <h3 className="m-0 text-[20px] font-normal tracking-[-0.01em]">Noise band</h3>
+        <p className="m-0 text-[15px] leading-[1.6] text-ink-2">
+          Five photos of the same skin never give identical numbers, so their spread is your noise. A later reading counts as a real change only when it lands outside the band. A band needs at least three usable photos, and it is wider when there are few.
+        </p>
+        <p className="m-0 mt-auto overflow-x-auto rounded-[14px] bg-white px-4 py-3 font-mono text-[13px] text-ink">band = max(1.96 · √2 · sd, t₀.₉₇₅,ₙ₋₁ · sd · √(1 + 1/n))</p>
+      </article>
+      <article className="flex flex-col gap-3 rounded-[28px] bg-surface p-[clamp(20px,2.4vw,28px)]">
+        <h3 className="m-0 text-[20px] font-normal tracking-[-0.01em]">Spot diary</h3>
+        <p className="m-0 text-[15px] leading-[1.6] text-ink-2">
+          Each face photo places every spot on a standard face, so the same spot is recognised next time even if your head is turned a little. A single photo can miss a spot, so it takes two to add one or to call it gone.
+        </p>
+        <ul className="m-0 mt-auto flex list-none flex-wrap gap-2 p-0 text-[13px]">
+          <li className="rounded-pill bg-white px-3 py-1.5">Joins after two check-ins show it</li>
+          <li className="rounded-pill bg-white px-3 py-1.5">Gone after two clear ones in a row</li>
+        </ul>
+      </article>
+    </div>
+  )
+}
+
 /**
- * "Measured · then explained": what each kind of photo measures (derived from the metric table, never a
- * hand-written list), the method figures, the noise band and the spot diary as two cards, and under the
- * card a slim strip of the services answering right now. The App's "How this is measured" links land here (/science).
+ * "Measured · then explained": the banner, the headline and what each kind of photo measures (derived from the
+ * metric table, never a hand-written list). The method's other pieces sit elsewhere on the page: the noise band
+ * and spot diary under "How it works", the four figures under "What is measured", the live service checks in the
+ * footer. The App's "How this is measured" links land here (/science).
  */
 export function ScienceSection({ className = '' }: { className?: string }) {
   return (
-    <section id="science" className={`flex flex-col items-center gap-4 pt-[clamp(72px,10vw,140px)] ${className}`}>
+    <section id="science" className={`flex justify-center pt-[clamp(72px,10vw,140px)] ${className}`}>
       <h2 className="sr-only">The science</h2>
       <div className="w-full max-w-[1080px] overflow-hidden rounded-[clamp(36px,5vw,56px)] bg-surface shadow-[0_40px_80px_-50px_rgba(0,0,0,.3)]">
         <div
-          className="relative grid h-[clamp(300px,42vw,520px)] place-items-center overflow-hidden"
+          className="relative grid h-[clamp(220px,30vw,360px)] place-items-center overflow-hidden"
           style={{
             background:
               'radial-gradient(40% 50% at 25% 30%, #7C83F0 0%, transparent 70%), radial-gradient(45% 50% at 80% 25%, #F2B53A 0%, transparent 70%), radial-gradient(50% 50% at 20% 85%, #FF5A3A 0%, transparent 70%), radial-gradient(60% 50% at 70% 80%, #4F9B6A 0%, transparent 70%), #1E3B33',
@@ -74,9 +114,9 @@ export function ScienceSection({ className = '' }: { className?: string }) {
           }}
         >
           <div aria-hidden className="absolute inset-[-10%] backdrop-blur-[40px]" />
-          <p className="relative m-0 px-5 text-center text-[clamp(22px,3.4vw,42px)] font-light tracking-[.06em] text-white">MEASURED&nbsp;&nbsp;·&nbsp;&nbsp;THEN&nbsp;&nbsp;EXPLAINED</p>
+          <p className="relative m-0 px-5 text-center text-[clamp(16px,3.4vw,42px)] font-light tracking-[.06em] text-white">MEASURED&nbsp;&nbsp;·&nbsp;&nbsp;THEN&nbsp;&nbsp;EXPLAINED</p>
         </div>
-        <div className="flex flex-col gap-[clamp(20px,3vw,32px)] p-[clamp(24px,4vw,48px)]">
+        <div className="p-[clamp(24px,4vw,48px)]">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-[clamp(32px,5vw,72px)]">
             <div className="flex flex-col items-start gap-[22px]">
               <h3 className="m-0 text-[clamp(22px,2.2vw,28px)] font-normal leading-[1.25] tracking-[-0.01em]">Numbers come from image measurement. Gemini explains them and never invents one.</h3>
@@ -95,38 +135,8 @@ export function ScienceSection({ className = '' }: { className?: string }) {
               Face check-ins measure {list(FACE.map(name))}. Faces carry no colour reference, so face readings are labelled indicative. Cheek and nose close-ups add {list(CLOSE_ONLY.map(name))}, with the iris setting the scale. Forearm tests measure {list(FOREARM.map(name))}, and are labelled measured when a RAW photo has a white reference beside the skin. Thresholds are relative to your own skin, so no tone is treated as better than another.
             </p>
           </div>
-
-          <dl className="m-0 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {STATS.map(([v, l]) => (
-              <div key={l} className="flex flex-col gap-2 rounded-[22px] bg-white p-5">
-                <dt className="font-dot text-[40px] leading-none">{v}</dt>
-                <dd className="m-0 text-[13px] leading-snug text-ink-2">{l}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <article className="flex flex-col gap-3 rounded-[26px] bg-white p-[clamp(20px,2.4vw,28px)]">
-              <h4 className="m-0 text-[18px] font-medium">Noise band</h4>
-              <p className="m-0 text-[15px] leading-[1.6] text-ink-2">
-                Five photos of the same skin never give identical numbers, so their spread is your noise. A later reading counts as a real change only when it lands outside the band. A band needs at least three usable photos, and it is wider when there are few.
-              </p>
-              <p className="m-0 mt-auto overflow-x-auto rounded-[14px] bg-surface px-4 py-3 font-mono text-[13px] text-ink">band = max(1.96 · √2 · sd, t₀.₉₇₅,ₙ₋₁ · sd · √(1 + 1/n))</p>
-            </article>
-            <article className="flex flex-col gap-3 rounded-[26px] bg-white p-[clamp(20px,2.4vw,28px)]">
-              <h4 className="m-0 text-[18px] font-medium">Spot diary</h4>
-              <p className="m-0 text-[15px] leading-[1.6] text-ink-2">
-                Each face photo places every spot on a standard face, so the same spot is recognised next time even if your head is turned a little. A single photo can miss a spot, so it takes two to add one or to call it gone.
-              </p>
-              <ul className="m-0 mt-auto flex list-none flex-wrap gap-2 p-0 text-[13px]">
-                <li className="rounded-pill bg-surface px-3 py-1.5">Joins after two check-ins show it</li>
-                <li className="rounded-pill bg-surface px-3 py-1.5">Gone after two clear ones in a row</li>
-              </ul>
-            </article>
-          </div>
         </div>
       </div>
-      <LiveStatus />
     </section>
   )
 }
