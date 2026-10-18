@@ -9,8 +9,8 @@ import { fmtDate } from '../../lib/format'
 import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, isCloseUp, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
 
-export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick' }
-export const MODE_LONG: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick photo' }
+export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera' }
+export const MODE_LONG: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera photo' }
 
 /**
  *   pending    uploading or still measuring

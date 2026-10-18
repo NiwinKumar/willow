@@ -265,7 +265,9 @@ users/{uid}
              under_eye|oil_glow), photo_time: morning|midday|evening|null, display_name: string|null (<= 60),
              skin_type: oily|combination|dry|normal|sensitive|null,
              checkin: {days: int[] (0 = Mon .. 6 = Sun), time: "HH:MM", tz: IANA name} | null, updated_at,
-             hide_sponsored: bool (default false; Routine's sponsored card off)}
+             hide_sponsored: bool (default false; Routine's sponsored card off),
+             track: (cheek_macro|nose_macro|face_full|forearm_treated|forearm_control)[] (1-5, capture
+             order, duplicates collapse) | null (null = the app's default places; Oct 18)}
 users/{uid}/sessions/{session_id}
   site, capture_mode, n_frames, created_at, status: uploading|processing|done|failed,
   frame_uris[], is_baseline, result (AnalysisResult), labels{}, explanation{}

@@ -1,14 +1,19 @@
-import { api, type CheckinSchedule, type PhotoTime, type Profile, type ProfilePatch, type SkinType } from './api'
+import { api, type CheckinSchedule, type PhotoTime, type Profile, type ProfilePatch, type SkinType, type TrackPlace } from './api'
 import { cleanGoals, type GoalId } from './metrics'
 import { prefs } from './prefs'
+import { cleanTrack } from './track'
 
 /**
- * The person's profile (users/{uid}.profile): goals, usual photo time, skin type and check-in schedule.
+ * The person's profile (users/{uid}.profile): goals, usual photo time, skin type, check-in schedule and places to track.
  * This device keeps a copy (lib/prefs) so screens order at once; once someone is signed in the account is the
  * source of truth: sign-in adopts the account's profile, and every change is written to it (data/store).
  * The display name is not kept here: it comes from the sign-in (lib/identity) and is only sent up.
  */
-export type LocalProfile = { goals: GoalId[]; photo_time: PhotoTime | null; skin_type: SkinType | null; checkin: CheckinSchedule | null }
+/** `track` is null until the person chooses (placesOf then gives the default). */
+export type LocalProfile = { goals: GoalId[]; photo_time: PhotoTime | null; skin_type: SkinType | null; checkin: CheckinSchedule | null; track: TrackPlace[] | null }
+
+/** The places a check-in walks through for this profile. */
+export const placesOf = (p: Pick<LocalProfile, 'goals' | 'track'>): TrackPlace[] => cleanTrack(p.track, p.goals)
 
 export const SKIN_TYPES: { id: SkinType; label: string }[] = [
   { id: 'oily', label: 'Oily' },
@@ -40,7 +45,8 @@ export function browserTz(): string {
 }
 
 export function localProfile(): LocalProfile {
-  return { goals: prefs.goals(), photo_time: prefs.photoTime(), skin_type: prefs.skinType(), checkin: prefs.checkin() }
+  const t = prefs.track()
+  return { goals: prefs.goals(), photo_time: prefs.photoTime(), skin_type: prefs.skinType(), checkin: prefs.checkin(), track: t ? cleanTrack(t) : null }
 }
 
 /** Write the fields of a patch to this device's copy. */
@@ -49,9 +55,10 @@ export function writeLocal(patch: ProfilePatch): void {
   if ('photo_time' in patch) prefs.setPhotoTime(patch.photo_time ?? null)
   if ('skin_type' in patch) prefs.setSkinType(patch.skin_type ?? null)
   if ('checkin' in patch) prefs.setCheckin(patch.checkin ?? null)
+  if ('track' in patch) prefs.setTrack(patch.track?.length ? cleanTrack(patch.track) : null)
 }
 
-const isEmpty = (p: LocalProfile) => !p.goals.length && !p.photo_time && !p.skin_type && !p.checkin
+const isEmpty = (p: LocalProfile) => !p.goals.length && !p.photo_time && !p.skin_type && !p.checkin && !p.track
 
 /**
  * On sign-in: the account's profile wins and is copied here. An account with none yet (a new guest, or someone
@@ -74,7 +81,8 @@ export async function syncProfile(getIdToken: () => Promise<string>, displayName
 }
 
 function adopt(p: Profile) {
-  writeLocal({ goals: p.goals, photo_time: p.photo_time, skin_type: p.skin_type, checkin: p.checkin })
+  // An api from before places to track sends no `track`: keep this device's choice.
+  writeLocal({ goals: p.goals, photo_time: p.photo_time, skin_type: p.skin_type, checkin: p.checkin, ...(p.track !== undefined ? { track: p.track } : {}) })
 }
 
 /** Send this device's whole copy (after a change); marked dirty until the account confirms it. */

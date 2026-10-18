@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Site } from '../../data/types'
 import { photoSteps } from '../../lib/baselineGuide'
 import { closeUpPlace, isCloseUp } from '../../lib/metrics'
+import { say, tone } from './cue'
+import { openCloseUp, takeStill, type Lens } from './lens'
 import { POSE_HINT, type Pose } from './model'
 
 export type CamPhase = 'ask' | 'starting' | 'live' | 'denied' | 'unavailable' | 'ended' | 'done'
@@ -54,7 +56,9 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
   // A cheek photo (head turned about 45°) is lit unevenly by its shape: judged like a close-up.
   const turned = pose !== 'front'
   const [phase, setPhase] = useState<CamPhase>('ask')
-  const [facing, setFacing] = useState<Facing>(faceSite ? 'user' : 'environment')
+  // Close-ups and the forearms use the back camera (sharper, and the macro lens on Pro iPhones); the face the front one.
+  const [facing, setFacing] = useState<Facing>(closeUp || !faceSite ? 'environment' : 'user')
+  const [lens, setLens] = useState<Lens | null>(null)
   const [gates, setGates] = useState<Gates>({ light: false, even: false, still: false })
   const [hint, setHint] = useState('Starting the camera')
   const [countdown, setCountdown] = useState<{ n: number; by: 'auto' | 'timer' } | null>(null)
@@ -69,6 +73,9 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
   const liveSince = useRef<number | null>(null)
   const firing = useRef(false)
   const movedSinceShot = useRef(true)
+  const facingRef = useRef(facing)
+  facingRef.current = facing
+  const spoken = useRef({ text: '', at: 0 })
   const takenRef = useRef(taken)
   takenRef.current = taken
   const shotRef = useRef(onShot)
@@ -102,8 +109,10 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
       }
       setPhase('starting')
       try {
-        // Close-ups need about 20 px per mm for pores: ask for the full 4K frame.
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: want, width: { ideal: closeUp ? 3840 : 1920 }, height: { ideal: closeUp ? 2160 : 1440 } }, audio: false })
+        // Close-ups need about 20 px per mm for pores: ask for the full 4K frame, on the macro lens where there is one.
+        const size = { width: { ideal: closeUp ? 3840 : 1920 }, height: { ideal: closeUp ? 2160 : 1440 } }
+        const opened = closeUp && want === 'environment' ? await openCloseUp(size) : { stream: await navigator.mediaDevices.getUserMedia({ video: { ...size, facingMode: want }, audio: false }), lens: (want === 'user' ? 'front' : 'main') as Lens }
+        const s = opened.stream
         if (gen !== generation.current || !mounted.current) {
           // Back was pressed (or another start began) while the browser was asking: never leave the camera on.
           s.getTracks().forEach((t) => t.stop())
@@ -126,6 +135,7 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
           if (track) void holdCamera(track)
         }, SETTLE_MS)
         setFacing(want)
+        setLens(opened.lens)
         setPhase('live')
       } catch (e) {
         if (gen !== generation.current || !mounted.current) return
@@ -168,16 +178,26 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
     const v = video.current
     if (!v || firing.current || !v.videoWidth) return
     firing.current = true
-    const c = document.createElement('canvas')
-    c.width = v.videoWidth
-    c.height = v.videoHeight
-    c.getContext('2d')!.drawImage(v, 0, 0)
-    const blob: Blob | null = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))
+    // The back camera's own still keeps its EXIF (the engine reads lens and focus from it); else a video frame.
+    const back = facingRef.current === 'environment'
+    let blob = back ? await takeStill(stream.current?.getVideoTracks()[0]) : null
+    if (!blob) {
+      const c = document.createElement('canvas')
+      c.width = v.videoWidth
+      c.height = v.videoHeight
+      c.getContext('2d')!.drawImage(v, 0, 0)
+      blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.92))
+    }
     if (blob) {
       const idx = takenRef.current + 1
-      const file = new File([blob], `frame_${idx}.jpg`, { type: 'image/jpeg' })
+      const file = new File([blob], `frame_${idx}.jpg`, { type: blob.type || 'image/jpeg' })
       setFlash((f) => f + 1)
       shotRef.current(file, URL.createObjectURL(blob))
+      // The back camera faces away from the screen: a tone for every photo, and the count out loud.
+      if (back) {
+        tone(idx >= n)
+        say(idx >= n ? 'All photos taken. You can look at the screen now.' : `Photo ${idx} of ${n}. Move the phone away a little, then back.`)
+      }
       if (idx >= n) {
         stop()
         setPhase('done')
@@ -263,10 +283,21 @@ export function useCamera({ site, n, taken, pose = 'front', onShot }: { site: Si
   const allPass = gates.light && gates.even && gates.still
   const canShoot = phase === 'live' && settled && (allPass || manual) && taken < n
 
+  // Back camera: say the framing hint out loud when it changes (at most every 4 s), since the screen faces away.
+  useEffect(() => {
+    if (phase !== 'live' || facing !== 'environment' || !closeUp) return
+    const now = performance.now()
+    if (hint === spoken.current.text || now - spoken.current.at < 4000) return
+    spoken.current = { text: hint, at: now }
+    say(hint.replace(' · ', '. '))
+  }, [hint, phase, facing, closeUp])
+
   return {
     phase,
     video,
     facing,
+    /** Which lens is live: the macro-capable ultra wide, the main back lens, or the front camera. */
+    lens,
     mirrored: facing === 'user',
     gates,
     allPass,

@@ -87,7 +87,7 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
       ruler: { ratio: null, label: 'Every later reading is compared with this point' },
       text:
         used >= 3
-          ? `Later ${s.capture_mode === 'uncalibrated' ? 'Quick' : 'RAW'} check-ins of this place are compared with this one. A change only counts when it is bigger than that reading’s normal range.`
+          ? `Later ${s.capture_mode === 'uncalibrated' ? 'camera' : 'RAW'} check-ins of this place are compared with this one. A change only counts when it is bigger than that reading’s normal range.`
           : 'A baseline needs 3 or more usable photos to measure how much your readings wobble on their own. Check in again with more photos and make that one your baseline.',
     }
   }

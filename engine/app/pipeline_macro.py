@@ -262,12 +262,30 @@ def _no_face(srgb8: np.ndarray, site: str) -> dict:
 
 def _front_camera(path: str) -> bool:
     """A photo that cannot be a macro shot: a selfie camera (lens EXIF), or no camera EXIF at
-    all (the web app's camera saves a canvas JPEG, always the front camera). Only a camera
-    photo with its EXIF, or a DNG, may fall back to the assumed macro scale."""
+    all (a canvas frame: the web app's front camera, and its fallback when the back camera
+    cannot take a full photo). Only a camera photo with its EXIF, or a DNG, may fall back to
+    the assumed macro scale (and then only if _not_macro finds nothing against it)."""
     if Path(path).suffix.lower() == ".dng":
         return False
     info = load_photo_srgb8(path)[1]  # already decoded once
     return "front" in (info.lens or "").lower() or not (info.camera or info.lens)
+
+
+def _not_macro(path: str) -> str | None:
+    """Why a camera photo with no face in view cannot be a macro shot, from its EXIF:
+    "face_not_found" (a longer lens or digital zoom, or focused too far away: only an eye in
+    view could give its scale), "blurry" (the camera says it is out of focus), else None. A DNG,
+    or a photo without these tags, is not judged (the scale stays assumed)."""
+    if Path(path).suffix.lower() == ".dng":
+        return None
+    info = load_photo_srgb8(path)[1]
+    if info.focal_35mm is not None and info.focal_35mm > config.MACRO_MAX_FOCAL_35MM:
+        return "face_not_found"
+    if info.focus_position is not None and info.focus_position < config.MACRO_MIN_FOCUS_POSITION:
+        return "face_not_found"
+    if info.af_confidence is not None and info.af_confidence < config.MACRO_MIN_AF_CONFIDENCE:
+        return "blurry"
+    return None
 
 
 def _frame(path: str, site: str, overlays: bool = False) -> dict:
@@ -277,6 +295,7 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
     h, w = srgb8.shape[:2]
     face = _find_face(srgb8)
     iris = _iris_px_per_mm(face, (h, w)) if face is not None else None
+    not_macro = None
     if iris is not None:
         px_full, scale_from = iris, "iris"
     elif face is not None:
@@ -285,6 +304,9 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
         return _no_face(srgb8, site)
     else:
         px_full, scale_from = max(h, w) / config.MACRO_FIELD_WIDTH_MM, "assumed"
+        not_macro = _not_macro(path)
+        if not_macro == "face_not_found":  # a normal photo: the assumed scale would be far off
+            return _no_face(srgb8, site)
     scale = min(config.MACRO_WORK_PX_PER_MM / px_full, 1.0)
     size = (max(round(w * scale), 1), max(round(h * scale), 1))
     lin = cv2.resize(linear.astype(np.float32), size, interpolation=cv2.INTER_AREA)
@@ -305,7 +327,7 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
     quality.reasons = [r for r in quality.reasons if r != "blurry"]
     grey = cv2.cvtColor(s8, cv2.COLOR_RGB2GRAY).astype(np.float32)
     quality.sharpness = laplacian_variance(grey)  # at the working scale (pores need detail)
-    if quality.sharpness < config.MACRO_SHARPNESS_MIN:
+    if quality.sharpness < config.MACRO_SHARPNESS_MIN or not_macro == "blurry":
         quality.reasons.append("blurry")
     enough = skin.sum() / px**2 / 100.0 >= config.MACRO_MIN_SKIN_CM2
     if not enough:  # too little skin (or none of the site's region) in the close-up
