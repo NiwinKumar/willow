@@ -55,9 +55,9 @@ How to work:
   (priority 1 = first). tier is null for a gap across every tier.
 - Right after adding a brief, add its candidates (finish one brief before the next): look for
   under-used products already in the catalog with list_products (that tier) and get_ingredients,
-  and add up to 3 with add_candidate. You may call several tools in one turn. Candidates: a product sold for the goal that
-  too few people use to measure, or a product not sold for the goal whose ingredient list has an
-  active ingredient commonly used for it. Prefer leave-on products over cleansers and masks.
+  and add up to 3 with add_candidate. You may call several tools in one turn. Candidates: a
+  product sold for the goal that too few people use to measure, or a product not sold for the
+  goal whose ingredient list has an active ingredient commonly used for it. Prefer leave-on products over cleansers and masks.
 - If a tool refuses, read why and adjust. Then finish with a one-sentence summary.
 
 Writing:
