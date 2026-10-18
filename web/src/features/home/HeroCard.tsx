@@ -36,7 +36,7 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
         {/* The check-in schedule: "Check-in due today", "2 days late", "Next check-in Sat 17 Oct". */}
         {next ? <span className="rounded-pill bg-white/55 px-3 py-1.5 text-[12.5px] backdrop-blur-[10px]">{next}</span> : null}
       </div>
-      <div className="flex max-w-[560px] flex-col gap-4">
+      <div className="flex flex-col gap-4">
         <h1 className="m-0 font-serif text-[clamp(40px,3.8vw,58px)] leading-[.9] font-normal tracking-[-0.02em]">
           {/* A guest has no name to greet ("Good evening, there" read oddly). */}
           {name ? (
@@ -49,26 +49,30 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
             `${greet}.`
           )}
         </h1>
-        {lines.length ? (
-          <div className="flex flex-col gap-1">
-            {lines.map((l, i) => (
-              <p key={l.t} className="m-0 flex animate-[wWord_.9s_both] items-baseline gap-3 text-[15px] leading-[1.45] font-light tracking-[-0.005em]" style={{ animationDelay: `${200 + i * 140}ms` }}>
-                <Glyph g={l.g} />
-                <span>{l.t}</span>
-              </p>
-            ))}
-          </div>
-        ) : null}
-        {onAsk ? (
-          <button
-            type="button"
-            onClick={onAsk}
-            className="flex min-h-11 items-center gap-2.5 self-start rounded-pill bg-white/62 pr-[5px] pl-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.7)] backdrop-blur-[16px] transition-[background,translate] duration-300 hover:-translate-y-px hover:bg-white/85"
-          >
-            {askLabel}
-            <ArrowCircle />
-          </button>
-        ) : null}
+        {/* The lines on the left and the ask button in the bottom-right corner, sharing their last baseline;
+            on a narrow card the button wraps below them and stays on the right. */}
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+          {lines.length ? (
+            <div className="flex max-w-[560px] min-w-0 flex-1 basis-[300px] flex-col gap-1">
+              {lines.map((l, i) => (
+                <p key={l.t} className="m-0 flex animate-[wWord_.9s_both] items-baseline gap-3 text-[15px] leading-[1.45] font-light tracking-[-0.005em]" style={{ animationDelay: `${200 + i * 140}ms` }}>
+                  <Glyph g={l.g} />
+                  <span>{l.t}</span>
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {onAsk ? (
+            <button
+              type="button"
+              onClick={onAsk}
+              className="ml-auto flex min-h-11 shrink-0 items-center gap-2.5 rounded-pill bg-white/62 pr-[5px] pl-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.7)] backdrop-blur-[16px] transition-[background,translate] duration-300 hover:-translate-y-px hover:bg-white/85"
+            >
+              {askLabel}
+              <ArrowCircle />
+            </button>
+          ) : null}
+        </div>
       </div>
     </section>
   )
