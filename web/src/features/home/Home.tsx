@@ -33,7 +33,7 @@ import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
-import { BaselineTile, ProductTestTile } from './Tiles'
+import { BaselineTile, PhotosTile, ProductTestTile } from './Tiles'
 
 const POLL_MS = 10_000
 const EMPTY: Session[] = []
@@ -206,23 +206,28 @@ function HomeBody() {
         session={measured}
         baseline={read.baseline}
         goals={goals}
+        rows={4}
         onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
         onFull={() => openResult(measured)}
         onAsk={demo ? undefined : () => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(measured.created_at)}`)}
       />
     ) : null
 
-  // Row of smaller cards: as many as exist share the row, so no row has a hole.
-  const small: { key: string; node: (cls: string) => ReactNode }[] = []
-  if (measured && trends.length) small.push({ key: 'goals', node: goalsNode })
-  if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
-  if (effect?.rows.length) small.push({ key: 'effect', node: (cls) => <RoutineEffectCard className={cls} effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
-  // Routine today joins this row (it is the daily one); the product test and your baseline go small, at the foot.
-  small.push({ key: 'routine', node: () => routineCard })
-  const spans = rowSpans(small.length)
-  const foot: { key: string; node: ReactNode }[] = []
-  if (forearm) foot.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
-  if (read.baseline && !demo) foot.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })
+  // The row under the hero, in three columns, one card in each taking up the slack so the columns end level:
+  // what you're aiming for (goals or setup, over the routine's effect); the last check-in (how its photos came
+  // out, what changed since the baseline); the daily one (Routine today, with the product test and baseline under it).
+  type Slot = { key: string; node: ReactNode; grow?: boolean }
+  const lastPhotos = latest(own, (s) => s.status === 'done' && Boolean(s.result))
+  const aims: Slot[] = []
+  if (measured && trends.length) aims.push({ key: 'goals', node: goalsNode('flex-1') })
+  if (showSetup) aims.push({ key: 'setup', node: <SetupCard className="flex-1" rows={setupRows} /> })
+  if (effect?.rows.length) aims.push({ key: 'effect', node: <RoutineEffectCard className="flex-1" effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
+  const last: Slot[] = []
+  if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} onOpen={() => openResult(lastPhotos)} /> })
+  if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
+  const daily: Slot[] = [{ key: 'routine', node: null, grow: true }]
+  if (forearm) daily.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
+  if (read.baseline && !demo) daily.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })
 
   const am = activeIn(entries, 'am')
   const pm = activeIn(entries, 'pm')
@@ -261,6 +266,10 @@ function HomeBody() {
     )
   }
 
+  daily[0].node = routineCard
+  const columns = [aims, last, daily].filter((c) => c.length)
+  const spans = rowSpans(columns.length)
+
   const week = demo ? null : weekOf(own, read, goals, weeklyDayOf(checkin))
 
   return (
@@ -287,36 +296,25 @@ function HomeBody() {
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <LeadCard lead={lead} />
         </div>
-        {small.map((c, i) => (
-          <SmallSlot key={c.key} cls={spans[i]}>
-            {c.node('flex-1')}
-          </SmallSlot>
-        ))}
-        {changedNode(foot.length ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12')}
-        {foot.length ? (
-          // Beside "Since your baseline": the small tiles stacked; without it, side by side.
-          <div className={`col-span-12 flex min-w-0 gap-3.5 ${measured ? 'flex-col @min-[960px]:col-span-6' : 'flex-col @min-[560px]:flex-row'}`}>
-            {foot.map((f) => (
-              <div key={f.key} className="flex min-w-0 flex-1">
-                {f.node}
+        {columns.map((col, i) => (
+          <div key={col[0].key} className={`flex min-w-0 flex-col gap-3.5 ${spans[i]}`}>
+            {col.map((c, k) => (
+              <div key={c.key} className={`flex min-w-0 ${(col.some((x) => x.grow) ? c.grow : k === col.length - 1) ? 'flex-1' : ''}`}>
+                {c.node}
               </div>
             ))}
           </div>
-        ) : null}
+        ))}
       </div>
     </Frame>
   )
-}
-
-function SmallSlot({ cls, children }: { cls: string; children: ReactNode }) {
-  return <div className={`flex min-w-0 ${cls}`}>{children}</div>
 }
 
 /** Literal classes (Tailwind only generates what it can read). Quarter cards from a 960px column, pairs from 560px. */
 const Q: Record<number, string> = { 3: '@min-[960px]:col-span-3', 4: '@min-[960px]:col-span-4', 6: '@min-[960px]:col-span-6', 12: '@min-[960px]:col-span-12' }
 const T: Record<number, string> = { 6: '@min-[560px]:col-span-6', 12: '@min-[560px]:col-span-12' }
 
-/** Spans for n cards in the small-card row: up to four per row on desktop, pairs on tablet, never a hole. */
+/** Spans for n columns in the row under the hero: up to four per row on desktop, pairs on tablet, never a hole. */
 function rowSpans(n: number): string[] {
   const rows = n <= 4 ? [n] : n === 5 ? [3, 2] : [3, n - 3]
   const desk = rows.flatMap((k) => Array.from({ length: k }, () => 12 / k))

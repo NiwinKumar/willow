@@ -24,11 +24,11 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
 const ROWS = 3
 
 /** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
-export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string }) {
+export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className, rows: count = ROWS }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string; rows?: number }) {
   const metrics = byGoals(session.result?.metrics ?? [], goals).map((m) => ({ m, kind: verdictKind(m, session) }))
   const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
-  const rows = sorted.slice(0, ROWS)
-  const rest = sorted.slice(ROWS)
+  const rows = sorted.slice(0, count)
+  const rest = sorted.slice(count)
   const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
   return (
     <HomeCard label="Since your baseline" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
