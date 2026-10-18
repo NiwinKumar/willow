@@ -111,7 +111,7 @@ export function cheeksByDefault(sessions: Session[]): boolean {
   return last ? hasCheeks(last) : true
 }
 
-export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'quick')
+export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'camera')
 
 /**
  * Photos this check-in needs: 5 when it will become the baseline for this site and mode (no
