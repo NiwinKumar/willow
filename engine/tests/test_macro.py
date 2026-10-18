@@ -223,3 +223,25 @@ def test_a_close_focused_ultra_wide_macro_keeps_the_assumed_scale(tmp_path):
     assert r["quality"]["passed"] is True
     assert _metric(r, "pores")["value"] is not None
     assert _metric(r, "pores")["confidence"] == "indicative"  # assumed, until calibrated
+
+
+def test_a_close_up_with_a_mark_gives_a_candidate(tmp_path):
+    # Oct 18: every close-up with a blemish or spot failed (the candidate code read a face view the
+    # close-up frame does not have); the synthetic close-ups above have no marks, so none caught it
+    from skimage.color import rgb2lab
+
+    _macro(tmp_path / "c.jpg", pores_per_cm2=0)
+    rgb = np.asarray(Image.open(tmp_path / "c.jpg")).astype(float) / 255
+    lab = rgb2lab(rgb)
+    yy, xx = np.ogrid[: lab.shape[0], : lab.shape[1]]
+    ppm = _px_per_mm()
+    mark = (yy - H / 2) ** 2 + (xx - W / 2) ** 2 <= (1.5 * ppm) ** 2  # a 3 mm dark patch
+    lab[mark, 0] -= 18
+    out = (np.clip(lab2rgb(lab), 0, 1) * 255 + 0.5).astype(np.uint8)
+    exif = Image.Exif()
+    exif[0x0110] = "iPhone 17 Pro"
+    Image.fromarray(out).save(tmp_path / "m.jpg", quality=97, exif=exif)
+    r = analyze_macro([str(tmp_path / "m.jpg")], "cheek_macro", output_prefix=str(tmp_path / "out"))
+    assert r["quality"]["passed"] is True
+    assert r["candidates"]
+    assert all(c["features"]["view"] == 0.0 for c in r["candidates"])
