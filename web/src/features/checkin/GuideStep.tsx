@@ -50,7 +50,6 @@ export function GuideStep(props: {
   const [rawDone, setRawDone] = useState(prefs.lightroomDone)
   const on = ticks.filter(Boolean).length
   const name = SITE_NAME[site]
-  const modeName = raw ? 'RAW' : 'quick'
 
   // First sessions: just how to take the photos, in plain words (why 5 photos is explained elsewhere).
   const again = kind === 'arm' ? 'point it at the four dots again' : kind === 'close' ? 'bring it back a hand’s width from your face' : 'line your face up in the oval again'
@@ -60,8 +59,8 @@ export function GuideStep(props: {
       ? `Your last baseline had too few clear photos, so let’s take ${n} new ones. ${howTo}`
       : howTo
     : baseline
-      ? `Your ${modeName} baseline for ${name.toLowerCase()} is from ${fmtDate(baseline.created_at)}. Matching its light, pose and distance keeps today’s reading comparable.${kind === 'arm' ? ' Check in the other arm right after this one.' : ''}`
-      : `Your earlier ${modeName} photos for ${name.toLowerCase()} are saved. Matching their light, pose and distance keeps today’s reading comparable.`
+      ? `Your baseline for ${name.toLowerCase()} is from ${fmtDate(baseline.created_at)}. Matching its light, pose and distance keeps today’s reading comparable.${kind === 'arm' ? ' Check in the other arm right after this one.' : ''}`
+      : `Your earlier photos for ${name.toLowerCase()} are saved. Matching their light, pose and distance keeps today’s reading comparable.`
 
   return (
     <div className="relative mx-auto grid max-w-[1180px] animate-rise grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
@@ -72,7 +71,7 @@ export function GuideStep(props: {
       >
         <div>
           <span className="font-mono text-[12px] tracking-[.08em] opacity-90">
-            ■ {name.toUpperCase()} · {raw ? 'RAW' : 'QUICK'} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
+            ■ {name.toUpperCase()} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
           </span>
           <h1 id="ck-title" tabIndex={-1} className="mt-[18px] mb-0 text-[clamp(30px,3.4vw,44px)] leading-[1.05] font-light tracking-[-0.02em] outline-none">
             {sides ? `${total} photos: ${total - 2} facing the camera, then each cheek.` : first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
@@ -93,7 +92,7 @@ export function GuideStep(props: {
         <div className="flex flex-col gap-2.5">
           <p className="m-0 text-[16px] leading-[1.55]">{body}</p>
           <button type="button" onClick={props.onChangePlace} className="min-h-11 self-start text-[14px] underline underline-offset-4 opacity-90">
-            Change place or mode
+            Change place
           </button>
         </div>
       </section>
