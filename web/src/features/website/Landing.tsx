@@ -11,6 +11,7 @@ import { useAuth } from '../../lib/useAuth'
 import { useSamples } from '../../lib/useSamples'
 import { ProofLockup } from '../retail/brand'
 import { HeroBloom, Lockup } from './Decor'
+import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH, useOpenApp } from './destinations'
 import { FIRST_CHECKIN, isReturning } from './entry'
 import { journeyLine, journeyUnavailableLine, useEntryActions, useJourney } from './hooks'
 import { Figures, LiveStatus, MethodCards, ScienceSection } from './ScienceSection'
@@ -89,7 +90,7 @@ export default function Landing() {
       <SectionRail ready={introDone} />
       {/* One main landmark for the page; the privacy footer stays outside it (contentinfo). */}
       <main>
-        <Hero returning={returning} bloomRef={bloom} />
+        <Hero bloomRef={bloom} />
         <WaysIn returning={returning} />
         <How />
         <ScienceSection className={`${pad} ${railRoom}`} />
@@ -101,9 +102,9 @@ export default function Landing() {
   )
 }
 
-function Hero({ returning, bloomRef }: { returning: boolean; bloomRef: Ref<HTMLDivElement> }) {
+function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
   const { user, loading } = useAuth()
-  const entry = useEntryActions()
+  const app = useOpenApp()
   const me = identity(user)
   return (
     <section id="top" className="w-sky relative min-h-[min(94vh,860px)] overflow-hidden rounded-b-[clamp(36px,5vw,64px)] text-ink">
@@ -114,15 +115,14 @@ function Hero({ returning, bloomRef }: { returning: boolean; bloomRef: Ref<HTMLD
 
       <header className={`relative z-[2] flex flex-wrap items-center justify-between gap-4 py-[clamp(18px,3vw,32px)] ${pad}`}>
         <Lockup />
-        <div className="flex items-center gap-[clamp(12px,2vw,24px)]">
-          {/* With the longer "Open Willow →" the header would wrap on a phone; business visitors still have the footer link there. */}
-          <Link to="/retail" className={`text-[15px] text-ink no-underline transition-opacity hover:opacity-60 ${returning ? 'max-[439px]:hidden' : ''}`}>
-            For business
+        {/* Sign-in lives here; the hero buttons below are the ways in. */}
+        {loading ? null : app.signedIn ? (
+          <span className="max-w-[60vw] truncate text-[14px] text-ink-2">Signed in as {me.email ?? me.name}</span>
+        ) : (
+          <Link to="/signin" className="cta-yellow flex min-h-11 items-center rounded-pill px-6 text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
+            Sign in
           </Link>
-          <Link to={returning ? '/home' : '/signin'} className="cta-yellow rounded-pill px-6 py-[13px] text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
-            {returning ? 'Open Willow →' : 'Sign in'}
-          </Link>
-        </div>
+        )}
       </header>
 
       <div className={`relative z-[2] grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-center gap-[clamp(28px,5vw,72px)] pb-[clamp(32px,6vh,64px)] pt-[clamp(28px,6vh,72px)] ${pad}`}>
@@ -133,33 +133,43 @@ function Hero({ returning, bloomRef }: { returning: boolean; bloomRef: Ref<HTMLD
           <p className="m-0 max-w-[520px] text-[clamp(17px,1.4vw,20px)] font-light leading-normal">
             Willow compares each standardized photo with your own baseline and tells you when a change is bigger than your normal photo-to-photo variation. Computer vision measures. AI explains. Cosmetic appearance tracking only, never a diagnosis.
           </p>
-          <div className="flex min-h-14 flex-wrap gap-2.5">
-            {loading ? null : returning ? (
-              <>
-                <Link to="/home" className="flex min-h-14 items-center gap-3 rounded-pill bg-selected px-[26px] text-[16px] text-inverse no-underline transition-transform hover:-translate-y-0.5">
-                  Open Willow <span aria-hidden>→</span>
-                </Link>
-                <p className="m-0 self-center text-[14px] text-ink-2">Signed in {me.guest ? 'as a guest on this browser' : `as ${me.email ?? me.name}`}</p>
-              </>
-            ) : (
-              <>
-                <button type="button" onClick={entry.google} disabled={entry.pending !== null} aria-busy={entry.pending === 'google' || undefined} className="flex min-h-14 items-center gap-3 rounded-pill bg-selected py-0 pl-2 pr-[26px] text-[16px] text-inverse transition-transform hover:-translate-y-0.5">
-                  <span aria-hidden className="grid size-10 place-items-center rounded-full bg-white text-[17px] font-semibold text-ink">
-                    G
-                  </span>
-                  <span>{entry.pending === 'google' ? 'Signing in…' : user?.isAnonymous ? 'Keep my results with Google' : 'Continue with Google'}</span>
-                </button>
-                <button type="button" onClick={entry.guest} disabled={entry.pending !== null} aria-busy={entry.pending === 'guest' || undefined} className="min-h-14 rounded-pill border border-line-strong bg-white/50 px-[26px] text-[16px] text-ink backdrop-blur-[14px] transition-colors hover:bg-white/80">
-                  {entry.pending === 'guest' ? 'Starting…' : 'Continue as guest'}
-                </button>
-              </>
-            )}
-          </div>
-          {entry.error ? (
-            <p role="alert" className="m-0 max-w-[460px] rounded-[16px] bg-selected px-4 py-3 text-[14px] text-inverse">
-              {entry.error}
+          <div className="flex w-full max-w-[460px] flex-col gap-2.5">
+            <Link
+              to={JOURNEY_PATH}
+              aria-describedby="hero-mei-note"
+              className="flex min-h-14 items-center justify-between gap-3 rounded-pill bg-selected py-0 pl-[26px] pr-2 text-[16px] text-inverse no-underline transition-transform hover:-translate-y-0.5 hover:text-inverse"
+            >
+              Explore Mei’s journey
+              <span aria-hidden className="grid size-10 place-items-center rounded-full bg-white text-ink">
+                →
+              </span>
+            </Link>
+            <p id="hero-mei-note" className="m-0 px-1 text-[13px] text-ink-2">
+              Mei is simulated: generated photos, measured by the live engine.
             </p>
-          ) : null}
+            <div className="mt-1 flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                onClick={app.open}
+                aria-describedby="hero-app-note"
+                className="min-h-12 flex-[1_1_150px] whitespace-nowrap rounded-pill border border-line-strong bg-white/50 px-4 text-[15px] text-ink backdrop-blur-[14px] transition-colors hover:bg-white/80"
+              >
+                Open the Willow app
+              </button>
+              <Link
+                to={PROOF_PATH}
+                className="flex min-h-12 flex-[1_1_150px] items-center justify-center whitespace-nowrap rounded-pill border border-line-strong bg-white/50 px-4 text-[15px] text-ink no-underline backdrop-blur-[14px] transition-colors hover:bg-white/80"
+              >
+                Open Willow Proof
+              </Link>
+            </div>
+            <p id="hero-app-note" className="m-0 px-1 text-[13px] text-ink-2">
+              {app.signedIn ? 'The app opens your own account.' : 'Not signed in, so the app opens Mei’s account, read-only. Willow Proof is the retail side.'}
+            </p>
+            <Link to={BRAND_JOURNEY_PATH} className="flex min-h-11 items-center self-start px-1 text-[14px] text-ink underline decoration-line-strong underline-offset-4 transition-opacity hover:opacity-60">
+              Explore a brand’s journey <span aria-hidden className="ml-1.5">→</span>
+            </Link>
+          </div>
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ COSMETIC TRACKING · NOT A MEDICAL DEVICE</span>
         </div>
         <div aria-hidden className="min-h-[min(60vh,520px)]" />

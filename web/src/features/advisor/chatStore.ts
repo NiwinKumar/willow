@@ -319,3 +319,6 @@ export function regenerate() {
   set({ messages: state.messages.slice(0, i - 1) })
   ask(prev.text, prev.context, prev.photos)
 }
+
+/** For a guided walkthrough: true once Wisp has answered the last question and nothing is pending. */
+export const chatSettled = () => state.phase === 'idle' && state.messages.at(-1)?.role === 'willow'

@@ -398,3 +398,4 @@
     transition-duration: 0.01ms !important;
   }
 }
+@keyframes tourPing { from { transform: scale(.4); opacity: 1 } to { transform: scale(1.8); opacity: 0 } }
