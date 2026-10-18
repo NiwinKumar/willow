@@ -274,6 +274,10 @@ def view(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
         "starts_at": iso(doc.get("starts_at")),
         "ends_at": iso(doc.get("ends_at")),
         "created_at": iso(doc.get("created_at")),
+        # started by an AutoCampaign rule (app/autopilot.py): its id and name, else null
+        "rule": {"id": doc["rule_id"], "name": doc.get("rule_name") or ""}
+        if doc.get("rule_id")
+        else None,
         "product": product.get("name"),
         "brand": product.get("brand"),
         "category": product.get("category"),
@@ -292,9 +296,14 @@ def end(store: Store, cid: str, doc: Doc) -> Doc:
 
 
 def delete_owned(store: Store, uid: str) -> None:
-    """DELETE /v1/me: the person's campaigns go with the account."""
+    """DELETE /v1/me: the person's campaigns, AutoCampaign rules and their activity go with the
+    account."""
     for cid, _ in store.campaigns_of(uid):
         store.campaign_delete(cid)
+    for rid, _ in store.rules_of(uid):
+        store.rule_delete(rid)
+    for aid, _ in store.activities_of(uid):
+        store.activity_delete(aid)
 
 
 # -- consumer side -----------------------------------------------------------------------------
