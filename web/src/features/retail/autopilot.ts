@@ -83,28 +83,29 @@ export function emptyRule(workspace: string): RuleBody {
   }
 }
 
-/** The fill-in-the-blanks pattern every typed rule follows. */
-export const PATTERN = 'When [any of my serums / products] [becomes Proven / gains a new skin type / sees rising demand / works for an under-served group] for [goal], promote it [to the skin types it works for] for [7 / 14 / 30] days, with a [10–50]% holdout, max [1–3] at a time. [Ask me first / Start it automatically / Run it on autopilot].'
-
-/** Ready-made rules, one per trigger: tap one to fill the form, or copy it and change the words. */
-export const TEMPLATES: { title: string; text: string; rule: (workspace: string) => RuleBody }[] = [
+/** Ready-made rules, one per trigger: tap one to fill the form, then change the words. `blurb` is the card's one line. */
+export const TEMPLATES: { title: string; blurb: string; text: string; rule: (workspace: string) => RuleBody }[] = [
   {
     title: 'Promote what becomes Proven',
+    blurb: 'Promote a product once it’s proven to work.',
     text: 'When any of my serums becomes Proven for dark spots, promote it to the skin types it works for, for 14 days, with a 20% holdout, max 2 at a time.',
     rule: (w) => emptyRule(w),
   },
   {
     title: 'Reach a newly proven skin type',
+    blurb: 'Reach a new skin type it works for.',
     text: 'When any of my products gains a new skin type with a positive lift, suggest a 7-day campaign for that group, with a 20% holdout, max 1 at a time.',
     rule: (w) => ({ ...emptyRule(w), name: 'New skin types', scope: { category: null, product_ids: [] }, trigger: { kind: 'new_segment', goals: [], unmet_min: 0.5 }, action: { days: 7, holdout_pct: 0.2, max_running: 1 } }),
   },
   {
     title: 'Ride rising demand',
+    blurb: 'Promote proven picks when demand grows.',
     text: 'When demand for redness is rising and one of my products is Proven for it, start it automatically for 14 days, with a 20% holdout, max 2 at a time.',
     rule: (w) => ({ ...emptyRule(w), name: 'Rising redness demand', level: 'auto', scope: { category: null, product_ids: [] }, trigger: { kind: 'rising_demand', goals: ['redness'], unmet_min: 0.5 } }),
   },
   {
     title: 'Help an under-served group',
+    blurb: 'Help people not seeing results yet.',
     text: 'When 50% or more of a skin type see no change yet for blemishes and one of my products works for them, run it on autopilot for 30 days, with a 20% holdout, max 1 at a time.',
     rule: (w) => ({ ...emptyRule(w), name: 'Under-served blemishes', level: 'autopilot', scope: { category: null, product_ids: [] }, trigger: { kind: 'unmet_need', goals: ['blemishes'], unmet_min: 0.5 }, action: { days: 30, holdout_pct: 0.2, max_running: 1 } }),
   },
