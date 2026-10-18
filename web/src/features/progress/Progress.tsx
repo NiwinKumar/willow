@@ -16,8 +16,9 @@ import { fmtDate, parseDate, plural } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
+import { routineMarkers } from './markers'
 import { DAY_BG, DAY_WORDS, bandText, chartable, currentBaseline, dayOf, dayStatus, usedFrames, type DayStatus } from './model'
-import { Page } from './parts'
+import { MetricSwitcher, Page } from './parts'
 import { metricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
 
@@ -201,19 +202,15 @@ export default function Progress() {
           </section>
 
           <section aria-label="Metric over time" className="flex flex-col justify-between gap-4 rounded-[44px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse shadow-[0_40px_80px_-50px_rgba(0,0,0,.7)] squircle">
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
-              <h2 className="m-0 text-[24px] font-normal">{label || 'Over time'}</h2>
-              <div className="flex flex-wrap gap-1">
-                {tracks.map((t) => {
-                  const on = t === track
-                  return (
-                    <button key={`${t.site}.${t.metric}`} type="button" aria-pressed={on} onClick={() => setQuery({ metric: t.metric, site: t.site })} className={`min-h-10 rounded-pill border border-[#333] px-3.5 text-[13px] transition-colors ${on ? 'bg-white text-ink' : 'text-white'}`}>
-                      {t.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            <MetricSwitcher
+              options={tracks.map((t) => ({ key: `${t.site}.${t.metric}`, label: t.label }))}
+              value={track ? `${track.site}.${track.metric}` : null}
+              label={label || 'Over time'}
+              onChange={(key) => {
+                const t = tracks.find((x) => `${x.site}.${x.metric}` === key)
+                if (t) setQuery({ metric: t.metric, site: t.site })
+              }}
+            />
             {series && series.points.some((p) => p.value !== null) && metric ? (
               <TimelineChart
                 points={series.points}
@@ -260,14 +257,11 @@ export default function Progress() {
   )
 }
 
-/** Routine starts placed between the check-ins around them. */
+/** Routine starts placed between the check-ins around them; products started the same day share one marker. */
 function useMarkers(sessions: Session[], entries: { started_at: string; custom_name: string; brand: string }[]) {
   return useMemo(() => {
     const times = sessions.map((s) => new Date(s.created_at).getTime())
-    return entries
-      .map((e) => ({ at: fractionalIndex(times, parseDate(e.started_at.slice(0, 10)).getTime()), label: `${(e.custom_name || e.brand).toUpperCase().slice(0, 18)} · ${fmtDate(e.started_at.slice(0, 10)).toUpperCase()}` }))
-      .filter((m): m is { at: number; label: string } => m.at !== null)
-      .slice(0, 6)
+    return routineMarkers(entries, (day) => fractionalIndex(times, parseDate(day).getTime()), (day) => fmtDate(day))
   }, [sessions, entries])
 }
 
@@ -327,12 +321,14 @@ function NotesCard({ notes }: { notes: Note[] }) {
   const list = all ? notes : notes.slice(-8)
   return (
     <section aria-label="Notes and routine changes" className="flex flex-col gap-1.5 rounded-[44px] bg-surface/70 p-[clamp(22px,3vw,32px)] squircle">
-      <span className="mb-2 font-mono text-[12px] text-ink-2">■ NOTES AND ROUTINE CHANGES</span>
-      {notes.length > 8 ? (
-        <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="min-h-11 self-start rounded-pill bg-sunken px-4 text-[13px] hover:bg-muted">
-          {all ? 'Show the latest 8' : `Show all ${notes.length}`}
-        </button>
-      ) : null}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <span className="font-mono text-[12px] text-ink-2">■ NOTES AND ROUTINE CHANGES</span>
+        {notes.length > 8 ? (
+          <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="min-h-11 rounded-pill bg-selected px-4 text-[13px] text-inverse transition-[background] duration-300 hover:bg-[#2a2a2a]">
+            {all ? 'Show the latest 8' : `Show all ${notes.length}`}
+          </button>
+        ) : null}
+      </div>
       {list.length ? (
         <ul className="m-0 list-none p-0">
           {list.map((n, i) => (

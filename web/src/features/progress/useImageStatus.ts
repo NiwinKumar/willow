@@ -24,3 +24,36 @@ export function useImageStatus(url: string | null): 'none' | 'loading' | 'ready'
   if (done?.url !== url) return 'loading'
   return done.ok ? 'ready' : 'failed'
 }
+
+/**
+ * Whether at least one of the photo URLs loads: 'checking' until every probe answered or one succeeded,
+ * 'no' when none loads (or there are none). Used to keep a photo comparison closed when there is nothing to show.
+ */
+export function useAnyPhotoLoads(urls: string[]): 'checking' | 'yes' | 'no' {
+  const key = urls.join('\n')
+  const [result, setResult] = useState<{ key: string; ok: boolean } | null>(null)
+  useEffect(() => {
+    if (!key) return
+    let live = true
+    let pending = key.split('\n').length
+    const probes = key.split('\n').map((u) => {
+      const img = new Image()
+      img.onload = () => live && setResult({ key, ok: true })
+      img.onerror = () => {
+        pending -= 1
+        if (live && pending === 0) setResult((r) => (r?.key === key && r.ok ? r : { key, ok: false }))
+      }
+      img.src = u
+      return img
+    })
+    return () => {
+      live = false
+      for (const p of probes) {
+        p.onload = null
+        p.onerror = null
+      }
+    }
+  }, [key])
+  if (!key) return 'no'
+  return result?.key === key ? (result.ok ? 'yes' : 'no') : 'checking'
+}
