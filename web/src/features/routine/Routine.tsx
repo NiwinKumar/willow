@@ -112,8 +112,8 @@ function LiveRoutine() {
     <main className="relative mx-auto flex max-w-[1320px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-2">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">Your routine</h1>
-          <span className="text-[14px] text-ink-2">{meta}</span>
+          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{tab === 'tests' ? 'Test a product' : 'Your routine'}</h1>
+          <span className="text-[14px] text-ink-2">{tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : meta}</span>
         </div>
         <button type="button" onClick={() => setAdd({ mode: 'search' })} className="order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
           Add product

@@ -663,6 +663,7 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 - The Routine check is plain text on the blue card: severity and kind are words (no pills), a small icon button re-runs it, and each finding's actions sit bottom right (Ask Wisp why last).
 - Routine check layout: the top right holds a small "How this was checked" ghost button (info icon) beside the icon-only re-run button; it opens a calm full-width note under the header. Each finding is its own soft inset panel (label, title, one row of products at 26px, one muted line, then a hairline and the actions bottom right), in a 2-column grid on wide containers and 1 column on narrow, with the action rows aligned across a row.
 - Product rows use `compactName` (cut at the first qualifier, brand and strengths dropped, type word kept); the full name is in the tooltip and the accessible label. Schedule notes and the ◆ change are plain text, not pills.
+- Product tests tab: the page title reads "Test a product" (with a one-line subtitle) instead of "Your routine". The "How it works" card and the "Start a test" card share one row height (stretch); the product rows are compact (30px images, one-line names, a muted brand · type line), the list scrolls past about six rows, and "Something else" stays pinned last below it. The two cards stack on narrow screens.
 
 ### Progress: measure switcher
 - The over-time chart shows one measure at a time: its name is a select (title with a chevron) with previous / next arrows, in the person's goal order, instead of a pill per measure.
