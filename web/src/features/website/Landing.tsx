@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type 
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { WillowIntro } from '../../components/willow/WillowLoader'
-import { enterDemo, leaveDemo } from '../../data/useData'
+import { leaveDemo } from '../../data/useData'
 import { identity } from '../../lib/identity'
 import { JUDGE_STOPS } from '../../lib/judge'
 import { useAuth } from '../../lib/useAuth'
@@ -230,10 +230,7 @@ function WaysIn({ returning }: { returning: boolean }) {
         <button
           type="button"
           disabled={journey.state !== 'ready'}
-          onClick={() => {
-            enterDemo()
-            navigate('/home?demo=1')
-          }}
+          onClick={() => navigate('/journey')}
           className={`${wayCard} text-white`}
           style={{ background: 'radial-gradient(60% 40% at 30% 60%, #9FC2C9 0%, transparent 70%), linear-gradient(200deg, #2F4A2A 0%, #3E6A6E 45%, #15241C 100%)' }}
         >
