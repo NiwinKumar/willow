@@ -1,22 +1,20 @@
 import { X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-import { toast } from 'sonner'
 
 import type { Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import { placesOf } from '../../lib/profile'
-import { choicesOf, minutesFor, trackOf, type TrackChoice, type TrackPlace } from '../../lib/track'
+import { minutesFor, type TrackPlace } from '../../lib/track'
 import './checkin.css'
 import { baselineLine, SITE_NAME, SITE_SWATCH, whenCaps } from './model'
-import { TrackChoices } from './TrackChoices'
 
 /**
  * The "Check in" side sheet (Willow App.dc.html, capOpen): the one way to check in. It lists today's
  * check-in, every place the person tracks (profile.track, chosen in onboarding or You), about how long it
  * takes, and one "Start check-in" that walks through all of them (RAW files can be uploaded at any place
- * from its camera step). Someone who never chose places (onboarded before Oct 18) chooses them here first.
+ * from its camera step). It never asks for places: with none saved it uses the default ones (lib/track), and
+ * places are changed in You.
  * A native <dialog>: focus trap, Esc and the scrim for free.
  */
 export default function CheckInPicker({ open, onClose, onStart }: { open: boolean; onClose: () => void; onStart: (places: TrackPlace[], upload: boolean) => void }) {
@@ -27,8 +25,6 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
   const live = data.mode === 'live'
   const known = live && data.status !== 'loading'
   const sessionsOf = (s: Site) => data.series(s)?.sessions ?? []
-  const [choosing, setChoosing] = useState(() => live && !data.profile.track?.length)
-  const [saving, setSaving] = useState(false)
 
   const opener = useRef<HTMLElement | null>(null)
   useEffect(() => {
@@ -79,35 +75,18 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
             </button>
           </div>
 
-          {choosing ? (
-            <ChoosePlaces
-              initial={choicesOf(places)}
-              busy={saving}
-              onSave={(picked) => {
-                setSaving(true)
-                data
-                  .saveProfile({ track: trackOf(picked) })
-                  .catch(() => toast.error('Couldn’t save your places on this account. They’re kept on this device for now.'))
-                  .finally(() => {
-                    setSaving(false)
-                    setChoosing(false)
-                  })
-              }}
-            />
-          ) : (
-            <Today
-              live={live}
-              known={known}
-              places={places}
-              line={(p) => baselineLine(sessionsOf(p), 'uncalibrated').text}
-              onStart={() => onStart(places, false)}
-              onUpload={() => onStart(places, true)}
-              onChange={() => {
-                onClose()
-                navigate('/you#places')
-              }}
-            />
-          )}
+          <Today
+            live={live}
+            known={known}
+            places={places}
+            line={(p) => baselineLine(sessionsOf(p), 'uncalibrated').text}
+            onStart={() => onStart(places, false)}
+            onUpload={() => onStart(places, true)}
+            onChange={() => {
+              onClose()
+              navigate('/you#places')
+            }}
+          />
         </div>
       ) : null}
     </dialog>
@@ -165,22 +144,3 @@ function Today({ live, known, places, line, onStart, onUpload, onChange }: { liv
 }
 
 /** First open for someone who never chose places: the onboarding cards, then today's check-in. */
-function ChoosePlaces({ initial, busy, onSave }: { initial: TrackChoice[]; busy: boolean; onSave: (picked: TrackChoice[]) => void }) {
-  const [picked, setPicked] = useState(initial)
-  return (
-    <>
-      <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-5 pt-2 pb-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-[15px]">Where should Willow look?</span>
-          <span className="text-[13px] leading-[1.45] text-ink-2">Every check-in covers these places, one after another. You can change them in You.</span>
-        </div>
-        <TrackChoices value={picked} onChange={setPicked} />
-      </div>
-      <div className="flex flex-col gap-2 border-t border-ink/[.06] px-5 pt-3.5 pb-5">
-        <button type="button" disabled={busy} onClick={() => onSave(picked)} className="flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background] hover:bg-[#2a2a2a] disabled:opacity-60">
-          {busy ? 'Saving…' : 'Save places'}
-        </button>
-      </div>
-    </>
-  )
-}
