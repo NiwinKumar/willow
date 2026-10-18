@@ -14,11 +14,10 @@ import type { AdvisorStage } from '../../lib/api'
 import { toJpegBase64 } from '../../lib/image'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { verdictCounts } from '../../lib/verdict'
-import { AvailableInOwnAccount } from '../routine/OwnAccountNotice'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
-import { ask, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment } from './chatStore'
+import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
 import { useComposing, WispMark, wispState } from './Wisp'
 
@@ -53,13 +52,7 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
         ) : null}
         {data.mode === 'live' ? <ContextChip /> : null}
       </div>
-      {data.mode === 'demo' ? (
-        <div className="p-4">
-          <AvailableInOwnAccount compact what="Wisp reads your own results and routine, so it and your routine" />
-        </div>
-      ) : (
-        <Chat seed={seed} full={full} onExitFull={full ? onToggleFull : undefined} />
-      )}
+      <Chat seed={seed} full={full} onExitFull={full ? onToggleFull : undefined} />
     </div>
   )
 }
@@ -182,6 +175,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
   const wide = useMediaQuery('(min-width: 900px)')
   const { getIdToken, user } = useAuth()
   const uid = user?.uid ?? null
+  const demo = data.mode === 'demo'
   const starters = useStarters()
   const scroller = useRef<HTMLDivElement>(null)
   const [product, setProduct] = useState<Product | null>(null)
@@ -192,7 +186,8 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
   const started = chat.messages.length > 0
 
   // Another person on this tab (Google switch, sign-out then sign-in) never sees the last one's chat.
-  useEffect(() => setTokenSource(getIdToken, uid), [getIdToken, uid])
+  // The demo journey's chat is Mei's (DEMO_OWNER): her stored questions, and new ones answered from her data.
+  useEffect(() => setTokenSource(getIdToken, demo ? DEMO_OWNER : uid), [getIdToken, uid, demo])
   // A question from elsewhere in the app (Routine, Results): asked once per seed.
   useEffect(() => {
     if (seed && takeSeed(seed)) ask(seed.text, seed.context)

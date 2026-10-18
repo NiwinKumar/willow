@@ -16,6 +16,8 @@ GLOBAL_UID = "_global"
 # action: (per person, everyone)
 CAPS: dict[str, tuple[int, int]] = {
     "advisor": (20, 3000),
+    # Wisp on the public demo journey: every judge asks as the demo account, so one shared count.
+    "demo_advisor": (300, 3000),
     "retailer_ask": (20, 1500),
     "proof_claims": (30, 1500),  # Willow Proof claim drafts (app/proof_ai.py)
     "label_scan": (30, 1500),
@@ -32,6 +34,7 @@ CAPS: dict[str, tuple[int, int]] = {
 
 MESSAGES = {
     "advisor": "That is 20 questions for today.",
+    "demo_advisor": "The demo's questions for today are used up. Your own account has its own.",
     "retailer_ask": "That is 20 questions for today.",
     "campaign_create": "That is 20 new campaigns for today.",
     "proof_claims": "That is 30 sets of claim drafts for today.",
