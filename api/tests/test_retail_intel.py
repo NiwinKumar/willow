@@ -581,3 +581,28 @@ def test_skin_type_changes_effect_size():
 
     f = _facts()
     assert pooled(f, "oily") - pooled(f, "dry") > 0.15  # oil control works better on oily skin
+
+
+def test_autopilot_signals_match_eligibility_and_the_rising_goal_card(monkeypatch):
+    raw = retailer.raw_from_tables(_tables())
+    monkeypatch.setattr(retailer, "fetch", lambda: raw)
+    monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": None, "version": 0})
+    monkeypatch.setattr(retail_intel, "_facts", {})
+    sig = retail_intel.autopilot_signals()
+    elig = {e["product_id"]: e for e in retail_intel.eligibility_all()}
+    assert {p["product_id"] for p in sig["products"]} == set(elig)
+    for p in sig["products"]:
+        e = elig[p["product_id"]]
+        assert (p["tier"], p["eligible"], p["goals"], p["skin_types"]) == (
+            e["tier"],
+            e["eligible"],
+            e["goals"],
+            e["skin_types"],
+        )
+        if p["tier"] == "proven":
+            assert p["n"] >= 30 and p["lift_lo"] > 0
+    card = retail_intel._rising_goal(_facts())
+    if card:
+        assert card["link"]["id"] in sig["rising"]
+        assert sig["rising"][card["link"]["id"]]["to"] == card["value"]
+    assert all(c["unmet"] is not None and 0 <= c["unmet"] <= 1 for c in sig["unmet"])
