@@ -14,13 +14,13 @@ import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
-import { outcomeFor } from '../../lib/outcome'
+import { routineEffect } from '../../lib/routineEffect'
 import { addToCalendar } from '../../lib/reminders'
 import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
 import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
-import { ChangedCard, ProductWatchCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
+import { ChangedCard, RoutineEffectCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
 import { useProductTests } from '../routine/productTests'
 import { useOutcomeSessions } from '../routine/routineModel'
@@ -140,17 +140,9 @@ function HomeBody() {
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
-  // Product watch: each active product with the real outcome it can be judged on (docs/UX_SPEC.md).
+  // Routine effect: how each product's target measurement moved since it started (lib/effect.ts).
   const outcomeSessions = useOutcomeSessions()
-  const watch = useMemo(() => {
-    if (demo) return []
-    const rank = { real: 0, none: 1, early: 2, unmeasured: 3 } as const
-    return (entries ?? [])
-      .filter((e) => !e.ended_at)
-      .map((e) => ({ e, o: outcomeFor(e, outcomeSessions) }))
-      .filter((r) => r.o.kind !== 'unmeasured')
-      .sort((a, b) => rank[a.o.kind] - rank[b.o.kind])
-  }, [demo, entries, outcomeSessions])
+  const effect = useMemo(() => (demo ? null : routineEffect(entries ?? [], outcomeSessions, check.data)), [demo, entries, outcomeSessions, check.data])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
   const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
@@ -210,7 +202,7 @@ function HomeBody() {
     })
   }
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
-  if (watch.length) small.push({ key: 'watch', node: (cls) => <ProductWatchCard className={cls} rows={watch} onOpen={() => navigate('/routine')} /> })
+  if (effect?.rows.length) small.push({ key: 'effect', node: (cls) => <RoutineEffectCard className={cls} effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
   if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
   if (diary && latestFace) small.push({ key: 'spots', node: (cls) => <SpotDiaryTile className={cls} diary={diary} onOpen={() => navigate({ pathname: `/result/${latestFace.id}`, hash: '#spot-diary' })} /> })
   const spans = rowSpans(small.length)
