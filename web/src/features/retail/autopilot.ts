@@ -1,4 +1,4 @@
-import type { AutopilotActivity, AutopilotKind, RuleBody, RuleLevel, RuleTrigger } from '../../lib/api'
+import type { AutopilotActivity, AutopilotKind, RuleBody, RuleLevel } from '../../lib/api'
 import { GOALS } from '../../lib/metrics.ts'
 import { SKIN_LABEL } from '../routine/sponsored.ts'
 
@@ -8,7 +8,7 @@ import { SKIN_LABEL } from '../routine/sponsored.ts'
  * two to the same words), so the editor can preview it live while the form changes.
  */
 
-export const CATEGORIES: { id: string; label: string; noun: string }[] = [
+const CATEGORIES: { id: string; label: string; noun: string }[] = [
   { id: 'serum', label: 'Serums', noun: 'serums' },
   { id: 'sunscreen', label: 'Sunscreens', noun: 'sunscreens' },
   { id: 'treatment', label: 'Treatments', noun: 'treatments' },
@@ -18,13 +18,6 @@ export const CATEGORIES: { id: string; label: string; noun: string }[] = [
   { id: 'exfoliant', label: 'Exfoliants', noun: 'exfoliants' },
   { id: 'eye_care', label: 'Eye care', noun: 'eye care' },
   { id: 'mask', label: 'Masks', noun: 'masks' },
-]
-
-export const TRIGGERS: { id: RuleTrigger; label: string; hint: string }[] = [
-  { id: 'proven', label: 'Becomes Proven', hint: '30+ users at week 8, and clearly better than non-users.' },
-  { id: 'new_segment', label: 'Gains a new goal or skin type', hint: 'A new group with a positive lift; the campaign targets that group.' },
-  { id: 'rising_demand', label: 'Demand rises for its goal', hint: 'A goal’s share of people goes up month on month, and the product is Proven for it.' },
-  { id: 'unmet_need', label: 'Works for an under-served group', hint: 'A skin type × goal group where many see no change yet, and this product works for them.' },
 ]
 
 export const LEVELS: { id: RuleLevel; label: string; hint: string }[] = [
