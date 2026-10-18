@@ -6,12 +6,11 @@ import { fmtDate } from '../../lib/format'
 import { METRIC_META, fmtSigned, unitOf } from '../../lib/metrics'
 import { outcomeFor } from '../../lib/outcome'
 import { readForearm } from '../home/forearm'
-import { shortName } from '../home/derive'
 import { PlanDotMark } from '../home/Tiles'
+import { CHECK_CARD, GapCard, TonightCard, tonightOf } from './CheckCards'
 import { ProductImage } from './productUi'
 import { VERDICT_AFTER_DAYS, testDay } from './productTests'
 import { entryName, imageOf, type Finding } from './routineModel'
-import { alternatesWith, restsOn } from './schedule'
 import { StartTest } from './StartTest'
 
 /**
@@ -30,7 +29,6 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
   onAlternate: (tonight: RoutineEntry, rests: RoutineEntry) => Promise<void>
 }) {
   const navigate = useNavigate()
-  const [busy, setBusy] = useState(false)
   const tonight = tonightOf(findings, entries, usedLastNight)
   const gaps = findings.filter((f) => f.kind === 'Gap').slice(0, tonight ? 1 : 2)
   const changes = entries
@@ -45,15 +43,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
     .slice(0, 3 - gaps.length - (tonight ? 1 : 0))
   if (gaps.length + changes.length === 0 && !tonight) return null
 
-  const card = 'relative isolate flex min-h-[230px] flex-[1_1_260px] flex-col gap-3 overflow-hidden rounded-[32px] p-5 squircle'
-  const alternate = async (on: RoutineEntry, off: RoutineEntry) => {
-    setBusy(true)
-    try {
-      await onAlternate(on, off)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const card = CHECK_CARD
   return (
     <section aria-labelledby="suggested-h" className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2.5 px-1.5 pt-1">
@@ -63,63 +53,10 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
         <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">■ UPDATES WITH EACH CHECK-IN AND ROUTINE CHANGE</span>
       </div>
       <div className="flex flex-wrap gap-3">
-        {tonight ? (
-          <article
-            className={`${card} text-inverse`}
-            style={{ background: 'radial-gradient(90% 80% at 80% 0%, #6B5BFF 0%, transparent 60%), radial-gradient(70% 70% at 0% 100%, #F25FA8 0%, transparent 65%), #1A1745', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -30px 60px rgba(122,92,255,.25), 0 30px 60px -40px rgba(29,35,122,.8)', animation: 'wRise .5s both' }}
-          >
-            <div className="flex items-start justify-between gap-2.5">
-              <span aria-hidden className="relative h-[58px] w-[84px]">
-                <span className="absolute top-0 left-0 motion-safe:animate-breathe">
-                  <ProductImage product={imageOf(tonight.on)} size={56} />
-                </span>
-                <span className="absolute top-[18px] left-[44px] rounded-full shadow-[0_0_0_2px_#1A1745]">
-                  <ProductImage product={imageOf(tonight.off)} size={38} muted rest />
-                </span>
-                <span className="absolute top-3 left-[66px] grid size-[18px] place-items-center rounded-full bg-[#1A1745] text-[10px]">☾</span>
-              </span>
-              <span className="font-mono text-[10.5px] tracking-[.08em] text-[#C9CFFF]">■ TONIGHT</span>
-            </div>
-            <span className="text-[19px] leading-[1.2] tracking-[-0.01em] text-balance">
-              {tonight.done ? `${shortName(tonight.on)} tonight. ${shortName(tonight.off)} rests.` : `${shortName(tonight.on)} and ${shortName(tonight.off)} on the same night.`}
-            </span>
-            <span className="text-[12.5px] leading-[1.45] text-pretty text-[#D5D8FF]">
-              {tonight.done
-                ? `${usedLastNight(tonight.off.id) ? `You used ${shortName(tonight.off).toLowerCase()} last night. ` : ''}Alternating the two lowers the chance of irritation.`
-                : `${tonight.finding?.title ?? ''} Alternating nights lowers the chance of irritation: ${shortName(tonight.on).toLowerCase()} tonight, ${shortName(tonight.off).toLowerCase()} tomorrow.`}
-            </span>
-            {tonight.done ? (
-              <span className="mt-auto inline-flex min-h-9 items-center self-start rounded-pill bg-white/15 px-3.5 text-[13px]">✓ Alternating nights</span>
-            ) : (
-              <button type="button" disabled={busy} aria-busy={busy} onClick={() => void alternate(tonight.on, tonight.off)} className="mt-auto min-h-11 self-start rounded-pill bg-white/92 px-4 text-[13px] text-ink transition-transform hover:-translate-y-px disabled:opacity-60">
-                {busy ? 'Saving…' : 'Alternate nights'}
-              </button>
-            )}
-          </article>
-        ) : null}
-        {gaps.map((f, i) => {
-          const sun = f.find?.category === 'sunscreen'
-          return (
-            <article
-              key={f.key}
-              className={`${card} text-ink`}
-              style={{ background: 'radial-gradient(90% 90% at 100% 0%, #FFF3A8 0%, transparent 60%), radial-gradient(80% 80% at 0% 100%, #FFB27A 0%, transparent 65%), #FFE2CF', boxShadow: 'inset 0 0 50px 8px rgba(255,255,255,.45), 0 30px 60px -44px rgba(255,107,74,.6)', animation: `wRise .5s ${(i + (tonight ? 1 : 0)) * 0.07}s both` }}
-            >
-              <div className="flex items-start justify-between gap-2.5">
-                <span aria-hidden className="relative grid size-[58px] place-items-center rounded-full border-[1.5px] border-dashed border-ink/40 bg-white/35 font-mono text-[11px] tracking-[.06em]">
-                  <span className="absolute -inset-[9px] -z-10 rounded-full motion-safe:animate-breathe" style={{ background: 'radial-gradient(circle, rgba(255,243,168,.9), transparent 70%)' }} />
-                  {sun ? 'SPF' : '+'}
-                </span>
-                <span className="font-mono text-[10.5px] tracking-[.08em]">■ {sun ? 'MORNING · MISSING' : 'MISSING STEP'}</span>
-              </div>
-              <span className="text-[19px] leading-[1.2] tracking-[-0.01em] text-balance">{sun ? 'Add a sunscreen to your mornings.' : f.title}</span>
-              <span className="text-[12.5px] leading-[1.45] text-pretty text-[#3E3C38]">{f.fix}</span>
-              <button type="button" onClick={() => onFind(f)} className="mt-auto min-h-11 self-start rounded-pill bg-selected px-4 text-[13px] text-inverse transition-transform hover:-translate-y-px">
-                Find one
-              </button>
-            </article>
-          )
-        })}
+        {tonight ? <TonightCard tonight={tonight} usedLastNight={usedLastNight} onAlternate={onAlternate} /> : null}
+        {gaps.map((f, i) => (
+          <GapCard key={f.key} finding={f} onFind={() => onFind(f)} delay={(i + (tonight ? 1 : 0)) * 0.07} />
+        ))}
         {changes.map(({ e, o, latest, m }, i) => (
           <article
             key={e.id}
@@ -153,25 +90,6 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
       </div>
     </section>
   )
-}
-
-/**
- * Tonight's pair: two evening products already alternating (done), else the first conflict the check says to
- * alternate. In a new pair the product not used last night goes tonight.
- */
-function tonightOf(findings: Finding[], entries: RoutineEntry[], usedLastNight: (id: string) => boolean): { on: RoutineEntry; off: RoutineEntry; done: boolean; finding?: Finding } | null {
-  const pm = entries.filter((e) => e.slots.includes('pm') && !e.ended_at)
-  for (const a of pm)
-    for (const b of pm)
-      if (a.id < b.id && alternatesWith(a, b)) {
-        const [on, off] = restsOn(a) ? [b, a] : [a, b]
-        return { on, off, done: true }
-      }
-  const f = findings.find((x) => x.kind === 'Conflict' && x.alternate && x.entries.length === 2 && x.entries.every((e) => e.slots.includes('pm')))
-  if (!f) return null
-  const [a, b] = f.entries
-  const [on, off] = usedLastNight(b.id) && !usedLastNight(a.id) ? [a, b] : [b, a]
-  return { on, off, done: false, finding: f }
 }
 
 const BAND = { background: 'radial-gradient(120% 140% at 0% 0%, #B8E986 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #4FB866 0%, transparent 60%), #DDF3C9', boxShadow: 'inset 0 0 60px 10px rgba(255,255,255,.45), 0 30px 60px -44px rgba(15,59,58,.5)' }

@@ -8,7 +8,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
 import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
-import type { CaptureMode, RoutineEntry, RoutineCheck, Session } from '../../data/types'
+import type { CaptureMode, RoutineEntry, Session } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
 import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
@@ -19,10 +19,13 @@ import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, 
 import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
-import { ChangedCard, NextStepCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
+import { ChangedCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
+import { ApartCard, GapCard, TonightCard, tonightOf } from '../routine/CheckCards'
 import { useProductTests } from '../routine/productTests'
-import { restsOn } from '../routine/schedule'
+import { entryName, findingsOf, type Finding } from '../routine/routineModel'
+import { useRoutineWrites } from '../routine/writes'
+import { addDays, restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
 import { LeadCard, type Lead } from './LeadCard'
@@ -138,7 +141,26 @@ function HomeBody() {
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
-  const finding = demo ? null : nextStepOf(check.data, byId)
+  // The routine check card: tonight's pair, else the first conflict, else the first gap.
+  const yesterday = addDays(day, -1)
+  const lastNight = useRoutineLog(yesterday, yesterday)
+  const usedLastNight = (id: string) => Boolean(lastNight.data?.find((d) => d.date === yesterday)?.used[id]?.includes('pm'))
+  const writes = useRoutineWrites()
+  const current = useMemo(() => (entries ?? []).filter((e) => !e.ended_at), [entries])
+  const findings = useMemo(() => (check.data && entries ? findingsOf(check.data, entries) : []), [check.data, entries])
+  const tonight = demo ? null : tonightOf(findings, current, usedLastNight)
+  const apart = demo ? null : (findings.find((f) => f.kind === 'Conflict' && f.entries.length >= 2) ?? null)
+  const gap = demo ? null : (findings.find((f) => f.kind === 'Gap') ?? null)
+  const hasCheck = Boolean(tonight || apart || gap)
+  const alternate = async (on: RoutineEntry, off: RoutineEntry) => {
+    try {
+      await writes.alternate(on, off)
+    } catch {
+      toast.error(`Couldn't set ${entryName(on)} and ${entryName(off)} to alternate. Nothing changed; try again.`)
+    }
+  }
+  const askAbout = (f: Finding) => ask(f.question, 'Routine check')
+  const findFor = (f: Finding) => navigate('/routine', { state: { find: { ...f.find, mode: 'search', slot: f.find?.category === 'sunscreen' ? 'am' : undefined } } })
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
   const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
@@ -198,7 +220,26 @@ function HomeBody() {
     })
   }
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
-  if (finding) small.push({ key: 'next', node: (cls) => <NextStepCard className={cls} title={finding.title} body={finding.body} onRoutine={() => navigate('/routine')} onAsk={() => ask(finding.question, 'Routine check')} /> })
+  if (hasCheck) {
+    small.push({
+      key: 'check',
+      node: (cls) =>
+        tonight ? (
+          <TonightCard
+            className={cls}
+            tonight={tonight}
+            usedLastNight={usedLastNight}
+            onAlternate={alternate}
+            onAsk={() => ask(`Why should I alternate my ${shortName(tonight.on).toLowerCase()} and ${shortName(tonight.off).toLowerCase()}?`, 'Routine check')}
+            delay={0.28}
+          />
+        ) : apart ? (
+          <ApartCard className={cls} finding={apart} onRoutine={() => navigate('/routine')} onAsk={() => askAbout(apart)} delay={0.28} />
+        ) : gap ? (
+          <GapCard className={cls} finding={gap} onFind={() => findFor(gap)} onAsk={() => askAbout(gap)} delay={0.28} />
+        ) : null,
+    })
+  }
   if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
   if (diary && latestFace) small.push({ key: 'spots', node: (cls) => <SpotDiaryTile className={cls} diary={diary} onOpen={() => navigate({ pathname: `/result/${latestFace.id}`, hash: '#spot-diary' })} /> })
   const spans = rowSpans(small.length)
@@ -520,29 +561,6 @@ function withTonight(lines: HeroLine[], tonight: HeroLine | null): HeroLine[] {
   if (lines.length < 3) return [...lines, tonight]
   const i = lines.findIndex((l) => l.g === '→')
   return i === -1 ? lines : [...lines.slice(0, i), ...lines.slice(i + 1), tonight]
-}
-
-/** Next step: the routine check's first conflict, else its first gap (no other kinds exist). */
-function nextStepOf(check: RoutineCheck | undefined, byId: Map<string, RoutineEntry>): { title: string; body: string; question: string } | null {
-  if (!check) return null
-  const source = (s: 'rule' | 'model') => (s === 'model' ? 'Suggested by the routine check.' : 'Found by the routine check.')
-  for (const c of check.conflicts) {
-    const es = c.products.map((id) => byId.get(id)).filter((e): e is RoutineEntry => Boolean(e))
-    if (es.length < 2) continue
-    const names = es.map((e) => e.custom_name)
-    const shared = (['am', 'pm'] as const).filter((slot) => es.every((e) => e.slots.includes(slot)))
-    const where = shared.length === 2 ? 'morning and evening routines' : shared[0] === 'am' ? 'morning routine' : shared[0] === 'pm' ? 'evening routine' : 'routine'
-    const list = names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-    return {
-      title: `Your ${list} are ${names.length === 2 ? 'both' : 'all'} in your ${where}.`,
-      body: `${c.issue} ${c.suggestion} ${source(c.source)}`,
-      question: `Is it OK to use my ${list} in the same ${where === 'routine' ? 'routine' : where.replace(' routines', ' routine')}?`,
-    }
-  }
-  const g = check.gaps[0]
-  if (!g) return null
-  const need = g.need.charAt(0).toLowerCase() + g.need.slice(1)
-  return { title: `Your routine needs ${need}.`, body: `${g.why} ${g.suggestion} ${source('rule')}`, question: `Which product could cover this for me: ${need}?` }
 }
 
 function recentRows({ all, entries, joined, goals, navigate }: { all: Session[]; entries: RoutineEntry[] | undefined; joined: string | null; goals: string[]; navigate: Nav }): RecentRow[] {

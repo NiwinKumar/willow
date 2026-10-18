@@ -107,23 +107,6 @@ export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: s
   )
 }
 
-/** Next step: the routine check's first finding, in words, with what to do about it. */
-export function NextStepCard({ title, body, onRoutine, onAsk, className }: { title: string; body: string; onRoutine: () => void; onAsk: () => void; className?: string }) {
-  return (
-    <HomeCard label="Next step" className={className} delay={280}>
-      <span className="self-start rounded-pill bg-lime px-2.5 py-[5px] font-mono text-[10.5px] tracking-[.08em]">■ NEXT STEP</span>
-      <span className="text-[17px] leading-[1.3] tracking-[-0.01em]">{title}</span>
-      <span className="text-[13px] leading-normal text-[#3E3C38]">{body}</span>
-      <div className="mt-auto flex flex-wrap gap-1.5">
-        <Pill onClick={onRoutine}>Look at routine</Pill>
-        <Pill tone="outline" onClick={onAsk}>
-          Ask Wisp
-        </Pill>
-      </div>
-    </HomeCard>
-  )
-}
-
 /** tie: orders rows on the same `at` (products started the same day: the one added last first). */
 export type RecentRow = { key: string; at: number; tie?: number; d: string; t: string; x: string; onClick?: () => void }
 
