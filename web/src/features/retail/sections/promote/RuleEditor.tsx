@@ -1,10 +1,10 @@
-import { Check, Copy, ShieldCheck, Wand2 } from 'lucide-react'
+import { Check, Wand2 } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import { api, ApiError, type AutoRule, type RuleBody } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/useAuth'
-import { PATTERN, ruleSentence, TEMPLATES } from '../../autopilot'
+import { ruleSentence, TEMPLATES } from '../../autopilot'
 import { Button, SidePanel } from '../../ui'
 
 /*
@@ -115,7 +115,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
       }
     >
       <div className="flex flex-col gap-8">
-        <Group title="Start from a template" hint="Tap one to use it, or change its words below.">
+        <Group title="Start from a template" hint="Tap one to use it.">
           <div className="grid gap-2 sm:grid-cols-2">
             {TEMPLATES.map((t, i) => {
               const on = typed === t.text && readFor === t.text
@@ -131,14 +131,14 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
                     {on ? <Check size={13} strokeWidth={2.2} aria-hidden className="text-proof-leaf" /> : null}
                     {t.title}
                   </span>
-                  <span className="text-proof-label leading-snug text-ink-2">{ruleSentence(t.rule(workspace.id))}</span>
+                  <span className="text-proof-label leading-snug text-ink-2">{t.blurb}</span>
                 </button>
               )
             })}
           </div>
         </Group>
 
-        <Group title="Or describe it in your own words" hint="Gemini reads it into the rule; check “Reads as” before you turn it on.">
+        <Group title="Or write your own" hint="Gemini turns your words into a rule.">
           <label htmlFor={`${ids}-typed`} className="sr-only">
             Describe the rule
           </label>
@@ -156,17 +156,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
               <Wand2 size={14} strokeWidth={1.7} aria-hidden />
               {busy === 'read' ? 'Reading…' : fresh ? 'Read' : 'Read it'}
             </Button>
-            <Button
-              kind="ghost"
-              onClick={() => {
-                void navigator.clipboard?.writeText(PATTERN).then(() => toast('Pattern copied'), () => undefined)
-              }}
-            >
-              <Copy size={14} strokeWidth={1.7} aria-hidden />
-              Copy the pattern
-            </Button>
           </div>
-          <p className="m-0 rounded-ctl bg-pf-bg2 px-3 py-2 font-mono text-proof-label leading-relaxed text-ink-2">{PATTERN}</p>
           {fresh && missed ? (
             <p role="status" className="m-0 text-proof-small text-ink-2">
               {source === 'rules' ? 'Gemini was unavailable, so fixed word patterns read it. ' : ''}
@@ -174,11 +164,6 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
             </p>
           ) : null}
         </Group>
-
-        <p className="m-0 flex items-start gap-2 text-proof-small text-ink-2">
-          <ShieldCheck size={15} strokeWidth={1.7} aria-hidden className="mt-px shrink-0 text-proof-leaf" />
-          Whatever the rule says, it only promotes Proven products, only to goals and skin types with a positive lift, at most 3 running at once, always labelled Sponsored and always with a holdout.
-        </p>
       </div>
     </SidePanel>
   )

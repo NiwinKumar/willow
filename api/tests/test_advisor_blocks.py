@@ -104,9 +104,10 @@ def test_unusable_widgets_are_left_out_and_capped(client, fake, monkeypatch):
         tools=[],
     )
     widgets = [b["widget"] for b in body["blocks"] if b["type"] == "widget"]
+    # the spot diary is gone from the app: its widget is left out
     assert widgets == [
         {"kind": "routine", "params": {"slot": "pm"}},
-        {"kind": "spot_diary", "params": {}},
+        {"kind": "product_test", "params": {}},
     ]
 
 

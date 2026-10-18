@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { api, ApiError, type AutopilotActivity, type AutopilotView, type AutoRule } from '../../../../lib/api'
 import { setQueryData } from '../../../../lib/query'
 import { useAuth } from '../../../../lib/useAuth'
-import { agoText, feedOrder, KIND, LEVELS, openProposals, ruleSentence, TEMPLATES } from '../../autopilot'
+import { agoText, feedOrder, KIND, LEVELS, openProposals, TEMPLATES } from '../../autopilot'
 import { Badge, Button, ErrorState, Panel, SkeletonTable, ToolButton } from '../../ui'
 import { RuleEditor } from './RuleEditor'
 import { autopilotKey, useAutopilot } from './useAutopilot'
@@ -115,7 +115,7 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
         meta={rules.length ? <Badge tone={rules.some((r) => r.enabled) ? 'green' : 'gray'}>{rules.filter((r) => r.enabled).length} on</Badge> : null}
         description={
           <>
-            Standing rules, run by Gemini. On every check it reads the evidence, decides what to start, adjust or stop for each rule, and says why; the guardrails stay in code.
+            Rules that promote your proven products for you.
             {rules.some((r) => r.enabled) ? (
               <span className="block pt-1 text-ink-3" title="Checked on their own when this page opens and on the nightly run; Run check now does it at once.">
                 Checks run on their own{lastRun ? ` · last check ${agoText(lastRun)}` : ''}. Run check now does one at once.
@@ -149,12 +149,12 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
           </ul>
         ) : (
           <div className="flex flex-col gap-3 px-5 pb-5">
-            <p className="m-0 text-proof-small text-ink-2">No rules yet. Start from one of these, then change anything:</p>
+            <p className="m-0 text-proof-small text-ink-2">Pick one to start:</p>
             <div className="grid gap-2 md:grid-cols-2">
               {TEMPLATES.map((t, i) => (
                 <button key={t.title} type="button" onClick={() => setEditor({ open: true, editing: null, template: i })} className="flex flex-col items-start gap-1 rounded-card border border-line bg-surface p-3 text-left transition-colors hover:border-line-strong hover:bg-pf-hover">
                   <span className="text-proof-small font-medium text-ink">{t.title}</span>
-                  <span className="text-proof-label leading-snug text-ink-2">{ruleSentence(t.rule(workspace.id))}</span>
+                  <span className="text-proof-label leading-snug text-ink-2">{t.blurb}</span>
                 </button>
               ))}
             </div>

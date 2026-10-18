@@ -679,10 +679,8 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 - Routine bottom row: Morning, Evening and the Product test card are always the same height (the tallest of them), so a 3-product slot beside a 4-product slot still lines up; the test card spreads its content top to bottom.
 - Cards that share a row with a taller card fill it instead of leaving empty space: "Suggested today" spreads its rows evenly down the card, and the Product test card puts its icon at the top and its button at the bottom right.
 
-### Result page (compact)
-- Small by default. The title is 26-34px; the check-in switcher is one slim row (a thin rail with small ticks and a small thumb, "12 CHECK-INS" on the left, the current check-in on the right) and the whole top of the page fits one screen.
-- The big hero is replaced by a compact Summary card: what the reading is compared with and how many photos counted, the verdict counts, and the readings that moved beyond the normal range with how far (tap one for its detail). Without a comparison (baseline, not measured) one short line says what happened.
-- "Explanation" is now "Insights": a short read that ends on a full sentence, "Read more" for the rest, and the next steps as small buttons (Ask Wisp is the ink one). No source line, no "standard explanation" wording; the AI tag shows only when Gemini wrote it.
-- Measurements are small cards (about 120px tall, 5-across on wide screens, 2-across on a phone): name and verdict on one line, the value, a thin range track, one line of delta.
-- The photo comparison is a "Photos" button in the header (disabled when no photo is available). It opens a sheet with the reference photo and its Detected spots / quality panel together; following a spot in the diary opens it automatically.
-- The Spot diary stays at the bottom, at about half its former size.
+### Day page (the one result page, compact)
+- /result redirects to the day page (`/progress/:day`), which is the one result page; the Spot diary and the big hero are gone. Small by default: the whole top of the page fits one screen.
+- "Explanation" is now "Insights" (`InsightsCard`): a short read that ends on a full sentence, "Read more" for the rest, and the next steps as small buttons (Ask Wisp is the ink one). No source line, no "standard explanation" wording; the AI tag shows only when Gemini wrote it.
+- The day summary card carries the buttons: Compare (photo comparison popup, disabled when no photo loads) and Notes (popup with the day's notes and editor), top right. Ask Wisp and "Use as baseline" sit in the top bar, left of the previous / next day.
+- The minimal check-in scrubber (thin rail, small ticks and thumb) is kept in `components/charts/Scrubber.tsx`.
