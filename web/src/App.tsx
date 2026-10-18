@@ -15,6 +15,7 @@ const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({
 const SignIn = lazy(() => import('./features/website/SignIn'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
+const Journey = lazy(() => import('./features/journey/Journey'))
 const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
 const Terms = lazy(() => import('./features/website/Terms'))
 const Retail = lazy(() => import('./features/retail/Retail'))
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/welcome/:step" element={<Welcome />} />
             <Route path="/judge" element={<Judge />} />
+            <Route path="/journey" element={<Journey />} />
             <Route path="/terms" element={<Terms />} />
             {/* The assistant avatar in every state (not linked; for checking the motion). */}
             <Route path="/lab/avatar" element={<AvatarLab />} />
