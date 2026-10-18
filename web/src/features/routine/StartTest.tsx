@@ -28,7 +28,7 @@ export function StartTest({ preset, onCancel, onStarted, hideIntro }: { preset: 
     try {
       await writes.start({ entry_id: preset.entry_id, product_id: preset.product_id, name: name.trim() || undefined, length_days: days })
       onStarted?.()
-      shell?.openCheckIn({ add: ['forearm_treated', 'forearm_control'] })
+      shell?.openCheckIn()
     } catch (e) {
       setError(e instanceof ApiError && e.status === 409 ? 'Another forearm test is running. End it on the product test page first.' : failureText(e, "Couldn't start the test. Nothing was saved; try again."))
     } finally {
