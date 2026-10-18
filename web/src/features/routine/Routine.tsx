@@ -24,10 +24,9 @@ import { ProductTests, TestStrip } from './TestsTab'
 import { RoutineHistory } from './RoutineHistory'
 import { Suggestions } from './Suggestions'
 import { suggestionsOf } from './suggestedToday'
-import { AvailableInOwnAccount } from './OwnAccountNotice'
 import { FeelNudge } from './FeelCard'
 import { RequestNotice } from './RequestNotice'
-import { useRoutineWrites } from './writes'
+import { failureText, useRoutineWrites } from './writes'
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
 // Unknown categories (label scans) sort just before sunscreen, never above the cleanser.
@@ -36,12 +35,6 @@ const byStep = (a: RoutineEntry, b: RoutineEntry) => rank(a.category) - rank(b.c
 
 /** The routine page (design: Willow App Routine, view="routine"), on the person's own routine. */
 export default function Routine() {
-  const data = useData()
-  if (data.mode === 'demo') return <DemoNotice />
-  return <LiveRoutine />
-}
-
-function LiveRoutine() {
   const data = useData()
   const navigate = useNavigate()
   const location = useLocation()
@@ -93,8 +86,8 @@ function LiveRoutine() {
   const alternate = async (on: RoutineEntry, off: RoutineEntry) => {
     try {
       await writes.alternate(on, off)
-    } catch {
-      toast(`Couldn't set ${entryName(on)} and ${entryName(off)} to alternate. Nothing changed; try again.`)
+    } catch (e) {
+      toast(failureText(e, `Couldn't set ${entryName(on)} and ${entryName(off)} to alternate. Nothing changed; try again.`))
     }
   }
   // From the check card: the product not used last night goes tonight.
@@ -278,18 +271,6 @@ function LiveRoutine() {
           setAdd({ product: p })
         }}
       />
-    </main>
-  )
-}
-
-/** Demo journey: the routine is the person's own, so it is not part of the read-only demo. */
-function DemoNotice() {
-  return (
-    <main className="relative mx-auto flex max-w-[1320px] flex-col gap-[18px] px-[clamp(16px,4vw,40px)] pt-2">
-      <div className="pt-[clamp(8px,2vw,24px)] pb-1">
-        <h1 className="font-serif text-[clamp(34px,3.5vw,52px)] leading-[.9] font-normal">Your routine</h1>
-      </div>
-      <AvailableInOwnAccount what="Your routine, its compatibility check and the product catalog" />
     </main>
   )
 }

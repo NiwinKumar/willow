@@ -202,3 +202,22 @@ def test_bigquery_up_but_insights_failing_is_degraded(client, monkeypatch):
     monkeypatch.setattr(retailer, "insights", failing)
     body = client.get("/v1/demo/status").json()
     assert body["bigquery"]["status"] == "degraded" and body["bigquery"]["latency_ms"] >= 0
+
+
+def test_journey_routine_is_public_and_read_only(client, fake):
+    demo_client = client.__class__(client.app, headers={"X-Dev-Uid": "demo_willow"})
+    demo_client.post("/v1/demo/judge-setup")
+    entry = demo_client.get("/v1/routine").json()["entries"][0]
+    today = entry["started_at"][:10]
+    demo_client.put(f"/v1/routine/log/{today}/{entry['id']}/am")
+    demo.clear_cache()
+    anon = client.__class__(client.app)
+    routine = anon.get(f"/v1/demo/routine?today={today}").json()["entries"]
+    mine = demo_client.get("/v1/routine").json()["entries"]
+    assert [e["id"] for e in routine] == [e["id"] for e in mine]
+    days = anon.get(f"/v1/demo/routine/log?from={today}&to={today}").json()["days"]
+    assert days[0]["used"][entry["id"]] == ["am"]
+    check = anon.get("/v1/demo/routine/check").json()
+    assert "conflicts" in check
+    # nothing a caller sends reaches the demo account: there are no demo write routes
+    assert anon.put(f"/v1/demo/routine/log/{today}/{entry['id']}/pm").status_code in (404, 405)
