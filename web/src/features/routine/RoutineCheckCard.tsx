@@ -126,7 +126,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
               const open = !phone || openKey === f.key
               const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={rows ? 20 : 26} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
               const actions = (
-                <span className={`flex flex-wrap gap-2 ${rows ? 'justify-end @min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto justify-start pt-1'}`}>
+                <span className={`flex flex-wrap gap-2 ${rows ? 'justify-end @min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto justify-end pt-1'}`}>
                   {f.find ? (
                     <button type="button" onClick={() => onFind(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink">
                       Find one
