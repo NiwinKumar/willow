@@ -661,7 +661,13 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 ### Routine page (compact)
 - Order: asks that need an answer first (Request notice, the Quick check), then the Routine check beside Suggested today (or the Product test strip when there is nothing to suggest), then Morning and Evening beside the Product test strip and the sponsored card.
 - The Routine check is plain text on the blue card: severity and kind are words (no pills), a small icon button re-runs it, and each finding's actions sit bottom right (Ask Wisp why last).
+- Routine check layout: the top right holds a small "How this was checked" ghost button (info icon) beside the icon-only re-run button; it opens a calm full-width note under the header. Each finding is its own soft inset panel (label, title, one row of products at 26px, one muted line, then a hairline and the actions bottom right), in a 2-column grid on wide containers and 1 column on narrow, with the action rows aligned across a row.
 - Product rows use `compactName` (cut at the first qualifier, brand and strengths dropped, type word kept); the full name is in the tooltip and the accessible label. Schedule notes and the ◆ change are plain text, not pills.
 
 ### Progress: measure switcher
 - The over-time chart shows one measure at a time: its name is a select (title with a chevron) with previous / next arrows, in the person's goal order, instead of a pill per measure.
+
+### Progress: day detail actions and photo comparison
+- The day's actions (Ask Wisp about this day, Use this day as baseline, Open the full report) are compact buttons in the top bar, to the left of the previous / next day switchers, instead of a card at the bottom; the report link is the one ink button.
+- The photo comparison is collapsed behind a "Compare photos" button. It stays disabled, with a one-line reason, when none of the check-in photos loads (no preview, deleted after 30 days, or a failed load).
+- The before/after split has no slider underneath: the white round handle on the divider is the control (drag with mouse or touch; focused, arrows move it by 2%, Shift+arrows by 10%, Home/End jump to the ends).
