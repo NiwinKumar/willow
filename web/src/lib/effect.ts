@@ -18,6 +18,8 @@ export type EffectDeps = {
   /** Sites a face product can show up on. */
   sites: Site[]
   day: (iso: string) => Date
+  /** The baseline a session is compared with, among the sessions of its site. */
+  baseline: (session: Session, sessions: Session[]) => Session | null
 }
 
 /** helping: a real change in the direction people usually want; away: a real change the other way; changed: a real change with no preferred direction (skin tone); steady: measured, nothing beyond the normal range; early: too soon to say. */
@@ -52,7 +54,12 @@ export type EffectRow = {
   days: number
   metric: MetricId | null
   /** The targeted metric's readings from the last check-in before the start to the latest. */
-  points: number[]
+  points: { t: number; v: number }[]
+  /** The person's baseline reading of that metric and the half-width of their normal range around it (for the chart's reference lines). */
+  baseline: number | null
+  band: number | null
+  /** How to read the line: "Redness · lower is calmer" (none for skin tone). */
+  reading: string | null
   flag: EffectFlag | null
 }
 export type RoutineEffect = { rows: EffectRow[]; counts: Record<Effect, number> }
@@ -62,7 +69,9 @@ const valueOf = (s: Session, t: MetricId) => s.result?.metrics.find((m) => m.id 
 const nameOf = (e: Pick<RoutineEntry, 'custom_name' | 'brand'>) => e.custom_name || e.brand || 'this product'
 
 /** The targeted metric's readings over time on one site: the last one before the start, then everything after. */
-function trend(entry: RoutineEntry, sessions: Session[], deps: EffectDeps, prefer: { metric: MetricId; site: Site } | null): { metric: MetricId; points: number[] } | null {
+type Trend = { metric: MetricId; points: { t: number; v: number }[]; baseline: number | null; band: number | null }
+
+function trend(entry: RoutineEntry, sessions: Session[], deps: EffectDeps, prefer: { metric: MetricId; site: Site } | null): Trend | null {
   const start = deps.day(entry.started_at).getTime()
   const targets = deps.targets(entry)
   const measured = sessions.filter(usable)
@@ -70,19 +79,31 @@ function trend(entry: RoutineEntry, sessions: Session[], deps: EffectDeps, prefe
     const all = measured.filter((s) => s.site === site && valueOf(s, t) !== null).sort((a, b) => a.created_at.localeCompare(b.created_at))
     const after = all.filter((s) => new Date(s.created_at).getTime() >= start)
     const before = all.filter((s) => new Date(s.created_at).getTime() < start).slice(-1)
-    return [...before, ...after].map((s) => valueOf(s, t) as number)
+    return [...before, ...after]
+  }
+  const make = (t: MetricId, site: Site, used: Session[]): Trend => {
+    const base = deps.baseline(used[used.length - 1], measured.filter((s) => s.site === site))
+    const bm = base?.result?.metrics.find((m) => m.id === t)
+    return { metric: t, points: used.map((s) => ({ t: new Date(s.created_at).getTime(), v: valueOf(s, t) as number })), baseline: bm?.value ?? null, band: bm?.mdc95 ?? null }
   }
   if (prefer) {
-    const points = series(prefer.metric, prefer.site)
-    if (points.length >= 2) return { metric: prefer.metric, points }
+    const used = series(prefer.metric, prefer.site)
+    if (used.length >= 2) return make(prefer.metric, prefer.site, used)
   }
-  let best: { metric: MetricId; points: number[] } | null = null
+  let best: { t: MetricId; site: Site; used: Session[] } | null = null
   for (const t of targets)
     for (const site of deps.words(t).sites.filter((x) => deps.sites.includes(x))) {
-      const points = series(t, site)
-      if (points.length >= 2 && (!best || points.length > best.points.length)) best = { metric: t, points }
+      const used = series(t, site)
+      if (used.length >= 2 && (!best || used.length > best.used.length)) best = { t, site, used }
     }
-  return best
+  return best ? make(best.t, best.site, best.used) : null
+}
+
+/** "Redness · lower is calmer": which way the line should go, in the metric's own words. */
+function readingOf(metric: MetricId, deps: EffectDeps): string | null {
+  const w = deps.words(metric)
+  const wanted = WANTED[metric]
+  return wanted === undefined ? null : `${w.label} · ${wanted < 0 ? `lower is ${w.decrease}` : `higher is ${w.increase}`}`
 }
 
 export function routineEffect(entries: RoutineEntry[], sessions: Session[], check: RoutineCheck | undefined, deps: EffectDeps, now = Date.now()): RoutineEffect {
@@ -121,7 +142,7 @@ export function routineEffect(entries: RoutineEntry[], sessions: Session[], chec
         question: `My ${nameOf(e)} shows no change in ${deps.words(metric).label.toLowerCase()} after ${weeks} weeks. Do I still need it?`,
       }
     }
-    rows.push({ e, o, effect, line, days, metric, points: t?.points ?? [], flag })
+    rows.push({ e, o, effect, line, days, metric, points: t?.points ?? [], baseline: t?.baseline ?? null, band: t?.band ?? null, reading: metric ? readingOf(metric, deps) : null, flag })
   }
   // Two products that share an active: the one used less long may be the one to drop.
   for (const d of check?.duplicates ?? []) {

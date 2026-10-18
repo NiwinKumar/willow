@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { Sparkline } from '../../components/charts/Sparkline'
+import { TrendChart } from '../../components/charts'
 import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
 import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
@@ -153,41 +153,46 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
           ))}
         </span>
       </p>
-      <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 @min-[360px]:grid-cols-2">
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {shown.map((r) => (
-          <li key={r.e.id} className={`flex min-w-0 flex-col gap-2 rounded-[22px] squircle p-3 @min-[360px]:[&:nth-child(odd):last-child]:col-span-2 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
-            <div className="flex items-start justify-between gap-2">
-              <ProductImage product={imageOf(r.e)} size={40} decorative />
-              <span className="font-mono text-[10px] text-ink-2" aria-label={`Day ${r.days}`}>
-                DAY {r.days}
-              </span>
+          <li key={r.e.id} className={`flex min-w-0 flex-col gap-2 rounded-[22px] squircle py-2.5 pr-3 pl-2.5 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
+            {/* Chart to the right of the product; on a card too narrow for both it drops below. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex min-w-0 flex-[1_1_165px] items-center gap-3">
+                <ProductImage product={imageOf(r.e)} size={40} decorative />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[14px]">{shortName(r.e)}</span>
+                  <span className="truncate text-[12px] text-ink-2" title={r.o.detail}>
+                    <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
+                    {r.line}
+                  </span>
+                  <span className="font-mono text-[10px] text-ink-2" aria-label={`Day ${r.days}`}>
+                    DAY {r.days}
+                  </span>
+                </span>
+              </div>
+              {r.points.length > 1 ? (
+                <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5 text-ink-2">
+                  <TrendChart points={r.points} baseline={r.baseline} band={r.band} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started, with your baseline and normal range`} />
+                  {r.reading ? <span className="text-[10.5px] leading-none">{r.reading}</span> : null}
+                </span>
+              ) : null}
             </div>
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-[14px]">{shortName(r.e)}</span>
-              <span className="line-clamp-2 text-[12px] leading-[1.35] text-ink-2" title={r.o.detail}>
-                <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
-                {r.line}
-              </span>
-            </span>
             {r.flag ? (
-              <span className="flex flex-col items-start gap-1.5 text-[12px] leading-[1.35]">
-                <span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] leading-[1.35]">
+                <span className="min-w-0 flex-[1_1_160px]">
                   <span aria-hidden>△ </span>
                   {r.flag.text}
                 </span>
                 <Pill tone="outline" onClick={() => onAsk(r.flag!.question)}>
                   Ask Wisp
                 </Pill>
-              </span>
-            ) : r.points.length > 1 ? (
-              <span className="mt-auto pt-1 text-ink-2">
-                <Sparkline values={r.points} width={110} height={30} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started`} />
-              </span>
+              </div>
             ) : null}
           </li>
         ))}
       </ul>
-      <span className="mt-auto text-[11.5px] leading-[1.4] text-ink-2">Measured against your own normal range. Timing is an association, not proof.</span>
+      <span className="mt-auto text-[11.5px] leading-[1.4] text-ink-2">Dashed line: your baseline. Shaded: your normal range. Timing is an association, not proof.</span>
     </section>
   )
 }
