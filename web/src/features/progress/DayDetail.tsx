@@ -19,13 +19,18 @@ import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
 import { frameFor, photoSize } from './frame'
 import { MetricTile } from './MetricCard'
-import { DAY_HERO, MODE_LONG, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, optionLabel, orderMetrics, photoExpired, sessionState, usableLine, usedFrames } from './model'
+import { DAY_HERO, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, optionLabel, orderMetrics, photoExpired, sessionState, usableLine, usedFrames } from './model'
 import { Page, Pills } from './parts'
 import { PhotoFrame } from './PhotoFrame'
 import { NOTE_DOT, productName, rejectNote, sessionNotes } from './timeline'
 
-/** Day detail (design "Day detail"): one day's check-in, its readings, a photo comparison, notes and actions. */
-export function DayDetail({ day, site, sessions, byDay, entries }: { day: string; site: Site; sessions: Session[]; byDay: Map<string, Session[]>; entries: RoutineEntry[] }) {
+const NONE: Session[] = []
+
+/**
+ * Day detail (design "Day detail"): one day's check-in of every place, its readings, a photo comparison, notes and
+ * actions. ?session= picks a check-in of the day, else ?site= a place, else the latest analysed one.
+ */
+export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<string, Session[]>; entries: RoutineEntry[] }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
@@ -33,7 +38,11 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   const shell = useShell()
   const list = byDay.get(day) ?? []
   const pickId = params.get('session')
-  const session = list.find((s) => s.id === pickId) ?? (list.length ? daySession(list) : null)
+  const qSite = params.get('site')
+  const session = list.find((s) => s.id === pickId) ?? (list.some((s) => s.site === qSite) ? daySession(list.filter((s) => s.site === qSite)) : list.length ? daySession(list) : null)
+  const site: Site = session?.site ?? 'face_full'
+  // This place's check-ins: the baseline and the comparison are always within one place.
+  const sessions = data.series(site)?.sessions ?? NONE
   const daysSorted = useMemo(() => [...byDay.keys()].sort(), [byDay])
   const di = daysSorted.indexOf(day)
   const prevDay = di > 0 ? daysSorted[di - 1] : null
@@ -41,8 +50,8 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   const [asking, setAsking] = useState(false)
   const date = parseDate(day)
   // Forearm days have no calendar of their own: their page is the product test.
-  const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(site.startsWith('forearm') ? '/test' : `/progress?site=${site}`))
-  const go = (d: string) => navigate(`/progress/${d}?site=${site}`, { replace: true, state: location.state })
+  const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(site.startsWith('forearm') ? '/test' : '/progress'))
+  const go = (d: string) => navigate(`/progress/${d}`, { replace: true, state: location.state })
 
   const nav = (
     <nav aria-label="Breadcrumb" className="flex flex-wrap items-center justify-between gap-x-3.5 gap-y-2.5">
@@ -68,7 +77,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
     return (
       <Page label="Day detail">
         {nav}
-        <EmptyState title={`No check-in of your ${SITE_LABEL[site].toLowerCase()} on this day`} body="Pick a coloured day in the calendar." action={<ButtonLink to={`/progress?site=${site}`}>Back to the calendar</ButtonLink>} />
+        <EmptyState title="No check-in on this day" body="Pick a coloured day in the calendar." action={<ButtonLink to="/progress">Back to the calendar</ButtonLink>} />
       </Page>
     )
 
@@ -95,6 +104,9 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
   const notes = [...started.map((e) => ({ text: `Started ${productName(e)}`, dot: NOTE_DOT.routine })), ...sessionNotes(session).filter((n) => n.kind !== 'note')]
   const others = list.filter((s) => s.id !== session.id)
+  // Two check-ins of one place on a day are told apart by their time.
+  const pillLabel = (s: Session) => `${SITE_LABEL[s.site]}${list.filter((x) => x.site === s.site).length > 1 ? ` · ${clockOf(s.created_at)}` : ''}`
+  const sameSite = list.filter((s) => s.site === session.site).length > 1
 
   return (
     <Page label="Day detail">
@@ -104,7 +116,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
           <Pills
             label="Check-in on this day"
             tone="white"
-            options={list.map((s) => ({ value: s.id, label: `${clockOf(s.created_at)} · ${MODE_LONG[s.capture_mode]}` }))}
+            options={list.map((s) => ({ value: s.id, label: pillLabel(s) }))}
             value={session.id}
             onChange={(id) => setParams((p) => ({ ...Object.fromEntries(p), session: id }), { replace: true, state: location.state })}
           />
@@ -117,8 +129,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
         >
           <div className="flex min-w-0 flex-col gap-4">
             <span className="font-mono text-[11px] tracking-[.08em]">
-              ■ {MODE_LONG[session.capture_mode].toUpperCase()}
-              {session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''} · {usableLine(session).toUpperCase()}
+              ■ {SITE_LABEL[site].toUpperCase()} · {usableLine(session).toUpperCase()}
             </span>
             <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,48px)] leading-[.9] font-normal tracking-[-0.01em]">
               {date.toLocaleDateString('en-GB', { weekday: 'long' })},
@@ -183,7 +194,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
               ) : null}
               {data.mode === 'live' ? (
                 <Button variant="outline" disabled={!canBeBaseline(session)} onClick={() => setAsking(true)}>
-                  {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${others.length ? `, ${clockOf(session.created_at)}` : ''} as baseline` : 'Not eligible as a baseline'}
+                  {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${sameSite ? `, ${clockOf(session.created_at)}` : ''} as your ${SITE_LABEL[site].toLowerCase()} baseline` : 'Not eligible as a baseline'}
                 </Button>
               ) : null}
               <button
@@ -203,14 +214,14 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
         </div>
         <Disclaimer />
       </div>
-      <BaselineDialog session={session} withTime={others.length > 0} open={asking} onClose={() => setAsking(false)} />
+      <BaselineDialog session={session} withTime={sameSite} open={asking} onClose={() => setAsking(false)} />
     </Page>
   )
 }
 
-/** Earlier / Later photo comparison over same-mode check-ins (design split slider). */
+/** Earlier / Later photo comparison over this place's check-ins (design split slider). */
 function Compare({ session, sessions, baseline }: { session: Session; sessions: Session[]; baseline: Session | null }) {
-  const pool = sessions.filter((s) => s.capture_mode === session.capture_mode && s.status === 'done' && s.measured !== false)
+  const pool = sessions.filter((s) => s.status === 'done' && s.measured !== false)
   const [a, setA] = useState<string>(baseline && baseline.id !== session.id ? baseline.id : (pool[0]?.id ?? session.id))
   const [b, setB] = useState<string>(session.id)
   const A = pool.find((s) => s.id === a) ?? session
