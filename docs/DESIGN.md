@@ -678,3 +678,11 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 - Routine header: the Routine / Product tests switcher sits on the design's glass track (`SegmentedControl frosted`: bg-glass, blur, white inset ring) and History is a glass button, like the other header controls over the gradient; no grey track and no brown outline.
 - Routine bottom row: Morning, Evening and the Product test card are always the same height (the tallest of them), so a 3-product slot beside a 4-product slot still lines up; the test card spreads its content top to bottom.
 - Cards that share a row with a taller card fill it instead of leaving empty space: "Suggested today" spreads its rows evenly down the card, and the Product test card puts its icon at the top and its button at the bottom right.
+
+### Result page (compact)
+- Small by default. The title is 26-34px; the check-in switcher is one slim row (a thin rail with small ticks and a small thumb, "12 CHECK-INS" on the left, the current check-in on the right) and the whole top of the page fits one screen.
+- The big hero is replaced by a compact Summary card: what the reading is compared with and how many photos counted, the verdict counts, and the readings that moved beyond the normal range with how far (tap one for its detail). Without a comparison (baseline, not measured) one short line says what happened.
+- "Explanation" is now "Insights": a short read that ends on a full sentence, "Read more" for the rest, and the next steps as small buttons (Ask Wisp is the ink one). No source line, no "standard explanation" wording; the AI tag shows only when Gemini wrote it.
+- Measurements are small cards (about 120px tall, 5-across on wide screens, 2-across on a phone): name and verdict on one line, the value, a thin range track, one line of delta.
+- The photo comparison is a "Photos" button in the header (disabled when no photo is available). It opens a sheet with the reference photo and its Detected spots / quality panel together; following a spot in the diary opens it automatically.
+- The Spot diary stays at the bottom, at about half its former size.

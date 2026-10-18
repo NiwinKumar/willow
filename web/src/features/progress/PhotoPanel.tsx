@@ -1,6 +1,9 @@
-import { forwardRef, useMemo, useState, type KeyboardEvent } from 'react'
+import { Images } from 'lucide-react'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 
+import { Button } from '../../components/ui/Button'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { Sheet } from '../../components/ui/Sheet'
 import type { MetricId, Session, ViewName } from '../../data/types'
 import type { SessionView } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
@@ -13,7 +16,7 @@ import { PhotoFrame } from './PhotoFrame'
 import { regionItems, type RegionItem } from './regions'
 import { spotItems, spotLabelLine, spotShort, type SpotItem } from './spots'
 import { useHoldCompare } from './useHoldCompare'
-import { useImageStatus } from './useImageStatus'
+import { useAnyPhotoLoads, useImageStatus } from './useImageStatus'
 import { candidateView, GROUP_LABEL, shownViews, VIEW_LABEL, VIEW_ORDER, viewSession } from './views'
 
 /** A spot diary sighting shown on this photo: its box in this photo's pixels. */
@@ -41,13 +44,56 @@ type Props = {
 const SIDE_METRICS: MetricId[] = ['pigment_spots', 'blemishes']
 
 /**
+ * A small "Photos" button for the page header. It opens a sheet with the reference photo and what the engine
+ * found on it (see PhotoStage). Disabled when there is no photo to show: none uploaded or kept (deleted after
+ * 30 days), or none of its images loads. Arrives open when a spot diary mark is followed (?track=).
+ */
+export function PhotosButton(props: Props) {
+  const { session, focus, view = null } = props
+  const [open, setOpen] = useState(Boolean(focus))
+  // The spot diary mark arrives after the page (null -> set): open the sheet on it.
+  const [hadFocus, setHadFocus] = useState(Boolean(focus))
+  if (hadFocus !== Boolean(focus)) {
+    setHadFocus(Boolean(focus))
+    if (focus) setOpen(true)
+  }
+  // Every photo this check-in can show: the front one and the signed cheek photos.
+  const own = view?.session.id === session.id ? view.session : null
+  const urls = [session.preview?.url, ...(own?.views ?? []).map((v) => v.preview?.url)].filter((u): u is string => Boolean(u))
+  const loads = useAnyPhotoLoads([...new Set(urls)])
+  const available = loads !== 'no'
+  const title = available ? undefined : !session.preview && photoExpired(session) ? 'Photos are deleted 30 days after upload' : 'No photo to show'
+  return (
+    <>
+      <Button variant="glass" size="sm" icon={Images} disabled={!available} title={title} aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        Photos
+      </Button>
+      <Sheet open={open && available} onClose={() => setOpen(false)} title="Photos" variant="modal" size="lg">
+        <PhotoStage
+          {...props}
+          onOpenMetric={
+            props.onOpenMetric
+              ? (id) => {
+                  // The metric sheet is a <dialog> too: close this one first or it opens hidden behind it.
+                  setOpen(false)
+                  props.onOpenMetric?.(id)
+                }
+              : undefined
+          }
+        />
+      </Sheet>
+    </>
+  )
+}
+
+/**
  * The reference photo with what the engine found on it: spot candidates as numbered rings, the redness map
  * (when the engine drew one), the measured regions (tap one for its metrics) or nothing. Hold the photo (or
  * B) to see the baseline photo in place. A check-in with cheek photos has a glass Front face / Left cheek /
  * Right cheek toggle; each photo shows its own spots, redness and areas. Beside it the "Detected spots" panel
  * (grouped by photo when there are cheek photos), the mole note and the photo-quality card.
  */
-export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ session, focus, baseline = null, view = null, order = [], onOpenMetric }, ref) {
+function PhotoStage({ session, focus, baseline = null, view = null, order = [], onOpenMetric }: Props) {
   const [overlayPick, setOverlay] = useState<Overlay | null>(null)
   const [showHidden, setShowHidden] = useState(false)
   const [picked, setPicked] = useState<{ sid: string; n: number } | null>(null)
@@ -119,19 +165,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
     if (p.left < 0 || p.left > 100 || p.top < 0 || p.top > 100) return null
     const on = it.n === selN
     return (
-      <button
-        key={it.n}
-        type="button"
-        onClick={() => pick(it)}
-        aria-label={`Spot ${it.n}: ${it.kind}`}
-        aria-pressed={on}
-        className="group absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
-        style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: on ? 3 : 1 }}
-      >
-        <span
-          className={`grid size-[26px] place-items-center rounded-full border-2 bg-white/30 text-[12px] font-semibold text-ink backdrop-blur-[2px] transition-transform duration-200 group-hover:scale-115 ${on ? 'animate-[wPulse_1.6s_ease-out_infinite]' : ''}`}
-          style={{ borderColor: it.ring }}
-        >
+      <button key={it.n} type="button" onClick={() => pick(it)} aria-label={`Spot ${it.n}: ${it.kind}`} aria-pressed={on} className="group absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center" style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: on ? 3 : 1 }}>
+        <span className={`grid size-[26px] place-items-center rounded-full border-2 bg-white/30 text-[12px] font-semibold text-ink backdrop-blur-[2px] transition-transform duration-200 group-hover:scale-115 ${on ? 'animate-[wPulse_1.6s_ease-out_infinite]' : ''}`} style={{ borderColor: it.ring }}>
           {it.n}
         </span>
       </button>
@@ -139,9 +174,9 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   }
 
   return (
-    // Two columns for every site: a forearm photo on its own across a desktop page is taller than the screen.
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 pt-6">
-      <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+    // The photo (capped by the viewport height, it is 4:5) with the findings beside it; stacked on a narrow screen.
+    <div className="flex flex-col gap-5 md:flex-row md:items-start">
+      <section aria-label="Reference photo" className="mx-auto flex w-full max-w-[calc((100dvh-250px)*.8)] shrink-0 flex-col gap-3 md:mx-0 md:w-[46%]">
         <div className={`relative ${canCompare ? 'touch-pan-y select-none [-webkit-touch-callout:none]' : ''}`} {...(canCompare ? hold.bind : {})}>
           <PhotoFrame session={shown} box={box} alt={`Your ${multi ? `${VIEW_LABEL[active].toLowerCase()} ` : ''}photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
             {overlay === 'redness' && rednessUrl ? <RednessLayer url={rednessUrl} box={box} session={shown} /> : null}
@@ -149,11 +184,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             {overlay === 'spots' ? visible.map(ring) : null}
             {focus && focusPos ? (
               <>
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both,wRingPulse_1.8s_.5s_ease-out_infinite] rounded-full border-[2.5px] border-ink outline-[3px] outline-white/85 outline-solid"
-                  style={{ left: `${focusPos.left}%`, top: `${focusPos.top}%`, width: focusSize, height: focusSize, zIndex: 4 }}
-                />
+                <span aria-hidden className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both,wRingPulse_1.8s_.5s_ease-out_infinite] rounded-full border-[2.5px] border-ink outline-[3px] outline-white/85 outline-solid" style={{ left: `${focusPos.left}%`, top: `${focusPos.top}%`, width: focusSize, height: focusSize, zIndex: 4 }} />
                 <span className="pointer-events-none absolute -translate-x-1/2 animate-[wFadeIn_.4s_.1s_both] rounded-pill bg-selected px-3 py-[7px] text-[12px] whitespace-nowrap text-inverse" style={{ left: `${focusPos.left}%`, top: `calc(${focusPos.top}% + ${focusSize / 2 + 8}px)`, zIndex: 4 }}>
                   {focus.tag}
                 </span>
@@ -177,9 +208,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             </div>
           ) : null}
           {session.preview && overlay === 'redness' ? (
-            <span className="pointer-events-none absolute bottom-[72px] left-[18px] z-[5] max-w-[calc(100%-36px)] rounded-[16px] bg-white/80 px-3 py-2 text-[12px] leading-[1.35]">
-              {redFailed ? 'The redness map could not be loaded. Reload the page to try again.' : 'Marked: where the camera sees more red than your usual skin. Not a medical assessment.'}
-            </span>
+            <span className="pointer-events-none absolute bottom-[72px] left-[18px] z-[5] max-w-[calc(100%-36px)] rounded-[16px] bg-white/80 px-3 py-2 text-[12px] leading-[1.35]">{redFailed ? 'The redness map could not be loaded. Reload the page to try again.' : 'Marked: where the camera sees more red than your usual skin. Not a medical assessment.'}</span>
           ) : null}
           {session.preview && options.length ? <OverlayPicker options={options} value={overlay} onChange={setOverlay} /> : null}
           {hold.armed && baseline && baseBox ? (
@@ -190,16 +219,11 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
           ) : null}
         </div>
         {/* What photo this is, on the card under the photo (over it, it covered the face). */}
-        <span className="px-2 pb-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
+        <span className="px-1 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
         {openRegion ? <RegionCard region={openRegion} onOpen={onOpenMetric} onClose={() => setRegion(null)} /> : null}
         {canCompare ? (
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5 pb-1">
-            <button
-              type="button"
-              aria-pressed={hold.pinned}
-              onClick={hold.toggle}
-              className={`flex min-h-11 items-center gap-2 rounded-pill px-4 text-[14px] transition-colors ${hold.pinned ? 'bg-selected text-inverse' : 'bg-sunken text-ink hover:bg-muted'}`}
-            >
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            <button type="button" aria-pressed={hold.pinned} onClick={hold.toggle} className={`flex min-h-11 items-center gap-2 rounded-pill px-4 text-[14px] transition-colors ${hold.pinned ? 'bg-selected text-inverse' : 'bg-sunken text-ink hover:bg-muted'}`}>
               <span aria-hidden className={`size-2.5 rounded-full ${hold.pinned ? 'bg-lime' : 'border-[1.5px] border-ink/40'}`} />
               Show baseline · {baseDate}
             </button>
@@ -211,22 +235,16 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
         </span>
       </section>
 
-      <section aria-label={spotsHere ? 'Detected spots' : 'Photo quality'} className="flex flex-col gap-3">
+      <section aria-label={spotsHere ? 'Detected spots' : 'Photo quality'} className="flex min-w-0 flex-1 flex-col gap-3 md:max-h-[calc(100dvh-170px)] md:overflow-y-auto md:pr-1">
         {spotsHere ? (
-          <div className="flex flex-col gap-3.5 rounded-[36px] bg-selected p-[clamp(20px,3vw,28px)] text-inverse squircle">
+          <div className="flex flex-col gap-3.5 rounded-[36px] bg-selected p-5 text-inverse squircle">
             <div className="flex flex-wrap items-baseline justify-between gap-2.5">
               <h3 className="m-0 text-[24px] font-normal">Detected spots</h3>
               <span className="font-dot text-[30px] font-extrabold text-lime" aria-label={`${skin.length} skin ${skin.length === 1 ? 'finding' : 'findings'}`}>
                 {String(skin.length).padStart(2, '0')}
               </span>
             </div>
-            <p className="m-0 text-[14px] leading-[1.45] text-white/75">
-              {!allItems.length
-                ? `No spots were found on ${multi ? 'these photos' : 'this photo'}.`
-                : labelsMissing
-                  ? 'Found by image measurement. AI labels weren’t available for this check-in, so candidates are shown without appearance labels.'
-                  : 'Found by image measurement. Labels are AI suggestions about appearance, not diagnoses.'}
-            </p>
+            <p className="m-0 text-[14px] leading-[1.45] text-white/75">{!allItems.length ? `No spots were found on ${multi ? 'these photos' : 'this photo'}.` : labelsMissing ? 'Found by image measurement. AI labels weren’t available for this check-in, so candidates are shown without appearance labels.' : 'Found by image measurement. Labels are AI suggestions about appearance, not diagnoses.'}</p>
             {sel ? (
               <div key={sel.n} className="flex animate-[wRise_.35s_both] items-center gap-3.5 rounded-[24px] bg-white/8 p-3.5">
                 <SpotCrop key={`${session.id}-${sel.c.id}`} url={crops[sel.c.id] ?? null} n={sel.n} ring={sel.ring} />
@@ -259,23 +277,17 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                       </span>
                     ) : null}
                     {multi && !g.items.length ? <span className="px-3 pb-1 text-[13px] text-white/60">No spots found on this photo.</span> : null}
-                {(all ? g.items : g.items.slice(0, LIST_LIMIT)).map((it) => (
-                  <button
-                    key={it.n}
-                    type="button"
-                    aria-pressed={it.n === selN}
-                    onClick={() => pick(it)}
-                    className={`flex min-h-11 w-full items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-colors ${it.n === selN ? 'bg-white/14' : 'hover:bg-white/6'}`}
-                  >
-                    <span className="grid size-[30px] shrink-0 place-items-center rounded-full border-2 text-[12px]" style={{ borderColor: it.ring }}>
-                      {it.n}
-                    </span>
-                    <span className="flex flex-1 flex-col gap-0.5">
-                      <span className="text-[15px]">{it.kind}</span>
-                      <span className="text-[12px] text-white/70">{spotShort(it, labelsMissing)}</span>
-                    </span>
-                  </button>
-                ))}
+                    {(all ? g.items : g.items.slice(0, LIST_LIMIT)).map((it) => (
+                      <button key={it.n} type="button" aria-pressed={it.n === selN} onClick={() => pick(it)} className={`flex min-h-11 w-full items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-colors ${it.n === selN ? 'bg-white/14' : 'hover:bg-white/6'}`}>
+                        <span className="grid size-[30px] shrink-0 place-items-center rounded-full border-2 text-[12px]" style={{ borderColor: it.ring }}>
+                          {it.n}
+                        </span>
+                        <span className="flex flex-1 flex-col gap-0.5">
+                          <span className="text-[15px]">{it.kind}</span>
+                          <span className="text-[12px] text-white/70">{spotShort(it, labelsMissing)}</span>
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 ))}
                 {groups.some((g) => g.items.length > LIST_LIMIT) ? (
@@ -293,12 +305,12 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             ) : null}
           </div>
         ) : null}
-        {spotsHere ? <div className="rounded-[28px] bg-surface px-[22px] py-[18px] text-[14px] leading-normal text-ink-2 squircle">Moles are not assessed. {MOLE_NOTE}</div> : null}
+        {spotsHere ? <div className="rounded-[28px] bg-sunken px-[22px] py-[18px] text-[14px] leading-normal text-ink-2 squircle">Moles are not assessed. {MOLE_NOTE}</div> : null}
         <QualityCard session={session} />
       </section>
     </div>
   )
-})
+}
 
 /** Spots / Redness / Areas / None, the design's glass radiogroup at the foot of the photo. Arrow keys move. */
 function OverlayPicker({ options, value, onChange }: { options: Overlay[]; value: Overlay; onChange: (o: Overlay) => void }) {
@@ -314,15 +326,7 @@ function OverlayPicker({ options, value, onChange }: { options: Overlay[]; value
   return (
     <div role="radiogroup" aria-label="Show on the photo" onKeyDown={move} className="absolute bottom-4 left-1/2 z-[5] flex max-w-[calc(100%-24px)] -translate-x-1/2 gap-[3px] rounded-pill bg-white/75 p-1 backdrop-blur-[16px]">
       {options.map((o) => (
-        <button
-          key={o}
-          type="button"
-          role="radio"
-          aria-checked={value === o}
-          tabIndex={value === o ? 0 : -1}
-          onClick={() => onChange(o)}
-          className={`min-h-10 rounded-pill px-3.5 text-[13px] whitespace-nowrap transition-colors max-[360px]:px-2.5 ${value === o ? 'bg-selected text-inverse' : 'text-ink'}`}
-        >
+        <button key={o} type="button" role="radio" aria-checked={value === o} tabIndex={value === o ? 0 : -1} onClick={() => onChange(o)} className={`min-h-10 rounded-pill px-3.5 text-[13px] whitespace-nowrap transition-colors max-[360px]:px-2.5 ${value === o ? 'bg-selected text-inverse' : 'text-ink'}`}>
           {OVERLAY_LABEL[o]}
         </button>
       ))}
@@ -425,7 +429,7 @@ function QualityCard({ session }: { session: Session }) {
   const notes = readableWarnings(r)
   const all = r.quality.passed && r.frames_used === session.n_frames
   const title = left ? (r.frames_used === 1 ? `Only 1 of ${session.n_frames} photos was used` : `${r.frames_used} of ${session.n_frames} photos were used`) : all ? (session.n_frames === 1 ? 'Your photo was usable' : `All ${session.n_frames} photos usable`) : 'Photo quality'
-  const tone = left ? 'bg-[var(--action-primary)]' : session.is_baseline && all ? 'bg-lime' : 'bg-surface'
+  const tone = left ? 'bg-[var(--action-primary)]' : session.is_baseline && all ? 'bg-lime' : 'bg-sunken'
   return (
     <div className={`flex flex-col gap-1.5 rounded-[28px] px-[22px] py-[18px] squircle ${tone}`}>
       <span className="text-[15px]">{title}</span>

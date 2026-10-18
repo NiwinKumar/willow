@@ -22,15 +22,15 @@ function markSeen(id: string) {
   }
 }
 
-const WORD_LIMIT = 50
+const WORD_LIMIT = 40
 
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
- * The explanation card: Gemini's (or the template's) words for this session, revealed word by word once per
- * browser session (whole under reduced motion), its source on the second line, then NEXT actions.
+ * Insights: Gemini's (or the template's) words for this session, revealed word by word once per browser session
+ * (whole under reduced motion), a short read first and the rest on request, then the next steps as small buttons.
  */
-export function ExplanationCard({ session, measured, actions }: { session: Session; measured: boolean; actions: ReactNode }) {
+export function InsightsCard({ session, measured, actions }: { session: Session; measured: boolean; actions: ReactNode }) {
   const ex = session.explanation
   const text = useMemo(() => {
     if (!ex) return ''
@@ -42,8 +42,18 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
   // A long explanation would stretch the hero beside it far past the design's height: the first part shows,
   // the rest on request (screen readers always get the whole text).
   const [more, setMore] = useState(false)
-  const long = allWords.length > WORD_LIMIT + 15
-  const words = long && !more ? allWords.slice(0, WORD_LIMIT) : allWords
+  // The short read ends on a full sentence: as many whole sentences as fit the limit (at least the first).
+  const cut = useMemo(() => {
+    let n = 0
+    for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+      const c = sentence.split(/\s+/).length
+      if (n && n + c > WORD_LIMIT) break
+      n += c
+    }
+    return n
+  }, [text])
+  const long = allWords.length > cut
+  const words = long && !more ? allWords.slice(0, cut) : allWords
   // Reveal once per session per browser session; the parent remounts this card per session (key).
   const [instant] = useState(() => !text || seen(session.id) || reduced())
   const [count, setCount] = useState(0)
@@ -62,46 +72,37 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
     return () => window.clearInterval(timer)
   }, [instant, more, words.length, session.id])
 
-  const source = !measured
-    ? 'WILLOW · NO MEASUREMENTS TO EXPLAIN'
-    : session.explanation_source === 'gemini'
-      ? 'GEMINI · NUMBERS CHECKED AGAINST MEASUREMENTS ✓'
-      : 'STANDARD EXPLANATION · WRITTEN FROM YOUR NUMBERS'
   const busy = shown < words.length
   return (
-    <section aria-label="Explanation" className="flex flex-[1_1_320px] flex-col gap-[18px] rounded-[44px] bg-surface p-[clamp(22px,3vw,32px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-      {/* Wraps the AI tag under the source line when the card is narrow, instead of squeezing the source into a column. */}
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
-        <span aria-hidden className="size-10 shrink-0 animate-[wBreathe_5s_ease-in-out_infinite] rounded-full shadow-[0_0_20px_rgba(61,123,255,.4)]" style={{ background: 'radial-gradient(circle at 40% 35%, var(--aura-ice), var(--aura-sky) 55%, #1B1F7A)' }} />
-        <span className="flex min-w-[min(100%,190px)] flex-1 flex-col">
-          <span className="text-[15px]">Explanation</span>
-          <span className="font-mono text-[11px] tracking-[.04em] text-ink-2">{source}</span>
-        </span>
-        {session.explanation_source === 'gemini' && measured ? <AITag className="ml-auto shrink-0 whitespace-nowrap" /> : null}
+    <section aria-label="Insights" className="flex flex-col gap-3 rounded-[28px] bg-surface p-4 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden className="size-7 shrink-0 animate-[wBreathe_5s_ease-in-out_infinite] rounded-full shadow-[0_0_14px_rgba(61,123,255,.4)]" style={{ background: 'radial-gradient(circle at 40% 35%, var(--aura-ice), var(--aura-sky) 55%, #1B1F7A)' }} />
+        <h2 className="m-0 flex-1 text-[16px] font-normal">Insights</h2>
+        {session.explanation_source === 'gemini' && measured ? <AITag className="shrink-0 whitespace-nowrap" /> : null}
       </div>
       {text ? (
         <div aria-busy={busy}>
           {/* Screen readers get the whole text at once; the reveal is visual only. */}
           <p className="sr-only">{text}</p>
-          <p aria-hidden className="m-0 min-h-[120px] text-[18px] leading-[1.55] font-light">
+          <p aria-hidden className="m-0 text-[14.5px] leading-[1.55]">
             {words.slice(0, shown).map((w, i) => (
               <span key={i} className={instant ? undefined : 'animate-[wWord_.5s_ease-out_both]'}>
                 {w}{' '}
               </span>
             ))}
-            {busy ? <span className="inline-block h-[18px] w-[9px] animate-[wBlink_1s_steps(2)_infinite] rounded-[4px] bg-[var(--aura-sky)] align-[-3px]" /> : long && !more ? '…' : null}
+            {busy ? <span className="inline-block h-[14px] w-[7px] animate-[wBlink_1s_steps(2)_infinite] rounded-[3px] bg-[var(--aura-sky)] align-[-2px]" /> : null}
           </p>
           {long && !busy ? (
-            <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="mt-1 min-h-11 text-[14px] underline underline-offset-4">
-              {more ? 'Show less' : 'Read the whole explanation'}
+            <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="mt-0.5 min-h-9 text-[13px] underline underline-offset-4">
+              {more ? 'Show less' : 'Read more'}
             </button>
           ) : null}
         </div>
       ) : (
-        <p className="m-0 text-[18px] leading-[1.55] font-light">{measured ? 'No explanation was written for this check-in. The numbers below are measured from your photos.' : 'Nothing was measured on this check-in, so there is nothing to explain yet.'}</p>
+        <p className="m-0 text-[14.5px] leading-[1.55] text-ink-2">{measured ? 'No insights were written for this check-in. The numbers below are measured from your photos.' : 'Nothing was measured on this check-in, so there are no insights yet.'}</p>
       )}
-      {ex?.next_steps.length ? (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[14px] leading-[1.45] text-ink-2">
+      {ex?.next_steps.length && (more || !long) ? (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px] leading-[1.45] text-ink-2">
           {ex.next_steps.slice(0, 3).map((s) => (
             <li key={s} className="flex gap-2">
               <span aria-hidden>·</span>
@@ -110,18 +111,14 @@ export function ExplanationCard({ session, measured, actions }: { session: Sessi
           ))}
         </ul>
       ) : null}
-      <div className="mt-auto flex flex-col gap-2">
-        <span className="font-mono text-[12px] text-ink-2">NEXT</span>
-        {actions}
-      </div>
-      {ex?.disclaimer ? <p className="m-0 text-caption text-ink-2">{ex.disclaimer}</p> : null}
+      <div className="mt-auto flex flex-wrap justify-end gap-2 pt-1">{actions}</div>
     </section>
   )
 }
 
-/** One NEXT row: a soft full-width link or button with an arrow. */
-export function NextAction({ children, onClick, to }: { children: ReactNode; onClick?: () => void; to?: string }) {
-  const cls = 'flex min-h-[52px] items-center justify-between gap-2.5 rounded-[20px] bg-sunken px-[18px] py-2.5 text-left text-[15px] leading-[1.3] no-underline transition-colors hover:bg-muted'
+/** One next step: a small outline button (or the ink one for the main step) with an arrow. */
+export function NextAction({ children, onClick, to, primary }: { children: ReactNode; onClick?: () => void; to?: string; primary?: boolean }) {
+  const cls = `inline-flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] leading-[1.2] no-underline transition-colors ${primary ? 'bg-selected text-inverse hover:bg-[#2a2a2a]' : 'text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5'}`
   if (to)
     return (
       <Link to={to} className={cls}>
