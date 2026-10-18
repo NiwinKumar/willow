@@ -121,7 +121,6 @@ export default function Progress() {
 
   if (day) return <DayDetail day={day} byDay={byDay} entries={entries} />
 
-  const hasForearm = data.sites.some((s) => s.startsWith('forearm'))
 
   // ---- calendar cells ----
   const days: Record<string, CalendarDay> = {}
@@ -157,11 +156,6 @@ export default function Progress() {
       <div className="flex animate-[wInL_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-4 pt-[clamp(8px,2vw,24px)] pb-2">
           <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Your skin, over time</h1>
-          {hasForearm ? (
-            <Link to="/test" className="flex min-h-11 items-center text-[15px] text-ink">
-              Product test →
-            </Link>
-          ) : null}
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4">
