@@ -269,7 +269,7 @@ function NoteEditor({ session, empty }: { session: Session; empty: boolean }) {
       <div className="flex flex-col gap-2 pt-2">
         <label className="flex flex-col gap-1.5 text-[13px] text-ink-2">
           Your note
-          <textarea value={text} maxLength={280} rows={3} onChange={(e) => setText(e.target.value)} className="rounded-sm bg-sunken p-3 text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line-subtle)] outline-none focus-visible:shadow-[0_0_0_2px_var(--focus-ring)]" placeholder="New lamp, a late night, started a serum…" />
+          <textarea value={text} maxLength={280} rows={3} onChange={(e) => setText(e.target.value)} className="rounded-sm bg-sunken p-3 text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line-subtle)] outline-none" placeholder="New lamp, a late night, started a serum…" />
         </label>
         <span className="text-caption text-ink-2">{280 - text.length} characters left</span>
         <div className="flex gap-2">

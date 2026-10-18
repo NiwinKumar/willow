@@ -131,7 +131,7 @@ export function AskAggregates({ d, filters }: { d: Insights | null; filters: Fil
             e.preventDefault()
             void ask(draft)
           }}
-          className="flex items-center gap-1.5 rounded-ctl border border-line-strong bg-surface p-1 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus"
+          className="flex items-center gap-1.5 rounded-ctl border border-line-strong bg-surface p-1"
         >
           <label htmlFor="retail-ask" className="sr-only">
             Question about the aggregates

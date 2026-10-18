@@ -204,7 +204,10 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | GET/DELETE | `/v1/advisor/history` | stored chat, oldest first: `{messages: [{id, role: user\|willow, text, created_at, photos? \| reply?}], keep: 200}`; DELETE (New chat) -> 204 |
 | GET | `/v1/me/usage` | `{advisor, routine_check, label_scan, retailer_ask}` each `{used, cap, remaining, resets_at}` (UTC midnight); reading counts nothing |
 | GET | `/v1/demo/status` | public: `api`, `engine`, `gemini`, `storage`, `bigquery` (each live: `status: ok\|degraded\|unreachable` (+`waking` for the engine), `latency_ms`, `reason?: slow\|busy`), `catalog`, `checked_at`; cached 60 s (10 s after a failed check) |
-| GET | `/v1/catalog/search?q=&concern=&max_price=` | catalog search |
+| GET | `/v1/catalog/search?q=&concern=&max_price=` | catalog search. Oct 18: `concern` may repeat (products made for every concern given), `limit` up to 200; the answer adds `total` (every match, past `limit`) and `catalog_size` |
+| GET | `/v1/product-requests` (Oct 18) | `{requests: [{id, brand, name, status: pending\|added\|declined, product_id, product (catalog entry once added) \| null, has_photo, askers (people who asked, pending only) \| null, created_at, resolved_at, seen}]}`, newest first |
+| POST | `/v1/product-requests` (Oct 18) | `{brand ≤80, name ≤120, photo?: {mime_type: image/jpeg\|png\|webp, data_base64 ≤8 MB}}`: a photo, or both brand and name (else 422) -> 201 the request. 409 `in_catalog` (`detail.product`) when the catalog already has it; 422 `bad_image`; daily cap `product_request` 10 / 2000. The photo is stored at `requests/{uid}/{id}.{ext}` until the request is answered |
+| PATCH | `/v1/product-requests/{id}` (Oct 18) | `{seen: bool}` -> 204 (the in-app note was seen); 404 unknown |
 | GET | `/v1/retailer/insights` | aggregate JSON for the in-app retailer view (BigQuery) |
 | GET | `/v1/me` | `{uid, consent, profile}`; `consent` and `profile` are null until saved |
 | PUT | `/v1/me/profile` | partial update of `users/{uid}.profile` (fields left out keep their value, `null` clears one) -> `{profile}`; 422 on an unknown field or value |
@@ -275,13 +278,19 @@ users/{uid}/advisor_messages/{id}          (newest 200 kept; removed by DELETE /
   role: user|willow, text, created_at, photos (user: count only, photos never stored),
   reply (willow: {message, blocks[], product_ids[], follow_up_suggestions[], retrieval[], checks})
 users/{uid}/usage/{yyyy-mm-dd}
-  advisor, routine_check, label_scan, retailer_ask, analyze, sample_runs (daily counters)
+  advisor, routine_check, label_scan, retailer_ask, analyze, sample_runs, product_request (daily counters)
 users/{uid}/routine/{entry_id}
   product_id | null, custom_name, brand, inci[], key_actives[], started_at, ended_at,
   applied_sites[], source: catalog|label_scan|manual
   schedule: {kind: daily|alternate|days, days?: int[] (0=Mon..6=Sun), anchor: YYYY-MM-DD} | null
     (alternate = every other day from anchor; null = every day), created_at, updated_at
   feel: {verdict: working|unsure|not_for_me, tags[], week, at} | null, feel_history[]   (Oct 17, self-reported)
+users/{uid}/product_requests/{id}          (Oct 18; pr_ + 10 hex)
+  brand, name, key, status: pending|added|declined, product_id | null, photo_name | null,
+  created_at, resolved_at | null, seen
+product_requests/{key}                     (Oct 18; key = normalised brand + name, or photo-<id>)
+  brand, name, requesters[uid], count, status, product_id | null, first_at, last_at, resolved_at
+  (DELETE /v1/me removes the person from requesters[])
 users/{uid}/product_tests/{test_id}
   entry_id | null, product_id | null, name, site_pair: forearm, started_at (YYYY-MM-DD),
   length_days (7-56), ended_at | null, created_at, updated_at

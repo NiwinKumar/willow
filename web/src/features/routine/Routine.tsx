@@ -21,6 +21,7 @@ import { SponsoredCard } from './SponsoredCard'
 import { ProductTestCard, Suggestions } from './Suggestions'
 import { AvailableInOwnAccount } from './OwnAccountNotice'
 import { FeelNudge } from './FeelCard'
+import { RequestNotice } from './RequestNotice'
 import { useRoutineWrites } from './writes'
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
@@ -109,6 +110,7 @@ function LiveRoutine() {
       </div>
 
       {!loading && !failed ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
+      {!loading && !failed ? <RequestNotice onAdd={(p) => setAdd({ product: p })} /> : null}
       {!loading && !failed ? <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} /> : null}
       {!loading && !failed && current.length ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : null}
 
@@ -155,8 +157,8 @@ function LiveRoutine() {
               <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-[15px] text-inverse">
                 Search catalog
               </button>
-              <button type="button" onClick={() => setAdd({ mode: 'scan' })} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] text-[15px]">
-                Scan a label
+              <button type="button" onClick={() => setAdd({ mode: 'request' })} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] text-[15px]">
+                Request a product
               </button>
             </div>
           </div>

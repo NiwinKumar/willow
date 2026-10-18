@@ -96,18 +96,31 @@ def _norm(text: str) -> str:
 
 def search(
     q: str | None = None,
-    concern: str | None = None,
+    concern: str | list[str] | None = None,
     category: str | None = None,
     max_price: float | None = None,
     currency: str | None = None,
     exclude_ingredients: list[str] | None = None,
     limit: int = 8,
 ) -> list[dict[str, Any]]:
+    return search_all(q, concern, category, max_price, currency, exclude_ingredients)[:limit]
+
+
+def search_all(
+    q: str | None = None,
+    concern: str | list[str] | None = None,
+    category: str | None = None,
+    max_price: float | None = None,
+    currency: str | None = None,
+    exclude_ingredients: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Every match, best first. Several concerns: products made for all of them."""
     excluded = [_norm(x) for x in exclude_ingredients or [] if x.strip()]
     terms = _norm(q).split() if q else []
+    wanted = [concern] if isinstance(concern, str) else list(concern or [])
     scored = []
     for p in products():
-        if concern and concern not in p["concerns"]:
+        if any(c not in p["concerns"] for c in wanted):
             continue
         if category and p["category"] != category:
             continue
@@ -139,7 +152,7 @@ def search(
         # Only the products matching the most words ("vitamin c" is not every product with a "c").
         best = scored[0][0]
         scored = [s for s in scored if s[0] == best]
-    return [p for _, _, p in scored[:limit]]
+    return [p for _, _, p in scored]
 
 
 def match(brand: str | None, name: str | None) -> tuple[dict[str, Any], float] | None:

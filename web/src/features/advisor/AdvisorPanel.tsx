@@ -530,9 +530,9 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           e.preventDefault()
           send()
         }}
-        className="flex items-end gap-2 rounded-[28px] border border-white/90 bg-white/[.82] p-1.5 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-offset-2 has-[textarea:focus-visible]:outline-focus shadow-[0_20px_40px_-24px_rgba(0,0,0,.35)] backdrop-blur-[20px]"
+        className="flex items-end gap-2 rounded-[28px] border border-white/90 bg-white/[.82] p-1.5 shadow-[0_20px_40px_-24px_rgba(0,0,0,.35)] backdrop-blur-[20px]"
       >
-        <label title="Attach a photo of a product or its label (product photos only)" className="hit44 relative mb-2 ml-1 grid size-[30px] flex-none cursor-pointer place-items-center rounded-full bg-sunken text-[15px] transition-colors hover:bg-ink/10 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-focus has-[input:disabled]:cursor-default has-[input:disabled]:opacity-50">
+        <label title="Attach a photo of a product or its label (product photos only)" className="hit44 relative mb-2 ml-1 grid size-[30px] flex-none cursor-pointer place-items-center rounded-full bg-sunken text-[15px] transition-colors hover:bg-ink/10 has-[input:disabled]:cursor-default has-[input:disabled]:opacity-50">
           <input
             type="file"
             accept="image/*,.heic,.heif"
