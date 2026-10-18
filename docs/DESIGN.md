@@ -647,7 +647,8 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 - [ ] Disclaimer present on reports; synthetic badge on every retail chart when not real.
 - [ ] iPhone Safari: safe-area insets, 100dvh, backdrop-filter with -webkit- prefix.
 
-### Home: What changed, Your goals, Check-in card
-- What changed lists up to six measures from the latest measured face check-in, changed first, each with its value and how far it moved against the baseline, under one sentence and a one-cell-per-measure strip; the rest fold into a single link line.
-- Your goals replaced Recent: each goal measure as a trend since the baseline against the person's own normal range (same chart as Routine effect), with the check-in streak in words. Shown beside Routine today once there is a measured check-in after the baseline; otherwise Routine today takes the full row.
-- Check-in card: the big number (days since baseline) sits above the title, left-aligned; the Check in button sits bottom right.
+### Home: compact cards
+- Home cards are kept small and quiet: a bigger card is shrunk to match its neighbour, never the other way round. Product and measure rows are one line (name, a short status, a small chart), with no tally lines or long legends.
+- What changed: the three leading measures (changed first) with value and move against the baseline; the rest are one count.
+- Your goals replaced Recent: up to three goal measures as small trends against the person's normal range, beside Routine today once a measured check-in follows the baseline (otherwise Routine today takes the row).
+- Check-in card: the big number (days since baseline) sits above the title; the Check in button is bottom right.

@@ -17,7 +17,7 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
   return (
     <section
       aria-label="Today"
-      className="relative isolate flex min-h-[clamp(280px,26vw,340px)] min-w-0 animate-[wRise_.6s_both] flex-col justify-between gap-7 overflow-hidden rounded-[36px] squircle text-ink"
+      className="relative isolate flex min-h-[clamp(240px,20vw,260px)] min-w-0 animate-[wRise_.6s_both] flex-col justify-between gap-7 overflow-hidden rounded-[36px] squircle text-ink"
       style={{
         padding: 'clamp(20px,2.4vw,30px)',
         background: 'linear-gradient(180deg, #F8E2CB 0%, #F4C6B6 38%, #DDBBDD 62%, #9DB4E8 84%, #84A3E0 100%)',

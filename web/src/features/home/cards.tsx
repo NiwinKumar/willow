@@ -7,7 +7,7 @@ import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effec
 import { imageOf } from '../routine/routineModel'
 import { fmtSigned, fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
 import { VERDICT_WORDS, verdictKind } from '../../lib/verdict'
-import { byGoals, cap, metricAura, shortDay, shortName, verdictSentence } from './derive'
+import { byGoals, metricAura, shortDay, shortName } from './derive'
 import type { GoalTrend } from './goals'
 import { CardHead, Pill, VerdictLine } from './parts'
 
@@ -21,7 +21,7 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
 }
 
 /** Rows What changed lists before folding the rest into one line. */
-const ROWS = 6
+const ROWS = 3
 
 /** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
 export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string }) {
@@ -29,66 +29,46 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
   const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
   const rows = sorted.slice(0, ROWS)
   const rest = sorted.slice(ROWS)
-  const compared = metrics.filter((x) => x.kind === 'changed' || x.kind === 'normal')
-  const sentence = verdictSentence(session, goals)
   const note = baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)
   return (
-    <HomeCard label="What changed" className={className} delay={120}>
+    <HomeCard label="What changed" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
       <CardHead title="What changed" note={note} />
-      {sentence ? <p className="m-0 -mt-1 text-[13px] leading-[1.4] text-balance">{sentence}</p> : null}
-      {compared.length ? (
-        <div role="img" aria-label={`${compared.filter((x) => x.kind === 'changed').length} of ${compared.length} measures changed beyond your normal range`} className="flex gap-1">
-          {compared.map(({ m, kind }) => (
-            <span key={m.id} className={`h-1.5 flex-1 rounded-full ${kind === 'changed' ? 'bg-signal' : 'bg-ink/[.14]'}`} />
-          ))}
-        </div>
-      ) : null}
-      <div className="flex flex-1 flex-col gap-1.5">
+      <div className="flex flex-col gap-1">
         {rows.map(({ m, kind }, i) => {
           const unit = m.value === null ? '' : unitOf(m).trim()
-          const moved = kind === 'changed' ? (m.direction === 'decrease' ? METRIC_META[m.id].decrease : m.direction === 'increase' ? METRIC_META[m.id].increase : null) : null
           return (
             <button
               key={m.id}
               type="button"
               onClick={() => onOpen(m.id)}
               aria-label={`${METRIC_META[m.id].label}: ${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
-              className="flex min-h-11 max-h-[88px] flex-1 animate-[wRise_.5s_both] items-center gap-2.5 rounded-[18px] squircle bg-ink/[.035] py-2 pr-3 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-11 animate-[wRise_.5s_both] items-center gap-2.5 rounded-[16px] squircle bg-ink/[.035] py-1.5 pr-3 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
               style={{ animationDelay: `${i * 70 + 120}ms` }}
             >
-              <span aria-hidden className="size-8 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
+              <span aria-hidden className="size-7 flex-none rounded-[10px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13.5px]">{METRIC_META[m.id].label}</span>
-                <VerdictLine kind={kind} className="text-[11.5px] text-ink-2" />
-                {moved && moved !== 'change detected' ? <span className="truncate text-[11.5px] text-ink-2">{cap(moved)}</span> : null}
+                <span className="truncate text-[13px]">{METRIC_META[m.id].label}</span>
+                <VerdictLine kind={kind} className="text-[11px] text-ink-2" />
               </span>
               <span className="flex flex-none flex-col items-end">
                 <span className="flex items-baseline gap-[3px]">
-                  <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
-                  {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
+                  <span className="font-dot text-[16px]">{fmtValue(m.value, m)}</span>
+                  {unit ? <span className="text-[10px] text-ink-2">{unit}</span> : null}
                 </span>
-                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? (
-                  <span className="text-[11px] text-ink-2">
-                    {fmtSigned(m.delta, m)} vs baseline
-                  </span>
-                ) : null}
+                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[10.5px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}
               </span>
             </button>
           )
         })}
-        {rest.length ? (
-          <button type="button" onClick={onFull} className="min-h-9 self-start px-1 text-[12px] text-ink-2 hover:text-ink">
-            {rest.length} more {rest.every((x) => x.kind === 'normal') ? 'within your normal range' : 'in the full result'} →
-          </button>
-        ) : null}
       </div>
-      <div className="mt-auto flex flex-wrap gap-1.5">
+      <div className="mt-auto flex flex-wrap items-center gap-1.5">
         <Pill onClick={onFull}>Full result</Pill>
         {onAsk ? (
           <Pill tone="outline" onClick={onAsk}>
             Ask about this
           </Pill>
         ) : null}
+        {rest.length ? <span className="ml-auto text-[11.5px] text-ink-2">+{rest.length} more in the result</span> : null}
       </div>
     </HomeCard>
   )
@@ -158,58 +138,40 @@ const EFFECT_WORD: Record<Effect, { glyph: string; word: string }> = {
  */
 export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect: RoutineEffect; onOpen: () => void; onAsk: (question: string) => void; className?: string }) {
   const shown = effect.rows.slice(0, 4)
-  const tally = (['helping', 'changed', 'steady', 'away', 'early'] as const).filter((k) => effect.counts[k] > 0)
   return (
     <section
       aria-label="Routine effect"
-      className={`@container relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-3 overflow-hidden rounded-lg squircle p-5 text-ink ${className ?? ''}`}
+      className={`@container relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-2 overflow-hidden rounded-lg squircle p-4 text-ink ${className ?? ''}`}
       style={{ background: 'radial-gradient(100% 90% at 0% 0%, #E6F3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #D8B8FF 0%, transparent 62%), #EAF2FF', boxShadow: 'inset 0 0 44px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(61,123,255,.55)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="m-0 text-h3 font-normal">Is your routine working?</h2>
-        <button type="button" onClick={onOpen} className="min-h-11 shrink-0 py-1 text-[13px] text-ink-2 hover:text-ink">
+        <button type="button" onClick={onOpen} className="min-h-9 shrink-0 text-[13px] text-ink-2 hover:text-ink">
           Routine →
         </button>
       </div>
-      <p className="m-0 -mt-1.5 flex flex-col gap-0.5 text-[13px] leading-[1.4]">
-        <span className="text-balance">{effectHeadline(effect.counts)}</span>
-        <span className="text-[12px] text-ink-2">
-          {tally.map((k, i) => (
-            <span key={k}>
-              {i ? ' · ' : ''}
-              <span aria-hidden>{EFFECT_WORD[k].glyph} </span>
-              {effect.counts[k]} {EFFECT_WORD[k].word}
-            </span>
-          ))}
-        </span>
-      </p>
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      <p className="m-0 -mt-1 text-[12.5px] leading-[1.35] text-ink-2 text-balance">{effectHeadline(effect.counts)}</p>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {shown.map((r) => (
-          <li key={r.e.id} className={`flex min-w-0 flex-col gap-2 rounded-[22px] squircle py-2.5 pr-3 pl-2.5 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
-            {/* Chart to the right of the product; on a card too narrow for both it drops below. */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <div className="flex min-w-0 flex-[1_1_165px] items-center gap-3">
-                <ProductImage product={imageOf(r.e)} size={40} decorative />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[14px]">{shortName(r.e)}</span>
-                  <span className="truncate text-[12px] text-ink-2" title={r.o.detail}>
-                    <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
-                    {r.line}
-                  </span>
-                  <span className="font-mono text-[10px] text-ink-2" aria-label={`Day ${r.days}`}>
-                    DAY {r.days}
-                  </span>
+          <li key={r.e.id} className={`flex min-w-0 flex-col gap-1.5 rounded-[18px] squircle py-1.5 pr-3 pl-2 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
+            <div className="flex items-center gap-2.5">
+              <ProductImage product={imageOf(r.e)} size={32} decorative />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[13px]">{shortName(r.e)}</span>
+                <span className="truncate text-[11px] text-ink-2" title={r.o.detail}>
+                  <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
+                  {r.line}
+                  {r.metric ? ` · ${METRIC_META[r.metric].label}` : ''} · day {r.days}
                 </span>
-              </div>
+              </span>
               {r.points.length > 1 ? (
-                <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5 text-ink-2">
-                  <TrendChart points={r.points} baseline={r.baseline} band={r.band} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started, with your baseline and normal range`} />
-                  {r.reading ? <span className="text-[11px] leading-none">{r.reading}</span> : null}
+                <span className="hidden flex-none text-ink-2 @min-[380px]:block" title={r.reading ?? undefined}>
+                  <TrendChart points={r.points} baseline={r.baseline} band={r.band} width={96} height={30} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started, with your baseline and normal range`} />
                 </span>
               ) : null}
             </div>
             {r.flag ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] leading-[1.35]">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] leading-[1.35]">
                 <span className="min-w-0 flex-[1_1_160px]">
                   <span aria-hidden>△ </span>
                   {r.flag.text}
@@ -222,7 +184,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
           </li>
         ))}
       </ul>
-      <span className="mt-auto text-[11.5px] leading-[1.4] text-ink-2">Dashed line: your baseline. Shaded: your normal range. Timing is an association, not proof.</span>
+      <span className="mt-auto text-[11px] leading-[1.35] text-ink-2">Dashed: your baseline. Shaded: your normal range. Timing is an association, not proof.</span>
     </section>
   )
 }
@@ -230,49 +192,45 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
 /** Your goals: each measure the person chose, as a trend since the baseline against their own normal range. */
 export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, className }: { trends: GoalTrend[]; baseline: Session | null; onOpen: (metricId: string) => void; onProgress: () => void; onAsk?: () => void; className?: string }) {
   return (
-    <HomeCard label="Your goals" className={`@container ${className ?? ''}`} delay={320}>
+    <HomeCard label="Your goals" className={`@container gap-2 p-4 ${className ?? ''}`} delay={320}>
       <CardHead title="Your goals" note={baseline ? `since baseline · ${shortDay(baseline.created_at)}` : undefined} />
-      <ul className="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
-        {trends.map((t) => (
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {trends.slice(0, 3).map((t) => (
           <li key={t.id} className="flex">
             <button
               type="button"
               onClick={() => onOpen(t.id)}
               aria-label={`${t.label}: ${t.line}. Open in the result.`}
-              className="flex min-h-11 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-3 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              title={t.reading ?? undefined}
+              className="flex min-h-11 flex-1 items-center gap-2.5 rounded-[16px] squircle bg-ink/[.035] py-1.5 pr-3 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
             >
-              <span className="flex min-w-0 flex-[1_1_180px] items-center gap-2.5">
-                <span aria-hidden className="size-8 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13.5px]">{t.label}</span>
-                  <span className="flex items-start gap-1.5 text-[11.5px] leading-[1.35] text-ink-2">
-                    <span aria-hidden className={`w-3 flex-none ${t.kind === 'changed' ? 'text-signal' : ''}`}>
-                      {VERDICT_WORDS[t.kind].glyph}
-                    </span>
-                    {t.line}
+              <span aria-hidden className="size-7 flex-none rounded-[10px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[13px]">{t.label}</span>
+                <span className="flex items-center gap-1.5 truncate text-[11px] text-ink-2">
+                  <span aria-hidden className={`flex-none ${t.kind === 'changed' ? 'text-signal' : ''}`}>
+                    {VERDICT_WORDS[t.kind].glyph}
                   </span>
+                  <span className="truncate">{t.line}</span>
                 </span>
               </span>
               {t.points.length > 1 ? (
-                <span className="ml-auto flex flex-none flex-col items-end gap-0.5 text-ink-2">
-                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={132} height={40} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
-                  {t.reading ? <span className="text-[11px] leading-none">{t.reading}</span> : null}
+                <span className="hidden flex-none text-ink-2 @min-[380px]:block">
+                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={96} height={30} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
                 </span>
-              ) : t.reading ? (
-                <span className="ml-auto text-[11px] text-ink-2">{t.reading}</span>
               ) : null}
             </button>
           </li>
         ))}
       </ul>
-      <p className="m-0 text-[11.5px] leading-[1.4] text-ink-2">Dashed line: your baseline. Shaded: your normal range. Leaving the shade means a real change.</p>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="mt-auto flex flex-wrap items-center gap-1.5">
         <Pill onClick={onProgress}>See progress</Pill>
         {onAsk ? (
           <Pill tone="outline" onClick={onAsk}>
             Ask about my goals
           </Pill>
         ) : null}
+        <span className="ml-auto text-[11px] text-ink-2">Dashed: baseline · shaded: normal range</span>
       </div>
     </HomeCard>
   )
