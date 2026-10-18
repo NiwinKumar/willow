@@ -62,17 +62,13 @@ export function LeadCard({ lead }: { lead: Lead }) {
           </span>
         ) : null}
       </div>
-      <div className="relative flex flex-1 flex-col justify-end gap-3">
+      <div className="relative flex flex-1 items-center">
         {lead.big ? (
           <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-            <span className="font-dot text-[clamp(48px,4.4vw,64px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">{lead.big}</span>
-            {lead.bigLabel ? <span className="max-w-[140px] pb-0.5 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
+            <span className="font-dot text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">{lead.big}</span>
+            {lead.bigLabel ? <span className="max-w-[140px] pb-1 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
           </div>
         ) : null}
-        <div className="flex min-w-0 flex-col gap-2">
-          <h2 className="m-0 text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
-          <p className="m-0 max-w-[46ch] text-[14px] leading-[1.45]">{lead.sub}</p>
-        </div>
       </div>
       {lead.prog !== undefined ? (
         <div role="progressbar" aria-label={lead.bigLabel ?? 'Progress'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(lead.prog * 100)} className="relative h-[5px] overflow-hidden rounded-[5px] bg-white/45">
@@ -92,26 +88,32 @@ export function LeadCard({ lead }: { lead: Lead }) {
           </ol>
         </div>
       ) : null}
-      {lead.cta || lead.note ? (
-        <div className="relative flex flex-wrap items-center justify-end gap-2">
-          {lead.cta ? (
-            <button
-              type="button"
-              onClick={lead.cta.onClick}
-              className="flex min-h-[46px] items-center gap-3 rounded-pill bg-selected pr-[5px] pl-5 text-[14.5px] text-inverse shadow-[0_14px_26px_-14px_rgba(0,0,0,.6)] transition-transform duration-[250ms] hover:-translate-y-0.5"
-            >
-              {lead.cta.label}
-              <ArrowCircle tone="yellow" size={36} />
-            </button>
-          ) : null}
-          {lead.secondary ? (
-            <button type="button" onClick={lead.secondary.onClick} className="order-first min-h-11 rounded-pill bg-white/60 px-4 text-[13px] text-ink backdrop-blur-[10px] hover:bg-white/80">
-              {lead.secondary.label}
-            </button>
-          ) : null}
-          {lead.note ? <span className="rounded-pill bg-white/60 px-3.5 py-2.5 text-[13px] backdrop-blur-[10px]">{lead.note}</span> : null}
+      <div className="relative flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-2">
+          <h2 className="m-0 text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
+          <p className="m-0 max-w-[46ch] text-[14px] leading-[1.45]">{lead.sub}</p>
         </div>
-      ) : null}
+        {lead.cta || lead.note || lead.secondary ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {lead.cta ? (
+              <button
+                type="button"
+                onClick={lead.cta.onClick}
+                className="flex min-h-[46px] items-center gap-3 rounded-pill bg-selected pr-[5px] pl-5 text-[14.5px] text-inverse shadow-[0_14px_26px_-14px_rgba(0,0,0,.6)] transition-transform duration-[250ms] hover:-translate-y-0.5"
+              >
+                {lead.cta.label}
+                <ArrowCircle tone="yellow" size={36} />
+              </button>
+            ) : null}
+            {lead.secondary ? (
+              <button type="button" onClick={lead.secondary.onClick} className="order-first min-h-11 rounded-pill bg-white/60 px-4 text-[13px] text-ink backdrop-blur-[10px] hover:bg-white/80">
+                {lead.secondary.label}
+              </button>
+            ) : null}
+            {lead.note ? <span className="rounded-pill bg-white/60 px-3.5 py-2.5 text-[13px] backdrop-blur-[10px]">{lead.note}</span> : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   )
 }
