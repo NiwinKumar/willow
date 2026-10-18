@@ -138,10 +138,10 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
         <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
-          <WayIn to={JOURNEY_PATH} tone="ink" icon={PlayCircle} title="Explore Mei’s journey" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
+          <WayIn to={JOURNEY_PATH} tone="purple" icon={PlayCircle} title="Explore Mei’s journey" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
+          <WayIn to={BRAND_JOURNEY_PATH} tone="green" icon={Building2} title="Explore a brand’s journey" sub="How a skincare brand uses Proof, played for you" />
           <WayIn onClick={app.open} tone="cta" icon={Smartphone} title="Open the Willow app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
           <WayIn to={PROOF_PATH} tone="glass" icon={BarChart3} title="Open Willow Proof" sub="For brands: which products measurably work, for whom" />
-          <WayIn to={BRAND_JOURNEY_PATH} tone="glass" icon={Building2} title="Explore a brand’s journey" sub="How a skincare brand uses Proof, played for you" />
         </nav>
       </div>
     </section>
@@ -149,7 +149,8 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
 }
 
 const WAY_TONE = {
-  ink: { cls: 'text-inverse', bg: 'linear-gradient(180deg, #34343a 0%, #121214 100%)', shadow: '0 26px 50px -20px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.4)', icon: 'bg-white text-ink' },
+  purple: { cls: 'text-white', bg: 'linear-gradient(180deg, #7B6BEE 0%, #5642D0 100%)', shadow: '0 26px 50px -20px rgba(70,50,190,.65), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -2px 0 rgba(20,10,80,.3)', icon: 'bg-white text-[#4A38BE]' },
+  green: { cls: 'text-white', bg: 'linear-gradient(180deg, #3F9566 0%, #236645 100%)', shadow: '0 26px 50px -20px rgba(25,95,60,.65), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,40,20,.3)', icon: 'bg-white text-[#1F5C3D]' },
   cta: { cls: 'text-ink', bg: 'linear-gradient(180deg, color-mix(in oklab, var(--color-cta) 55%, white) 0%, var(--color-cta) 100%)', shadow: '0 24px 46px -20px rgba(120,110,0,.55), inset 0 1px 0 rgba(255,255,255,.8), inset 0 -2px 0 rgba(0,0,0,.08)', icon: 'bg-ink text-inverse' },
   glass: { cls: 'text-ink', bg: 'linear-gradient(180deg, rgba(255,255,255,.92) 0%, rgba(255,255,255,.66) 100%)', shadow: '0 22px 44px -22px rgba(30,20,60,.45), inset 0 1px 0 #fff, inset 0 0 0 1px rgba(18,18,18,.08)', icon: 'bg-ink text-inverse' },
 } as const
@@ -163,7 +164,7 @@ function WayIn({ to, onClick, tone, icon: Icon, title, sub }: { to?: string; onC
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-1 h-[45%] rounded-[24px] bg-gradient-to-b from-white/35 to-transparent" />
       <span className="relative flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-[clamp(19px,1.7vw,23px)] leading-[1.15] font-medium tracking-[-0.01em]">{title}</span>
-        <span className="text-[13.5px] leading-[1.35] opacity-75">{sub}</span>
+        <span className={`text-[13.5px] leading-[1.35] ${tone === 'purple' || tone === 'green' ? 'opacity-90' : 'opacity-75'}`}>{sub}</span>
       </span>
       <span aria-hidden className={`relative grid size-12 flex-none place-items-center rounded-full transition-transform duration-200 group-hover:translate-x-0.5 ${t.icon}`}>
         <Icon size={22} strokeWidth={1.8} />
