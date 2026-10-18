@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import type { Session } from '../../data/types'
@@ -54,13 +55,15 @@ export default function CheckInReplay() {
     return () => timers.forEach(clearTimeout)
   }, [face, close, full, n, day, navigate])
 
-  if (!face) return <div className="grid min-h-[60vh] place-items-center text-ink-2">Loading her check-in…</div>
+  if (!face) return createPortal(<div className="fixed inset-0 z-[70] grid place-items-center bg-[#0c0c0e] text-white/70">Loading her check-in…</div>, document.body)
   const url = face.preview?.url ?? null
-  return (
+  // Portalled to body: the app page wrapper animates with a transform, which would trap a fixed layer inside it.
+  return createPortal(
     <main className="fixed inset-0 z-[70] overflow-hidden">
       {phase === 'camera' || phase === 'closeup' ? <Camera url={phase === 'closeup' ? (close?.preview?.url ?? url) : url} closeup={phase === 'closeup'} shots={phase === 'closeup' ? 1 : shots} n={phase === 'closeup' ? 1 : Math.min(n, 5)} /> : <Measuring face={face} close={close} phase={phase} ticks={ticks} />}
       <span className="absolute top-4 left-1/2 z-[3] -translate-x-1/2 rounded-pill bg-black/55 px-3.5 py-1.5 text-[12.5px] text-white/85 backdrop-blur">Replay of Mei’s check-in · {new Date(face.created_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
-    </main>
+    </main>,
+    document.body,
   )
 }
 
