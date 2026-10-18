@@ -29,6 +29,7 @@ def _macro(
     h=H,
     hair=False,
     seed=0,
+    exif_tags=None,
 ):
     rng = np.random.default_rng(seed)
     ppm = _px_per_mm(w)
@@ -52,6 +53,7 @@ def _macro(
     rgb = (np.clip(lab2rgb(lab), 0, 1) * 255 + 0.5).astype(np.uint8)
     exif = Image.Exif()
     exif[0x0110] = "iPhone 17 Pro"  # a camera photo: only these may use the assumed macro scale
+    exif.get_ifd(0x8769).update(exif_tags or {})
     Image.fromarray(rgb).save(path, quality=97, exif=exif)
     return n / area_cm2
 
@@ -181,3 +183,43 @@ def test_a_web_camera_close_up_without_a_face_is_not_measured(tmp_path):
     assert r["quality"]["passed"] is False
     assert "face_not_found" in r["quality"]["reasons"]
     assert all(m["value"] is None for m in r["metrics"])
+
+
+def _apple_note(focus_position, af_confidence):
+    """An Apple MakerNote with FocusPosition and AFConfidence (signed longs, as iPhones write)."""
+    entries = [(0x002F, focus_position), (0x003D, af_confidence)]
+    body = b"".join(
+        t.to_bytes(2, "big")
+        + (9).to_bytes(2, "big")
+        + (1).to_bytes(4, "big")
+        + v.to_bytes(4, "big", signed=True)
+        for t, v in entries
+    )
+    return b"Apple iOS\x00\x00\x01MM" + len(entries).to_bytes(2, "big") + body
+
+
+@pytest.mark.parametrize(
+    ("tags", "reason"),
+    [
+        ({0xA405: 26}, "face_not_found"),  # the main camera: a hand's width away at best
+        ({0xA405: 103}, "face_not_found"),  # digital zoom
+        ({0xA405: 14, 0x927C: _apple_note(111, 94)}, "face_not_found"),  # ultra wide at ~12 cm
+        ({0xA405: 14, 0x927C: _apple_note(255, 0)}, "blurry"),  # the camera says out of focus
+    ],
+)
+def test_a_photo_the_camera_says_is_no_macro_shot_is_not_measured(tmp_path, tags, reason):
+    # no eye in view: the assumed 30 mm field only fits a real macro shot, so EXIF that says
+    # otherwise fails the frame (instead of pores and spots read at the wrong scale)
+    _macro(tmp_path / "c.jpg", exif_tags=tags)
+    r = analyze_macro([str(tmp_path / "c.jpg")], "cheek_macro")
+    assert r["quality"]["passed"] is False
+    assert reason in r["quality"]["reasons"]
+    assert all(m["value"] is None for m in r["metrics"])
+
+
+def test_a_close_focused_ultra_wide_macro_keeps_the_assumed_scale(tmp_path):
+    _macro(tmp_path / "c.jpg", exif_tags={0xA405: 14, 0x927C: _apple_note(255, 92)})
+    r = analyze_macro([str(tmp_path / "c.jpg")], "cheek_macro")
+    assert r["quality"]["passed"] is True
+    assert _metric(r, "pores")["value"] is not None
+    assert _metric(r, "pores")["confidence"] == "indicative"  # assumed, until calibrated

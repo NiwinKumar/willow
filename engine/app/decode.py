@@ -13,6 +13,10 @@ pillow_heif.register_heif_opener()  # lets Pillow open iPhone .heic files
 
 EXIF_IFD, TAG_MODEL, TAG_EXPOSURE, TAG_ISO = 0x8769, 0x0110, 0x829A, 0x8827
 TAG_LENS_MODEL = 0xA434
+TAG_MAKER_NOTE, TAG_FOCAL_35MM = 0x927C, 0xA405
+# Apple's MakerNote (undocumented; read as exiftool does): FocusPosition, the lens actuator's
+# position (higher = closer; 255 is the closest it focuses), and AFConfidence (0 = not in focus)
+APPLE_FOCUS_POSITION, APPLE_AF_CONFIDENCE = 0x002F, 0x003D
 
 
 @dataclass
@@ -73,6 +77,28 @@ class PhotoInfo:
     iso: int | None
     exposure_s: float | None
     lens: str | None = None  # e.g. "iPhone 17 Pro Max front camera 2.715mm f/1.9"
+    focal_35mm: float | None = None  # ~13-14 on an iPhone ultra wide; more with digital zoom
+    focus_position: int | None = None  # Apple only (MakerNote)
+    af_confidence: int | None = None  # Apple only (MakerNote)
+
+
+def apple_focus(note: bytes) -> tuple[int | None, int | None]:
+    """(FocusPosition, AFConfidence) from an Apple MakerNote; (None, None) for anything else.
+    Big-endian IFD after a 14-byte "Apple iOS" header; both tags fit in the entry itself."""
+    out: dict[int, int] = {}
+    try:
+        if not note.startswith(b"Apple iOS"):
+            return None, None
+        count = int.from_bytes(note[14:16], "big")
+        for i in range(count):
+            entry = note[16 + 12 * i : 28 + 12 * i]
+            tag, typ, n = (int.from_bytes(entry[a:b], "big") for a, b in ((0, 2), (2, 4), (4, 8)))
+            if tag in (APPLE_FOCUS_POSITION, APPLE_AF_CONFIDENCE) and n == 1 and typ in (3, 4, 9):
+                size = 2 if typ == 3 else 4
+                out[tag] = int.from_bytes(entry[8 : 8 + size], "big", signed=typ == 9)
+    except (IndexError, ValueError):
+        return None, None
+    return out.get(APPLE_FOCUS_POSITION), out.get(APPLE_AF_CONFIDENCE)
 
 
 def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
@@ -101,6 +127,9 @@ def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
     sub = exif.get_ifd(EXIF_IFD)
     iso = sub.get(TAG_ISO)
     exposure = sub.get(TAG_EXPOSURE)
+    note = sub.get(TAG_MAKER_NOTE)
+    focus, af = apple_focus(note) if isinstance(note, bytes) else (None, None)
+    focal = sub.get(TAG_FOCAL_35MM)
     info = PhotoInfo(
         format=fmt,
         size=(rgb8.shape[1], rgb8.shape[0]),
@@ -109,6 +138,9 @@ def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
         iso=int(iso[0] if isinstance(iso, tuple) else iso) if iso else None,
         exposure_s=float(exposure) if exposure else None,
         lens=sub.get(TAG_LENS_MODEL),
+        focal_35mm=float(focal) if focal else None,
+        focus_position=focus,
+        af_confidence=af,
     )
     return rgb8, info
 

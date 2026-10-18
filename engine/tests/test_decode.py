@@ -52,3 +52,13 @@ def test_capture_mode_from_file_types():
     assert capture_mode_for(["a.heic", "b.jpg"]) == "uncalibrated"
     with pytest.raises(ValueError):
         capture_mode_for(["a.dng", "b.jpg"])
+
+
+def test_apple_focus_reads_the_maker_note_and_ignores_others():
+    from app.decode import apple_focus
+
+    entry = (0x002F).to_bytes(2, "big") + (9).to_bytes(2, "big") + (1).to_bytes(4, "big")
+    note = b"Apple iOS\x00\x00\x01MM" + (1).to_bytes(2, "big") + entry + (165).to_bytes(4, "big")
+    assert apple_focus(note) == (165, None)
+    assert apple_focus(b"Nikon\x00" + bytes(40)) == (None, None)
+    assert apple_focus(b"Apple iOS\x00\x00\x01MM\x00\x05") == (None, None)  # cut short

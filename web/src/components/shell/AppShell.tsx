@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { CaptureMode, Site } from '../../data/types'
+import type { TrackPlace } from '../../lib/track'
 import { useData } from '../../data/useData'
 import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
@@ -67,10 +68,12 @@ export function AppShell() {
     setAdvisorFull(false)
   }, [])
   const startCheckIn = useCallback(
-    (site: Site, mode: CaptureMode, opts?: { sample?: string }) => {
+    (site: Site, mode: CaptureMode, opts?: { sample?: string; places?: TrackPlace[] }) => {
       setCheckIn({ open: false })
       const qs = new URLSearchParams({ site, mode })
       if (opts?.sample) qs.set('sample', opts.sample)
+      // A whole check-in: every tracked place in turn (CheckInFlow ?places=).
+      if (opts?.places?.length) qs.set('places', opts.places.join(','))
       // The flow draws over the page it was opened from (background location); Back walks its steps.
       const background = (location.state as { background?: unknown } | null)?.background ?? location
       navigate(`/check-in?${qs}`, { state: { background } })
@@ -169,7 +172,7 @@ export function AppShell() {
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />
         {checkIn.open ? (
           <Suspense fallback={null}>
-            <CheckInPicker open onClose={() => setCheckIn({ open: false })} preset={checkIn.preset} onStart={startCheckIn} />
+            <CheckInPicker open onClose={() => setCheckIn({ open: false })} preset={checkIn.preset} onStart={startCheckIn} onStartAll={(places) => startCheckIn(places[0], 'uncalibrated', { places })} />
           </Suspense>
         ) : null}
       </div>

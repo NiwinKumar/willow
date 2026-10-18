@@ -11,20 +11,24 @@ import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '
 import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
 import { useData } from '../../data/useData'
+import { TrackChoices } from '../checkin/TrackChoices'
+import { placesOf } from '../../lib/profile'
+import { choicesOf, trackOf, type TrackChoice } from '../../lib/track'
 import { useAuth } from '../../lib/useAuth'
 import { SoftBackdrop } from './Decor'
 import { FIRST_CHECKIN, hasConsent } from './entry'
 
 const BACKDROP = 'radial-gradient(40% 40% at 15% 20%, rgba(255,178,122,.55), transparent 70%), radial-gradient(40% 45% at 85% 80%, rgba(156,211,255,.6), transparent 70%), radial-gradient(35% 35% at 80% 15%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
 
-type Step = 'consent' | 'goals' | 'about'
-const STEPS = ['Consent', 'Goals', 'About you', 'Capture']
-const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, about: 2 }
-const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', about: '/welcome/goals' }
+type Step = 'consent' | 'goals' | 'places' | 'about'
+const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Capture']
+const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3 }
+const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places' }
+const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places' }
 
 /**
- * Onboarding: /welcome = consent, /welcome/goals = goals, /welcome/about = photo time, optional skin type and
- * check-in days; then the person's first check-in (or `?next=`). Each step fits one screen (laptop and phone):
+ * Onboarding: /welcome = consent, /welcome/goals = goals, /welcome/places = places to track (every check-in covers
+ * them all), /welcome/about = photo time, optional skin type and check-in days; then the person's first check-in (or `?next=`). Each step fits one screen (laptop and phone):
  * a compact title, the step's content (scrolls inside only if a detail is opened) and an action bar that is
  * always in view. Consent is kept on this device (lib/prefs) and saved to the account (PUT /v1/me/consent);
  * the rest is the profile (lib/profile, PUT /v1/me/profile). Goals only reorder the report.
@@ -32,7 +36,7 @@ const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', ab
 export default function Welcome() {
   const { step: raw } = useParams()
   const { search } = useLocation()
-  const step: Step = raw === 'goals' || raw === 'about' ? raw : 'consent'
+  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' ? raw : 'consent'
   const { user } = useAuth()
 
   useEffect(() => {
@@ -50,7 +54,7 @@ export default function Welcome() {
         <Stepper current={STEP_INDEX[step]} />
         <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
       </header>
-      {step === 'goals' ? <Goals key="goals" /> : step === 'about' ? <About key="about" /> : <Consent key="consent" />}
+      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : <Consent key="consent" />}
     </div>
   )
 }
@@ -62,7 +66,7 @@ function BackButton({ step, search }: { step: Step; search: string }) {
   const prev = PREV[step]
   if (prev)
     return (
-      <Link to={`${prev}${search}`} aria-label={`Back to ${step === 'goals' ? 'consent' : 'goals'}`} className={backClass}>
+      <Link to={`${prev}${search}`} aria-label={`Back to ${PREV_NAME[step]}`} className={backClass}>
         ←
       </Link>
     )
@@ -273,7 +277,7 @@ function Goals() {
     // Saved on this device (and for the demo journey in this tab); every screen re-orders at once. Someone
     // signed in has it on their account now; a new guest's copy goes up as their account starts (data/store).
     setGoals(picked)
-    navigate(`/welcome/about${search}`)
+    navigate(`/welcome/places${search}`)
   }
 
   return (
@@ -323,6 +327,38 @@ function Goals() {
             </button>
           )
         })}
+      </div>
+    </StepFrame>
+  )
+}
+
+/** Places to track: chosen once, every check-in walks through all of them (changeable in You). */
+function Places() {
+  const { saveProfile, profile } = useData()
+  const navigate = useNavigate()
+  const { search } = useLocation()
+  const [picked, setPicked] = useState<TrackChoice[]>(() => choicesOf(placesOf(profile)))
+
+  const next = () => {
+    void saveProfile({ track: trackOf(picked) }).catch(() => undefined)
+    navigate(`/welcome/about${search}`)
+  }
+
+  return (
+    <StepFrame
+      wide
+      eyebrow="CHOOSE ONE OR MORE"
+      title="Where should Willow look?"
+      sub="Every check-in covers these places, one after another. You can change them in You."
+      actions={
+        <button type="button" onClick={next} className={primary}>
+          Continue <span aria-hidden>→</span>
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <TrackChoices value={picked} onChange={setPicked} />
+        <p className="m-0 px-1 text-[13px] leading-[1.45] text-ink-2">Have a camera that shoots RAW (DNG)? You can upload those files in a check-in instead; higher quality photos can give steadier readings.</p>
       </div>
     </StepFrame>
   )

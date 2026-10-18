@@ -17,8 +17,10 @@ import { baselineState } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { prefs } from '../../lib/prefs'
+import { parsePlaces, type TrackPlace } from '../../lib/track'
 import { useAuth } from '../../lib/useAuth'
 import { CameraStep } from './CameraStep'
+import { unlockCues } from './cue'
 import './checkin.css'
 import { addFiles, isDng, recheck, rowsFromShots, usable } from './files'
 import { FilesStep } from './FilesStep'
@@ -34,6 +36,7 @@ import { planTopUp } from './topup'
 import { useAnalysis } from './useAnalysis'
 import { useSoft } from './useSoft'
 import { useUpload } from './useUpload'
+import { PlaceStep, SentStep } from './Walkthrough'
 
 type Shot = { file: File; url: string }
 /** History state of each check-in entry: the page drawn behind, and how many steps deep this entry is. */
@@ -52,6 +55,8 @@ type NavState = { background?: unknown; depth?: number; prev?: string | null } |
  *   ?session=<id>                              watch or resume measuring a session
  *   ?topup=<id>                                add the missing photos to a baseline without a normal range,
  *                                              then measure it again (topup.ts)
+ *   ?places=cheek_macro,face_full              a whole check-in: every tracked place in turn (place → camera →
+ *                                              review → upload), each measured in the background, then "sent"
  */
 export default function CheckInFlow() {
   const location = useLocation()
@@ -75,6 +80,13 @@ export default function CheckInFlow() {
   const capturing = !sessionParam && sampleParam === null
   const nParam = Number(params.get('n'))
   const topupParam = capturing ? params.get('topup') : null
+  // A whole check-in (the sheet's "Start check-in"): every tracked place in turn, with the camera.
+  const places = capturing && mode === 'uncalibrated' && !topupParam ? parsePlaces(params.get('places')) : []
+  const walk = places.length > 0
+  const placeIndex = Math.max(0, places.indexOf(site as TrackPlace))
+  const [sent, setSent] = useState<Site[]>([])
+  const [skipped, setSkipped] = useState<Site[]>([])
+  const placeDone = useRef<((id: string) => void) | null>(null)
   // The baseline being topped up, once planned (topup.ts): its date for the copy. Null until then.
   const [topup, setTopup] = useState<{ id: string; date: string } | null>(null)
   const [topupError, setTopupError] = useState<string | null>(null)
@@ -116,6 +128,8 @@ export default function CheckInFlow() {
     topup: topup?.id ?? null,
     onDone: (id) => {
       leaveDemo()
+      // A whole check-in moves on to the next place; this one is measured in the background.
+      if (placeDone.current) return placeDone.current(id)
       uploaded.current = true
       setHeld(id)
       go({ step: 'processing', session: id }, { replace: true })
@@ -223,10 +237,14 @@ export default function CheckInFlow() {
       return
     }
     if (computedN === null) return
+    if (walk) {
+      go({ step: 'place', n: String(n ?? computedN) }, { replace: true })
+      return
+    }
     const first = computedN === 5
     const initial: Step = first || (mode === 'calibrated_raw' && !prefs.lightroomDone()) ? 'guide' : mode === 'calibrated_raw' ? 'files' : 'camera'
     go({ step: initial, n: String(n ?? computedN) }, { replace: true })
-  }, [ready, topupParam, sampleParam, sessionParam, step, capturing, siteParam, computedN, n, mode, go])
+  }, [ready, topupParam, sampleParam, sessionParam, step, capturing, siteParam, computedN, n, mode, walk, go])
 
   // Back is held while photos upload or are measured (CAP holds processing), and steps that need state
   // they no longer have (a reload) fall back to one that works.
@@ -282,7 +300,9 @@ export default function CheckInFlow() {
     else navigate('/home', { replace: true })
   }, [held, analysis.state.kind, data, hasBackground, depth, navigate])
 
-  const working = upload.busy || analysis.state.kind === 'running' || analysis.state.kind === 'offline'
+  // Part-way through a whole check-in, the places already sent keep measuring; closing asks first.
+  const partWay = walk && sent.length > 0 && step !== 'sent'
+  const working = upload.busy || analysis.state.kind === 'running' || analysis.state.kind === 'offline' || partWay
   const requestClose = useCallback(() => (working ? setConfirm(true) : close()), [working, close])
   const requestRef = useRef(requestClose)
   requestRef.current = requestClose
@@ -336,6 +356,28 @@ export default function CheckInFlow() {
     setTopup(null)
     go({ session: null, sample: null, topup: null, ...patch }, { replace: true })
   }
+
+  /** A whole check-in: the next tracked place, or the end. Skipped places are listed there. */
+  const toNext = () => {
+    const next = places[placeIndex + 1]
+    if (next) return newAttempt({ site: next, n: known ? String(neededFor(sessionsOf(next), 'uncalibrated')) : null, step: 'place' })
+    upload.reset([])
+    clearShots()
+    go({ step: 'sent', n: null }, { replace: true })
+  }
+  // Measured on Willow's side while the person takes the next place (analyze runs to the end on the api even
+  // if this page closes); Home and Progress show each result when it lands.
+  placeDone.current = walk
+    ? (id) => {
+        void getIdToken()
+          .then((t) => api.analyze(t, id))
+          .catch(() => undefined)
+          .finally(() => void data.refresh())
+        void data.refresh()
+        setSent((s) => [...s, site])
+        toNext()
+      }
+    : null
 
   /** A new check-in for the same place and mode as the session being watched (Result's "Try again" opens ?session= alone). */
   const again = () => {
@@ -392,7 +434,8 @@ export default function CheckInFlow() {
 
   // ---- render ----
   // Face check-ins: the pose of every photo (front, then the cheeks when cheek photos are on).
-  const cheeks = cheeksPick ?? cheeksByDefault(sessionsOf(site).filter((s) => s.capture_mode === mode))
+  // (a whole check-in that has the cheek close-up already shoots the cheek: no turned-head face photos)
+  const cheeks = walk && places.includes('cheek_macro') ? false : (cheeksPick ?? cheeksByDefault(sessionsOf(site).filter((s) => s.capture_mode === mode)))
   const poses = n === null ? [] : shotPoses(site, n, cheeks)
   const shotsN = poses.length || (n ?? 0)
   let content: ReactNode
@@ -430,6 +473,7 @@ export default function CheckInFlow() {
       <WillowLoader inline label="Opening your baseline" />
     )
   else if (inDemo || (capturing && (!known || !step))) content = <WillowLoader inline label="Loading your sessions" />
+  else if (step === 'sent') content = <SentStep sent={sent} skipped={skipped} onHome={close} />
   else if (step === 'processing')
     content = (
       <ProcessingStep
@@ -460,6 +504,21 @@ export default function CheckInFlow() {
       />
     )
   else if (n === null) content = <WillowLoader inline label="Loading your sessions" />
+  else if (step === 'place')
+    content = (
+      <PlaceStep
+        key={site}
+        site={site}
+        index={placeIndex}
+        total={places.length}
+        n={shotsN}
+        onStart={() => go({ step: 'camera' })}
+        onSkip={() => {
+          setSkipped((s) => [...s, site])
+          toNext()
+        }}
+      />
+    )
   else if (step === 'guide') {
     const st = baselineState(sessionsOf(site), mode)
     const baseline = st.state === 'set' ? st.session : null
@@ -478,7 +537,10 @@ export default function CheckInFlow() {
         deviation={deviation}
         onNote={setNote}
         onDeviation={setDeviation}
-        onCamera={() => go({ step: 'camera' })}
+        onCamera={() => {
+          unlockCues() // inside the tap: lets the back camera's tones and voice play on iOS
+          go({ step: 'camera' })
+        }}
         onFiles={() => go({ step: 'files' })}
         onSite={(s) => setSiteMode(s, mode)}
         onChangePlace={() => go({ step: 'site' })}
@@ -495,7 +557,7 @@ export default function CheckInFlow() {
         onShot={(file, url) => setShots((s) => (s.length >= shotsN ? s : [...s, { file, url }]))}
         onRetakeLast={() => setShots((s) => s.slice(0, -1))}
         onReview={() => go({ step: 'review' })}
-        onBack={() => (nav.prev === 'guide' ? navigate(-1) : go({ step: 'guide' }))}
+        onBack={() => (walk ? go({ step: 'place' }, { replace: true }) : nav.prev === 'guide' ? navigate(-1) : go({ step: 'guide' }))}
         onFiles={() => go({ step: 'files' })}
       />
     )
@@ -568,7 +630,9 @@ export default function CheckInFlow() {
         <p className="m-0 text-[15px] leading-normal text-ink-2">
           {upload.busy
             ? 'Your photos are still uploading. If you close now, the rest are not sent and this check-in is not measured.'
-            : 'Willow keeps measuring on its side. You can leave: the result lands in Home when it’s ready.'}
+            : partWay
+              ? `The ${plural(sent.length, 'place')} already sent ${sent.length === 1 ? 'keeps' : 'keep'} measuring. The places left are not taken today.`
+              : 'Willow keeps measuring on its side. You can leave: the result lands in Home when it’s ready.'}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button variant="ink" onClick={() => setConfirm(false)}>
