@@ -72,8 +72,8 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
       title: 'Promoted',
       // An ended campaign was a promotion (its results stay); the product can be promoted again.
       state: campaign?.status === 'active' || ended ? 'done' : campaign ? 'partial' : 'todo',
-      detail: campaign ? (campaign.status === 'active' ? `Live · ${reachText}` : ended ? `Campaign ended · ${reachText}` : 'Campaign paused') : eligible ? 'Ready to promote' : 'Opens once Proven',
-      ...(eligible && (!campaign || ended) ? { to: promoteTo, cta: ended ? 'Promote again' : 'Promote' } : {}),
+      detail: campaign ? `${campaign.status === 'active' ? `Live · ${reachText}` : ended ? `Campaign ended · ${reachText}` : 'Campaign paused'}${campaign.rule ? ` · Auto-promoted by rule “${campaign.rule.name}”` : ''}` : eligible ? 'Ready to promote' : 'Opens once Proven',
+      ...(eligible && (!campaign || ended) ? { to: promoteTo, cta: ended ? 'Promote again' : 'Promote' } : campaign?.rule ? { to: `${promoteTo.split('?')[0]}#autocampaign`, cta: 'See the rule' } : {}),
     },
     {
       id: 'lift',
