@@ -123,6 +123,7 @@ function LiveRoutine() {
         </button>
         <div className="order-3 flex basis-full flex-wrap items-center gap-2 sm:order-2 sm:basis-auto">
           <SegmentedControl
+            frosted
             label="Routine or product tests"
             size="sm"
             value={tab}
@@ -132,7 +133,7 @@ function LiveRoutine() {
               { value: 'tests', label: tests.running ? 'Product test · running' : 'Product tests' },
             ]}
           />
-          <button type="button" onClick={() => setHistory(true)} className="hit44 flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-colors hover:bg-ink/5">
+          <button type="button" onClick={() => setHistory(true)} className="hit44 glass-pill flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-colors hover:bg-white/80">
             <History size={15} strokeWidth={1.7} aria-hidden />
             History{stopped.length ? <span className="font-mono text-[11px] text-ink-2">{stopped.length}</span> : null}
           </button>
@@ -226,7 +227,7 @@ function LiveRoutine() {
         </div>
       ) : (
         <div className="@container flex flex-col gap-3">
-          <div className="grid items-start gap-3 @min-[620px]:grid-cols-2 @min-[1020px]:has-[.side>*]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
+          <div className="grid items-stretch gap-3 @min-[620px]:grid-cols-2 @min-[1020px]:has-[.side>*]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
             {(['am', 'pm'] as const).map((slot) => (
               <SlotCard
                 key={slot}

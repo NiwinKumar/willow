@@ -30,7 +30,7 @@ const OpenTest = ({ onClick, children = 'Open test' }: { onClick: () => void; ch
 export function TestStrip({ read, onStart }: { read: ForearmRead | null; onStart: () => void }) {
   const navigate = useNavigate()
   return (
-    <section aria-label="Product test" className="card flex flex-wrap items-center gap-x-6 gap-y-4 p-5">
+    <section aria-label="Product test" className="card flex flex-1 flex-wrap content-between items-center gap-x-6 gap-y-4 p-5">
       <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full text-willow-900" style={{ background: 'radial-gradient(circle at 34% 28%, #fff 0%, #B8E986 40%, #4FB866 100%)' }}>
         <FlaskConical size={20} strokeWidth={1.6} />
       </span>
