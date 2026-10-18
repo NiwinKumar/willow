@@ -99,7 +99,7 @@ export const GOALS: { id: GoalId; label: string; metrics: MetricId[] }[] = [
   { id: 'under_eye', label: 'Under-eye', metrics: ['dark_circles'] },
   { id: 'oil_glow', label: 'Shine and glow', metrics: ['shine', 'glow'] },
 ]
-export const MAX_GOALS = 3
+export const MAX_GOALS = 5
 
 /** Goal ids saved before the 8 goals (this device only), and what each became. */
 const OLD_GOALS: Record<string, GoalId[]> = {

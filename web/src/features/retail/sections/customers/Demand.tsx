@@ -18,7 +18,7 @@ export function WhatPeopleWant({ d, goalId, className = '' }: { d: Insights; goa
   const max = Math.max(1, ...rows.map((r) => r.n))
   const months = d.needs_by_month?.months ?? []
   return (
-    <Panel title="What people want" id="demand-h" description="People per goal (up to 3 each), and the share with a visible change so far." className={className}>
+    <Panel title="What people want" id="demand-h" description="People per goal (up to 5 each), and the share with a visible change so far." className={className}>
       {rows.length === 0 ? (
         <EmptyState compact title="No goal has enough people yet" body={`No goal has ${MIN_GROUP} or more people in this filter.`} />
       ) : (
