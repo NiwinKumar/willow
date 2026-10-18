@@ -17,7 +17,7 @@ import { prefs } from '../../lib/prefs'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
 import { routineMarkers } from './markers'
-import { DAY_BG, DAY_WORDS, bandText, chartable, currentBaseline, dayOf, dayStatus, usedFrames, type DayStatus } from './model'
+import { DAY_BG, DAY_RANK, DAY_WORDS, bandText, chartable, currentBaseline, dayOf, dayStatus, usedFrames, type DayStatus } from './model'
 import { MetricSwitcher, Page } from './parts'
 import { metricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
@@ -26,7 +26,6 @@ import { routineNotes, sessionNotes, type Note } from './timeline'
 const PLACES: Site[] = ['face_full', ...CLOSE_UPS]
 const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)
 // The day colour is the most telling session of the day: a change outranks a baseline, a normal day and so on.
-const DAY_RANK: DayStatus[] = ['improved', 'otherWay', 'shifted', 'baseline', 'normal', 'notEnough', 'rejected', 'other']
 // The key lists the day colours this calendar uses (the baseline and the normal range always).
 const KEY_ORDER: DayStatus[] = ['baseline', 'improved', 'otherWay', 'shifted', 'normal', 'notEnough', 'rejected', 'other']
 

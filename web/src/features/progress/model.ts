@@ -103,6 +103,9 @@ export function leadMetric(ordered: Metric[], session: Session): Metric | null {
 export type DayStatus = 'baseline' | 'improved' | 'otherWay' | 'shifted' | 'normal' | 'notEnough' | 'rejected' | 'other'
 
 /** One calendar colour per session (design CELLBG): a day with a real change says which way it went, an improvement first. */
+/** Which day status tells the most, for a day with several check-ins (its colour on the calendar and the day page). */
+export const DAY_RANK: DayStatus[] = ['improved', 'otherWay', 'shifted', 'baseline', 'normal', 'notEnough', 'rejected', 'other']
+
 export function dayStatus(s: Session): DayStatus {
   const st = sessionState(s)
   if (st === 'rejected') return 'rejected'
