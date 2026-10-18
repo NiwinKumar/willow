@@ -11,19 +11,40 @@ import { weekOf } from './feel'
 import { entryName, slotWords } from './routineModel'
 import { alternatePair, scheduleWords } from './schedule'
 
-/** The demo journey's routine is Mei's and read-only: ticks stay in the tab, every other change is refused with this. */
-export const DEMO_READ_ONLY = "This is Mei's routine, read-only in the demo. Ticks stay on this device; adding or changing products works in your own account."
+/** The demo journey's routine is Mei's: changes stay in this tab (her account never changes); adding or removing a product needs your own account. */
+export const DEMO_READ_ONLY = "This is Mei's routine in the demo. Adding or removing products works in your own account."
 const readOnly = async (): Promise<never> => {
   throw new ApiError(403, DEMO_READ_ONLY, 'demo_read_only')
 }
+const DEMO_KEY = ['routine', 'demo']
+const patchDemo = (id: string, next: Partial<RoutineEntry>) => setQueryData<RoutineEntry[]>(DEMO_KEY, (list) => (list ?? []).map((x) => (x.id === id ? { ...x, ...next } : x)))
+const inTab = ' (this demo tab only)'
 const demoWrites = {
   add: readOnly,
-  stop: async () => void toast(DEMO_READ_ONLY),
   remove: readOnly,
-  setSlots: readOnly,
-  setSchedule: readOnly,
-  alternate: readOnly,
-  setFeel: readOnly,
+  stop: async (e: RoutineEntry) => {
+    patchDemo(e.id, { ended_at: localDay() })
+    toast(`Stopped ${entryName(e)}${inTab}. It stays under "Stopped" with its dates.`)
+  },
+  setSlots: async (e: RoutineEntry, slots: ('am' | 'pm')[]) => {
+    patchDemo(e.id, { slots })
+    toast(`${entryName(e)}: ${slotWords(slots).toLowerCase()}${inTab}`)
+  },
+  setSchedule: async (e: RoutineEntry, schedule: RoutineSchedule | null) => {
+    patchDemo(e.id, { schedule })
+    toast(`${entryName(e)}: ${scheduleWords(schedule, !e.slots.includes('am')).toLowerCase()}${inTab}`)
+  },
+  alternate: async (tonight: RoutineEntry, rests: RoutineEntry) => {
+    const pair = alternatePair(localDay())
+    patchDemo(tonight.id, { schedule: pair.tonight })
+    patchDemo(rests.id, { schedule: pair.rests })
+    toast(`${entryName(tonight)} and ${entryName(rests)} now alternate nights${inTab}. ${entryName(tonight)} is tonight.`)
+  },
+  setFeel: async (e: RoutineEntry, verdict: FeelVerdict, tags: FeelTag[]) => {
+    const feel = { verdict, tags, week: weekOf(e.started_at, localDay()), at: new Date().toISOString() }
+    patchDemo(e.id, { feel })
+    return { ...e, feel }
+  },
 }
 
 /**

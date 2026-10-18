@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { buttonClass } from './components/ui/Button'
 import { WillowLoader } from './components/willow/WillowLoader'
 import { DataProvider } from './data/store'
+import { TourOverlay } from './features/tour/TourOverlay'
 import { useAuth } from './lib/useAuth'
 import Landing from './features/website/Landing'
 
@@ -16,6 +17,7 @@ const SignIn = lazy(() => import('./features/website/SignIn'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
 const Journey = lazy(() => import('./features/journey/Journey'))
+const BrandJourney = lazy(() => import('./features/journey/BrandJourney'))
 const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
 const Terms = lazy(() => import('./features/website/Terms'))
 const Retail = lazy(() => import('./features/retail/Retail'))
@@ -51,6 +53,7 @@ export default function App() {
             <Route path="/welcome/:step" element={<Welcome />} />
             <Route path="/judge" element={<Judge />} />
             <Route path="/journey" element={<Journey />} />
+            <Route path="/journey/brand" element={<BrandJourney />} />
             <Route path="/terms" element={<Terms />} />
             {/* The assistant avatar in every state (not linked; for checking the motion). */}
             <Route path="/lab/avatar" element={<AvatarLab />} />
@@ -85,6 +88,7 @@ export default function App() {
           ) : null}
         </Suspense>
       </ErrorBoundary>
+      <TourOverlay />
       <Toaster
         position="bottom-center"
         offset={104}

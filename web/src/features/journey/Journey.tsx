@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { toSession } from '../../data/live'
 import type { Metric, Session } from '../../data/types'
@@ -8,12 +8,16 @@ import { enterDemo } from '../../data/useData'
 import { api } from '../../lib/api'
 import { fmtReading, METRIC_META, unitOf } from '../../lib/metrics'
 import { wordsFor, verdictKind } from '../../lib/verdict'
+import { setWalkthroughs, startSegment, walkthroughsOn } from '../tour/runner'
+import { MEI_WEEKS } from './meiSegments'
 
 /**
  * /journey: Mei's eight weeks as a story a judge can sit back and watch. Mei is simulated (generated photos of no
  * real person); every number on a slide is her real measurement from the live engine, every headline is Gemini's
  * explanation of it and every note is hers, all read from /v1/demo/journey. One slide per face check-in (with the
- * cheek close-up taken the same evening), then where she ended up, then the way into her full app.
+ * cheek close-up taken the same evening), then where she ended up, then the way into her full app. Between weeks a
+ * short walkthrough plays her real demo account (meiSegments.ts, features/tour) and comes back to the next slide
+ * (?at=); judges can turn the walkthroughs off.
  */
 
 const SLIDE_MS = 7000
@@ -31,9 +35,12 @@ export default function Journey() {
   const navigate = useNavigate()
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [weeks, setWeeks] = useState<Week[]>([])
-  const [i, setI] = useState(0)
+  const [params] = useSearchParams()
+  const [i, setI] = useState(() => Math.max(0, Number(params.get('at')) || 0))
   const [paused, setPaused] = useState(false)
+  const [walk, setWalk] = useState(walkthroughsOn)
   const touch = useRef<number | null>(null)
+  const iRef = useRef(0)
 
   useEffect(() => {
     api
@@ -52,16 +59,32 @@ export default function Journey() {
   const slides: Slide[] = useMemo(() => [{ kind: 'intro' }, ...weeks.map((w, k) => ({ kind: 'week' as const, w, i: k })), { kind: 'end' }], [weeks])
   const last = slides.length - 1
   const go = (n: number) => setI(Math.max(0, Math.min(last, n)))
+  // Forward from a week slide: that week in the app first (when walkthroughs are on), then the next slide.
+  const forward = (from: number) => {
+    const s = slides[from]
+    const seg = s?.kind === 'week' ? MEI_WEEKS[s.i] : undefined
+    if (walk && seg) startSegment(seg, `/journey?at=${from + 1}`)
+    else go(from + 1)
+  }
+  const forwardRef = useRef(forward)
+  useEffect(() => {
+    forwardRef.current = forward
+    iRef.current = i
+  })
+  const toggleWalk = () => {
+    setWalkthroughs(!walk)
+    setWalk(!walk)
+  }
 
   useEffect(() => {
     if (state !== 'ready' || paused || i >= last) return
-    const t = window.setTimeout(() => setI((x) => Math.min(last, x + 1)), SLIDE_MS)
+    const t = window.setTimeout(() => forwardRef.current(i), SLIDE_MS)
     return () => window.clearTimeout(t)
   }, [i, paused, state, last])
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') setI((x) => Math.min(last, x + 1))
+      if (e.key === 'ArrowRight') forwardRef.current(iRef.current)
       else if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1))
       else if (e.key === ' ') {
         e.preventDefault()
@@ -89,7 +112,10 @@ export default function Journey() {
         if (touch.current === null) return
         const dx = e.changedTouches[0].clientX - touch.current
         touch.current = null
-        if (Math.abs(dx) > 50) go(i + (dx < 0 ? 1 : -1))
+        if (Math.abs(dx) > 50) {
+          if (dx < 0) forward(i)
+          else go(i - 1)
+        }
       }}
     >
       <header className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-[clamp(16px,3vw,32px)] pt-4">
@@ -98,6 +124,12 @@ export default function Journey() {
             <span className="font-serif text-[22px]">willow</span>
             <span className="rounded-pill bg-ink/[.06] px-3 py-1 text-[12.5px] text-ink-2">Mei is simulated · generated photos, real measurements</span>
           </span>
+          <button type="button" role="switch" aria-checked={walk} onClick={toggleWalk} className="ml-auto flex min-h-11 items-center gap-2 rounded-pill px-3 text-[13px] text-ink-2 hover:bg-ink/5">
+            <span className={`relative h-5 w-9 rounded-full transition-colors ${walk ? 'bg-ink' : 'bg-ink/20'}`} aria-hidden>
+              <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] ${walk ? 'left-[18px]' : 'left-0.5'}`} />
+            </span>
+            Show her in the app between weeks
+          </button>
           <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 place-items-center rounded-full hover:bg-ink/5">
             <X size={20} strokeWidth={1.6} />
           </button>
@@ -129,7 +161,7 @@ export default function Journey() {
         ) : null}
         {state === 'ready' && slide.kind === 'intro' && first ? <Intro face={first.face} count={weeks.length} closeUps={weeks.filter((w) => w.close).length} /> : null}
         {state === 'ready' && slide.kind === 'week' ? <WeekSlide w={slide.w} n={slide.i} total={weeks.length} /> : null}
-        {state === 'ready' && slide.kind === 'end' && first && latest ? <End first={first} latest={latest} onApp={openApp} onOwn={() => navigate('/welcome')} /> : null}
+        {state === 'ready' && slide.kind === 'end' && first && latest ? <End first={first} latest={latest} onApp={openApp} onBrand={() => navigate('/journey/brand')} onProof={() => navigate('/retail')} onOwn={() => navigate('/welcome')} /> : null}
       </section>
 
       {state === 'ready' ? (
@@ -141,12 +173,12 @@ export default function Journey() {
             {paused ? <Play size={18} /> : <Pause size={18} />}
           </button>
           {i < last ? (
-            <button type="button" onClick={() => go(i + 1)} className="flex min-h-11 items-center gap-1 rounded-pill bg-selected px-5 text-inverse">
-              Next <ChevronRight size={18} />
+            <button type="button" onClick={() => forward(i)} className="flex min-h-11 items-center gap-1 rounded-pill bg-selected px-5 text-inverse">
+              {walk && slide?.kind === 'week' ? `Week ${slide.i + 1} in the app` : 'Next'} <ChevronRight size={18} />
             </button>
           ) : (
             <button type="button" onClick={openApp} className="min-h-11 rounded-pill bg-selected px-5 text-inverse">
-              Open Mei’s app
+              Open Mei’s account
             </button>
           )}
         </footer>
@@ -260,7 +292,7 @@ function WeekSlide({ w, n, total }: { w: Week; n: number; total: number }) {
   )
 }
 
-function End({ first, latest, onApp, onOwn }: { first: Week; latest: Week; onApp: () => void; onOwn: () => void }) {
+function End({ first, latest, onApp, onBrand, onProof, onOwn }: { first: Week; latest: Week; onApp: () => void; onBrand: () => void; onProof: () => void; onOwn: () => void }) {
   const ms = pick(latest.face, FACE_IDS)
   return (
     <div className="grid w-full items-center gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
@@ -284,12 +316,18 @@ function End({ first, latest, onApp, onOwn }: { first: Week; latest: Week; onApp
         </ul>
         <div className="flex flex-wrap gap-2 pt-1">
           <button type="button" onClick={onApp} className="min-h-12 rounded-pill bg-selected px-6 text-[15px] text-inverse">
-            Open Mei’s app
+            Open Mei’s account
+          </button>
+          <button type="button" onClick={onProof} className="min-h-12 rounded-pill bg-white px-6 text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]">
+            Open Willow Proof
           </button>
           <button type="button" onClick={onOwn} className="min-h-12 rounded-pill bg-white px-6 text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]">
             Start my own baseline
           </button>
         </div>
+        <button type="button" onClick={onBrand} className="self-start text-[14px] text-ink-2 underline underline-offset-4">
+          See how a brand uses Willow Proof
+        </button>
         <p className="m-0 text-[12.5px] text-ink-2">Cosmetic appearance only, not a medical assessment.</p>
       </div>
     </div>
