@@ -138,7 +138,7 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
         <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
-          <WayIn to={JOURNEY_PATH} tone="ink" icon={PlayCircle} title="Explore Mei’s journey" sub="Eight weeks, played for you · Mei is simulated, measured by the live engine" />
+          <WayIn to={JOURNEY_PATH} tone="ink" icon={PlayCircle} title="Explore Mei’s journey" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
           <WayIn onClick={app.open} tone="cta" icon={Smartphone} title="Open the Willow app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
           <WayIn to={PROOF_PATH} tone="glass" icon={BarChart3} title="Open Willow Proof" sub="For brands: which products measurably work, for whom" />
           <WayIn to={BRAND_JOURNEY_PATH} tone="glass" icon={Building2} title="Explore a brand’s journey" sub="How a skincare brand uses Proof, played for you" />
