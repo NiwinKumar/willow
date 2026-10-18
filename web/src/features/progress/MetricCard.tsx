@@ -2,19 +2,20 @@ import { BandBar } from '../../components/charts'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, confidenceOf, verdictKind } from '../../lib/verdict'
+import { VERDICT_WORDS, changeWay, confidenceOf, verdictKind, wordsFor } from '../../lib/verdict'
 import { EMPTY_CARD, METRIC_LOOK } from './metricLook'
 import { verdictHeadline } from './headline'
 import { bandText, deltaText, valueText } from './model'
 
-/** The verdict pill the cards draw: black with the ember ◆ for Changed, frosted otherwise. Glyph + words. */
+/** The verdict pill the cards draw: black with the ember ◆ for Improved / Shifted, frosted otherwise. Glyph + words. */
 function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Session; size?: 'md' | 'sm' }) {
   const kind = verdictKind(metric, session)
-  const changed = kind === 'changed'
+  const way = changeWay(metric)
+  const changed = kind === 'changed' && way !== 'otherWay'
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-pill whitespace-nowrap ${size === 'md' ? 'px-3 py-[7px] text-[12px]' : 'px-[11px] py-1.5 text-[12px]'} ${changed ? 'bg-selected text-inverse' : 'bg-white/65'}`}>
-      <VerdictGlyph kind={kind} onDark={changed} />
-      {VERDICT_WORDS[kind].label}
+      <VerdictGlyph kind={kind} way={way} onDark={changed} />
+      {wordsFor(metric, session).label}
     </span>
   )
 }
@@ -27,7 +28,6 @@ function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Sessi
 export function MetricCard({ metric: m, session, band, compared, against, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; compared: boolean; against?: string; onOpen: () => void; delay?: number }) {
   const look = METRIC_LOOK[m.id]
   const none = m.value === null
-  const kind = verdictKind(m, session)
   const unit = unitOf(m).trim()
   const ratio = compared && band && m.delta !== null ? m.delta / band : null
   const deltaLabel = none ? 'No reading' : session.is_baseline ? 'Baseline value' : !compared ? VERDICT_WORDS.notCompared.short : `Δ ${deltaText(m)}`
@@ -37,7 +37,7 @@ export function MetricCard({ metric: m, session, band, compared, against, onOpen
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : valueText(m)}, ${VERDICT_WORDS[kind].label}`}. Open detail`}
+      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : valueText(m)}, ${wordsFor(m, session).label}`}. Open detail`}
       className="relative flex min-h-[320px] animate-[wRise_.5s_both] flex-col justify-between gap-[18px] rounded-[40px] p-6 text-left shadow-[inset_0_0_40px_8px_rgba(255,255,255,.4),0_30px_60px_-44px_rgba(0,0,0,.5)] transition-transform duration-[400ms] ease-[cubic-bezier(.2,.7,.2,1)] squircle hover:-translate-y-[5px]"
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >

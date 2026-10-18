@@ -23,7 +23,7 @@
 - Input JSON: goal(s), site, metrics (id, label, value, unit, delta, mdc95, verdict, direction, confidence), quality reasons, routine entries with start dates, days since baseline.
 - Output schema `Explanation`: `{headline: string, items: [{metric_id, summary, quoted_numbers: string[]}], next_steps: string[] (max 3), disclaimer: string}`.
 - Validator: extract all numbers from `headline` and `summary`; each must appear (after rounding to the shown precision) in the input JSON; otherwise retry once, then use a template ("Redness: within normal photo variation (change -0.8, noise threshold 0.86)").
-- Rules: only metrics with `real_change` get "changed" language; `within_noise` -> "no clear change yet"; indicative metrics say "trend"; never attribute causation with certainty ("may be linked to starting X 3 weeks ago").
+- Rules: only metrics with `real_change` get change language, said by its direction (Oct 18): toward what people usually want (`way: improved`) it *improved*, said warmly; the other way (`way: other_way`) it *moved the other way*, said gently, never "worse", "worsened" or "declined" (the validator rejects those, and an improvement claimed for a change the other way); skin tone only *shifted*; `within_noise` -> "no clear change yet"; indicative metrics say "trend"; never attribute causation with certainty ("may be linked to starting X 3 weeks ago").
 
 ## 3. Label scan
 - Input: product photo(s) (front and/or back).
