@@ -5,13 +5,15 @@
  */
 import type { MetricId, Session } from '../../data/types'
 import { fmtValue, goalMetrics, METRIC_META, unitOf } from '../../lib/metrics'
-import { verdictKind, type VerdictKind } from '../../lib/verdict'
-import { byGoals, cap, countWord, runOf, usable } from './derive'
+import { changeWay, movedWords, verdictKind, type ChangeWay, type VerdictKind } from '../../lib/verdict'
+import { byGoals, countWord, runOf, usable } from './derive'
 
 export type GoalTrend = {
   id: MetricId
   label: string
   kind: VerdictKind
+  /** The way a real change went (improved, the other way); null when nothing moved beyond the range. */
+  way: ChangeWay | null
   /** What the latest check-in says, in words ("Fewer / fainter spots · 3 check-ins in a row"). */
   line: string
   /** "Now 1.9% · baseline 2.7%". */
@@ -22,7 +24,7 @@ export type GoalTrend = {
 }
 
 const NONE: Record<VerdictKind, string> = {
-  changed: 'Changed',
+  changed: 'Beyond your normal range',
   normal: 'Holding steady, within your normal range',
   baseline: 'Your baseline',
   notEnough: 'Normal range not ready yet',
@@ -45,12 +47,13 @@ export function goalTrends(lead: Session, baseline: Session | null, face: Sessio
     const unit = unitOf(m).trim()
     const run = kind === 'changed' ? runOf(m.id, face, lead) : 0
     const words = METRIC_META[m.id]
-    const moved = m.direction === 'decrease' ? words.decrease : m.direction === 'increase' ? words.increase : null
-    const head = kind === 'changed' && moved && moved !== 'change detected' ? cap(moved) : NONE[kind]
+    // A change in the wanted direction says how ("Calmer"); the other way is said gently ("Moved the other way").
+    const head = kind === 'changed' ? movedWords(m, words) : NONE[kind]
     return {
       id: m.id,
       label: words.label,
       kind,
+      way: kind === 'changed' ? changeWay(m) : null,
       line: run >= 2 ? `${head} · ${countWord(run).toLowerCase()} check-ins in a row` : head,
       reading: bm?.value != null && !lead.is_baseline ? `Now ${fmtValue(m.value, m)}${unit} · baseline ${fmtValue(bm.value, bm)}${unit}` : null,
       points: same.flatMap((s) => {

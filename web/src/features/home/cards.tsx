@@ -6,7 +6,7 @@ import type { Session } from '../../data/types'
 import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
 import { imageOf } from '../routine/routineModel'
 import { fmtSigned, fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, verdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, changeWay, verdictKind } from '../../lib/verdict'
 import { byGoals, metricAura, shortDay, shortName } from './derive'
 import type { GoalTrend } from './goals'
 import { CardHead, Pill, VerdictLine } from './parts'
@@ -31,10 +31,10 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
   const rest = sorted.slice(ROWS)
   const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
   return (
-    <HomeCard label="What changed" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
+    <HomeCard label="Since your baseline" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <div className="flex min-w-0 flex-col">
-          <h2 className="m-0 text-h3 font-normal">What changed</h2>
+          <h2 className="m-0 text-h3 font-normal">Since your baseline</h2>
           <span className="text-[11px] text-ink-2">
             {baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)}
             {rest.length ? ` · ${rest.length} more in the result` : ''}
@@ -66,7 +66,7 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
               <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[14px]">{METRIC_META[m.id].label}</span>
-                <VerdictLine kind={kind} className="text-[12px] text-ink-2" />
+                <VerdictLine kind={kind} way={changeWay(m)} className="text-[12px] text-ink-2" />
               </span>
               <span className="flex flex-none flex-col items-end gap-0.5">
                 <span className="flex items-baseline gap-[3px]">
@@ -134,7 +134,7 @@ const EFFECT_STROKE: Record<Effect, string> = { helping: 'var(--willow-700)', aw
 const EFFECT_WORD: Record<Effect, { glyph: string; word: string }> = {
   helping: { glyph: '◆', word: 'helping' },
   away: { glyph: '▲', word: 'moving the other way' },
-  changed: { glyph: '◆', word: 'changed' },
+  changed: { glyph: '◆', word: 'shifted' },
   steady: { glyph: '○', word: 'no change yet' },
   early: { glyph: '◌', word: 'too early' },
 }
@@ -235,15 +235,15 @@ export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, classNa
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[14px]">{t.label}</span>
                 <span className="flex items-center gap-1.5 truncate text-[12px] text-ink-2">
-                  <span aria-hidden className={`flex-none ${t.kind === 'changed' ? 'text-signal' : ''}`}>
-                    {VERDICT_WORDS[t.kind].glyph}
+                  <span aria-hidden className={`flex-none ${t.kind === 'changed' && t.way !== 'otherWay' ? 'text-signal' : ''}`}>
+                    {t.way ? CHANGE_WORDS[t.way].glyph : VERDICT_WORDS[t.kind].glyph}
                   </span>
                   <span className="truncate">{t.line}</span>
                 </span>
               </span>
               {t.points.length > 1 ? (
                 <span className="hidden flex-none text-ink-2 @min-[380px]:block">
-                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={120} height={36} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
+                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={120} height={36} stroke={t.kind === 'changed' && t.way !== 'otherWay' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
                 </span>
               ) : null}
             </button>

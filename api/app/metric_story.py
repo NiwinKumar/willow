@@ -67,7 +67,10 @@ Write "points": 3 to 5 short bullet sentences, in this order:
   "about the same".
 - the overall trend across history when there are 3 or more check-ins (steady, improving, back
   and forth).
-- the verdict against the start, in plain words.
+- the verdict against the start, in plain words: a real_change toward what people usually want
+  (lower redness, spots, pores, texture, lines, shine, blemishes, evenness; higher under-eye
+  brightness and glow) is an improvement, said warmly; the other way is said gently ("moved the
+  other way"), never "worse", "worsened" or "declined".
 - each routine product, by name: when it started or stopped and how often it was used.
 Write "reasons": at most 2 sentences on what MAY explain the change, or the lack of one.
 Rules:
@@ -194,7 +197,8 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
         "is_baseline": bool(doc.get("is_baseline")),
     }
     if metric_id in explain.DIRECTION_WORDS:
-        out["when_lower"], out["when_higher"] = explain.DIRECTION_WORDS[metric_id]
+        # the unwanted side is said gently ("moved the other way"), never "more redness"
+        out["when_lower"], out["when_higher"] = explain.gentle_words({"id": metric_id})
     out["history"] = _history(store, uid, doc, metric_id, m)
     prev = _previous(store, uid, sid, doc, metric_id)
     lo = now_day - timedelta(days=13)
@@ -251,13 +255,17 @@ def _points(f: dict[str, Any]) -> list[str]:
         pts.append(f"{now}, about the same as last time.")
     elif f["metric_id"] == "tone_ita":
         pts.append(f"{now}, a shift from last time (skin tone is descriptive only).")
+    elif explain.way_of({"id": f["metric_id"]}, d) == "other_way":
+        pts.append(f"{now}, {explain.OTHER_WAY} since last time.")
     else:
         pts.append(f"{now}, {down if d < 0 else up} than last time.")
     verdict = f.get("verdict_vs_baseline")
     if f.get("is_baseline"):
         pts.append("This is your baseline: later check-ins are compared with it.")
     elif verdict == "real_change":
-        pts.append("Since your baseline: a real change, bigger than your normal photo variation.")
+        way = explain.way_of({"id": f["metric_id"]}, f.get("change_vs_baseline"))
+        said = {"improved": "improved", "other_way": explain.OTHER_WAY}.get(way or "", "shifted")
+        pts.append(f"Since your baseline: {said}, more than your photos usually vary.")
     elif verdict == "within_noise":
         pts.append("Since your baseline: no real change, within your normal photo variation.")
     for p in f.get("routine", []):
