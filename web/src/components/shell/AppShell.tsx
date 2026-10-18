@@ -2,8 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { CaptureMode, Site } from '../../data/types'
-import { placesOf } from '../../lib/profile'
-import { cleanTrack, type TrackPlace } from '../../lib/track'
+import type { TrackPlace } from '../../lib/track'
 import { useData } from '../../data/useData'
 import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
@@ -134,14 +133,7 @@ export function AppShell() {
 
   const api = useMemo<ShellApi>(
     () => ({
-      openCheckIn: (opts) => {
-        // A product test needs both forearms on the list before its first check-in.
-        if (opts?.add?.length) {
-          const track = cleanTrack([...placesOf(data.profile), ...opts.add])
-          if (track.length !== placesOf(data.profile).length) data.saveProfile({ track }).catch(() => undefined)
-        }
-        setCheckIn({ open: true })
-      },
+      openCheckIn: () => setCheckIn({ open: true }),
       closeCheckIn: () => setCheckIn({ open: false }),
       checkInOpen: checkIn.open,
       startCheckIn,
