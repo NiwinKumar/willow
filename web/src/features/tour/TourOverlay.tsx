@@ -184,7 +184,7 @@ export function TourOverlay() {
       <section
         role="status"
         aria-live="polite"
-        className="pointer-events-auto fixed right-3 bottom-3 left-3 z-[1002] mx-auto flex max-w-[460px] flex-col gap-2.5 rounded-[26px] bg-selected p-4 text-inverse shadow-[0_30px_60px_-20px_rgba(0,0,0,.6)] sm:right-auto sm:left-5 sm:mx-0"
+        className="pointer-events-auto fixed right-3 bottom-3 left-3 z-[1002] mx-auto flex max-w-[460px] flex-col gap-2.5 rounded-[26px] bg-[#141414] p-4 text-white shadow-[0_30px_60px_-20px_rgba(0,0,0,.6)] sm:right-auto sm:left-5 sm:mx-0"
       >
         <div className="flex items-center justify-between gap-3 text-[12.5px] opacity-70">
           <span>{run.seg.title}</span>
@@ -205,7 +205,7 @@ export function TourOverlay() {
           <button type="button" onClick={() => goStep(run.i + 1)} className="flex min-h-11 items-center gap-1 rounded-pill bg-white/12 px-4 text-[14px] hover:bg-white/20">
             Next step <ChevronRight size={16} />
           </button>
-          <button type="button" onClick={back} className="ml-auto flex min-h-11 items-center gap-1.5 rounded-pill bg-white px-4 text-[14px] text-ink">
+          <button type="button" onClick={back} className="ml-auto flex min-h-11 items-center gap-1.5 rounded-pill bg-white px-4 text-[14px] text-[#141414]">
             <Undo2 size={15} /> Back to the story
           </button>
         </div>
