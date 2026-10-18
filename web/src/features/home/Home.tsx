@@ -6,7 +6,7 @@ import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
+import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse } from '../../data/hooks'
 import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
 import type { RoutineEntry, Session } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
@@ -33,14 +33,14 @@ import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
-import { ProductTestTile, SpotDiaryTile } from './Tiles'
+import { ProductTestTile } from './Tiles'
 
 const POLL_MS = 10_000
 const EMPTY: Session[] = []
 
 /**
  * Home (Willow App.dc.html, isHome): greeting, today's check-in, what changed, routine today, product test,
- * spot diary, next step and recent activity, all read from the person's own sessions and routine. Demo mode
+ * next step and recent activity, all read from the person's own sessions and routine. Demo mode
  * shows the team's journey read-only.
  */
 export default function Home() {
@@ -119,7 +119,6 @@ function HomeBody() {
   const log = useRoutineLog()
   const setUse = useSetRoutineUse()
   const check = useRoutineCheck(entries)
-  const spots = useSpots()
   const tests = useProductTests()
   const byId = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e])), [entries])
 
@@ -150,7 +149,6 @@ function HomeBody() {
   const effect = useMemo(() => (demo ? null : routineEffect(entries ?? [], outcomeSessions, check.data)), [demo, entries, outcomeSessions, check.data])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
-  const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
   // The hero's question follows what the lines above it are about: a check-in from today, an earlier
   // one (the lines still describe it), or no baseline yet.
@@ -220,7 +218,6 @@ function HomeBody() {
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
   if (effect?.rows.length) small.push({ key: 'effect', node: (cls) => <RoutineEffectCard className={cls} effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
   if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
-  if (diary && latestFace) small.push({ key: 'spots', node: (cls) => <SpotDiaryTile className={cls} diary={diary} onOpen={() => navigate({ pathname: `/result/${latestFace.id}`, hash: '#spot-diary' })} /> })
   const spans = rowSpans(small.length)
 
   const am = activeIn(entries, 'am')

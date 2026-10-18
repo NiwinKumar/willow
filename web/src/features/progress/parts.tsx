@@ -99,7 +99,7 @@ export function TomorrowSheet({ open, onClose }: { open: boolean; onClose: () =>
         <span aria-hidden className="pointer-events-none absolute -top-[90px] -right-[80px] size-[220px] animate-[wBreathe_6s_ease-in-out_infinite] rounded-full opacity-75 blur-[18px]" style={{ background: 'radial-gradient(circle at 40% 40%, var(--aura-apricot), var(--aura-coral) 45%, transparent 70%)' }} />
         <span className="relative font-mono text-[11px] tracking-[.08em] text-ink-2">■ AFTER YOUR FACE PHOTO</span>
         <h2 className="relative m-0 font-serif text-[clamp(28px,3.9vw,36px)] leading-[.95] font-normal">Same time tomorrow?</h2>
-        <p className="relative m-0 text-[16px] leading-[1.55] text-ink-2">The spot diary compares one day with the next, so tomorrow’s photo works best taken the same way:</p>
+        <p className="relative m-0 text-[16px] leading-[1.55] text-ink-2">Each check-in is compared with your baseline, so tomorrow’s photo works best taken the same way:</p>
         <ol className="relative m-0 flex list-none flex-col gap-2 p-0">
           {['Same room and light, facing the window', 'Clean face, nothing applied', 'Hair back, face the camera straight on'].map((t, i) => (
             <li key={t} className="flex animate-[wRise_.45s_both] items-center gap-3.5 rounded-[20px] bg-sunken px-4 py-3 text-[15px]" style={{ animationDelay: `${200 + i * 80}ms` }}>
@@ -110,7 +110,7 @@ export function TomorrowSheet({ open, onClose }: { open: boolean; onClose: () =>
             </li>
           ))}
         </ol>
-        {fine ? <p className="relative m-0 text-[13px] leading-normal text-ink-2">Phone photos work better than laptop cameras: laptop photos miss more spots, so more rows read “Not seen last time”.</p> : null}
+        {fine ? <p className="relative m-0 text-[13px] leading-normal text-ink-2">Phone photos work better than laptop cameras: laptop photos are softer, so fewer of them pass the quality check.</p> : null}
         <Button variant="primary" size="lg" onClick={onClose} className="relative">
           See today’s report
         </Button>

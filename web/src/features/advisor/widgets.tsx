@@ -1,16 +1,15 @@
 /**
  * In-chat widgets ("artifacts"). The advisor only names a widget and its parameters (api advisor_blocks.py);
- * every number here comes from the app's own data (sessions, routine, spot diary, catalog), exactly as the
+ * every number here comes from the app's own data (sessions, routine, catalog), exactly as the
  * full screens show it. Each widget links to its full screen.
  */
 import { ArrowUpRight, Check } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import { Sparkline } from '../../components/charts/Sparkline'
-import { activeIn, useRoutine, useRoutineLog, useSpots } from '../../data/hooks'
+import { activeIn, useRoutine, useRoutineLog } from '../../data/hooks'
 import type { MetricId, Product, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
-import type { SpotStatus } from '../../lib/api'
 import { fmtDate, fmtPrice } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, fmtValue, unitOf } from '../../lib/metrics'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, verdictCounts, wordsFor, type VerdictKind } from '../../lib/verdict'
@@ -195,36 +194,6 @@ function ProductWidget({ productId, links }: { productId: string; links: WidgetL
   )
 }
 
-const SPOT_WORDS: Record<SpotStatus, string> = { new: 'New', still_there: 'Still there', fading: 'Fading', not_seen_last_time: 'Not seen last time', gone: 'Gone' }
-
-function SpotDiaryWidget({ links }: { links: WidgetLinks }) {
-  const spots = useSpots()
-  const data = useData()
-  const face = [...data.all].reverse().find((s) => s.site === 'face_full' && usable(s))
-  const d = spots.data
-  const counts = (Object.keys(SPOT_WORDS) as SpotStatus[]).map((k) => [k, d?.tracks.filter((t) => t.status === k).length ?? 0] as const).filter(([, n]) => n > 0)
-  return (
-    <Frame title="Spot diary" link="Diary" onLink={() => links.go(face ? `/result/${face.id}#spot-diary` : '/progress')}>
-      {!d ? (
-        <Empty>{spots.status === 'error' ? 'The spot diary couldn’t be loaded.' : 'Loading the spot diary…'}</Empty>
-      ) : counts.length ? (
-        <span className="flex flex-wrap gap-1.5">
-          {counts.map(([k, n]) => (
-            <span key={k} className="rounded-pill bg-white px-2.5 py-1 text-[12px]">
-              {n} {SPOT_WORDS[k].toLowerCase()}
-            </span>
-          ))}
-          <span className="self-center text-[11.5px] text-ink-2">
-            over {d.sessions_used} check-in{d.sessions_used === 1 ? '' : 's'}
-          </span>
-        </span>
-      ) : (
-        <Empty>No spots followed yet. The diary starts after 3 face check-ins over 2 or more days.</Empty>
-      )}
-    </Frame>
-  )
-}
-
 function ProductTestWidget({ links }: { links: WidgetLinks }) {
   const data = useData()
   const latest = (site: Site) => [...data.all].reverse().find((s) => s.site === site && usable(s))
@@ -259,8 +228,6 @@ export function Widget({ spec, links }: { spec: WidgetSpec; links: WidgetLinks }
       return <RoutineWidget slot={p.slot === 'am' || p.slot === 'pm' ? p.slot : undefined} links={links} />
     case 'product':
       return p.product_id ? <ProductWidget productId={p.product_id} links={links} /> : null
-    case 'spot_diary':
-      return <SpotDiaryWidget links={links} />
     case 'product_test':
       return <ProductTestWidget links={links} />
     default:

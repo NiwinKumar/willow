@@ -16,9 +16,6 @@ import { useHoldCompare } from './useHoldCompare'
 import { useImageStatus } from './useImageStatus'
 import { candidateView, GROUP_LABEL, shownViews, VIEW_LABEL, VIEW_ORDER, viewSession } from './views'
 
-/** A spot diary sighting shown on this photo: its box in this photo's pixels. */
-export type DiaryFocus = { bbox: [number, number, number, number] | null; candidateId?: string | null; tag: string; area: string; status: string; backLabel: string; onBack: () => void }
-
 type Overlay = 'spots' | 'redness' | 'areas' | 'none'
 const OVERLAY_LABEL: Record<Overlay, string> = { spots: 'Spots', redness: 'Redness', areas: 'Areas', none: 'None' }
 
@@ -27,7 +24,6 @@ const fine = () => typeof window !== 'undefined' && window.matchMedia('(pointer:
 
 type Props = {
   session: Session
-  focus: DiaryFocus | null
   /** The baseline this check-in is compared with: hold the photo to see it in place. */
   baseline?: Session | null
   /** GET /v1/sessions/{id} for this session (redness overlay, spot crops), when it has loaded. */
@@ -47,13 +43,13 @@ const SIDE_METRICS: MetricId[] = ['pigment_spots', 'blemishes']
  * Right cheek toggle; each photo shows its own spots, redness and areas. Beside it the "Detected spots" panel
  * (grouped by photo when there are cheek photos), the mole note and the photo-quality card.
  */
-export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ session, focus, baseline = null, view = null, order = [], onOpenMetric }, ref) {
+export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ session, baseline = null, view = null, order = [], onOpenMetric }, ref) {
   const [overlayPick, setOverlay] = useState<Overlay | null>(null)
   const [showHidden, setShowHidden] = useState(false)
   const [picked, setPicked] = useState<{ sid: string; n: number } | null>(null)
   const [region, setRegion] = useState<{ sid: string; key: string } | null>(null)
   const [all, setAll] = useState(false)
-  const [viewPick, setViewPick] = useState<{ sid: string; focusId: string | null; v: ViewName } | null>(null)
+  const [viewPick, setViewPick] = useState<{ sid: string; v: ViewName } | null>(null)
 
   // The single-session view belongs to this session only (it may still be the previous one while scrubbing).
   const own = view?.session.id === session.id ? view.session : null
@@ -61,16 +57,13 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const views = useMemo(() => shownViews(session.result, signedViews), [session.result, signedViews])
   const multi = views.length > 1
   const allItems = useMemo(() => spotItems(session), [session])
-  // Which photo is on the stage: the one picked, else the one the diary's spot is on, else the front.
-  const focusId = focus?.candidateId ?? null
-  const focusItem = focusId ? allItems.find((it) => it.c.id === focusId) : undefined
-  const pickedView = viewPick?.sid === session.id && viewPick.focusId === focusId ? viewPick.v : null
-  const wanted = pickedView ?? (focusItem ? candidateView(focusItem.c) : null)
+  // Which photo is on the stage: the one picked, else the front.
+  const wanted = viewPick?.sid === session.id ? viewPick.v : null
   const rv = multi ? (views.find((v) => v.view === wanted) ?? views[0]) : null
   const active: ViewName = rv?.view ?? 'front'
   const sv = rv ? signedViews.find((v) => v.view === rv.view) : undefined
   const shown = useMemo(() => (rv && sv ? viewSession(session, rv, sv.preview) : session), [session, rv, sv])
-  const pickView = (v: ViewName) => setViewPick({ sid: session.id, focusId, v })
+  const pickView = (v: ViewName) => setViewPick({ sid: session.id, v })
 
   // Only the marks on the photo shown: without the cheek photos (still loading, failed, older sessions) that is the front.
   const items = allItems.filter((it) => candidateView(it.c) === active)
@@ -92,10 +85,6 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const expired = !session.preview && photoExpired(session)
   const missing = expired ? 'Photos are deleted 30 days after upload. The measurements stay.' : 'No photo preview for this check-in. The numbers are measured from your photos.'
   const caption = `YOUR PHOTO · ${fmtDate(session.created_at).toUpperCase()}`
-  // The diary's box is in the pixels of the photo its spot was found on.
-  const focusHere = !focusItem || candidateView(focusItem.c) === active
-  const focusPos = focus?.bbox && focusHere ? toPct(box, focus.bbox[0] + focus.bbox[2] / 2, focus.bbox[1] + focus.bbox[3] / 2) : null
-  const focusSize = focus?.bbox ? Math.min(64, Math.max(28, (Math.max(focus.bbox[2], focus.bbox[3]) / box.w) * 420 + 14)) : 0
 
   const rednessUrl = (sv ? sv.redness_url : own?.overlay_urls?.redness) ?? null
   const crops = own?.crop_urls ?? {}
@@ -147,33 +136,10 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             {overlay === 'redness' && rednessUrl ? <RednessLayer url={rednessUrl} box={box} session={shown} /> : null}
             {overlay === 'areas' ? <RegionLayer regions={regions} box={box} open={openRegion?.key ?? null} onPick={(key) => setRegion(openRegion?.key === key ? null : { sid: session.id, key })} /> : null}
             {overlay === 'spots' ? visible.map(ring) : null}
-            {focus && focusPos ? (
-              <>
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both,wRingPulse_1.8s_.5s_ease-out_infinite] rounded-full border-[2.5px] border-ink outline-[3px] outline-white/85 outline-solid"
-                  style={{ left: `${focusPos.left}%`, top: `${focusPos.top}%`, width: focusSize, height: focusSize, zIndex: 4 }}
-                />
-                <span className="pointer-events-none absolute -translate-x-1/2 animate-[wFadeIn_.4s_.1s_both] rounded-pill bg-selected px-3 py-[7px] text-[12px] whitespace-nowrap text-inverse" style={{ left: `${focusPos.left}%`, top: `calc(${focusPos.top}% + ${focusSize / 2 + 8}px)`, zIndex: 4 }}>
-                  {focus.tag}
-                </span>
-              </>
-            ) : null}
           </PhotoFrame>
           {multi ? (
             <div className="absolute top-3.5 left-1/2 z-[6] w-max max-w-[calc(100%-24px)] -translate-x-1/2">
               <SegmentedControl glass label="Which photo" options={views.map((v) => ({ value: v.view, label: VIEW_LABEL[v.view] }))} value={active} onChange={pickView} />
-            </div>
-          ) : null}
-          {focus && overlay !== 'areas' ? (
-            <div className={`absolute inset-x-3.5 z-[5] ${multi ? 'top-[62px]' : 'top-3.5'} flex animate-[wRise_.35s_both] items-center gap-3 rounded-[22px] bg-surface/90 py-2.5 pr-2.5 pl-4 backdrop-blur-[14px]`}>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[15px]">{focus.area}</span>
-                <span className="text-[13px] text-ink-2">{focus.bbox && focusHere ? focus.status : 'Not seen on this photo'}</span>
-              </span>
-              <button type="button" onClick={focus.onBack} className="min-h-11 shrink-0 rounded-pill bg-selected px-3.5 text-[13px] text-inverse">
-                Back to {focus.backLabel}
-              </button>
             </div>
           ) : null}
           {session.preview && overlay === 'redness' ? (
