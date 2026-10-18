@@ -29,6 +29,7 @@
 - Input: product photo(s) (front and/or back).
 - Output: `{brand, product_name, category: enum(CATALOG_SPEC), inci: [{name, confidence: high|low}], key_actives: [{name, pct: number|null}], claims_on_pack: string[], confidence, failure: glare|blurry|no_label|cut_off|null}` (Oct 15: per-ingredient legibility and a failure reason; plain `inci` strings still validate as legible items). Validator: a failure caps `confidence` at low, any low-confidence ingredient caps it at medium, `no_label` drops everything read; a failure with nothing read is refunded so the retake is free. The web draws low-confidence ingredients as dashed chips with "?" and gives retry advice per failure reason.
 - Then match against catalog (brand + name fuzzy match); if matched, link `product_id`; else store as custom routine entry.
+- Oct 18: the add sheet uses the scan only inside **Request a product**: a pack photo is read to fill in brand and name (or, on a catalog match, offer that product); nothing read is saved as a routine product. The request itself goes to `POST /v1/product-requests` (CONTRACT.md).
 - api: `POST /v1/label-scan` with `{images: [{mime_type, data_base64}]}` (1-2 images, the web downsizes to a JPEG first) returns `{scan, match}` and saves nothing; the web shows a confirm/edit step, then `POST /v1/routine`. Trailing punctuation from printed lists is stripped; active names are lower-cased.
 
 ## 4. Routine compatibility check
