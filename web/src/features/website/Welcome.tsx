@@ -17,18 +17,19 @@ import { choicesOf, trackOf, type TrackChoice } from '../../lib/track'
 import { useAuth } from '../../lib/useAuth'
 import { SoftBackdrop } from './Decor'
 import { FIRST_CHECKIN, hasConsent } from './entry'
+import { MeetWisp } from './MeetWisp'
 
 const BACKDROP = 'radial-gradient(40% 40% at 15% 20%, rgba(255,178,122,.55), transparent 70%), radial-gradient(40% 45% at 85% 80%, rgba(156,211,255,.6), transparent 70%), radial-gradient(35% 35% at 80% 15%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
 
-type Step = 'consent' | 'goals' | 'places' | 'about'
-const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Capture']
-const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3 }
-const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places' }
-const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places' }
+type Step = 'consent' | 'goals' | 'places' | 'about' | 'wisp'
+const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Meet Wisp', 'Capture']
+const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3, wisp: 4 }
+const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places', wisp: '/welcome/about' }
+const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places', wisp: 'about you' }
 
 /**
  * Onboarding: /welcome = consent, /welcome/goals = goals, /welcome/places = places to track (every check-in covers
- * them all), /welcome/about = photo time, optional skin type and check-in days; then the person's first check-in (or `?next=`). Each step fits one screen (laptop and phone):
+ * them all), /welcome/about = photo time, optional skin type and check-in days, /welcome/wisp = meet Wisp (an animated introduction to the assistant); then the person's first check-in (or `?next=`). Each step fits one screen (laptop and phone):
  * a compact title, the step's content (scrolls inside only if a detail is opened) and an action bar that is
  * always in view. Consent is kept on this device (lib/prefs) and saved to the account (PUT /v1/me/consent);
  * the rest is the profile (lib/profile, PUT /v1/me/profile). Goals only reorder the report.
@@ -36,7 +37,7 @@ const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places:
 export default function Welcome() {
   const { step: raw } = useParams()
   const { search } = useLocation()
-  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' ? raw : 'consent'
+  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' || raw === 'wisp' ? raw : 'consent'
   const { user } = useAuth()
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function Welcome() {
         <Stepper current={STEP_INDEX[step]} />
         <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
       </header>
-      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : <Consent key="consent" />}
+      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : step === 'wisp' ? <Wisp key="wisp" /> : <Consent key="consent" />}
     </div>
   )
 }
@@ -384,14 +385,12 @@ function About() {
   const { user, continueAsGuest } = useAuth()
   const { saveProfile, profile } = useData()
   const navigate = useNavigate()
-  const [params] = useSearchParams()
   const [time, setTime] = useState<PhotoTime>(() => profile.photo_time ?? 'evening')
   const [skin, setSkin] = useState<SkinType | null>(() => profile.skin_type)
   const [days, setDays] = useState<number[]>(() => profile.checkin?.days ?? [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const target = nextPath(params.get('next'), FIRST_CHECKIN)
-  const toCapture = target.startsWith('/check-in')
+  const { search } = useLocation()
 
   const finish = async () => {
     const checkin = days.length ? { days, time: profile.checkin?.time ?? PHOTO_TIME_CLOCK[time], tz: browserTz() } : null
@@ -407,11 +406,7 @@ function About() {
         return setError('Could not start a guest session. Check your connection and try again.')
       }
     }
-    if (toCapture) {
-      // The first check-in draws over Home (not over onboarding), so its ✕ and the Back from its result land on Home.
-      navigate('/home', { replace: true })
-      navigate(target, { state: { background: { pathname: '/home', search: '', hash: '', state: null, key: 'welcome' } } })
-    } else navigate(target)
+    navigate(`/welcome/wisp${search}`)
   }
 
   return (
@@ -427,7 +422,7 @@ function About() {
             </p>
           ) : null}
           <button type="button" onClick={() => void finish()} disabled={busy} className={primary}>
-            {busy ? 'Starting…' : toCapture ? 'Save and set up my first capture' : 'Save and continue'} <span aria-hidden>→</span>
+            {busy ? 'Starting…' : 'Save and continue'} <span aria-hidden>→</span>
           </button>
         </>
       }
@@ -464,6 +459,56 @@ function About() {
           </div>
         </Field>
       </div>
+    </StepFrame>
+  )
+}
+
+/** Meet Wisp: the assistant's introduction, then on to the first check-in (or `?next=`). */
+function Wisp() {
+  const { user, continueAsGuest } = useAuth()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const target = nextPath(params.get('next'), FIRST_CHECKIN)
+  const toCapture = target.startsWith('/check-in')
+
+  const finish = async () => {
+    if (!user) {
+      setBusy(true)
+      setError(null)
+      try {
+        await continueAsGuest()
+      } catch {
+        setBusy(false)
+        return setError('Could not start a guest session. Check your connection and try again.')
+      }
+    }
+    if (toCapture) {
+      // The first check-in draws over Home (not over onboarding), so its ✕ and the Back from its result land on Home.
+      navigate('/home', { replace: true })
+      navigate(target, { state: { background: { pathname: '/home', search: '', hash: '', state: null, key: 'welcome' } } })
+    } else navigate(target)
+  }
+
+  return (
+    <StepFrame
+      eyebrow="YOUR ASSISTANT"
+      title="Meet Wisp"
+      actions={
+        <>
+          {error ? (
+            <p role="alert" className="m-0 rounded-[14px] bg-selected px-3.5 py-2 text-[13px] text-inverse">
+              {error}
+            </p>
+          ) : null}
+          <button type="button" onClick={() => void finish()} disabled={busy} className={primary}>
+            {busy ? 'Starting…' : toCapture ? 'Set up my first capture' : 'Continue'} <span aria-hidden>→</span>
+          </button>
+        </>
+      }
+    >
+      <MeetWisp />
     </StepFrame>
   )
 }
