@@ -25,7 +25,7 @@ export function ResultHero({ hero, photos }: { hero: Hero; photos: string }) {
         <div className="flex flex-wrap justify-center gap-2">
           {hero.chips.map((c) => (
             <span key={c.t} className="flex items-center gap-2 rounded-pill bg-white/60 px-3.5 py-[9px] text-[14px] text-ink backdrop-blur-[12px]">
-              {c.g === 'text' ? <span aria-hidden>{c.mark}</span> : <VerdictGlyph kind={c.g} />}
+              {c.g === 'text' ? <span aria-hidden>{c.mark}</span> : <VerdictGlyph kind={c.g} way={c.way} />}
               {c.t}
             </span>
           ))}

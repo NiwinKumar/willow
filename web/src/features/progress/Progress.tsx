@@ -25,7 +25,9 @@ import { routineNotes, sessionNotes, type Note } from './timeline'
 const PLACES: Site[] = ['face_full', ...CLOSE_UPS]
 const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)
 // The day colour is the most telling session of the day: a change outranks a baseline, a normal day and so on.
-const DAY_RANK: DayStatus[] = ['changed', 'baseline', 'normal', 'notEnough', 'rejected', 'other']
+const DAY_RANK: DayStatus[] = ['improved', 'otherWay', 'shifted', 'baseline', 'normal', 'notEnough', 'rejected', 'other']
+// The key lists the day colours this calendar uses (the baseline and the normal range always).
+const KEY_ORDER: DayStatus[] = ['baseline', 'improved', 'otherWay', 'shifted', 'normal', 'notEnough', 'rejected', 'other']
 
 /** One metric of one place, charted against that place's current baseline (the capture mode of its latest check-in). */
 type Track = { site: Site; mode: CaptureMode; metric: MetricId; label: string }
@@ -124,8 +126,10 @@ export default function Progress() {
 
   // ---- calendar cells ----
   const days: Record<string, CalendarDay> = {}
+  const used = new Set<DayStatus>()
   for (const [d, list] of byDay) {
     const st = DAY_RANK.find((k) => list.some((x) => dayStatus(x) === k)) ?? 'other'
+    used.add(st)
     const started = routineDays[d] ?? []
     const note = list.some((x) => x.note)
     const when = parseDate(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -172,7 +176,7 @@ export default function Progress() {
               onNext={() => mi < months.length - 1 && setMonthPick(months[mi + 1])}
               legend={
                 <>
-                  {(['baseline', 'changed', 'normal', 'notEnough', 'rejected', 'other'] as const).map((k) => (
+                  {KEY_ORDER.filter((k) => k === 'baseline' || k === 'normal' || used.has(k)).map((k) => (
                     <KeyRow key={k} swatch={{ background: DAY_BG[k] }}>
                       {DAY_WORDS[k]}
                     </KeyRow>

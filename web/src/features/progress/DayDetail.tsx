@@ -15,7 +15,7 @@ import { ApiError, api } from '../../lib/api'
 import { clockOf, fmtDate, parseDate } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
-import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
+import { VERDICT_WORDS, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
 import { frameFor, photoSize } from './frame'
 import { MetricTile } from './MetricCard'
@@ -88,7 +88,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   const c = counts(session)
   const measured = st === 'compared' || st === 'baseline' || st === 'former'
   const ordered = orderMetrics(session.result?.metrics ?? [], data.goals)
-  const chips: { g: VerdictKind | null; t: string }[] =
+  const chips: { g: VerdictKind | null; t: string; way?: ChangeWay }[] =
     st === 'rejected'
       ? [{ g: 'notCompared', t: 'Not measured' }]
       : st === 'baseline'
@@ -97,10 +97,10 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             { g: null, t: 'Later days compare with this one' },
           ]
         : st === 'compared'
-          ? (['changed', 'normal', 'notEnough', 'notCompared'] as const).filter((k) => c[k]).map((k) => ({ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }))
+          ? [...changeLines(session).map((l) => ({ g: 'changed' as const, way: l.way, t: l.text })), ...(['normal', 'notEnough', 'notCompared'] as const).filter((k) => c[k]).map((k) => ({ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }))]
           : [{ g: 'notCompared', t: st === 'former' ? 'An earlier baseline, not compared' : st === 'pending' ? 'Still measuring' : st === 'failed' ? 'Did not finish measuring' : 'Not measured' }]
   const big = st === 'rejected' ? '00' : st === 'baseline' ? String(usedFrames(session)).padStart(2, '0') : st === 'compared' ? String(c.changed).padStart(2, '0') : '—'
-  const bigLabel = st === 'rejected' ? 'usable photos' : st === 'baseline' ? 'photos in your baseline' : st === 'compared' ? (c.changed === 1 ? 'reading changed beyond your normal range' : 'readings changed beyond your normal range') : 'not compared'
+  const bigLabel = st === 'rejected' ? 'usable photos' : st === 'baseline' ? 'photos in your baseline' : st === 'compared' ? (c.changed === 1 ? 'reading moved beyond your normal range' : 'readings moved beyond your normal range') : 'not compared'
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
   const notes = [...started.map((e) => ({ text: `Started ${productName(e)}`, dot: NOTE_DOT.routine })), ...sessionNotes(session).filter((n) => n.kind !== 'note')]
   const others = list.filter((s) => s.id !== session.id)
@@ -139,7 +139,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             <div className="flex flex-wrap gap-1.5">
               {chips.map((ch) => (
                 <span key={ch.t} className="flex min-h-[34px] items-center gap-[7px] rounded-pill bg-white/60 px-[13px] text-[13px]">
-                  {ch.g ? <VerdictGlyph kind={ch.g} /> : <span aria-hidden>○</span>}
+                  {ch.g ? <VerdictGlyph kind={ch.g} way={ch.way} /> : <span aria-hidden>○</span>}
                   {ch.t}
                 </span>
               ))}
@@ -202,7 +202,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 className="flex min-h-11 items-center text-[14px] underline"
                 onClick={() =>
                   shell.openAdvisor(
-                    `Help me read my ${SITE_LABEL[site].toLowerCase()} check-in from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${st === 'compared' ? `${c.changed} changed, ${c.normal} within normal range` : st === 'baseline' ? 'it is my baseline' : st === 'rejected' ? 'the photos could not be measured' : 'it was not compared'}${started.length ? `. I started ${started.map(productName).join(' and ')} that day` : ''}.`,
+                    `Help me read my ${SITE_LABEL[site].toLowerCase()} check-in from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${st === 'compared' ? `${[...changeLines(session).map((l) => l.text), `${c.normal} within normal range`].join(', ')}` : st === 'baseline' ? 'it is my baseline' : st === 'rejected' ? 'the photos could not be measured' : 'it was not compared'}${started.length ? `. I started ${started.map(productName).join(' and ')} that day` : ''}.`,
                     `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`,
                   )
                 }

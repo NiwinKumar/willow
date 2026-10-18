@@ -1,5 +1,6 @@
 import type { MetricId, RoutineCheck, RoutineEntry, Session, Site } from '../data/types'
 import type { Outcome } from './outcome'
+import { WANTED } from './verdict.ts'
 
 /**
  * How the routine is doing, product by product (Home's "Routine effect"). Every fact is a number the engine
@@ -25,19 +26,6 @@ export type EffectDeps = {
 /** helping: a real change in the direction people usually want; away: a real change the other way; changed: a real change with no preferred direction (skin tone); steady: measured, nothing beyond the normal range; early: too soon to say. */
 export type Effect = 'helping' | 'away' | 'changed' | 'steady' | 'early'
 
-/** The direction of change people usually want per metric (docs/CONTRACT.md: "lower redness is usually desired"). Skin tone has none. */
-const WANTED: Partial<Record<MetricId, 1 | -1>> = {
-  pigment_spots: -1,
-  tone_evenness: -1,
-  redness: -1,
-  blemishes: -1,
-  pores: -1,
-  texture: -1,
-  lines: -1,
-  shine: -1,
-  dark_circles: 1,
-  glow: 1,
-}
 
 /** Weeks without a change beyond the normal range after which a product is worth a second look (outcome text: most effects take 4 to 8 weeks). */
 export const REVIEW_WEEKS = 8
@@ -121,7 +109,7 @@ export function routineEffect(entries: RoutineEntry[], sessions: Session[], chec
       const delta = o.session.result?.metrics.find((m) => m.id === o.metric)?.delta ?? 0
       const wanted = WANTED[o.metric]
       effect = wanted === undefined ? 'changed' : Math.sign(delta) === wanted ? 'helping' : 'away'
-      line = effect === 'helping' ? 'Helping' : effect === 'away' ? 'Moving the other way' : 'Changed'
+      line = effect === 'helping' ? 'Helping' : effect === 'away' ? 'Moving the other way' : 'Shifted'
     } else if (o.kind === 'none') {
       effect = 'steady'
       line = 'No change beyond your normal range'

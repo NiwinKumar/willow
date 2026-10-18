@@ -21,7 +21,8 @@ def test_template_only_quotes_numbers_from_the_metrics():
         }
     )
     exp = explain.template(result)
-    assert exp["headline"] == "1 real change since your baseline"
+    # the fixture's redness went up: said gently, never "worse"
+    assert exp["headline"] == "1 moved the other way since your baseline"
     assert exp["items"][0]["metric_id"] == "redness"
     allowed = set()
     for m in result["metrics"]:
@@ -361,3 +362,46 @@ def test_saved_explanations_with_jargon_or_many_numbers_are_flagged_for_a_rewrit
         "items": [{"summary": "7 fewer blemishes than at your start."}],
     }
     assert explain.plain_enough(new) and explain.plain_enough(None)
+
+
+def _m(mid, delta, verdict="real_change"):
+    return {
+        "id": mid,
+        "label": mid,
+        "verdict": verdict,
+        "delta": delta,
+        "mdc95": 0.5,
+        "value": 1.0,
+        "confidence": "indicative",
+        "unit": "%",
+    }
+
+
+def test_a_change_is_said_by_its_direction():
+    assert explain.change_headline([_m("redness", -1.0), _m("pores", -2.0)]) == (
+        "2 improved since your baseline"
+    )
+    assert explain.change_headline([_m("redness", -1.0), _m("glow", -0.2)]) == (
+        "1 improved, 1 moved the other way since your baseline"
+    )
+    assert explain.change_headline([_m("tone_ita", 3.0)]) == "1 shifted since your baseline"
+    assert explain.since_start(_m("redness", 1.0), 1.0) == "moved the other way since your start"
+    assert (
+        explain.since_start(_m("dark_circles", 1.0), 1.0)
+        == "a brighter under-eye than at your start"
+    )
+
+
+def test_harsh_words_and_false_improvements_are_rejected():
+    data = {"metrics": [_m("redness", 1.0) | {"way": "other_way"}], "frames_used": 3}
+    harsh = explain._Explanation(
+        headline="Redness moved the other way",
+        items=[{"metric_id": "redness", "summary": "Your redness got worse since your start."}],
+        next_steps=[],
+        disclaimer=explain.DISCLAIMER,
+    )
+    assert any("harsh" in p for p in explain.problems(harsh, data))
+    flipped = harsh.model_copy(
+        update={"items": [explain._Item(metric_id="redness", summary="Your redness improved.")]}
+    )
+    assert any("improvement claimed" in p for p in explain.problems(flipped, data))

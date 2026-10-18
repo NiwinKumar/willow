@@ -1,6 +1,6 @@
 import type { Metric, Session } from '../../data/types.ts'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics.ts'
-import { verdictKind } from '../../lib/verdict.ts'
+import { changeWay, verdictKind } from '../../lib/verdict.ts'
 
 /**
  * What a measurement card says first after the baseline: the verdict in words ("Calmer than your start",
@@ -18,10 +18,13 @@ export function verdictHeadline(m: Metric, session: Pick<Session, 'is_baseline'>
   const fmt = (v: number) => `${fmtValue(v, m)}${unit === '°' ? '°' : unit ? ` ${unit}` : ''}`
   const numbers = m.delta !== null && m.delta !== undefined ? `${fmt(m.value - m.delta)} → ${fmt(m.value)}` : fmt(m.value)
   if (kind === 'changed') {
+    const way = changeWay(m)
+    // Skin tone is descriptive: a shift is reported, never a better direction. A change the other way is said
+    // gently ("Moved the other way"), never "worse".
+    if (way === 'shifted') return { headline: `Shifted since ${against}`, numbers }
+    if (way === 'otherWay') return { headline: `Moved the other way since ${against}`, numbers }
     const meta = METRIC_META[m.id]
-    // Skin tone is descriptive: a change is reported, never a better or worse direction.
-    if (m.id === 'tone_ita' || m.delta === null || m.delta === undefined) return { headline: `Changed since ${against}`, numbers }
-    const words = m.delta < 0 ? meta.decrease : meta.increase
+    const words = (m.delta ?? 0) < 0 ? meta.decrease : meta.increase
     return { headline: `${words.charAt(0).toUpperCase()}${words.slice(1)} than ${against}`, numbers }
   }
   if (kind === 'normal') return { headline: 'No real change', numbers }

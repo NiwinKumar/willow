@@ -338,7 +338,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
         <div className="card flex flex-col gap-1.5 bg-sunken px-5 py-4">
           <span className="font-mono text-[12px] text-ink-2">■ YOUR READINGS SINCE START</span>
           <span className="flex items-center gap-2 text-[15px]">
-            <VerdictGlyph kind={OUTCOME_GLYPH[outcome.kind]} />
+            <VerdictGlyph kind={OUTCOME_GLYPH[outcome.kind]} way={outcome.kind === 'real' ? outcome.way : undefined} />
             {outcome.text}
           </span>
           <span className="text-[13px] leading-[1.5] text-ink-2">{outcome.detail}</span>
