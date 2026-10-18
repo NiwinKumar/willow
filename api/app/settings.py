@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # this service account's email. Unset audience: the route answers 503 (except AUTH_MODE=dev).
     reminders_audience: str | None = None
     scheduler_service_account: str = "sa-scheduler@willow-511508.iam.gserviceaccount.com"
+    # POST /v1/internal/autopilot (AutoCampaign's nightly check, app/autopilot.py): the same
+    # scheduler service account, with this audience. Unset: 503 (except AUTH_MODE=dev).
+    autopilot_audience: str | None = None
     # A reminder goes out on the first run at or after the scheduled time, up to this long after it.
     reminder_window_minutes: int = 30
 

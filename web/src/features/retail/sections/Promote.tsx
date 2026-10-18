@@ -11,6 +11,7 @@ import { sectionPath, useRetailState } from '../state'
 import type { ProductRow, Products } from '../types'
 import { Bone, Button, EmptyState, ErrorState, int, PageHeader, pts, SidePanel, SkeletonTable, ToolButton } from '../ui'
 import { CampaignDetail, CampaignDetailFooter, type Confirm } from './promote/CampaignCard'
+import { AutoCampaigns } from './promote/AutoCampaigns'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
 import { useCampaignActions } from './promote/useCampaignActions'
@@ -23,7 +24,8 @@ import { EligibleList } from './promote/EligibleList'
  * Eligibility is always the mixed cohort, all time (the evidence shoppers see), whatever the top bar says.
  * Sign-in: a guest account, made on arrival (as Ask does on first question).
  * URL: ?new=<product_id> (or ?new=1, or the older ?product=<id>) opens the create panel (&skins=a,b ticks only those skin types); ?campaign=<id> opens a
- * campaign; ?all=1 lists campaigns from every workspace.
+ * campaign; ?all=1 lists campaigns from every workspace. AutoCampaign (standing rules and their activity) sits under
+ * the campaigns (#autocampaign).
  */
 
 const REFRESH_MS = 30_000
@@ -311,6 +313,8 @@ function Body({ uid }: { uid: string }) {
       ) : (
         <HowItWorks />
       )}
+
+      <AutoCampaigns uid={uid} workspace={{ id: wsId ?? 'retailer', label: wsLabel }} onCampaignsChanged={() => void refetch()} />
 
       <EligibleList
         title={brand ? 'Your products ready to promote' : 'Ready to promote'}
