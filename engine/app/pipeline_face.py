@@ -574,7 +574,8 @@ def _candidates(
                     **({"seen_in_fraction": seen[i - 1]} if seen else {}),
                     # which photo of the session the bbox is in, and its view (VIEW_CODE)
                     "frame_index": float(frame["index"]),
-                    "view": VIEW_CODE.get(frame["view"], 0.0),
+                    # (a close-up has no face view: 0, like a front photo)
+                    "view": VIEW_CODE.get(frame.get("view", "front"), 0.0),
                     "frames_in_view": float(frames),
                     **_place_features(places[i - 1], b.radius),
                 },
