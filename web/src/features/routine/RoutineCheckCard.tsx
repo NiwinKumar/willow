@@ -120,47 +120,47 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
         </div>
       ) : done ? (
         <div className="flex flex-col gap-3">
-          <div className={rows ? 'flex flex-col divide-y divide-white/10 border-t border-white/10' : `grid gap-3 ${shown.length === 2 ? '@min-[560px]:grid-cols-2' : ''}`}>
+          <div className={rows ? 'flex flex-col gap-2' : `grid gap-3 ${shown.length === 2 ? '@min-[560px]:grid-cols-2' : ''}`}>
             {shown.map((f, i) => {
               const sev = SEVERITY_STYLE[f.severity]
               const open = !phone || openKey === f.key
-              const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={26} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
+              const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={rows ? 20 : 26} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
               const actions = (
                 <span className={`flex flex-wrap justify-end gap-2 ${rows ? '@min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto border-t border-white/10 pt-3'}`}>
                   {f.find ? (
-                    <button type="button" onClick={() => onFind(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink">
+                    <button type="button" onClick={() => onFind(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink">
                       Find one
                     </button>
                   ) : null}
                   {f.alternate && f.entries.length === 2 ? (
-                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink disabled:opacity-60">
+                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink disabled:opacity-60">
                       {alternating === f.key ? 'Saving…' : 'Alternate these'}
                     </button>
                   ) : null}
-                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-9 rounded-pill bg-white/[.16] px-3.5 text-[13px] whitespace-nowrap transition-colors hover:bg-white/[.26]">
+                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-8 rounded-pill bg-white/[.16] px-3.5 text-[12.5px] whitespace-nowrap transition-colors hover:bg-white/[.26]">
                     Ask Wisp why →
                   </button>
                 </span>
               )
               return (
-                <article key={f.key} className={rows ? 'flex flex-col gap-3 py-4 last:pb-0 @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-6' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
-                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <article key={f.key} className={rows ? 'flex flex-col gap-2.5 rounded-[16px] bg-white/[.07] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-5' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
+                  <div className={`flex min-w-0 flex-1 flex-col ${rows ? 'gap-1.5' : 'gap-3'}`}>
                     <div className="flex items-start gap-2.5">
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                        <span className="flex flex-wrap items-center gap-x-2 font-mono text-[10.5px] tracking-[.08em] text-[#C9CFFF]">
+                        <span className="flex flex-wrap items-center gap-x-2 text-[11.5px] text-[#C9CFFF]">
                           <span>
                             <span aria-hidden>{sev.glyph} </span>
-                            {f.severity.toUpperCase()}
-                            <span className="sr-only"> severity</span> · {f.kind.toUpperCase()}
+                            {f.severity}
+                            <span className="sr-only"> severity</span> {f.kind.toLowerCase()}
                           </span>
                           {f.ai ? (
                             <span className="inline-flex items-center gap-1">
                               <Sparkles size={11} strokeWidth={1.8} aria-hidden />
-                              AI SUGGESTION
+                              AI suggestion
                             </span>
                           ) : null}
                         </span>
-                        <h3 className={`text-[15px] leading-[1.35] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
+                        <h3 className={`text-[15px] leading-[1.3] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
                       </div>
                       {phone ? (
                         <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12]">
@@ -171,7 +171,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                     {open ? (
                       <>
                         {items.length ? (
-                          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-[13px]">
+                          <ul className={`m-0 flex list-none flex-wrap p-0 text-[12.5px] ${rows ? 'gap-x-3.5 gap-y-1' : 'gap-x-4 gap-y-2'}`}>
                             {items.map((it) => (
                               <li key={it.id} title={it.full} className="flex items-center gap-2">
                                 {it.image}
@@ -180,7 +180,9 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                             ))}
                           </ul>
                         ) : null}
-                        <p className={`max-w-[60ch] text-[13px] leading-[1.5] ${MUTED}`}>{f.fix}</p>
+                        <p title={f.fix} className={`max-w-[64ch] text-[12.5px] leading-[1.45] ${MUTED} ${rows ? 'line-clamp-2' : ''}`}>
+                          {f.fix}
+                        </p>
                       </>
                     ) : null}
                   </div>
