@@ -13,7 +13,7 @@ const onResult = () => window.location.pathname.startsWith('/progress/')
 const checkIn = (k: number, caption: string): TourStep => ({ route: `/replay/${DAYS[k]}${k === 0 ? '?full=1' : ''}`, until: onResult, hold: 1400, caption })
 // Hold to compare, as she would: holding B flickers her baseline over this week's photo (useHoldCompare).
 const holdB = (type: 'keydown' | 'keyup') => () => void window.dispatchEvent(new KeyboardEvent(type, { key: 'b' }))
-const photo = 'css:[aria-label="Reference photo"] svg[role="img"]'
+const photo = 'css:[aria-label="Reference photo"] > div:first-child'
 const compare = (caption: string): TourStep[] => [
   { target: photo, action: 'point', hold: 900, caption },
   { target: photo, action: 'point', run: holdB('keydown'), hold: 3600, caption: 'She holds the photo: her baseline flickers over this week’s, same framing. The quickest way to see a change.' },
