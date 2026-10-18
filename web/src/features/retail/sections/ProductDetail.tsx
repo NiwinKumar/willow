@@ -14,10 +14,11 @@ import { ANCHOR, channelOf, CLAIM_TIERS, DEFAULT_CHANNEL, type ActionTarget } fr
 import { sectionPath, useRetailState } from '../state'
 import type { Actions, BrandFlow, Filters, Insights, ProductDetail as Detail, Seg } from '../types'
 import { useView } from '../useView'
-import { Badge, Bone, Button, copyText, CurveChart, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, ProofTierChip, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
+import { Badge, Bone, Button, copyText, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, ProofTierChip, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
 import { ClaimStudio } from './ClaimStudio'
 import { FeelPanel } from './FeelPanel'
 import { NextSteps } from './NextSteps'
+import { ProductJourney } from './ProductJourney'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
@@ -40,7 +41,7 @@ export default function ProductDetail() {
 
 function DetailSkeleton() {
   return (
-    <div role="status" aria-label="Loading product" className="flex flex-col gap-8">
+    <div role="status" aria-label="Loading product" className="flex flex-col gap-4">
       <div aria-hidden className="flex gap-4">
         <Bone className="size-14 shrink-0 rounded-card" />
         <div className="flex flex-1 flex-col gap-2">
@@ -48,10 +49,9 @@ function DetailSkeleton() {
           <Bone className="h-4 w-[min(420px,60%)]" />
         </div>
       </div>
-      <SkeletonPanel height={110} />
-      <div aria-hidden className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <SkeletonPanel height={420} className="lg:col-span-7" />
-        <SkeletonPanel height={420} className="lg:col-span-5" />
+      <div aria-hidden className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <SkeletonPanel height={340} className="lg:col-span-8" />
+        <SkeletonPanel height={340} className="lg:col-span-4" />
       </div>
     </div>
   )
@@ -109,6 +109,7 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
   const steps = pipelineSteps({ p, weeksN, statements: x.evidence.length, eligible: x.eligibility.eligible, campaign, promoteTo })
   const actions = useView<Actions>(`actions|${p.product_id}|${filters.cohort}|${filters.range}`, () => retailerActions(p.product_id, filters))
   const hasSteps = actions.status === 'ready' && actions.data.actions.length > 0
+  const showSteps = actions.status !== 'failed' && !(actions.status === 'ready' && !actions.data.actions.length)
   const channel = channelOf(param('claim'))
   // A next step on this page: pick its tab or channel, then scroll there once the new tab has rendered.
   const scrollTo = (t: Extract<ActionTarget, { kind: 'scroll' }>) => {
@@ -122,8 +123,8 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
   }, [hash, p.product_id])
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-proof-small text-ink-2">
           <Link to={`${sectionPath('products')}${carry}`} className="rounded-ctl text-ink-2 no-underline hover:text-ink">
             Products
@@ -181,31 +182,36 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
         </div>
       </div>
 
-      <section id={ANCHOR.pipeline} aria-labelledby="pipe-h" className="rounded-card border border-line bg-surface px-5 py-5 outline-none">
-        <h2 id="pipe-h" className="sr-only">
-          Proof pipeline
-        </h2>
-        <ProofPipeline steps={steps} />
-      </section>
+      {measured ? <Facts x={x} weeksN={weeksN} /> : null}
 
-      <NextSteps view={actions} campaigns={`${sectionPath('campaigns')}${carry}`} claimable={CLAIM_TIERS.includes(p.tier) && x.evidence.length > 0} onScroll={scrollTo} />
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <Panel title="Outcome" id="outcome-h" className="lg:col-span-7" description={`People using it against non-users with the same goals, by week of the ${weeksN}-week window.`}>
-          {measured ? <Outcome x={x} weeksN={weeksN} /> : <EmptyState compact title="No outcome yet" body={reasonText(p)} />}
-        </Panel>
-        <Panel title="Where it works" id="seg-h" className="lg:col-span-5" description="Visible change by group. Dot: rate; bar: 95% interval; tick: non-users.">
-          <div className="flex flex-col gap-3">
-            <Tabs label="Group by" tabs={SEG_TABS.map((t) => ({ id: t.id, label: t.label }))} value={seg} onChange={(v) => setParam({ seg: v === 'skin' ? null : v })} panelId="seg-panel" />
-            <div id="seg-panel" role="tabpanel" aria-labelledby="seg-h">
-              {measured ? <SegList segs={x.segments[seg]} /> : <EmptyState compact title="No groups yet" body={reasonText(p)} />}
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-12">
+        {measured ? <ProductJourney x={x} weeksN={weeksN} className="lg:col-span-8" /> : (
+          <Panel title="No outcome yet" id="outcome-h" className="lg:col-span-8">
+            <EmptyState compact title="No outcome yet" body={reasonText(p)} />
+          </Panel>
+        )}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
+          <section id={ANCHOR.pipeline} aria-labelledby="pipe-h" className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-card border border-line bg-surface px-5 pb-4 pt-4 outline-none">
+            <h2 id="pipe-h" className="m-0 text-proof-h text-ink">
+              Proof pipeline
+            </h2>
+            <ProofPipeline steps={steps} vertical compact />
+          </section>
+          <Panel title="Where it works" id="seg-h" className="flex-1" description="Visible change by group. Dot: rate; bar: 95% interval; tick: non-users.">
+            <div className="flex flex-1 flex-col gap-2">
+              <Tabs label="Group by" tabs={SEG_TABS.map((t) => ({ id: t.id, label: t.label }))} value={seg} onChange={(v) => setParam({ seg: v === 'skin' ? null : v })} panelId="seg-panel" />
+              <div id="seg-panel" role="tabpanel" aria-labelledby="seg-h" className="flex flex-1 flex-col">
+                {measured ? <SegList segs={x.segments[seg]} /> : <EmptyState compact title="No groups yet" body={reasonText(p)} />}
+              </div>
+              {seg === 'goal' ? <p className="m-0 text-proof-small text-ink-2">People can hold several goals, so goal groups overlap.</p> : seg === 'tone' ? <p className="m-0 text-proof-small text-ink-2">Tone bands are buckets for “works for whom”, never an order.</p> : null}
             </div>
-            {seg === 'goal' ? <p className="m-0 text-proof-small text-ink-2">People can hold several goals, so goal groups overlap.</p> : seg === 'tone' ? <p className="m-0 text-proof-small text-ink-2">Tone bands are buckets for “works for whom”, never an order.</p> : null}
-          </div>
-        </Panel>
+          </Panel>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+      {showSteps ? <NextSteps view={actions} campaigns={`${sectionPath('campaigns')}${carry}`} claimable={CLAIM_TIERS.includes(p.tier) && x.evidence.length > 0} onScroll={scrollTo} /> : null}
+
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
         <Panel
           title="Claim-ready statements"
           id="ev-h"
@@ -222,23 +228,24 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
         >
           <EvidenceList x={x} />
         </Panel>
-        <Panel title={`Against other ${p.category_label.toLowerCase()}`} id="comp-h" className="lg:col-span-5" flush description="Same category, sharing a goal, 10+ people. Ranked by visible change.">
-          <Competitors x={x} brandView={brandView} carry={carry} />
-        </Panel>
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
+          <Panel title={`Against other ${p.category_label.toLowerCase()}`} id="comp-h" flush description="Same category, sharing a goal, 10+ people. Ranked by visible change.">
+            <Competitors x={x} brandView={brandView} carry={carry} />
+          </Panel>
+          <Panel title="In people’s routines" id="ctx-h" description={p.users ? `Among its ${int(p.users)} users. Groups under ${MIN_GROUP} people are left out.` : undefined}>
+            <div className="flex flex-col gap-4">
+              <Tabs label="Routine context" tabs={CTX_TABS.map((t) => ({ id: t.id, label: t.label }))} value={ctx} onChange={(v) => setParam({ ctx: v === 'co' ? null : v })} panelId="ctx-panel" />
+              <div id="ctx-panel" role="tabpanel" aria-labelledby="ctx-h">
+                {ctx === 'co' ? <CoUsed x={x} carry={carry} /> : ctx === 'switch' ? <Switching x={x} carry={carry} /> : <Conflicts x={x} />}
+              </div>
+            </div>
+          </Panel>
+        </div>
       </div>
 
       <ClaimStudio key={p.product_id} x={x} filters={filters} channel={channel} onChannel={(c) => setParam({ claim: c === DEFAULT_CHANNEL ? null : c })} onNextSteps={hasSteps ? () => goTo(ANCHOR.next) : null} />
 
       <FeelPanel x={x} />
-
-      <Panel title="In people’s routines" id="ctx-h" description={p.users ? `Among its ${int(p.users)} users. Groups under ${MIN_GROUP} people are left out.` : undefined}>
-        <div className="flex flex-col gap-4">
-          <Tabs label="Routine context" tabs={CTX_TABS.map((t) => ({ id: t.id, label: t.label }))} value={ctx} onChange={(v) => setParam({ ctx: v === 'co' ? null : v })} panelId="ctx-panel" />
-          <div id="ctx-panel" role="tabpanel" aria-labelledby="ctx-h">
-            {ctx === 'co' ? <CoUsed x={x} carry={carry} /> : ctx === 'switch' ? <Switching x={x} carry={carry} /> : <Conflicts x={x} />}
-          </div>
-        </div>
-      </Panel>
     </div>
   )
 }
@@ -249,57 +256,55 @@ function reasonText(p: Detail['product']): string {
   return `Fewer than ${MIN_GROUP} people have reached week 8 with it.`
 }
 
-/** The hero figure (share of users with a visible change), the comparison, the curve and four supporting facts. */
-function Outcome({ x, weeksN }: { x: Detail; weeksN: number }) {
+/**
+ * The facts in one strip: how many of its users saw a visible change, how fast, how many kept using it, its share of
+ * routines and its rank, and the comparison with people who have the same goals but do not use it (what the Proven
+ * tier is measured against: it tells the product apart from people who would have improved anyway).
+ */
+function Facts({ x, weeksN }: { x: Detail; weeksN: number }) {
   const p = x.product
   const liftTip = useTooltip(p.lift_lo !== null && p.lift_hi !== null ? `95% interval ${pts(p.lift_lo)} to ${pts(p.lift_hi)}` : '')
   const rateTip = useTooltip(p.rate_lo !== null && p.rate_hi !== null ? `95% interval ${interval(p.rate_lo, p.rate_hi)}` : '')
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-        <div className="flex flex-col gap-1">
-          <span {...rateTip.trigger} tabIndex={0} className="cursor-help text-proof-hero text-ink tnum">
-            {pct(p.rate)}
-          </span>
-          {rateTip.node}
-          <span className="text-proof-body text-ink-2">
-            of {int(p.n)} users saw a visible change by week {weeksN}
-          </span>
-        </div>
-        {p.base_rate !== null ? (
-          <div className="flex flex-col gap-1 pb-0.5">
-            <span className="flex items-baseline gap-2">
-              <span className="text-proof-kpi text-ink-2 tnum">{pct(p.base_rate)}</span>
-              {p.lift !== null ? (
-                <>
-                  <span {...liftTip.trigger} tabIndex={0} className={`cursor-help rounded-pill px-2 py-0.5 text-proof-small font-semibold tnum ${p.lift > 0 ? 'bg-proof-leaf-soft text-proof-leaf' : 'bg-sunken text-ink-2'}`}>
-                    {pts(p.lift)}
-                  </span>
-                  {liftTip.node}
-                </>
-              ) : null}
+    <section aria-label="Key facts" className="rounded-card border border-line bg-surface px-5 py-3">
+      <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="truncate text-proof-small text-ink-2">Visible change</dt>
+          <dd className="m-0 flex flex-col">
+            <span {...rateTip.trigger} tabIndex={0} className="w-fit cursor-help text-[22px] font-semibold leading-7 tracking-[-0.02em] text-ink tnum">
+              {pct(p.rate)}
             </span>
-            <span className="text-proof-body text-ink-2">of non-users with the same goals</span>
-          </div>
-        ) : (
-          <span className="pb-1 text-proof-body text-ink-2">Fewer than {MIN_GROUP} non-users to compare with.</span>
-        )}
-      </div>
-      {x.curve.users.some((v) => v !== null) ? (
-        <CurveChart
-          title={`${p.product}: share with a visible change by week, users and non-users`}
-          weeks={x.curve.weeks}
-          height={220}
-          series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal', n: p.n }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : [])]}
-        />
-      ) : null}
-      <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-line pt-4 sm:grid-cols-4">
+            {rateTip.node}
+            <span className="truncate text-proof-label text-ink-2 tnum">of {int(p.n)} by week {weeksN}</span>
+          </dd>
+        </div>
         <Stat label="Time to change" value={weeks(p.weeks)} sub="median, of those who changed" />
         <Stat label={`Still using at week ${weeksN}`} value={pct(p.cont8)} sub={p.n ? `of ${int(p.n)}` : undefined} />
         <Stat label="Share of routines" value={pct(p.routine_share)} sub={`${int(p.users)} users`} />
         <Stat label="Rank in category" value={x.competitors.rank ? `${x.competitors.rank} of ${x.competitors.of}` : '—'} sub={x.competitors.rank ? 'by visible change' : 'not ranked'} />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="truncate text-proof-small text-ink-2">Same goals, not using it</dt>
+          <dd className="m-0 flex flex-col">
+            {p.base_rate !== null ? (
+              <span className="flex items-baseline gap-1.5">
+                <span className="text-[22px] font-semibold leading-7 tracking-[-0.02em] text-ink-2 tnum">{pct(p.base_rate)}</span>
+                {p.lift !== null ? (
+                  <>
+                    <span {...liftTip.trigger} tabIndex={0} className={`cursor-help rounded-pill px-1.5 py-0.5 text-proof-label font-semibold tnum ${p.lift > 0 ? 'bg-proof-leaf-soft text-proof-leaf' : 'bg-sunken text-ink-2'}`}>
+                      {pts(p.lift)}
+                    </span>
+                    {liftTip.node}
+                  </>
+                ) : null}
+              </span>
+            ) : (
+              <span className="text-proof-small text-ink-2">Fewer than {MIN_GROUP} to compare</span>
+            )}
+            <span className="truncate text-proof-label text-ink-2">the baseline for Proven</span>
+          </dd>
+        </div>
       </dl>
-    </div>
+    </section>
   )
 }
 
@@ -307,11 +312,11 @@ function Outcome({ x, weeksN }: { x: Detail; weeksN: number }) {
 function SegList({ segs }: { segs: Seg[] }) {
   if (!segs.length) return <EmptyState compact title="No groups" body="No measured users in these groups." />
   return (
-    <ul className="m-0 flex list-none flex-col p-0">
+    <ul className="m-0 flex flex-1 list-none flex-col p-0">
       {segs.map((s) => {
         const ci = segInterval(s)
         return (
-          <li key={s.id} className="grid min-h-11 grid-cols-[104px_minmax(0,1fr)_44px] items-center gap-3 border-b border-line last:border-b-0">
+          <li key={s.id} className="grid min-h-10 flex-1 grid-cols-[96px_minmax(0,1fr)_44px] items-center gap-3 border-b border-line last:border-b-0">
             <span className="truncate text-proof-body text-ink" title={s.label}>
               {s.label}
             </span>
@@ -359,9 +364,9 @@ function EvidenceList({ x }: { x: Detail }) {
   return (
     <ol className="m-0 flex list-none flex-col p-0">
       {x.evidence.map((e) => (
-        <li key={e.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-line py-3.5 first:pt-0 last:border-b-0 last:pb-0">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <p className="m-0 text-proof-body text-ink">{e.text}</p>
+        <li key={e.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-line py-2.5 first:pt-0 last:border-b-0 last:pb-0">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="m-0 text-proof-small text-ink">{e.text}</p>
             <span className="flex flex-wrap items-center gap-2 text-proof-label text-ink-2 tnum">
               <Badge>{KIND_LABEL[e.kind]}</Badge>
               n={int(e.n)}
@@ -437,7 +442,7 @@ function CoUsed({ x, carry }: { x: Detail; carry: string }) {
   if (!x.co_used.length) return <EmptyState compact title="No pairing reaches 10 people yet" body="Products used together by fewer than 10 people are not shown." />
   const max = Math.max(...x.co_used.map((c) => c.share))
   return (
-    <ul className="m-0 grid list-none grid-cols-1 gap-x-8 p-0 md:grid-cols-2">
+    <ul className="m-0 grid list-none grid-cols-1 gap-x-8 p-0">
       {x.co_used.map((c) => (
         <li key={c.product_id} className="grid min-h-14 grid-cols-[minmax(0,1fr)_88px_56px] items-center gap-3 border-b border-line">
           <ProductCell p={c} to={`${sectionPath('products', c.product_id)}${carry}`} />
@@ -471,7 +476,7 @@ function Switching({ x, carry }: { x: Detail; carry: string }) {
         </p>
       ) : null}
       {any(from) || any(to) ? (
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5">
           <FlowList title="Came from" group={from} max={max} empty="No source reaches 10 people yet" />
           <FlowList title="Went to" group={to} max={max} empty="No destination reaches 10 people yet" />
         </div>

@@ -12,31 +12,32 @@ import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipe
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail, useProducts } from '../productData'
 import { sectionPath, useRetailState } from '../state'
-import type { Brief, BriefCard, BrandSummary, Insights, ProductRow, Products } from '../types'
-import { Badge, Bone, Button, cohortKind, CurveChart, EmptyState, ErrorState, int, KpiStrip, MIN_GROUP, PageHeader, Panel, pct, pts, SkeletonKpis, SkeletonPanel, TierDot, ToolButton, type Kpi } from '../ui'
+import type { Brief, BriefCard, Insights, ProductRow } from '../types'
+import { Badge, Bone, Button, cohortKind, CurveChart, EmptyState, ErrorState, int, MIN_GROUP, PageHeader, Panel, pct, pts, SkeletonKpis, SkeletonPanel, TierDot, ToolButton } from '../ui'
 import { briefHref, cardFigure } from '../ui/insight'
+import { WidgetBoard } from './overview/Board'
 import { useAutopilot } from './promote/useAutopilot'
 import { InsightsGate } from './shared'
 
 /*
  * Overview (/retail): what is working and what needs attention, for the retailer or one brand.
- *   1. Spotlight: the strongest Proven product (yours, in a brand workspace) with its outcome, its curve and its
- *      Proof pipeline, and the two next steps (view the proof, promote it). The demo starts here.
- *   2. Four key figures.
- *   3. This week's brief (fixed rules over the aggregates, with Gemini's checked summary) and the top products.
- *   4. About this data (collapsed).
+ *   1. The board (overview/Board.tsx), one screen: the spotlight (the strongest Proven product, yours in a brand
+ *      workspace, with its outcome, its curve, its Proof pipeline and the two next steps; the demo starts here)
+ *      beside the market curve, then three small tiles, then the goals and the top brands.
+ *   2. This week's brief (fixed rules over the aggregates, with Gemini's checked summary) and the top products.
+ *   3. About this data (collapsed).
  */
 
 export default function Overview() {
   return (
     <InsightsGate
       skeleton={
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-5">
           <div aria-hidden className="flex flex-col gap-2">
             <Bone className="h-7 w-56" />
             <Bone className="h-4 w-[min(520px,80%)]" />
           </div>
-          <SkeletonPanel height={300} />
+          <SkeletonPanel height={280} />
           <SkeletonKpis n={4} />
         </div>
       }
@@ -44,19 +45,6 @@ export default function Overview() {
       {(d) => <Body d={d} />}
     </InsightsGate>
   )
-}
-
-/** People-weighted visible-change rate over measured rows (null under 10 people in all). */
-function weighted(rows: ProductRow[], key: 'rate' | 'cont8'): { value: number; n: number } | null {
-  let s = 0
-  let n = 0
-  for (const r of rows) {
-    const v = r[key]
-    if (v === null || r.n === null) continue
-    s += v * r.n
-    n += r.n
-  }
-  return n >= MIN_GROUP ? { value: s / n, n } : null
 }
 
 /** The spotlight: highest lift lower bound among Proven rows, else the Promising row closest to Proven. */
@@ -110,7 +98,7 @@ function Body({ d }: { d: Insights }) {
   )
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={brand ?? 'Overview'}
         description={description}
@@ -123,9 +111,15 @@ function Body({ d }: { d: Insights }) {
           </>
         }
       />
-      {state.status === 'loading' ? <SkeletonPanel height={300} /> : spot ? <Spotlight row={spot} weeksN={d.cohort.weeks} mine={Boolean(brand)} /> : <NoSpotlight brand={brand} />}
-      <Kpis d={d} all={all} rows={rows} brand={brand} summary={summary} />
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+      <WidgetBoard
+        d={d}
+        all={all}
+        rows={rows}
+        brand={brand}
+        summary={summary}
+        spotlight={state.status === 'loading' ? <SkeletonPanel height={280} /> : spot ? <Spotlight row={spot} weeksN={d.cohort.weeks} mine={Boolean(brand)} /> : <NoSpotlight brand={brand} />}
+      />
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-12">
         <BriefPanel brand={brand} className="lg:col-span-7" />
         <TopProducts rows={rows} brand={brand} className="lg:col-span-5" />
       </div>
@@ -147,67 +141,71 @@ function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; min
   const eligible = x ? x.eligibility.eligible : row.tier === 'proven'
   const steps = pipelineSteps({ p: row, weeksN, statements: x ? x.evidence.length : null, eligible, campaign, promoteTo })
   return (
-    <section aria-labelledby="spot-h" className="overflow-hidden rounded-card border border-line bg-surface">
-      <div className="grid grid-cols-1 lg:grid-cols-12">
-        <div className="flex min-w-0 flex-col gap-5 p-6 lg:col-span-7">
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="spot-h" className="m-0 flex items-center gap-2 text-proof-small font-medium text-ink-2">
-              <Sparkles size={15} strokeWidth={1.7} aria-hidden className="text-proof-leaf" />
-              {row.tier === 'proven' ? (mine ? 'Your strongest proof' : 'Strongest proof in the catalog') : mine ? 'Closest to Proven' : 'Closest to Proven in the catalog'}
-            </h2>
-            <Badge tone={row.tier === 'proven' ? 'green' : 'amber'}>
-              <TierDot tier={row.tier} />
-              {row.tier === 'proven' ? 'Proven' : 'Promising'}
-            </Badge>
-          </div>
-          <Link to={productTo} className="group flex min-w-0 items-center gap-4 no-underline">
-            <span className="shrink-0 overflow-hidden rounded-card border border-line bg-pf-bg2 p-1">
-              <ProductImage product={{ image_url: row.image_url, category: row.category, name: row.product }} size={48} />
-            </span>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate text-proof-h text-ink group-hover:underline">{row.product}</span>
-              <span className="truncate text-proof-small text-ink-2">
-                {row.brand} · {row.category_label}
-              </span>
-            </span>
-          </Link>
-          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-proof-hero text-ink tnum">{pct(row.rate)}</span>
-              <span className="text-proof-body text-ink-2">
-                of {int(row.n)} users saw a visible change by week {weeksN}
+    <section aria-labelledby="spot-h" className="flex w-full min-w-0 flex-col overflow-hidden rounded-card border border-line bg-surface">
+      <div className="flex min-w-0 flex-col gap-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link to={productTo} aria-label={row.product} className="shrink-0 overflow-hidden rounded-card border border-line bg-pf-bg2 p-0.5">
+              <ProductImage product={{ image_url: row.image_url, category: row.category, name: row.product }} size={36} />
+            </Link>
+            <div className="flex min-w-0 flex-col">
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 id="spot-h" className="m-0 min-w-0 truncate text-proof-body font-medium text-ink">
+                  <Link to={productTo} className="text-ink no-underline hover:underline">
+                    {row.product}
+                  </Link>
+                </h2>
+                <Badge tone={row.tier === 'proven' ? 'green' : 'amber'}>
+                  <TierDot tier={row.tier} />
+                  {row.tier === 'proven' ? 'Proven' : 'Promising'}
+                </Badge>
+              </div>
+              <span className="flex min-w-0 items-center gap-1.5 truncate text-proof-small text-ink-2">
+                <Sparkles size={13} strokeWidth={1.7} aria-hidden className="shrink-0 text-proof-leaf" />
+                {row.tier === 'proven' ? (mine ? 'Your strongest proof' : 'Strongest proof in the catalog') : mine ? 'Closest to Proven' : 'Closest to Proven in the catalog'} · {row.brand}
               </span>
             </div>
-            {row.base_rate !== null ? (
-              <div className="flex flex-col gap-1 pb-0.5">
-                <span className="flex items-baseline gap-2">
-                  <span className="text-proof-kpi text-ink-2 tnum">{pct(row.base_rate)}</span>
-                  {row.lift !== null ? <span className={`rounded-pill px-2 py-0.5 text-proof-small font-semibold tnum ${row.lift > 0 ? 'bg-proof-leaf-soft text-proof-leaf' : 'bg-sunken text-ink-2'}`}>{pts(row.lift)}</span> : null}
-                </span>
-                <span className="text-proof-body text-ink-2">of non-users with the same goals</span>
-              </div>
-            ) : null}
           </div>
-          {x && x.curve.users.some((v) => v !== null) ? (
-            <CurveChart title={`${row.product}: share with a visible change by week`} weeks={x.curve.weeks} height={150} series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal' }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : [])]} />
-          ) : (
-            <Bone className="h-[150px] w-full" />
-          )}
-        </div>
-        <div className="flex min-w-0 flex-col gap-5 border-t border-line bg-pf-bg2 p-6 lg:col-span-5 lg:border-l lg:border-t-0">
-          <h3 className="m-0 text-proof-small font-medium text-ink-2">From photos to an accountable promotion</h3>
-          <ProofPipeline steps={steps} vertical />
-          <div className="mt-auto flex flex-wrap gap-2">
+          <div className="flex items-center gap-2">
             <Button to={productTo} kind="secondary">
-              View proof <ArrowRight size={15} strokeWidth={1.7} aria-hidden />
+              View proof <ArrowRight size={14} strokeWidth={1.7} aria-hidden />
             </Button>
             {eligible && (!campaign || campaign.status === 'ended') ? (
               <Button to={promoteTo} kind="primary">
-                <Megaphone size={15} strokeWidth={1.7} aria-hidden /> Promote
+                <Megaphone size={14} strokeWidth={1.7} aria-hidden /> Promote
               </Button>
             ) : null}
           </div>
         </div>
+        <div className="grid grid-cols-1 items-center gap-x-5 gap-y-3 md:grid-cols-12">
+          <div className="flex min-w-0 items-start gap-5 md:col-span-6">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[36px] font-medium leading-[40px] tracking-[-0.04em] text-ink tnum">{pct(row.rate)}</span>
+              <span className="max-w-[170px] text-proof-small text-ink-2">
+                of {int(row.n)} users saw a visible change by week {weeksN}
+              </span>
+            </div>
+            {row.base_rate !== null ? (
+              <div className="flex min-w-0 flex-col">
+                <span className="flex items-baseline gap-1.5 leading-[40px]">
+                  <span className="text-[22px] font-medium tracking-[-0.03em] text-ink-2 tnum">{pct(row.base_rate)}</span>
+                  {row.lift !== null ? <span className={`rounded-pill px-1.5 py-0.5 text-proof-small font-semibold tnum ${row.lift > 0 ? 'bg-proof-leaf-soft text-proof-leaf' : 'bg-sunken text-ink-2'}`}>{pts(row.lift)}</span> : null}
+                </span>
+                <span className="max-w-[140px] text-proof-small text-ink-2">of non-users, same goals</span>
+              </div>
+            ) : null}
+          </div>
+          <div className="min-w-0 md:col-span-6">
+            {x && x.curve.users.some((v) => v !== null) ? (
+              <CurveChart title={`${row.product}: share with a visible change by week`} weeks={x.curve.weeks} height={96} series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal' }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : [])]} />
+            ) : (
+              <Bone className="h-[96px] w-full" />
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mt-auto border-t border-line bg-pf-bg2 px-4 py-2.5">
+        <ProofPipeline steps={steps} compact />
       </div>
     </section>
   )
@@ -223,41 +221,6 @@ function NoSpotlight({ brand }: { brand: string | null }) {
       action={{ label: 'See every product', to: `${sectionPath('products')}${carry}` }}
     />
   )
-}
-
-/* ───────────────────────────── key figures ───────────────────────────── */
-
-function Kpis({ d, all, rows, brand, summary }: { d: Insights; all: Products | null; rows: ProductRow[]; brand: string | null; summary: BrandSummary | null }) {
-  if (!all) return <SkeletonKpis n={4} />
-  const kind = cohortKind(d.cohort)
-  const proven = rows.filter((r) => r.tier === 'proven').length
-  // A brand's own figures come from the api's brand summary (each person once, as Market shows them); the
-  // product rows are the fallback when this api build has no /brands.
-  const own = summary ? (summary.rate !== null && summary.n !== null ? { value: summary.rate, n: summary.n } : null) : weighted(rows, 'rate')
-  const market = weighted(all.products, 'rate')
-  const cont = brand ? (summary ? (summary.cont8 !== null ? { value: summary.cont8, n: null } : null) : weighted(rows, 'cont8')) : null
-  const unmet = d.tiles.find((t) => t.label.startsWith('Unmet'))
-  const users = brand ? (summary ? summary.users : rows.reduce((s, r) => s + (r.users ?? 0), 0)) : null
-  const items: Kpi[] = brand
-    ? [
-        { id: 'proven', label: 'Proven products', value: String(proven), unit: `of ${rows.length}`, note: `${rows.filter((r) => r.tier === 'promising').length} Promising` },
-        {
-          id: 'rate',
-          label: 'Visible change by week 8',
-          value: own ? pct(own.value).replace('%', '') : '—',
-          unit: own ? '%' : undefined,
-          note: own && market ? `${pts(own.value - market.value)} vs the market’s ${pct(market.value)}` : `Fewer than ${MIN_GROUP} people`,
-        },
-        { id: 'cont', label: 'Still using at week 8', value: cont ? pct(cont.value).replace('%', '') : '—', unit: cont ? '%' : undefined, note: cont ? (cont.n !== null ? `of ${int(cont.n)} people` : 'of your users at week 8') : `Fewer than ${MIN_GROUP} people` },
-        { id: 'users', label: 'People using your products', value: users === null ? '—' : int(users), note: users === null ? `Fewer than ${MIN_GROUP} people` : kind === 'simulated' ? 'Simulated cohort' : kind === 'mixed' ? 'Mostly simulated' : 'Consented users' },
-      ]
-    : [
-        { id: 'proven', label: 'Proven products', value: String(proven), unit: `of ${rows.length}`, note: `${rows.filter((r) => r.tier === 'promising').length} Promising, ${rows.filter((r) => r.rate === null).length} without numbers` },
-        { id: 'rate', label: 'Visible change by week 8', value: market ? pct(market.value).replace('%', '') : '—', unit: market ? '%' : undefined, note: 'People-weighted, across measured products' },
-        { id: 'unmet', label: 'No visible change yet', value: unmet && unmet.value !== '–' ? unmet.value.replace('%', '') : '—', unit: unmet && unmet.value !== '–' ? '%' : undefined, note: unmet && unmet.value !== '–' ? `of ${int(unmet.n)} people at week ${d.cohort.weeks} have a goal without one` : `Fewer than ${MIN_GROUP} people` },
-        { id: 'users', label: kind === 'real' ? 'Consented people' : 'People measured', value: int(d.cohort.synthetic + d.cohort.real), note: kind === 'simulated' ? 'Simulated cohort' : kind === 'mixed' ? `${int(d.cohort.real)} real, the rest simulated` : 'Opted in to sharing' },
-      ]
-  return <KpiStrip items={items} />
 }
 
 /* ───────────────────────────── the brief ───────────────────────────── */

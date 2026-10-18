@@ -276,6 +276,87 @@ def test_product_detail_on_the_synthetic_cohort():
     assert retail_intel.product_view(f, "no-such-product") is None
 
 
+def _link(j, a, b):
+    return next((x["n"] for x in j["links"] if x["source"] == a and x["target"] == b), None)
+
+
+def _nodes(j):
+    return {n["id"]: n for n in j["nodes"]}
+
+
+def _journey_cohort(stop_unchanged=0):
+    """60 users who reached week 8: 40 saw a change (30 kept using, 10 stopped at week 3; of the 30,
+    10 said it works, 10 said mixed, 10 said nothing), 20 did not (`stop_unchanged` of them stopped
+    at week 3); 15 users not at week 8 yet (5 stopped); 25 non-users (10 changed)."""
+    users = [_user(i) for i in range(60)] + [_user(i, last_week=5) for i in range(60, 75)]
+    users += [_user(i) for i in range(100, 125)]
+    routine = []
+    for i in range(75):
+        stopped = 3 if (30 <= i < 40) or (40 <= i < 40 + stop_unchanged) or 60 <= i < 65 else None
+        r = _use(i, CICA, stopped=stopped)
+        if i < 10:
+            r["feel"], r["feel_week"] = "working", 4
+        elif i < 20:
+            r["feel"], r["feel_week"] = "unsure", 4
+        routine.append(r)
+    first = [_changed(i) for i in range(40)] + [_changed(i, start=8) for i in range(100, 110)]
+    return _f(users, first, routine)
+
+
+def test_journey_is_a_tree_of_real_counts():
+    j = retail_intel.product_view(_journey_cohort(), CICA)["journey"]
+    n = _nodes(j)
+    assert (n["used"]["n"], n["w8"]["n"], n["early"]["n"]) == (75, 60, 15)
+    assert (n["change"]["n"], n["none"]["n"]) == (40, 20)
+    assert (n["ch_kept"]["n"], n["ch_stopped"]["n"]) == (30, 10)
+    assert (n["ch_working"]["n"], n["ch_mixed"]["n"], n["ch_quiet"]["n"]) == (10, 10, 10)
+    # Non-users with the same goals are one group, with no outcome split of their own.
+    assert n["non"]["n"] == 25 and n["non"]["lane"] == "non" and n["used"]["lane"] == "users"
+    assert not any(k["source"] == "non" for k in j["links"])
+    # Every part is the sum of its own children, each person once.
+    for parent, kids in (
+        ("used", ("w8", "early")),
+        ("w8", ("change", "none")),
+        ("change", ("ch_kept", "ch_stopped")),
+    ):
+        assert sum(_link(j, parent, k) or 0 for k in kids) == n[parent]["n"]
+
+
+def test_journey_leaves_out_a_small_part_and_what_would_give_it_back():
+    j = retail_intel.product_view(_journey_cohort(stop_unchanged=4), CICA)["journey"]
+    n = _nodes(j)
+    # 4 of the 20 who saw no change stopped: under 10, so neither part of that split is shown, and
+    # the group is flagged: its total of 20 stays, since it reveals no small group.
+    assert n["none"]["n"] == 20 and n["none"]["more"] is True
+    assert "no_kept" not in n and "no_stopped" not in n
+    assert n["change"]["more"] is False
+    assert all(x["n"] >= M for x in j["links"]) and all(v["n"] >= M for v in j["nodes"])
+
+
+def test_journey_on_the_synthetic_cohort_is_consistent_and_never_shows_a_small_group():
+    f = _facts()
+    shown = 0
+    for r in retail_intel.rows(f):
+        d = retail_intel.product_view(f, r["product_id"])
+        if r["tier"] == "too_few":
+            assert d["journey"] is None
+            continue
+        j = d["journey"]
+        shown += 1
+        n = _nodes(j)
+        assert n["used"]["n"] == d["product"]["users"] and n["w8"]["n"] == d["product"]["n"]
+        assert all(v["n"] >= M for v in j["nodes"]) and all(x["n"] >= M for x in j["links"])
+        out: dict = {}
+        for x in j["links"]:
+            assert x["source"] in n and x["target"] in n and n[x["target"]]["n"] == x["n"]
+            out[x["source"]] = out.get(x["source"], 0) + x["n"]
+        for parent, total in out.items():
+            assert total <= n[parent]["n"]
+            if total < n[parent]["n"]:
+                assert n[parent]["more"]  # the rest is under 10 or held back, and the card says so
+    assert shown >= 5
+
+
 def test_evidence_is_measured_cosmetic_and_quotes_only_computed_numbers():
     f = _facts()
     proven = next(r for r in retail_intel.rows(f) if r["tier"] == "proven")
