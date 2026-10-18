@@ -69,6 +69,15 @@ class Store(Protocol):
     def shelf_get(self, uid: str) -> Doc | None: ...
     def shelf_set(self, uid: str, doc: Doc) -> None: ...
     def shelf_delete(self, uid: str) -> None: ...
+    # Product requests (app/product_requests.py): users/{uid}/product_requests/{id}, and one
+    # product_requests/{key} per requested product with who asked (so all of them hear back).
+    def product_request_set(self, uid: str, rid: str, doc: Doc) -> None: ...
+    def product_request_update(self, uid: str, rid: str, fields: Doc) -> None: ...
+    def product_requests_of(self, uid: str) -> list[tuple[str, Doc]]: ...
+    def product_wish_add(self, key: str, uid: str, doc: Doc) -> Doc: ...
+    def product_wish_get(self, key: str) -> Doc | None: ...
+    def product_wish_update(self, key: str, fields: Doc) -> None: ...
+    def product_wishes(self) -> list[tuple[str, Doc]]: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -195,8 +204,15 @@ class FirestoreStore:
         return int((ref.get().to_dict() or {}).get(key, 0))
 
     def delete_user(self, uid: str) -> None:
+        from google.cloud import firestore
+
         db = self._db()
-        # recursive: every subcollection goes too (sessions, routine, usage, advisor_messages)
+        # recursive: every subcollection goes too (sessions, routine, usage, advisor_messages,
+        # product_requests); and the person leaves every product request they were counted in
+        wishes = db.collection("product_requests").where("requesters", "array_contains", uid)
+        for snap in wishes.stream():
+            n = len([u for u in (snap.to_dict() or {}).get("requesters", []) if u != uid])
+            snap.reference.update({"requesters": firestore.ArrayRemove([uid]), "count": n})
         db.recursive_delete(db.document(f"users/{uid}"))
 
     def product_tests_list(self, uid: str) -> list[tuple[str, Doc]]:
@@ -340,6 +356,46 @@ class FirestoreStore:
     def shelf_delete(self, uid: str) -> None:
         self._db().document(f"shelf/{uid}").delete()
 
+    def product_request_set(self, uid: str, rid: str, doc: Doc) -> None:
+        self._db().document(f"users/{uid}/product_requests/{rid}").set(doc)
+
+    def product_request_update(self, uid: str, rid: str, fields: Doc) -> None:
+        self._db().document(f"users/{uid}/product_requests/{rid}").update(fields)
+
+    def product_requests_of(self, uid: str) -> list[tuple[str, Doc]]:
+        snaps = self._db().collection(f"users/{uid}/product_requests").stream()
+        return [(s.id, s.to_dict()) for s in snaps]
+
+    def product_wish_add(self, key: str, uid: str, doc: Doc) -> Doc:
+        """Count this person once for the product (a transaction, so two at once both count)."""
+        from google.cloud import firestore
+
+        db = self._db()
+        ref = db.document(f"product_requests/{key}")
+
+        @firestore.transactional
+        def add(tx) -> Doc:
+            snap = ref.get(transaction=tx)
+            cur = snap.to_dict() if snap.exists else {**doc, "requesters": [], "count": 0}
+            if uid not in cur["requesters"]:
+                cur["requesters"] = [*cur["requesters"], uid]
+                cur["count"] = len(cur["requesters"])
+            cur["last_at"] = doc["last_at"]
+            tx.set(ref, cur)
+            return cur
+
+        return add(db.transaction())
+
+    def product_wish_get(self, key: str) -> Doc | None:
+        snap = self._db().document(f"product_requests/{key}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def product_wish_update(self, key: str, fields: Doc) -> None:
+        self._db().document(f"product_requests/{key}").update(fields)
+
+    def product_wishes(self) -> list[tuple[str, Doc]]:
+        return [(s.id, s.to_dict()) for s in self._db().collection("product_requests").stream()]
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -358,6 +414,8 @@ class MemoryStore:
         self.campaign_seen: dict[tuple[str, str], Doc] = {}
         self.campaign_member: dict[tuple[str, str], Doc] = {}
         self.shelf: dict[str, Doc] = {}
+        self.product_requests: dict[tuple[str, str], Doc] = {}
+        self.wishes: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -441,6 +499,12 @@ class MemoryStore:
             for key in [k for k in table if k[0] == uid]:
                 del table[key]
         self.users.pop(uid, None)
+        for key in [k for k in self.product_requests if k[0] == uid]:
+            del self.product_requests[key]
+        for wish in self.wishes.values():
+            if uid in wish["requesters"]:
+                wish["requesters"].remove(uid)
+                wish["count"] = len(wish["requesters"])
         for key in [k for k in self.product_tests if k[0] == uid]:
             del self.product_tests[key]
         self.advisor_clear(uid)
@@ -544,6 +608,32 @@ class MemoryStore:
 
     def shelf_delete(self, uid: str) -> None:
         self.shelf.pop(uid, None)
+
+    def product_request_set(self, uid: str, rid: str, doc: Doc) -> None:
+        self.product_requests[(uid, rid)] = copy.deepcopy(doc)
+
+    def product_request_update(self, uid: str, rid: str, fields: Doc) -> None:
+        self.product_requests[(uid, rid)].update(copy.deepcopy(fields))
+
+    def product_requests_of(self, uid: str) -> list[tuple[str, Doc]]:
+        return [(r, copy.deepcopy(d)) for (u, r), d in self.product_requests.items() if u == uid]
+
+    def product_wish_add(self, key: str, uid: str, doc: Doc) -> Doc:
+        cur = self.wishes.setdefault(key, {**copy.deepcopy(doc), "requesters": [], "count": 0})
+        if uid not in cur["requesters"]:
+            cur["requesters"].append(uid)
+            cur["count"] = len(cur["requesters"])
+        cur["last_at"] = doc["last_at"]
+        return copy.deepcopy(cur)
+
+    def product_wish_get(self, key: str) -> Doc | None:
+        return copy.deepcopy(self.wishes.get(key))
+
+    def product_wish_update(self, key: str, fields: Doc) -> None:
+        self.wishes[key].update(copy.deepcopy(fields))
+
+    def product_wishes(self) -> list[tuple[str, Doc]]:
+        return [(k, copy.deepcopy(d)) for k, d in self.wishes.items()]
 
 
 @lru_cache
