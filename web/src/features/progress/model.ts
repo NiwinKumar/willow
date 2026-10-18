@@ -7,7 +7,7 @@ import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/ty
 import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, isCloseUp, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, verdictKind, wordsFor, type VerdictKind } from '../../lib/verdict'
 
 export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera' }
 export const MODE_LONG: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera photo' }
@@ -100,16 +100,19 @@ export function leadMetric(ordered: Metric[], session: Session): Metric | null {
   return ordered.find((m) => verdictKind(m, session) === 'changed') ?? ordered.find((m) => m.value !== null && m.delta !== null) ?? ordered.find((m) => m.value !== null) ?? null
 }
 
-export type DayStatus = 'baseline' | 'changed' | 'normal' | 'notEnough' | 'rejected' | 'other'
+export type DayStatus = 'baseline' | 'improved' | 'otherWay' | 'shifted' | 'normal' | 'notEnough' | 'rejected' | 'other'
 
-/** One calendar colour per session (design CELLBG; "quick" became "no normal range yet"). */
+/** One calendar colour per session (design CELLBG): a day with a real change says which way it went, an improvement first. */
 export function dayStatus(s: Session): DayStatus {
   const st = sessionState(s)
   if (st === 'rejected') return 'rejected'
   if (st === 'baseline') return 'baseline'
   if (st !== 'compared') return 'other'
   const kinds = (s.result?.metrics ?? []).map((m) => verdictKind(m, s))
-  if (kinds.includes('changed')) return 'changed'
+  if (kinds.includes('changed')) {
+    const c = changeCounts(s)
+    return c.improved ? 'improved' : c.otherWay ? 'otherWay' : 'shifted'
+  }
   if (kinds.includes('normal')) return 'normal'
   if (kinds.includes('notEnough')) return 'notEnough'
   return 'other'
@@ -117,7 +120,10 @@ export function dayStatus(s: Session): DayStatus {
 
 export const DAY_BG: Record<DayStatus, string> = {
   baseline: 'radial-gradient(circle at 30% 20%, #F4FFB0, var(--signal-baseline) 70%)',
-  changed: 'radial-gradient(120% 100% at 80% 100%, #FF8A5C 0%, #FFB27A 45%, #FFE3CC 100%)',
+  improved: 'radial-gradient(120% 100% at 80% 100%, #FF8A5C 0%, #FFB27A 45%, #FFE3CC 100%)',
+  // the other way: a soft dusty rose, never an alarm colour
+  otherWay: 'radial-gradient(120% 100% at 80% 100%, #D8B4A6 0%, #E8D1C6 45%, #F6EDE8 100%)',
+  shifted: 'radial-gradient(120% 100% at 80% 100%, #F2BC8F 0%, #F7D5B8 45%, #FCEFE3 100%)',
   normal: 'radial-gradient(120% 100% at 80% 100%, #B9A4FF 0%, #D8B8FF 45%, #EFE6FF 100%)',
   notEnough: 'radial-gradient(120% 100% at 80% 100%, #7FB6FF 0%, #9CD3FF 45%, #E3F1FF 100%)',
   rejected: 'repeating-linear-gradient(135deg, #F3D6CE 0 6px, #FBE9E4 6px 12px)',
@@ -127,7 +133,9 @@ export const DAY_BG: Record<DayStatus, string> = {
 /** Calendar key words: the verdict words of lib/verdict.ts, plus the one day state that is not a verdict. */
 export const DAY_WORDS: Record<DayStatus, string> = {
   baseline: VERDICT_WORDS.baseline.label,
-  changed: VERDICT_WORDS.changed.label,
+  improved: CHANGE_WORDS.improved.label,
+  otherWay: CHANGE_WORDS.otherWay.label,
+  shifted: `Tone ${CHANGE_WORDS.shifted.label.toLowerCase()}`,
   normal: VERDICT_WORDS.normal.label,
   notEnough: VERDICT_WORDS.notEnough.label,
   rejected: 'No usable photos',
@@ -137,7 +145,9 @@ export const DAY_WORDS: Record<DayStatus, string> = {
 /** Day-detail hero gradient and glow per status (design HB). */
 export const DAY_HERO: Record<DayStatus, [string, string]> = {
   baseline: ['radial-gradient(60% 70% at 78% 62%, #C8E62E 0%, #DCF24B 30%, #EEF7B8 62%, #E9E8E2 100%)', 'rgba(170,200,20,.55)'],
-  changed: ['radial-gradient(55% 65% at 78% 60%, #FF6A00 0%, #FF8A2A 22%, #F7A866 42%, #E4BFA9 62%, #D6D3D8 100%)', 'rgba(255,106,0,.55)'],
+  improved: ['radial-gradient(55% 65% at 78% 60%, #FF6A00 0%, #FF8A2A 22%, #F7A866 42%, #E4BFA9 62%, #D6D3D8 100%)', 'rgba(255,106,0,.55)'],
+  otherWay: ['radial-gradient(55% 65% at 78% 60%, #C99A88 0%, #D8B4A6 25%, #E8D1C6 50%, #ECE6E2 100%)', 'rgba(170,110,90,.4)'],
+  shifted: ['radial-gradient(55% 65% at 78% 60%, #F0A060 0%, #F2BC8F 25%, #F7D5B8 50%, #ECE6E2 100%)', 'rgba(230,140,70,.45)'],
   normal: ['radial-gradient(55% 65% at 78% 60%, #9C84FF 0%, #B9A4FF 25%, #D8C6FF 50%, #E7E1F2 100%)', 'rgba(107,76,255,.45)'],
   notEnough: ['radial-gradient(55% 65% at 78% 60%, #5E9BFF 0%, #7FB6FF 25%, #B8D8FF 52%, #E3EBF5 100%)', 'rgba(31,92,255,.45)'],
   rejected: ['radial-gradient(55% 65% at 78% 60%, #FF8A70 0%, #FFB3A1 35%, #F6DCD4 70%, #ECE6E2 100%)', 'rgba(224,69,42,.45)'],
@@ -199,11 +209,10 @@ export { baselineFor, referenceFor }
 /** Words for the advisor question about one metric, built only from measured values. */
 export function metricQuestion(m: Metric, s: Session, baseline: Session | null): string {
   const band = bandOf(baseline, m.id)
-  const kind = verdictKind(m, s)
   const parts = [`My ${METRIC_META[m.id].label.toLowerCase()} on ${fmtDate(s.created_at, { day: 'numeric', month: 'long' })} read ${valueText(m)}`]
   if (m.delta !== null && !s.is_baseline) parts.push(`a change of ${deltaText(m)} since my baseline`)
   if (band !== null && !s.is_baseline) parts.push(`normal range ${bandText(m, band)}`)
-  return `${parts.join(', ')} (Willow says: ${VERDICT_WORDS[kind].label.toLowerCase()}). What could explain this, and what should I keep the same next time?`
+  return `${parts.join(', ')} (Willow says: ${wordsFor(m, s).label.toLowerCase()}). What could explain this, and what should I keep the same next time?`
 }
 
 export function siteHasSpots(site: Site): boolean {

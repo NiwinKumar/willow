@@ -54,12 +54,42 @@ JARGON = re.compile(
 )
 
 
+# The direction people usually want (web/src/lib/verdict.ts WANTED): lower for most metrics,
+# higher for under-eye brightness and glow. Skin tone has none.
+WANTED_HIGHER = {"dark_circles", "glow"}
+# A change the other way is said gently, never "worse" (UX_SPEC copy rules).
+OTHER_WAY = "moved the other way"
+
+
+def way_of(metric: dict[str, Any], delta: float | None) -> str | None:
+    """'improved', 'other_way' or (skin tone) 'shifted' for a delta; None without one."""
+    if metric["id"] == "tone_ita" or metric["id"] not in DIRECTION_WORDS:
+        return "shifted"
+    if not delta:
+        return None
+    wanted_up = metric["id"] in WANTED_HIGHER
+    return "improved" if (delta > 0) == wanted_up else "other_way"
+
+
 def since_start(metric: dict[str, Any], delta: float) -> str:
-    """'fewer blemishes than at your start'; skin tone only ever 'a shift from your start'."""
+    """'fewer blemishes than at your start'; the other way 'moved the other way since your start';
+    skin tone only ever 'a shift from your start'."""
     if metric["id"] == "tone_ita":
         return "a shift from your start"
+    if way_of(metric, delta) == "other_way":
+        return f"{OTHER_WAY} since your start"
     low, high = DIRECTION_WORDS.get(metric["id"], ("a lower reading", "a higher reading"))
     return f"{low if delta < 0 else high} than at your start"
+
+
+def change_headline(real: list[dict[str, Any]]) -> str:
+    """'3 improved since your baseline', '2 improved, 1 moved the other way since your baseline'."""
+    counts = {"improved": 0, "other_way": 0, "shifted": 0}
+    for m in real:
+        counts[way_of(m, m.get("delta")) or "shifted"] += 1
+    words = {"improved": "improved", "other_way": OTHER_WAY, "shifted": "shifted"}
+    parts = [f"{n} {words[w]}" for w, n in counts.items() if n]
+    return f"{', '.join(parts)} since your baseline"
 
 
 # The app's names where they differ from the engine's labels (web/src/lib/metrics.ts)
@@ -141,7 +171,7 @@ def template(result: dict[str, Any], first_reading: bool = True) -> dict[str, An
             headline = "Not compared with your baseline this time"
             steps = ["Take your next photos in the same spot and light."]
     elif real:
-        headline = f"{len(real)} real change{'s' if len(real) != 1 else ''} since your baseline"
+        headline = change_headline(real)
         steps = ["Keep the routine steady so the next reading is comparable."]
     else:
         headline = "No clear change since your baseline yet"
@@ -194,7 +224,10 @@ Rules:
 - Each item is one sentence of at most 25 words. Lead with what it means for the person.
 - Use only the metrics given. Quote numbers exactly as given (delta without its sign, days); never
   compute new numbers, percentages or estimates. Never quote dates or photo numbers ("photo 3").
-- verdict real_change: say it changed (no need to explain how this is judged).
+- verdict real_change: say which way it went, using the metric's way field (no need to explain
+  how this is judged). way improved: say it improved, warmly and encouragingly. way other_way: say
+  gently that it moved the other way; never "worse", "worsened", "declined", "deteriorated" or
+  "got bad", and never alarm. way shifted (skin tone): say it shifted, with no direction.
   within_noise: "about the same as at your start", with no number. no_baseline with a delta:
   the change is shown but the baseline needs more photos before it can be called real.
   no_baseline without a delta: this is the first reading, but only when is_baseline is true;
@@ -324,17 +357,34 @@ def gemini_input(result: dict[str, Any], context: dict[str, Any]) -> dict[str, A
                     else dict(
                         zip(
                             ("when_lower", "when_higher"),
-                            DIRECTION_WORDS.get(m["id"], ("lower", "higher")),
+                            gentle_words(m),
                             strict=True,
                         )
                     )
                 ),
+                **_way_field(m),
                 **shown_numbers(m),
             }
             for m in result["metrics"]
         ],
         **context,
     }
+
+
+def _way_field(metric: dict[str, Any]) -> dict[str, str]:
+    """{"way": ...} for a real change (improved, other_way, shifted), else nothing."""
+    way = way_of(metric, metric.get("delta")) if metric["verdict"] == "real_change" else None
+    return {"way": way} if way else {}
+
+
+def gentle_words(metric: dict[str, Any]) -> tuple[str, str]:
+    """(when_lower, when_higher) with the unwanted side said gently ("moved the other way")."""
+    low, high = DIRECTION_WORDS.get(metric["id"], ("lower", "higher"))
+    return (OTHER_WAY, high) if metric["id"] in WANTED_HIGHER else (low, OTHER_WAY)
+
+
+# Harsh words for a change the other way: never in an explanation (it softens the news).
+HARSH = re.compile(r"\b(wors\w*|declin\w*|deteriorat\w*|got bad|bad news)\b", re.I)
 
 
 # Direction words: an item may not contradict the measured direction (an "increase" for a
@@ -412,6 +462,8 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"banned wording in: {text}")
         if JARGON.search(text):
             found.append(f"jargon in: {text}")
+        if HARSH.search(text):
+            found.append(f"harsh wording in: {text}")
     if too_many_numbers(exp.headline, 1):
         found.append(f"numbers in headline: {exp.headline}")
     for item in exp.items:
@@ -426,6 +478,10 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"change language for {item.metric_id} ({verdicts[item.metric_id]})")
         elif issue := _direction_problem(item.summary, by_id[item.metric_id]):
             found.append(issue)
+        elif by_id[item.metric_id].get("way") == "other_way" and re.search(
+            r"\b(improv\w*|better)\b", item.summary, re.I
+        ):
+            found.append(f"improvement claimed for a change the other way: {item.summary}")
     if not any(v == "real_change" for v in verdicts.values()) and _claims_change(exp.headline):
         found.append("change language in headline")
     return found

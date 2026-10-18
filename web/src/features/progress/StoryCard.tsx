@@ -34,9 +34,9 @@ export function StoryCard({ session, metricId }: { session: Session; metricId: s
   const state: 'loading' | 'ready' | 'none' = mode !== 'live' ? 'none' : got?.key !== key ? 'loading' : story ? 'ready' : 'none'
   if (state === 'none') return null
   return (
-    <section aria-label="What changed" aria-busy={state === 'loading'} className="flex flex-col gap-3 rounded-[28px] bg-sunken px-5 py-[18px]">
+    <section aria-label="How it moved" aria-busy={state === 'loading'} className="flex flex-col gap-3 rounded-[28px] bg-sunken px-5 py-[18px]">
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-[17px]">What changed</span>
+        <span className="text-[17px]">How it moved</span>
         {story?.source === 'gemini' ? <span className="font-mono text-[11px] tracking-[.04em] text-ink-2 uppercase">AI-written · numbers checked against your measurements</span> : null}
       </span>
       {state === 'loading' ? (

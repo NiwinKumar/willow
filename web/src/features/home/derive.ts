@@ -8,7 +8,7 @@ import { baselineFor, inFlight, isUnmeasured, stalled } from '../../data/live'
 import { localDay } from '../../lib/api'
 import { parseDate } from '../../lib/format'
 import { byGoalOrder, METRIC_META, SITE_LABEL } from '../../lib/metrics'
-import { verdictKind, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, changeWay, verdictKind, type VerdictKind } from '../../lib/verdict'
 
 /** Back after this many days without a face check-in when no check-in schedule is set (lib/schedule gapDaysFor). */
 export const GAP_DAYS = 14
@@ -132,13 +132,15 @@ export function runOf(metricId: MetricId, face: Session[], from: Session): numbe
 const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten']
 export const countWord = (n: number) => WORDS[n] ?? String(n)
 
-/** One verdict sentence for a measured session: what changed, and what stayed within the normal range. */
+/** One verdict sentence for a measured session: what improved (or moved the other way), and what stayed within the normal range. */
 export function verdictSentence(s: Session, goals: string[]): string | null {
   const { changed, normal, kinds } = splitVerdicts(s, goals)
   const compared = [...kinds.values()].filter((k) => k === 'changed' || k === 'normal').length
   if (compared === 0) return null
   if (changed.length === 0) return compared === kinds.size ? 'Everything measured stayed within your normal range.' : `${cap(listOf(normal))} stayed within your normal range.`
-  const head = `${cap(listOf(changed))} changed beyond your normal range`
+  // Grouped by the way they moved, the good news first: "Redness improved; tone evenness moved the other way".
+  const groups = (['improved', 'otherWay', 'shifted'] as const).map((w) => ({ w, ms: changed.filter((m) => changeWay(m) === w) })).filter((g) => g.ms.length)
+  const head = cap(groups.map((g) => `${listOf(g.ms)} ${CHANGE_WORDS[g.w].label.toLowerCase()}`).join('; ')) + ', beyond your normal range'
   if (normal.length === 0) return `${head}.`
   return changed.length + normal.length === kinds.size ? `${head}; everything else stayed within it.` : `${head}; ${listOf(normal)} stayed within it.`
 }
