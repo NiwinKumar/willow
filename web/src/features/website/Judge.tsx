@@ -167,11 +167,11 @@ export default function Judge() {
     },
     {
       id: 'proof',
-      title: 'Our team’s proof journey',
-      tag: journey.state === 'unavailable' ? 'REAL JOURNEY · UNAVAILABLE' : 'REAL JOURNEY · READ-ONLY',
+      title: 'Mei’s eight weeks, simulated',
+      tag: journey.state === 'unavailable' ? 'SIMULATED JOURNEY · UNAVAILABLE' : 'SIMULATED JOURNEY · READ-ONLY',
       body:
         journey.state === 'ready'
-          ? `Our own photos, measured by the live engine: baseline, noise band and history. ${journeyLine(journey)}.`
+          ? `A simulated person (generated photos), measured by the live engine: baseline, normal range, a flare-up, what improved and what did not. ${journeyLine(journey)}.`
           : journey.state === 'loading'
             ? 'Checking the journey…'
             : `${journeyUnavailableLine(journey)} The sample run in stop 01 shows the same pipeline on real photos.`,
