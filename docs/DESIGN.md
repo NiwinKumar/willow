@@ -653,3 +653,7 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 - Your goals replaced Recent: up to three goal measures as small trends against the person's normal range. The buttons and the chart legend sit in the header (no footer), so the rows can be taller. It leads the small-card row (where What changed used to be); What changed now sits beside Routine today. With no measured check-in after the baseline, Routine today takes its row.
 - Check-in card: the big number (days since baseline) sits middle-left; the title and subtext sit bottom-left and the Check in button bottom-right.
 - Routine today fills the height of its row. Products scale to the panel, not the card: up to four share one row, five to ten wrap into two (orbs shrink with the columns), eleven or more into three with the names dropped (tooltip and accessible label keep them), so the card never grows with the routine.
+
+### Progress: timeline markers and notes
+- Routine-change markers on a metric's timeline are one per start day: products started together read "3 PRODUCTS STARTED · 18 OCT" instead of stacking, and labels near the right edge are right-aligned so they stay inside the chart.
+- "Notes and routine changes": the Show all / Show the latest 8 button sits top right of the card as a solid ink pill.

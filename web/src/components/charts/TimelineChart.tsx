@@ -110,7 +110,7 @@ export function TimelineChart({
           return (
             <g key={`m${k}`}>
               <line x1={x} x2={x} y1={34 + (k % 3) * 16} y2={250} stroke={LIME} strokeOpacity={0.7} strokeDasharray="3 5" />
-              <text x={Math.min(x + 6, 520)} y={30 + (k % 3) * 16} fill={LIME} fontSize={10} fontFamily={MONO}>
+              <text x={x > 380 ? x - 6 : x + 6} y={30 + (k % 3) * 16} textAnchor={x > 380 ? 'end' : 'start'} fill={LIME} fontSize={10} fontFamily={MONO}>
                 {m.label}
               </text>
             </g>
