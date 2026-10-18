@@ -128,22 +128,21 @@ const EFFECT_WORD: Record<Effect, { glyph: string; word: string }> = {
  */
 export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect: RoutineEffect; onOpen: () => void; onAsk: (question: string) => void; className?: string }) {
   const shown = effect.rows.slice(0, 4)
-  const flagged = shown.filter((r) => r.flag).slice(0, 2)
   const tally = (['helping', 'changed', 'steady', 'away', 'early'] as const).filter((k) => effect.counts[k] > 0)
   return (
     <section
       aria-label="Routine effect"
-      className={`relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-3 overflow-hidden rounded-lg squircle p-5 text-ink ${className ?? ''}`}
+      className={`@container relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-3 overflow-hidden rounded-lg squircle p-5 text-ink ${className ?? ''}`}
       style={{ background: 'radial-gradient(100% 90% at 0% 0%, #E6F3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #D8B8FF 0%, transparent 62%), #EAF2FF', boxShadow: 'inset 0 0 44px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(61,123,255,.55)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[11px] tracking-[.08em]">■ ROUTINE EFFECT</span>
-        <button type="button" onClick={onOpen} className="min-h-11 py-1 text-[12.5px] text-ink-2 hover:text-ink">
+        <h2 className="m-0 text-h3 font-normal">Is your routine working?</h2>
+        <button type="button" onClick={onOpen} className="min-h-11 shrink-0 py-1 text-[13px] text-ink-2 hover:text-ink">
           Routine →
         </button>
       </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-[17px] leading-[1.25] tracking-[-0.01em] text-balance">{effectHeadline(effect.counts)}</span>
+      <p className="m-0 -mt-1.5 flex flex-col gap-0.5 text-[13px] leading-[1.4]">
+        <span className="text-balance">{effectHeadline(effect.counts)}</span>
         <span className="text-[12px] text-ink-2">
           {tally.map((k, i) => (
             <span key={k}>
@@ -153,40 +152,41 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
             </span>
           ))}
         </span>
-      </div>
-      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+      </p>
+      <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 @min-[360px]:grid-cols-2">
         {shown.map((r) => (
-          <li key={r.e.id} className="flex min-h-12 items-center gap-3 rounded-[18px] squircle bg-white/55 py-1.5 pr-3 pl-1.5">
-            <ProductImage product={imageOf(r.e)} size={34} decorative />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[13.5px]">{shortName(r.e)}</span>
-              <span className="truncate text-[12px] text-ink-2" title={r.o.detail}>
+          <li key={r.e.id} className={`flex min-w-0 flex-col gap-2 rounded-[22px] squircle p-3 @min-[360px]:[&:nth-child(odd):last-child]:col-span-2 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <ProductImage product={imageOf(r.e)} size={40} decorative />
+              <span className="font-mono text-[10px] text-ink-2" aria-label={`Day ${r.days}`}>
+                DAY {r.days}
+              </span>
+            </div>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[14px]">{shortName(r.e)}</span>
+              <span className="line-clamp-2 text-[12px] leading-[1.35] text-ink-2" title={r.o.detail}>
                 <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
                 {r.line}
               </span>
             </span>
-            <span className="flex shrink-0 flex-col items-end gap-0.5 text-ink-2" aria-label={`Day ${r.days}`}>
-              {r.points.length > 1 ? <Sparkline values={r.points} width={52} height={20} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started`} /> : <span aria-hidden className="h-5" />}
-              <span aria-hidden className="font-mono text-[10px]">DAY {r.days}</span>
-            </span>
+            {r.flag ? (
+              <span className="flex flex-col items-start gap-1.5 text-[12px] leading-[1.35]">
+                <span>
+                  <span aria-hidden>△ </span>
+                  {r.flag.text}
+                </span>
+                <Pill tone="outline" onClick={() => onAsk(r.flag!.question)}>
+                  Ask Wisp
+                </Pill>
+              </span>
+            ) : r.points.length > 1 ? (
+              <span className="mt-auto pt-1 text-ink-2">
+                <Sparkline values={r.points} width={110} height={30} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started`} />
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>
-      {flagged.length ? (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {flagged.map((r) => (
-            <li key={r.e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] leading-[1.4]">
-              <span className="min-w-0 flex-[1_1_180px]">
-                <span aria-hidden>△ </span>
-                <span className="text-ink">{shortName(r.e)}.</span> <span className="text-ink-2">{r.flag!.text}</span>
-              </span>
-              <Pill tone="outline" onClick={() => onAsk(r.flag!.question)}>
-                Ask Wisp
-              </Pill>
-            </li>
-          ))}
-        </ul>
-      ) : null}
       <span className="mt-auto text-[11.5px] leading-[1.4] text-ink-2">Measured against your own normal range. Timing is an association, not proof.</span>
     </section>
   )
