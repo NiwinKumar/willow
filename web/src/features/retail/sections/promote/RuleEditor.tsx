@@ -25,6 +25,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
   const [rule, setRule] = useState<RuleBody>(start)
   const [typed, setTyped] = useState('')
   const [missed, setMissed] = useState<string[] | null>(null)
+  const [source, setSource] = useState<'gemini' | 'rules' | null>(null)
   const [busy, setBusy] = useState<'parse' | 'save' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const ids = useId()
@@ -40,6 +41,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
       const out = await api.parseRule(await getIdToken(), typed.trim(), workspace.id)
       setRule({ ...out.rule, workspace: workspace.id })
       setMissed(out.missed)
+      setSource(out.source ?? null)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Couldn’t read that rule. Check the connection and try again.')
     } finally {
@@ -117,7 +119,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
           </div>
         </Group>
 
-        <Group title="Or describe it in your own words" hint="Willow reads it into the form below with fixed patterns; check the fields before you save.">
+        <Group title="Or describe it in your own words" hint="Gemini reads it into the form below; check the fields before you save.">
           <label htmlFor={`${ids}-typed`} className="sr-only">
             Describe the rule
           </label>
@@ -148,7 +150,8 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
           <p className="m-0 rounded-ctl bg-pf-bg2 px-3 py-2 font-mono text-proof-label leading-relaxed text-ink-2">{PATTERN}</p>
           {missed ? (
             <p role="status" className="m-0 text-proof-small text-ink-2">
-              {missed.length ? `Filled in. Not found in your words, so kept as the default: ${missed.join('; ')}.` : 'Filled in from your words. Check the fields below.'}
+              {source === 'rules' ? 'Gemini was unavailable, so fixed word patterns filled it in. ' : ''}
+              {missed.length ? `Not found in your words, so kept as the default: ${missed.join('; ')}.` : 'Filled in from your words. Check the fields below.'}
             </p>
           ) : null}
         </Group>

@@ -8,7 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app import autopilot, campaigns, catalog, limits
+from app import autopilot, autopilot_agent, campaigns, catalog, gemini, limits
 from app.auth import AuthUser, current_user
 from app.retailer import CATEGORY_LABEL
 from app.routes.me_routes import Goal
@@ -202,12 +202,72 @@ class ParseBody(BaseModel):
     workspace: str = Field(min_length=1, max_length=80)
 
 
+class DraftTrigger(BaseModel):
+    kind: Literal["proven", "new_segment", "rising_demand", "unmet_need"]
+    goals: list[Goal] = Field(default_factory=list)
+    unmet_min: float = autopilot.UNMET_MIN
+
+
+class DraftConditions(BaseModel):
+    in_store: bool = False
+    start_on: str | None = None  # YYYY-MM-DD
+    stop_after: str | None = None
+    monthly_cap: int | None = None
+
+
+class DraftAction(BaseModel):
+    days: int = 14  # 7, 14 or 30 (checked by Action); Gemini's schema takes string enums only
+    holdout_pct: float = campaigns.HOLDOUT_PCT
+    max_running: int = 2
+
+
+class DraftRule(BaseModel):
+    """What Gemini fills from the typed words (checked against RuleBody before it is shown)."""
+
+    name: str
+    level: Literal["suggest", "auto", "autopilot"] = "suggest"
+    category: Category | None = None
+    trigger: DraftTrigger
+    conditions: DraftConditions = Field(default_factory=DraftConditions)
+    action: DraftAction = Field(default_factory=DraftAction)
+
+
+class ParseOut(BaseModel):
+    rule: DraftRule
+    missed: list[str] = Field(default_factory=list, max_length=6)
+
+
 @router.post("/retailer/autopilot/parse")
-def parse_rule(body: ParseBody, user: AuthUser = Depends(current_user)) -> dict[str, Any]:
-    """A rule typed in plain words, read into the form's fields (nothing is saved): {rule,
-    sentence, missed}."""
-    out = autopilot.parse(body.text, body.workspace)
-    return out | {"sentence": autopilot.describe(out["rule"])}
+def parse_rule(
+    body: ParseBody, user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """A rule typed in plain words, read into the form's fields by Gemini (nothing is saved):
+    {rule, sentence, missed, source}. The draft must pass the form's own checks; without Gemini
+    (or when its draft fails them) fixed word patterns read it (`source` "rules")."""
+    fallback = autopilot.parse(body.text, body.workspace)
+    try:
+        limits.take(store, user.uid, "campaign_create")
+        out = autopilot_agent.parse(body.text, body.workspace, fallback["rule"], ParseOut)
+        d = out["rule"]
+        rule = RuleBody(
+            name=(d["name"] or fallback["rule"]["name"])[:60],
+            workspace=body.workspace,
+            level=d["level"],
+            scope=Scope(category=d["category"]),
+            trigger=Trigger(**d["trigger"]),
+            conditions=Conditions(**d["conditions"]),
+            action=Action(**d["action"]),
+        )
+        doc = _body_doc(rule)
+        missed = [m for m in out["missed"] if isinstance(m, str) and len(m) <= 120]
+        return {
+            "rule": doc,
+            "missed": missed,
+            "source": "gemini",
+            "sentence": autopilot.describe(doc),
+        }
+    except (gemini.GeminiError, ValueError, HTTPException):
+        return fallback | {"source": "rules", "sentence": autopilot.describe(fallback["rule"])}
 
 
 def _run(fn, *args) -> dict[str, Any]:

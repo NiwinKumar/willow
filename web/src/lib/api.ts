@@ -472,7 +472,7 @@ export const api = {
   replaceRule: (token: string, id: string, body: RuleBody) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PUT', ...json(body) }),
   toggleRule: (token: string, id: string, enabled: boolean) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PATCH', ...json({ enabled }) }),
   deleteRule: (token: string, id: string) => request<void>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  parseRule: (token: string, text: string, workspace: string) => request<{ rule: RuleBody; sentence: string; missed: string[] }>(token, '/v1/retailer/autopilot/parse', { method: 'POST', ...json({ text, workspace }) }),
+  parseRule: (token: string, text: string, workspace: string) => request<{ rule: RuleBody; sentence: string; missed: string[]; source?: 'gemini' | 'rules' }>(token, '/v1/retailer/autopilot/parse', { method: 'POST', ...json({ text, workspace }) }),
   /** "Run check now"; `ifStale`: only when the last check is over 30 minutes old (the Campaigns page on open). */
   runAutopilot: (token: string, ifStale = false) => request<AutopilotView & { result: AutopilotResult | null }>(token, `/v1/retailer/autopilot/run${ifStale ? '?if_stale=true' : ''}`, { method: 'POST' }),
   autopilotAct: (token: string, activityId: string, act: 'approve' | 'dismiss' | 'undo') => request<AutopilotView & { campaign_id?: string; outcome?: string }>(token, `/v1/retailer/autopilot/activity/${encodeURIComponent(activityId)}/${act}`, { method: 'POST' }),
@@ -494,7 +494,7 @@ export type RuleBody = {
   conditions: { in_store: boolean; start_on: string | null; stop_after: string | null; monthly_cap: number | null }
   action: { days: 7 | 14 | 30; holdout_pct: number; max_running: number }
 }
-export type AutopilotKind = 'proposed' | 'started' | 'paused' | 'resumed' | 'ended' | 'extended' | 'narrowed' | 'held' | 'undone' | 'summary'
+export type AutopilotKind = 'proposed' | 'started' | 'paused' | 'resumed' | 'ended' | 'extended' | 'narrowed' | 'held' | 'undone' | 'summary' | 'reviewed'
 export type AutopilotActivity = {
   id: string
   at: string
@@ -512,6 +512,8 @@ export type AutopilotActivity = {
   campaign_id: string | null
   proposal: ({ action: 'start' | 'pause' | 'resume' | 'end' | 'extend' | 'narrow' } & Record<string, unknown>) | null
   numbers: { lift?: number | null; lift_lo?: number | null; n?: number | null }
+  /** 'gemini': the agent decided and wrote it; null: the fixed logic, an approval or an undo. */
+  by?: 'gemini' | null
   can_undo: boolean
 }
 export type AutoRule = RuleBody & {
@@ -524,7 +526,8 @@ export type AutoRule = RuleBody & {
   created_at: string
 }
 export type AutopilotView = { rules: AutoRule[]; activity: AutopilotActivity[] }
-export type AutopilotResult = { ran_at: string; rules: number; started: number; proposed: number; paused: number; resumed: number; ended: number; extended: number; narrowed: number; held: number }
+/** source: 'gemini' when the agent ran the rules; 'rules' when Gemini was unreachable and the fixed logic ran. */
+export type AutopilotResult = { ran_at: string; rules: number; source?: 'gemini' | 'rules'; started: number; proposed: number; paused: number; resumed: number; ended: number; extended: number; narrowed: number; held: number }
 
 /** Proof-gated promotion types (docs/CONTRACT.md section 3, docs/RETAILER_INSIGHTS.md). */
 export type SponsoredPlacement = 'routine'

@@ -33,7 +33,7 @@ import secrets
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from app import campaigns, catalog
+from app import campaigns, catalog, gemini
 from app.retailer import CATEGORY_LABEL, GOAL_LABEL, SKIN_LABEL
 from app.store import Doc, Store, iso
 
@@ -229,6 +229,8 @@ def activity_view(aid: str, doc: Doc) -> dict[str, Any]:
         "campaign_id": doc.get("campaign_id"),
         "proposal": doc.get("proposal"),
         "numbers": doc.get("numbers") or {},
+        # who decided: "gemini" (the agent) or null (the fixed logic, approvals, undo)
+        "by": doc.get("by"),
         "can_undo": doc["kind"] == "started" and doc.get("status") == "done",
     }
 
@@ -394,12 +396,21 @@ def run(store: Store, uid: str, at: datetime | None = None) -> dict[str, Any]:
         ("started", "proposed", "paused", "resumed", "ended", "extended", "narrowed", "held"), 0
     )
     rules = sorted(store.rules_of(uid), key=lambda r: iso(r[1].get("created_at")) or "")
+    source = "gemini"
     for rid, rdoc in rules:
         if not rdoc.get("enabled"):
             continue
-        _manage(store, uid, (rid, rdoc), by_id, at, totals)
-        if _window_open(rdoc, at.date()):
-            _decide(store, uid, (rid, rdoc), sig, at, totals)
+        _guard(store, uid, (rid, rdoc), by_id, at, totals)
+        try:
+            from app import autopilot_agent
+
+            autopilot_agent.run_rule(store, uid, (rid, rdoc), sig, at, totals)
+        except gemini.GeminiError:
+            # Gemini unreachable before acting: this rule runs on the fixed logic
+            source = "rules"
+            _manage(store, uid, (rid, rdoc), by_id, at, totals)
+            if _window_open(rdoc, at.date()):
+                _decide(store, uid, (rid, rdoc), sig, at, totals)
         seen = {
             p["product_id"]: {
                 "goals": p.get("goals") or [],
@@ -412,7 +423,39 @@ def run(store: Store, uid: str, at: datetime | None = None) -> dict[str, Any]:
         if rdoc["level"] == "autopilot":
             fields |= _summary(store, uid, (rid, rdoc), at)
         store.rule_update(rid, fields)
-    return {"ran_at": iso(at), "rules": len(rules), **totals}
+    return {"ran_at": iso(at), "rules": len(rules), "source": source, **totals}
+
+
+def _guard(
+    store: Store,
+    uid: str,
+    rule: tuple[str, Doc],
+    by_id: dict[str, dict],
+    at: datetime,
+    totals: dict,
+) -> None:
+    """The one step never left to the agent: a running campaign this rule started whose product
+    is no longer Proven is paused at once (no shopper sees its card)."""
+    rid, _ = rule
+    for cid, doc in store.campaigns_of(uid):
+        if doc.get("rule_id") != rid or campaigns.status_of(doc, at) != "active":
+            continue
+        p = by_id.get(doc["product_id"]) or {}
+        if _proven(p):
+            continue
+        _apply(store, cid, doc, "pause", {}, at)
+        name = f"{p.get('brand', '')} {p.get('product', doc['product_id'])}".strip()
+        _log(
+            store,
+            uid,
+            rule,
+            "paused",
+            f"Paused {name}: it is no longer rated Proven, so no shopper sees its card.",
+            at,
+            product_id=doc["product_id"],
+            campaign_id=cid,
+        )
+        totals["paused"] += 1
 
 
 def _decide(
@@ -943,8 +986,10 @@ def parse(text: str, workspace: str) -> dict[str, Any]:
         holdout = min(max(int(m.group(1)) / 100, 0.1), 0.5)
     max_running = 2
     if m := re.search(
-        r"(?:max|maximum|at most|up to) (\d|one|two|three)(?: at a time| running)?", t
-    ):
+        r"(?:max|maximum|at most|up to|only) (\d|one|two|three)(?: campaigns?)? "
+        r"(?:at a time|running)",
+        t,
+    ) or re.search(r"(?:max|maximum|at most|up to) (\d|one|two|three)", t):
         max_running = min(max(_num(m.group(1)), 1), campaigns.MAX_ACTIVE)
     if re.search(r"autopilot|fully|on its own|without asking", t):
         level = "autopilot"
