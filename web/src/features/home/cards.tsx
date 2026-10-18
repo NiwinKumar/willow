@@ -1,9 +1,14 @@
 import type { ReactNode } from 'react'
 
+import { TrendChart } from '../../components/charts'
+import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
-import { fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
-import { verdictKind } from '../../lib/verdict'
-import { byGoals, metricAura, shortDay } from './derive'
+import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
+import { imageOf } from '../routine/routineModel'
+import { fmtSigned, fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
+import { VERDICT_WORDS, verdictKind } from '../../lib/verdict'
+import { byGoals, metricAura, shortDay, shortName } from './derive'
+import type { GoalTrend } from './goals'
 import { CardHead, Pill, VerdictLine } from './parts'
 
 /** Standard Home card shell: surface, radius 30, rise in. */
@@ -15,16 +20,39 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
   )
 }
 
-/** What changed: the latest measured face check-in's first three measures, in goal order, against the baseline. */
+/** Rows What changed lists before folding the rest into one line. */
+const ROWS = 3
+
+/** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
 export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string }) {
-  const rows = byGoals(session.result?.metrics ?? [], goals).slice(0, 3)
-  const note = baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)
+  const metrics = byGoals(session.result?.metrics ?? [], goals).map((m) => ({ m, kind: verdictKind(m, session) }))
+  const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
+  const rows = sorted.slice(0, ROWS)
+  const rest = sorted.slice(ROWS)
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
   return (
-    <HomeCard label="What changed" className={className} delay={120}>
-      <CardHead title="What changed" note={note} />
-      <div className="flex flex-col gap-1.5">
-        {rows.map((m, i) => {
-          const kind = verdictKind(m, session)
+    <HomeCard label="What changed" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="m-0 text-h3 font-normal">What changed</h2>
+          <span className="text-[11px] text-ink-2">
+            {baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)}
+            {rest.length ? ` · ${rest.length} more in the result` : ''}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {onAsk ? (
+            <button type="button" onClick={onAsk} className={`${small} text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.14)] hover:bg-ink/5`}>
+              Ask about this
+            </button>
+          ) : null}
+          <button type="button" onClick={onFull} className={`${small} bg-selected text-inverse hover:bg-[#2a2a2a]`}>
+            Full result
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col gap-1.5">
+        {rows.map(({ m, kind }, i) => {
           const unit = m.value === null ? '' : unitOf(m).trim()
           return (
             <button
@@ -32,29 +60,24 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
               type="button"
               onClick={() => onOpen(m.id)}
               aria-label={`${METRIC_META[m.id].label}: ${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
-              className="flex min-h-11 animate-[wRise_.5s_both] items-center gap-2.5 rounded-[18px] squircle bg-ink/[.035] py-2 pr-2.5 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-14 max-h-24 flex-1 animate-[wRise_.5s_both] items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
               style={{ animationDelay: `${i * 70 + 120}ms` }}
             >
-              <span aria-hidden className="size-8 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13.5px]">{METRIC_META[m.id].label}</span>
-                <VerdictLine kind={kind} className="text-[11.5px] text-ink-2" />
+              <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[14px]">{METRIC_META[m.id].label}</span>
+                <VerdictLine kind={kind} className="text-[12px] text-ink-2" />
               </span>
-              <span className="flex items-baseline gap-[3px]">
-                <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
-                {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
+              <span className="flex flex-none flex-col items-end gap-0.5">
+                <span className="flex items-baseline gap-[3px]">
+                  <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
+                  {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
+                </span>
+                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[11px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}
               </span>
             </button>
           )
         })}
-      </div>
-      <div className="mt-auto flex flex-wrap gap-1.5">
-        <Pill onClick={onFull}>Full result</Pill>
-        {onAsk ? (
-          <Pill tone="outline" onClick={onAsk}>
-            Ask about this
-          </Pill>
-        ) : null}
       </div>
     </HomeCard>
   )
@@ -107,66 +130,126 @@ export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: s
   )
 }
 
-/** Next step: the routine check's first finding, in words, with what to do about it. */
-export function NextStepCard({ title, body, onRoutine, onAsk, className }: { title: string; body: string; onRoutine: () => void; onAsk: () => void; className?: string }) {
+const EFFECT_STROKE: Record<Effect, string> = { helping: 'var(--willow-700)', away: 'var(--aura-coral)', changed: 'currentColor', steady: 'currentColor', early: 'currentColor' }
+const EFFECT_WORD: Record<Effect, { glyph: string; word: string }> = {
+  helping: { glyph: '◆', word: 'helping' },
+  away: { glyph: '▲', word: 'moving the other way' },
+  changed: { glyph: '◆', word: 'changed' },
+  steady: { glyph: '○', word: 'no change yet' },
+  early: { glyph: '◌', word: 'too early' },
+}
+
+/**
+ * Routine effect: how much the routine is moving your skin, product by product. Each row is a product with the
+ * measurement it targets (a trend line since the day it started, against your own normal range), and a short
+ * flag when a product moved the other way, shows nothing after weeks of use, or overlaps another. All of it
+ * comes from lib/effect.ts (measured numbers and rules, never a model); timing is an association, not proof.
+ */
+export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect: RoutineEffect; onOpen: () => void; onAsk: (question: string) => void; className?: string }) {
+  const shown = effect.rows.slice(0, 4)
   return (
-    <HomeCard label="Next step" className={className} delay={280}>
-      <span className="self-start rounded-pill bg-lime px-2.5 py-[5px] font-mono text-[10.5px] tracking-[.08em]">■ NEXT STEP</span>
-      <span className="text-[17px] leading-[1.3] tracking-[-0.01em]">{title}</span>
-      <span className="text-[13px] leading-normal text-[#3E3C38]">{body}</span>
-      <div className="mt-auto flex flex-wrap gap-1.5">
-        <Pill onClick={onRoutine}>Look at routine</Pill>
-        <Pill tone="outline" onClick={onAsk}>
-          Ask Wisp
-        </Pill>
+    <section
+      aria-label="Routine effect"
+      className={`@container relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-2 overflow-hidden rounded-lg squircle p-4 text-ink ${className ?? ''}`}
+      style={{ background: 'radial-gradient(100% 90% at 0% 0%, #E6F3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #D8B8FF 0%, transparent 62%), #EAF2FF', boxShadow: 'inset 0 0 44px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(61,123,255,.55)' }}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="m-0 text-h3 font-normal">Is your routine working?</h2>
+        <button type="button" onClick={onOpen} className="min-h-9 shrink-0 text-[13px] text-ink-2 hover:text-ink">
+          Routine →
+        </button>
       </div>
-    </HomeCard>
+      <p className="m-0 -mt-1 text-[12.5px] leading-[1.35] text-ink-2 text-balance">{effectHeadline(effect.counts)}</p>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {shown.map((r) => (
+          <li key={r.e.id} className={`flex min-w-0 flex-col gap-1.5 rounded-[18px] squircle py-1.5 pr-3 pl-2 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
+            <div className="flex items-center gap-2.5">
+              <ProductImage product={imageOf(r.e)} size={32} decorative />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[13px]">{shortName(r.e)}</span>
+                <span className="truncate text-[11px] text-ink-2" title={r.o.detail}>
+                  <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
+                  {r.line}
+                  {r.metric ? ` · ${METRIC_META[r.metric].label}` : ''} · day {r.days}
+                </span>
+              </span>
+              {r.points.length > 1 ? (
+                <span className="hidden flex-none text-ink-2 @min-[380px]:block" title={r.reading ?? undefined}>
+                  <TrendChart points={r.points} baseline={r.baseline} band={r.band} width={96} height={30} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started, with your baseline and normal range`} />
+                </span>
+              ) : null}
+            </div>
+            {r.flag ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] leading-[1.35]">
+                <span className="min-w-0 flex-[1_1_160px]">
+                  <span aria-hidden>△ </span>
+                  {r.flag.text}
+                </span>
+                <Pill tone="outline" onClick={() => onAsk(r.flag!.question)}>
+                  Ask Wisp
+                </Pill>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <span className="mt-auto text-[11px] leading-[1.35] text-ink-2">Dashed: your baseline. Shaded: your normal range. Timing is an association, not proof.</span>
+    </section>
   )
 }
 
-/** tie: orders rows on the same `at` (products started the same day: the one added last first). */
-export type RecentRow = { key: string; at: number; tie?: number; d: string; t: string; x: string; onClick?: () => void }
-
-/** Recent: sessions, notes, baselines and routine changes, newest first, each opening its place. */
-export function RecentCard({ rows, onAll, className }: { rows: RecentRow[]; onAll: () => void; className?: string }) {
+/** Your goals: each measure the person chose, as a trend since the baseline against their own normal range. */
+export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, className }: { trends: GoalTrend[]; baseline: Session | null; onOpen: (metricId: string) => void; onProgress: () => void; onAsk?: () => void; className?: string }) {
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
   return (
-    <HomeCard label="Recent activity" className={`gap-2 ${className ?? ''}`} delay={320}>
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="m-0 text-h3 font-normal">Recent</h2>
-        <button type="button" onClick={onAll} className="min-h-11 px-0 py-1 text-[13px] text-ink-2 hover:text-ink">
-          All in Progress →
-        </button>
+    <HomeCard label="Your goals" className={`@container gap-2 p-4 ${className ?? ''}`} delay={320}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="m-0 text-h3 font-normal">Your goals</h2>
+          <span className="text-[11px] text-ink-2">
+            {baseline ? `since baseline · ${shortDay(baseline.created_at)} · ` : ''}dashed: baseline · shaded: normal
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {onAsk ? (
+            <button type="button" onClick={onAsk} className={`${small} text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.14)] hover:bg-ink/5`}>
+              Ask about goals
+            </button>
+          ) : null}
+          <button type="button" onClick={onProgress} className={`${small} bg-selected text-inverse hover:bg-[#2a2a2a]`}>
+            See progress
+          </button>
+        </div>
       </div>
-      {rows.length ? (
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-x-4 p-0">
-          {rows.map((a) => {
-            const inner = (
-              <>
-                <span className="pt-[3px] font-mono text-[10.5px] text-ink-2">{a.d}</span>
-                <span aria-hidden className="mt-1.5 size-[7px] rounded-full bg-selected" />
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-[13.5px]">{a.t}</span>
-                  <span className="truncate text-[12px] text-ink-2">{a.x}</span>
+      <ul className="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
+        {trends.slice(0, 3).map((t) => (
+          <li key={t.id} className="flex flex-1">
+            <button
+              type="button"
+              onClick={() => onOpen(t.id)}
+              aria-label={`${t.label}: ${t.line}. Open in the result.`}
+              title={t.reading ?? undefined}
+              className="flex min-h-14 max-h-24 flex-1 items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+            >
+              <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[14px]">{t.label}</span>
+                <span className="flex items-center gap-1.5 truncate text-[12px] text-ink-2">
+                  <span aria-hidden className={`flex-none ${t.kind === 'changed' ? 'text-signal' : ''}`}>
+                    {VERDICT_WORDS[t.kind].glyph}
+                  </span>
+                  <span className="truncate">{t.line}</span>
                 </span>
-              </>
-            )
-            const cls = 'grid w-full grid-cols-[56px_10px_1fr] items-start gap-2.5 rounded-[14px] px-1.5 py-[7px] text-left text-ink'
-            return (
-              <li key={a.key}>
-                {a.onClick ? (
-                  <button type="button" onClick={a.onClick} className={`${cls} min-h-11 transition-[background] duration-200 hover:bg-ink/[.04]`}>
-                    {inner}
-                  </button>
-                ) : (
-                  <div className={cls}>{inner}</div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      ) : (
-        <p className="m-0 text-[13px] text-ink-2">Nothing yet. Your check-ins, notes and routine changes will show here.</p>
-      )}
+              </span>
+              {t.points.length > 1 ? (
+                <span className="hidden flex-none text-ink-2 @min-[380px]:block">
+                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={120} height={36} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
+                </span>
+              ) : null}
+            </button>
+          </li>
+        ))}
+      </ul>
     </HomeCard>
   )
 }

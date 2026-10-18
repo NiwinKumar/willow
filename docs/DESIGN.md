@@ -224,7 +224,7 @@ Spacing (4px base): `0`=0, `0.5`=2, `1`=4, `1.5`=6, `2`=8, `2.5`=10, `3`=12, `3.
 - 12 columns, gap 14px (space-3.5) at every width.
 - Page padding: clamp(16px, 4vw, 40px).
 - Cards in a row stretch to equal height (align-items: stretch). Never leave a hole in a row: if a card is absent, the neighbour spans the space.
-- Home rows (active user, desktop): [Hero 6 | Check-in 6] · [What changed 3 | Next step 3 | Product test 3 | Spot diary 3] · [Routine 6 | Recent 6]. Tablet: everything span 6, routine/recent span 12. Phone: span 12.
+- Home rows (active user, desktop): [Hero 6 | Check-in 6] · [What changed 3 | Next step 3 | Product test 3 | Spot diary 3] · [Routine 6 | What changed 6]. Tablet: everything span 6, routine/goals span 12. Phone: span 12.
 - Touch targets ≥ 44×44px; buttons are 48px tall on phone.
 
 | Radius | px | Use |
@@ -646,3 +646,10 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 - [ ] Empty, first reading, processing, partial/total failure, timeout, offline, demo, deleted states implemented where listed.
 - [ ] Disclaimer present on reports; synthetic badge on every retail chart when not real.
 - [ ] iPhone Safari: safe-area insets, 100dvh, backdrop-filter with -webkit- prefix.
+
+### Home: compact cards
+- Home cards are kept small and quiet: a bigger card is shrunk to match its neighbour, never the other way round. Product and measure rows are one line (name, a short status, a small chart), with no tally lines or long legends.
+- What changed: the three leading measures (changed first) with value and move against the baseline; the rest are one count in the header. Its buttons sit in the header like Your goals, so the rows are taller.
+- Your goals replaced Recent: up to three goal measures as small trends against the person's normal range. The buttons and the chart legend sit in the header (no footer), so the rows can be taller. It leads the small-card row (where What changed used to be); What changed now sits beside Routine today. With no measured check-in after the baseline, Routine today takes its row.
+- Check-in card: the big number (days since baseline) sits middle-left; the title and subtext sit bottom-left and the Check in button bottom-right.
+- Routine today fills the height of its row. Products scale to the panel, not the card: up to four share one row, five to ten wrap into two (orbs shrink with the columns), eleven or more into three with the names dropped (tooltip and accessible label keep them), so the card never grows with the routine.
