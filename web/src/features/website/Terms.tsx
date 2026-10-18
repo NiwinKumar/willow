@@ -161,7 +161,7 @@ export default function Terms() {
         </Section>
 
         <Section title="The demo and sample photos">
-          <p>The demo journey and the sample photos in the judge tour are the team’s own photos, used with the agreement of each person photographed.</p>
+          <p>The demo journey follows Mei, a simulated person: her photos are generated and show no real person, and her routine and notes are written for the demo. Her readings are measured by the live engine like anyone’s. The sample photos in the judge tour are the team’s own photos, used with the agreement of each person photographed.</p>
         </Section>
 
         <Section title="Changes and contact">

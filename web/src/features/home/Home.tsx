@@ -54,8 +54,8 @@ export default function Home() {
         {data.mode === 'demo' ? (
           <EmptyState
             {...(demoUnavailable() === 'empty'
-              ? { title: 'The demo journey has no check-ins yet', body: "It shows our team's own check-ins, measured by the live engine, and none have been measured yet. Your own check-ins are in your account." }
-              : { title: "The demo journey can't be read right now", body: "It is our team's own measured check-ins, read from the live api. Try again in a moment, or leave the demo." })}
+              ? { title: 'The demo journey has no check-ins yet', body: "It follows Mei, a simulated person, measured by the live engine, and none of her check-ins have been measured yet. Your own check-ins are in your account." }
+              : { title: "The demo journey can't be read right now", body: "It is Mei's measured check-ins (a simulated person), read from the live api. Try again in a moment, or leave the demo." })}
             action={
               <Button
                 variant="ink"

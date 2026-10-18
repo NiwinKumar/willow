@@ -69,7 +69,7 @@ export default function You() {
 function DemoRow() {
   const navigate = useNavigate()
   return (
-    <Row label="You're looking at the demo journey" hint="Our team's own photos, measured by the live engine, read-only. Your own account, privacy and delete controls are in your account.">
+    <Row label="You're looking at the demo journey" hint="Mei is simulated: generated photos of someone who does not exist, measured by the live engine, read-only. Your own account, privacy and delete controls are in your account.">
       <button
         type="button"
         className={outline}

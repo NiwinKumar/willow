@@ -209,7 +209,7 @@ function WaysIn({ returning }: { returning: boolean }) {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <h2 className="m-0 font-serif text-[clamp(36px,4.4vw,60px)] font-normal leading-none tracking-[-0.01em]">Four ways in</h2>
         <p className="m-0 max-w-[420px] text-[16px] leading-normal text-ink-2">
-          The demo journey is our team’s own photos, measured by the live engine and read-only. Sample runs go through the real pipeline in a guest account of your own. Only your own capture creates personal results.
+          The demo journey follows Mei, a simulated person: generated photos of someone who does not exist, measured by the live engine, read-only. Sample runs go through the real pipeline in a guest account of your own. Only your own capture creates personal results.
         </p>
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-4">
@@ -238,11 +238,11 @@ function WaysIn({ returning }: { returning: boolean }) {
           style={{ background: 'radial-gradient(60% 40% at 30% 60%, #9FC2C9 0%, transparent 70%), linear-gradient(200deg, #2F4A2A 0%, #3E6A6E 45%, #15241C 100%)' }}
         >
           <WayText
-            tag={journey.state === 'unavailable' ? 'REAL JOURNEY · UNAVAILABLE' : 'REAL JOURNEY · READ-ONLY'}
-            title="Walk our team’s proof journey"
+            tag={journey.state === 'unavailable' ? 'SIMULATED JOURNEY · UNAVAILABLE' : 'SIMULATED JOURNEY · READ-ONLY'}
+            title="Follow Mei’s eight weeks"
             body={
               journey.state === 'ready'
-                ? `Our own photos, measured by the same engine as yours. ${journeyLine(journey)}.`
+                ? `A simulated person with acne: generated photos, measured by the same engine as yours. ${journeyLine(journey)}.`
                 : journey.state === 'loading'
                   ? 'Checking the journey…'
                   : journeyUnavailableLine(journey)
