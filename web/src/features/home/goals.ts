@@ -4,7 +4,7 @@
  * half-width, verdict); the words come from METRIC_META and lib/verdict, never from a model.
  */
 import type { MetricId, Session } from '../../data/types'
-import { fmtValue, goalMetrics, METRIC_META, unitOf } from '../../lib/metrics'
+import { goalMetrics, METRIC_META, unitOf, fmtReading } from '../../lib/metrics'
 import { changeWay, movedWords, verdictKind, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { byGoals, countWord, runOf, usable } from './derive'
 
@@ -55,7 +55,7 @@ export function goalTrends(lead: Session, baseline: Session | null, face: Sessio
       kind,
       way: kind === 'changed' ? changeWay(m) : null,
       line: run >= 2 ? `${head} · ${countWord(run).toLowerCase()} check-ins in a row` : head,
-      reading: bm?.value != null && !lead.is_baseline ? `Now ${fmtValue(m.value, m)}${unit} · baseline ${fmtValue(bm.value, bm)}${unit}` : null,
+      reading: bm?.value != null && !lead.is_baseline ? `Now ${fmtReading(m.value, m)}${unit} · baseline ${fmtReading(bm.value, bm)}${unit}` : null,
       points: same.flatMap((s) => {
         const v = s.result?.metrics.find((x) => x.id === m.id)?.value
         return v == null ? [] : [{ t: Date.parse(s.created_at), v }]

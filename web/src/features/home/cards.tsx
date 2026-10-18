@@ -5,7 +5,7 @@ import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
 import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
 import { imageOf } from '../routine/routineModel'
-import { fmtSigned, fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
+import { fmtSigned, METRIC_META, unitOf, fmtReading } from '../../lib/metrics'
 import { CHANGE_WORDS, VERDICT_WORDS, changeWay, verdictKind } from '../../lib/verdict'
 import { byGoals, metricAura, shortDay, shortName } from './derive'
 import type { GoalTrend } from './goals'
@@ -59,7 +59,7 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
               key={m.id}
               type="button"
               onClick={() => onOpen(m.id)}
-              aria-label={`${METRIC_META[m.id].label}: ${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
+              aria-label={`${METRIC_META[m.id].label}: ${fmtReading(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
               className="flex min-h-14 max-h-24 flex-1 animate-[wRise_.5s_both] items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
               style={{ animationDelay: `${i * 70 + 120}ms` }}
             >
@@ -70,7 +70,7 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
               </span>
               <span className="flex flex-none flex-col items-end gap-0.5">
                 <span className="flex items-baseline gap-[3px]">
-                  <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
+                  <span className="font-dot text-[18px]">{fmtReading(m.value, m)}</span>
                   {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
                 </span>
                 {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[11px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}

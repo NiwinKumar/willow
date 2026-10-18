@@ -145,6 +145,12 @@ export function fmtValue(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): s
   return Number(s) === 0 ? s.replace('-', '') : s.replace('-', '−')
 }
 
+/** A reading as shown: a signed scale (under-eye, ΔL* against the cheek) shows "+" above zero, so +3.5 and −3.5 read as the pair they are. */
+export function fmtReading(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {
+  const s = fmtValue(v, m)
+  return m.unit === 'delta_l_star' && v !== null && Number(s) > 0 ? `+${s}` : s
+}
+
 export function fmtSigned(v: number | null, m: Pick<Metric, 'mdc95' | 'unit'>): string {
   if (v === null) return '–'
   const s = fmtValue(Math.abs(v), m)

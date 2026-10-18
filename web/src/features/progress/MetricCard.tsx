@@ -1,7 +1,7 @@
 import { BandBar } from '../../components/charts'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
-import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
+import { METRIC_META, unitOf, fmtReading } from '../../lib/metrics'
 import { changeWay, verdictKind, wordsFor } from '../../lib/verdict'
 import { EMPTY_CARD, METRIC_LOOK } from './metricLook'
 import { verdictHeadline } from './headline'
@@ -44,7 +44,7 @@ export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 
         <Pill metric={m} session={session} size="sm" />
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="font-dot text-[clamp(31px,2.99vw,39px)] leading-[.9] font-extrabold tnum">{none ? '—' : fmtValue(m.value, m)}</span>
+        <span className="font-dot text-[clamp(31px,2.99vw,39px)] leading-[.9] font-extrabold tnum">{none ? '—' : fmtReading(m.value, m)}</span>
         {!none && unit ? <span className="text-[15px]">{unit}</span> : null}
       </div>
       <div className="flex flex-col gap-2">
