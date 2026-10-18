@@ -174,7 +174,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
               {r.points.length > 1 ? (
                 <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5 text-ink-2">
                   <TrendChart points={r.points} baseline={r.baseline} band={r.band} stroke={EFFECT_STROKE[r.effect]} label={`${r.metric ? METRIC_META[r.metric].label : 'Reading'} since you started, with your baseline and normal range`} />
-                  {r.reading ? <span className="text-[10.5px] leading-none">{r.reading}</span> : null}
+                  {r.reading ? <span className="text-[11px] leading-none">{r.reading}</span> : null}
                 </span>
               ) : null}
             </div>

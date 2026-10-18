@@ -62,11 +62,11 @@ test('a real drop in redness since the start is helping; a real rise is away and
   const r1 = routineEffect([entry('serum', 40, ['redness_sensitivity'])], down, undefined)
   assert.equal(r1.rows[0].effect, 'helping')
   assert.equal(r1.rows[0].flag, null)
-  assert.match(r1.rows[0].line, /Redness: calmer/)
+  assert.equal(r1.rows[0].line, 'Helping')
   assert.equal(r1.rows[0].points.length, 3)
   assert.equal(r1.rows[0].baseline, 10)
   assert.equal(r1.rows[0].band, 0.5)
-  assert.equal(r1.rows[0].reading, 'Redness · lower is calmer')
+  assert.equal(r1.rows[0].reading, 'Redness · lower means calmer')
   const up = [baseline, session('a', 20, 10.5, 'within_noise', 0.5), session('c', 3, 12, 'real_change', 2)]
   const r2 = routineEffect([entry('serum', 40, ['redness_sensitivity'])], up, undefined)
   assert.equal(r2.rows[0].effect, 'away')
