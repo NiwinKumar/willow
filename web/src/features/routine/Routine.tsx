@@ -60,11 +60,14 @@ function LiveRoutine() {
   const [add, setAdd] = useState<AddPreset | null>(null)
   const [info, setInfo] = useState<ProductTarget | null>(null)
   // A product the advisor offered ("Add to routine" in its product sheet) arrives as router state.
-  const incoming = (location.state as { addProduct?: Product } | null)?.addProduct
-  const sheetPreset: AddPreset | null = incoming ? { product: incoming } : add
+  // The Home routine check card sends "Find one" the same way: a preset to search the catalog with.
+  const incomingState = location.state as { addProduct?: Product; find?: AddPreset } | null
+  const incoming = incomingState?.addProduct
+  const incomingFind = incomingState?.find
+  const sheetPreset: AddPreset | null = incoming ? { product: incoming } : (incomingFind ?? add)
   const closeAdd = () => {
     setAdd(null)
-    if (incoming) navigate(location.pathname, { replace: true, state: null })
+    if (incoming || incomingFind) navigate(location.pathname, { replace: true, state: null })
   }
 
   const am = current.filter((e) => e.slots.includes('am')).sort(byStep)
