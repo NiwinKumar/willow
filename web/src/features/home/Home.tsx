@@ -15,7 +15,7 @@ import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
 import { placesOf } from '../../lib/profile'
-import { minutesFor } from '../../lib/track'
+import { minutesFor, withArms } from '../../lib/track'
 import { routineEffect } from '../../lib/routineEffect'
 import { addToCalendar } from '../../lib/reminders'
 import { fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
@@ -135,7 +135,7 @@ function HomeBody() {
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
   const closeUp = { wanted: goals.includes('pores_texture') || goals.includes('smoother'), doneToday: (data.series('cheek_macro')?.sessions ?? EMPTY).some((s) => counts(s) && dayOf(s.created_at) === day) }
-  const tracked = placesOf(data.profile)
+  const tracked = withArms(placesOf(data.profile), !demo && Boolean(tests.running))
   const dueNow = !demo && checkin && due && (due.kind === 'due' || due.kind === 'late')
   const placeChips = demo ? ['Face'] : [...tracked.map((p) => SITE_SHORT[p]), ...(dueNow ? ['Due'] : [])]
   const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
