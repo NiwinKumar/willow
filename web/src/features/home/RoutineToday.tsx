@@ -45,17 +45,16 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
 }) {
   return (
     <HomeCard label="Routine today" className={`gap-3 p-4 ${className ?? ''}`} delay={160}>
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <div className="flex flex-wrap items-baseline gap-x-2.5">
-          <h2 className="m-0 text-h3 font-normal">Routine today</h2>
-          <span className="text-caption text-ink-2">Tap a product when you use it</span>
-        </div>
+      {/* Title, then the routine check's first finding right beside it, then the hint; wraps on a narrow card. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1">
+        <h2 className="m-0 text-h3 font-normal">Routine today</h2>
         {conflict ? (
           <button type="button" onClick={onRoutine} title={conflict.title} aria-label={`Routine check: ${conflict.title}`} className="flex min-h-11 items-center gap-1.5 rounded-pill bg-[#FFE3CF] px-3 text-[12px] text-ink hover:bg-[#FFD3B5]">
             <span aria-hidden>△</span>
             {conflict.label}
           </button>
         ) : null}
+        <span className="text-caption text-ink-2">Tap a product when you use it</span>
       </div>
       <div className="flex flex-wrap gap-2.5">
         {(['am', 'pm'] as const).map((slot) => {
