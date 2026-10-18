@@ -11,7 +11,7 @@ import { boostedAdds, campaignInsight, cumulativeDays, dateRange, durationText, 
 import { sectionPath, useRetailState } from '../state'
 import { fetchProduct } from '../productData'
 import type { ProductDetail } from '../types'
-import { Bone, Button, EmptyState, ErrorState, int, KpiStrip, PageHeader, Panel, pct, ProofTierChip, pts, SkeletonKpis, SkeletonPanel, type Kpi } from '../ui'
+import { Bone, Button, EmptyState, ErrorState, int, PageHeader, Panel, pct, ProofTierChip, pts, SkeletonKpis, SkeletonPanel, type Kpi } from '../ui'
 import { BlobRadial, StreamChart } from '../ui/widgets'
 import { ErrorBox, StatusBadge, type Confirm } from './promote/CampaignCard'
 import { ShopperPreview } from './promote/ShopperPreview'
@@ -227,16 +227,17 @@ function Dashboard({ c, back, productTo, eligibility, at, confirm, setConfirm, o
         {actions.error ? <ErrorBox error={actions.error} /> : null}
       </div>
 
-      <KpiStrip items={kpis} label={`Results for ${name}`} />
+      <Summary c={c} kpis={kpis} label={`Results for ${name}`} />
 
       <div className="grid gap-4 lg:grid-cols-12">
         <Story c={c} at={at} className="lg:col-span-8" />
         <Holdout c={c} holdout={holdout} className="lg:col-span-4" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        {detail ? <Works d={detail} productTo={productTo} className="lg:col-span-5" /> : null}
-        <Audience c={c} holdout={holdout} eligibility={eligibility} className={detail ? 'lg:col-span-7' : 'lg:col-span-12'} />
+      <div className={`grid gap-4 md:grid-cols-2 ${detail ? 'lg:grid-cols-3' : ''}`}>
+        {detail ? <Works d={detail} productTo={productTo} /> : null}
+        <Audience c={c} holdout={holdout} />
+        {eligibility ? <Preview c={c} eligibility={eligibility} className={detail ? 'md:col-span-2 lg:col-span-1' : ''} /> : null}
       </div>
     </div>
   )
@@ -268,57 +269,75 @@ function ConfirmBar({ kind, actions, setConfirm }: { kind: Confirm | null; actio
 
 const TONE_DOT: Record<ReturnType<typeof campaignInsight>['tone'], string> = { good: 'bg-proof-leaf', neutral: 'bg-[var(--pf-base)]', wait: 'bg-pf-amber' }
 
-/** The answer first (what the campaign is doing, in a sentence), then the stream: shown, clicked and added building up over the run. */
-function Story({ c, at, className }: { c: Campaign; at: number | null; className?: string }) {
+/** The answer first, and the three figures that back it, in one band: what the campaign is doing, then reach, adds and lift. */
+function Summary({ c, kpis, label }: { c: Campaign; kpis: Kpi[]; label: string }) {
   const insight = campaignInsight(c)
-  const days = cumulativeDays(c.stats.daily)
-  const label = (iso: string) => dayLabel(iso)
   return (
-    <Panel id="cmp-story" className={className} footnote={at ? `Updated ${new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}, refreshes every 30 s while this tab is open. Willow measures adds to a routine, not store sales or channels.` : 'Willow measures adds to a routine, not store sales or channels.'}>
-      <div className="flex flex-col gap-6">
-        <div className="flex items-start gap-3">
-          <span aria-hidden className={`mt-2 size-2.5 shrink-0 rounded-full ${TONE_DOT[insight.tone]}`} />
-          <div className="flex min-w-0 max-w-[640px] flex-col gap-1">
-            <h2 id="cmp-story" className="m-0 text-[20px] font-semibold leading-7 tracking-[-0.02em] text-ink [text-wrap:balance]">
-              {insight.headline}
-            </h2>
-            <p className="m-0 text-proof-body text-ink-2">{insight.detail}</p>
-          </div>
+    <section aria-label={label} className="grid overflow-hidden rounded-card border border-line bg-surface lg:grid-cols-12">
+      <div className="flex items-start gap-3 p-5 lg:col-span-5">
+        <span aria-hidden className={`mt-2 size-2.5 shrink-0 rounded-full ${TONE_DOT[insight.tone]}`} />
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="m-0 text-[18px] font-semibold leading-6 tracking-[-0.02em] text-ink [text-wrap:balance]">{insight.headline}</h2>
+          <p className="m-0 text-proof-body text-ink-2">{insight.detail}</p>
         </div>
-        {days.length ? (
-          <div className="-mx-5 flex flex-col gap-3">
-            <StreamChart
-              days={days.map((d) => ({ label: label(d.day), values: d.values }))}
-              bands={[
-                { id: 'shown', label: 'Card shown' },
-                { id: 'clicked', label: 'Clicked through' },
-                { id: 'added', label: 'Added to routine' },
-              ]}
-              caption={`Running totals of the card shown, clicked and added to a routine, day by day, for ${c.product ?? 'this campaign'}`}
-            />
-            <p className="m-0 px-5 text-proof-small text-ink-2">
-              Band width is the running total: the outer band is everyone who saw the card, the middle those who clicked, the core those who added the product. The pills above give the total shown by that day.
-            </p>
-          </div>
-        ) : null}
       </div>
+      <dl className="m-0 grid grid-cols-1 border-t border-line sm:grid-cols-3 lg:col-span-7 lg:border-l lg:border-t-0">
+        {kpis.map((k) => (
+          <div key={k.id} className="flex min-w-0 flex-col justify-center gap-1 border-line px-5 py-4 [&:not(:last-child)]:border-b sm:[&:not(:last-child)]:border-b-0 sm:[&:not(:last-child)]:border-r">
+            <dt className="truncate text-proof-small text-ink-2">{k.label}</dt>
+            <dd className="m-0 text-proof-kpi text-ink tnum">{k.value}</dd>
+            <dd className="m-0 text-proof-small text-ink-2 sm:truncate">{k.note}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+/** The stream: the card shown, clicked and added building up over the run (a short chart; the answer is in the band above). */
+function Story({ c, at, className }: { c: Campaign; at: number | null; className?: string }) {
+  const days = cumulativeDays(c.stats.daily)
+  return (
+    <Panel
+      id="cmp-story"
+      title="Shown, clicked, added"
+      description="Running totals by day: the outer band is everyone who saw the card, the middle those who clicked, the core those who added the product."
+      className={className}
+      footnote={`${at ? `Updated ${new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}, refreshes every 30 s. ` : ''}Willow measures adds to a routine, not store sales or channels.`}
+    >
+      {days.length ? (
+        <div className="-mx-5 -mb-1">
+          <StreamChart
+            height={190}
+            days={days.map((d) => ({ label: dayLabel(d.day), values: d.values }))}
+            bands={[
+              { id: 'shown', label: 'Card shown' },
+              { id: 'clicked', label: 'Clicked through' },
+              { id: 'added', label: 'Added to routine' },
+            ]}
+            caption={`Running totals of the card shown, clicked and added to a routine, day by day, for ${c.product ?? 'this campaign'}`}
+          />
+        </div>
+      ) : (
+        <p className="m-0 py-6 text-proof-body text-ink-2">The first day’s numbers appear here once the card has been shown.</p>
+      )}
     </Panel>
   )
 }
 
-/** 100 people as dots: the filled ones are the people in that group who added the product. */
+/** 100 people as a strip of dots: the filled ones are the people in that group who added the product. */
 function PerHundred({ filled, label, tone, empty = false }: { filled: number; label: string; tone: 'leaf' | 'grey'; empty?: boolean }) {
   return (
-    <figure className="m-0 flex min-w-0 flex-1 flex-col gap-2.5" aria-label={empty ? `${label}: not measured yet` : `${label}: ${filled} in 100 added the product`}>
-      <div aria-hidden className="grid grid-cols-10 gap-[5px]">
+    <figure className="m-0 flex min-w-0 flex-col gap-1.5" aria-label={empty ? `${label}: not measured yet` : `${label}: ${filled} in 100 added the product`}>
+      <figcaption className="flex items-baseline gap-2">
+        <span className="text-[20px] font-semibold leading-6 tracking-[-0.02em] text-ink tnum">{empty ? '—' : filled}</span>
+        <span className="text-proof-small text-ink-2">in 100 · {label}</span>
+      </figcaption>
+      <div aria-hidden className="grid grid-cols-[repeat(25,minmax(0,1fr))] gap-[3px]">
         {Array.from({ length: 100 }, (_, k) => (
           <span key={k} className={`aspect-square rounded-full ${k < filled && !empty ? (tone === 'leaf' ? 'bg-proof-leaf' : 'bg-[var(--pf-base)]') : empty ? 'border border-dashed border-line-strong' : 'bg-sunken ring-1 ring-inset ring-line'}`} />
         ))}
       </div>
-      <figcaption className="flex flex-col">
-        <span className="text-[20px] font-semibold leading-7 tracking-[-0.02em] text-ink tnum">{empty ? '—' : filled}</span>
-        <span className="text-proof-small text-ink-2">{label}</span>
-      </figcaption>
     </figure>
   )
 }
@@ -328,9 +347,9 @@ function Holdout({ c, holdout, className }: { c: Campaign; holdout: number; clas
   const inc = c.stats.incrementality
   const boost = boostedAdds(inc)
   return (
-    <Panel id="cmp-holdout" title="With the card, without it" description="Out of every 100 matching people, how many added the product" className={className} footnote={`The ${Math.round(holdout * 100)}% holdout is picked at random and never sees the card, so the gap between the two is what the campaign caused.`}>
-      <div className="flex flex-1 flex-col justify-between gap-5">
-        <div className="flex gap-5">
+    <Panel id="cmp-holdout" title="With the card, without it" description="How many of 100 matching people added the product" className={className} footnote={`The ${Math.round(holdout * 100)}% holdout is picked at random and never sees the card, so the gap between the two is what the campaign caused.`}>
+      <div className="flex flex-1 flex-col justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <PerHundred filled={Math.round((inc?.exposed.rate ?? 0) * 100)} label="Could see the card" tone="leaf" empty={!inc} />
           <PerHundred filled={Math.round((inc?.holdout.rate ?? 0) * 100)} label="Holdout" tone="grey" empty={!inc} />
         </div>
@@ -355,32 +374,45 @@ function Holdout({ c, holdout, className }: { c: Campaign; holdout: number; clas
   )
 }
 
-/** Who the campaign reaches and where: the audience as chips, the placement in a line, and the card shoppers see. */
-function Audience({ c, holdout, eligibility, className }: { c: Campaign; holdout: number; eligibility: Parameters<typeof ShopperPreview>[0]['product'] | null; className?: string }) {
+/** Who the campaign reaches: the goals and skin types it targets, as chips. */
+function Audience({ c, holdout, className }: { c: Campaign; holdout: number; className?: string }) {
   const chip = (t: string) => (
     <span key={t} className="inline-flex h-6 items-center rounded-pill border border-line bg-pf-bg2 px-2.5 text-proof-small text-ink">
       {t}
     </span>
   )
   return (
-    <Panel id="cmp-audience" title="Who it reaches" description="Shown as one Sponsored card on the shopper’s Routine page" className={className}>
-      <div className="flex flex-1 flex-col gap-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <span className="text-proof-small text-ink-2">Goals</span>
-            <div className="flex flex-wrap gap-1.5">{c.goals.map((g) => chip(goalLabel(g)))}</div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-proof-small text-ink-2">Skin types</span>
-            <div className="flex flex-wrap gap-1.5">{c.skin_types.length ? c.skin_types.map((t) => chip(skinLabel(t))) : chip('Every type the evidence covers')}</div>
-          </div>
+    <Panel id="cmp-audience" title="Who it reaches" description="One Sponsored card on the shopper’s Routine page" className={className}>
+      <div className="flex flex-1 flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <span className="text-proof-small text-ink-2">Goals</span>
+          <div className="flex flex-wrap gap-1.5">{c.goals.map((g) => chip(goalLabel(g)))}</div>
         </div>
-        {eligibility ? (
-          <div className="mx-auto w-full max-w-[460px]">
-            <ShopperPreview compact product={eligibility} extra={{ image_url: c.image_url, category: c.category }} goals={c.goals} skinTypes={c.skin_types} />
-          </div>
-        ) : null}
-        <p className="m-0 mt-auto text-proof-small text-ink-2">{Math.round(holdout * 100)}% of matching people never see it, so the lift can be measured. Delivery is never split by goal or skin type.</p>
+        <div className="flex flex-col gap-2">
+          <span className="text-proof-small text-ink-2">Skin types</span>
+          <div className="flex flex-wrap gap-1.5">{c.skin_types.length ? c.skin_types.map((t) => chip(skinLabel(t))) : chip('Every type the evidence covers')}</div>
+        </div>
+        <dl className="m-0 mt-auto grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 border-t border-line pt-4 text-proof-small">
+          <dt className="text-ink-2">Placement</dt>
+          <dd className="m-0 text-ink">Routine page, under the shopper’s own routine</dd>
+          <dt className="text-ink-2">Runs</dt>
+          <dd className="m-0 text-ink tnum">
+            {dateRange(c.starts_at, c.ends_at)} · {durationText(c)}
+          </dd>
+          <dt className="text-ink-2">Holdout</dt>
+          <dd className="m-0 text-ink">{Math.round(holdout * 100)}% of matching people never see it, so the lift can be measured</dd>
+        </dl>
+      </div>
+    </Panel>
+  )
+}
+
+/** The card as a shopper sees it. */
+function Preview({ c, eligibility, className }: { c: Campaign; eligibility: Parameters<typeof ShopperPreview>[0]['product']; className?: string }) {
+  return (
+    <Panel id="cmp-preview" title="What shoppers see" description="The Sponsored card, as drawn in the shopper app" className={className}>
+      <div className="flex flex-1 items-center">
+        <ShopperPreview compact product={eligibility} extra={{ image_url: c.image_url, category: c.category }} goals={c.goals} skinTypes={c.skin_types} />
       </div>
     </Panel>
   )
@@ -391,7 +423,7 @@ function Audience({ c, holdout, eligibility, className }: { c: Campaign; holdout
  * using it and one for non-users with the same goals, both read against the highest rate. Only groups of 10 or
  * more people are drawn; with fewer than three such groups there is no shape to draw and the panel says so.
  */
-function Works({ d, productTo, className }: { d: ProductDetail; productTo: string; className?: string }) {
+function Works({ d, productTo }: { d: ProductDetail; productTo: string }) {
   const ok = (g: { rate: number | null; suppressed: boolean }) => !g.suppressed && g.rate !== null
   // the split with the most groups of 10+ people gives the fullest shape (goals win a tie)
   const options = [
@@ -407,9 +439,9 @@ function Works({ d, productTo, className }: { d: ProductDetail; productTo: strin
   const p = d.product
   const insight = ownRecordInsight(p)
   return (
-    <Panel id="cmp-works" title="Where it works" description={`A visible change by week 8, by ${by.name}`} className={className} actions={<ProofTierChip tier={p.tier} />}>
+    <Panel id="cmp-works" title="Where it works" description={`A visible change by week 8, by ${by.name}`} actions={<ProofTierChip tier={p.tier} />}>
       {draw ? (
-        <div className="flex flex-1 flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-3">
           <BlobRadial
             axes={segs.map((g) => g.label)}
             layers={[
@@ -421,6 +453,7 @@ function Works({ d, productTo, className }: { d: ProductDetail; productTo: strin
             centreCaption="people measured"
             caption={`Share of people with a visible change by week 8, by ${by.name}, for the product and for non-users with the same goals`}
             format={(v) => pct(v * peak)}
+            compact
           />
           <ul className="m-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-1.5 p-0 text-proof-small text-ink-2">
             <li className="inline-flex items-center gap-2">

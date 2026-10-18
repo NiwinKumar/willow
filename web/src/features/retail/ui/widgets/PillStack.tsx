@@ -2,7 +2,9 @@ import { useState, type CSSProperties } from 'react'
 
 import { SrTable, Widget } from './Widget'
 
-export type StackSegment = { id: string; label: string; value: number; display: string }
+/** What a part's colour says: green = settled in the product's favour, amber = on the way, grey = no effect found, hollow = not enough to say. */
+export type StackTone = 'green' | 'amber' | 'grey' | 'hollow'
+export type StackSegment = { id: string; label: string; value: number; display: string; tone?: StackTone }
 
 /**
  * One whole split into pills whose widths are the parts. Pick a pill (hover, focus or tap) and the figure at the
@@ -35,6 +37,7 @@ export function PillStack({ title, segments, defaultId, caption, ariaLabel }: { 
             aria-label={`${s.label}: ${s.display}`}
             title={`${s.label}: ${s.display}`}
             data-on={s.id === on.id ? '' : undefined}
+            data-tone={s.tone}
             className="wg-stack-pill"
             style={{ '--v': Math.max(s.value, 0.0001), '--i': i } as CSSProperties}
             onPointerEnter={() => setPick(s.id)}
@@ -44,6 +47,17 @@ export function PillStack({ title, segments, defaultId, caption, ariaLabel }: { 
           />
         ))}
       </div>
+      <ul className="wg-stack-legend" aria-hidden>
+        {segments.map((s) => (
+          <li key={s.id}>
+            <button type="button" tabIndex={-1} data-on={s.id === on.id ? '' : undefined} onPointerEnter={() => setPick(s.id)} onPointerLeave={() => setPick(null)} onClick={() => setPick(s.id)}>
+              <i data-tone={s.tone} className="wg-stack-key" />
+              <span>{s.label}</span>
+              <b>{s.display}</b>
+            </button>
+          </li>
+        ))}
+      </ul>
       <SrTable caption={title} head={['Part', 'Value']} rows={segments.map((s) => [s.label, s.display])} />
     </Widget>
   )
