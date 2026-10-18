@@ -3,19 +3,20 @@ import { bandPosition } from '../../components/charts/chartMath'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, confidenceOf, verdictKind, type VerdictKind } from '../../lib/verdict'
+import { VERDICT_WORDS, changeWay, confidenceOf, verdictKind, wordsFor, type VerdictKind } from '../../lib/verdict'
 import { EMPTY_CARD, METRIC_LOOK } from './metricLook'
 import { verdictHeadline } from './headline'
 import { bandText, deltaText, valueText } from './model'
 
-/** The verdict pill the cards draw: black with the ember ◆ for Changed, frosted otherwise. Glyph + words. */
+/** The verdict pill the cards draw: black with the ember ◆ for Improved / Shifted, frosted otherwise. Glyph + words. */
 function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Session; size?: 'md' | 'sm' }) {
   const kind = verdictKind(metric, session)
-  const changed = kind === 'changed'
+  const way = changeWay(metric)
+  const changed = kind === 'changed' && way !== 'otherWay'
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-pill whitespace-nowrap ${size === 'md' ? 'px-3 py-[7px] text-[12px]' : 'px-[11px] py-1.5 text-[12px]'} ${changed ? 'bg-selected text-inverse' : 'bg-white/65'}`}>
-      <VerdictGlyph kind={kind} onDark={changed} />
-      {VERDICT_WORDS[kind].label}
+      <VerdictGlyph kind={kind} way={way} onDark={changed} />
+      {wordsFor(metric, session).label}
     </span>
   )
 }
@@ -53,15 +54,15 @@ export function MetricCard({ metric: m, session, band, compared, against, onOpen
       type="button"
       onClick={onOpen}
       title={said ? `${said.headline}. ${fullDelta}` : fullDelta}
-      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : valueText(m)}, ${VERDICT_WORDS[kind].label}`}. Open detail`}
+      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : valueText(m)}, ${wordsFor(m, session).label}`}. Open detail`}
       className="relative flex h-full min-h-[116px] min-w-0 animate-[wRise_.5s_both] flex-col justify-between gap-2 rounded-[24px] p-3.5 text-left shadow-[inset_0_0_30px_4px_rgba(255,255,255,.35),0_18px_36px_-30px_rgba(0,0,0,.4)] transition-transform duration-[400ms] ease-[cubic-bezier(.2,.7,.2,1)] squircle hover:-translate-y-0.5"
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >
       <span className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[14px] font-medium">{METRIC_META[m.id].label}</span>
-        <span title={VERDICT_WORDS[kind].long} className="inline-flex shrink-0 items-center gap-1 text-[11px] opacity-85">
-          <VerdictGlyph kind={kind} size={10} />
-          <span className="sr-only min-[480px]:not-sr-only">{CARD_VERDICT[kind]}</span>
+        <span title={wordsFor(m, session).long} className="inline-flex shrink-0 items-center gap-1 text-[11px] opacity-85">
+          <VerdictGlyph kind={kind} way={changeWay(m)} size={10} />
+          <span className="sr-only min-[480px]:not-sr-only">{kind === 'changed' ? wordsFor(m, session).short : CARD_VERDICT[kind]}</span>
         </span>
       </span>
       <span className="flex items-baseline gap-1.5">

@@ -1,7 +1,7 @@
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META } from '../../lib/metrics'
-import { verdictKind } from '../../lib/verdict'
+import { changeWay, verdictKind } from '../../lib/verdict'
 import type { Hero } from './hero'
 import { deltaText } from './model'
 
@@ -28,7 +28,7 @@ export function ResultSummary({ hero, photos, session, ordered, onOpenMetric }: 
         <div className="flex flex-wrap gap-1.5">
           {hero.chips.map((c) => (
             <span key={c.t} className="flex items-center gap-1.5 rounded-pill bg-sunken px-2.5 py-1 text-[12.5px]">
-              {c.g === 'text' ? <span aria-hidden>{c.mark}</span> : <VerdictGlyph kind={c.g} />}
+              {c.g === 'text' ? <span aria-hidden>{c.mark}</span> : <VerdictGlyph kind={c.g} way={c.way} />}
               {c.t}
             </span>
           ))}
@@ -40,7 +40,7 @@ export function ResultSummary({ hero, photos, session, ordered, onOpenMetric }: 
             <li key={m.id} className="border-t border-line first:border-t-0">
               <button type="button" onClick={() => onOpenMetric(m)} className="hit44 flex min-h-9 w-full items-center justify-between gap-3 py-1 text-left text-[14px] hover:underline">
                 <span className="flex items-center gap-2">
-                  <VerdictGlyph kind="changed" />
+                  <VerdictGlyph kind="changed" way={changeWay(m)} />
                   {METRIC_META[m.id].label}
                 </span>
                 <span className="font-mono text-[12.5px] tnum">{deltaText(m)}</span>

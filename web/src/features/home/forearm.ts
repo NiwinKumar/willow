@@ -74,9 +74,9 @@ export function standingOf(treated: Session[], controls: Session[]): { g: string
     const ddReal = Math.abs(dd) > band && Math.sign(dd) === Math.sign(tm.delta)
     const tReal = tm.verdict === 'real_change'
     const cReal = cm.verdict === 'real_change'
-    if (tReal && ddReal) return { g: '◆', t: cReal ? 'Both arms changed, the treated arm more' : 'Treated arm changed beyond the control' }
+    if (tReal && ddReal) return { g: '◆', t: cReal ? 'Both arms moved, the treated arm more' : 'Treated arm moved beyond the control' }
     if (cReal) return { g: '○', t: 'Both arms moved: not attributable to the product' }
-    if (tReal) return { g: '◌', t: 'Treated arm changed, not yet clearly more than the control' }
+    if (tReal) return { g: '◌', t: 'Treated arm moved, not yet clearly more than the control' }
     return { g: '○', t: 'Within normal range on both arms so far' }
   }
   return { g: '—', t: 'Could not compare the latest photos' }

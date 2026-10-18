@@ -14,7 +14,7 @@ import type { CaptureMode, Metric, Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { fmtDate, fmtHours, parseDate, plural } from '../../lib/format'
 import { fmtSigned, fmtValue } from '../../lib/metrics'
-import { VERDICT_WORDS, verdictKind, type VerdictKind } from '../../lib/verdict'
+import { VERDICT_WORDS, changeWay, verdictKind, wordsFor, type VerdictKind } from '../../lib/verdict'
 import { PlanDotMark } from '../home/Tiles'
 import { MAX_TEST_DAYS, MIN_TEST_DAYS, VERDICT_AFTER_DAYS, planDots, testDay, useProductTestWrites, useProductTests } from '../routine/productTests'
 import { StartTest } from '../routine/StartTest'
@@ -48,8 +48,8 @@ const isArmMetric = (v: string | null): v is ArmMetric => v === 'tone_ita' || v 
  */
 type Kind = 'treated' | 'both_more' | 'not_attributable' | 'treated_small_gap' | 'noise' | 'no_band' | 'missing'
 const KIND: Record<Kind, { glyph: VerdictKind; words: string }> = {
-  treated: { glyph: 'changed', words: 'Treated-side change' },
-  both_more: { glyph: 'changed', words: 'Both changed, treated more' },
+  treated: { glyph: 'changed', words: 'Moved on the product side' },
+  both_more: { glyph: 'changed', words: 'Both moved, the product side more' },
   not_attributable: { glyph: 'normal', words: 'Shared drift' },
   treated_small_gap: { glyph: 'notEnough', words: 'Not separable yet' },
   noise: { glyph: 'normal', words: 'No clear difference' },
@@ -246,8 +246,8 @@ export default function ProductTest() {
         <span className="flex flex-wrap justify-between gap-2">
           <span className="text-[20px]">{name}</span>
           <span className="flex items-center gap-1.5 rounded-pill bg-white/14 px-3 py-[7px] text-[12px]">
-            {kind ? <VerdictGlyph kind={kind} onDark /> : <VerdictGlyph kind="notCompared" onDark />}
-            {early && session ? 'Too early' : kind ? VERDICT_WORDS[kind].label : session ? VERDICT_WORDS.notCompared.label : 'No photo'}
+            {kind ? <VerdictGlyph kind={kind} way={m ? changeWay(m) : undefined} onDark /> : <VerdictGlyph kind="notCompared" onDark />}
+            {early && session ? 'Too early' : kind && m ? wordsFor(m, session).label : session ? VERDICT_WORDS.notCompared.label : 'No photo'}
           </span>
         </span>
         <span className="flex flex-col items-center gap-1.5">
@@ -276,13 +276,13 @@ export default function ProductTest() {
       case 'no_band':
         return { h: 'These baselines have too few photos for a band.', b: `Treated moved ${tr} and untreated ${un}. A baseline with fewer than 3 usable photos has no noise band, so Willow can’t say whether either change is real. Values are shown, verdicts are withheld. Take 3 or more photos of each square for the next baseline.` }
       case 'treated':
-        return { h: 'The treated arm changed beyond its noise band. The control arm didn’t.', b: `Both arms were photographed together. The control moved ${un}, inside its band, so shared drift such as lighting explains little of the treated arm’s ${tr}. The ${dd} difference is larger than the combined uncertainty of ${band}, so it may be linked to the product.` }
+        return { h: 'The treated arm moved beyond its noise band. The control arm didn’t.', b: `Both arms were photographed together. The control moved ${un}, inside its band, so shared drift such as lighting explains little of the treated arm’s ${tr}. The ${dd} difference is larger than the combined uncertainty of ${band}, so it may be linked to the product.` }
       case 'both_more':
-        return { h: 'Both arms changed, the treated arm more.', b: `Both moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated arm moved ${dd} more, beyond the combined uncertainty of ${band}; that extra part may be linked to the product.` }
+        return { h: 'Both arms moved, the treated arm more.', b: `Both moved outside their bands (treated ${tr}, untreated ${un}), so something besides the product, such as light, sun or temperature, moved both. The treated arm moved ${dd} more, beyond the combined uncertainty of ${band}; that extra part may be linked to the product.` }
       case 'not_attributable':
-        return { h: t.verdict === 'real_change' ? 'Both arms changed by a similar amount.' : 'Only the untreated arm changed.', b: `Treated moved ${tr} and untreated ${un}. When the untreated arm moves too, the cause is likely shared: light, season or camera. This does not point to the product.` }
+        return { h: t.verdict === 'real_change' ? 'Both arms moved by a similar amount.' : 'Only the untreated arm moved.', b: `Treated moved ${tr} and untreated ${un}. When the untreated arm moves too, the cause is likely shared: light, season or camera. This does not point to the product.` }
       case 'treated_small_gap':
-        return { h: 'The treated arm changed, but not clearly more than the control.', b: `The treated arm moved ${tr}, outside its own band, while the untreated arm moved ${un}. The ${dd} difference is still inside the combined uncertainty of ${band}, so it can’t yet be separated from drift such as light or time of day.` }
+        return { h: 'The treated arm moved, but not clearly more than the control.', b: `The treated arm moved ${tr}, outside its own band, while the untreated arm moved ${un}. The ${dd} difference is still inside the combined uncertainty of ${band}, so it can’t yet be separated from drift such as light or time of day.` }
       default:
         return { h: 'Neither arm moved beyond its normal range.', b: `Treated moved ${tr} and untreated ${un}; the ${dd} difference is inside the combined uncertainty of ${band}. There is no measurable change to attribute to anything yet.` }
     }

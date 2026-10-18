@@ -21,7 +21,7 @@ import { addToCalendar } from '../../lib/reminders'
 import { fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
 import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
-import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, changeLines, changeTitle, changeWay, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
 import { useProductTests } from '../routine/productTests'
@@ -447,9 +447,9 @@ function doneLead(s: Session, goals: string[], eyebrow: string): Lead {
   const notEnough = [...kinds.values()].filter((k) => k === 'notEnough').length
   // The same count words as the Result hero chips (lib/verdict.ts).
   const count = (n: number, k: VerdictKind) => (n ? `${VERDICT_WORDS[k].glyph} ${n} ${VERDICT_WORDS[k].label.toLowerCase()}` : '')
-  const chips = [count(changed.length, 'changed'), count(normal.length, 'normal'), count(notEnough, 'notEnough')].filter(Boolean)
+  const chips = [...changeLines(s).map((l) => `${CHANGE_WORDS[l.way].glyph} ${l.text}`), count(normal.length, 'normal'), count(notEnough, 'notEnough')].filter(Boolean)
   const first = changed[0]
-  const title = changed.length === 0 ? (normal.length ? 'Within your normal range' : 'Not enough data to compare yet') : changed.length === 1 ? `${METRIC_META[first.id].label} changed` : `${changed.length} measures changed`
+  const title = changed.length === 0 ? (normal.length ? 'Within your normal range' : 'Not enough data to compare yet') : changeTitle(changed, (m) => METRIC_META[m.id].label)
   const u = first ? unitOf(first).trim() : ''
   return {
     eyebrow,
@@ -472,8 +472,13 @@ function linesFrom(s: Session, face: Session[], goals: string[]): HeroLine[] {
   const out: HeroLine[] = []
   if (changed.length) {
     const run = runOf(changed[0].id, face, s)
-    out.push({ g: '◆', t: `${METRIC_META[changed[0].id].label} changed beyond your normal range${run >= 2 ? `, ${countWord(run).toLowerCase()} check-ins in a row` : ''}.` })
-    if (changed.length > 1) out.push({ g: '◆', t: `${cap(listOf(changed.slice(1)))} changed too.` })
+    const first = CHANGE_WORDS[changeWay(changed[0])]
+    out.push({ g: first.glyph, t: `${METRIC_META[changed[0].id].label} ${first.label.toLowerCase()}, beyond your normal range${run >= 2 ? `, ${countWord(run).toLowerCase()} check-ins in a row` : ''}.` })
+    // The rest, grouped by the way they moved: what improved first, then (gently) what moved the other way.
+    for (const way of ['improved', 'otherWay', 'shifted'] as const) {
+      const rest = changed.slice(1).filter((m) => changeWay(m) === way)
+      if (rest.length) out.push({ g: CHANGE_WORDS[way].glyph, t: `${cap(listOf(rest))} ${CHANGE_WORDS[way].label.toLowerCase()}${way === changeWay(changed[0]) ? ' too' : ''}.` })
+    }
   }
   if (normal.length) out.push({ g: '○', t: normal.length <= 2 ? `${cap(listOf(normal))} held within your normal range.` : `${cap(normal.slice(0, 2).map((m) => lowerFirst(METRIC_META[m.id].label)).join(', '))} and ${normal.length - 2} more held within your normal range.` })
   if (!out.length) out.push({ g: '◌', t: 'Not enough data to compare yet: your baseline has no normal range for these.' })
