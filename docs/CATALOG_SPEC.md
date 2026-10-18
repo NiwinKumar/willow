@@ -3,7 +3,7 @@
 Facts only: names, ingredients (INCI), concerns, prices, store links. No marketing copy, no review text, no scraped ratings. Efficacy comes only from Willow measurements (team data + labeled synthetic cohort).
 
 ## Size and mix
-Oct 18: about 150 products, Asia-Pacific first (K-beauty, J-beauty, India, SEA/ANZ, and global brands sold there); grows after submission, and with product requests (below). Originally 40-60 real SKUs, global + regional brands, 3 price tiers (budget / mid / premium), across categories and concerns. Suggested brands (pick what you can verify quickly): The Ordinary, CeraVe, La Roche-Posay, Paula's Choice, COSRX, Beauty of Joseon, Neutrogena, Bioderma, Minimalist, The Derma Co, Dot & Key, Plum, Some By Mi, Round Lab, Kiehl's, Clinique. At least 2 options per concern per tier where possible.
+Oct 18: about 150 products, Asia-Pacific first (K-beauty, J-beauty, India, SEA/ANZ, and global brands sold there); grows after submission, and with product requests (below). The synthetic retailer cohort stays drawn over the Oct 15 catalog (`api/seed/cohort_products.json`, 48 products): products added later have real data only. Originally 40-60 real SKUs, global + regional brands, 3 price tiers (budget / mid / premium), across categories and concerns. Suggested brands (pick what you can verify quickly): The Ordinary, CeraVe, La Roche-Posay, Paula's Choice, COSRX, Beauty of Joseon, Neutrogena, Bioderma, Minimalist, The Derma Co, Dot & Key, Plum, Some By Mi, Round Lab, Kiehl's, Clinique. At least 2 options per concern per tier where possible.
 
 ## Enums
 `category`: cleanser, toner, serum, treatment, exfoliant, moisturizer, sunscreen, eye_care, mask.
