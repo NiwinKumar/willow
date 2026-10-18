@@ -98,6 +98,38 @@ export function TourOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.v])
 
+  // The walkthrough sits in the top layer (a manual popover), so app sheets (native modal dialogs, also top layer)
+  // never cover or blur it: whenever a dialog opens it is raised again, above that dialog.
+  const layer = useRef<HTMLDivElement>(null)
+  const playing = Boolean(run)
+  useEffect(() => {
+    const el = layer.current
+    if (!playing || !el) return
+    document.documentElement.setAttribute('data-touring', '')
+    const raise = () => {
+      try {
+        if (el.matches(':popover-open')) el.hidePopover()
+        el.showPopover()
+      } catch {
+        /* no popover support: it stays a fixed layer */
+      }
+    }
+    raise()
+    const watch = new MutationObserver((changes) => {
+      if (changes.some((c) => c.target instanceof HTMLDialogElement && c.target.open)) raise()
+    })
+    watch.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] })
+    return () => {
+      watch.disconnect()
+      document.documentElement.removeAttribute('data-touring')
+      try {
+        el.hidePopover()
+      } catch {
+        /* already hidden */
+      }
+    }
+  }, [playing])
+
   if (!run) return null
   const step = run.seg.steps[run.i]
   const total = run.seg.steps.length
@@ -106,9 +138,9 @@ export function TourOverlay() {
     if (to) navigate(to)
   }
   return (
-    <div data-tour-ui>
+    <div data-tour-ui ref={layer} popover="manual">
       {/* the page plays itself: clicks underneath would derail it */}
-      <div className="fixed inset-0 z-[1000] cursor-default" aria-hidden />
+      <div className="pointer-events-auto fixed inset-0 z-[1000] cursor-default" aria-hidden />
       {cursor ? (
         <div className="pointer-events-none fixed top-0 left-0 z-[1001] transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)]" style={{ transform: `translate(${cursor.x}px, ${cursor.y}px)` }} aria-hidden>
           {cursor.clicks ? <span key={cursor.clicks} className="absolute -top-5 -left-5 size-10 rounded-full bg-[rgba(91,108,255,.35)] animate-[tourPing_.6s_ease-out_forwards]" /> : null}
@@ -120,7 +152,7 @@ export function TourOverlay() {
       <section
         role="status"
         aria-live="polite"
-        className="fixed right-3 bottom-3 left-3 z-[1002] mx-auto flex max-w-[460px] flex-col gap-2.5 rounded-[26px] bg-selected p-4 text-inverse shadow-[0_30px_60px_-20px_rgba(0,0,0,.6)] sm:right-auto sm:left-5 sm:mx-0"
+        className="pointer-events-auto fixed right-3 bottom-3 left-3 z-[1002] mx-auto flex max-w-[460px] flex-col gap-2.5 rounded-[26px] bg-selected p-4 text-inverse shadow-[0_30px_60px_-20px_rgba(0,0,0,.6)] sm:right-auto sm:left-5 sm:mx-0"
       >
         <div className="flex items-center justify-between gap-3 text-[12.5px] opacity-70">
           <span>{run.seg.title}</span>
