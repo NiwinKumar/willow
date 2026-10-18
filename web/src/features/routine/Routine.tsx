@@ -23,6 +23,7 @@ import { SponsoredCard } from './SponsoredCard'
 import { ProductTests, TestStrip } from './TestsTab'
 import { RoutineHistory } from './RoutineHistory'
 import { Suggestions } from './Suggestions'
+import { suggestionsOf } from './suggestedToday'
 import { AvailableInOwnAccount } from './OwnAccountNotice'
 import { FeelNudge } from './FeelCard'
 import { RequestNotice } from './RequestNotice'
@@ -103,6 +104,7 @@ function LiveRoutine() {
   }
 
   const testRead = readForearm(treated, controls, tests.running)
+  const suggested = suggestionsOf(findings, current, sessions, usedLastNight)
   const showTests = tab === 'tests' && !loading && !failed
   const attention = !loading && !failed
 
@@ -137,13 +139,23 @@ function LiveRoutine() {
         </div>
       </div>
 
-      {attention && !showTests && current.length ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
-
+      {/* Asks that need an answer come first, above the check. */}
       {attention && !showTests ? (
         <>
           <RequestNotice onAdd={(p) => setAdd({ product: p })} />
           <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} />
         </>
+      ) : null}
+
+      {attention && !showTests && current.length ? (
+        <div className="@container">
+          <div className="grid items-stretch gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_360px]">
+            <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} />
+            <div className="flex min-w-0 flex-col gap-3 empty:hidden [&>section]:flex-1">
+              {suggested.any ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : <TestStrip read={testRead} onStart={() => setTab('tests')} />}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {showTests ? (
@@ -214,7 +226,7 @@ function LiveRoutine() {
         </div>
       ) : (
         <div className="@container flex flex-col gap-3">
-          <div className="grid gap-3 @min-[620px]:grid-cols-2">
+          <div className="grid items-start gap-3 @min-[620px]:grid-cols-2 @min-[1020px]:has-[.side>*]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
             {(['am', 'pm'] as const).map((slot) => (
               <SlotCard
                 key={slot}
@@ -227,13 +239,8 @@ function LiveRoutine() {
                 onAdd={() => setAdd({ mode: 'search', slot })}
               />
             ))}
-          </div>
-          <div className="grid gap-3 @min-[760px]:grid-cols-1 @min-[760px]:has-[.sug>*]:grid-cols-2 @min-[760px]:items-start">
-            <div className="sug empty:hidden">
-              <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <TestStrip read={testRead} onStart={() => setTab('tests')} />
+            <div className="side flex min-w-0 flex-col gap-3 empty:hidden @min-[620px]:col-span-2 @min-[1020px]:col-span-1">
+              {suggested.any ? <TestStrip read={testRead} onStart={() => setTab('tests')} /> : null}
               <SponsoredCard inRoutine={everAdded} onView={(productId) => setInfo({ productId })} />
             </div>
           </div>

@@ -18,7 +18,7 @@ import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../l
 import { DayDetail } from './DayDetail'
 import { routineMarkers } from './markers'
 import { DAY_BG, DAY_WORDS, MODE_LONG, bandText, chartable, currentBaseline, dayOf, daySession, dayStatus, usableLine, usedFrames } from './model'
-import { Page, Pills } from './parts'
+import { MetricSwitcher, Page, Pills } from './parts'
 import { metricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
 
@@ -194,16 +194,7 @@ export default function Progress() {
           </section>
 
           <section aria-label="Metric over time" className="flex flex-col justify-between gap-4 rounded-[44px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse shadow-[0_40px_80px_-50px_rgba(0,0,0,.7)] squircle">
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
-              <h2 className="m-0 text-[24px] font-normal">{label || 'Over time'}</h2>
-              <div className="flex flex-wrap gap-1">
-                {metricIds.map((id) => (
-                  <button key={id} type="button" aria-pressed={id === metric} onClick={() => setQuery({ metric: id })} className={`min-h-10 rounded-pill border border-[#333] px-3.5 text-[13px] transition-colors ${id === metric ? 'bg-white text-ink' : 'text-white'}`}>
-                    {METRIC_META[id].label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <MetricSwitcher ids={metricIds} value={metric} label={label || 'Over time'} onChange={(id) => setQuery({ metric: id })} />
             {series && series.points.some((p) => p.value !== null) && metric ? (
               <TimelineChart
                 points={series.points}
