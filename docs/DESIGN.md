@@ -224,7 +224,7 @@ Spacing (4px base): `0`=0, `0.5`=2, `1`=4, `1.5`=6, `2`=8, `2.5`=10, `3`=12, `3.
 - 12 columns, gap 14px (space-3.5) at every width.
 - Page padding: clamp(16px, 4vw, 40px).
 - Cards in a row stretch to equal height (align-items: stretch). Never leave a hole in a row: if a card is absent, the neighbour spans the space.
-- Home rows (active user, desktop): [Hero 6 | Check-in 6] · [What changed 3 | Next step 3 | Product test 3 | Spot diary 3] · [Routine 6 | What changed 6]. Tablet: everything span 6, routine/goals span 12. Phone: span 12.
+- Home rows (active user, desktop; Oct 18): [Hero 6 | Check-in 6] · [Your goals | Is your routine working? | Routine today] (sharing the row) · [Since your baseline 6 | Product test (compact) over Your baseline, stacked, 6]. Without a measured check-in the two small tiles sit side by side. Tablet: pairs. Phone: span 12.
 - Touch targets ≥ 44×44px; buttons are 48px tall on phone.
 
 | Radius | px | Use |
