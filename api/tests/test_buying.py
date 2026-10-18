@@ -369,3 +369,12 @@ def test_while_the_agent_works_the_fixed_list_is_pending(rows, monkeypatch):
 def test_route_degrades_to_503(rows, monkeypatch):
     monkeypatch.setattr(retailer, "fetch", lambda: (_ for _ in ()).throw(RuntimeError("bq")))
     assert TestClient(app).get("/v1/retailer/buying-list").status_code == 503
+
+
+def test_the_trend_tool_reads_monthly_demand(rows):
+    ep, _ = _episode()
+    goals = ep.call("get_trends", {})["goals"]
+    assert goals and all(
+        set(g) >= {"goal", "from_share_pct", "to_share_pct", "rising"} for g in goals
+    )
+    assert any(g["rising"] for g in goals)  # the simulated cohort's dark spots demand grows

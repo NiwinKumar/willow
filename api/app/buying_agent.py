@@ -94,7 +94,10 @@ TOOLS = types.Tool(
             "Every goal: people who want it, and per price tier the number of catalog options, the "
             "share of their users with a visible change by week 8 (null under 10 people) and n.",
         ),
-        _decl("get_trends", "Goals whose share of people rose from last month to this month."),
+        _decl(
+            "get_trends",
+            "Each goal's share of people last month and this month, and whether it rose.",
+        ),
         _decl(
             "get_underserved",
             "Skin type x goal groups and the share with no visible change by week 8.",
@@ -198,11 +201,29 @@ class Episode:
         return {"goals": out, "low_rate_note": "under 0.2 visible change is low"}
 
     def get_trends(self) -> dict:
-        try:
-            f, _, _ = retail_intel.facts(self.cohort_, self.range_)
-            return {"rising": retail_intel.rising_goals(f)}
-        except Exception:
-            return {"rising": {}}
+        """Each goal's share of people with a reading, last month against the month before (both
+        months 10+ people; whole percents), from the aggregates' goal demand by month."""
+        m = self.ins.get("needs_by_month") or {}
+        months, people = m.get("months") or [], m.get("people") or []
+        if len(months) < 2 or min(people[-2:]) < retailer.MIN_GROUP:
+            return {"goals": []}
+        out = []
+        for g in m.get("goals") or []:
+            a, b = (g.get("counts") or [None, None])[-2:]
+            if a is None or b is None or a < retailer.MIN_GROUP or b < retailer.MIN_GROUP:
+                continue
+            sa, sb = round(100 * a / people[-2]), round(100 * b / people[-1])
+            out.append(
+                {
+                    "goal": g["goal_id"],
+                    "from_month": months[-2],
+                    "to_month": months[-1],
+                    "from_share_pct": sa,
+                    "to_share_pct": sb,
+                    "rising": sb > sa,
+                }
+            )
+        return {"goals": out}
 
     def get_underserved(self, goal: str | None = None) -> dict:
         try:
