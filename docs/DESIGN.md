@@ -657,3 +657,11 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 ### Progress: timeline markers and notes
 - Routine-change markers on a metric's timeline are one per start day: products started together read "3 PRODUCTS STARTED · 18 OCT" instead of stacking, and labels near the right edge are right-aligned so they stay inside the chart.
 - "Notes and routine changes": the Show all / Show the latest 8 button sits top right of the card as a solid ink pill.
+
+### Routine page (compact)
+- Order: asks that need an answer first (Request notice, the Quick check), then the Routine check beside Suggested today (or the Product test strip when there is nothing to suggest), then Morning and Evening beside the Product test strip and the sponsored card.
+- The Routine check is plain text on the blue card: severity and kind are words (no pills), a small icon button re-runs it, and each finding's actions sit bottom right (Ask Wisp why last).
+- Product rows use `compactName` (cut at the first qualifier, brand and strengths dropped, type word kept); the full name is in the tooltip and the accessible label. Schedule notes and the ◆ change are plain text, not pills.
+
+### Progress: measure switcher
+- The over-time chart shows one measure at a time: its name is a select (title with a chevron) with previous / next arrows, in the person's goal order, instead of a pill per measure.
