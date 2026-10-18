@@ -13,6 +13,7 @@ import { useView } from '../../useView'
 import { YoursTag } from '../shared'
 import { MarketFrame, PanelBone } from './Frame'
 import { NOTE } from './model'
+import { ShelfResults } from './ShelfResults'
 
 /*
  * Market › Categories (?view=categories&category=&goal=), on the insights' category flows and
@@ -76,6 +77,8 @@ export function CategoriesView({ d }: { d: Insights }) {
         <BrandsInCategory cat={cat} ranked={ranked} mine={mine} className="xl:col-span-5" />
       </div>
       <TopProducts cat={cat} d={d} mine={mine} />
+      {/* the shelf is the store's: the retailer workspace only */}
+      {workspace.kind === 'retailer' ? <ShelfResults category={cat.category} /> : null}
     </MarketFrame>
   )
 }

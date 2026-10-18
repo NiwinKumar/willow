@@ -25,6 +25,7 @@ CAPS: dict[str, tuple[int, int]] = {
     "routine_check": (100, 5000),  # re-run on every routine change; past it, rules only
     # Proof-gated promotion (app/campaigns.py): Firestore writes, not paid calls; bounded anyway.
     "campaign_create": (20, 2000),
+    "shelf_upload": (20, 2000),  # Shelf vs results stock files (app/shelf.py)
     "sponsored_event": (60, 100000),  # a person counts once a day per campaign and kind
 }
 
