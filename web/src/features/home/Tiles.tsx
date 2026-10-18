@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import type { Session } from '../../data/types'
 import { fmtDate, plural } from '../../lib/format'
 import type { PlanDot } from '../routine/productTests'
@@ -53,7 +55,8 @@ export function ProductTestTile({ read, onOpen, className = '' }: { read: Forear
 
 /** Your baseline, small: the day every check-in is compared with, how long ago, its photos and how many readings have a normal range. */
 export function BaselineTile({ baseline, onOpen, className = '' }: { baseline: Session; onOpen: () => void; className?: string }) {
-  const days = Math.max(0, Math.round((Date.now() - new Date(baseline.created_at).getTime()) / 86_400_000))
+  const [now] = useState(() => Date.now())
+  const days = Math.max(0, Math.round((now - new Date(baseline.created_at).getTime()) / 86_400_000))
   const photos = baseline.result?.quality.passed ? baseline.result.frames_used : 0
   const ranged = (baseline.result?.metrics ?? []).filter((m) => m.value !== null && m.mdc95 !== null).length
   const ago = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`
