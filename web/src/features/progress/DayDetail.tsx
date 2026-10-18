@@ -11,21 +11,21 @@ import { Sheet } from '../../components/ui/Sheet'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner } from '../../data/hooks'
-import { stalled } from '../../data/live'
-import type { MetricId, RoutineEntry, Session, Site } from '../../data/types'
+import { SITE_ORDER, stalled } from '../../data/live'
+import type { MetricId, RoutineEntry, Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
 import { clockOf, fmtDate, parseDate } from '../../lib/format'
 import { METRIC_META, SITE_LABEL } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
-import { VERDICT_WORDS, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
 import { InsightsCard, NextAction } from './ExplanationCard'
 import { frameFor, photoSize } from './frame'
 import { MetricTile } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
-import { DAY_HERO, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, metricQuestion, optionLabel, orderMetrics, photoExpired, retryable, sessionState, usableLine, usedFrames } from './model'
-import { Page, Pills, StatusCard, TomorrowSheet } from './parts'
+import { DAY_HERO, DAY_RANK, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, metricQuestion, optionLabel, orderMetrics, photoExpired, retryable, sessionState, usableLine, usedFrames } from './model'
+import { Page, StatusCard, TomorrowSheet } from './parts'
 import { PhotoFrame } from './PhotoFrame'
 import { PhotoPanel } from './PhotoPanel'
 import { RejectedPhotos, UnmeasuredPhotos } from './photos'
@@ -35,11 +35,12 @@ import { useSessionView } from './useSessionView'
 
 const NONE: Session[] = []
 const TOMORROW_KEY = 'willow.tomorrowShown'
+const isMeasured = (st: string) => st === 'compared' || st === 'baseline' || st === 'former'
 
 /**
- * A day's result (design "Day detail"), the one result page: one day's check-in of every place, the
- * explanation, its readings (tap one for its detail, ?metric=), the photo with its spots and areas, notes and
- * actions. ?session= picks a check-in of the day, else ?site= a place, else the latest analysed one.
+ * A day's result (design "Day detail"), the one result page, for every place at once: one check-in per place
+ * (?session= picks it for its place, else the place's latest analysed one), the insights, every reading in
+ * one grid (tap one for its detail, ?metric= and ?place=), then each place's photo with its spots and areas.
  */
 export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<string, Session[]>; entries: RoutineEntry[] }) {
   const navigate = useNavigate()
@@ -47,24 +48,25 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   const [params, setParams] = useSearchParams()
   const data = useData()
   const shell = useShell()
-  const list = byDay.get(day) ?? []
-  const pickId = params.get('session')
+  const list = byDay.get(day) ?? NONE
+  const picked = list.find((s) => s.id === params.get('session')) ?? null
   const qSite = params.get('site')
-  const session = list.find((s) => s.id === pickId) ?? (list.some((s) => s.site === qSite) ? daySession(list.filter((s) => s.site === qSite)) : list.length ? daySession(list) : null)
-  const site: Site = session?.site ?? 'face_full'
-  // This place's check-ins: the baseline and the comparison are always within one place.
-  const sessions = data.series(site)?.sessions ?? NONE
+  const shown = SITE_ORDER.filter((p) => list.some((s) => s.site === p)).map((p) => (picked?.site === p ? picked : daySession(list.filter((s) => s.site === p))))
+  const primary = picked ?? shown.find((s) => s.site === qSite) ?? shown[0] ?? null
+  const multi = shown.length > 1
+  // Each place's check-ins: a baseline and a comparison are always within one place.
+  const seriesOf = (s: Session) => data.series(s.site)?.sessions ?? NONE
+  const baseOf = (s: Session) => baselineFor(s, seriesOf(s))
   const daysSorted = useMemo(() => [...byDay.keys()].sort(), [byDay])
   const di = daysSorted.indexOf(day)
   const prevDay = di > 0 ? daysSorted[di - 1] : null
   const nextDay = di >= 0 && di < daysSorted.length - 1 ? daysSorted[di + 1] : null
-  const [asking, setAsking] = useState(false)
+  const [asking, setAsking] = useState<Session | null>(null)
   const date = parseDate(day)
 
   // Still measuring: read again every few seconds until the api answers (no made-up progress). A session
   // stuck for 30 min will not move by waiting, so polling stops there.
-  const pending = session ? sessionState(session) === 'pending' : false
-  const polling = pending && session !== null && !stalled(session)
+  const polling = shown.some((s) => sessionState(s) === 'pending' && !stalled(s))
   const { refresh } = data
   useEffect(() => {
     if (!polling) return
@@ -73,16 +75,16 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
     }, 6000)
     return () => window.clearInterval(t)
   }, [polling, refresh])
-  // The single-session view signs what the list does not: the redness overlay, every frame, the spot crops.
-  const view = useSessionView(session && !pending ? session.id : null)
 
-  // Metric detail in the URL (?metric=); opening pushes, so Back closes it.
+  // Metric detail in the URL (?metric= and the place it was read at, ?place=); opening pushes, so Back closes it.
   const metricId = params.get('metric') as MetricId | null
-  const showMetric = (id: MetricId) =>
+  const qPlace = params.get('place') ?? picked?.site ?? null
+  const showMetric = (s: Session, id: MetricId) =>
     setParams(
       (p) => {
         const n = new URLSearchParams(p)
         n.set('metric', id)
+        n.set('place', s.site)
         return n
       },
       { state: { ...(location.state as object | null), sheet: true } },
@@ -94,6 +96,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
         (p) => {
           const n = new URLSearchParams(p)
           n.delete('metric')
+          n.delete('place')
           return n
         },
         { replace: true, state: location.state },
@@ -103,19 +106,20 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   // "Same time tomorrow?" once after a face check-in (the check-in flow lands on ?from=check-in).
   const [tomorrow, setTomorrow] = useState(false)
   const fromCheckIn = params.get('from') === 'check-in'
+  const face = shown.find((s) => s.site === 'face_full') ?? null
   useEffect(() => {
-    if (!fromCheckIn || !session) return
-    let shown: string[] = []
+    if (!fromCheckIn) return
+    let seen: string[] = []
     try {
-      shown = JSON.parse(sessionStorage.getItem(TOMORROW_KEY) ?? '[]') as string[]
+      seen = JSON.parse(sessionStorage.getItem(TOMORROW_KEY) ?? '[]') as string[]
     } catch {
       /* private mode */
     }
     const t = window.setTimeout(() => {
-      if (session.site === 'face_full' && sessionState(session) !== 'pending' && !shown.includes(session.id)) {
+      if (face && sessionState(face) !== 'pending' && !seen.includes(face.id)) {
         setTomorrow(true)
         try {
-          sessionStorage.setItem(TOMORROW_KEY, JSON.stringify([...shown.slice(-20), session.id]))
+          sessionStorage.setItem(TOMORROW_KEY, JSON.stringify([...seen.slice(-20), face.id]))
         } catch {
           /* private mode */
         }
@@ -130,9 +134,9 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
       )
     }, 1400)
     return () => window.clearTimeout(t)
-  }, [fromCheckIn, session, setParams, location.state])
+  }, [fromCheckIn, face, setParams, location.state])
   // Forearm days have no calendar of their own: their page is the product test.
-  const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(site.startsWith('forearm') ? '/test' : '/progress'))
+  const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(primary && !multi && primary.site.startsWith('forearm') ? '/test' : '/progress'))
   const go = (d: string) =>
     navigate(`/progress/${d}`, {
       replace: true,
@@ -171,7 +175,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
     </nav>
   )
 
-  if (!session)
+  if (!primary)
     return (
       <Page label="Day detail">
         {nav()}
@@ -179,123 +183,128 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
       </Page>
     )
 
-  const st = sessionState(session)
-  const status = dayStatus(session)
+  const placeOf = (s: Session) => SITE_LABEL[s.site]
+  const states = shown.map((s) => ({ s, st: sessionState(s) }))
+  const compared = states.filter((x) => x.st === 'compared').map((x) => x.s)
+  const baselines = states.filter((x) => x.st === 'baseline').map((x) => x.s)
+  const status = DAY_RANK.find((k) => shown.some((s) => dayStatus(s) === k)) ?? 'other'
   const [heroBg, heroGlow] = DAY_HERO[status]
-  const baseline = baselineFor(session, sessions)
-  const c = counts(session)
-  const measured = st === 'compared' || st === 'baseline' || st === 'former'
-  const ordered = orderMetrics(session.result?.metrics ?? [], data.goals)
-  const chips: { g: VerdictKind | null; t: string; way?: ChangeWay }[] =
-    st === 'rejected'
-      ? [{ g: 'notCompared', t: 'Not measured' }]
-      : st === 'baseline'
-        ? [
-            { g: 'baseline', t: 'Your starting point' },
-            { g: null, t: 'Later days compare with this one' },
-          ]
-        : st === 'compared'
-          ? [...changeLines(session).map((l) => ({ g: 'changed' as const, way: l.way, t: l.text })), ...(['normal', 'notEnough', 'notCompared'] as const).filter((k) => c[k]).map((k) => ({ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }))]
-          : [
-              {
-                g: 'notCompared',
-                t: st === 'former' ? 'An earlier baseline, not compared' : st === 'pending' ? 'Still measuring' : st === 'failed' ? 'Did not finish measuring' : 'Not measured',
-              },
-            ]
-  const big = st === 'rejected' ? '00' : st === 'baseline' ? String(usedFrames(session)).padStart(2, '0') : st === 'compared' ? String(c.changed).padStart(2, '0') : '—'
-  const bigLabel = st === 'rejected' ? 'usable photos' : st === 'baseline' ? 'photos in your baseline' : st === 'compared' ? (c.changed === 1 ? 'reading moved beyond your normal range' : 'readings moved beyond your normal range') : 'not compared'
+
+  // The day's changes over every place, best news first.
+  const ways: Record<ChangeWay, number> = { improved: 0, otherWay: 0, shifted: 0 }
+  const kinds = { changed: 0, normal: 0, notEnough: 0, notCompared: 0 }
+  for (const s of compared) {
+    const w = changeCounts(s)
+    for (const k of ['improved', 'otherWay', 'shifted'] as const) ways[k] += w[k]
+    const c = counts(s)
+    for (const k of ['changed', 'normal', 'notEnough', 'notCompared'] as const) kinds[k] += c[k]
+  }
+  const firstState = states[0].st
+  const chips: { g: VerdictKind | null; t: string; way?: ChangeWay }[] = compared.length
+    ? [
+        ...(['improved', 'otherWay', 'shifted'] as const).filter((w) => ways[w]).map((w) => ({ g: 'changed' as const, way: w, t: `${ways[w]} ${CHANGE_WORDS[w].label.toLowerCase()}` })),
+        ...(['normal', 'notEnough', 'notCompared'] as const).filter((k) => kinds[k]).map((k) => ({ g: k, t: `${kinds[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` })),
+        ...baselines.map((s) => ({ g: 'baseline' as const, t: `${placeOf(s)}: your starting point` })),
+      ]
+    : baselines.length
+      ? [
+          { g: 'baseline', t: multi && baselines.length < shown.length ? `${baselines.map(placeOf).join(', ')}: your starting point` : 'Your starting point' },
+          { g: null, t: 'Later days compare with this one' },
+        ]
+      : states.every((x) => x.st === 'rejected')
+        ? [{ g: 'notCompared', t: 'Not measured' }]
+        : [{ g: 'notCompared', t: firstState === 'former' ? 'An earlier baseline, not compared' : firstState === 'pending' ? 'Still measuring' : firstState === 'failed' ? 'Did not finish measuring' : 'Not measured' }]
+  const big = compared.length ? String(kinds.changed).padStart(2, '0') : baselines.length ? String(baselines.reduce((n, s) => n + usedFrames(s), 0)).padStart(2, '0') : states.every((x) => x.st === 'rejected') ? '00' : '—'
+  const bigLabel = compared.length ? (kinds.changed === 1 ? 'reading moved beyond your normal range' : 'readings moved beyond your normal range') : baselines.length ? 'photos in your baseline' : states.every((x) => x.st === 'rejected') ? 'usable photos' : 'not compared'
+
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
   const notes = [
     ...started.map((e) => ({
       text: `Started ${productName(e)}`,
       dot: NOTE_DOT.routine,
     })),
-    ...sessionNotes(session).filter((n) => n.kind !== 'note'),
+    ...shown.flatMap((s) =>
+      sessionNotes(s)
+        .filter((n) => n.kind !== 'note')
+        .map((n) => (multi ? { ...n, text: `${placeOf(s)}: ${n.text}` } : n)),
+    ),
   ]
-  const others = list.filter((s) => s.id !== session.id)
-  const order = ordered.map((m) => m.id)
-  const openMetric = ordered.find((m) => m.id === metricId) ?? null
-  const sheetRef = session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, sessions) : baseline
-  const sheetRefLabel = sheetRef && sheetRef !== baseline && sheetRef !== session ? `Check-in, ${fmtDate(sheetRef.created_at) === fmtDate(session.created_at) ? clockOf(sheetRef.created_at) : fmtDate(sheetRef.created_at)}` : 'Baseline'
+
+  // Every reading of the day in one grid, in goal order; a metric read at two places is named with its place.
+  const items = states.filter((x) => isMeasured(x.st)).flatMap((x) => (x.s.result?.metrics ?? []).map((m) => ({ m, s: x.s, st: x.st })))
+  const ownerOf = new Map(items.map((i) => [i.m, i]))
+  const byGoal = orderMetrics(
+    items.map((i) => i.m),
+    data.goals,
+  ).map((m) => ownerOf.get(m)!)
+  // The same metric at two places sits side by side, where it first comes in goal order.
+  const firstAt = new Map<MetricId, number>()
+  byGoal.forEach((i, k) => {
+    if (!firstAt.has(i.m.id)) firstAt.set(i.m.id, k)
+  })
+  const ordered = [...byGoal].sort((a, b) => firstAt.get(a.m.id)! - firstAt.get(b.m.id)!)
+  const twice = new Set(ordered.filter((i, k) => ordered.findIndex((j) => j.m.id === i.m.id) !== k).map((i) => i.m.id))
+  const open = ordered.find((i) => i.m.id === metricId && i.s.site === qPlace) ?? ordered.find((i) => i.m.id === metricId) ?? null
+  const sheetSession = open?.s ?? primary
+  const sheetBase = baseOf(sheetSession)
+  const sheetRef = sheetSession.is_baseline ? sheetSession : open ? referenceFor(open.m.id, sheetSession, sheetBase, seriesOf(sheetSession)) : sheetBase
+  const sheetRefLabel = sheetRef && sheetRef !== sheetBase && sheetRef !== sheetSession ? `Check-in, ${fmtDate(sheetRef.created_at) === fmtDate(sheetSession.created_at) ? clockOf(sheetRef.created_at) : fmtDate(sheetRef.created_at)}` : 'Baseline'
+
   const checkIn = () => shell.openCheckIn()
-  const measureAgain = () => navigate(`/check-in?session=${session.id}`, { state: { background: location } })
-  // Under the explanation: what to do next (asking Wisp and the baseline live in the actions card below).
-  const next: Record<string, ReactNode[]> = {
-    compared: [
-      <NextAction key="c" onClick={checkIn}>
-        Check in again, same light and distance
-      </NextAction>,
-    ],
-    baseline: [
-      <NextAction key="c" onClick={checkIn}>
-        {(session.result?.frames_used ?? 0) >= 3 ? 'Next check-in: same light and distance' : 'Check in again with more photos'}
-      </NextAction>,
-      <NextAction key="r" to="/routine">
-        Add the products you’re starting
-      </NextAction>,
-    ],
-    rejected: [
-      <NextAction key="c" onClick={checkIn}>
-        Retake this check-in
-      </NextAction>,
-    ],
-    unmeasured: [
-      <NextAction key="f" onClick={checkIn}>
-        Check in instead
-      </NextAction>,
-    ],
+  const measureAgain = (s: Session) => navigate(`/check-in?session=${s.id}`, { state: { background: location } })
+  // Under the insights: what to do next. "Check in again" once for the day, not once per place.
+  const nextFor = (s: Session, st: string, first: boolean): ReactNode[] => {
+    const again = (text: string) =>
+      first ? [
+        <NextAction key="c" onClick={checkIn}>
+          {text}
+        </NextAction>,
+      ] : []
+    if (st === 'compared') return again('Check in again, same light and distance')
+    if (st === 'baseline')
+      return [
+        ...again((s.result?.frames_used ?? 0) >= 3 ? 'Next check-in: same light and distance' : 'Check in again with more photos'),
+        ...(first ? [
+          <NextAction key="r" to="/routine">
+            Add the products you’re starting
+          </NextAction>,
+        ] : []),
+      ]
+    if (st === 'rejected')
+      return [
+        <NextAction key="c" onClick={checkIn}>
+          Retake this check-in
+        </NextAction>,
+      ]
+    if (st === 'unmeasured')
+      return [
+        <NextAction key="f" onClick={checkIn}>
+          Check in instead
+        </NextAction>,
+      ]
+    return []
   }
-  // Two check-ins of one place on a day are told apart by their time.
-  const pillLabel = (s: Session) => `${SITE_LABEL[s.site]}${list.filter((x) => x.site === s.site).length > 1 ? ` · ${clockOf(s.created_at)}` : ''}`
-  const sameSite = list.filter((s) => s.site === session.site).length > 1
-  const actions = (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        className="flex min-h-9 items-center px-1 text-[13px] underline underline-offset-4"
-        onClick={() =>
-          shell.openAdvisor(
-            `Help me read my ${SITE_LABEL[site].toLowerCase()} check-in from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${st === 'compared' ? `${[...changeLines(session).map((l) => l.text), `${c.normal} within normal range`].join(', ')}` : st === 'baseline' ? 'it is my baseline' : st === 'rejected' ? 'the photos could not be measured' : 'it was not compared'}${started.length ? `. I started ${started.map(productName).join(' and ')} that day` : ''}.`,
-            `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`,
-          )
-        }
-      >
-        Ask Wisp about this day
-      </button>
-      {data.mode === 'live' ? (
-        <Button variant="outline" size="sm" disabled={!canBeBaseline(session)} onClick={() => setAsking(true)}>
-          {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${sameSite ? `, ${clockOf(session.created_at)}` : ''} as baseline` : 'Not eligible as a baseline'}
-        </Button>
-      ) : null}
-      {st !== 'pending' ? (
-        <ButtonLink to={`/result/${session.id}`} variant="ink" size="sm" trailing={<span aria-hidden>→</span>}>
-          Open the full report
-        </ButtonLink>
-      ) : null}
-    </div>
+  const told = states.filter((x) => x.st !== 'pending' && x.st !== 'failed')
+  const describe = (s: Session, st: string) => (st === 'compared' ? [...changeLines(s).map((l) => l.text), `${counts(s).normal} within normal range`].join(', ') : st === 'baseline' ? 'it is my baseline' : st === 'rejected' ? 'the photos could not be measured' : 'it was not compared')
+  const askWisp = (
+    <button
+      type="button"
+      className="flex min-h-9 items-center px-1 text-[13px] underline underline-offset-4"
+      onClick={() =>
+        shell.openAdvisor(
+          `Help me read my check-in from ${fmtDate(primary.created_at, { day: 'numeric', month: 'long' })}: ${states.map((x) => (multi ? `${placeOf(x.s).toLowerCase()}: ${describe(x.s, x.st)}` : describe(x.s, x.st))).join('; ')}${started.length ? `. I started ${started.map(productName).join(' and ')} that day` : ''}.`,
+          `Check-in · ${fmtDate(primary.created_at)}`,
+        )
+      }
+    >
+      Ask Wisp about this day
+    </button>
   )
 
   return (
     <Page label="Day detail">
-      <div key={session.id} className="flex animate-[wInR_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4 pt-[clamp(8px,2vw,20px)]">
-        {nav(actions)}
-        {others.length ? (
-          <Pills
-            label="Check-in on this day"
-            tone="white"
-            options={list.map((s) => ({
-              value: s.id,
-              label: pillLabel(s),
-            }))}
-            value={session.id}
-            onChange={(id) =>
-              setParams((p) => ({ ...Object.fromEntries(p), session: id }), {
-                replace: true,
-                state: location.state,
-              })
-            }
-          />
-        ) : null}
+      <div key={day} className="flex animate-[wInR_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4 pt-[clamp(8px,2vw,20px)]">
+        {nav(askWisp)}
 
         <section
           aria-label="Day summary"
@@ -306,12 +315,9 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           }}
         >
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-            <span className="font-mono text-[11px] tracking-[.08em]">
-              ■ {SITE_LABEL[site].toUpperCase()} · {usableLine(session).toUpperCase()}
-            </span>
+            <span className="font-mono text-[11px] tracking-[.08em]">■ {(multi ? shown.map(placeOf).join(' · ') : `${placeOf(primary)} · ${usableLine(primary)}`).toUpperCase()}</span>
             <div className="ml-auto flex flex-wrap justify-end gap-2">
-              {measured ? <CompareButton session={session} sessions={sessions} baseline={baseline} /> : null}
-              <NotesButton session={session} notes={notes} />
+              <NotesButton session={primary} notes={notes} />
             </div>
           </div>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] items-end gap-6">
@@ -342,84 +348,88 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           </div>
         </section>
 
-        {st === 'pending' && stalled(session) ? (
-          // Home's "didn't finish" links here: waiting longer will not change this one (polling has stopped).
-          <StatusCard
-            eyebrow="DID NOT FINISH"
-            title="This check-in did not finish."
-            body={<>{session.status === 'uploading' ? 'The photos never finished uploading, so nothing was measured.' : 'Measuring stopped before a result came back. The photos are saved, so it can be measured again.'}</>}
-            action={
-              session.status === 'uploading' ? (
-                <Button variant="ink" size="lg" onClick={checkIn}>
-                  Take a new check-in
-                </Button>
-              ) : (
-                <Button variant="ink" size="lg" onClick={measureAgain}>
-                  Measure again
-                </Button>
-              )
-            }
-          />
-        ) : st === 'pending' ? (
-          <StatusCard
-            busy
-            eyebrow="STILL MEASURING"
-            title="This check-in is still being measured."
-            body={<>Your photos are uploaded. Results show here as soon as the measurement finishes; this page checks again on its own.</>}
-            action={
-              <Button variant="outline" onClick={() => void data.refresh()}>
-                Check now
-              </Button>
-            }
-          />
-        ) : st === 'failed' ? (
-          <StatusCard
-            eyebrow="DID NOT FINISH"
-            title="This check-in did not finish measuring."
-            body={<>{retryable(session) ? 'The photos are saved, so it can be measured again.' : (session.error?.message ?? 'The photos could not be read.')}</>}
-            action={
-              retryable(session) ? (
-                <Button variant="ink" size="lg" onClick={measureAgain}>
-                  Try again
-                </Button>
-              ) : (
-                <Button variant="ink" size="lg" onClick={checkIn}>
-                  Take new photos
-                </Button>
-              )
-            }
-          />
-        ) : (
-          <InsightsCard key={session.id} session={session} measured={measured} actions={next[st] ?? null} />
-        )}
+        {states.map(({ s, st }) => {
+          const where = multi ? ` · ${placeOf(s).toUpperCase()}` : ''
+          if (st === 'pending' && stalled(s))
+            // Home's "didn't finish" links here: waiting longer will not change this one (polling has stopped).
+            return (
+              <StatusCard
+                key={s.id}
+                eyebrow={`DID NOT FINISH${where}`}
+                title="This check-in did not finish."
+                body={<>{s.status === 'uploading' ? 'The photos never finished uploading, so nothing was measured.' : 'Measuring stopped before a result came back. The photos are saved, so it can be measured again.'}</>}
+                action={
+                  s.status === 'uploading' ? (
+                    <Button variant="ink" size="lg" onClick={checkIn}>
+                      Take a new check-in
+                    </Button>
+                  ) : (
+                    <Button variant="ink" size="lg" onClick={() => measureAgain(s)}>
+                      Measure again
+                    </Button>
+                  )
+                }
+              />
+            )
+          if (st === 'pending')
+            return (
+              <StatusCard
+                key={s.id}
+                busy
+                eyebrow={`STILL MEASURING${where}`}
+                title="This check-in is still being measured."
+                body={<>Your photos are uploaded. Results show here as soon as the measurement finishes; this page checks again on its own.</>}
+                action={
+                  <Button variant="outline" onClick={() => void data.refresh()}>
+                    Check now
+                  </Button>
+                }
+              />
+            )
+          if (st === 'failed')
+            return (
+              <StatusCard
+                key={s.id}
+                eyebrow={`DID NOT FINISH${where}`}
+                title="This check-in did not finish measuring."
+                body={<>{retryable(s) ? 'The photos are saved, so it can be measured again.' : (s.error?.message ?? 'The photos could not be read.')}</>}
+                action={
+                  retryable(s) ? (
+                    <Button variant="ink" size="lg" onClick={() => measureAgain(s)}>
+                      Try again
+                    </Button>
+                  ) : (
+                    <Button variant="ink" size="lg" onClick={checkIn}>
+                      Take new photos
+                    </Button>
+                  )
+                }
+              />
+            )
+          return null
+        })}
 
-        {st === 'rejected' ? (
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[36px] bg-surface p-[clamp(22px,3vw,30px)] squircle">
-            <span className="flex max-w-[620px] flex-col gap-1.5">
-              <span className="text-[20px]">No readings from this day</span>
-              <span className="text-[15px] leading-normal text-ink-2">{`${rejectNote(session)}${baseline ? ' Your baseline is unchanged.' : ''}`}</span>
-            </span>
-            <Button variant="primary" size="lg" onClick={checkIn} trailing={<span aria-hidden>→</span>}>
-              Take new photos
-            </Button>
+        {told.length ? (
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-3">
+            {told.map((x, k) => (
+              <InsightsCard key={x.s.id} session={x.s} measured={isMeasured(x.st)} place={multi ? placeOf(x.s) : undefined} actions={nextFor(x.s, x.st, k === 0)} />
+            ))}
           </div>
         ) : null}
-        {st === 'rejected' ? <RejectedPhotos session={session} frameUrls={view?.session.frame_urls} /> : null}
-        {st === 'unmeasured' ? <UnmeasuredPhotos session={session} frameUrls={view?.session.frame_urls} /> : null}
 
-        {measured && ordered.length ? (
+        {ordered.length ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
-            {ordered.map((m, i) => {
+            {ordered.map(({ m, s, st }, i) => {
               // counts of a check-in with (or without) cheek photos compare with one taken the same way
-              const ref = referenceFor(m.id, session, baseline, sessions)
+              const ref = referenceFor(m.id, s, baseOf(s), seriesOf(s))
               return (
                 <MetricTile
-                  key={m.id}
+                  key={`${s.id}:${m.id}`}
                   metric={m}
-                  session={session}
-                  onOpen={() => showMetric(m.id)}
-                  band={session.is_baseline || st === 'former' ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null}
-                  baselineDay={ref ? (fmtDate(ref.created_at) === fmtDate(session.created_at) ? `${ref === baseline ? 'baseline' : 'check-in'}, ${clockOf(ref.created_at)}` : fmtDate(ref.created_at)) : null}
+                  session={s}
+                  place={twice.has(m.id) ? placeOf(s) : undefined}
+                  onOpen={() => showMetric(s, m.id)}
+                  band={s.is_baseline || st === 'former' ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null}
                   delay={i * 60}
                 />
               )
@@ -427,27 +437,81 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           </div>
         ) : null}
 
-        {measured ? <PhotoPanel session={session} baseline={st === 'compared' ? baseline : null} view={view} order={order} onOpenMetric={showMetric} /> : null}
+        {states.map(({ s, st }) => (
+          <PlaceSection
+            key={s.id}
+            session={s}
+            st={st}
+            sessions={seriesOf(s)}
+            baseline={baseOf(s)}
+            order={ordered.filter((i) => i.s === s).map((i) => i.m.id)}
+            live={data.mode === 'live'}
+            withTime={list.filter((x) => x.site === s.site).length > 1}
+            onCheckIn={checkIn}
+            onBaseline={() => setAsking(s)}
+            onOpenMetric={(id) => showMetric(s, id)}
+          />
+        ))}
 
         <p className="m-0 pt-2 text-caption text-ink-2">Photos delete 30 days after upload; measurements stay in your account until you delete them.</p>
         <Disclaimer />
       </div>
-      <BaselineDialog session={session} withTime={sameSite} open={asking} onClose={() => setAsking(false)} />
+      <BaselineDialog session={asking ?? primary} withTime={list.filter((x) => x.site === (asking ?? primary).site).length > 1} open={asking !== null} onClose={() => setAsking(null)} />
       <MetricSheet
-        metric={openMetric}
-        session={session}
+        metric={open?.m ?? null}
+        session={sheetSession}
         baseline={sheetRef}
         baselineLabel={sheetRefLabel}
-        sessions={sessions}
+        sessions={seriesOf(sheetSession)}
         onClose={closeMetric}
         onAsk={(m) => {
           // The sheet is a modal <dialog> (top layer): close it, or the advisor opens hidden behind it.
           closeMetric()
-          shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)
+          shell.openAdvisor(metricQuestion(m, sheetSession, sheetBase), `${METRIC_META[m.id].label} · ${fmtDate(sheetSession.created_at)}`)
         }}
       />
       <TomorrowSheet open={tomorrow} onClose={() => setTomorrow(false)} />
     </Page>
+  )
+}
+
+/** One place's part of the day below the readings: its photo (spots, redness, areas; hold to compare with the
+ * baseline) with Compare photos and the baseline button, or why nothing was measured. */
+function PlaceSection({ session, st, sessions, baseline, order, live, withTime, onCheckIn, onBaseline, onOpenMetric }: { session: Session; st: string; sessions: Session[]; baseline: Session | null; order: MetricId[]; live: boolean; withTime: boolean; onCheckIn: () => void; onBaseline: () => void; onOpenMetric: (id: MetricId) => void }) {
+  // The single-session view signs what the list does not: the redness overlay, every frame, the spot crops.
+  const view = useSessionView(st !== 'pending' ? session.id : null)
+  if (st === 'rejected')
+    return (
+      <>
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[36px] bg-surface p-[clamp(22px,3vw,30px)] squircle">
+          <span className="flex max-w-[620px] flex-col gap-1.5">
+            <span className="text-[20px]">No readings from your {SITE_LABEL[session.site].toLowerCase()}</span>
+            <span className="text-[15px] leading-normal text-ink-2">{`${rejectNote(session)}${baseline ? ' Your baseline is unchanged.' : ''}`}</span>
+          </span>
+          <Button variant="primary" size="lg" onClick={onCheckIn} trailing={<span aria-hidden>→</span>}>
+            Take new photos
+          </Button>
+        </div>
+        <RejectedPhotos session={session} frameUrls={view?.session.frame_urls} />
+      </>
+    )
+  if (st === 'unmeasured') return <UnmeasuredPhotos session={session} frameUrls={view?.session.frame_urls} />
+  if (!isMeasured(st)) return null
+  return (
+    <section aria-label={SITE_LABEL[session.site]} className="flex flex-col">
+      <div className="-mb-2 flex flex-wrap items-center justify-between gap-2 pt-6">
+        <h2 className="m-0 text-[20px] font-normal">{SITE_LABEL[session.site]}</h2>
+        <div className="flex flex-wrap gap-2">
+          <CompareButton key={session.id} session={session} sessions={sessions} baseline={baseline} />
+          {live ? (
+            <Button variant="outline" size="sm" disabled={!canBeBaseline(session)} onClick={onBaseline}>
+              {session.is_baseline ? 'This is your baseline' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${withTime ? `, ${clockOf(session.created_at)}` : ''} as baseline` : 'Not eligible as a baseline'}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <PhotoPanel session={session} baseline={st === 'compared' ? baseline : null} view={view} order={order} onOpenMetric={onOpenMetric} />
+    </section>
   )
 }
 

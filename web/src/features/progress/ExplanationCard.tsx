@@ -30,7 +30,7 @@ const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefe
  * Insights: Gemini's (or the template's) words for this session, revealed word by word once per browser session
  * (whole under reduced motion), a short read first and the rest on request, then the next steps as small buttons.
  */
-export function InsightsCard({ session, measured, actions }: { session: Session; measured: boolean; actions: ReactNode }) {
+export function InsightsCard({ session, measured, actions, place }: { session: Session; measured: boolean; actions: ReactNode; place?: string }) {
   const ex = session.explanation
   const text = useMemo(() => {
     if (!ex) return ''
@@ -77,7 +77,7 @@ export function InsightsCard({ session, measured, actions }: { session: Session;
     <section aria-label="Insights" className="flex flex-col gap-3 rounded-[28px] bg-surface p-4 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
       <div className="flex items-center gap-2.5">
         <span aria-hidden className="size-7 shrink-0 animate-[wBreathe_5s_ease-in-out_infinite] rounded-full shadow-[0_0_14px_rgba(61,123,255,.4)]" style={{ background: 'radial-gradient(circle at 40% 35%, var(--aura-ice), var(--aura-sky) 55%, #1B1F7A)' }} />
-        <h2 className="m-0 flex-1 text-[16px] font-normal">Insights</h2>
+        <h2 className="m-0 flex-1 text-[16px] font-normal">{place ? `Insights · ${place}` : 'Insights'}</h2>
         {session.explanation_source === 'gemini' && measured ? <AITag className="shrink-0 whitespace-nowrap" /> : null}
       </div>
       {text ? (
