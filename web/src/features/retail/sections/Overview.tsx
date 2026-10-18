@@ -185,13 +185,10 @@ function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; min
                 of {int(row.n)} users saw a visible change by week {weeksN}
               </span>
             </div>
-            {row.base_rate !== null ? (
+            {row.cont8 !== null ? (
               <div className="flex min-w-0 flex-col">
-                <span className="flex items-baseline gap-1.5 leading-[40px]">
-                  <span className="text-[22px] font-medium tracking-[-0.03em] text-ink-2 tnum">{pct(row.base_rate)}</span>
-                  {row.lift !== null ? <span className={`rounded-pill px-1.5 py-0.5 text-proof-small font-semibold tnum ${row.lift > 0 ? 'bg-proof-leaf-soft text-proof-leaf' : 'bg-sunken text-ink-2'}`}>{pts(row.lift)}</span> : null}
-                </span>
-                <span className="max-w-[140px] text-proof-small text-ink-2">of non-users, same goals</span>
+                <span className="text-[22px] font-medium leading-[40px] tracking-[-0.03em] text-ink-2 tnum">{pct(row.cont8)}</span>
+                <span className="max-w-[140px] text-proof-small text-ink-2">of users still using it at week {weeksN}</span>
               </div>
             ) : null}
           </div>
@@ -400,6 +397,13 @@ function BriefRow({ c }: { c: BriefCard }) {
 
 /* ───────────────────────────── top products ───────────────────────────── */
 
+/** A lift as the extra people per 100 users: 0.47 → "+47". */
+function extraPer100(lift: number | null): string {
+  if (lift === null) return '—'
+  const n = Math.round(lift * 100)
+  return `${n > 0 ? '+' : n < 0 ? '−' : '±'}${Math.abs(n)}`
+}
+
 function TopProducts({ rows, brand, className }: { rows: ProductRow[]; brand: string | null; className?: string }) {
   const { carry } = useRetailState()
   const top = rows
@@ -408,11 +412,11 @@ function TopProducts({ rows, brand, className }: { rows: ProductRow[]; brand: st
     .slice(0, 6)
   return (
     <Panel
-      title={brand ? 'Your products' : 'Top products'}
+      title={brand ? 'Your strongest products' : 'Strongest products'}
       id="top-h"
       className={className}
       flush
-      description="By lift over non-users with the same goals."
+      description="Ranked by extra people with a visible change per 100 users, against non-users with the same goals."
       actions={
         <Link to={`${sectionPath('products')}${carry}`} className="inline-flex items-center gap-1 text-proof-small text-ink-2 no-underline hover:text-ink">
           View all <ArrowRight size={14} strokeWidth={1.6} aria-hidden />
@@ -430,11 +434,14 @@ function TopProducts({ rows, brand, className }: { rows: ProductRow[]; brand: st
                     <span className="truncate text-proof-body font-medium text-ink">{r.product}</span>
                     <span className="flex items-center gap-1.5 truncate text-proof-label text-ink-2">
                       <TierDot tier={r.tier} />
-                      {brand ? r.category_label : r.brand} · {pct(r.rate)} of {int(r.n)}
+                      {brand ? r.category_label : r.brand} · {pct(r.rate)} saw a change{r.cont8 !== null ? ` · ${pct(r.cont8)} still using` : ''}
                     </span>
                   </span>
                 </span>
-                <span className={`text-proof-body font-semibold tnum ${(r.lift ?? 0) > 0 ? 'text-proof-leaf' : 'text-ink-2'}`}>{pts(r.lift)}</span>
+                <span className="flex flex-col items-end" title={`${int(r.n)} people; ${pts(r.lift)} over non-users, 95% interval ${pts(r.lift_lo)} to ${pts(r.lift_hi)}`}>
+                  <span className={`text-proof-body font-semibold leading-5 tnum ${(r.lift ?? 0) > 0 ? 'text-proof-leaf' : 'text-ink-2'}`}>{extraPer100(r.lift)}</span>
+                  <span className="text-proof-label text-ink-2">per 100 users</span>
+                </span>
               </Link>
             </li>
           ))}

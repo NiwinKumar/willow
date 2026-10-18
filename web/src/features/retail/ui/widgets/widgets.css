@@ -56,11 +56,11 @@
 }
 .wg-title {
   margin: 0;
-  padding-top: 4px;
-  font-size: 13px;
-  line-height: 20px;
+  padding-top: 2px;
+  font-size: 16px;
+  line-height: 24px;
   font-weight: 600;
-  letter-spacing: -.005em;
+  letter-spacing: -.01em;
   color: var(--wg-fg);
 }
 .wg-cap {
@@ -248,6 +248,98 @@ a.wg-rank-row:hover {
   background: var(--wg-acc);
 }
 
+/* ───── brand bars ───── */
+.wg-bars {
+  gap: 10px;
+}
+.wg-bars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wg-bars-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--wg-fg2);
+  text-decoration: none;
+  transition: color .2s ease;
+}
+.wg-bars-row[data-on],
+a.wg-bars-row:hover {
+  color: var(--wg-fg);
+}
+.wg-bars-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.wg-bars-line .t {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+}
+.wg-bars-line .n {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-bars-line .d {
+  font-size: 12px;
+  color: var(--wg-fg2);
+}
+.wg-bars-line .v {
+  min-width: 34px;
+  text-align: right;
+  font-weight: 500;
+  color: var(--wg-fg);
+}
+.wg-bars-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--wg-track);
+}
+.wg-bars-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--wg-acc);
+  opacity: .55;
+  transition: opacity .2s ease;
+}
+.wg-bars-row[data-on] .wg-bars-fill,
+.wg-bars-row:hover .wg-bars-fill {
+  opacity: 1;
+}
+.wg-bars-ref {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--wg-fg);
+  opacity: .7;
+}
+.wg-bars-key {
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  margin-right: 2px;
+  vertical-align: -1px;
+  border-radius: 1px;
+  background: var(--wg-fg);
+  opacity: .7;
+}
+
 /* ───── pill stack ───── */
 .wg-stack {
   gap: 12px;
@@ -304,6 +396,59 @@ a.wg-rank-row:hover {
   max-width: 4px;
   border-radius: 999px;
   background: var(--wg-bg);
+}
+/* a part's colour is its status: green settled, amber on the way, grey no effect found, hollow not enough to say */
+.wg-stack-pill[data-tone='green'],
+.wg-stack-key[data-tone='green'] {
+  background: var(--wg-acc);
+}
+.wg-stack-pill[data-tone='amber'],
+.wg-stack-key[data-tone='amber'] {
+  background: var(--wg-amber);
+}
+.wg-stack-pill[data-tone='grey'],
+.wg-stack-key[data-tone='grey'] {
+  background: var(--wg-grey);
+}
+.wg-stack-pill[data-tone='hollow'],
+.wg-stack-key[data-tone='hollow'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--wg-grey);
+}
+.wg-stack-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wg-stack-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wg-fg2);
+  cursor: pointer;
+}
+.wg-stack-legend button[data-on] {
+  color: var(--wg-fg);
+}
+.wg-stack-legend b {
+  font-weight: 500;
+  color: var(--wg-fg);
+}
+.wg-stack-key {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--wg-grey);
 }
 @container (max-width: 300px) {
   .wg-stack-pill[data-on]::after {
@@ -540,10 +685,13 @@ a.wg-rank-row:hover {
 }
 
 /* ───── tick gauge ───── */
+.wg-gauge {
+  gap: 12px;
+}
 .wg-gauge-row {
   display: flex;
   flex: 1;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
 }

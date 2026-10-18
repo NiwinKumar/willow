@@ -132,7 +132,7 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
             csv={{ name: csvName('brands', d), meta: csvMeta(d, note) }}
           />
         </Panel>
-        <Panel title="Positioning" id="positioning-h" description="Visible change against still using at week 8. Bubble size: people." className="xl:col-span-5">
+        <Panel title="Positioning" id="positioning-h" description="Each dot is a brand. Further up: more of its people saw a visible change. Further right: more kept using it." className="xl:col-span-5">
           <PositioningChart
             caption="Brands: visible change against still using at week 8"
             points={measured.filter((b) => b.cont8 !== null).map((b) => ({ id: b.brand, label: b.brand, rate: b.rate, lo: b.lo, hi: b.hi, cont: b.cont8!, users: b.users, n: b.n, emphasis: b === leader }))}
@@ -289,7 +289,7 @@ function BrandBody({ b, brands }: { b: BrandDetail; brands: BrandSummary[]; d: I
         <Panel title="You vs the market by goal" id="goals-h" description={<VsLegend you="You" rival />} className="xl:col-span-7" footnote={`Visible change by week 8 among people with the goal who use a product for it; sorted by your gap to the market. ${note}`}>
           {b.goals.length === 0 ? <EmptyState compact title="No measured goal yet" body={`${b.brand} has no product for a measured goal in this filter.`} /> : <VsMarketRows rows={goalRows(b.goals)} rival youLabel="You" labelHeader="Goal" selected={param('goal')} caption={`${b.brand} against the market, by goal`} />}
         </Panel>
-        <Panel title="Positioning" id="positioning-h" description="Visible change against still using at week 8. Bubble size: people." className="xl:col-span-5">
+        <Panel title="Positioning" id="positioning-h" description="Each dot is a brand. Further up: more of its people saw a visible change. Further right: more kept using it." className="xl:col-span-5">
           <PositioningChart caption={`${b.brand} among brands: visible change against still using at week 8`} points={points} onSelect={(id) => id !== b.brand && setParam({ brand: slugOf(id) }, { push: true })} height={360} />
         </Panel>
       </div>
