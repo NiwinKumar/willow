@@ -428,7 +428,7 @@ function About() {
       }
     >
       <div className={`${card} flex flex-col divide-y divide-ink/[.07]`} style={cardStyle}>
-        <Field title="When do you usually take photos?" note="Same time each session is best">
+        <Field title="When do you prefer to take photos and check in?" note="Same time each session is best">
           <div role="radiogroup" aria-label="Usual photo time" className={`${track} self-start`}>
             {PHOTO_TIMES.map((t) => (
               <button key={t.id} type="button" role="radio" aria-checked={time === t.id} onClick={() => setTime(t.id)} className={pill(time === t.id)}>

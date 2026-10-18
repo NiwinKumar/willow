@@ -34,8 +34,8 @@ export function MeetWisp() {
     }
     const timers: number[] = []
     let ticker: number | undefined
-    timers.push(window.setTimeout(() => setState('listening'), 700))
-    timers.push(window.setTimeout(() => setState('happy'), 1500))
+    timers.push(window.setTimeout(() => setState('listening'), 200))
+    timers.push(window.setTimeout(() => setState('happy'), 550))
     timers.push(
       window.setTimeout(() => {
         setState('speaking')
@@ -48,8 +48,8 @@ export function MeetWisp() {
             setState('idle')
             setSaid(true)
           }
-        }, 26)
-      }, 2500),
+        }, 11)
+      }, 950),
     )
     return () => {
       timers.forEach((t) => window.clearTimeout(t))

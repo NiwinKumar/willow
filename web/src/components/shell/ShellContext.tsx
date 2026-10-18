@@ -12,7 +12,7 @@ export type AdvisorSeed = { id: number; text: string; context?: string }
 export type ShellApi = {
   /** Open the check-in sheet: today's check-in of every tracked place, the only way to check in. `add`
    * puts places on the person's list first (a product test adds both forearms). */
-  openCheckIn: (opts?: { add?: TrackPlace[] }) => void
+  openCheckIn: () => void
   closeCheckIn: () => void
   checkInOpen: boolean
   /** Start the check-in flow directly (the sheet's Start): /check-in?site=&mode=&places= over the current page. */
