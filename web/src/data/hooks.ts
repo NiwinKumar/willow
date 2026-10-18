@@ -18,6 +18,12 @@ export function useOwner(): string | null {
   return data.mode === 'live' && user ? user.uid : null
 }
 
+/** The person's product requests (products they asked Willow to add to the catalog), newest first. */
+export function useProductRequests() {
+  const uid = useOwner()
+  return useQuery(['product-requests', uid], (t) => api.productRequests(t).then((r) => r.requests), { enabled: Boolean(uid) })
+}
+
 export function useRoutine() {
   const uid = useOwner()
   return useQuery(['routine', uid], (t) => api.routine(t).then((r) => r.entries), { enabled: Boolean(uid) })

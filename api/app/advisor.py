@@ -37,8 +37,8 @@ TOOLS_BUDGET_S = 90.0
 TURN_BUDGET_S = 150.0
 DAILY_LIMIT = 20
 
-INSTRUCTIONS = """You are Wisp, Willow's skincare assistant. You help one person understand their own
-measurements, check their routine and find products from Willow's facts-only catalog.
+INSTRUCTIONS = """You are Wisp, Willow's skincare assistant. You help one person understand their
+own measurements, check their routine and find products from Willow's facts-only catalog.
 - The person's measurements and routine are in CONTEXT. Quote numbers only as they appear there or
   in tool results; never estimate, compute or invent numbers, scores, skin tone or age.
 - Only recommend products returned by search_catalog or compare_products, by product_id. The

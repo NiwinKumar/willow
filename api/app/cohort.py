@@ -39,9 +39,11 @@ plainly (the retailer page's "About this data" panel repeats it):
 """
 
 import hashlib
+import json
 import math
 import random
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from app import catalog, contract, routine_check
@@ -303,6 +305,18 @@ def synthetic_feel(
     return {"feel": verdict, "feel_week": week - started, "feel_tags": tags}
 
 
+# The synthetic cohort was drawn over the catalog as it was on Oct 15 (48 products). Products added
+# later get no synthetic people: the same simulated people, routines and readings on every run, and
+# new products show only real data.
+COHORT_PRODUCTS = Path(__file__).resolve().parent.parent / "seed" / "cohort_products.json"
+
+
+def cohort_products() -> list[dict[str, Any]]:
+    ids = json.loads(COHORT_PRODUCTS.read_text())
+    by_id = {p["product_id"]: p for p in catalog.products()}
+    return [by_id[i] for i in ids if i in by_id]
+
+
 def generate(
     today: date | datetime | None = None, *, switching: bool = True, skin_effects: bool = True
 ) -> dict[str, list[dict[str, Any]]]:
@@ -318,7 +332,7 @@ def generate(
         else datetime(today.year, today.month, today.day, 23, 59, tzinfo=UTC)
     )
     rng = random.Random(SEED)
-    products = list(catalog.products())
+    products = cohort_products()
     by_goal: dict[str, list[dict[str, Any]]] = {}
     for p in products:
         for g in product_goals(p):

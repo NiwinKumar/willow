@@ -266,6 +266,23 @@ export type Profile = {
 }
 export type ProfilePatch = Partial<Omit<Profile, 'updated_at'>>
 
+/** A product someone asked Willow to add to the catalog (api app/product_requests.py). */
+export type ProductRequest = {
+  id: string
+  brand: string
+  name: string
+  status: 'pending' | 'added' | 'declined'
+  product_id: string | null
+  /** The catalog entry, once added. */
+  product: Product | null
+  has_photo: boolean
+  /** People who asked for the same product (pending requests only). */
+  askers: number | null
+  created_at: string | null
+  resolved_at: string | null
+  seen: boolean
+}
+
 export class ApiError extends Error {
   status: number
   code: string | null
@@ -391,10 +408,16 @@ export const api = {
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
   /** The account as the api knows it: uid, the consent and the profile on record (each null before any). */
   me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null; profile: Profile | null }>(token, '/v1/me'),
-  catalogSearch: (token: string, params: { q?: string; concern?: string; category?: string; max_price?: number; currency?: string; limit?: number }) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
-    return request<{ products: Product[] }>(token, `/v1/catalog/search?${qs}`)
+  /** `concern` may be several: products made for every one of them. `total` counts every match (past `limit`). */
+  catalogSearch: (token: string, params: { q?: string; concern?: string | string[]; category?: string; max_price?: number; currency?: string; limit?: number }) => {
+    const qs = new URLSearchParams(Object.entries(params).flatMap(([k, v]) => (v === undefined || v === '' ? [] : Array.isArray(v) ? v.map((x) => [k, x]) : [[k, String(v)]])))
+    return request<{ products: Product[]; total?: number; catalog_size?: number }>(token, `/v1/catalog/search?${qs}`)
   },
+  productRequests: (token: string) => request<{ requests: ProductRequest[] }>(token, '/v1/product-requests'),
+  /** 409 `in_catalog` (detail.product) when the catalog already has it. */
+  requestProduct: (token: string, body: { brand: string; name: string; photo?: { mime_type: string; data_base64: string } }) =>
+    request<ProductRequest>(token, '/v1/product-requests', { method: 'POST', ...json(body) }),
+  seenProductRequest: (token: string, id: string) => request<void>(token, `/v1/product-requests/${id}`, { method: 'PATCH', ...json({ seen: true }) }),
   catalogProduct: (token: string, productId: string) => request<Product>(token, `/v1/catalog/${productId}`),
   labelScan: (token: string, images: { mime_type: string; data_base64: string }[]) =>
     request<LabelScanResponse>(token, '/v1/label-scan', { method: 'POST', ...json({ images }) }),
