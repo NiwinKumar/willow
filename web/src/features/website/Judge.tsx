@@ -177,7 +177,7 @@ export default function Judge() {
             : `${journeyUnavailableLine(journey)} The sample run in stop 01 shows the same pipeline on real photos.`,
       cta: 'Open the journey',
       disabled: journey.state === 'ready' ? undefined : journey.state === 'loading' ? 'Checking' : 'Unavailable',
-      act: () => go('proof', '/home?demo=1', true),
+      act: () => go('proof', '/journey'),
     },
     {
       id: 'advisor',
