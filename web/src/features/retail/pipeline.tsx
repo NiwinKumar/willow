@@ -104,15 +104,15 @@ const WORD: Record<StepState, string> = { done: 'done', partial: 'in progress', 
 
 /**
  * The pipeline as a horizontal stepper (vertical under 768 px, or always with `vertical`). The line between two
- * steps fills when the step before it is done.
+ * steps fills when the step before it is done. `compact` tightens the spacing for a strip inside a card.
  */
-export function ProofPipeline({ steps, vertical = false, label = 'Proof pipeline' }: { steps: Step[]; vertical?: boolean; label?: string }) {
+export function ProofPipeline({ steps, vertical = false, compact = false, label = 'Proof pipeline' }: { steps: Step[]; vertical?: boolean; compact?: boolean; label?: string }) {
   return (
     <ol aria-label={label} className={`m-0 grid list-none p-0 ${vertical ? 'grid-cols-1 gap-0' : 'grid-cols-1 gap-0 md:grid-cols-5'}`}>
       {steps.map((s, i) => {
         const last = i === steps.length - 1
         return (
-          <li key={s.id} className={`relative flex min-w-0 gap-3 ${vertical ? 'pb-4 last:pb-0' : 'pb-4 last:pb-0 md:flex-col md:gap-2.5 md:pb-0 md:pr-4'}`}>
+          <li key={s.id} className={`relative flex min-w-0 gap-3 ${vertical ? (compact ? 'pb-3 last:pb-0' : 'pb-4 last:pb-0') : 'pb-4 last:pb-0 md:flex-col md:pb-0 md:pr-3 ' + (compact ? 'md:gap-1.5' : 'md:gap-2.5')}`}>
             {!last ? (
               <span
                 aria-hidden
@@ -121,11 +121,11 @@ export function ProofPipeline({ steps, vertical = false, label = 'Proof pipeline
             ) : null}
             <Glyph state={s.state} i={i} />
             <div className="flex min-w-0 flex-col gap-0.5">
-              <span className={`text-proof-body font-medium ${s.state === 'todo' ? 'text-ink-2' : 'text-ink'}`}>
+              <span className={`${compact ? 'text-proof-small' : 'text-proof-body'} font-medium ${s.state === 'todo' ? 'text-ink-2' : 'text-ink'}`}>
                 {s.title}
                 <span className="sr-only">: {WORD[s.state]}.</span>
               </span>
-              <span className="text-proof-small text-ink-2">{s.detail}</span>
+              <span className={`text-proof-small text-ink-2 ${compact ? "leading-[15px]" : ""}`}>{s.detail}</span>
               {s.to && s.cta ? (
                 <Link to={s.to} className="mt-1 self-start text-proof-small font-medium text-proof-leaf no-underline hover:underline">
                   {s.cta} →

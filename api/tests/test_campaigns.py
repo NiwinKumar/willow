@@ -605,3 +605,22 @@ def test_incrementality_in_the_campaign_stats(client, fake):
     inc = row["stats"]["incrementality"]
     assert inc["exposed"]["n"] >= 10 and inc["holdout"]["n"] >= 10
     assert inc["lift"] == 0.0 and inc["lift_lo"] == 0.0 and inc["lift_hi"] == 0.0
+
+
+def test_dev_seed_gives_each_kind_of_campaign_with_history():
+    from app import dev_seed
+    from app.store import MemoryStore
+
+    store = MemoryStore()
+    ids = dev_seed.seed_demo_campaigns(store)
+    assert len(ids) == 3 and dev_seed.seed_demo_campaigns(store) == []  # once
+    by = {cid: campaigns.view(store, cid, store.campaign_get(cid)) for cid in ids}
+    clear, collecting, ended = (by[s["id"]] for s in dev_seed.SPECS)
+    assert clear["status"] == "active" and len(clear["stats"]["daily"]) == 12
+    inc = clear["stats"]["incrementality"]
+    assert inc["lift"] > 0 and inc["lift_lo"] > 0 and inc["exposed"]["n"] == 640
+    assert collecting["status"] == "active" and collecting["stats"]["incrementality"] is None
+    assert ended["status"] == "ended" and len(ended["stats"]["daily"]) == 14
+    inc = ended["stats"]["incrementality"]
+    assert inc["lift_lo"] < 0 < inc["lift_hi"]
+    assert campaigns.active_count(store, dev_seed.DEV_OWNER) == 2

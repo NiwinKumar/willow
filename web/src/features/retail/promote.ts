@@ -215,3 +215,89 @@ export function durationText(c: Pick<Campaign, 'days' | 'starts_at' | 'ends_at' 
   if (c.status === 'ended' && planned !== null && ran !== null && ran < planned) return `ended early after ${ran} ${ran === 1 ? 'day' : 'days'} of ${planned}`
   return planned !== null ? `${planned} days` : ''
 }
+
+/** "Day 3 of 14" while it runs (UTC days, as the api counts them); null before it starts or once it has ended. */
+export function runDay(c: Pick<Campaign, 'status' | 'days' | 'starts_at' | 'ends_at'>, now: Date = new Date()): { day: number; of: number } | null {
+  const start = Date.parse(c.starts_at)
+  if (c.status === 'ended' || !Number.isFinite(start) || now.getTime() >= Date.parse(c.ends_at) || now.getTime() < start) return null
+  const of = c.days ?? Math.max(1, Math.round((Date.parse(c.ends_at) - start) / DAY_MS))
+  return { day: Math.min(of, Math.floor((now.getTime() - start) / DAY_MS) + 1), of }
+}
+
+/** The delivery funnel, in what the api counts: shown, clicked, added to a routine. Clicks and adds are read against impressions (each is once per person per day). */
+export function funnelSteps(s: Pick<Campaign['stats'], 'impressions' | 'clicks' | 'adds'>): { id: 'impressions' | 'clicks' | 'adds'; label: string; value: number; share: number | null }[] {
+  const of = s.impressions
+  return [
+    { id: 'impressions', label: 'Card shown', value: s.impressions, share: of ? 1 : null },
+    { id: 'clicks', label: 'Clicked through', value: s.clicks, share: of ? s.clicks / of : null },
+    { id: 'adds', label: 'Added to routine', value: s.adds, share: of ? s.adds / of : null },
+  ]
+}
+
+/**
+ * The extra people who added the product because the campaign showed them the card: the lift times the people who could see it,
+ * with the same 95% interval. It is an estimate from the holdout comparison, so null until that comparison exists.
+ */
+export function boostedAdds(inc: Campaign['stats']['incrementality']): { n: number; lo: number; hi: number } | null {
+  if (!inc) return null
+  const n = inc.exposed.n
+  return { n: Math.round(inc.lift * n), lo: Math.round(inc.lift_lo * n), hi: Math.round(inc.lift_hi * n) }
+}
+
+/** Share of impressions as a short percentage ("3.3%", "<0.1%"); null → "—". */
+export function shareText(v: number | null): string {
+  if (v === null) return '—'
+  if (v > 0 && v < 0.001) return '<0.1%'
+  return `${(Math.round(v * 1000) / 10).toFixed(1)}%`
+}
+
+/** Running totals by day (shown, clicked, added), for the stream: each day holds everything counted up to its end. */
+export function cumulativeDays(daily: Campaign['stats']['daily']): { day: string; values: [number, number, number] }[] {
+  let a = 0
+  let b = 0
+  let c = 0
+  return daily.map((d) => {
+    a += d.impressions
+    b += d.clicks
+    c += d.adds
+    return { day: d.day, values: [a, b, c] }
+  })
+}
+
+/**
+ * The page's one-sentence answer: what the campaign is doing, in words. The figures it quotes are the api's counts; the
+ * verdict on the holdout comparison is only made once both groups have 10 people, and only "clear" when the lift's 95%
+ * interval stays above zero.
+ */
+export function campaignInsight(c: Pick<Campaign, 'status' | 'stats'>): { tone: 'good' | 'neutral' | 'wait'; headline: string; detail: string } {
+  const s = c.stats
+  const inc = s.incrementality
+  if (s.impressions === 0)
+    return {
+      tone: 'wait',
+      headline: c.status === 'ended' ? 'It ended before anyone saw the card.' : c.status === 'paused' ? 'Paused, so no one sees the card.' : 'Waiting for the first shopper.',
+      detail: c.status === 'active' ? 'The first impression lands when a matching shopper opens their Routine page.' : 'Nothing was shown, so there is nothing to measure.',
+    }
+  const people = s.reach ?? s.impressions
+  const who = `${people.toLocaleString('en-GB')} ${people === 1 ? 'person has' : 'people have'} seen the card`
+  const acts = [s.clicks ? `${s.clicks.toLocaleString('en-GB')} clicked through` : '', s.adds ? `${s.adds.toLocaleString('en-GB')} added it to their routine` : ''].filter(Boolean)
+  const delivery = `${who}${acts.length ? `; ${acts.join(' and ')}` : ''}.`
+  if (!inc)
+    return {
+      tone: 'wait',
+      headline: s.adds ? 'People are adding it, but it is too early to say the card caused that.' : 'The card is being seen, and nobody has added the product yet.',
+      detail: `${delivery} The real test is the holdout: it unlocks once ${HOLDOUT_MIN} people are in each group.`,
+    }
+  const per100 = `${Math.round(inc.exposed.rate * 100)} in 100 people who could see the card added the product, against ${Math.round(inc.holdout.rate * 100)} in 100 who could not.`
+  if (inc.lift_lo > 0) return { tone: 'good', headline: 'The card is making people add this product.', detail: per100 }
+  if (inc.lift_hi < 0) return { tone: 'neutral', headline: 'People who saw the card were less likely to add the product.', detail: per100 }
+  return { tone: 'wait', headline: 'Too early to say whether the card changes anything.', detail: `${per100} The gap could still be chance.` }
+}
+
+/** The product's own record in a sentence (before any promotion): users' share with a visible change vs non-users with the same goals. */
+export function ownRecordInsight(row: { rate: number | null; base_rate: number | null; n: number | null }): string | null {
+  if (row.rate === null || row.base_rate === null || row.n === null) return null
+  const a = Math.round(row.rate * 100)
+  const b = Math.round(row.base_rate * 100)
+  return `${a} in 100 of its users had a visible change by week 8, against ${b} in 100 non-users with the same goals. The campaign promotes something that works on its own.`
+}

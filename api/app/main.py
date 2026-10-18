@@ -28,6 +28,16 @@ app = FastAPI(title="Willow api", version=__version__)
 log = logging.getLogger("willow.api")
 
 
+@app.on_event("startup")
+def _dev_seed() -> None:
+    """DEV_STORE=memory (with AUTH_MODE=dev): three demo campaigns with history, in memory only."""
+    if settings.auth_mode == "dev" and settings.dev_store == "memory":
+        from app import dev_seed
+        from app.store import get_store
+
+        dev_seed.seed_demo_campaigns(get_store())
+
+
 # Registered before CORS, so it sits inside it: an unexpected error still reaches the browser as
 # JSON with CORS headers ("Something went wrong") instead of a bare 500 the web reads as offline.
 @app.middleware("http")
