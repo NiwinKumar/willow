@@ -1,7 +1,7 @@
 /** One metric over the sessions of a site and mode, ready for TimelineChart. */
 import type { TimelinePoint } from '../../components/charts'
 import type { CaptureMode, MetricId, Session } from '../../data/types'
-import { fmtValue } from '../../lib/metrics'
+import { fmtValue, fmtReading } from '../../lib/metrics'
 import { bandOf, chartable, currentBaseline, metricOf, shortWhen } from './model'
 
 export type MetricSeries = { sessions: Session[]; points: TimelinePoint[]; baseIndex: number | null; band: number | null; format: (v: number) => string }
@@ -17,7 +17,7 @@ export function metricSeries(all: Session[], mode: CaptureMode, id: MetricId, ba
     return {
       value: m?.value ?? null,
       // Each point reads as its own result card does (its own precision); the axis uses `format`.
-      text: m && m.value !== null ? fmtValue(m.value, m) : undefined,
+      text: m && m.value !== null ? fmtReading(m.value, m) : undefined,
       label: shortWhen(s, sessions).toUpperCase(),
       why,
       name: new Date(s.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
