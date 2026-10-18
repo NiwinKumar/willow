@@ -2,51 +2,33 @@ import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import type { CaptureMode, Site } from '../../data/types'
+import { toast } from 'sonner'
+
+import type { Site } from '../../data/types'
 import { useData } from '../../data/useData'
-import { baselineState } from '../../lib/baselineGuide'
-import { fmtDate } from '../../lib/format'
-import { prefs } from '../../lib/prefs'
 import { placesOf } from '../../lib/profile'
-import { minutesFor, type TrackPlace } from '../../lib/track'
+import { choicesOf, minutesFor, trackOf, type TrackChoice, type TrackPlace } from '../../lib/track'
 import './checkin.css'
-import { baselineLine, neededFor, quickChecks, SITE_NAME, SITE_SWATCH, siteForMode, sitesFor, whenCaps } from './model'
+import { baselineLine, SITE_NAME, SITE_SWATCH, whenCaps } from './model'
+import { TrackChoices } from './TrackChoices'
 
 /**
- * The "Check in" side sheet (Willow App.dc.html, capOpen). It opens on today's check-in: the places the
- * person tracks (profile.track, chosen in onboarding), about how long it takes, and one "Start check-in"
- * that walks through all of them. "One place, or RAW files" (and any preset place) shows the single-place
- * picker: which place, Camera or RAW upload, three checks. Each row's line comes from the person's own
- * sessions in that mode (baselines are per site and mode). A native <dialog>: focus trap, Esc and the scrim
- * for free.
+ * The "Check in" side sheet (Willow App.dc.html, capOpen): the one way to check in. It lists today's
+ * check-in, every place the person tracks (profile.track, chosen in onboarding or You), about how long it
+ * takes, and one "Start check-in" that walks through all of them (RAW files can be uploaded at any place
+ * from its camera step). Someone who never chose places (onboarded before Oct 18) chooses them here first.
+ * A native <dialog>: focus trap, Esc and the scrim for free.
  */
-export default function CheckInPicker({
-  open,
-  onClose,
-  preset,
-  onStart,
-  onStartAll,
-}: {
-  open: boolean
-  onClose: () => void
-  preset?: { site?: Site; mode?: CaptureMode }
-  onStart: (site: Site, mode: CaptureMode) => void
-  onStartAll: (places: TrackPlace[]) => void
-}) {
+export default function CheckInPicker({ open, onClose, onStart }: { open: boolean; onClose: () => void; onStart: (places: TrackPlace[], upload: boolean) => void }) {
   const data = useData()
   const navigate = useNavigate()
   const ref = useRef<HTMLDialogElement>(null)
-  // A place asked for (Progress "today", a result's "Check in again") opens the single-place picker.
-  const [single, setSingle] = useState(Boolean(preset?.site || preset?.mode))
   const places = placesOf(data.profile)
-  const [mode, setModeOnly] = useState<CaptureMode>(preset?.mode ?? 'uncalibrated')
-  const [site, setSite] = useState<Site>(siteForMode(preset?.site ?? 'face_full', preset?.mode ?? 'uncalibrated'))
-  // RAW is for close-ups of one place and the forearms: switching mode keeps the place if that mode has it.
-  const setMode = (m: CaptureMode) => {
-    setModeOnly(m)
-    setSite((s) => siteForMode(s, m))
-  }
+  const live = data.mode === 'live'
+  const known = live && data.status !== 'loading'
+  const sessionsOf = (s: Site) => data.series(s)?.sessions ?? []
+  const [choosing, setChoosing] = useState(() => live && !data.profile.track?.length)
+  const [saving, setSaving] = useState(false)
 
   const opener = useRef<HTMLElement | null>(null)
   useEffect(() => {
@@ -69,24 +51,6 @@ export default function CheckInPicker({
     },
     [],
   )
-
-  const live = data.mode === 'live'
-  const known = live && data.status !== 'loading'
-  const sessionsOf = (s: Site) => data.series(s)?.sessions ?? []
-  const n = known ? neededFor(sessionsOf(site), mode) : null
-  const first = known && baselineState(sessionsOf(site), mode).state === 'none'
-  const raw = mode === 'calibrated_raw'
-  const last = live ? data.all[data.all.length - 1] : undefined
-
-  const note = raw
-    ? `${n ?? 'The'} DNG files from Lightroom${site.startsWith('forearm') ? ', with pen dots and white paper' : ', phone about 10 cm away'}. RAW is for close-ups and the forearms; take your whole face with the camera.`
-    : first
-      ? `${n ?? 5} photos with this device’s camera. They become your camera baseline.`
-      : `${n ?? 3} photos with this device’s camera, compared with your camera baseline.`
-  // The flow opens on the guide for a first session (or RAW before the one-time setup), else straight in.
-  // Same rule as the flow (computedN === 5): a thin baseline (no normal range) also opens the guide.
-  const cta = first || n === 5 ? 'Prepare your baseline' : raw ? (prefs.lightroomDone() ? 'Choose RAW files' : 'Set up RAW') : 'Open camera'
-  const checks = quickChecks(site)
 
   return (
     <dialog
@@ -115,83 +79,34 @@ export default function CheckInPicker({
             </button>
           </div>
 
-          {!single ? (
+          {choosing ? (
+            <ChoosePlaces
+              initial={choicesOf(places)}
+              busy={saving}
+              onSave={(picked) => {
+                setSaving(true)
+                data
+                  .saveProfile({ track: trackOf(picked) })
+                  .catch(() => toast.error('Couldn’t save your places on this account. They’re kept on this device for now.'))
+                  .finally(() => {
+                    setSaving(false)
+                    setChoosing(false)
+                  })
+              }}
+            />
+          ) : (
             <Today
               live={live}
               known={known}
               places={places}
               line={(p) => baselineLine(sessionsOf(p), 'uncalibrated').text}
-              onStart={() => onStartAll(places)}
+              onStart={() => onStart(places, false)}
+              onUpload={() => onStart(places, true)}
               onChange={() => {
                 onClose()
                 navigate('/you#places')
               }}
-              onSingle={() => setSingle(true)}
             />
-          ) : (
-            <>
-              <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-5 pt-2 pb-4">
-                {!live ? (
-                  <p className="m-0 rounded-[18px] bg-sunken px-3.5 py-3 text-[13px] leading-[1.45] text-ink-2">You’re looking at the sample journey. Checking in switches to your own account and your own photos.</p>
-                ) : null}
-                <div role="radiogroup" aria-label="What are you photographing" className="flex flex-col gap-1.5">
-                  {sitesFor(mode).map((s) => {
-                    const on = s === site
-                    const meta = !live ? null : !known ? 'Checking…' : baselineLine(sessionsOf(s), mode).text
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        onClick={() => setSite(s)}
-                        className={`flex min-h-14 w-full items-center gap-3 rounded-[20px] py-2 pr-3 pl-2 text-left transition-[background,box-shadow] duration-200 ${on ? 'bg-white shadow-[0_0_0_1.5px_var(--text-primary),0_10px_24px_-16px_rgba(0,0,0,.3)]' : 'hover:bg-ink/[.03]'}`}
-                      >
-                        <span aria-hidden className="size-10 flex-none rounded-[14px] shadow-[inset_0_0_12px_rgba(255,255,255,.5)]" style={{ background: SITE_SWATCH[s] }} />
-                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="text-[15px]">{SITE_NAME[s]}</span>
-                          {meta ? <span className="text-[12px] text-ink-2">{meta}</span> : null}
-                        </span>
-                        <span aria-hidden className={`grid size-5 flex-none place-items-center rounded-full text-[11px] text-inverse ${on ? 'bg-selected' : 'border-[1.5px] border-ink/20'}`}>
-                          {on ? '✓' : ''}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <SegmentedControl
-                    label="How"
-                    value={mode}
-                    onChange={setMode}
-                    options={[
-                      { value: 'uncalibrated', label: 'Camera' },
-                      { value: 'calibrated_raw', label: 'RAW upload' },
-                    ]}
-                  />
-                  <span className="px-1 text-[13px] leading-[1.45] text-[#3E3C38]">{note}</span>
-                </div>
-
-                <details className="ck-details rounded-[18px] bg-sunken px-3.5">
-                  <summary className="flex min-h-11 cursor-pointer items-center text-[14px]">Before you start · {checks.length} checks</summary>
-                  <ol className="m-0 mb-3 flex flex-col gap-1.5 pl-[18px] text-[13px] leading-[1.45] text-[#3E3C38]">
-                    {checks.map((c) => (
-                      <li key={c}>{c}</li>
-                    ))}
-                  </ol>
-                </details>
-              </div>
-
-              <div className="flex flex-col gap-2 border-t border-ink/[.06] px-5 pt-3.5 pb-5">
-                <button type="button" onClick={() => onStart(site, mode)} className="flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background] hover:bg-[#2a2a2a]">
-                  {cta} <span aria-hidden>→</span>
-                </button>
-                <span className="text-center text-[12px] text-ink-2">
-                  {!live ? ' ' : !known ? 'Checking your check-ins…' : last ? `Last capture ${fmtDate(last.created_at)} · ${SITE_NAME[last.site]} · ${last.capture_mode === 'calibrated_raw' ? 'RAW' : 'Camera'}` : 'No check-ins yet'}
-                </span>
-              </div>
-            </>
           )}
         </div>
       ) : null}
@@ -203,7 +118,7 @@ export default function CheckInPicker({
  * Today's check-in: every tracked place in capture order, each with its baseline line, then one button.
  * Close-ups use the back camera, the face the front one; the flow says which before each place.
  */
-function Today({ live, known, places, line, onStart, onChange, onSingle }: { live: boolean; known: boolean; places: TrackPlace[]; line: (p: TrackPlace) => string; onStart: () => void; onChange: () => void; onSingle: () => void }) {
+function Today({ live, known, places, line, onStart, onUpload, onChange }: { live: boolean; known: boolean; places: TrackPlace[]; line: (p: TrackPlace) => string; onStart: () => void; onUpload: () => void; onChange: () => void }) {
   const min = minutesFor(places)
   return (
     <>
@@ -215,7 +130,7 @@ function Today({ live, known, places, line, onStart, onChange, onSingle }: { liv
           <span className="text-[15px]">
             {places.length === 1 ? 'One place' : `${places.length} places`} · about {min} min
           </span>
-          <span className="text-[13px] leading-[1.45] text-ink-2">The camera guides you through each place in turn. When the last photo is in, you can close the app: your report is ready a few minutes later.</span>
+          <span className="text-[13px] leading-[1.45] text-ink-2">Willow guides you through each place in turn. When the last photo is in, you can close the app: your report is ready a few minutes later.</span>
         </div>
         <ol aria-label="Places in this check-in" className="m-0 flex list-none flex-col gap-1.5 p-0">
           {places.map((p, i) => (
@@ -234,14 +149,36 @@ function Today({ live, known, places, line, onStart, onChange, onSingle }: { liv
           <button type="button" onClick={onChange} className="min-h-11 text-ink underline decoration-ink/30 underline-offset-4">
             Change places
           </button>
-          <button type="button" onClick={onSingle} className="min-h-11 text-ink underline decoration-ink/30 underline-offset-4">
-            One place, or RAW files
-          </button>
         </div>
       </div>
       <div className="flex flex-col gap-2 border-t border-ink/[.06] px-5 pt-3.5 pb-5">
         <button type="button" onClick={onStart} className="flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background] hover:bg-[#2a2a2a]">
           Start check-in <span aria-hidden>→</span>
+        </button>
+        <button type="button" onClick={onUpload} className="min-h-11 text-[14px] text-ink underline decoration-ink/30 underline-offset-4">
+          Upload photos instead
+        </button>
+        <span className="text-center text-[12px] leading-[1.4] text-ink-2">Photos from your library or files, place by place. RAW (DNG) works too; higher quality photos can give steadier readings.</span>
+      </div>
+    </>
+  )
+}
+
+/** First open for someone who never chose places: the onboarding cards, then today's check-in. */
+function ChoosePlaces({ initial, busy, onSave }: { initial: TrackChoice[]; busy: boolean; onSave: (picked: TrackChoice[]) => void }) {
+  const [picked, setPicked] = useState(initial)
+  return (
+    <>
+      <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-5 pt-2 pb-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-[15px]">Where should Willow look?</span>
+          <span className="text-[13px] leading-[1.45] text-ink-2">Every check-in covers these places, one after another. You can change them in You.</span>
+        </div>
+        <TrackChoices value={picked} onChange={setPicked} />
+      </div>
+      <div className="flex flex-col gap-2 border-t border-ink/[.06] px-5 pt-3.5 pb-5">
+        <button type="button" disabled={busy} onClick={() => onSave(picked)} className="flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background] hover:bg-[#2a2a2a] disabled:opacity-60">
+          {busy ? 'Saving…' : 'Save places'}
         </button>
       </div>
     </>

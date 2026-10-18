@@ -3,8 +3,8 @@ import type { User } from 'firebase/auth'
 import { api } from '../../lib/api'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
 
-/** A new person's first step after onboarding: their face baseline, quick photos (no RAW needed). */
-export const FIRST_CHECKIN = '/check-in?site=face_full&mode=uncalibrated'
+/** A new person's first step after onboarding: Home with the check-in sheet open on the places they chose. */
+export const FIRST_CHECKIN = '/home?checkin=1'
 
 /** Consent to the current wording recorded on this device. */
 export function hasConsent(): boolean {

@@ -4,8 +4,6 @@ import { useMaybeShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { Chip } from '../../components/ui/Chip'
 import { TextField } from '../../components/ui/TextField'
-import type { CaptureMode } from '../../data/types'
-import { useData } from '../../data/useData'
 import { ApiError } from '../../lib/api'
 import { DEFAULT_TEST_DAYS, TEST_LENGTHS, VERDICT_AFTER_DAYS, useProductTestWrites } from './productTests'
 import { failureText } from './writes'
@@ -19,13 +17,10 @@ export type TestPreset = { entry_id?: string; product_id?: string; name: string;
 export function StartTest({ preset, onCancel, onStarted, hideIntro }: { preset: TestPreset; onCancel?: () => void; onStarted?: () => void; /** The page around it already explains how a test works. */ hideIntro?: boolean }) {
   const writes = useProductTestWrites()
   const shell = useMaybeShell()
-  const data = useData()
   const [name, setName] = useState(preset.name)
   const [days, setDays] = useState<number>(DEFAULT_TEST_DAYS)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // The same capture mode as the forearm photos so far (a test compares like with like), else quick photos.
-  const mode: CaptureMode = data.series('forearm_treated')?.sessions.at(-1)?.capture_mode ?? 'uncalibrated'
 
   const start = async () => {
     setBusy(true)
@@ -33,7 +28,7 @@ export function StartTest({ preset, onCancel, onStarted, hideIntro }: { preset: 
     try {
       await writes.start({ entry_id: preset.entry_id, product_id: preset.product_id, name: name.trim() || undefined, length_days: days })
       onStarted?.()
-      shell?.startCheckIn('forearm_treated', mode)
+      shell?.openCheckIn({ add: ['forearm_treated', 'forearm_control'] })
     } catch (e) {
       setError(e instanceof ApiError && e.status === 409 ? 'Another forearm test is running. End it on the product test page first.' : failureText(e, "Couldn't start the test. Nothing was saved; try again."))
     } finally {

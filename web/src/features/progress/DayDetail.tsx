@@ -146,7 +146,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
               <span className="text-[20px]">No readings from this day</span>
               <span className="text-[15px] leading-normal text-ink-2">{st === 'rejected' ? `${rejectNote(session)}${baseline ? ' Your baseline is unchanged.' : ''}` : 'This check-in did not finish measuring.'}</span>
             </span>
-            <Button variant="primary" size="lg" onClick={() => shell.startCheckIn(site, session.capture_mode)} trailing={<span aria-hidden>→</span>}>
+            <Button variant="primary" size="lg" onClick={() => shell.openCheckIn()} trailing={<span aria-hidden>→</span>}>
               Take new photos
             </Button>
           </div>

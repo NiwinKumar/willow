@@ -18,17 +18,36 @@ function howTo(site: Site): string {
  * Step "place" of a whole check-in (?places=): the card before each place. Which camera, one line on how,
  * three checks, then the camera. Nothing to choose: the places come from the profile.
  */
-export function PlaceStep({ site, index, total, n, onStart, onSkip }: { site: Site; index: number; total: number; n: number; onStart: () => void; onSkip: () => void }) {
+export function PlaceStep({
+  site,
+  index,
+  total,
+  n,
+  upload = false,
+  topupDate = null,
+  onStart,
+  onSkip,
+}: {
+  site: Site
+  index: number
+  total: number
+  n: number
+  upload?: boolean
+  topupDate?: string | null
+  onStart: () => void
+  onSkip: () => void
+}) {
   return (
     <div className="mx-auto flex max-w-[560px] animate-rise flex-col items-start gap-5 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-col gap-2">
         <MonoEyebrow>
-          {total > 1 ? `Place ${index + 1} of ${total}` : 'Your check-in'} · {camOf(site)}
+          {total > 1 ? `Place ${index + 1} of ${total}` : 'Your check-in'} · {upload ? 'Your photos' : camOf(site)}
         </MonoEyebrow>
         <SerifTitle id="ck-title">{SITE_NAME[site]}</SerifTitle>
       </div>
       <span aria-hidden className="h-28 w-full rounded-[28px] shadow-[inset_0_0_40px_rgba(255,255,255,.45)]" style={{ background: SITE_SWATCH[site] }} />
-      <p className="m-0 text-[16px] leading-normal text-[#3E3C38]">{howTo(site)}</p>
+      <p className="m-0 text-[16px] leading-normal text-[#3E3C38]">{upload ? 'Photos you already took of this place, from your library or files. RAW (DNG) works for close-ups and arms.' : howTo(site)}</p>
+      {topupDate ? <p className="m-0 rounded-[18px] bg-sunken px-3.5 py-3 text-[13px] leading-[1.45] text-ink-2">These photos join your baseline from {topupDate}, so it gets its normal range. Same light as that day if you can.</p> : null}
       <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[14px] text-ink">
         {quickChecks(site).map((c) => (
           <li key={c} className="flex items-start gap-2.5">
@@ -39,7 +58,7 @@ export function PlaceStep({ site, index, total, n, onStart, onSkip }: { site: Si
       </ul>
       <span className="text-[13px] text-ink-2">
         {plural(n, 'photo')}
-        {site.endsWith('_macro') ? ' · move the phone away a little between photos' : ''}
+        {!upload && site.endsWith('_macro') ? ' · move the phone away a little between photos' : ''}
       </span>
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -49,7 +68,7 @@ export function PlaceStep({ site, index, total, n, onStart, onSkip }: { site: Si
             onStart()
           }}
         >
-          Start camera
+          {upload ? 'Choose photos' : 'Start camera'}
         </Button>
         {total > 1 ? (
           <button type="button" onClick={onSkip} className="min-h-11 px-2 text-[14px] text-ink-2 underline decoration-ink/25 underline-offset-4">
