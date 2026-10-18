@@ -191,23 +191,41 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
 
 /** Your goals: each measure the person chose, as a trend since the baseline against their own normal range. */
 export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, className }: { trends: GoalTrend[]; baseline: Session | null; onOpen: (metricId: string) => void; onProgress: () => void; onAsk?: () => void; className?: string }) {
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
   return (
     <HomeCard label="Your goals" className={`@container gap-2 p-4 ${className ?? ''}`} delay={320}>
-      <CardHead title="Your goals" note={baseline ? `since baseline · ${shortDay(baseline.created_at)}` : undefined} />
-      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="m-0 text-h3 font-normal">Your goals</h2>
+          <span className="text-[11px] text-ink-2">
+            {baseline ? `since baseline · ${shortDay(baseline.created_at)} · ` : ''}dashed: baseline · shaded: normal
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {onAsk ? (
+            <button type="button" onClick={onAsk} className={`${small} text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.14)] hover:bg-ink/5`}>
+              Ask about goals
+            </button>
+          ) : null}
+          <button type="button" onClick={onProgress} className={`${small} bg-selected text-inverse hover:bg-[#2a2a2a]`}>
+            See progress
+          </button>
+        </div>
+      </div>
+      <ul className="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
         {trends.slice(0, 3).map((t) => (
-          <li key={t.id} className="flex">
+          <li key={t.id} className="flex flex-1">
             <button
               type="button"
               onClick={() => onOpen(t.id)}
               aria-label={`${t.label}: ${t.line}. Open in the result.`}
               title={t.reading ?? undefined}
-              className="flex min-h-11 flex-1 items-center gap-2.5 rounded-[16px] squircle bg-ink/[.035] py-1.5 pr-3 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-14 max-h-24 flex-1 items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
             >
-              <span aria-hidden className="size-7 flex-none rounded-[10px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px]">{t.label}</span>
-                <span className="flex items-center gap-1.5 truncate text-[11px] text-ink-2">
+              <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[14px]">{t.label}</span>
+                <span className="flex items-center gap-1.5 truncate text-[12px] text-ink-2">
                   <span aria-hidden className={`flex-none ${t.kind === 'changed' ? 'text-signal' : ''}`}>
                     {VERDICT_WORDS[t.kind].glyph}
                   </span>
@@ -216,22 +234,13 @@ export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, classNa
               </span>
               {t.points.length > 1 ? (
                 <span className="hidden flex-none text-ink-2 @min-[380px]:block">
-                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={96} height={30} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
+                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={120} height={36} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
                 </span>
               ) : null}
             </button>
           </li>
         ))}
       </ul>
-      <div className="mt-auto flex flex-wrap items-center gap-1.5">
-        <Pill onClick={onProgress}>See progress</Pill>
-        {onAsk ? (
-          <Pill tone="outline" onClick={onAsk}>
-            Ask about my goals
-          </Pill>
-        ) : null}
-        <span className="ml-auto text-[11px] text-ink-2">Dashed: baseline · shaded: normal range</span>
-      </div>
     </HomeCard>
   )
 }
