@@ -29,11 +29,29 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
   const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
   const rows = sorted.slice(0, ROWS)
   const rest = sorted.slice(ROWS)
-  const note = baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
   return (
     <HomeCard label="What changed" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
-      <CardHead title="What changed" note={note} />
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="m-0 text-h3 font-normal">What changed</h2>
+          <span className="text-[11px] text-ink-2">
+            {baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)}
+            {rest.length ? ` · ${rest.length} more in the result` : ''}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {onAsk ? (
+            <button type="button" onClick={onAsk} className={`${small} text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.14)] hover:bg-ink/5`}>
+              Ask about this
+            </button>
+          ) : null}
+          <button type="button" onClick={onFull} className={`${small} bg-selected text-inverse hover:bg-[#2a2a2a]`}>
+            Full result
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col gap-1.5">
         {rows.map(({ m, kind }, i) => {
           const unit = m.value === null ? '' : unitOf(m).trim()
           return (
@@ -42,33 +60,24 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
               type="button"
               onClick={() => onOpen(m.id)}
               aria-label={`${METRIC_META[m.id].label}: ${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
-              className="flex min-h-11 animate-[wRise_.5s_both] items-center gap-2.5 rounded-[16px] squircle bg-ink/[.035] py-1.5 pr-3 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-14 max-h-24 flex-1 animate-[wRise_.5s_both] items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
               style={{ animationDelay: `${i * 70 + 120}ms` }}
             >
-              <span aria-hidden className="size-7 flex-none rounded-[10px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px]">{METRIC_META[m.id].label}</span>
-                <VerdictLine kind={kind} className="text-[11px] text-ink-2" />
+              <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-[14px]">{METRIC_META[m.id].label}</span>
+                <VerdictLine kind={kind} className="text-[12px] text-ink-2" />
               </span>
-              <span className="flex flex-none flex-col items-end">
+              <span className="flex flex-none flex-col items-end gap-0.5">
                 <span className="flex items-baseline gap-[3px]">
-                  <span className="font-dot text-[16px]">{fmtValue(m.value, m)}</span>
-                  {unit ? <span className="text-[10px] text-ink-2">{unit}</span> : null}
+                  <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
+                  {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
                 </span>
-                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[10.5px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}
+                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[11px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}
               </span>
             </button>
           )
         })}
-      </div>
-      <div className="mt-auto flex flex-wrap items-center gap-1.5">
-        <Pill onClick={onFull}>Full result</Pill>
-        {onAsk ? (
-          <Pill tone="outline" onClick={onAsk}>
-            Ask about this
-          </Pill>
-        ) : null}
-        {rest.length ? <span className="ml-auto text-[11.5px] text-ink-2">+{rest.length} more in the result</span> : null}
       </div>
     </HomeCard>
   )

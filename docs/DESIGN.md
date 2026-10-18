@@ -649,6 +649,6 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 
 ### Home: compact cards
 - Home cards are kept small and quiet: a bigger card is shrunk to match its neighbour, never the other way round. Product and measure rows are one line (name, a short status, a small chart), with no tally lines or long legends.
-- What changed: the three leading measures (changed first) with value and move against the baseline; the rest are one count.
+- What changed: the three leading measures (changed first) with value and move against the baseline; the rest are one count in the header. Its buttons sit in the header like Your goals, so the rows are taller.
 - Your goals replaced Recent: up to three goal measures as small trends against the person's normal range. The buttons and the chart legend sit in the header (no footer), so the rows can be taller. It leads the small-card row (where What changed used to be); What changed now sits beside Routine today. With no measured check-in after the baseline, Routine today takes its row.
 - Check-in card: the big number (days since baseline) sits middle-left; the title and subtext sit bottom-left and the Check in button bottom-right.
