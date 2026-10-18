@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pointer } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import { useMediaQuery } from '../../lib/useMediaQuery'
@@ -30,6 +30,8 @@ export function Calendar({
   onPrev,
   onNext,
   legend,
+  nudge,
+  hint,
 }: {
   /** YYYY-MM */
   month: string
@@ -49,9 +51,16 @@ export function Calendar({
   onNext: () => void
   /** Colour key content (opened from the dots button). */
   legend?: ReactNode
+  /** A session day that bounces now and then to show it can be opened (until the person has opened one). */
+  nudge?: string
+  /** A short line with a pointer icon under the month title, saying days can be opened. */
+  hint?: ReactNode
 }) {
   const compact = useMediaQuery('(max-width: 639px)')
   const [keyOpen, setKeyOpen] = useState(false)
+  // The bouncing day stops for good once a pointer or the keyboard reaches it; reduced motion never bounces.
+  const reduce = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const [reached, setReached] = useState(false)
   const [y, m] = month.split('-').map(Number)
   const first = new Date(y, m - 1, 1)
   const lead = (first.getDay() + 6) % 7
@@ -110,6 +119,12 @@ export function Calendar({
           </button>
         </div>
       </div>
+      {hint ? (
+        <p className="m-0 flex w-fit items-center gap-2 rounded-pill bg-sunken px-3.5 py-2 text-[13px] text-ink">
+          <Pointer size={15} aria-hidden />
+          {hint}
+        </p>
+      ) : null}
       <div aria-hidden className="grid grid-cols-7 gap-1.5">
         {week.map((w, i) => (
           <span key={i} className="text-center font-mono text-[10px] tracking-[.08em] text-ink-2">
@@ -136,7 +151,9 @@ export function Calendar({
                 aria-label={day.label}
                 aria-current={iso === current ? 'date' : undefined}
                 className={`${cell} ${tap} text-ink`}
-                style={{ ...delay, background: day.bg, boxShadow: iso === current ? '0 0 0 2px var(--bg-surface), 0 0 0 3.5px var(--text-primary)' : 'inset 0 0 0 1px rgba(255,255,255,.5), 0 10px 22px -16px rgba(0,0,0,.45)' }}
+                onPointerEnter={iso === nudge ? () => setReached(true) : undefined}
+                onFocus={iso === nudge ? () => setReached(true) : undefined}
+                style={{ ...delay, ...(iso === nudge && !reached && !reduce ? { animation: 'wDotIn .45s cubic-bezier(.2,.8,.2,1) backwards, wNudge 2.8s ease-in-out 1.6s infinite' } : {}), background: day.bg, boxShadow: iso === current ? '0 0 0 2px var(--bg-surface), 0 0 0 3.5px var(--text-primary)' : 'inset 0 0 0 1px rgba(255,255,255,.5), 0 10px 22px -16px rgba(0,0,0,.45)' }}
               >
                 <span className={`text-[clamp(12px,1.3vw,15px)] ${isToday ? 'font-semibold' : ''}`}>{d}</span>
                 {dotRow(day.dots)}
