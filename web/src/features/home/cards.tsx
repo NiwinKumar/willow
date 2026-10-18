@@ -162,7 +162,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
       <p className="m-0 -mt-1 text-[12.5px] leading-[1.35] text-ink-2 text-balance">{effectHeadline(effect.counts)}</p>
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {shown.map((r) => (
-          <li key={r.e.id} className={`flex min-w-0 flex-col gap-1.5 rounded-[18px] squircle py-1.5 pr-3 pl-2 ${r.flag ? 'bg-[#FFE3CF]/75' : 'bg-white/55'}`}>
+          <li key={r.e.id} className="flex min-w-0 flex-col gap-1.5 rounded-[18px] squircle bg-white/55 py-2 pr-2 pl-2">
             <div className="flex items-center gap-2.5">
               <ProductImage product={imageOf(r.e)} size={32} decorative />
               <span className="flex min-w-0 flex-1 flex-col">
@@ -180,14 +180,15 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
               ) : null}
             </div>
             {r.flag ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] leading-[1.35]">
-                <span className="min-w-0 flex-[1_1_160px]">
+              // Every row looks the same; a flag is a small note under the name (lined up with it), its button compact.
+              <div className="ml-[42px] flex items-center gap-2 rounded-[12px] bg-[#FFE3CF]/80 py-1.5 pr-1.5 pl-2.5">
+                <span className="line-clamp-2 min-w-0 flex-1 text-[11.5px] leading-[1.35]" title={r.flag.text}>
                   <span aria-hidden>△ </span>
                   {r.flag.text}
                 </span>
-                <Pill tone="outline" onClick={() => onAsk(r.flag!.question)}>
+                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-colors hover:bg-white">
                   Ask Wisp
-                </Pill>
+                </button>
               </div>
             ) : null}
           </li>
