@@ -142,6 +142,16 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                   </button>
                 </span>
               )
+              const productList = items.length ? (
+                <ul className={`m-0 flex list-none p-0 text-[12.5px] ${rows ? 'flex-wrap gap-1.5 @min-[700px]:flex-nowrap @min-[700px]:justify-end' : 'flex-wrap gap-1.5'}`}>
+                  {items.map((it) => (
+                    <li key={it.id} title={it.full} className="flex items-center gap-1.5 rounded-pill bg-white/[.12] py-0.5 pr-2.5 pl-0.5 whitespace-nowrap">
+                      {it.image}
+                      {it.name}
+                    </li>
+                  ))}
+                </ul>
+              ) : null
               return (
                 <article key={f.key} className={rows ? 'flex flex-col gap-2.5 rounded-[16px] bg-white/[.07] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-5' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
                   <div className={`flex min-w-0 flex-1 flex-col ${rows ? 'gap-1.5' : 'gap-3'}`}>
@@ -160,7 +170,9 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                             </span>
                           ) : null}
                         </span>
-                        <h3 className={`text-[15px] leading-[1.3] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
+                        <h3 className={`text-[15px] leading-[1.5] font-normal ${open ? '' : 'line-clamp-2'}`}>
+                          {f.title} {open ? <mark className="rounded-[4px] bg-[rgba(150,166,255,.34)] px-1 text-inverse [box-decoration-break:clone]">{f.fix}</mark> : null}
+                        </h3>
                       </div>
                       {phone ? (
                         <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12]">
@@ -168,25 +180,16 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                         </button>
                       ) : null}
                     </div>
-                    {open ? (
-                      <>
-                        {items.length ? (
-                          <ul className={`m-0 flex list-none flex-wrap p-0 text-[12.5px] ${rows ? 'gap-x-3.5 gap-y-1' : 'gap-x-4 gap-y-2'}`}>
-                            {items.map((it) => (
-                              <li key={it.id} title={it.full} className="flex items-center gap-2">
-                                {it.image}
-                                {it.name}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                        <p title={f.fix} className={`max-w-[64ch] text-[12.5px] leading-[1.45] ${MUTED} ${rows ? 'line-clamp-2' : ''}`}>
-                          {f.fix}
-                        </p>
-                      </>
-                    ) : null}
+                    {open && !rows ? productList : null}
                   </div>
-                  {open ? actions : null}
+                  {open && rows ? (
+                    <div className="flex flex-col gap-2.5 @min-[700px]:shrink-0 @min-[700px]:items-end @min-[700px]:self-stretch @min-[700px]:justify-between">
+                      {productList}
+                      {actions}
+                    </div>
+                  ) : open ? (
+                    actions
+                  ) : null}
                 </article>
               )
             })}
