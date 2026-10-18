@@ -297,7 +297,7 @@ function Goals() {
         <>
           {hint ? (
             <p role="status" className="m-0 self-start rounded-[14px] bg-selected px-3.5 py-2 text-[13px] text-inverse">
-              Three goals is the limit. Remove one to choose another.
+              Five goals is the limit. Remove one to choose another.
             </p>
           ) : null}
           <button type="button" onClick={next} className={primary}>

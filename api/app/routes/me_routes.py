@@ -221,7 +221,7 @@ Goal = Literal[
     "under_eye",
     "oil_glow",
 ]
-MAX_GOALS = 3
+MAX_GOALS = 5
 # Places a check-in walks through, chosen once in onboarding (web lib/places.ts). The forearms are
 # one choice in the app and two places here (treated and untreated arm).
 TrackPlace = Literal["cheek_macro", "nose_macro", "face_full", "forearm_treated", "forearm_control"]
