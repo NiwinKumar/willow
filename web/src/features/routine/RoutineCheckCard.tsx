@@ -10,20 +10,11 @@ import { SEVERITY_STYLE, compactName, entryName, imageOf, type Finding } from '.
 
 const SKELETON = 'linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.08) 100%)'
 const MUTED = 'text-[#D5D8FF]'
-const SHOWN = 4
+const SHOWN = 5
 const SEVERITY_RANK: Record<Finding['severity'], number> = { High: 0, Moderate: 1, Low: 2 }
 
-/**
- * Columns follow the number of findings and the card's own width (container queries), so no cell is left empty:
- * one finding is full width, two sit side by side, three go three across when there is room (else two with the
- * last one spanning), more stay in two with an odd last one spanning.
- */
-function gridClass(n: number) {
-  if (n <= 1) return 'grid-cols-1'
-  if (n === 2) return 'grid-cols-1 @min-[560px]:grid-cols-2'
-  if (n === 3) return 'grid-cols-1 @min-[560px]:grid-cols-2 @min-[860px]:grid-cols-3 @min-[560px]:@max-[859px]:[&>*:last-child]:col-span-2'
-  return `grid-cols-1 @min-[560px]:grid-cols-2${n % 2 ? ' @min-[560px]:[&>*:last-child]:col-span-2' : ''}`
-}
+/** One or two findings sit side by side as panels; three or more are a list of rows (no cells to leave empty). */
+const ROWS_FROM = 3
 
 /**
  * The compatibility check, first on the page and the only blue thing on it (design: "■ ROUTINE CHECK"): a
@@ -56,6 +47,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
   const sorted = [...findings].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
   const anyAi = findings.some((f) => f.ai)
   const shown = all ? sorted : sorted.slice(0, SHOWN)
+  const rows = sorted.length >= ROWS_FROM
   const title = count === 0 ? 'Do these work together?' : running ? 'Checking…' : failed ? 'The check didn’t finish' : done ? (findings.length ? `${findings.length} thing${findings.length > 1 ? 's' : ''} to look at` : 'Looks compatible') : 'Do these work together?'
   const sub = count === 0 ? 'Compares ingredient lists across your morning and evening products.' : `${count} product${count === 1 ? '' : 's'} checked. Runs again when your routine changes.`
 
@@ -128,66 +120,71 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
         </div>
       ) : done ? (
         <div className="flex flex-col gap-3">
-          <div className={`grid gap-3 ${gridClass(shown.length)}`}>
+          <div className={rows ? 'flex flex-col divide-y divide-white/10 border-t border-white/10' : `grid gap-3 ${shown.length === 2 ? '@min-[560px]:grid-cols-2' : ''}`}>
             {shown.map((f, i) => {
               const sev = SEVERITY_STYLE[f.severity]
               const open = !phone || openKey === f.key
               const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={26} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
+              const actions = (
+                <span className={`flex flex-wrap justify-end gap-2 ${rows ? '@min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto border-t border-white/10 pt-3'}`}>
+                  {f.find ? (
+                    <button type="button" onClick={() => onFind(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink">
+                      Find one
+                    </button>
+                  ) : null}
+                  {f.alternate && f.entries.length === 2 ? (
+                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink disabled:opacity-60">
+                      {alternating === f.key ? 'Saving…' : 'Alternate these'}
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-9 rounded-pill bg-white/[.16] px-3.5 text-[13px] whitespace-nowrap transition-colors hover:bg-white/[.26]">
+                    Ask Wisp why →
+                  </button>
+                </span>
+              )
               return (
-                <article key={f.key} className="flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" style={{ animation: `wRise .45s ${i * 70}ms both` }}>
-                  <div className="flex items-start gap-2.5">
-                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                      <span className="flex flex-wrap items-center gap-x-2 font-mono text-[10.5px] tracking-[.08em] text-[#C9CFFF]">
-                        <span>
-                          <span aria-hidden>{sev.glyph} </span>
-                          {f.severity.toUpperCase()}
-                          <span className="sr-only"> severity</span> · {f.kind.toUpperCase()}
-                        </span>
-                        {f.ai ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Sparkles size={11} strokeWidth={1.8} aria-hidden />
-                            AI SUGGESTION
+                <article key={f.key} className={rows ? 'flex flex-col gap-3 py-4 last:pb-0 @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-6' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <span className="flex flex-wrap items-center gap-x-2 font-mono text-[10.5px] tracking-[.08em] text-[#C9CFFF]">
+                          <span>
+                            <span aria-hidden>{sev.glyph} </span>
+                            {f.severity.toUpperCase()}
+                            <span className="sr-only"> severity</span> · {f.kind.toUpperCase()}
                           </span>
-                        ) : null}
-                      </span>
-                      <h3 className={`text-[15px] leading-[1.35] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
+                          {f.ai ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Sparkles size={11} strokeWidth={1.8} aria-hidden />
+                              AI SUGGESTION
+                            </span>
+                          ) : null}
+                        </span>
+                        <h3 className={`text-[15px] leading-[1.35] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
+                      </div>
+                      {phone ? (
+                        <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12]">
+                          <ChevronDown size={16} strokeWidth={1.8} aria-hidden className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+                        </button>
+                      ) : null}
                     </div>
-                    {phone ? (
-                      <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12]">
-                        <ChevronDown size={16} strokeWidth={1.8} aria-hidden className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-                      </button>
+                    {open ? (
+                      <>
+                        {items.length ? (
+                          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-[13px]">
+                            {items.map((it) => (
+                              <li key={it.id} title={it.full} className="flex items-center gap-2">
+                                {it.image}
+                                {it.name}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        <p className={`max-w-[60ch] text-[13px] leading-[1.5] ${MUTED}`}>{f.fix}</p>
+                      </>
                     ) : null}
                   </div>
-                  {open ? (
-                    <div className="flex flex-1 flex-col gap-3">
-                      {items.length ? (
-                        <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-[13px]">
-                          {items.map((it) => (
-                            <li key={it.id} title={it.full} className="flex items-center gap-2">
-                              {it.image}
-                              {it.name}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      <p className={`max-w-[56ch] text-[13px] leading-[1.5] ${MUTED}`}>{f.fix}</p>
-                      <span className="mt-auto flex flex-wrap justify-end gap-2 border-t border-white/10 pt-3">
-                        {f.find ? (
-                          <button type="button" onClick={() => onFind(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink">
-                            Find one
-                          </button>
-                        ) : null}
-                        {f.alternate && f.entries.length === 2 ? (
-                          <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink disabled:opacity-60">
-                            {alternating === f.key ? 'Saving…' : 'Alternate these'}
-                          </button>
-                        ) : null}
-                        <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-9 rounded-pill bg-white/[.16] px-3.5 text-[13px] transition-colors hover:bg-white/[.26]">
-                          Ask Wisp why →
-                        </button>
-                      </span>
-                    </div>
-                  ) : null}
+                  {open ? actions : null}
                 </article>
               )
             })}
