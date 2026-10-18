@@ -41,7 +41,7 @@ function resultLines(view: SessionView): [string, string, string, string] {
   const colour = !q.passed
     ? 'Skipped'
     : r.capture_mode === 'uncalibrated'
-      ? 'Skipped · quick photos have no colour reference'
+      ? 'Skipped · camera photos have no colour reference'
       : q.card_detected
         ? q.reasons.includes('card_delta_e_high')
           ? 'Card found, but its colours read off'
