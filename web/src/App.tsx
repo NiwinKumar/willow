@@ -94,7 +94,7 @@ export default function App() {
       <Toaster
         position="bottom-center"
         offset={104}
-        toastOptions={{ unstyled: true, classNames: { toast: 'flex items-center gap-3 rounded-pill bg-selected px-[22px] py-3.5 text-[14px] text-inverse shadow-[0_20px_40px_-16px_rgba(0,0,0,.5)] max-w-[calc(100vw-32px)]', actionButton: 'rounded-pill bg-cta px-3 py-1 text-ink text-[13px]' } }}
+        toastOptions={{ unstyled: true, classNames: { toast: 'flex items-center gap-3 rounded-[24px] bg-selected px-[22px] py-3.5 text-[14px] text-inverse shadow-[0_20px_40px_-16px_rgba(0,0,0,.5)] max-w-[calc(100vw-32px)]', actionButton: 'shrink-0 whitespace-nowrap min-h-9 rounded-pill bg-cta px-3.5 text-ink text-[13px]' } }}
       />
     </DataProvider>
   )
