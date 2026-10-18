@@ -11,10 +11,13 @@ const DAYS = ['2026-08-23', '2026-08-30', '2026-09-06', '2026-09-13', '2026-09-2
 const onResult = () => window.location.pathname.startsWith('/progress/')
 
 const checkIn = (k: number, caption: string): TourStep => ({ route: `/replay/${DAYS[k]}${k === 0 ? '?full=1' : ''}`, until: onResult, hold: 1400, caption })
+// Hold to compare, as she would: holding B flickers her baseline over this week's photo (useHoldCompare).
+const holdB = (type: 'keydown' | 'keyup') => () => void window.dispatchEvent(new KeyboardEvent(type, { key: 'b' }))
+const photo = 'css:[aria-label="Reference photo"] svg[role="img"]'
 const compare = (caption: string): TourStep[] => [
-  { target: 'text:Show baseline', action: 'click', hold: 400, caption },
-  { target: 'css:[aria-label="Reference photo"] svg[role="img"]', action: 'point', hold: 3200, caption: 'Her baseline flickers over this week’s photo, same framing: the quickest way to see a change.' },
-  { target: 'text:Show baseline', action: 'click', hold: 600, caption: 'Back to this week.' },
+  { target: photo, action: 'point', hold: 900, caption },
+  { target: photo, action: 'point', run: holdB('keydown'), hold: 3600, caption: 'She holds the photo: her baseline flickers over this week’s, same framing. The quickest way to see a change.' },
+  { run: holdB('keyup'), hold: 700, caption: 'She lets go: back to this week.' },
 ]
 const askWisp = (question: string, caption: string): TourStep[] => [
   { target: 'css:[aria-label="Wisp"]', action: 'click', hold: 900, caption: 'She has a question, so she opens Wisp.' },
