@@ -9,7 +9,7 @@ gcloud builds submit --config infra/cloudbuild.engine.yaml --substitutions=_TAG=
 gcloud run deploy willow-engine --image us-central1-docker.pkg.dev/$PROJECT_ID/willow/engine:<tag> --region us-central1 \
   --service-account sa-engine@$PROJECT_ID.iam.gserviceaccount.com \
   --no-allow-unauthenticated --cpu 2 --memory 4Gi --concurrency 1 \
-  --min-instances 0 --max-instances 3 --timeout 120
+  --min-instances 0 --max-instances 3 --timeout 300
 
 # api (env vars go in a file: ALLOWED_ORIGINS has commas and the service account has an @)
 gcloud run deploy willow-api --source api --region us-central1 \

@@ -51,7 +51,7 @@ uv run python -m app.cli analyze --site forearm_treated --mode calibrated_raw da
 ```
 The CLI accepts local paths; the API accepts `gs://` URIs. Both return the same JSON.
 
-Timeouts: the api waits up to 120 s. Target per request: < 20 s for 5 frames.
+Timeouts: the api waits up to 280 s (the engine's Cloud Run timeout is 300 s). Target per request: < 20 s for 5 frames.
 
 ### 2.1 AnalyzeRequest
 ```json

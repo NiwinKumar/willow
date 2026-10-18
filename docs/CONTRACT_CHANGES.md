@@ -102,3 +102,9 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Version: engine stays 0.4.0 (no existing number changes; new sites start their own baselines).
 - Impact: engine, schemas, api, web.
 - Approved by: [x] Harshini [x] Niwin (Oct 18)
+
+## 2026-10-19: Longer engine timeout (proposed by Niwin; api/infra only)
+- Why: cheek close-ups take over 120 s on the engine (2 CPU), so Cloud Run cut them off and every cheek check-in ended "did not finish".
+- Change: the api waits up to 280 s for `/v1/analyze` (was 120 s); the engine's Cloud Run request timeout is 300 s (was 120 s). No request or response change.
+- Impact: engine code none; schemas none; api and infra only.
+- Approved by: n/a (api and infra, both Niwin's)
