@@ -310,7 +310,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
         <div className={`grid items-stretch gap-3 ${told.length ? 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]' : ''}`}>
           <section
             aria-label="Day summary"
-            className="relative flex flex-col gap-5 overflow-hidden rounded-[48px] p-[clamp(24px,4vw,44px)] text-ink squircle"
+            className="relative flex flex-col justify-between gap-4 overflow-hidden rounded-[44px] p-[clamp(20px,2.6vw,32px)] text-ink squircle"
             style={{
               background: heroBg,
               boxShadow: `inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 90px rgba(255,255,255,.35), 0 40px 80px -50px ${heroGlow}`,
@@ -322,9 +322,10 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 <NotesButton session={primary} notes={notes} />
               </div>
             </div>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] items-end gap-6">
-              <div className="flex min-w-0 flex-col gap-4">
-                <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,48px)] leading-[.9] font-normal tracking-[-0.01em]">
+            {/* The count sits beside the chips, its foot level with the last one: no row of its own. */}
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+              <div className="flex min-w-0 flex-col gap-3">
+                <h1 className="m-0 font-serif text-[clamp(30px,3vw,42px)] leading-[.9] font-normal tracking-[-0.01em]">
                   {date.toLocaleDateString('en-GB', { weekday: 'long' })},
                   <br />
                   <span className="italic">
@@ -336,16 +337,16 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 </h1>
                 <div className="flex flex-col items-start gap-1.5">
                   {chips.map((ch) => (
-                    <span key={ch.t} className="flex min-h-[34px] items-center gap-[7px] rounded-pill bg-white/60 px-[13px] text-[13px]">
+                    <span key={ch.t} className="flex min-h-[30px] items-center gap-[7px] rounded-pill bg-white/60 px-3 text-[12.5px]">
                       {ch.g ? <VerdictGlyph kind={ch.g} way={ch.way} /> : <span aria-hidden>○</span>}
                       {ch.t}
                     </span>
                   ))}
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1.5 justify-self-end text-right">
-                <span className="font-dot text-[clamp(62px,6.5vw,84px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
-                <span className="max-w-[220px] text-[15px]">{bigLabel}</span>
+              <div className="ml-auto flex flex-col items-end gap-1.5 text-right">
+                <span className="font-dot text-[clamp(52px,5vw,72px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
+                <span className="max-w-[190px] text-[13.5px] leading-[1.3]">{bigLabel}</span>
               </div>
             </div>
           </section>
