@@ -122,7 +122,8 @@ function StepFrame({ eyebrow, title, sub, aside, children, actions, wide }: { ey
         </div>
         {aside}
       </div>
-      <div className="no-scrollbar -mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-2 sm:flex-initial">{children}</div>
+      {/* room on every side for a hovered card to lift and grow (w-lift-sm: up 4 px, 1% larger) without the scroll box clipping it */}
+      <div className="no-scrollbar -mx-3 -mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-3 sm:flex-initial">{children}</div>
       <div className="flex flex-col gap-2 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))]">{actions}</div>
     </main>
   )
@@ -296,7 +297,7 @@ function Goals() {
         <>
           {hint ? (
             <p role="status" className="m-0 self-start rounded-[14px] bg-selected px-3.5 py-2 text-[13px] text-inverse">
-              Three goals is the limit. Remove one to choose another.
+              Five goals is the limit. Remove one to choose another.
             </p>
           ) : null}
           <button type="button" onClick={next} className={primary}>
