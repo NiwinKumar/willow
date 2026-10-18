@@ -66,63 +66,6 @@ export type SessionView = {
   explanation: Explanation | null
 }
 
-/** Spot diary (GET /v1/spots, api/app/tracks.py): each mark followed across face sessions by its
- * place on the face. Sessions are the columns, oldest first; tracks only lists confirmed marks. */
-export type SpotZone =
-  | 'forehead'
-  | 'nose'
-  | 'right_cheek'
-  | 'left_cheek'
-  | 'around_mouth'
-  | 'chin'
-  | 'right_jaw'
-  | 'left_jaw'
-/** How a mark looked: from Gemini's AI-suggested label, else from the engine's kind (red or dark). */
-export type SpotStage = 'bump' | 'clogged_pore' | 'mark' | 'red_spot' | 'dark_spot'
-export type SpotStatus = 'new' | 'still_there' | 'fading' | 'not_seen_last_time' | 'gone'
-export type SpotSighting = {
-  session_id: string
-  candidate_id: string
-  stage: SpotStage
-  label: string | null
-  kind: 'blemish' | 'spot'
-  diameter_mm: number | null
-  /** How much it stands out from the skin around it (a* for red marks, L* for dark ones). */
-  contrast: number
-  /** In that session's photo pixels (the photo_url of its column). */
-  bbox: [number, number, number, number] | null
-  crop_url: string | null
-  context_crop_url: string | null
-}
-export type SpotTrack = {
-  id: string
-  zone: SpotZone | null
-  /** Place on the canonical face, mm: x < 0 is the subject's right, y up (0,0 about the nose bridge). */
-  x_mm: number
-  y_mm: number
-  status: SpotStatus
-  confirmed: boolean
-  /** Already there at the first session: when it started is unknown. */
-  there_from_start: boolean
-  first_seen_session: string
-  last_seen_session: string
-  first_seen_index: number
-  last_seen_index: number
-  /** Gone: visible at least / at most this many days. Still there: at least, at_most null. */
-  days_visible: { at_least: number; at_most: number | null }
-  came_back: boolean
-  earlier_track: string | null
-  observations: SpotSighting[]
-}
-export type SpotZoneSummary = {
-  zone: SpotZone
-  visible_now: number
-  appeared: number
-  faded: number
-  came_back: number
-  /** Only once 3+ marks here have faded; null before that. */
-  typical_days_visible: { at_least: number; at_most: number; from: number } | null
-}
 /** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
  * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
  * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
@@ -133,20 +76,6 @@ export type MetricStory = {
   source: 'gemini' | 'facts'
   products: { name: string; brand: string; use: { days_used: number; of_days: number } | null }[]
   has_previous: boolean
-}
-
-export type SpotDiary = {
-  sessions: { id: string; created_at: string; day: number; photo_url: string | null; marks: number }[]
-  tracks: SpotTrack[]
-  /** Seen once in a one-photo session and not since: not shown (could be grain or a glint). */
-  unconfirmed: number
-  zones: SpotZoneSummary[]
-  sessions_used: number
-  days_covered: number
-  /** 3+ usable sessions over 2+ days. */
-  enough_data: boolean
-  /** Passed front-view sessions measured before the face map existed (re-measuring adds them). */
-  sessions_not_mapped: number
 }
 
 /** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */
@@ -451,7 +380,6 @@ export const api = {
   /** Claim drafts for one channel (api proof_ai.claims): sign-in, 30 a day; 429 `daily_limit`. */
   retailerClaims: (token: string, productId: string, body: { channel: RetailerClaimChannel } & RetailerFilters) =>
     request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }),
-  spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),

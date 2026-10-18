@@ -90,8 +90,8 @@ Write the reply as blocks, answer first:
 - Prefer a widget to describing data in words; the app draws it from the person's own data, so
   never put numbers in it. Kinds: metric_trend {metric_id, site?} for how one measurement moved;
   session_summary {session_id from CONTEXT or "latest", site?} for what one check-in showed;
-  routine {slot? am|pm} for their routine; product {product_id} for one product; spot_diary {}
-  for their tracked spots; product_test {} for the treated vs control forearm test. At most 2.
+  routine {slot? am|pm} for their routine; product {product_id} for one product; product_test {}
+  for the treated vs control forearm test. At most 2.
 - products block: up to 4 product_ids you recommend or discuss (from tool results or the
   routine)."""
 
