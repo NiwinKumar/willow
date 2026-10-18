@@ -50,6 +50,8 @@ cd web && npm install && npm run dev
 ```
 `web/.env.local` (never committed): `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`, `VITE_API_URL`.
 
+Keeping a local api away from the project's Firestore: **without the Firestore emulator (it needs Java), a local api writes to the real project's Firestore**, whatever `AUTH_MODE` says. `DEV_STORE=memory` (only with `AUTH_MODE=dev`) keeps everything in that process's memory instead and starts with one demo campaign for the dev account (`e2e_local`) that has ten days of delivery and a measured holdout (`api/app/dev_seed.py`), so the campaign page has real-shaped data to draw. It resets on every restart. Use it for any local run that creates campaigns, shoppers or events: `AUTH_MODE=dev DEV_STORE=memory ENGINE_MODE=fixture uv run uvicorn app.main:app --port 8080`.
+
 Reminders locally: with `AUTH_MODE=dev`, `curl -X POST localhost:<port>/v1/internal/reminders` runs one scheduler pass. Web Push needs a browser that allows notifications (headless Chrome denies them) and, on iPhone/iPad, Willow added to the Home Screen (iOS 16.4+). The service worker is `web/public/sw.js` (notifications only, no caching).
 
 ## Testing strategy

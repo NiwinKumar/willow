@@ -1,32 +1,26 @@
-# Willow Proof: retail brand (owner: Niwin)
+# Proof by Willow: retail brand (owner: Niwin)
 
-Willow Proof is the retail and brand side of Willow: the dashboard at `/retail/*` that shows which products are linked to a measured, held change for real people (or the labelled synthetic cohort). Descriptor: **Retail intelligence by Willow**. It is a sub-brand. It always reads as Willow, uses Willow's tokens, and never introduces a new data colour. The shopper app and the website stay Willow (favicon included).
+Proof by Willow (earlier "Willow Proof") is the retail and brand side of Willow: the dashboard at `/retail/*` that shows which products are linked to a measured, held change for real people (or the labelled synthetic cohort). Descriptor: **Retail intelligence**. It is a sub-brand. It wears Willow's own logo and always reads as Willow, uses Willow's tokens, and never introduces a new data colour. The shopper app and the website stay Willow (favicon included).
 
 Code: `web/src/features/retail/brand/` (`ProofMark`, `ProofWordmark`, `ProofLockup`), static mark `web/public/proof-mark.svg`, tokens at the end of `web/src/styles/tokens.css`, Tailwind mapping in `web/src/index.css` (`--color-proof-*`, `--text-proof-*`).
 
 ## Name and voice
-- Written "Willow Proof" in running text; the wordmark is lowercase "willow" (Outfit 300, as the consumer logo) + "Proof" (Instrument Serif). Never "WillowProof", "Proof by Willow" or "PROOF". Inside the app the top bar shows the mark and "Proof" in Geist; the full wordmark stays for the website and decks.
-- Page titles: `<Section> · Willow Proof` (Overview, Products, Customers, Market, Campaigns, Explore).
+- The name is **Proof by Willow** (Oct 19; it was "Willow Proof"). In running text write "Proof by Willow", and just "Proof" once the context is clear. Never "WillowProof" or "PROOF". The logo is Willow's own (the frosted tulip bud, `LogoMark`), not a separate Proof mark. Inside the app the top bar shows that logo with "Proof" (semibold) and "by Willow" (quieter) in Geist; the "by Willow" half hides on phones.
+- Page titles: `<Section> · Proof by Willow` (Overview, Products, Customers, Market, Campaigns, Explore).
 - Voice: the same as Willow (DESIGN.md "Voice"), tuned for a buyer: lead with the answer in one line, then the evidence. Every rate carries its n; intervals where the api sends them; "Fewer than 10 people" where suppressed. Cosmetic language only; "associated with", never "causes". No "better/worse skin", no lightness ranking.
 
-## The mark
-A willow-900 squircle (32-unit grid, corner 9) holding three things from the product itself:
-1. **The noise band**: a pale horizontal band (y 17-23), the same band Willow draws under every metric. Dashed edges at 24 px and up.
-2. **A short tick arm** starting inside the band, in willow-leaf.
-3. **The long arm as a willow leaf** leaving the band upward, filled leaf to leaf-hi, with a midrib at 24 px and up.
-
-Read together: a check mark whose rising stroke is a willow leaf that clears the noise band. That is the claim of the product: a change only counts when it leaves your own noise band. The mark is never animated, recoloured, outlined, or set on a busy image.
+## The logo
+Proof uses Willow's logo unchanged: the frosted tulip bud in its round ground (`components/willow/Logo.tsx`, `LogoMark`). `ProofMark` is that component. The earlier check-and-noise-band mark (Oct 16) is retired, and `public/proof-mark.svg` is removed. Never recolour, outline or animate the logo.
 
 ## Lockups
 | Lockup | Use | Component |
 |---|---|---|
-| Mark alone | Collapsed nav, mobile sheet footer, app icon contexts | `<ProofMark size />` |
-| Horizontal (mark + wordmark) | Top bar (22 px), compact headers | `<ProofLockup size />` |
-| With descriptor ("Retail intelligence by Willow") | Website footer, about panels, decks | `<ProofLockup size descriptor />` |
+| Logo alone | Collapsed nav, phone top bar | `<ProofMark size />` |
+| Logo + "Proof by Willow" | Top bar (26 px), compact headers | `<ProofLockup size />` |
+| With descriptor ("Retail intelligence") | Website footer, about panels, decks | `<ProofLockup size descriptor />` |
 
-- **Clear space**: a quarter of the mark size on every side; nothing (text, rules, controls) inside it.
-- **Minimum sizes**: mark 16 px alone (band edges and midrib drop out below 24 px automatically); 20 px mark in any lockup (the component clamps to 20).
-- On light surfaces (the website) the wordmark follows `text-ink` and the mark keeps its own dark ground, so the same component works on both themes.
+- **Clear space**: a quarter of the logo size on every side. **Minimum size**: 20 px in any lockup.
+- The name follows `text-ink` (and `text-ink-2` for "by Willow"), so it works on both themes; the logo keeps its own ground.
 
 ## Look (round 2, Oct 16): Vercel's Geist language, Willow's leaf
 Round 1 read as cluttered and "vibe-coded" (serif titles, dot-matrix KPIs, mono labels, eyebrows, a yellow chip on every panel). Round 2 follows Vercel's Geist system: white or near-black canvas, hairline borders, one sans family, hierarchy from size, weight and space, one accent. Willow's flair is the leaf-green accent and the Proof mark.
@@ -84,3 +78,16 @@ Spacing: page column 1200 px; 32 px between page zones, 24 px between panels, 20
 - Controls: `Tabs` (underline, optional count), `Segmented`, `Select`, `SearchField`, `Combobox`, `SidePanel`; states `EmptyState` / `ErrorState` (one action) and skeletons drawn to the final layout.
 - Helpers: `ui/format.ts` (`pct`, `pts`, `int`, `interval`, `MIN_GROUP`, `downloadCsv`, `copyText`), `ui/insight.ts` (`briefHref`, `cardFigure`, `topUnmet`, `strongestWinner`, `brandLeaders`, `wilson`).
 - The shopper preview in Campaigns draws the consumer card with `data-theme="light"` (Willow's own light tokens), so it is the real card, never a restyled copy.
+
+## Widgets (`web/src/features/retail/ui/widgets/`)
+Data-viz cards for Overview and the product page. They are Proof panels: surface, hairline border, text tokens, leaf accent, so they follow the light and dark themes like every other panel (no fixed palettes, no glow or gradient cards). Colour only carries meaning: leaf = a visible change / the product, blue = a second group, amber = a caution or people still waiting, grey = the rest. Each widget takes the numbers it draws as props and owns its hover, keyboard and screen-reader behaviour (a visually hidden table mirrors every chart); they size by container query, draw in once and respect reduced motion. Real aggregates only: the sections work the numbers out, no widget has sample data.
+- `GlowStat` (scrubbable curve, monotone cubic that never overshoots the data), `ProgressTile`, `RankList`, `PillStack`, `LineWidget`, `ScrubBars`, `PillColumns` (with a goal select), `TickGauge` (the callout only shows when there is room), `RingStack`, `DotMatrix`, `RadialTile`.
+- `FlowChart`: a Sankey drawn as a tree (each group splits once, so no band crosses another) on one people-per-pixel scale. Hover or focus a group and its path lights; the line above reads it in words. A dashed stub marks a group with a part under 10 people that is left out.
+- `StreamChart`: the design's stream ("Users reaching a real change"): nested running-total bands from a hairline at the left to full width at the right, a glow under the outer band, three tick lines with a pill above (the outer total) and below (the day); a hidden table lists every day. Used by the campaign page.
+- `BlobRadial`: the design's radial ("Goal demand by month"): one axis per category, soft closed Catmull-Rom shapes per layer from r 100 outwards, guide rings at the peak and half of it, category names around, a dotted number in the hollow centre (Doto). Needs three or more axes. Used by the campaign page.
+- Overview board (`sections/overview/Board.tsx`), one screen on a 1440 x 900 window (compact cards, 16 px padding, 12 px gaps, no card taller than it needs): row 1 the spotlight (product, figures, a small curve, the Proof pipeline as a strip along its foot, View proof / Promote) beside the market curve "Visible change by week 8" (8 + 4 columns); row 2 three equal tiles: catalog by proof, still using, no visible change yet (a brand workspace shows its own rate against the market instead); row 3 goals people chose (7) beside the top brands (5); then the brief and top products. Below 1024 px the rows stack.
+- Product journey (`sections/ProductJourney.tsx`, product page, measured products only): Started -> Week 8 reading -> Outcome -> Still using? -> How it feels. Non-users with the same goals are one group "from the market" with no outcome of their own (their outcome is the comparison in the figures above; a non-user does not "see a change" from the product). "Not effective" is worded "No visible change". Repeat purchases are not tracked, so the chart stops at "Still using" and says so.
+- Product page (`sections/ProductDetail.tsx`), top to bottom: a slim facts strip (visible change, time to change, still using, share of routines, rank, and the non-user baseline the Proven tier is measured against); then the journey chart as the main item (8 columns) beside a rail of the small Proof pipeline and Where it works (4); Next steps as a strip of up to three cards; the evidence (claim-ready statements beside the category comparison and routine context); claim drafts; how it feels. Only the journey chart is large; everything else is sized by how much a retailer needs it, and each row is balanced so no column leaves a gap. The chart fits its column (no scrollbar; it scrolls sideways only on a phone, with a hint).
+
+## Campaign page
+`/retail/campaigns/:id` (`sections/CampaignDashboard.tsx`) is a page, not a side panel: breadcrumb and header (packshot, name, status badge, day of the run, actions), a three-cell `KpiStrip` (the only numbers that get a tile), then an 8/4 row (the insight sentence over the `StreamChart`; the 100-dot with-vs-without panel) and a 5/7 row (where it works, the `BlobRadial`; who it reaches). Both charts are ported from the Retail design's own geometry (`design-from-claude-design/Willow Retail.dc.html`: `flow` and `polar`), recoloured to one leaf accent in light and dark; the stream bleeds to the card edges (`-mx-5`). the dot panel uses leaf for the group that could see the card and grey for the holdout. One accent, no per-panel data chips. Insight words come from pure helpers (`campaignInsight`, `ownRecordInsight`, `cumulativeDays`, `boostedAdds`, `runDay`) in `features/retail/promote.ts`, tested in `web/tests/promote.test.ts`.

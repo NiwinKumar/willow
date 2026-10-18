@@ -797,7 +797,17 @@ export type RetailerProductDetail = RetailerHead & {
   eligibility: { eligible: boolean; tier: RetailerProofTier; reasons: string[]; goals: string[]; skin_types: string[] }
   /** How it feels to the people using it (self-reported, shown next to the measurements); null under 10 people. */
   feel?: RetailerFeel | null
+  /** Absent on an api build older than the journey; null when the product has no measured outcome. */
+  journey?: RetailerJourney | null
 }
+/**
+ * How people move through one product (api retail_intel._journey): a tree of real counts, each group split once
+ * into its own parts, so a link is always people (never two separate totals drawn as an overlap). Users flow
+ * left to right in `col`s 0-4 beside a "non" lane of non-users with the same goals. A part under 10 people is
+ * left out with the part that would give it back; its parent says `more`. Null when nothing is measured.
+ */
+export type RetailerJourneyNode = { id: string; col: number; label: string; lane: 'users' | 'non'; n: number; more: boolean }
+export type RetailerJourney = { weeks: number; nodes: RetailerJourneyNode[]; links: { source: string; target: string; n: number }[] }
 export type RetailerFeelVerdict = 'working' | 'unsure' | 'not_for_me'
 export type RetailerFeelTag = { tag: string; label: string; good: boolean; n: number; share: number }
 /**

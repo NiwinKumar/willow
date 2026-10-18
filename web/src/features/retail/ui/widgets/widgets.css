@@ -1,0 +1,742 @@
+/*
+ * Willow Proof widgets: the data-viz cards of the retail screens (docs/RETAIL_BRAND.md "Widgets").
+ * They wear Proof's own tokens (neutral surface, hairline border, text tokens, leaf accent), so they follow the
+ * light and dark themes like every other panel. Colour carries meaning only: leaf = a visible change / the
+ * product, blue = a second group, amber = a caution, grey = the rest. Charts draw in SVG; text stays HTML where it can.
+ * Motion: one draw-in when a card mounts, then only motion that answers a hover, a key press or a pick.
+ */
+.wg {
+  --wg-bg: var(--bg-surface);
+  --wg-fg: var(--text-primary);
+  --wg-fg2: var(--text-secondary);
+  --wg-edge: var(--line-subtle);
+  --wg-hair: var(--line-subtle);
+  --wg-track: var(--bg-sunken);
+  --wg-track2: var(--bg-muted);
+  --wg-acc: var(--proof-leaf);
+  --wg-acc-soft: var(--proof-leaf-soft);
+  --wg-blue: var(--pf-blue);
+  --wg-amber: var(--pf-amber-fill);
+  --wg-red: var(--pf-red);
+  --wg-grey: var(--pf-base);
+  --wg-menu-bg: var(--bg-sunken);
+  --wg-menu-fg: var(--text-primary);
+  --wg-focus: var(--focus-ring);
+  --wg-pad: 16px;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  padding: var(--wg-pad);
+  border-radius: var(--radius-sm);
+  background: var(--wg-bg);
+  color: var(--wg-fg);
+  box-shadow: inset 0 0 0 1px var(--wg-edge);
+  font-variant-numeric: tabular-nums;
+}
+.wg *:focus-visible {
+  outline: 2px solid var(--wg-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ───── shared type and chrome ───── */
+.wg-head {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+.wg-title {
+  margin: 0;
+  padding-top: 4px;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  color: var(--wg-fg);
+}
+.wg-cap {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--wg-fg2);
+}
+.wg-menu {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--wg-edge);
+  border-radius: var(--radius-xs);
+  background: var(--wg-menu-bg);
+  color: var(--wg-menu-fg);
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform .15s ease, opacity .15s ease;
+}
+.wg-menu:hover {
+  background: var(--wg-track2);
+}
+.wg-big {
+  font-weight: 500;
+  letter-spacing: -.04em;
+  line-height: .95;
+}
+.wg-unit {
+  font-weight: 400;
+  letter-spacing: -.02em;
+  color: var(--wg-fg2);
+}
+.wg-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.wg-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wg-edge);
+  background: var(--wg-track);
+  color: var(--wg-fg2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ───── glow stat ───── */
+.wg-glow {
+  padding-bottom: 0;
+}
+.wg-glow-body {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 4px 8px;
+  margin: 0 calc(-1 * var(--wg-pad));
+  padding: 0 var(--wg-pad);
+}
+.wg-glow-copy {
+  display: flex;
+  flex: 0 1 270px;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-bottom: var(--wg-pad);
+}
+.wg-glow-chart {
+  flex: 1 1 280px;
+  min-width: 0;
+  margin: 0 calc(-1 * var(--wg-pad)) 0 0;
+  align-self: flex-end;
+}
+.wg-glow-chart svg {
+  display: block;
+  overflow: visible;
+}
+.wg-glow-sub {
+  max-width: 250px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--wg-fg2);
+}
+.wg-glow-sub b {
+  font-weight: 600;
+  color: var(--wg-fg);
+}
+@container (max-width: 520px) {
+  .wg-glow-chart {
+    margin-right: calc(-1 * var(--wg-pad));
+    flex-basis: 100%;
+  }
+  .wg-glow-copy {
+    flex-basis: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 0;
+  }
+  .wg-glow-sub {
+    max-width: none;
+  }
+}
+
+/* ───── progress tile ───── */
+.wg-progress {
+  min-height: 150px;
+  justify-content: space-between;
+}
+.wg-progress-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ───── rank list ───── */
+.wg-rank {
+  gap: 8px;
+}
+.wg-rank-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wg-rank-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 27px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--wg-fg2);
+  text-decoration: none;
+  opacity: calc(1 - var(--i) * .11);
+  transition: opacity .2s ease, color .2s ease;
+}
+.wg-rank-row[data-on] {
+  color: var(--wg-fg);
+}
+.wg-rank-list:hover .wg-rank-row,
+.wg-rank-list:focus-within .wg-rank-row {
+  opacity: 1;
+}
+a.wg-rank-row:hover {
+  color: var(--wg-fg);
+}
+.wg-rank-row > span:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.wg-rank-row .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-rank-row .v {
+  font-weight: 500;
+  color: var(--wg-fg);
+}
+.wg-rank-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--wg-acc);
+}
+
+/* ───── pill stack ───── */
+.wg-stack {
+  gap: 12px;
+}
+.wg-stack-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.wg-stack-val {
+  font-size: 26px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+  text-align: right;
+  white-space: nowrap;
+}
+.wg-stack-track {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-height: 52px;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  background: var(--wg-track);
+}
+.wg-stack-pill {
+  position: relative;
+  flex: var(--v) 1 0;
+  min-width: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wg-acc);
+  opacity: .55;
+  cursor: pointer;
+  transition: background .18s ease, flex-grow .3s cubic-bezier(.2, .7, .2, 1);
+  transform-origin: bottom;
+  animation: wgRiseY .7s cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(var(--i) * 55ms);
+}
+.wg-stack-pill[data-on] {
+  opacity: 1;
+}
+.wg-stack-pill[data-on]::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 4px;
+  min-width: 4px;
+  max-width: 4px;
+  border-radius: 999px;
+  background: var(--wg-bg);
+}
+@container (max-width: 300px) {
+  .wg-stack-pill[data-on]::after {
+    right: 50%;
+    translate: 2px 0;
+  }
+}
+
+/* ───── line widget ───── */
+.wg-line {
+  min-height: 180px;
+  gap: 8px;
+}
+.wg-line-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.wg-line-val {
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+}
+.wg-line-read {
+  min-height: 18px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wg-fg2);
+}
+.wg-line-read b {
+  font-weight: 500;
+  color: var(--wg-fg);
+}
+.wg-line-plot {
+  flex: 1;
+  min-height: 150px;
+  touch-action: pan-y;
+}
+
+/* ───── scrub bars ───── */
+.wg-bars {
+  min-height: 180px;
+  gap: 10px;
+}
+.wg-bars-plot {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 150px;
+  margin: 0 calc(-1 * var(--wg-pad)) calc(-1 * var(--wg-pad));
+  padding: 34px var(--wg-pad) 0;
+}
+.wg-bars-col {
+  position: relative;
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-width: 3px;
+  max-width: 22px;
+  align-items: flex-end;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.wg-bars-col i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--wg-acc);
+  transform-origin: bottom;
+  animation: wgRiseY .8s cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(var(--i) * 28ms);
+  transition: background .2s ease;
+}
+.wg-bars-col[data-after] i {
+  background: var(--wg-track2);
+}
+.wg-bars-flag {
+  position: absolute;
+  bottom: 0;
+  z-index: 1;
+  width: 1px;
+  background: var(--wg-fg);
+  pointer-events: none;
+  transition: left .18s ease, height .18s ease;
+}
+.wg-bars-flag span {
+  position: absolute;
+  bottom: 100%;
+  left: 3px;
+  padding: 0 0 4px;
+  font-size: 20px;
+  line-height: 26px;
+  letter-spacing: -.02em;
+  font-weight: 500;
+  color: var(--wg-fg);
+  white-space: nowrap;
+}
+.wg-bars-ref {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  height: 0;
+  border-top: 1px dashed var(--line-strong);
+  pointer-events: none;
+  transition: bottom .18s ease;
+}
+
+/* ───── pill columns ───── */
+.wg-cols {
+  gap: 10px;
+}
+.wg-cols-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wg-cols-val {
+  flex: none;
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: 500;
+  letter-spacing: -.035em;
+}
+.wg-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.wg-select select {
+  height: 32px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--wg-edge);
+  border-radius: var(--radius-xs);
+  background: var(--wg-bg);
+  color: var(--wg-fg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.wg-select svg {
+  position: absolute;
+  right: 11px;
+  pointer-events: none;
+  color: var(--wg-fg2);
+}
+.wg-cols-plot {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 30px repeat(var(--n), minmax(0, 1fr));
+  grid-template-rows: 1fr auto;
+  gap: 0 4px;
+  min-height: 100px;
+}
+.wg-cols-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 0 2px;
+  font-size: 11px;
+  line-height: 12px;
+  color: var(--wg-fg2);
+  text-align: left;
+}
+.wg-cols-col {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.wg-cols-track {
+  position: relative;
+  width: min(100%, 18px);
+  height: 100%;
+  border-radius: 999px;
+  background: var(--wg-track);
+  transition: background .18s ease;
+}
+.wg-cols-col[data-on] .wg-cols-track,
+.wg-cols-col:hover .wg-cols-track {
+  background: var(--wg-track2);
+}
+.wg-cols-fill {
+  position: absolute;
+  inset: auto 0 0;
+  min-height: 18px;
+  border-radius: 999px;
+  background: var(--wg-acc);
+  transform-origin: bottom;
+  animation: wgRiseY .8s cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(var(--i) * 45ms);
+  transition: height .45s cubic-bezier(.2, .7, .2, 1);
+}
+.wg-cols-lab {
+  padding-top: 8px;
+  font-size: 11px;
+  line-height: 13px;
+  text-align: center;
+  color: var(--wg-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-cols-lab[data-on] {
+  font-weight: 600;
+}
+.wg-cols-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 3;
+  translate: -50% 0;
+  padding: 5px 9px;
+  border-radius: var(--radius-xs);
+  background: var(--action-primary);
+  color: var(--text-inverse);
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ───── tick gauge ───── */
+.wg-gauge-row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wg-gauge-copy {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.wg-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  line-height: 14px;
+}
+.wg-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wg-legend i {
+  display: block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+.wg-gauge-plot {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.wg-gauge-plot svg {
+  display: block;
+  width: 100%;
+  max-width: 176px;
+  overflow: visible;
+}
+.wg-tick {
+  animation: wgTick .5s ease both;
+  animation-delay: calc(var(--i) * 9ms);
+}
+
+/* ───── rings ───── */
+.wg-rings {
+  min-height: 200px;
+  gap: 10px;
+}
+.wg-rings-plot svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.wg-ring-arc {
+  transition: opacity .2s ease;
+}
+.wg-ring-arc path.v {
+  stroke-dasharray: 1;
+  animation: wgDraw 1s cubic-bezier(.2, .7, .2, 1) both;
+  animation-delay: calc(var(--i) * 120ms);
+}
+
+/* ───── dot matrix ───── */
+.wg-dots {
+  gap: 12px;
+}
+.wg-dots-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wg-dots-val {
+  font-size: 26px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+}
+.wg-dots-grid {
+  display: grid;
+  flex: 1;
+  align-content: center;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: 5px;
+}
+.wg-dot {
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: var(--wg-track);
+  box-shadow: inset 0 0 0 1px var(--wg-edge);
+}
+.wg-dot[data-on] {
+  background: var(--wg-dot, var(--wg-acc));
+  box-shadow: none;
+  animation: wgPop .45s cubic-bezier(.2, .9, .3, 1.4) both;
+  animation-delay: calc(var(--i) * 12ms);
+}
+
+/* ───── radial tile ───── */
+.wg-radial {
+  min-height: 170px;
+  gap: 8px;
+}
+.wg-radial-plot {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+}
+.wg-radial-plot svg {
+  display: block;
+  width: min(100%, 150px);
+  height: auto;
+}
+
+/* ───── flow chart ───── */
+.wg-flow {
+  flex: 1;
+  gap: 12px;
+}
+.wg-flow-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--wg-pad));
+  padding: 0 var(--wg-pad) 4px;
+}
+.wg-flow-scroll::-webkit-scrollbar {
+  display: none;
+}
+.wg-flow-t {
+  paint-order: stroke;
+  stroke: var(--wg-bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.wg-flow-node {
+  cursor: default;
+}
+.wg-flow-node:focus-visible rect:first-of-type {
+  stroke: var(--wg-focus);
+  stroke-width: 2;
+}
+.wg-wipe {
+  animation: wgWipe 1s cubic-bezier(.2, .7, .2, 1) both;
+}
+
+@keyframes wgWipe {
+  from { clip-path: inset(0 100% 0 0) }
+  to { clip-path: inset(0 0 0 0) }
+}
+@keyframes wgRiseY {
+  from { scale: 1 0 }
+  to { scale: 1 1 }
+}
+@keyframes wgDraw {
+  from { stroke-dashoffset: 1 }
+  to { stroke-dashoffset: 0 }
+}
+@keyframes wgTick {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+@keyframes wgPop {
+  from { scale: .2; opacity: 0 }
+  to { scale: 1; opacity: 1 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wg *,
+  .wg *::before,
+  .wg *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ───── stream chart (campaign page) ───── */
+.wg-stream-in {
+  animation: wgWipe 1s cubic-bezier(.2, .7, .2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wg-stream-in {
+    animation-duration: .01ms !important;
+  }
+}

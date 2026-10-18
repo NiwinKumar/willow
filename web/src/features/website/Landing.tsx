@@ -427,7 +427,7 @@ function Footer() {
           <div key={c.title} className="flex flex-col gap-2.5">
             <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {c.title}</span>
             {c.title === 'FOR BUSINESS' ? (
-              <Link to="/retail" aria-label="Willow Proof, retail intelligence by Willow" className="mb-1 rounded-xs no-underline transition-opacity hover:opacity-70">
+              <Link to="/retail" aria-label="Proof by Willow, retail intelligence" className="mb-1 rounded-xs no-underline transition-opacity hover:opacity-70">
                 <ProofLockup size={24} descriptor />
               </Link>
             ) : null}
