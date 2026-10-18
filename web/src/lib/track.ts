@@ -24,7 +24,7 @@ export const CHOICE_COPY: Record<TrackChoice, { title: string; line: string; tag
   cheek: { title: 'Cheek close-up', line: 'Pores, texture, tone, spots and redness, up close.', tag: 'Recommended' },
   face: { title: 'Face photo', line: 'Lines, under-eye, shine and glow across your face.' },
   nose: { title: 'Nose close-up', line: 'Pores and blemishes, up close.' },
-  arms: { title: 'Forearms', line: 'For testing a product: one treated arm, one untreated.' },
+  arms: { title: 'Forearms', line: 'For testing a product: one arm with it, one without.' },
 }
 
 /** Goals the face photo alone measures (lines, under-eye, shine and glow): they put the face on by default. */

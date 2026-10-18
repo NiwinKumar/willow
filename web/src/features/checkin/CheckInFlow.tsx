@@ -32,7 +32,7 @@ import { ProcessingStep } from './ProcessingStep'
 import { ReviewStep } from './ReviewStep'
 import { SampleStep } from './SampleStep'
 import { SiteStep } from './SiteStep'
-import { planTopUp } from './topup'
+import { planTopUp, topUpNeed } from './topup'
 import { useAnalysis } from './useAnalysis'
 import { useSoft } from './useSoft'
 import { useUpload } from './useUpload'
@@ -81,8 +81,11 @@ export default function CheckInFlow() {
   const nParam = Number(params.get('n'))
   const topupParam = capturing ? params.get('topup') : null
   // A whole check-in (the sheet's "Start check-in"): every tracked place in turn, with the camera.
-  const places = capturing && mode === 'uncalibrated' && !topupParam ? parsePlaces(params.get('places')) : []
+  // (a place may switch to RAW files, or top up its baseline: the walk goes on either way)
+  const places = capturing ? parsePlaces(params.get('places')) : []
   const walk = places.length > 0
+  // "Upload photos instead" in the sheet: each place opens the file picker instead of the camera.
+  const uploadAll = walk && params.get('upload') === '1'
   const placeIndex = Math.max(0, places.indexOf(site as TrackPlace))
   const [sent, setSent] = useState<Site[]>([])
   const [skipped, setSkipped] = useState<Site[]>([])
@@ -141,6 +144,15 @@ export default function CheckInFlow() {
   const known = data.mode === 'live' && data.status !== 'loading'
   const sessionsOf = useCallback((s: Site) => data.series(s)?.sessions ?? [], [data])
   const computedN = known ? neededFor(sessionsOf(site), mode) : null
+  // A whole check-in tops up a camera baseline that has no normal range yet (topup.ts) instead of
+  // starting a new session for that place.
+  const topupOf = useCallback(
+    (p: Site): { topup?: string } => {
+      const b = sessionsOf(p).find((x) => x.is_baseline && x.capture_mode === 'uncalibrated') ?? null
+      return b && topUpNeed(b) > 0 ? { topup: b.id } : {}
+    },
+    [sessionsOf],
+  )
   const n = nParam >= 1 && nParam <= 5 ? nParam : computedN
   const rawStep = params.get('step') as Step | null
   const step: Step | null = rawStep && STEPS.includes(rawStep) && (rawStep !== 'processing' || activeSession) ? rawStep : sessionParam ? 'processing' : null
@@ -200,6 +212,8 @@ export default function CheckInFlow() {
     void (async () => {
       try {
         const plan = await planTopUp(await getIdToken(), topupParam)
+        // In a whole check-in a baseline that can't take photos just gets a new check-in for that place.
+        if (walk && plan.kind !== 'add') return go({ topup: null, step: 'place' }, { replace: true })
         if (plan.kind === 'refuse') return setTopupError(plan.why)
         if (plan.kind !== 'add') {
           setHeld(topupParam)
@@ -210,7 +224,7 @@ export default function CheckInFlow() {
         setTopup({ id: s.id, date: fmtDate(s.created_at) })
         // A reload keeps the step it was on (quick: camera, review or files; RAW: files).
         const keep = s.capture_mode === 'calibrated_raw' ? ['files'] : ['camera', 'review', 'files']
-        const at = rawStep && keep.includes(rawStep) ? rawStep : keep[0]
+        const at = rawStep && keep.includes(rawStep) ? rawStep : walk ? 'place' : keep[0]
         go({ site: s.site, mode: s.capture_mode, n: String(plan.need), step: at }, { replace: true })
       } catch (e) {
         topupStarted.current = null
@@ -238,13 +252,13 @@ export default function CheckInFlow() {
     }
     if (computedN === null) return
     if (walk) {
-      go({ step: 'place', n: String(n ?? computedN) }, { replace: true })
+      go({ step: 'place', n: String(n ?? computedN), ...topupOf(site) }, { replace: true })
       return
     }
     const first = computedN === 5
     const initial: Step = first || (mode === 'calibrated_raw' && !prefs.lightroomDone()) ? 'guide' : mode === 'calibrated_raw' ? 'files' : 'camera'
     go({ step: initial, n: String(n ?? computedN) }, { replace: true })
-  }, [ready, topupParam, sampleParam, sessionParam, step, capturing, siteParam, computedN, n, mode, walk, go])
+  }, [ready, topupParam, sampleParam, sessionParam, step, capturing, siteParam, computedN, n, mode, walk, site, topupOf, go])
 
   // Back is held while photos upload or are measured (CAP holds processing), and steps that need state
   // they no longer have (a reload) fall back to one that works.
@@ -360,7 +374,7 @@ export default function CheckInFlow() {
   /** A whole check-in: the next tracked place, or the end. Skipped places are listed there. */
   const toNext = () => {
     const next = places[placeIndex + 1]
-    if (next) return newAttempt({ site: next, n: known ? String(neededFor(sessionsOf(next), 'uncalibrated')) : null, step: 'place' })
+    if (next) return newAttempt({ site: next, mode: 'uncalibrated', n: known ? String(neededFor(sessionsOf(next), 'uncalibrated')) : null, step: 'place', ...topupOf(next) })
     upload.reset([])
     clearShots()
     go({ step: 'sent', n: null }, { replace: true })
@@ -512,7 +526,9 @@ export default function CheckInFlow() {
         index={placeIndex}
         total={places.length}
         n={shotsN}
-        onStart={() => go({ step: 'camera' })}
+        upload={uploadAll}
+        topupDate={topup?.date ?? null}
+        onStart={() => go({ step: uploadAll ? 'files' : 'camera' })}
         onSkip={() => {
           setSkipped((s) => [...s, site])
           toNext()
