@@ -73,22 +73,27 @@ def find_pores(
     # away from the skin's edge: a nostril rim, lid or hairline edge is a row of dark dots
     edge = max(round(config.PORE_EDGE_MM * px), 2)
     inner = cv2.erode(skin.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=edge) > 0
-    yy, xx = np.ogrid[: L.shape[0], : L.shape[1]]
+    h, w = L.shape
     out = []
     for y, x, s in blobs:
         y, x = int(y), int(x)
         if not inner[y, x]:
             continue
         r = max(s * 1.414, 1.0)
-        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin
-        if not disk.any() or float(z[disk].mean()) < config.PORE_MIN_SCORE:
+        # the disk only within its own bounding box: a whole-image mask per blob made a
+        # pore-rich close-up take minutes (thousands of blobs x every pixel)
+        ri = int(np.ceil(r))
+        y0, y1, x0, x1 = max(y - ri, 0), min(y + ri + 1, h), max(x - ri, 0), min(x + ri + 1, w)
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin[y0:y1, x0:x1]
+        if not disk.any() or float(z[y0:y1, x0:x1][disk].mean()) < config.PORE_MIN_SCORE:
             continue
         out.append(
             Pore(
                 x=float(x * back),
                 y=float(y * back),
                 diameter_mm=float(2 * r / px),
-                dark_l=float(darker[disk].mean()),
+                dark_l=float(darker[y0:y1, x0:x1][disk].mean()),
             )
         )
     for m in marks or []:

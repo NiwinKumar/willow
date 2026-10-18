@@ -88,20 +88,24 @@ def find_blemishes(
     # not on the mask edge; gaps left by single hairs (beard, stubble) are not an edge
     solid = skin | _small_holes(skin, config.BLEMISH_HAIR_GAP_MM2 * px_per_mm**2)
     inner = ndimage.binary_erosion(solid, iterations=max(edge, 1)) & search
-    yy, xx = np.ogrid[: skin.shape[0], : skin.shape[1]]
+    h, w = skin.shape
     found = []
     for y, x, s in blobs:
         y, x = int(y), int(x)
         if not inner[y, x]:
             continue
         r = s * 1.414
-        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin
-        score = float(z[disk].mean())
-        a_contrast = float((lab[..., 1] - a_bg)[disk].mean())
-        l_contrast = float((lab[..., 0] - l_bg)[disk].mean())
+        # every per-blob test within the disk's bounding box (a whole-image mask per blob is slow)
+        ri = int(np.ceil(r))
+        win = np.s_[max(y - ri, 0) : min(y + ri + 1, h), max(x - ri, 0) : min(x + ri + 1, w)]
+        yy, xx = np.ogrid[win]
+        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin[win]
+        score = float(z[win][disk].mean())
+        a_contrast = float((lab[win][..., 1] - a_bg[win])[disk].mean())
+        l_contrast = float((lab[win][..., 0] - l_bg[win])[disk].mean())
         if (
             score < config.BLEMISH_MIN_SCORE
-            or z_red[disk].mean() < config.BLEMISH_MIN_RED_Z
+            or z_red[win][disk].mean() < config.BLEMISH_MIN_RED_Z
             or a_contrast < config.BLEMISH_MIN_A_CONTRAST
             or a_contrast < config.BLEMISH_MIN_RED_RATIO * -l_contrast
         ):
