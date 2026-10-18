@@ -13,8 +13,8 @@ import { StartTest, type TestPreset } from './StartTest'
 
 const BAND = { background: 'radial-gradient(120% 140% at 0% 0%, #B8E986 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #4FB866 0%, transparent 60%), #DDF3C9', boxShadow: 'inset 0 0 50px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(15,59,58,.5)' }
 
-const OpenTest = ({ onClick, children = 'Open test' }: { onClick: () => void; children?: string }) => (
-  <button type="button" onClick={onClick} className="flex min-h-11 items-center gap-2.5 self-start rounded-pill bg-willow-900 pr-1.5 pl-[18px] text-[14px] text-inverse transition-transform hover:-translate-y-0.5">
+const OpenTest = ({ onClick, children = 'Open test', className = 'self-start' }: { onClick: () => void; children?: string; className?: string }) => (
+  <button type="button" onClick={onClick} className={`flex min-h-11 items-center gap-2.5 ${className} rounded-pill bg-willow-900 pr-1.5 pl-[18px] text-[14px] text-inverse transition-transform hover:-translate-y-0.5`}>
     {children}
     <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white text-willow-900">
       →
@@ -56,7 +56,7 @@ export function TestStrip({ read, onStart }: { read: ForearmRead | null; onStart
               ))}
             </span>
           </div>
-          <OpenTest onClick={() => navigate('/test')} />
+          <OpenTest onClick={() => navigate('/test')} className="ml-auto self-end" />
         </>
       ) : (
         <>
@@ -65,7 +65,9 @@ export function TestStrip({ read, onStart }: { read: ForearmRead | null; onStart
             <span className="text-[17px] leading-[1.25] tracking-[-0.01em] text-pretty">Try a product on your forearm first</span>
             <span className="text-[13.5px] leading-[1.4] text-ink-2">One square treated, one left untouched on the other arm, photographed together.</span>
           </div>
-          <OpenTest onClick={onStart}>Start a test</OpenTest>
+          <OpenTest onClick={onStart} className="ml-auto self-end">
+            Start a test
+          </OpenTest>
         </>
       )}
     </section>

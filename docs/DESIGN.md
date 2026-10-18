@@ -677,3 +677,4 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 - The Routine header controls (switcher, History, Add product) share one 8px gap.
 - Routine header: the Routine / Product tests switcher sits on the design's glass track (`SegmentedControl frosted`: bg-glass, blur, white inset ring) and History is a glass button, like the other header controls over the gradient; no grey track and no brown outline.
 - Routine bottom row: Morning, Evening and the Product test card are always the same height (the tallest of them), so a 3-product slot beside a 4-product slot still lines up; the test card spreads its content top to bottom.
+- Cards that share a row with a taller card fill it instead of leaving empty space: "Suggested today" spreads its rows evenly down the card, and the Product test card puts its icon at the top and its button at the bottom right.
