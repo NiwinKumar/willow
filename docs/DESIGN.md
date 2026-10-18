@@ -684,3 +684,6 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 - "Explanation" is now "Insights" (`InsightsCard`): a short read that ends on a full sentence, "Read more" for the rest, and the next steps as small buttons (Ask Wisp is the ink one). No source line, no "standard explanation" wording; the AI tag shows only when Gemini wrote it.
 - The day summary card carries the buttons: Compare (photo comparison popup, disabled when no photo loads) and Notes (popup with the day's notes and editor), top right. Ask Wisp and "Use as baseline" sit in the top bar, left of the previous / next day.
 - The minimal check-in scrubber (thin rail, small ticks and thumb) is kept in `components/charts/Scrubber.tsx`.
+
+### App icon
+- One icon for every page the app serves (the Willow app and Willow Proof under /retail, they share one index.html): the frosted flower tile, `web/public/favicon-32.png`, `favicon-64.png`, `apple-touch-icon.png` (180) and the manifest's `icon-192.png` / `icon-512.png`, all cut from the tile in `willow-favicon.png` (the source is not committed). The old SVG icons are gone.
