@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { choicesOf, cleanTrack, defaultTrack, minutesFor, parsePlaces, trackOf } from '../src/lib/track.ts'
+import { choicesOf, cleanTrack, defaultTrack, minutesFor, parsePlaces, trackOf, withArms } from '../src/lib/track.ts'
 
 test('the cheek close-up is always tracked by default; the face joins when a goal is only seen there', () => {
   assert.deepEqual(defaultTrack([]), ['cheek_macro'])
@@ -17,11 +17,17 @@ test('a saved list keeps known places in capture order and is never empty', () =
   assert.deepEqual(cleanTrack('cheek_macro'), ['cheek_macro'])
 })
 
-test('the forearms are one choice and two places', () => {
-  assert.deepEqual(trackOf(['arms', 'cheek']), ['cheek_macro', 'forearm_treated', 'forearm_control'])
-  assert.deepEqual(choicesOf(['cheek_macro', 'forearm_treated', 'forearm_control']), ['cheek', 'arms'])
-  // one arm alone is not the arms choice
-  assert.deepEqual(choicesOf(['forearm_treated']), [])
+test('the forearms are never a tracked place; an old save with them is cleaned', () => {
+  assert.deepEqual(cleanTrack(['cheek_macro', 'forearm_treated', 'forearm_control']), ['cheek_macro'])
+  assert.deepEqual(cleanTrack(['forearm_treated', 'forearm_control'], ['lines']), ['cheek_macro', 'face_full'])
+  assert.deepEqual(trackOf(['cheek', 'face']), ['cheek_macro', 'face_full'])
+  assert.deepEqual(choicesOf(['cheek_macro', 'nose_macro']), ['cheek', 'nose'])
+})
+
+test('a check-in includes both forearms only while a product test is running', () => {
+  assert.deepEqual(withArms(['cheek_macro', 'face_full'], false), ['cheek_macro', 'face_full'])
+  assert.deepEqual(withArms(['cheek_macro', 'face_full'], true), ['cheek_macro', 'face_full', 'forearm_treated', 'forearm_control'])
+  assert.deepEqual(withArms(['cheek_macro'], true), ['cheek_macro', 'forearm_treated', 'forearm_control'])
 })
 
 test('a check-in takes about a minute per place or two, rounded up', () => {

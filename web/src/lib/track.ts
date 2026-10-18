@@ -9,22 +9,24 @@ export type { TrackPlace }
  */
 export const TRACK_ORDER: TrackPlace[] = ['cheek_macro', 'nose_macro', 'face_full', 'forearm_treated', 'forearm_control']
 
-/** The choices as onboarding and You show them: the forearms are one choice and two places. */
-export type TrackChoice = 'cheek' | 'nose' | 'face' | 'arms'
+/** The forearms are never a place the person tracks: a check-in includes them only while a product test runs (`withArms`). */
+export const ARM_PLACES: TrackPlace[] = ['forearm_treated', 'forearm_control']
+const OWN_PLACES = TRACK_ORDER.filter((p) => !ARM_PLACES.includes(p))
+
+/** The choices as onboarding and You show them. */
+export type TrackChoice = 'cheek' | 'nose' | 'face'
 export const CHOICE_SITES: Record<TrackChoice, TrackPlace[]> = {
   cheek: ['cheek_macro'],
   nose: ['nose_macro'],
   face: ['face_full'],
-  arms: ['forearm_treated', 'forearm_control'],
 }
-export const TRACK_CHOICES: TrackChoice[] = ['cheek', 'face', 'nose', 'arms']
+export const TRACK_CHOICES: TrackChoice[] = ['cheek', 'face', 'nose']
 
 /** What each choice measures, in the person's words (engine pipelines; same facts as model SITE_MEASURES). */
 export const CHOICE_COPY: Record<TrackChoice, { title: string; line: string; tag?: string }> = {
   cheek: { title: 'Cheek close-up', line: 'Pores, texture, tone, spots and redness, up close.', tag: 'Recommended' },
   face: { title: 'Face photo', line: 'Lines, under-eye, shine and glow across your face.' },
   nose: { title: 'Nose close-up', line: 'Pores and blemishes, up close.' },
-  arms: { title: 'Forearms', line: 'For testing a product: one arm with it, one without.' },
 }
 
 /** Goals the face photo alone measures (lines, under-eye, shine and glow): they put the face on by default. */
@@ -35,12 +37,15 @@ export function defaultTrack(goals: string[]): TrackPlace[] {
   return goals.some((g) => FACE_GOALS.includes(g)) ? ['cheek_macro', 'face_full'] : ['cheek_macro']
 }
 
-/** Clean a saved list: known places only, in capture order, at least one. */
+/** Clean a saved list: the person's own places only (forearms from older saves are dropped), in capture order, at least one. */
 export function cleanTrack(raw: unknown, goals: string[] = []): TrackPlace[] {
-  const list = Array.isArray(raw) ? raw.filter((x): x is TrackPlace => TRACK_ORDER.includes(x as TrackPlace)) : []
-  const ordered = TRACK_ORDER.filter((p) => list.includes(p))
+  const list = Array.isArray(raw) ? raw.filter((x): x is TrackPlace => OWN_PLACES.includes(x as TrackPlace)) : []
+  const ordered = OWN_PLACES.filter((p) => list.includes(p))
   return ordered.length ? ordered : defaultTrack(goals)
 }
+
+/** What a check-in covers: the tracked places, plus both forearms while a product test is running. */
+export const withArms = (places: TrackPlace[], testRunning: boolean): TrackPlace[] => (testRunning ? TRACK_ORDER.filter((p) => places.includes(p) || ARM_PLACES.includes(p)) : places)
 
 export const choicesOf = (track: TrackPlace[]): TrackChoice[] => TRACK_CHOICES.filter((c) => CHOICE_SITES[c].every((s) => track.includes(s)))
 export const trackOf = (choices: TrackChoice[]): TrackPlace[] => TRACK_ORDER.filter((p) => choices.some((c) => CHOICE_SITES[c].includes(p)))
