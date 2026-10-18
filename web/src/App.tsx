@@ -18,6 +18,7 @@ const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
 const Journey = lazy(() => import('./features/journey/Journey'))
 const BrandJourney = lazy(() => import('./features/journey/BrandJourney'))
+const CheckInReplay = lazy(() => import('./features/journey/CheckInReplay'))
 const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
 const Terms = lazy(() => import('./features/website/Terms'))
 const Retail = lazy(() => import('./features/retail/Retail'))
@@ -67,6 +68,7 @@ export default function App() {
               <Route path="/test" element={<Page><ProductTest /></Page>} />
               <Route path="/routine" element={<Page><Routine /></Page>} />
               <Route path="/you" element={<Page><You /></Page>} />
+              <Route path="/replay/:day" element={<Page><CheckInReplay /></Page>} />
             </Route>
             {/* Old addresses (shared links, the judge notes) keep working. */}
             <Route path="/s/:site" element={<OldReport />} />
