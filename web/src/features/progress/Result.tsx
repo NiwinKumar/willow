@@ -14,6 +14,7 @@ import { useData } from '../../data/useData'
 import type { SpotTrack } from '../../lib/api'
 import { clockOf, fmtDate } from '../../lib/format'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, qualityCopy } from '../../lib/metrics'
+import { wordsFor } from '../../lib/verdict'
 import { failureReasons } from '../../lib/warnings'
 import { ExplanationCard, NextAction } from './ExplanationCard'
 import { LAST_LIKE_THIS } from './headline'
@@ -310,11 +311,11 @@ export default function Result() {
   const sheetRef = session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, siteSessions) : baseline
   const sheetRefLabel = sheetRef && sheetRef !== baseline && sheetRef !== session ? `Check-in, ${fmtDate(sheetRef.created_at) === fmtDate(session.created_at) ? clockOf(sheetRef.created_at) : fmtDate(sheetRef.created_at)}` : 'Baseline'
   const ask = () => {
-    const changed = ordered.filter((m) => m.verdict === 'real_change').map((m) => `${METRIC_META[m.id].label} ${deltaText(m)}`)
+    const changed = ordered.filter((m) => m.verdict === 'real_change').map((m) => `${METRIC_META[m.id].label} ${deltaText(m)}, ${wordsFor(m, session).label.toLowerCase()}`)
     const q =
       st === 'rejected'
         ? `My ${SITE_LABEL[site].toLowerCase()} check-in on ${fmtDate(session.created_at)} could not be measured (${failureReasons(session.result).join(' ')}). How do I take better photos next time?`
-        : `Help me read my ${SITE_LABEL[site].toLowerCase()} result from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${c.changed} changed${changed.length ? ` (${changed.join(', ')})` : ''}, ${c.normal} within normal range. What could explain it?`
+        : `Help me read my ${SITE_LABEL[site].toLowerCase()} result from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${c.changed} beyond my normal range${changed.length ? ` (${changed.join('; ')})` : ''}, ${c.normal} within normal range. What could explain it?`
     shell.openAdvisor(q, `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`)
   }
   const checkIn = () => shell.openCheckIn()

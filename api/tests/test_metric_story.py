@@ -87,7 +87,7 @@ def test_points_compare_with_last_week_and_name_the_routine():
     s = _story(_world())
     assert s["points"][0] == "Last check-in (23 Oct): 7.95."
     assert s["points"][1] == "This check-in (30 Oct): 7.35, more even tone than last time."
-    assert "real change" in s["points"][2]
+    assert s["points"][2] == "Since your baseline: improved, more than your photos usually vary."
     assert s["points"][3] == (
         "In your routine for this: Minimalist Alpha Arbutin 2% Serum "
         "(started 24 Oct, used 5 of 7 planned days)."

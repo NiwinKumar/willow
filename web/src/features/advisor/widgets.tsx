@@ -13,7 +13,7 @@ import { useData } from '../../data/useData'
 import type { SpotStatus } from '../../lib/api'
 import { fmtDate, fmtPrice } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, fmtValue, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, verdictCounts, verdictKind, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, changeLines, verdictCounts, wordsFor, type VerdictKind } from '../../lib/verdict'
 import { CategoryOrb } from '../routine/productUi'
 import { entryName, metaLine, slotWords } from '../routine/routineModel'
 
@@ -46,14 +46,17 @@ function Empty({ children }: { children: ReactNode }) {
   return <span className="text-[13px] text-ink-2">{children}</span>
 }
 
-function VerdictLine({ counts, only }: { counts: Record<VerdictKind, number>; only?: VerdictKind[] }) {
+/** A check-in's verdicts as counts; its changes by direction ("2 improved", "1 moved the other way"). */
+function VerdictLine({ session, only }: { session: Session; only?: VerdictKind[] }) {
+  const counts = verdictCounts(session)
   const kinds = (only ?? (Object.keys(counts) as VerdictKind[])).filter((k) => counts[k] > 0)
   if (!kinds.length) return <Empty>No measurements in this check-in.</Empty>
+  const items = kinds.flatMap((k): { key: string; text: string }[] => (k === 'changed' ? changeLines(session).map((l) => ({ key: l.way, text: `${CHANGE_WORDS[l.way].glyph} ${l.text}` })) : [{ key: k, text: `${VERDICT_WORDS[k].glyph} ${counts[k]} ${VERDICT_WORDS[k].short.toLowerCase()}` }]))
   return (
     <span className="flex flex-wrap gap-1.5">
-      {kinds.map((k) => (
-        <span key={k} className="rounded-pill bg-white px-2.5 py-1 text-[12px]">
-          {VERDICT_WORDS[k].glyph} {counts[k]} {VERDICT_WORDS[k].short.toLowerCase()}
+      {items.map((it) => (
+        <span key={it.key} className="rounded-pill bg-white px-2.5 py-1 text-[12px]">
+          {it.text}
         </span>
       ))}
     </span>
@@ -83,7 +86,7 @@ function MetricTrend({ metricId, site, links }: { metricId: MetricId; site?: Sit
               {fmtValue(lastMetric.value, lastMetric)} <span className="text-[12px] text-ink-2">{unitOf(lastMetric)}</span>
             </span>
             <span className="text-[12px] text-ink-2">
-              {VERDICT_WORDS[verdictKind(lastMetric, last)].glyph} {VERDICT_WORDS[verdictKind(lastMetric, last)].label} · {fmtDate(last.created_at)}
+              {wordsFor(lastMetric, last).glyph} {wordsFor(lastMetric, last).label} · {fmtDate(last.created_at)}
             </span>
           </span>
         </span>
@@ -99,7 +102,7 @@ function SessionSummary({ sessionId, site, links }: { sessionId: string; site?: 
   const s = sessionId === 'latest' ? [...data.all].reverse().find((x) => usable(x) && (!site || x.site === site)) : data.all.find((x) => x.id === sessionId)
   return (
     <Frame title={s ? `${SITE_LABEL[s.site]} check-in · ${fmtDate(s.created_at)}` : 'Check-in'} link="Open" onLink={() => links.go(s ? `/result/${s.id}` : '/progress')}>
-      {s ? <VerdictLine counts={verdictCounts(s)} /> : <Empty>No measured check-in yet.</Empty>}
+      {s ? <VerdictLine session={s} /> : <Empty>No measured check-in yet.</Empty>}
     </Frame>
   )
 }
@@ -235,7 +238,7 @@ function ProductTestWidget({ links }: { links: WidgetLinks }) {
         rows.map(([label, s]) => (
           <span key={label} className="flex flex-wrap items-center gap-2">
             <span className="w-[120px] text-[12.5px]">{label}</span>
-            {s ? <VerdictLine counts={verdictCounts(s)} only={['changed', 'normal', 'baseline', 'notEnough']} /> : <Empty>no check-in yet</Empty>}
+            {s ? <VerdictLine session={s} only={['changed', 'normal', 'baseline', 'notEnough']} /> : <Empty>no check-in yet</Empty>}
           </span>
         ))
       ) : (
