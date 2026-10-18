@@ -1,6 +1,7 @@
 import './website.css'
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react'
+import { BarChart3, Building2, PlayCircle, Smartphone, type LucideIcon } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { WillowIntro } from '../../components/willow/WillowLoader'
@@ -133,48 +134,51 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
           <p className="m-0 max-w-[520px] text-[clamp(17px,1.4vw,20px)] font-light leading-normal">
             Willow compares each standardized photo with your own baseline and tells you when a change is bigger than your normal photo-to-photo variation. Computer vision measures. AI explains. Cosmetic appearance tracking only, never a diagnosis.
           </p>
-          <div className="flex w-full max-w-[460px] flex-col gap-2.5">
-            <Link
-              to={JOURNEY_PATH}
-              aria-describedby="hero-mei-note"
-              className="flex min-h-14 items-center justify-between gap-3 rounded-pill bg-selected py-0 pl-[26px] pr-2 text-[16px] text-inverse no-underline transition-transform hover:-translate-y-0.5 hover:text-inverse"
-            >
-              Explore Mei’s journey
-              <span aria-hidden className="grid size-10 place-items-center rounded-full bg-white text-ink">
-                →
-              </span>
-            </Link>
-            <p id="hero-mei-note" className="m-0 px-1 text-[13px] text-ink-2">
-              Mei is simulated: generated photos, measured by the live engine.
-            </p>
-            <div className="mt-1 flex flex-wrap gap-2.5">
-              <button
-                type="button"
-                onClick={app.open}
-                aria-describedby="hero-app-note"
-                className="min-h-12 flex-[1_1_150px] whitespace-nowrap rounded-pill border border-line-strong bg-white/50 px-4 text-[15px] text-ink backdrop-blur-[14px] transition-colors hover:bg-white/80"
-              >
-                Open the Willow app
-              </button>
-              <Link
-                to={PROOF_PATH}
-                className="flex min-h-12 flex-[1_1_150px] items-center justify-center whitespace-nowrap rounded-pill border border-line-strong bg-white/50 px-4 text-[15px] text-ink no-underline backdrop-blur-[14px] transition-colors hover:bg-white/80"
-              >
-                Open Willow Proof
-              </Link>
-            </div>
-            <p id="hero-app-note" className="m-0 px-1 text-[13px] text-ink-2">
-              {app.signedIn ? 'The app opens your own account.' : 'Not signed in, so the app opens Mei’s account, read-only. Willow Proof is the retail side.'}
-            </p>
-            <Link to={BRAND_JOURNEY_PATH} className="flex min-h-11 items-center self-start px-1 text-[14px] text-ink underline decoration-line-strong underline-offset-4 transition-opacity hover:opacity-60">
-              Explore a brand’s journey <span aria-hidden className="ml-1.5">→</span>
-            </Link>
-          </div>
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ COSMETIC TRACKING · NOT A MEDICAL DEVICE</span>
         </div>
-        <div aria-hidden className="min-h-[min(60vh,520px)]" />
+        {/* The ways in: four big buttons, the first thing a judge sees. */}
+        <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
+          <WayIn to={JOURNEY_PATH} tone="ink" icon={PlayCircle} title="Explore Mei’s journey" sub="Eight weeks, played for you · Mei is simulated, measured by the live engine" />
+          <WayIn onClick={app.open} tone="cta" icon={Smartphone} title="Open the Willow app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
+          <WayIn to={PROOF_PATH} tone="glass" icon={BarChart3} title="Open Willow Proof" sub="For brands: which products measurably work, for whom" />
+          <WayIn to={BRAND_JOURNEY_PATH} tone="glass" icon={Building2} title="Explore a brand’s journey" sub="How a skincare brand uses Proof, played for you" />
+        </nav>
       </div>
     </section>
+  )
+}
+
+const WAY_TONE = {
+  ink: { cls: 'text-inverse', bg: 'linear-gradient(180deg, #34343a 0%, #121214 100%)', shadow: '0 26px 50px -20px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.4)', icon: 'bg-white text-ink' },
+  cta: { cls: 'text-ink', bg: 'linear-gradient(180deg, color-mix(in oklab, var(--color-cta) 55%, white) 0%, var(--color-cta) 100%)', shadow: '0 24px 46px -20px rgba(120,110,0,.55), inset 0 1px 0 rgba(255,255,255,.8), inset 0 -2px 0 rgba(0,0,0,.08)', icon: 'bg-ink text-inverse' },
+  glass: { cls: 'text-ink', bg: 'linear-gradient(180deg, rgba(255,255,255,.92) 0%, rgba(255,255,255,.66) 100%)', shadow: '0 22px 44px -22px rgba(30,20,60,.45), inset 0 1px 0 #fff, inset 0 0 0 1px rgba(18,18,18,.08)', icon: 'bg-ink text-inverse' },
+} as const
+
+/** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). */
+function WayIn({ to, onClick, tone, icon: Icon, title, sub }: { to?: string; onClick?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; sub: string }) {
+  const t = WAY_TONE[tone]
+  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] ${t.cls}`
+  const body = (
+    <>
+      <span aria-hidden className="pointer-events-none absolute inset-x-3 top-1 h-[45%] rounded-[24px] bg-gradient-to-b from-white/35 to-transparent" />
+      <span className="relative flex min-w-0 flex-1 flex-col gap-1">
+        <span className="text-[clamp(19px,1.7vw,23px)] leading-[1.15] font-medium tracking-[-0.01em]">{title}</span>
+        <span className="text-[13.5px] leading-[1.35] opacity-75">{sub}</span>
+      </span>
+      <span aria-hidden className={`relative grid size-12 flex-none place-items-center rounded-full transition-transform duration-200 group-hover:translate-x-0.5 ${t.icon}`}>
+        <Icon size={22} strokeWidth={1.8} />
+      </span>
+    </>
+  )
+  const style = { background: t.bg, boxShadow: t.shadow }
+  return to ? (
+    <Link to={to} className={cls} style={style}>
+      {body}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={cls} style={style}>
+      {body}
+    </button>
   )
 }
 
