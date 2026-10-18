@@ -15,14 +15,6 @@ import type { TourTarget } from './types'
  */
 const STOP = Symbol('stop')
 
-/** True when an ancestor makes a containing block for fixed elements (transform, filter, perspective, contain). */
-function trapped(el: Element): boolean {
-  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-    const c = getComputedStyle(p)
-    if (c.transform !== 'none' || c.filter !== 'none' || c.perspective !== 'none' || c.backdropFilter !== 'none' || /paint|layout|strict|content/.test(c.contain) || /transform|filter/.test(c.willChange)) return true
-  }
-  return false
-}
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export function TourOverlay() {
@@ -120,13 +112,25 @@ export function TourOverlay() {
     const el = layer.current
     if (!playing || !el) return
     document.documentElement.setAttribute('data-touring', '')
-    // While it plays, app sheets open as plain (non-modal) dialogs: no blurred backdrop, the page isn't made
-    // inert, and the card stays above and clickable. index.css places them as a modal would be.
+    // While it plays, app sheets open non-modally (no blurred backdrop, the page isn't made inert) but still in
+    // the top layer, as a manual popover, so nothing on the page covers them; the card is raised above each one.
     const showModal = HTMLDialogElement.prototype.showModal
     HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-      // A transformed or filtered ancestor would trap a fixed (non-modal) dialog inside it: then stay modal.
-      if (trapped(this)) showModal.call(this)
-      else this.show()
+      this.show()
+      try {
+        this.popover = 'manual'
+        this.showPopover()
+        this.addEventListener(
+          'close',
+          () => {
+            if (this.matches(':popover-open')) this.hidePopover()
+            this.removeAttribute('popover')
+          },
+          { once: true },
+        )
+      } catch {
+        /* no popover support: a plain non-modal dialog */
+      }
       raise()
     }
     const raise = () => {
@@ -143,7 +147,7 @@ export function TourOverlay() {
     })
     watch.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] })
     const keepOnTop = window.setInterval(() => {
-      if (document.querySelector('dialog:modal')) raise()
+      if (document.querySelector('dialog[open]')) raise()
     }, 500)
     return () => {
       watch.disconnect()
