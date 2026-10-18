@@ -10,16 +10,17 @@ import { useQuery } from '../../lib/query'
 import { addToCalendar, currentSubscription, isIos, permission, PushBlocked, pushSupport, turnOffPush, turnOnPush } from '../../lib/reminders'
 import { scheduleText } from '../../lib/schedule'
 import { useAuth } from '../../lib/useAuth'
+import { Row } from './settings'
+import { outline } from './settingsClasses'
 
-const outline = 'min-h-[46px] self-start rounded-pill bg-white px-[18px] text-[14px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)] hover:bg-ink/[.03] disabled:opacity-55'
 
 /**
- * Reminders (You): the check-in schedule as a repeating calendar event, and notifications on this device
+ * Reminder rows (You → Check-ins): the check-in schedule as a repeating calendar event, and notifications on this device
  * (Web Push from the api, sent at the check-in time on scheduled days unless the person already checked in).
  * The days and time themselves are set in the check-in schedule (profile.checkin). Home's "Set a reminder"
- * opens this card (#reminders).
+ * scrolls here (#reminders).
  */
-export function RemindersCard() {
+export function ReminderRows() {
   const { getIdToken } = useAuth()
   const uid = useOwner()
   const checkin = useCheckin()
@@ -27,7 +28,7 @@ export function RemindersCard() {
   // The profile is still on its way: no "No check-in days yet" before it has answered.
   const loadingMe = !me.data && (me.status === 'loading' || me.status === 'idle')
   const location = useLocation()
-  const ref = useRef<HTMLElement>(null)
+  const ref = useRef<HTMLDivElement>(null)
   // enabled false: the api has no VAPID keys (local runs, before setup), so reminders are by calendar only.
   const key = useQuery(['push-key', uid], (t) => api.pushKey(t), { enabled: Boolean(uid), staleMs: 10 * 60_000 })
   const [support] = useState(pushSupport)
@@ -103,28 +104,29 @@ export function RemindersCard() {
   const canToggle = busy === null && on !== null && (on || (pushReady && support === 'supported' && !blocked && Boolean(checkin)))
 
   return (
-    <section ref={ref} id="reminders" aria-label="Reminders" className="flex scroll-mt-24 flex-col gap-3 rounded-[36px] squircle bg-surface p-6">
-      <span className="font-mono text-[12px] text-ink-2">■ REMINDERS</span>
-      <span className="text-[20px]">{checkin ? scheduleText(checkin) : loadingMe ? 'Loading your check-in days…' : 'No check-in days yet'}</span>
-      <span className="text-[14px] leading-normal text-[#3E3C38]">
-        {checkin
-          ? `Check-ins on the same days, at the same time, keep the light and your results comparable.${checkin.tz !== deviceTz ? ` Times are ${checkin.tz.replace(/_/g, ' ')} time.` : ''}`
-          : loadingMe
-            ? ''
-            : 'Choose the days and time you check in, then add them to your calendar or turn on notifications here.'}
-      </span>
-      <button type="button" onClick={() => void calendar()} disabled={!checkin || busy === 'calendar'} aria-busy={busy === 'calendar' || undefined} className={outline}>
-        {busy === 'calendar' ? 'Making the calendar file…' : 'Add to calendar'}
-      </button>
-      <span className="text-[13px] text-ink-2">One repeating event with an alert, for Google, Apple or Outlook calendars.</span>
-      <div className="flex flex-col gap-2 rounded-[20px] bg-sunken px-4 py-2">
+    <div ref={ref} id="reminders" className="scroll-mt-24">
+      <Row
+        label="Add to your calendar"
+        hint={
+          checkin
+            ? `One repeating event with an alert, ${scheduleText(checkin).toLowerCase()}${checkin.tz !== deviceTz ? ` (${checkin.tz.replace(/_/g, ' ')} time)` : ''}. Works with Google, Apple and Outlook.`
+            : loadingMe
+              ? 'Loading your check-in days…'
+              : 'Choose your check-in days above first.'
+        }
+      >
+        <button type="button" onClick={() => void calendar()} disabled={!checkin || busy === 'calendar'} aria-busy={busy === 'calendar' || undefined} className={outline}>
+          {busy === 'calendar' ? 'Making the file…' : 'Add to calendar'}
+        </button>
+      </Row>
+      <div className="flex flex-col gap-2 border-t border-ink/[.07] py-2.5">
         <Toggle label="Notifications on this device" checked={Boolean(on)} disabled={!canToggle} onChange={(v) => void onPush(v)} description={pushNote} />
         {on && pushReady ? (
-          <button type="button" onClick={() => void sendTest()} disabled={busy !== null} aria-busy={busy === 'test' || undefined} className={`${outline} mb-2 min-h-11`}>
+          <button type="button" onClick={() => void sendTest()} disabled={busy !== null} aria-busy={busy === 'test' || undefined} className={`${outline} mb-1.5 self-start`}>
             {busy === 'test' ? 'Sending…' : 'Send a test notification'}
           </button>
         ) : null}
       </div>
-    </section>
+    </div>
   )
 }
