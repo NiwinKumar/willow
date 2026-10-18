@@ -7,8 +7,8 @@ Built for the **Google Cloud AI Builder Cup 2026** (Hack2skill), theme **Retail 
 > Cosmetic appearance tracking. Not a medical device and not a diagnosis.
 
 ## Try it
-- **Judges: https://willow-511508.web.app/judge** (about four minutes, no sign-in). You get a guest account of your own; every stop runs live: the measurement engine on Cloud Run, Gemini on Vertex AI, Firestore and BigQuery. A side panel shows the live status of each service.
-- App: https://willow-511508.web.app
+- **Judges: https://meetwillow.web.app/judge** (about four minutes, no sign-in). You get a guest account of your own; every stop runs live: the measurement engine on Cloud Run, Gemini on Vertex AI, Firestore and BigQuery. A side panel shows the live status of each service.
+- App: https://meetwillow.web.app (also reachable at willow-511508.web.app)
 
 ## The problem
 People spend weeks on a serum and still cannot tell whether it worked: phone photos change with light, angle and the camera's own processing, so "looks better" is mostly noise. Retailers only see purchases and returns, never outcomes, so recommendations reward marketing rather than results.
