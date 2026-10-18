@@ -115,11 +115,11 @@ export function ShelfResults({ category }: { category: string }) {
     if (failed === key)
       return (
         <section id="shelf">
-          <ErrorState title="Shelf vs results didn’t load" body="The aggregates it is built from didn’t answer. No flag is shown rather than a guessed one." onRetry={refresh} />
+          <ErrorState title="Shelf check didn’t load" body="The aggregates it is built from didn’t answer. No flag is shown rather than a guessed one." onRetry={refresh} />
         </section>
       )
     return (
-      <div role="status" aria-label="Loading shelf vs results" aria-busy="true">
+      <div role="status" aria-label="Loading shelf check" aria-busy="true">
         <SkeletonPanel height={120} />
       </div>
     )
@@ -133,7 +133,7 @@ export function ShelfResults({ category }: { category: string }) {
   return (
     <section id="shelf">
       <Panel
-        title="Shelf vs results"
+        title="Shelf check: what works vs what’s stocked"
         id="proof-shelf-h"
         meta={
           v.source === 'gemini' ? (
@@ -157,7 +157,7 @@ export function ShelfResults({ category }: { category: string }) {
           )
         }
         actions={
-          <ToolButton onClick={() => setOpen(!open)} label={open ? 'Hide shelf vs results' : 'Show shelf vs results'}>
+          <ToolButton onClick={() => setOpen(!open)} label={open ? 'Hide shelf check' : 'Show shelf check'}>
             <span aria-hidden className="contents">
               <ChevronDown size={14} strokeWidth={1.8} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
               {open ? 'Hide' : 'Show'}
