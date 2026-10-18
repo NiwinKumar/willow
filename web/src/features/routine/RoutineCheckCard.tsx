@@ -1,5 +1,5 @@
-import { ChevronDown, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { ChevronDown, Info, RefreshCw } from 'lucide-react'
+import { useId, useState } from 'react'
 
 import { useShell } from '../../components/shell/ShellContext'
 import { AITag } from '../../components/willow/AITag'
@@ -10,12 +10,14 @@ import { ProductImage } from './productUi'
 import { SEVERITY_STYLE, compactName, entryName, imageOf, type Finding } from './routineModel'
 
 const SKELETON = 'linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.08) 100%)'
+const MUTED = 'text-[#D5D8FF]'
 const SEVERITY_RANK: Record<Finding['severity'], number> = { High: 0, Moderate: 1, Low: 2 }
 
 /**
  * The compatibility check, first on the page and the only blue thing on it (design: "■ ROUTINE CHECK"): a
- * compact card with the verdict and a small re-run button at the top, and every finding under it, most serious
- * first, as plain text (severity and kind are words, not pills; the actions sit bottom right). On a phone the
+ * compact card with the verdict at the top left, "How this was checked" and a small re-run icon button at the top
+ * right, and every finding under it, most serious first, each in its own soft inset panel (severity and kind are
+ * words, not pills; the actions sit bottom right). On a phone the
  * findings are one-line rows that open on tap, so the lists stay in reach. It runs by itself whenever the
  * routine changes (useRoutineCheck is keyed by the routine); the icon button re-asks.
  */
@@ -25,6 +27,8 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
   const [rerun, setRerun] = useState(false)
   const [alternating, setAlternating] = useState<string | null>(null)
   const [openKey, setOpenKey] = useState<string | null>(null)
+  const [showHow, setShowHow] = useState(false)
+  const howId = useId()
   const alternate = async (f: Finding) => {
     setAlternating(f.key)
     try {
@@ -59,25 +63,46 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -40px 80px rgba(110,139,255,.2), 0 40px 80px -44px rgba(29,35,122,.8)',
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
+        <div className="flex min-w-0 flex-1 basis-[13rem] flex-col gap-1.5">
           <span className="font-mono text-[11px] tracking-[.08em] text-[#C9CFFF]">■ ROUTINE CHECK</span>
           <h2 className="text-[clamp(21px,1.9vw,25px)] leading-[1.1] font-light tracking-[-0.02em]">{title}</h2>
-          <p className="text-[13px] leading-[1.45] text-[#D5D8FF]">{sub}</p>
+          <p className={`text-[13px] leading-[1.45] ${MUTED}`}>{sub}</p>
         </div>
         {count > 0 ? (
-          <button
-            type="button"
-            onClick={() => void runAgain()}
-            disabled={running}
-            aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'}
-            title={failed ? 'Try again' : 'Run again'}
-            className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-colors hover:bg-white/[.26] disabled:opacity-60"
-          >
-            <RefreshCw size={15} strokeWidth={1.8} aria-hidden className={running ? 'motion-safe:animate-spin' : ''} />
-          </button>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {done && findings.length ? (
+              <button
+                type="button"
+                aria-expanded={showHow}
+                aria-controls={howId}
+                onClick={() => setShowHow((v) => !v)}
+                className="hit44 inline-flex h-9 items-center gap-1.5 rounded-pill bg-white/[.14] px-3.5 text-[12.5px] text-inverse transition-colors hover:bg-white/[.26]"
+              >
+                <Info size={14} strokeWidth={1.8} aria-hidden />
+                How this was checked
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void runAgain()}
+              disabled={running}
+              aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'}
+              title={failed ? 'Try again' : 'Run again'}
+              className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-colors hover:bg-white/[.26] disabled:opacity-60"
+            >
+              <RefreshCw size={15} strokeWidth={1.8} aria-hidden className={running ? 'motion-safe:animate-spin' : ''} />
+            </button>
+          </div>
         ) : null}
       </div>
+
+      {showHow && done && findings.length ? (
+        <p id={howId} className="max-w-[760px] rounded-[16px] bg-white/[.07] px-4 py-3 text-[12.5px] leading-[1.55] text-[#D5D8FF]">
+          Findings come from Willow’s ingredient rules.{anyAi ? ' Findings tagged AI suggestion are Gemini’s reading of the lists, which can be wrong.' : ''}
+          {check.data?.notes.length ? ` Also checked: ${check.data.notes.join(' ')}` : ''}
+        </p>
+      ) : null}
 
       {count === 0 ? (
         <p className="text-[14px] leading-[1.55] text-[#D5D8FF]">Looks for conflicting actives, duplicates and gaps such as a missing sunscreen, once there is something in your routine.</p>
@@ -101,15 +126,15 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
           <span className="text-[14.5px] leading-[1.45]">No conflicts, duplicates or gaps found in this routine.</span>
         </div>
       ) : done ? (
-        <div className="grid gap-x-6 gap-y-4 @min-[640px]:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
+        <div className="grid gap-3 @min-[640px]:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
           {sorted.map((f, i) => {
             const sev = SEVERITY_STYLE[f.severity]
             const open = !phone || openKey === f.key
-            const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={22} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
+            const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={26} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
             return (
-              <article key={f.key} className="flex flex-col gap-2 border-t border-white/15 pt-3" style={{ animation: `wRise .45s ${i * 70}ms both` }}>
+              <article key={f.key} className="flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]" style={{ animation: `wRise .45s ${i * 70}ms both` }}>
                 <div className="flex items-start gap-2.5">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <span className="flex flex-wrap items-center gap-x-2 font-mono text-[10.5px] tracking-[.08em] text-[#C9CFFF]">
                       <span>
                         <span aria-hidden>{sev.glyph} </span>
@@ -118,7 +143,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                       </span>
                       {f.ai ? <AITag label="AI suggestion" className="text-ink" /> : null}
                     </span>
-                    <h3 className={`text-[15px] leading-[1.3] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
+                    <h3 className={`text-[15px] leading-[1.35] font-normal ${open ? '' : 'line-clamp-2'}`}>{f.title}</h3>
                   </div>
                   {phone ? (
                     <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12]">
@@ -127,19 +152,19 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                   ) : null}
                 </div>
                 {open ? (
-                  <div className="flex flex-1 flex-col gap-2.5">
+                  <div className="flex flex-1 flex-col gap-3">
                     {items.length ? (
-                      <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0 text-[13px]">
+                      <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-[13px]">
                         {items.map((it) => (
-                          <li key={it.id} title={it.full} className="flex items-center gap-1.5">
+                          <li key={it.id} title={it.full} className="flex items-center gap-2">
                             {it.image}
                             {it.name}
                           </li>
                         ))}
                       </ul>
                     ) : null}
-                    <p className="text-[13px] leading-[1.5] text-[#D5D8FF]">{f.fix}</p>
-                    <span className="mt-auto flex flex-wrap justify-end gap-2 pt-1">
+                    <p className={`max-w-[56ch] text-[13px] leading-[1.5] ${MUTED}`}>{f.fix}</p>
+                    <span className="mt-auto flex flex-wrap justify-end gap-2 border-t border-white/10 pt-3">
                       {f.find ? (
                         <button type="button" onClick={() => onFind(f)} className="min-h-9 rounded-pill bg-white px-3.5 text-[13px] text-ink">
                           Find one
@@ -160,15 +185,6 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
             )
           })}
         </div>
-      ) : null}
-      {done && findings.length ? (
-        <details className="mt-auto text-[12px] leading-[1.5] text-[#C9CFFF]">
-          <summary className="hit44 inline-block cursor-pointer list-none underline underline-offset-4">How this was checked</summary>
-          <p className="max-w-[760px] pt-1.5">
-            Findings come from Willow’s ingredient rules.{anyAi ? ' Findings tagged AI suggestion are Gemini’s reading of the lists, which can be wrong.' : ''}
-            {check.data?.notes.length ? ` Also checked: ${check.data.notes.join(' ')}` : ''}
-          </p>
-        </details>
       ) : null}
     </section>
   )

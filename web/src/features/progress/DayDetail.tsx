@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { ChevronDown, Images } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -22,6 +23,7 @@ import { MetricTile } from './MetricCard'
 import { DAY_HERO, MODE_LONG, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, optionLabel, orderMetrics, photoExpired, sessionState, usableLine, usedFrames } from './model'
 import { Page, Pills } from './parts'
 import { PhotoFrame } from './PhotoFrame'
+import { useAnyPhotoLoads } from './useImageStatus'
 import { NOTE_DOT, productName, rejectNote, sessionNotes } from './timeline'
 
 /** Day detail (design "Day detail"): one day's check-in, its readings, a photo comparison, notes and actions. */
@@ -42,24 +44,40 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   const date = parseDate(day)
   // Forearm days have no calendar of their own: their page is the product test.
   const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(site.startsWith('forearm') ? '/test' : `/progress?site=${site}`))
-  const go = (d: string) => navigate(`/progress/${d}?site=${site}`, { replace: true, state: location.state })
+  const go = (d: string) =>
+    navigate(`/progress/${d}?site=${site}`, {
+      replace: true,
+      state: location.state,
+    })
 
-  const nav = (
+  const nav = (actions?: ReactNode) => (
     <nav aria-label="Breadcrumb" className="flex flex-wrap items-center justify-between gap-x-3.5 gap-y-2.5">
       <div className="flex min-w-0 items-center gap-3.5">
         <button type="button" onClick={back} className="flex min-h-11 items-center gap-2 rounded-pill bg-white/65 pr-[18px] pl-3.5 text-[14px] backdrop-blur-[12px] hover:bg-white">
           <span aria-hidden>←</span>
           {date.toLocaleDateString('en-GB', { month: 'long' })}
         </button>
-        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">HISTORY / {date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}</span>
+        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">
+          HISTORY /{' '}
+          {date
+            .toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })
+            .toUpperCase()}
+        </span>
       </div>
-      <div className="flex gap-1.5">
-        <button type="button" onClick={() => prevDay && go(prevDay)} disabled={!prevDay} aria-label="Previous check-in day" className="min-h-11 rounded-pill bg-white/65 px-4 text-[13px] disabled:opacity-40">
-          ‹ {prevDay ? fmtDate(prevDay) : 'Earlier'}
-        </button>
-        <button type="button" onClick={() => nextDay && go(nextDay)} disabled={!nextDay} aria-label="Next check-in day" className="min-h-11 rounded-pill bg-white/65 px-4 text-[13px] disabled:opacity-40">
-          {nextDay ? fmtDate(nextDay) : 'Later'} ›
-        </button>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {actions}
+        <div className="flex gap-1.5">
+          <button type="button" onClick={() => prevDay && go(prevDay)} disabled={!prevDay} aria-label="Previous check-in day" className="min-h-11 rounded-pill bg-white/65 px-4 text-[13px] disabled:opacity-40">
+            ‹ {prevDay ? fmtDate(prevDay) : 'Earlier'}
+          </button>
+          <button type="button" onClick={() => nextDay && go(nextDay)} disabled={!nextDay} aria-label="Next check-in day" className="min-h-11 rounded-pill bg-white/65 px-4 text-[13px] disabled:opacity-40">
+            {nextDay ? fmtDate(nextDay) : 'Later'} ›
+          </button>
+        </div>
       </div>
     </nav>
   )
@@ -67,7 +85,7 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   if (!session)
     return (
       <Page label="Day detail">
-        {nav}
+        {nav()}
         <EmptyState title={`No check-in of your ${SITE_LABEL[site].toLowerCase()} on this day`} body="Pick a coloured day in the calendar." action={<ButtonLink to={`/progress?site=${site}`}>Back to the calendar</ButtonLink>} />
       </Page>
     )
@@ -88,32 +106,85 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
             { g: null, t: 'Later days compare with this one' },
           ]
         : st === 'compared'
-          ? (['changed', 'normal', 'notEnough', 'notCompared'] as const).filter((k) => c[k]).map((k) => ({ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }))
-          : [{ g: 'notCompared', t: st === 'former' ? 'An earlier baseline, not compared' : st === 'pending' ? 'Still measuring' : st === 'failed' ? 'Did not finish measuring' : 'Not measured' }]
+          ? (['changed', 'normal', 'notEnough', 'notCompared'] as const)
+              .filter((k) => c[k])
+              .map((k) => ({
+                g: k,
+                t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}`,
+              }))
+          : [
+              {
+                g: 'notCompared',
+                t: st === 'former' ? 'An earlier baseline, not compared' : st === 'pending' ? 'Still measuring' : st === 'failed' ? 'Did not finish measuring' : 'Not measured',
+              },
+            ]
   const big = st === 'rejected' ? '00' : st === 'baseline' ? String(usedFrames(session)).padStart(2, '0') : st === 'compared' ? String(c.changed).padStart(2, '0') : '—'
   const bigLabel = st === 'rejected' ? 'usable photos' : st === 'baseline' ? 'photos in your baseline' : st === 'compared' ? (c.changed === 1 ? 'reading changed beyond your normal range' : 'readings changed beyond your normal range') : 'not compared'
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
-  const notes = [...started.map((e) => ({ text: `Started ${productName(e)}`, dot: NOTE_DOT.routine })), ...sessionNotes(session).filter((n) => n.kind !== 'note')]
+  const notes = [
+    ...started.map((e) => ({
+      text: `Started ${productName(e)}`,
+      dot: NOTE_DOT.routine,
+    })),
+    ...sessionNotes(session).filter((n) => n.kind !== 'note'),
+  ]
   const others = list.filter((s) => s.id !== session.id)
+  const actions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className="flex min-h-9 items-center px-1 text-[13px] underline underline-offset-4"
+        onClick={() =>
+          shell.openAdvisor(
+            `Help me read my ${SITE_LABEL[site].toLowerCase()} check-in from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${st === 'compared' ? `${c.changed} changed, ${c.normal} within normal range` : st === 'baseline' ? 'it is my baseline' : st === 'rejected' ? 'the photos could not be measured' : 'it was not compared'}${started.length ? `. I started ${started.map(productName).join(' and ')} that day` : ''}.`,
+            `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`,
+          )
+        }
+      >
+        Ask Wisp about this day
+      </button>
+      {data.mode === 'live' ? (
+        <Button variant="outline" size="sm" disabled={!canBeBaseline(session)} onClick={() => setAsking(true)}>
+          {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${others.length ? `, ${clockOf(session.created_at)}` : ''} as baseline` : 'Not eligible as a baseline'}
+        </Button>
+      ) : null}
+      {st !== 'pending' ? (
+        <ButtonLink to={`/result/${session.id}`} variant="ink" size="sm" trailing={<span aria-hidden>→</span>}>
+          Open the full report
+        </ButtonLink>
+      ) : null}
+    </div>
+  )
 
   return (
     <Page label="Day detail">
       <div key={session.id} className="flex animate-[wInR_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4 pt-[clamp(8px,2vw,20px)]">
-        {nav}
+        {nav(actions)}
         {others.length ? (
           <Pills
             label="Check-in on this day"
             tone="white"
-            options={list.map((s) => ({ value: s.id, label: `${clockOf(s.created_at)} · ${MODE_LONG[s.capture_mode]}` }))}
+            options={list.map((s) => ({
+              value: s.id,
+              label: `${clockOf(s.created_at)} · ${MODE_LONG[s.capture_mode]}`,
+            }))}
             value={session.id}
-            onChange={(id) => setParams((p) => ({ ...Object.fromEntries(p), session: id }), { replace: true, state: location.state })}
+            onChange={(id) =>
+              setParams((p) => ({ ...Object.fromEntries(p), session: id }), {
+                replace: true,
+                state: location.state,
+              })
+            }
           />
         ) : null}
 
         <section
           aria-label="Day summary"
           className="relative grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] items-end gap-6 overflow-hidden rounded-[48px] p-[clamp(24px,4vw,44px)] text-ink squircle"
-          style={{ background: heroBg, boxShadow: `inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 90px rgba(255,255,255,.35), 0 40px 80px -50px ${heroGlow}` }}
+          style={{
+            background: heroBg,
+            boxShadow: `inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 90px rgba(255,255,255,.35), 0 40px 80px -50px ${heroGlow}`,
+          }}
         >
           <div className="flex min-w-0 flex-col gap-4">
             <span className="font-mono text-[11px] tracking-[.08em]">
@@ -123,7 +194,12 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
             <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,48px)] leading-[.9] font-normal tracking-[-0.01em]">
               {date.toLocaleDateString('en-GB', { weekday: 'long' })},
               <br />
-              <span className="italic">{date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</span>
+              <span className="italic">
+                {date.toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              </span>
             </h1>
             <div className="flex flex-wrap gap-1.5">
               {chips.map((ch) => (
@@ -175,30 +251,6 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
               ))}
               <NoteEditor key={session.id} session={session} empty={!notes.length} />
             </section>
-            <section aria-label="Actions" className="flex flex-col items-start gap-2.5 rounded-[36px] bg-surface/70 p-[clamp(20px,3vw,28px)] squircle">
-              {st !== 'pending' ? (
-                <ButtonLink to={`/result/${session.id}`} variant="ink" size="lg" trailing={<span aria-hidden>→</span>}>
-                  Open the full report
-                </ButtonLink>
-              ) : null}
-              {data.mode === 'live' ? (
-                <Button variant="outline" disabled={!canBeBaseline(session)} onClick={() => setAsking(true)}>
-                  {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${others.length ? `, ${clockOf(session.created_at)}` : ''} as baseline` : 'Not eligible as a baseline'}
-                </Button>
-              ) : null}
-              <button
-                type="button"
-                className="flex min-h-11 items-center text-[14px] underline"
-                onClick={() =>
-                  shell.openAdvisor(
-                    `Help me read my ${SITE_LABEL[site].toLowerCase()} check-in from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}: ${st === 'compared' ? `${c.changed} changed, ${c.normal} within normal range` : st === 'baseline' ? 'it is my baseline' : st === 'rejected' ? 'the photos could not be measured' : 'it was not compared'}${started.length ? `. I started ${started.map(productName).join(' and ')} that day` : ''}.`,
-                    `${SITE_LABEL[site]} · ${fmtDate(session.created_at)}`,
-                  )
-                }
-              >
-                Ask Wisp about this day
-              </button>
-            </section>
           </div>
         </div>
         <Disclaimer />
@@ -216,10 +268,11 @@ function Compare({ session, sessions, baseline }: { session: Session; sessions: 
   const A = pool.find((s) => s.id === a) ?? session
   const B = pool.find((s) => s.id === b) ?? session
   // Two check-ins on one day are told apart by their time.
-  const label = (s: Session) => optionLabel(s, pool).replace(/ · .*$/, '').toUpperCase()
-  const layer = (s: Session) => (
-    <PhotoFrame session={s} box={frameFor(s.site, s.result, photoSize(s))} alt={`Photo from ${fmtDate(s.created_at, { day: 'numeric', month: 'long' })}`} missing={photoExpired(s) ? 'Photo deleted after 30 days' : 'No photo preview'} rounded="rounded-none" />
-  )
+  const label = (s: Session) =>
+    optionLabel(s, pool)
+      .replace(/ · .*$/, '')
+      .toUpperCase()
+  const layer = (s: Session) => <PhotoFrame session={s} box={frameFor(s.site, s.result, photoSize(s))} alt={`Photo from ${fmtDate(s.created_at, { day: 'numeric', month: 'long' })}`} missing={photoExpired(s) ? 'Photo deleted after 30 days' : 'No photo preview'} rounded="rounded-none" />
   const select = (lbl: string, value: string, set: (v: string) => void) => (
     <label className="flex min-w-[150px] flex-1 flex-col gap-1 text-[12px] text-ink-2">
       {lbl}
@@ -232,13 +285,36 @@ function Compare({ session, sessions, baseline }: { session: Session; sessions: 
       </select>
     </label>
   )
+  // A comparison needs a photo to look at: without any preview URL (RAW references, photos deleted after 30 days) it stays closed.
+  const urls = pool.flatMap((s) => (s.preview?.url ? [s.preview.url] : []))
+  const hasPhotos = useAnyPhotoLoads(urls) !== 'no'
+  const [open, setOpen] = useState(false)
+  const shown = open && hasPhotos
   return (
-    <section aria-label="Photo comparison" className="flex flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-      <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
-        {select('Earlier', a, setA)}
-        {select('Later', b, setB)}
+    <section aria-label="Photo comparison" className="flex flex-col gap-3 rounded-[36px] bg-surface p-[clamp(14px,2.4vw,20px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5">
+        <span className="flex flex-col">
+          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ PHOTO COMPARISON</span>
+          {!hasPhotos ? (
+            <span className="text-[13px] text-ink-2">
+              No photos to compare yet
+              {pool.some(photoExpired) ? ' (photos are deleted after 30 days)' : ''}.
+            </span>
+          ) : null}
+        </span>
+        <Button variant="outline" size="sm" icon={Images} disabled={!hasPhotos} aria-expanded={shown} onClick={() => setOpen((o) => !o)} trailing={<ChevronDown size={16} strokeWidth={1.8} aria-hidden className={`transition-transform ${shown ? 'rotate-180' : ''}`} />}>
+          {shown ? 'Hide comparison' : 'Compare photos'}
+        </Button>
       </div>
-      <CompareSplit left={layer(A)} right={layer(B)} leftLabel={label(A)} rightLabel={label(B)} />
+      {shown ? (
+        <>
+          <div className="flex flex-wrap gap-2 px-1.5">
+            {select('Earlier', a, setA)}
+            {select('Later', b, setB)}
+          </div>
+          <CompareSplit left={layer(A)} right={layer(B)} leftLabel={label(A)} rightLabel={label(B)} />
+        </>
+      ) : null}
     </section>
   )
 }
@@ -254,7 +330,9 @@ function NoteEditor({ session, empty }: { session: Session; empty: boolean }) {
   const save = async () => {
     setSaving(true)
     try {
-      const view = await api.patchSession(await getIdToken(), session.id, { note: text.trim() || null })
+      const view = await api.patchSession(await getIdToken(), session.id, {
+        note: text.trim() || null,
+      })
       data.upsert(view)
       setEditing(false)
       toast('Note saved')
@@ -307,4 +385,3 @@ function NoteEditor({ session, empty }: { session: Session; empty: boolean }) {
     </>
   )
 }
-
