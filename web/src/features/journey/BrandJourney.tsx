@@ -359,7 +359,9 @@ function Curve({ x }: { x: RetailerProductDetail }) {
 /* ───────────────────────────── slides ───────────────────────────── */
 
 function Intro({ d }: { d: Data }) {
-  const shots = d.brand.products.filter((p) => p.image_url).slice(0, 4)
+  // The products this story is about (its Proven ones), not the whole catalog.
+  const proven = d.brand.products.filter((p) => p.image_url && p.tier === 'proven')
+  const shots = (proven.length ? proven : [d.hero.product]).slice(0, 4)
   return (
     <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]">
       <div className="grid grid-cols-2 gap-3 justify-self-center">
@@ -480,7 +482,7 @@ function CustomersSlide({ d }: { d: Data }) {
         </Lead>
         {leads.length ? (
           <div className="flex flex-col gap-2">
-            <span className="text-[13px] text-ink-2">Groups where a {BRAND} product is the best pick</span>
+            <span className="text-[13px] text-ink-2">Groups where a product from {BRAND} is the best pick</span>
             <Chips items={leads} />
           </div>
         ) : null}
@@ -549,6 +551,7 @@ function CampaignSlide({ d }: { d: Data }) {
           Only a Proven product can be promoted in the Willow app, and only to people whose goals and skin type its evidence covers. A randomised holdout never sees the card, so the lift the campaign causes is measured, not assumed.
         </Lead>
         {e.reasons[0] ? <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">{e.reasons[0]}</p> : null}
+        <CohortNote d={d} />
       </div>
       <div className="flex flex-col gap-4 rounded-[20px] bg-white/70 p-4">
         <div className="flex items-center gap-3">
@@ -585,7 +588,7 @@ function End({ onProof, onMei, onApp }: { onProof: () => void; onMei: () => void
       <div className="flex flex-col gap-4">
         <h2 className="m-0 font-serif text-[clamp(32px,3.6vw,52px)] leading-none font-normal">From measured to promoted</h2>
         <p className="m-0 max-w-[520px] text-[15px] leading-[1.5] text-ink-2">
-          One path for every product: measured in real routines, proven against people who don’t use it, claimed in words the evidence supports, and promoted only where it works.
+          One path for every product: measured in people’s routines, proven against people who don’t use it, claimed in words the evidence supports, and promoted only where it works.
         </p>
         <div className="flex flex-wrap gap-2 pt-1">
           <button type="button" onClick={onProof} className="min-h-12 rounded-pill bg-selected px-6 text-[15px] text-inverse">
