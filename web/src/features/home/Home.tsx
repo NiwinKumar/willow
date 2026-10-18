@@ -8,23 +8,26 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
 import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
-import type { CaptureMode, RoutineEntry, RoutineCheck, Session } from '../../data/types'
+import type { CaptureMode, RoutineEntry, Session } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
 import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
+import { routineEffect } from '../../lib/routineEffect'
 import { addToCalendar } from '../../lib/reminders'
 import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
-import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
+import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
-import { ChangedCard, NextStepCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
+import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
 import { useProductTests } from '../routine/productTests'
+import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
+import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
@@ -138,11 +141,24 @@ function HomeBody() {
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
-  const finding = demo ? null : nextStepOf(check.data, byId)
+  // Routine effect: how each product's target measurement moved since it started (lib/effect.ts).
+  const outcomeSessions = useOutcomeSessions()
+  const effect = useMemo(() => (demo ? null : routineEffect(entries ?? [], outcomeSessions, check.data)), [demo, entries, outcomeSessions, check.data])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
   const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
+  // The hero's question follows what the lines above it are about: a check-in from today, an earlier
+  // one (the lines still describe it), or no baseline yet.
+  const heroAsk =
+    read.person === 'new' || read.person === 'noBand'
+      ? { label: 'How to start', run: () => ask('How do I take a good face baseline?', 'Today') }
+      : latestFace && dayOf(latestFace.created_at) === day
+        ? { label: 'Ask about today', run: () => ask('Explain today’s read: what changed and what should I do today?', 'Today') }
+        : {
+            label: 'Ask about these',
+            run: () => ask('Explain my last check-in: what changed, and what should I do until the next one?', latestFace ? `Face check-in · ${shortDay(latestFace.created_at)}` : 'Today'),
+          }
   const showSetup = !demo && (read.person === 'new' || read.person === 'noBand')
 
   const setupRows: SetupRow[] = [
@@ -167,27 +183,38 @@ function HomeBody() {
     { t: 'Save with Google', d: 'Keep photos and results', state: me.guest ? 'todo' : 'done', onClick: () => navigate('/you') },
   ]
 
+  // Your goals (trends since the baseline) leads the small-card row; What changed (the latest check-in's numbers) sits beside Routine today.
+  const trends = useMemo(() => (read.lead && !read.lead.is_baseline ? goalTrends(read.lead, read.baseline, face, goals) : []), [read.lead, read.baseline, face, goals])
+  const measured = showChanged ? read.lead : null
+  const goalsNode = (cls: string) =>
+    measured && trends.length ? (
+      <GoalsCard
+        className={cls}
+        trends={trends}
+        baseline={read.baseline}
+        onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
+        onProgress={() => navigate('/progress')}
+        onAsk={demo ? undefined : () => ask('How are my goals going since my baseline, and what should I do next?', 'Goals')}
+      />
+    ) : null
+  const changedNode = (cls: string) =>
+    measured ? (
+      <ChangedCard
+        className={cls}
+        session={measured}
+        baseline={read.baseline}
+        goals={goals}
+        onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
+        onFull={() => openResult(measured)}
+        onAsk={demo ? undefined : () => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(measured.created_at)}`)}
+      />
+    ) : null
+
   // Row of smaller cards: as many as exist share the row, so no row has a hole.
   const small: { key: string; node: (cls: string) => ReactNode }[] = []
-  if (showChanged && read.lead) {
-    const s = read.lead
-    small.push({
-      key: 'changed',
-      node: (cls) => (
-        <ChangedCard
-          className={cls}
-          session={s}
-          baseline={read.baseline}
-          goals={goals}
-          onOpen={(m) => navigate(`/result/${s.id}?metric=${m}`)}
-          onFull={() => openResult(s)}
-          onAsk={demo ? undefined : () => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(s.created_at)}`)}
-        />
-      ),
-    })
-  }
+  if (measured && trends.length) small.push({ key: 'goals', node: goalsNode })
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
-  if (finding) small.push({ key: 'next', node: (cls) => <NextStepCard className={cls} title={finding.title} body={finding.body} onRoutine={() => navigate('/routine')} onAsk={() => ask(finding.question, 'Routine check')} /> })
+  if (effect?.rows.length) small.push({ key: 'effect', node: (cls) => <RoutineEffectCard className={cls} effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
   if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
   if (diary && latestFace) small.push({ key: 'spots', node: (cls) => <SpotDiaryTile className={cls} diary={diary} onOpen={() => navigate({ pathname: `/result/${latestFace.id}`, hash: '#spot-diary' })} /> })
   const spans = rowSpans(small.length)
@@ -200,7 +227,8 @@ function HomeBody() {
   const missingSunscreen = Boolean(check.data?.gaps.some((g) => /sunscreen/i.test(g.need)))
 
   let routineCard: ReactNode
-  const routineCls = 'col-span-12 @min-[960px]:col-span-6'
+  const beside = Boolean(measured)
+  const routineCls = beside ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12'
   if (demo) routineCard = <RoutineEmpty demo className={routineCls} onRoutine={() => navigate('/routine')} />
   else if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
   else if (routine.status === 'error') {
@@ -229,7 +257,6 @@ function HomeBody() {
     )
   }
 
-  const recent = recentRows({ all: data.all, entries: demo ? undefined : entries, joined: demo ? null : (user?.metadata?.creationTime ?? null), goals, navigate })
   const week = demo ? null : weekOf(own, read, goals, weeklyDayOf(checkin))
 
   return (
@@ -249,7 +276,8 @@ function HomeBody() {
             name={me.guest ? null : me.first}
             next={heroNext}
             lines={heroLines}
-            onAsk={demo ? undefined : () => (read.person === 'new' || read.person === 'noBand' ? ask('How do I take a good face baseline?', 'Today') : ask('Explain today’s read: what changed and what should I do today?', 'Today'))}
+            onAsk={demo ? undefined : heroAsk.run}
+            askLabel={heroAsk.label}
           />
         </div>
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
@@ -261,7 +289,7 @@ function HomeBody() {
           </SmallSlot>
         ))}
         {routineCard}
-        <RecentCard className={routineCls} rows={recent} onAll={() => navigate('/progress')} />
+        {changedNode('col-span-12 @min-[960px]:col-span-6')}
       </div>
     </Frame>
   )
@@ -281,8 +309,6 @@ function rowSpans(n: number): string[] {
   const desk = rows.flatMap((k) => Array.from({ length: k }, () => 12 / k))
   return desk.map((d, i) => `col-span-12 ${T[n % 2 === 1 && i === n - 1 ? 12 : 6]} ${Q[d]}`)
 }
-
-type Nav = ReturnType<typeof useNavigate>
 
 function leadFor({
   read,
@@ -508,65 +534,6 @@ function withTonight(lines: HeroLine[], tonight: HeroLine | null): HeroLine[] {
   if (lines.length < 3) return [...lines, tonight]
   const i = lines.findIndex((l) => l.g === '→')
   return i === -1 ? lines : [...lines.slice(0, i), ...lines.slice(i + 1), tonight]
-}
-
-/** Next step: the routine check's first conflict, else its first gap (no other kinds exist). */
-function nextStepOf(check: RoutineCheck | undefined, byId: Map<string, RoutineEntry>): { title: string; body: string; question: string } | null {
-  if (!check) return null
-  const source = (s: 'rule' | 'model') => (s === 'model' ? 'Suggested by the routine check.' : 'Found by the routine check.')
-  for (const c of check.conflicts) {
-    const es = c.products.map((id) => byId.get(id)).filter((e): e is RoutineEntry => Boolean(e))
-    if (es.length < 2) continue
-    const names = es.map((e) => e.custom_name)
-    const shared = (['am', 'pm'] as const).filter((slot) => es.every((e) => e.slots.includes(slot)))
-    const where = shared.length === 2 ? 'morning and evening routines' : shared[0] === 'am' ? 'morning routine' : shared[0] === 'pm' ? 'evening routine' : 'routine'
-    const list = names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-    return {
-      title: `Your ${list} are ${names.length === 2 ? 'both' : 'all'} in your ${where}.`,
-      body: `${c.issue} ${c.suggestion} ${source(c.source)}`,
-      question: `Is it OK to use my ${list} in the same ${where === 'routine' ? 'routine' : where.replace(' routines', ' routine')}?`,
-    }
-  }
-  const g = check.gaps[0]
-  if (!g) return null
-  const need = g.need.charAt(0).toLowerCase() + g.need.slice(1)
-  return { title: `Your routine needs ${need}.`, body: `${g.why} ${g.suggestion} ${source('rule')}`, question: `Which product could cover this for me: ${need}?` }
-}
-
-function recentRows({ all, entries, joined, goals, navigate }: { all: Session[]; entries: RoutineEntry[] | undefined; joined: string | null; goals: string[]; navigate: Nav }): RecentRow[] {
-  const rows: RecentRow[] = []
-  for (const s of all) {
-    const at = Date.parse(s.created_at)
-    const open = () => navigate(`/result/${s.id}`)
-    const baseline = s.is_baseline && usable(s)
-    rows.push({ key: `s:${s.id}`, at, d: shortDay(s.created_at), t: `${s.sample_id ? 'Sample run' : baseline ? 'Baseline set' : 'Check-in'} · ${SITE_SHORT[s.site]}`, x: summaryOf(s), onClick: open })
-    if (s.note) rows.push({ key: `n:${s.id}`, at: at + 1, d: shortDay(s.created_at), t: 'Note', x: `“${s.note}”`, onClick: open })
-  }
-  for (const e of entries ?? []) {
-    rows.push({ key: `r:${e.id}`, at: parseDate(e.started_at).getTime(), tie: Date.parse(e.created_at ?? '') || 0, d: shortDay(e.started_at), t: 'Started a product', x: e.custom_name, onClick: () => navigate('/routine') })
-    if (e.ended_at) rows.push({ key: `e:${e.id}`, at: parseDate(e.ended_at).getTime(), d: shortDay(e.ended_at), t: 'Stopped a product', x: e.custom_name, onClick: () => navigate('/routine') })
-  }
-  if (joined) {
-    const iso = new Date(joined).toISOString()
-    const names = goals.map((g) => GOALS.find((x) => x.id === g)?.label.toLowerCase()).filter(Boolean)
-    rows.push({ key: 'joined', at: Date.parse(iso), d: shortDay(iso), t: 'Joined Willow', x: names.length ? `Goals: ${names.join(', ')}` : 'No goals chosen yet', onClick: () => navigate('/you') })
-  }
-  return rows.sort((a, b) => b.at - a.at || (b.tie ?? 0) - (a.tie ?? 0)).slice(0, 6)
-}
-
-function summaryOf(s: Session): string {
-  if (inFlight(s)) return stalled(s) ? "— Didn't finish" : '◐ Measuring'
-  if (s.status === 'failed') return "— Didn't finish"
-  if (s.measured === false) return 'Saved, not measured'
-  if (!s.result?.quality.passed) return '— Photos not usable'
-  if (s.is_baseline) {
-    const f = s.baseline_ref?.frames ?? s.result.frames_used
-    return `${plural(f, 'usable photo', 'usable photos')} · ${(s.baseline_ref?.has_noise_band ?? f >= BAND_FRAMES) ? 'normal range ready' : 'no normal range yet'}`
-  }
-  const { changed, normal } = splitVerdicts(s, [])
-  if (changed.length) return `◆ ${cap(listOf(changed, 2))} changed`
-  if (normal.length) return '○ Within normal range'
-  return '◌ Not enough data yet'
 }
 
 const WEEKDAY = ['M', 'T', 'W', 'T', 'F', 'S', 'S']

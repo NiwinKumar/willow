@@ -331,17 +331,20 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
           </div>
         </div>
         {!atEnd && started ? (
-          <button
-            type="button"
-            onClick={() => {
-              setAtEnd(true)
-              toEnd()
-            }}
-            className="absolute bottom-3 left-1/2 inline-flex min-h-9 -translate-x-1/2 items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse shadow-[0_12px_30px_-12px_rgba(0,0,0,.45)]"
-            style={{ animation: 'wRise .25s both' }}
-          >
-            <ArrowDown size={13} strokeWidth={2} aria-hidden /> Latest
-          </button>
+          // Centred by the wrapper, not a translate: the rise animation owns `translate` and would undo it.
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setAtEnd(true)
+                toEnd()
+              }}
+              className="pointer-events-auto inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse shadow-[0_12px_30px_-12px_rgba(0,0,0,.45)]"
+              style={{ animation: 'wRise .25s both' }}
+            >
+              <ArrowDown size={13} strokeWidth={2} aria-hidden /> Latest
+            </button>
+          </div>
         ) : null}
       </div>
 
