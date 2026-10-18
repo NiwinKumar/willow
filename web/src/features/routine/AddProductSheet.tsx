@@ -60,7 +60,7 @@ export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: bo
     if (open) setStep(preset?.product ? 'confirm' : 'pick')
   }
   return (
-    <RoutineSheet open={open} onClose={onClose} kind="bottom" title={step === 'confirm' ? 'Confirm details' : 'Add a product'} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
+    <RoutineSheet open={open} onClose={onClose} kind="bottom" fixedHeight title={step === 'confirm' ? 'Confirm details' : 'Add a product'} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
       {open ? <AddFlow preset={preset ?? {}} inRoutine={inRoutine} onClose={onClose} step={step} setStep={setStep} /> : null}
     </RoutineSheet>
   )
