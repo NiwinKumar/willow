@@ -1,7 +1,8 @@
 /**
  * Shared reads for the app's screens. Sessions come from the DataProvider (useData); everything else the
  * signed-in person owns is read here through the shared cache (lib/query.ts), so Home, Routine and the
- * advisor never ask twice or disagree. Demo mode has no routine, log, spots or account: these stay idle.
+ * advisor never ask twice or disagree. Demo mode has no spots or account (these stay idle); its routine, ticks
+ * and routine check are the demo journey's, read-only, and ticks a judge makes stay in this tab.
  */
 import { useCallback } from 'react'
 
@@ -18,6 +19,13 @@ export function useOwner(): string | null {
   return data.mode === 'live' && user ? user.uid : null
 }
 
+/** Whose routine the screens read: the signed-in person's own (key = uid), the demo journey's (key 'demo'), or none. */
+export function useRoutineReader(): { key: string | null; demo: boolean } {
+  const uid = useOwner()
+  const data = useData()
+  return data.mode === 'demo' ? { key: 'demo', demo: true } : { key: uid, demo: false }
+}
+
 /** The person's product requests (products they asked Willow to add to the catalog), newest first. */
 export function useProductRequests() {
   const uid = useOwner()
@@ -25,8 +33,8 @@ export function useProductRequests() {
 }
 
 export function useRoutine() {
-  const uid = useOwner()
-  return useQuery(['routine', uid], (t) => api.routine(t).then((r) => r.entries), { enabled: Boolean(uid) })
+  const { key, demo } = useRoutineReader()
+  return useQuery(['routine', key], (t) => (demo ? api.demoRoutine() : api.routine(t)).then((r) => r.entries), { enabled: Boolean(key), public: demo })
 }
 
 /** Products in use today, for a slot. "Stop using" sets ended_at to today, so a product stopped today is gone. */
@@ -37,13 +45,21 @@ export function activeIn(entries: RoutineEntry[] | undefined, slot: 'am' | 'pm')
 
 /** Routine ticks for a range of the person's own days (default: today only). */
 export function useRoutineLog(from: string = localDay(), to: string = from) {
-  const uid = useOwner()
-  return useQuery(['routine-log', uid, from, to], (t) => api.routineLog(t, { from, to }).then((r) => r.days), { enabled: Boolean(uid) })
+  const { key, demo } = useRoutineReader()
+  // Demo: read once and kept (staleMs Infinity), so the ticks a judge makes in this tab are not read over.
+  return useQuery(['routine-log', key, from, to], (t) => (demo ? api.demoRoutineLog({ from, to }) : api.routineLog(t, { from, to })).then((r) => r.days), {
+    enabled: Boolean(key),
+    public: demo,
+    staleMs: demo ? Infinity : undefined,
+  })
 }
 
-/** Tick or untick one product for a day and slot. Optimistic; the api's answer for that day wins. */
+/**
+ * Tick or untick one product for a day and slot. Optimistic; the api's answer for that day wins. In the demo
+ * journey a tick stays in this tab only: nothing is sent, so the demo account never changes.
+ */
 export function useSetRoutineUse() {
-  const uid = useOwner()
+  const { key: uid, demo } = useRoutineReader()
   const { getIdToken } = useAuth()
   return useCallback(
     async (day: string, entryId: string, slot: 'am' | 'pm', used: boolean) => {
@@ -59,6 +75,7 @@ export function useSetRoutineUse() {
         return [...(days ?? []).filter((x) => x.date !== day), next]
       }
       setQueryData<RoutineLogDay[]>(key, patch)
+      if (demo) return
       try {
         const answer = await api.setRoutineUse(await getIdToken(), day, entryId, slot, used)
         setQueryData<RoutineLogDay[]>(key, (days) => [...(days ?? []).filter((x) => x.date !== day), answer])
@@ -70,7 +87,7 @@ export function useSetRoutineUse() {
         throw e
       }
     },
-    [uid, getIdToken],
+    [uid, demo, getIdToken],
   )
 }
 
@@ -79,7 +96,7 @@ export function useSetRoutineUse() {
  * routine itself: one check per routine version, shared by Home and Routine.
  */
 export function useRoutineCheck(entries: RoutineEntry[] | undefined) {
-  const uid = useOwner()
+  const { key: uid, demo } = useRoutineReader()
   const version = (entries ?? [])
     .filter((e) => !e.ended_at)
     .map((e) => `${e.id}:${e.slots.join('')}${e.schedule && e.schedule.kind !== 'daily' ? `:${e.schedule.kind}:${e.schedule.anchor}:${(e.schedule.days ?? []).join('')}` : ''}`)
@@ -96,7 +113,7 @@ export function useRoutineCheck(entries: RoutineEntry[] | undefined) {
       } catch {
         /* private mode */
       }
-      const check = await api.routineCheck(t)
+      const check = demo ? await api.demoRoutineCheck() : await api.routineCheck(t)
       try {
         sessionStorage.setItem(saved, JSON.stringify(check))
       } catch {
@@ -104,7 +121,7 @@ export function useRoutineCheck(entries: RoutineEntry[] | undefined) {
       }
       return check
     },
-    { enabled: Boolean(uid) && entries !== undefined && version.length > 0, staleMs: Infinity },
+    { enabled: Boolean(uid) && entries !== undefined && version.length > 0, staleMs: Infinity, public: demo },
   )
   const { refetch } = query
   /** "Run again": a fresh check, not the one kept for this tab. */

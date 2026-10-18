@@ -383,6 +383,11 @@ export const api = {
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),
+  /** The demo journey's routine, ticks and routine check: read-only, no sign-in. */
+  demoRoutine: () => publicGet<{ entries: RoutineEntry[] }>(`/v1/demo/routine?today=${localDay()}`),
+  demoRoutineLog: (range: { from: string; to: string }) =>
+    publicGet<{ from: string; to: string; days: RoutineLogDay[] }>(`/v1/demo/routine/log?${new URLSearchParams(range).toString()}`),
+  demoRoutineCheck: () => publicGet<RoutineCheck>('/v1/demo/routine/check'),
   startSample: (token: string, sampleId: string) =>
     request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }),
   judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }),

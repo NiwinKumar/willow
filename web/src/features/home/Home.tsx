@@ -141,12 +141,12 @@ function HomeBody() {
   const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
   const todayLine = `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}, about ${minutesFor(tracked)} min`
   const lead = leadFor({ read, goals, demo, checkIn, openResult, placeChips, todayLine })
-  const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
+  const heroLines = withTonight(heroLinesFor(read, goals, demo, due), tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
   // Routine effect: how each product's target measurement moved since it started (lib/effect.ts).
   const outcomeSessions = useOutcomeSessions()
-  const effect = useMemo(() => (demo ? null : routineEffect(entries ?? [], outcomeSessions, check.data)), [demo, entries, outcomeSessions, check.data])
+  const effect = useMemo(() => routineEffect(entries ?? [], outcomeSessions, check.data), [entries, outcomeSessions, check.data])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
@@ -238,8 +238,7 @@ function HomeBody() {
 
   let routineCard: ReactNode
   const routineCls = 'flex-1'
-  if (demo) routineCard = <RoutineEmpty demo className={routineCls} onRoutine={() => navigate('/routine')} />
-  else if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
+  if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
   else if (routine.status === 'error') {
     routineCard = (
       <section aria-label="Routine today" className={`card flex flex-col items-start gap-2 p-5 ${routineCls}`}>
