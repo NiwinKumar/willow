@@ -154,7 +154,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                   className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both,wRingPulse_1.8s_.5s_ease-out_infinite] rounded-full border-[2.5px] border-ink outline-[3px] outline-white/85 outline-solid"
                   style={{ left: `${focusPos.left}%`, top: `${focusPos.top}%`, width: focusSize, height: focusSize, zIndex: 4 }}
                 />
-                <span className="pointer-events-none absolute -translate-x-1/2 animate-[wRise_.4s_.1s_both] rounded-pill bg-selected px-3 py-[7px] text-[12px] whitespace-nowrap text-inverse" style={{ left: `${focusPos.left}%`, top: `calc(${focusPos.top}% + ${focusSize / 2 + 8}px)`, zIndex: 4 }}>
+                <span className="pointer-events-none absolute -translate-x-1/2 animate-[wFadeIn_.4s_.1s_both] rounded-pill bg-selected px-3 py-[7px] text-[12px] whitespace-nowrap text-inverse" style={{ left: `${focusPos.left}%`, top: `calc(${focusPos.top}% + ${focusSize / 2 + 8}px)`, zIndex: 4 }}>
                   {focus.tag}
                 </span>
               </>
