@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useShell } from '../../components/shell/ShellContext'
@@ -91,7 +91,6 @@ function HomeBody() {
   const me = identity(user)
   const shell = useShell()
   const navigate = useNavigate()
-  const location = useLocation()
   const demo = data.mode === 'demo'
   // Goals live on this device (You writes them); read fresh so a change there reorders Home at once.
   const goals = data.goals
@@ -131,12 +130,10 @@ function HomeBody() {
     setUse(day, e.id, slot, on).catch(() => toast.error(`Couldn't save that tick for ${shortName(e)}. Try again.`))
   }
 
-  const checkIn = (site: Session['site'] = 'face_full', mode?: CaptureMode) => shell.openCheckIn({ site, mode })
-  // Today's check-in: every place the person tracks, in one go (the sheet lists them).
-  const checkInToday = () => shell.openCheckIn()
+  // The one check-in: every place the person tracks, in one go (the sheet lists them).
+  const checkIn = () => shell.openCheckIn()
   const openResult = (s: Session) => navigate(`/result/${s.id}`)
   // Add the missing photos to a baseline without a normal range (the check-in's top-up mode).
-  const topUp = (s: Session) => navigate(`/check-in?topup=${s.id}`, { state: { background: location } })
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
   const closeUp = { wanted: goals.includes('pores_texture') || goals.includes('smoother'), doneToday: (data.series('cheek_macro')?.sessions ?? EMPTY).some((s) => counts(s) && dayOf(s.created_at) === day) }
@@ -145,7 +142,7 @@ function HomeBody() {
   const placeChips = demo ? ['Face'] : [...tracked.map((p) => SITE_SHORT[p]), ...(dueNow ? ['Due'] : [])]
   const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
   const todayLine = `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}, about ${minutesFor(tracked)} min`
-  const lead = leadFor({ read, goals, demo, checkIn, checkInToday, openResult, topUp, placeChips, todayLine })
+  const lead = leadFor({ read, goals, demo, checkIn, openResult, placeChips, todayLine })
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
@@ -175,10 +172,10 @@ function HomeBody() {
       d: read.person === 'new' ? 'About three minutes, by a window' : `${plural(read.baselineFrames ?? 0, 'usable photo', 'usable photos')} of ${BAND_FRAMES} · no normal range yet`,
       state: read.person === 'new' ? 'todo' : 'part',
       part: Math.min(1, (read.baselineFrames ?? 0) / BAND_FRAMES),
-      onClick: () => (read.person === 'noBand' && read.baseline && topUpNeed(read.baseline) > 0 ? topUp(read.baseline) : checkIn('face_full')),
+      onClick: checkIn,
     },
     ...(closeUp.wanted
-      ? [{ t: 'Cheek close-up', d: 'For your pores and texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: () => checkIn('cheek_macro') }]
+      ? [{ t: 'Cheek close-up', d: 'For your pores and texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: checkIn }]
       : []),
     { t: 'Add your routine', d: 'So results can point to products', state: entries?.length ? 'done' : 'todo', onClick: () => navigate('/routine') },
     {
@@ -323,19 +320,15 @@ function leadFor({
   goals,
   demo,
   checkIn,
-  checkInToday,
   openResult,
-  topUp,
   placeChips,
   todayLine,
 }: {
   read: HomeRead
   goals: string[]
   demo: boolean
-  checkIn: (site?: Session['site'], mode?: CaptureMode) => void
-  checkInToday: () => void
+  checkIn: () => void
   openResult: (s: Session) => void
-  topUp: (s: Session) => void
   placeChips: string[]
   todayLine: string
 }): Lead {
@@ -348,7 +341,7 @@ function leadFor({
   const t = read.todaySession
   if (t) {
     const site = SITE_SHORT[t.site].toUpperCase()
-    const again = { label: 'Check in again', onClick: () => checkIn(t.site, t.capture_mode) }
+    const again = { label: 'Check in again', onClick: checkIn }
     switch (read.todayKind) {
       case 'measuring': {
         const up = t.status === 'uploading'
@@ -388,7 +381,7 @@ function leadFor({
   const f = read.baselineFrames ?? 0
   switch (read.person) {
     case 'new':
-      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkInToday }, aura: 'coral' }
+      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
     case 'noBand': {
       // Photos kept (under 30 days): add the missing ones to this same baseline (design: "Add 2 photos").
       const need = topUpNeed(read.baseline)
@@ -402,7 +395,7 @@ function leadFor({
           bigLabel: 'usable baseline photos',
           prog: Math.min(1, f / BAND_FRAMES),
           chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : []), `${plural(need, 'photo')} left`],
-          cta: { label: `Add ${plural(need, 'photo')}`, onClick: () => topUp(b) },
+          cta: { label: 'Check in', onClick: checkIn },
           secondary: { label: 'See baseline', onClick: () => openResult(b) },
           aura: 'coral',
         }
@@ -415,7 +408,7 @@ function leadFor({
         bigLabel: 'usable baseline photos',
         prog: Math.min(1, f / BAND_FRAMES),
         chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
-        cta: { label: 'Check in', onClick: checkInToday },
+        cta: { label: 'Check in', onClick: checkIn },
         secondary: read.baseline ? { label: 'See baseline', onClick: () => openResult(read.baseline!) } : undefined,
         aura: 'coral',
       }
@@ -428,7 +421,7 @@ function leadFor({
         big: read.lastFace ? String(daysSince(read.lastFace.created_at)) : undefined,
         bigLabel: 'days since your last check-in',
         chips: placeChips,
-        cta: { label: 'Check in now', onClick: checkInToday },
+        cta: { label: 'Check in now', onClick: checkIn },
         aura: 'sky',
       }
     default:
@@ -439,7 +432,7 @@ function leadFor({
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
         bigLabel: 'days since your baseline',
         chips: placeChips,
-        cta: { label: 'Check in', onClick: checkInToday },
+        cta: { label: 'Check in', onClick: checkIn },
         aura: 'violet',
       }
   }

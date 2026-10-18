@@ -10,12 +10,13 @@ import type { TrackPlace } from '../../lib/track'
 export type AdvisorSeed = { id: number; text: string; context?: string }
 
 export type ShellApi = {
-  /** Open the check-in picker (site + mode), optionally preselected. */
-  openCheckIn: (preset?: { site?: Site; mode?: CaptureMode }) => void
+  /** Open the check-in sheet: today's check-in of every tracked place, the only way to check in. `add`
+   * puts places on the person's list first (a product test adds both forearms). */
+  openCheckIn: (opts?: { add?: TrackPlace[] }) => void
   closeCheckIn: () => void
   checkInOpen: boolean
-  /** Start the check-in flow directly (skips the picker): /check-in?site=&mode= over the current page. */
-  startCheckIn: (site: Site, mode: CaptureMode, opts?: { sample?: string; places?: TrackPlace[] }) => void
+  /** Start the check-in flow directly (the sheet's Start): /check-in?site=&mode=&places= over the current page. */
+  startCheckIn: (site: Site, mode: CaptureMode, opts?: { sample?: string; places?: TrackPlace[]; upload?: boolean }) => void
   /** Open the advisor panel; with `text`, that question is asked straight away. `context` labels the chip. */
   openAdvisor: (text?: string, context?: string) => void
   closeAdvisor: () => void

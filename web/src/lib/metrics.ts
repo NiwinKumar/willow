@@ -82,8 +82,8 @@ export const SITE_LABEL: Record<Site, string> = {
   forehead_macro: 'Forehead close-up',
   chin_macro: 'Chin close-up',
   nose_macro: 'Nose close-up',
-  forearm_treated: 'Treated forearm',
-  forearm_control: 'Control forearm',
+  forearm_treated: 'Arm with product',
+  forearm_control: 'Arm without product',
 }
 
 /** The goals a person can pick (up to three), each matched 1:1 to catalog concerns and to the metrics it

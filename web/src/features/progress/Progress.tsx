@@ -161,7 +161,7 @@ export default function Progress() {
               days={days}
               today={today}
               dots={routineDots}
-              onToday={() => shell.openCheckIn({ site })}
+              onToday={() => shell.openCheckIn()}
               canPrev={mi > 0}
               canNext={mi < months.length - 1}
               onPrev={() => mi > 0 && setMonthPick(months[mi - 1])}
@@ -240,7 +240,7 @@ export default function Progress() {
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-4">
-          <BaselineCard baseline={baseline} mode={mode} site={site} onCheckIn={() => shell.startCheckIn(site, mode)} />
+          <BaselineCard baseline={baseline} mode={mode} site={site} onCheckIn={() => shell.openCheckIn()} />
           <NotesCard notes={notes} />
         </div>
         <Disclaimer />
