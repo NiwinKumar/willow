@@ -1,7 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type Ref } from 'react'
 
-import { Button } from '../../components/ui/Button'
 import { Chip } from '../../components/ui/Chip'
 import { useOwner } from '../../data/hooks'
 import type { FeelTag, FeelVerdict, RoutineEntry } from '../../data/types'
@@ -16,14 +15,14 @@ import { failureText, useRoutineWrites } from './writes'
 const FAIL = "Couldn't save how it feels. Nothing changed; try again."
 
 /** The three verdicts as one-tap pills (aria-pressed), 44px tall, wrapping on a phone. */
-function VerdictButtons({ value, disabled, onPick, label, onDark }: { value: FeelVerdict | null; disabled?: boolean; onPick: (v: FeelVerdict) => void; label: string; onDark?: boolean }) {
+function VerdictButtons({ value, disabled, onPick, label, onDark, compact }: { value: FeelVerdict | null; disabled?: boolean; onPick: (v: FeelVerdict) => void; label: string; onDark?: boolean; compact?: boolean }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+    <div role="group" aria-label={label} className={`flex flex-wrap ${compact ? 'gap-1.5' : 'gap-2'}`}>
       {VERDICTS.map((v) => {
         const on = v.id === value
         const tone = on ? 'bg-selected text-inverse' : onDark ? 'bg-white text-ink' : 'bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5'
         return (
-          <button key={v.id} type="button" aria-pressed={on} disabled={disabled} onClick={() => !on && onPick(v.id)} className={`min-h-11 rounded-pill px-4 text-[14px] transition-[background,scale] duration-200 active:scale-[.97] disabled:opacity-60 ${tone}`}>
+          <button key={v.id} type="button" aria-pressed={on} disabled={disabled} onClick={() => !on && onPick(v.id)} className={`rounded-pill transition-[background,scale] duration-200 active:scale-[.97] disabled:opacity-60 ${compact ? 'hit44 min-h-8 px-2.5 text-[12.5px] sm:px-3 sm:text-[13px]' : 'min-h-11 px-4 text-[14px]'} ${tone}`}>
             {v.label}
           </button>
         )
@@ -164,22 +163,22 @@ export function FeelNudge({ entries, onOpen }: { entries: RoutineEntry[]; onOpen
 
   if (answered)
     return (
-      <section aria-labelledby={headingId} className="card flex flex-wrap items-center gap-3 px-5 py-3.5" style={{ animation: 'wRise .35s both' }}>
-        <ProductImage product={imageOf(answered.entry)} size={40} decorative />
-        <div className="flex min-w-0 flex-1 basis-[220px] flex-col gap-0.5" role="status">
-          <h2 id={headingId} ref={thanks} tabIndex={-1} className="text-[16px] font-normal outline-none">
+      <section aria-labelledby={headingId} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[20px] border border-line bg-white/55 px-3.5 py-2 backdrop-blur-sm" style={{ animation: 'wRise .35s both' }}>
+        <ProductImage product={imageOf(answered.entry)} size={28} decorative />
+        <div className="flex min-w-0 flex-1 basis-[220px] items-baseline gap-x-2 gap-y-0 flex-wrap" role="status">
+          <h2 id={headingId} ref={thanks} tabIndex={-1} className="text-[14px] font-normal outline-none">
             Thanks, saved.
           </h2>
-          <span className="text-[13px] leading-[1.45] text-ink-2">
+          <span className="text-[12.5px] leading-[1.4] text-ink-2">
             {entryName(answered.entry)}: “{VERDICT_LABEL[answered.verdict]}”. Only you see it.
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="outline" onClick={() => onOpen(answered.entry)}>
+          <button type="button" onClick={() => onOpen(answered.entry)} className="hit44 min-h-8 rounded-pill px-3 text-[13px] shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5">
             Add how it feels
-          </Button>
-          <button type="button" onClick={() => setHidden(true)} aria-label="Close" className="grid size-11 place-items-center rounded-full text-ink-2 hover:bg-ink/5">
-            <X size={18} strokeWidth={1.6} aria-hidden />
+          </button>
+          <button type="button" onClick={() => setHidden(true)} aria-label="Close" className="hit44 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-ink/5">
+            <X size={16} strokeWidth={1.6} aria-hidden />
           </button>
         </div>
       </section>
@@ -187,24 +186,22 @@ export function FeelNudge({ entries, onOpen }: { entries: RoutineEntry[]; onOpen
 
   const n = shown!
   return (
-    <section aria-labelledby={headingId} aria-busy={saving !== null || undefined} className="card flex flex-col gap-3 px-5 py-4">
-      <div className="flex items-center gap-3">
-        <ProductImage product={imageOf(n.entry)} size={40} decorative />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 id={headingId} className="text-[16px] leading-[1.3] font-normal">
+    <section aria-labelledby={headingId} aria-busy={saving !== null || undefined} className="relative flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[20px] border border-line bg-white/55 py-2.5 pr-2 pl-3.5 backdrop-blur-sm">
+      <div className="flex min-w-0 flex-1 basis-[280px] items-center gap-3 pr-7 sm:pr-0">
+        <ProductImage product={imageOf(n.entry)} size={32} decorative />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h2 id={headingId} className="text-[14px] leading-[1.3] font-normal">
             {nudgeQuestion(n, entryName(n.entry))}
           </h2>
-          <span className="text-[13px] text-ink-2">Your own view, one tap. Only you see it.</span>
+          <span className="hidden text-[12px] text-ink-2 sm:block">Your own view, one tap. Only you see it.</span>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        <VerdictButtons label={`How ${entryName(n.entry)} is going for you`} value={null} disabled={saving !== null} onPick={(v) => void pick(n, v)} />
-        <Button variant="ghost" onClick={notNow} disabled={saving !== null} className="ml-auto text-ink-2">
-          Not now
-        </Button>
-      </div>
+      <VerdictButtons compact label={`How ${entryName(n.entry)} is going for you`} value={null} disabled={saving !== null} onPick={(v) => void pick(n, v)} />
+      <button type="button" onClick={notNow} disabled={saving !== null} aria-label="Not now" title="Not now: hides this for a few days" className="hit44 absolute top-1.5 right-1.5 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-ink/5 disabled:opacity-60 sm:static">
+        <X size={16} strokeWidth={1.6} aria-hidden />
+      </button>
       {error ? (
-        <p role="alert" className="text-[13px] text-avoid">
+        <p role="alert" className="basis-full text-[13px] text-avoid">
           {error}
         </p>
       ) : null}

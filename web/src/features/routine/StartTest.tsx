@@ -16,7 +16,7 @@ export type TestPreset = { entry_id?: string; product_id?: string; name: string;
  * "Start a forearm test" (design: product test band, "Self-tanner test"): name, length (7 to 56 days, 28 by
  * default), then straight into the treated-arm check-in so the first photos are the "before".
  */
-export function StartTest({ preset, onCancel, onStarted }: { preset: TestPreset; onCancel?: () => void; onStarted?: () => void }) {
+export function StartTest({ preset, onCancel, onStarted, hideIntro }: { preset: TestPreset; onCancel?: () => void; onStarted?: () => void; /** The page around it already explains how a test works. */ hideIntro?: boolean }) {
   const writes = useProductTestWrites()
   const shell = useMaybeShell()
   const data = useData()
@@ -43,9 +43,11 @@ export function StartTest({ preset, onCancel, onStarted }: { preset: TestPreset;
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[14px] leading-[1.5]">
-        Use it on a small square on one forearm and leave the same square on the other forearm untouched. Photograph both arms together before the first use, then every few days. Willow gives a verdict after day {VERDICT_AFTER_DAYS}.
-      </p>
+      {hideIntro ? null : (
+        <p className="text-[14px] leading-[1.5]">
+          Use it on a small square on one forearm and leave the same square on the other forearm untouched. Photograph both arms together before the first use, then every few days. Willow gives a verdict after day {VERDICT_AFTER_DAYS}.
+        </p>
+      )}
       {preset.fixedName ? null : <TextField label="What you are testing" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Self-tanner" />}
       <div className="flex flex-col gap-1.5">
         <span id="test-length" className="text-[13px] opacity-80">
