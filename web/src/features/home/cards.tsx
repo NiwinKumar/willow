@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react'
 
-import type { Session } from '../../data/types'
+import { ProductImage } from '../../components/willow/ProductImage'
+import type { RoutineEntry, Session } from '../../data/types'
+import { parseDate } from '../../lib/format'
+import type { Outcome } from '../../lib/outcome'
+import { imageOf } from '../routine/routineModel'
 import { fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
 import { verdictKind } from '../../lib/verdict'
-import { byGoals, metricAura, shortDay } from './derive'
+import { byGoals, metricAura, shortDay, shortName } from './derive'
 import { CardHead, Pill, VerdictLine } from './parts'
 
 /** Standard Home card shell: surface, radius 30, rise in. */
@@ -104,6 +108,62 @@ export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: s
         ))}
       </ul>
     </HomeCard>
+  )
+}
+
+/** Whole days since a product was started (never negative). */
+const daysOn = (startedAt: string) => Math.max(0, Math.floor((Date.now() - parseDate(startedAt).getTime()) / 86_400_000))
+/** Most effects take 4 to 8 weeks to show beyond normal photo variation (the wording lib/outcome.ts uses). */
+const WATCH_WEEKS = 8
+
+/**
+ * Product watch: the products in the routine that Willow can judge, each with how long it has been in use and
+ * what the measurements say about it (changed beyond your normal range, still within it, or too early).
+ * Outcomes come from lib/outcome.ts, so the hedging stays: timing is an association, not proof.
+ */
+export function ProductWatchCard({ rows, onOpen, className }: { rows: { e: RoutineEntry; o: Outcome }[]; onOpen: () => void; className?: string }) {
+  const shown = rows.slice(0, 4)
+  return (
+    <section
+      aria-label="Product watch"
+      className={`relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-3 overflow-hidden rounded-lg squircle p-5 text-ink ${className ?? ''}`}
+      style={{ background: 'radial-gradient(100% 90% at 0% 0%, #E6F3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #D8B8FF 0%, transparent 62%), #EAF2FF', boxShadow: 'inset 0 0 44px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(61,123,255,.55)' }}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-mono text-[11px] tracking-[.08em]">■ PRODUCT WATCH</span>
+        <button type="button" onClick={onOpen} className="min-h-11 py-1 text-[12.5px] text-ink-2 hover:text-ink">
+          Routine →
+        </button>
+      </div>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {shown.map(({ e, o }) => {
+          const days = daysOn(e.started_at)
+          const week = Math.min(WATCH_WEEKS, Math.floor(days / 7) + 1)
+          const glyph = o.kind === 'real' ? '◆' : o.kind === 'none' ? '○' : '◌'
+          return (
+            <li key={e.id} className="flex min-h-12 items-center gap-3 rounded-[18px] squircle bg-white/55 py-1.5 pr-3 pl-1.5">
+              <ProductImage product={imageOf(e)} size={36} decorative />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[13.5px]">{shortName(e)}</span>
+                <span className="truncate text-[12px] text-ink-2" title={o.detail}>
+                  <span aria-hidden>{glyph} </span>
+                  {o.text}
+                </span>
+              </span>
+              <span className="flex shrink-0 flex-col items-end gap-1" aria-label={`Day ${days}`}>
+                <span className="font-mono text-[10.5px] text-ink-2">DAY {days}</span>
+                <span aria-hidden className="flex gap-[2px]">
+                  {Array.from({ length: WATCH_WEEKS }, (_, i) => (
+                    <span key={i} className={`h-[5px] w-[5px] rounded-full ${i < week ? 'bg-selected' : 'bg-ink/15'}`} />
+                  ))}
+                </span>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <span className="mt-auto text-[11.5px] leading-[1.4] text-ink-2">Most products take 4 to 8 weeks to show beyond normal photo variation. Timing is an association, not proof.</span>
+    </section>
   )
 }
 

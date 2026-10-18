@@ -14,18 +14,17 @@ import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
+import { outcomeFor } from '../../lib/outcome'
 import { addToCalendar } from '../../lib/reminders'
 import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
 import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
-import { ChangedCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
+import { ChangedCard, ProductWatchCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
-import { ApartCard, GapCard, TonightCard, tonightOf } from '../routine/CheckCards'
 import { useProductTests } from '../routine/productTests'
-import { entryName, findingsOf, type Finding } from '../routine/routineModel'
-import { useRoutineWrites } from '../routine/writes'
-import { addDays, restsOn } from '../routine/schedule'
+import { useOutcomeSessions } from '../routine/routineModel'
+import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
 import { LeadCard, type Lead } from './LeadCard'
@@ -141,26 +140,17 @@ function HomeBody() {
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
-  // The routine check card: tonight's pair, else the first conflict, else the first gap.
-  const yesterday = addDays(day, -1)
-  const lastNight = useRoutineLog(yesterday, yesterday)
-  const usedLastNight = (id: string) => Boolean(lastNight.data?.find((d) => d.date === yesterday)?.used[id]?.includes('pm'))
-  const writes = useRoutineWrites()
-  const current = useMemo(() => (entries ?? []).filter((e) => !e.ended_at), [entries])
-  const findings = useMemo(() => (check.data && entries ? findingsOf(check.data, entries) : []), [check.data, entries])
-  const tonight = demo ? null : tonightOf(findings, current, usedLastNight)
-  const apart = demo ? null : (findings.find((f) => f.kind === 'Conflict' && f.entries.length >= 2) ?? null)
-  const gap = demo ? null : (findings.find((f) => f.kind === 'Gap') ?? null)
-  const hasCheck = Boolean(tonight || apart || gap)
-  const alternate = async (on: RoutineEntry, off: RoutineEntry) => {
-    try {
-      await writes.alternate(on, off)
-    } catch {
-      toast.error(`Couldn't set ${entryName(on)} and ${entryName(off)} to alternate. Nothing changed; try again.`)
-    }
-  }
-  const askAbout = (f: Finding) => ask(f.question, 'Routine check')
-  const findFor = (f: Finding) => navigate('/routine', { state: { find: { ...f.find, mode: 'search', slot: f.find?.category === 'sunscreen' ? 'am' : undefined } } })
+  // Product watch: each active product with the real outcome it can be judged on (docs/UX_SPEC.md).
+  const outcomeSessions = useOutcomeSessions()
+  const watch = useMemo(() => {
+    if (demo) return []
+    const rank = { real: 0, none: 1, early: 2, unmeasured: 3 } as const
+    return (entries ?? [])
+      .filter((e) => !e.ended_at)
+      .map((e) => ({ e, o: outcomeFor(e, outcomeSessions) }))
+      .filter((r) => r.o.kind !== 'unmeasured')
+      .sort((a, b) => rank[a.o.kind] - rank[b.o.kind])
+  }, [demo, entries, outcomeSessions])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestFace = latest(face, (s) => s.status === 'done')
   const diary = !demo && spots.data?.enough_data && latestFace ? spots.data : null
@@ -220,26 +210,7 @@ function HomeBody() {
     })
   }
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
-  if (hasCheck) {
-    small.push({
-      key: 'check',
-      node: (cls) =>
-        tonight ? (
-          <TonightCard
-            className={cls}
-            tonight={tonight}
-            usedLastNight={usedLastNight}
-            onAlternate={alternate}
-            onAsk={() => ask(`Why should I alternate my ${shortName(tonight.on).toLowerCase()} and ${shortName(tonight.off).toLowerCase()}?`, 'Routine check')}
-            delay={0.28}
-          />
-        ) : apart ? (
-          <ApartCard className={cls} finding={apart} onRoutine={() => navigate('/routine')} onAsk={() => askAbout(apart)} delay={0.28} />
-        ) : gap ? (
-          <GapCard className={cls} finding={gap} onFind={() => findFor(gap)} onAsk={() => askAbout(gap)} delay={0.28} />
-        ) : null,
-    })
-  }
+  if (watch.length) small.push({ key: 'watch', node: (cls) => <ProductWatchCard className={cls} rows={watch} onOpen={() => navigate('/routine')} /> })
   if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
   if (diary && latestFace) small.push({ key: 'spots', node: (cls) => <SpotDiaryTile className={cls} diary={diary} onOpen={() => navigate({ pathname: `/result/${latestFace.id}`, hash: '#spot-diary' })} /> })
   const spans = rowSpans(small.length)
