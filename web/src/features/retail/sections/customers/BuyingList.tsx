@@ -1,5 +1,5 @@
 import { ChevronDown, Copy, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -13,9 +13,13 @@ import { useView } from '../../useView'
 /*
  * Buying list (retailer workspace; api buying.py): the assortment gaps worth acting on, ranked by people who want
  * the goal x how big the gap is, each as a short brief a buyer can paste, with under-used products already in the
- * catalog to look at first. Every number in a brief comes from the aggregates; Gemini only reads ingredient lists
- * (checked), and every candidate carries "Not measured … yet" or "Too few users to measure yet", never a tier.
+ * catalog to look at first. Gemini writes it as an agent (api buying_agent.py: which gaps, their order, the briefs,
+ * the products and why), every number and word checked; while it works (and when it can't) the fixed-logic list is
+ * shown and the page asks again. Every candidate carries "Not measured … yet" or "Too few users to measure yet".
  */
+
+const POLL_MS = 5000
+const POLLS = 24
 
 /** Some packs print INCI in capitals ("NIACINAMIDE"): shown as Niacinamide. */
 const inciCase = (s: string) => (s === s.toUpperCase() ? s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()) : s)
@@ -46,6 +50,31 @@ const copy = (text: string, what: string) =>
 export function BuyingList() {
   const { filters, insights } = useRetailData()
   const q = useView<List>(`buying|${filters.cohort}|${filters.range}`, () => retailerBuyingList(filters))
+  // Gemini's list replaces the fixed one when it is ready: ask again quietly while it is pending.
+  const [newer, setNewer] = useState<{ key: string; list: List } | null>(null)
+  const viewKey = `${filters.cohort}|${filters.range}`
+  const pending = (newer?.key === viewKey ? newer.list : q.data)?.pending === true
+  useEffect(() => {
+    if (!pending) return
+    let alive = true
+    let left = POLLS
+    const tick = () => {
+      if (!alive || left-- <= 0) return
+      retailerBuyingList(filters).then(
+        (l) => {
+          if (!alive) return
+          if (l.pending) window.setTimeout(tick, POLL_MS)
+          else setNewer({ key: viewKey, list: l })
+        },
+        () => alive && window.setTimeout(tick, POLL_MS),
+      )
+    }
+    const t = window.setTimeout(tick, POLL_MS)
+    return () => {
+      alive = false
+      window.clearTimeout(t)
+    }
+  }, [pending, viewKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const d = insights.status === 'ready' || insights.status === 'empty' ? insights.d : null
   // Folded by default (it is long); a #buying link opens it.
   const { hash } = useLocation()
@@ -68,7 +97,7 @@ export function BuyingList() {
         <ErrorState title="The buying list didn’t load" body="The aggregates it is built from didn’t answer. No brief is shown rather than a guessed one." onRetry={q.retry} />
       </section>
     )
-  const list = q.data
+  const list = newer?.key === viewKey ? newer.list : q.data
   return (
     <section id="buying">
       <Panel
@@ -76,14 +105,22 @@ export function BuyingList() {
         id="proof-buying-h"
         meta={
           list.source === 'gemini' ? (
-            <Badge tone="outline" title="Gemini read the ingredient lists of the products below; each reason was checked against the product’s INCI list. Every number comes from the aggregates.">
-              <Sparkles size={12} strokeWidth={1.7} aria-hidden /> Ingredients read by Gemini
+            <Badge tone="outline" title="Gemini chose the gaps and their order, wrote the briefs and picked the products; every number, word and product was checked against the aggregates and the catalog.">
+              <Sparkles size={12} strokeWidth={1.7} aria-hidden /> Written by Gemini
+            </Badge>
+          ) : list.pending ? (
+            <Badge tone="gray" title="Showing the fixed-logic list until Gemini's is ready.">
+              <Sparkles size={12} strokeWidth={1.7} aria-hidden className="animate-pulse" /> Gemini is writing it…
             </Badge>
           ) : null
         }
         description={
           open || !list.items.length ? (
-            'The gaps worth acting on, ranked by how many people want the goal and how big the gap is, with under-used products already in the catalog to look at first.'
+            list.source === 'gemini' && list.summary ? (
+              list.summary
+            ) : (
+              'The gaps worth acting on, ranked by how many people want the goal and how big the gap is, with under-used products already in the catalog to look at first.'
+            )
           ) : (
             <>
               <strong>

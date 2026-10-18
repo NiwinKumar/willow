@@ -1,37 +1,28 @@
 """Buying list (Willow Proof, retailer workspace): the assortment gaps worth acting on, as short
 buying briefs, each with under-used products already in the catalog to look at first.
 
-1. Watch: per goal and price tier (cohort.TIERS, INR-equivalent), the catalog's options and their
-   measured outcome rate (retailer.insights `gaps`, the same numbers as the Customers tab), weighted
-   by how many people want the goal (`needs`).
-2. Gaps: `missing` (no option in the tier), `weak` (options well below the goal's best tier, or
-   under 20% visible change), `low_everywhere` (every measured tier under 20%), `unmeasured`
-   (options, none with 10+ people at week 8), `thin` (one option). Ranked by people x severity.
-3. Brief: one deterministic sentence per gap; every number in it comes from the aggregates.
-4. Candidates: catalog products, never outside ones (there is no wider catalog yet), that are
-   under-used for the goal: in the tier and sold for the goal but with too few users to measure, or
-   in the tier with an active ingredient used for the goal while not sold or measured for it.
-   Gemini reads the ingredient lists and says which ingredient fits and why, checked: the
-   ingredient must be in that product's INCI list, no numbers, no claim that it works. Without
-   Gemini (or when a pick fails the checks) a fixed ingredient table does the same.
+Gemini writes it as an agent (app/buying_agent.py): it reads the aggregates through tools, decides
+which gaps matter and in what order, writes the briefs, picks the shelf products and says why; code
+checks every number, word and product. It runs in the background once per filter and data version;
+until it is ready (and whenever Gemini can't be reached) this module's fixed logic gives the list:
+- gaps per goal and price tier (cohort.TIERS, INR-equivalent) from retailer.insights `gaps` and
+  `needs`: `missing`, `weak` (well behind the goal's best tier, or under 20% visible change),
+  `low_everywhere`, `unmeasured`, `thin`; ranked by people x severity;
+- one template brief per gap, every number from the aggregates;
+- candidates from the catalog only (there is no wider catalog yet): sold for the goal with too few
+  users to measure, or not sold for it with an ingredient a fixed table links to the goal.
 
-Nothing here implies a candidate is proven: candidates carry `label` "Not measured for <goal> yet"
-or "Too few users to measure yet", and the list carries `caveat`.
+Nothing implies a candidate is proven: candidates carry `label` "Not measured for <goal> yet" or
+"Too few users to measure yet" (set by code), and the list carries `caveat`.
 """
 
-import json
 import logging
 import re
 import threading
 import time
-from collections import defaultdict
 from typing import Any
 
-from pydantic import BaseModel, Field
-
-from app import catalog, cohort, gemini, retail_intel, retailer
-from app.explain import BANNED
-from app.proof_ai import OVERCLAIM
+from app import catalog, cohort, retail_intel, retailer
 
 log = logging.getLogger("willow.buying")
 
@@ -283,29 +274,6 @@ def _template_why(gap: dict[str, Any], kind: str, ingredient: str | None) -> str
     )
 
 
-class Fit(BaseModel):
-    gap: str = Field(max_length=60)
-    product_id: str = Field(max_length=120)
-    ingredient: str = Field(max_length=80)
-    why: str = Field(max_length=240)
-
-
-class Fits(BaseModel):
-    fits: list[Fit] = Field(default_factory=list, max_length=20)
-
-
-INSTRUCTIONS = """You help a skincare retailer's buyer. For each GAP (a goal people want help
-with, in a price tier) you get CANDIDATES: products already in the store, in that tier, not sold
-for that goal, with their full ingredient (INCI) lists. Pick up to 3 per gap whose ingredient list
-has an ingredient commonly used for that goal, and say which ingredient and why it is worth a look,
-in one short plain sentence.
-- `ingredient` must be copied from that product's INCI list, and be an active ingredient (never
-  water, glycerin or another base).
-- Cosmetic, cautious wording: it is a reason to look, never evidence. Never say it works, is
-  effective, proven, clinically anything, treats or cures, and never name a medical condition.
-- Never describe skin colour or lightness (no brighten, lighten, radiance, fair).
-- No numbers or percentages. Skip a gap when nothing fits."""
-
 # Skin colour or lightness wording (docs/DESIGN.md principle 3): never in a reason.
 LIGHTNESS = re.compile(r"\b(bright\w*|lighten\w*|whiten\w*|fair\w*|radian\w*|glow\w*)\b", re.I)
 NOT_PROVEN = re.compile(
@@ -313,73 +281,6 @@ NOT_PROVEN = re.compile(
     r"reduce)|reduces?|fades?|eliminat\w*|best)\b",
     re.I,
 )
-
-
-def _fit_problem(f: Fit, p: dict[str, Any] | None, goal: str) -> str | None:
-    if p is None:
-        return "unknown product"
-    name = in_inci(p, f.ingredient)
-    if not name:
-        return "the ingredient is not on its INCI list"
-    if name not in table_fit(p, goal):
-        return "not an ingredient Willow links to this goal"
-    # digits only as part of a name (a product's or the ingredient's own, e.g. "C15", "Ceramide NP")
-    plain = f.why
-    for n in (p["name"], p["brand"], name, f.ingredient):
-        plain = plain.replace(n, "")
-    if re.search(r"\d", plain):
-        return "a number"
-    if OVERCLAIM.search(f.why) or BANNED.search(f.why) or NOT_PROVEN.search(f.why):
-        return "an efficacy claim"
-    if LIGHTNESS.search(f.why):
-        return "skin lightness wording"
-    return None
-
-
-def gemini_fits(gaps: list[dict[str, Any]], fit_pools: dict[str, list[dict]]) -> dict[str, list]:
-    """Gemini's reading of the ingredient lists: {gap id: [(product, inci name, why)]}, checked.
-    Raises gemini.GeminiError when Gemini can't be reached."""
-    payload = [
-        {
-            "gap": g["id"],
-            "goal": g["goal"],
-            "tier": g["tier"] or "any",
-            "candidates": [
-                {
-                    "product_id": p["product_id"],
-                    "name": f"{p['brand']} {p['name']}",
-                    "inci": _inci(p)[:60],
-                }
-                for p in fit_pools[g["id"]][:8]
-            ],
-        }
-        for g in gaps
-        if fit_pools.get(g["id"])
-    ]
-    if not payload:
-        return {}
-    out = gemini.generate_json(
-        "buying_fits",
-        [json.dumps({"GAPS": payload})],
-        Fits,
-        instructions=INSTRUCTIONS,
-        temperature=0.1,
-        max_output_tokens=2000,
-        timeout_ms=20_000,
-    )
-    picked: dict[str, list] = defaultdict(list)
-    for f in out.fits:
-        pool = {p["product_id"]: p for p in fit_pools.get(f.gap, [])}
-        p = pool.get(f.product_id)
-        goal = next((g["goal_id"] for g in gaps if g["id"] == f.gap), "")
-        problem = _fit_problem(f, p, goal)
-        if problem:
-            log.info("buying fit dropped (%s): %s", problem, f.product_id)
-            continue
-        if any(x[0]["product_id"] == f.product_id for x in picked[f.gap]):
-            continue
-        picked[f.gap].append((p, in_inci(p, f.ingredient), f.why.strip()))
-    return picked
 
 
 CAVEAT = (
@@ -390,68 +291,98 @@ CAVEAT = (
 
 _cache: dict[tuple, tuple[float, dict[str, Any]]] = {}
 _lock = threading.Lock()
+_inflight: dict[tuple, threading.Thread] = {}
 CACHE_S = 6 * 3600
 RETRY_S = 60
+WAIT_S = 1.5  # how long a request waits for the agent before answering with the fixed list
 
 
-def buying_list(cohort_: str = "mixed", range_: str = "all") -> dict[str, Any]:
-    """The ranked briefs with their candidates. Cached per filter and data version (a failed
-    Gemini read is retried after a minute). Raises when the rows are unavailable."""
-    ins = retailer.insights(cohort_, range_)
-    _, version = retailer._rows()
-    key = (cohort_, range_, version)
-    with _lock:
-        hit = _cache.get(key)
-        if hit and time.time() < hit[0]:
-            return hit[1]
-    rows = {r["product_id"]: r for r in retail_intel.products(cohort_, range_)["products"]}
+KIND_WORDS = ("missing", "weak", "low_everywhere", "unmeasured", "thin")
+
+
+def kind_of(g: dict[str, Any], tier: str | None) -> str:
+    """The kind of gap a goal x tier is (`low_everywhere` for a whole goal), for the badge."""
+    tiers = {t: g[t] for t, _, _ in cohort.TIERS}
+    rates = {t: v["rate"] for t, v in tiers.items() if v["rate"] is not None}
+    if tier is None:
+        return "low_everywhere"
+    v, best = tiers[tier], max(rates.values()) if rates else None
+    if v["options"] == 0:
+        return "missing"
+    if v["rate"] is None:
+        return "unmeasured"
+    if best is not None and (best - v["rate"] >= BEHIND or v["rate"] < LOW_RATE):
+        return "weak"
+    return "thin" if v["options"] == 1 else "weak"
+
+
+def rules_list(ins: dict[str, Any], rows: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """The fixed-logic list: ranked gaps, template briefs, table-matched candidates. Shown while the
+    agent works and whenever Gemini can't be reached."""
     gaps = [] if ins.get("empty") else find_gaps(ins)
-    all_pools = {g["id"]: pools(g, rows) for g in gaps}
-    source = "rules"
-    picked: dict[str, list] = {}
-    try:
-        picked = gemini_fits(gaps, {k: v["fit"] for k, v in all_pools.items()})
-        source = "gemini" if any(picked.values()) else "rules"
-    except gemini.GeminiError as exc:
-        log.info("buying list without Gemini: %s", exc)
     items = []
     for g in gaps:
         title, text = brief(g)
-        cands = [
-            _candidate(p, g, "few", None, _template_why(g, "few", None))
-            for p in all_pools[g["id"]]["few"]
-        ]
-        chosen = picked.get(g["id"]) or []
-        for p, ing, why in chosen:
-            cands.append(_candidate(p, g, "fit", ing, why))
-        # Gemini's reading first; the fixed table fills any slot left (leave-on products first)
-        taken = {c["product_id"] for c in cands}
-        for p in all_pools[g["id"]]["fit"]:
-            if p["product_id"] not in taken:
-                ing = table_fit(p, g["goal_id"])[0]
-                cands.append(_candidate(p, g, "fit", ing, _template_why(g, "fit", ing)))
+        pool = pools(g, rows)
+        cands = [_candidate(p, g, "few", None, _template_why(g, "few", None)) for p in pool["few"]]
+        for p in pool["fit"]:
+            ing = table_fit(p, g["goal_id"])[0]
+            cands.append(_candidate(p, g, "fit", ing, _template_why(g, "fit", ing)))
         items.append(
             {
                 **{k: g[k] for k in ("id", "goal_id", "goal", "tier", "kind", "demand", "options")},
-                "tier_label": TIER_LABEL.get(g["tier"], "every tier")
-                if g["tier"]
-                else "every tier",
+                "tier_label": TIER_LABEL[g["tier"]] if g["tier"] else "every tier",
                 "price": price_text(g["tier"]) if g["tier"] else None,
                 "title": title,
                 "brief": text,
                 "candidates": cands[:MAX_CANDIDATES],
             }
         )
-    result = {
-        "filters": ins.get("filters"),
-        "cohort": ins.get("cohort"),
-        "items": items,
-        "source": source,
-        "caveat": CAVEAT,
-    }
+    return items
+
+
+def _agent(key: tuple, ins: dict[str, Any], rows: dict, cohort_: str, range_: str) -> None:
+    from app import buying_agent
+
+    try:
+        items, summary = buying_agent.run(ins, rows, cohort_, range_)
+        out, ttl = {"items": items, "summary": summary, "source": "gemini"}, CACHE_S
+    except Exception as exc:  # Gemini unreachable, or it added nothing usable
+        log.info("buying list without Gemini: %s", exc)
+        out, ttl = {"items": rules_list(ins, rows), "summary": None, "source": "rules"}, RETRY_S
     with _lock:
-        _cache[key] = (
-            time.time() + (CACHE_S if source == "gemini" or not gaps else RETRY_S),
-            result,
-        )
-    return result
+        _cache[key] = (time.time() + ttl, out)
+
+
+def buying_list(cohort_: str = "mixed", range_: str = "all") -> dict[str, Any]:
+    """The buying list. Gemini writes it as an agent (app/buying_agent.py) in the background,
+    once per filter and data version; until it is ready the fixed-logic list is returned with
+    `pending: true` and the page asks again. Raises when the rows are unavailable."""
+    ins = retailer.insights(cohort_, range_)
+    _, version = retailer._rows()
+    key = (cohort_, range_, version)
+    head = {"filters": ins.get("filters"), "cohort": ins.get("cohort"), "caveat": CAVEAT}
+    with _lock:
+        hit = _cache.get(key)
+    if hit and time.time() < hit[0]:
+        return head | hit[1] | {"pending": False}
+    rows = {r["product_id"]: r for r in retail_intel.products(cohort_, range_)["products"]}
+    if ins.get("empty"):
+        return head | {"items": [], "summary": None, "source": "rules", "pending": False}
+    with _lock:
+        t = _inflight.get(key)
+        if t is None or not t.is_alive():
+            t = threading.Thread(target=_agent, args=(key, ins, rows, cohort_, range_), daemon=True)
+            _inflight[key] = t
+            t.start()
+    t.join(WAIT_S)
+    with _lock:
+        hit = _cache.get(key)
+    if hit and time.time() < hit[0]:
+        return head | hit[1] | {"pending": False}
+    return head | {
+        "items": rules_list(ins, rows),
+        "summary": None,
+        "source": "rules",
+        "pending": True,
+    }
