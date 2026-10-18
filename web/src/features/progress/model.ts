@@ -6,7 +6,7 @@ import { baselineFor, referenceFor } from '../../data/live'
 import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
 import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
-import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, isCloseUp, unitOf } from '../../lib/metrics'
+import { METRIC_META, VERDICT_RANK, byGoalOrder, fmtSigned, fmtValue, isCloseUp, unitOf, fmtReading } from '../../lib/metrics'
 import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, verdictKind, wordsFor, type VerdictKind } from '../../lib/verdict'
 
 export const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera' }
@@ -77,7 +77,7 @@ export function orderMetrics(metrics: Metric[], goals: string[]): Metric[] {
 export function valueText(m: Metric, v: number | null = m.value): string {
   if (v === null) return '–'
   const u = unitOf(m)
-  return `${fmtValue(v, m)}${u === '°' ? '°' : u ? ` ${u.trim()}` : ''}`
+  return `${fmtReading(v, m)}${u === '°' ? '°' : u ? ` ${u.trim()}` : ''}`
 }
 
 export function deltaText(m: Metric, d: number | null = m.delta): string {

@@ -1,5 +1,5 @@
 import type { Metric, Session } from '../../data/types.ts'
-import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics.ts'
+import { METRIC_META, unitOf, fmtReading } from '../../lib/metrics.ts'
 import { changeWay, verdictKind } from '../../lib/verdict.ts'
 
 /**
@@ -15,7 +15,7 @@ export function verdictHeadline(m: Metric, session: Pick<Session, 'is_baseline'>
   if (session.is_baseline || m.value === null) return null
   const kind = verdictKind(m, session)
   const unit = unitOf(m).trim()
-  const fmt = (v: number) => `${fmtValue(v, m)}${unit === '°' ? '°' : unit ? ` ${unit}` : ''}`
+  const fmt = (v: number) => `${fmtReading(v, m)}${unit === '°' ? '°' : unit ? ` ${unit}` : ''}`
   const numbers = m.delta !== null && m.delta !== undefined ? `${fmt(m.value - m.delta)} → ${fmt(m.value)}` : fmt(m.value)
   if (kind === 'changed') {
     const way = changeWay(m)
