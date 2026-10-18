@@ -667,7 +667,8 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 ### Progress: measure switcher
 - The over-time chart shows one measure at a time: its name is a select (title with a chevron) with previous / next arrows, in the person's goal order, instead of a pill per measure.
 
-### Progress: day detail actions and photo comparison
-- The day's actions (Ask Wisp about this day, Use this day as baseline, Open the full report) are compact buttons in the top bar, to the left of the previous / next day switchers, instead of a card at the bottom; the report link is the one ink button.
-- The photo comparison is collapsed behind a "Compare photos" button. It stays disabled, with a one-line reason, when none of the check-in photos loads (no preview, deleted after 30 days, or a failed load).
+### Progress: day detail actions, photos and notes
+- The day's actions (Ask Wisp about this day, Use this day as baseline, Open the full report) are compact buttons in the top bar, to the left of the previous / next day switchers; the report link is the one ink button.
+- There is no photo or notes section at the bottom. "Compare photos" and "Notes" (with a count) are two small glass buttons inside the day summary card, under the reading chips; each opens a popup (modal sheet).
+- "Compare photos" is disabled, with "· no photos" beside it, when none of the check-in photos loads (no preview, deleted after 30 days, or a failed load). The popup has the Earlier / Later selects over the split view, sized to fit the viewport height.
 - The before/after split has no slider underneath: the white round handle on the divider is the control (drag with mouse or touch; focused, arrows move it by 2%, Shift+arrows by 10%, Home/End jump to the ends).

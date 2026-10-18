@@ -1,4 +1,4 @@
-import { ChevronDown, Images } from 'lucide-react'
+import { Images, StickyNote } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import { CompareSplit } from '../../components/charts'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { Sheet } from '../../components/ui/Sheet'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner } from '../../data/hooks'
@@ -209,6 +210,10 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
                 </span>
               ))}
             </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {measured ? <CompareButton session={session} sessions={sessions} baseline={baseline} /> : null}
+              <NotesButton session={session} notes={notes} />
+            </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 justify-self-end text-right">
             <span className="font-dot text-[clamp(62px,6.5vw,84px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
@@ -238,21 +243,6 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
           </div>
         ) : null}
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4">
-          {measured ? <Compare session={session} sessions={sessions} baseline={baseline} /> : null}
-          <div className="flex flex-col gap-3">
-            <section aria-label="Notes from this day" className="flex flex-col gap-1 rounded-[36px] bg-surface p-[clamp(20px,3vw,28px)] squircle">
-              <span className="mb-2 font-mono text-[11px] tracking-[.08em] text-ink-2">■ NOTES FROM THIS DAY</span>
-              {notes.map((n) => (
-                <div key={n.text} className="flex items-start gap-3 border-b border-ink/7 py-2.5">
-                  <span aria-hidden className="mt-[5px] size-2.5 shrink-0 rounded-full" style={{ background: n.dot }} />
-                  <span className="text-[15px] leading-[1.45]">{n.text}</span>
-                </div>
-              ))}
-              <NoteEditor key={session.id} session={session} empty={!notes.length} />
-            </section>
-          </div>
-        </div>
         <Disclaimer />
       </div>
       <BaselineDialog session={session} withTime={others.length > 0} open={asking} onClose={() => setAsking(false)} />
@@ -260,8 +250,8 @@ export function DayDetail({ day, site, sessions, byDay, entries }: { day: string
   )
 }
 
-/** Earlier / Later photo comparison over same-mode check-ins (design split slider). */
-function Compare({ session, sessions, baseline }: { session: Session; sessions: Session[]; baseline: Session | null }) {
+/** "Compare photos" button and its popup: Earlier / Later photo comparison over same-mode check-ins (design split slider). */
+function CompareButton({ session, sessions, baseline }: { session: Session; sessions: Session[]; baseline: Session | null }) {
   const pool = sessions.filter((s) => s.capture_mode === session.capture_mode && s.status === 'done' && s.measured !== false)
   const [a, setA] = useState<string>(baseline && baseline.id !== session.id ? baseline.id : (pool[0]?.id ?? session.id))
   const [b, setB] = useState<string>(session.id)
@@ -285,37 +275,50 @@ function Compare({ session, sessions, baseline }: { session: Session; sessions: 
       </select>
     </label>
   )
-  // A comparison needs a photo to look at: without any preview URL (RAW references, photos deleted after 30 days) it stays closed.
+  // A comparison needs a photo to look at: without any photo that loads (RAW references, photos deleted after 30 days) the button stays disabled.
   const urls = pool.flatMap((s) => (s.preview?.url ? [s.preview.url] : []))
   const hasPhotos = useAnyPhotoLoads(urls) !== 'no'
   const [open, setOpen] = useState(false)
-  const shown = open && hasPhotos
   return (
-    <section aria-label="Photo comparison" className="flex flex-col gap-3 rounded-[36px] bg-surface p-[clamp(14px,2.4vw,20px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1.5">
-        <span className="flex flex-col">
-          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ PHOTO COMPARISON</span>
-          {!hasPhotos ? (
-            <span className="text-[13px] text-ink-2">
-              No photos to compare yet
-              {pool.some(photoExpired) ? ' (photos are deleted after 30 days)' : ''}.
-            </span>
-          ) : null}
-        </span>
-        <Button variant="outline" size="sm" icon={Images} disabled={!hasPhotos} aria-expanded={shown} onClick={() => setOpen((o) => !o)} trailing={<ChevronDown size={16} strokeWidth={1.8} aria-hidden className={`transition-transform ${shown ? 'rotate-180' : ''}`} />}>
-          {shown ? 'Hide comparison' : 'Compare photos'}
-        </Button>
-      </div>
-      {shown ? (
-        <>
-          <div className="flex flex-wrap gap-2 px-1.5">
+    <>
+      <Button variant="glass" size="sm" icon={Images} disabled={!hasPhotos} title={hasPhotos ? undefined : `No photos to compare${pool.some(photoExpired) ? ' (photos are deleted after 30 days)' : ''}`} onClick={() => setOpen(true)}>
+        Compare photos
+        {hasPhotos ? null : <span className="text-ink-2"> · no photos</span>}
+      </Button>
+      <Sheet open={open && hasPhotos} onClose={() => setOpen(false)} title="Compare photos" variant="modal" size="md">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
             {select('Earlier', a, setA)}
             {select('Later', b, setB)}
           </div>
-          <CompareSplit left={layer(A)} right={layer(B)} leftLabel={label(A)} rightLabel={label(B)} />
-        </>
-      ) : null}
-    </section>
+          <CompareSplit className="mx-auto w-full max-w-[min(100%,calc((100dvh-300px)*.8))]" left={layer(A)} right={layer(B)} leftLabel={label(A)} rightLabel={label(B)} />
+        </div>
+      </Sheet>
+    </>
+  )
+}
+
+/** "Notes" button and its popup: what Willow noted about the day plus the person's own note. */
+function NotesButton({ session, notes }: { session: Session; notes: { text: string; dot: string }[] }) {
+  const [open, setOpen] = useState(false)
+  const count = notes.length + (session.note ? 1 : 0)
+  return (
+    <>
+      <Button variant="glass" size="sm" icon={StickyNote} onClick={() => setOpen(true)}>
+        {count ? `Notes · ${count}` : 'Notes'}
+      </Button>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Notes from this day" variant="modal" size="sm">
+        <div className="flex flex-col gap-1">
+          {notes.map((n) => (
+            <div key={n.text} className="flex items-start gap-3 border-b border-ink/7 py-2.5">
+              <span aria-hidden className="mt-[5px] size-2.5 shrink-0 rounded-full" style={{ background: n.dot }} />
+              <span className="text-[15px] leading-[1.45]">{n.text}</span>
+            </div>
+          ))}
+          <NoteEditor key={session.id} session={session} empty={!notes.length} />
+        </div>
+      </Sheet>
+    </>
   )
 }
 
