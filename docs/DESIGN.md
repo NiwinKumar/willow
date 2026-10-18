@@ -686,4 +686,4 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 - The minimal check-in scrubber (thin rail, small ticks and thumb) is kept in `components/charts/Scrubber.tsx`.
 
 ### App icon
-- One icon for every page the app serves (the Willow app and Willow Proof under /retail, they share one index.html): the frosted flower tile, `web/public/favicon-32.png`, `favicon-64.png`, `apple-touch-icon.png` (180) and the manifest's `icon-192.png` / `icon-512.png`, all cut from the tile in `willow-favicon.png` (the source is not committed). The old SVG icons are gone.
+- One icon for every page the app serves (the Willow app and Willow Proof under /retail, they share one index.html): the frosted flower tile, `web/public/favicon-32.png`, `favicon-64.png`, `apple-touch-icon.png` (180) and the manifest's `icon-192.png` / `icon-512.png`, all cut from the tile in `willow-favicon-new.png` (Oct 18, replaced the first tile; the source is not committed). The touch icon has no transparency: the tile sits full bleed on its own cream edge colour, since iOS rounds the corners itself. The old SVG icons are gone.
