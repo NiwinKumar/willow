@@ -5,7 +5,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, confidenceOf, verdictKind } from '../../lib/verdict'
+import { changeWay, confidenceOf, verdictKind, wordsFor } from '../../lib/verdict'
 import { METRIC_LOOK } from './metricLook'
 import { bandOf, bandText, deltaText, metricOf, sessionState, valueText } from './model'
 import { StoryCard } from './StoryCard'
@@ -71,9 +71,9 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
           ))}
         </div>
         <div className="flex items-center gap-3.5 rounded-[28px] bg-selected px-5 py-[18px] text-inverse">
-          <VerdictGlyph kind={kind} size={20} onDark />
+          <VerdictGlyph kind={kind} way={changeWay(m)} size={20} onDark />
           <span className="flex flex-col gap-[3px]">
-            <span className="text-[17px]">{VERDICT_WORDS[kind].label}</span>
+            <span className="text-[17px]">{wordsFor(m, session).label}</span>
             <span className="text-[14px] text-white/70">{why(m, session, band)}</span>
           </span>
         </div>

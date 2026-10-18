@@ -2,7 +2,7 @@
 import type { Metric, Session } from '../../data/types'
 import { fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
-import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
+import { VERDICT_WORDS, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { REASON_SHORT, bandOf, bandText, counts, deltaText, leadMetric, noBand, sessionState, usedFrames } from './model'
 
 const G = {
@@ -13,7 +13,7 @@ const G = {
   coral: 'radial-gradient(52% 62% at 50% 60%, #FF5A3A 0%, #E0452A 25%, #9E2E1C 55%, #3A1208 100%)',
 }
 
-export type Chip = { g: VerdictKind | 'text'; t: string; mark?: string }
+export type Chip = { g: VerdictKind | 'text'; t: string; mark?: string; way?: ChangeWay }
 export type Hero = { bg: string; shadow: string; fg: string; eyebrow: string; kicker: string; big: string; bigLabel: string; chips: Chip[]; ruler: { ratio: number | null; label: string } | null; text: string; grey?: boolean }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -25,7 +25,9 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
   const bDay = baseline ? fmtDate(baseline.created_at).toUpperCase() : ''
   const lead = leadMetric(ordered, s)
   const leadBand = lead ? bandOf(baseline, lead.id) : null
-  const chipsFor = (kinds: VerdictKind[]): Chip[] => kinds.filter((k) => c[k] > 0).map((k) => ({ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }))
+  // A change is said by its direction ("2 improved", "1 moved the other way"), never as "changed".
+  const chipsFor = (kinds: VerdictKind[]): Chip[] =>
+    kinds.flatMap((k): Chip[] => (k === 'changed' ? changeLines(s).map((l) => ({ g: k, way: l.way, t: l.text })) : c[k] > 0 ? [{ g: k, t: `${c[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` }] : []))
   if (st === 'rejected') {
     // Missing pen dots are the engine's warnings, not a reason: name them instead of "No photo passed".
     const dots = (s.result?.warnings ?? []).some((w) => /pen-dot square not found/i.test(w))
@@ -117,7 +119,7 @@ export function heroFor(s: Session, baseline: Session | null, ordered: Metric[])
     eyebrow: `SINCE YOUR BASELINE${bDay ? ` · ${bDay}` : ''}`,
     kicker: 'Readings beyond your normal range',
     big: String(n),
-    bigLabel: n === 1 ? 'reading changed more than your photos usually vary' : n ? 'readings changed more than your photos usually vary' : 'no reading moved beyond your normal range',
+    bigLabel: n === 1 ? 'reading moved more than your photos usually vary' : n ? 'readings moved more than your photos usually vary' : 'no reading moved beyond your normal range',
     chips: chipsFor(['changed', 'normal', 'notEnough', 'notCompared']),
     ruler:
       lead && lead.delta !== null

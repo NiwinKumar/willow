@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 import { VerdictGlyph } from '../../components/willow/Verdict'
-import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 
 /** The design's small pills on Home cards: ink (black) or outline. 44px tall for touch. */
 export function Pill({ tone = 'ink', className = '', children, ...rest }: { tone?: 'ink' | 'outline' | 'glass'; children: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) {
@@ -31,11 +31,11 @@ export function CardHead({ title, note, id }: { title: string; note?: ReactNode;
 }
 
 /** Glyph + words, never colour alone (lib/verdict is the only source of the words). */
-export function VerdictLine({ kind, short, className = '' }: { kind: VerdictKind; short?: boolean; className?: string }) {
-  const w = VERDICT_WORDS[kind]
+export function VerdictLine({ kind, way, short, className = '' }: { kind: VerdictKind; way?: ChangeWay; short?: boolean; className?: string }) {
+  const w = kind === 'changed' && way ? CHANGE_WORDS[way] : VERDICT_WORDS[kind]
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
-      <VerdictGlyph kind={kind} size={10} />
+      <VerdictGlyph kind={kind} way={way} size={10} />
       {short ? w.short : w.label}
     </span>
   )

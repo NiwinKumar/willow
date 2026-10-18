@@ -12,7 +12,8 @@ const later = { is_baseline: false }
 
 test('a real change reads in words, numbers before → now', () => {
   assert.deepEqual(verdictHeadline(metric({}), later), { headline: 'Calmer than your start', numbers: '13.1 → 12.2' })
-  assert.equal(verdictHeadline(metric({ delta: 0.9, value: 14.0 }), later)?.headline, 'More redness than your start')
+  // the other way is said gently, never "worse" or "more redness"
+  assert.equal(verdictHeadline(metric({ delta: 0.9, value: 14.0 }), later)?.headline, 'Moved the other way since your start')
 })
 
 test('counts compared with an earlier check-in taken the same way say so', () => {
@@ -26,7 +27,7 @@ test('within the normal range: no real change', () => {
 
 test('skin tone never gets a direction', () => {
   const tone = metric({ id: 'tone_ita', unit: 'deg', delta: -3, value: 30 })
-  assert.equal(verdictHeadline(tone, later)?.headline, 'Changed since your start')
+  assert.equal(verdictHeadline(tone, later)?.headline, 'Shifted since your start')
 })
 
 test('the baseline keeps its number; no reading gives nothing', () => {
