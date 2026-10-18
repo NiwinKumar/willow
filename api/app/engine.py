@@ -15,7 +15,9 @@ import httpx
 from app import contract
 from app.settings import get_settings
 
-ENGINE_TIMEOUT_S = 120.0
+# Cheek close-ups can take over two minutes on the engine (2 CPU); the engine's Cloud Run timeout is
+# 300 s and the api's own is 300 s, so wait 280 s and still answer before the api is cut off.
+ENGINE_TIMEOUT_S = 280.0
 FIXTURE_WARNING = (
     "Sample result from the fixture engine: these numbers are not measured from your photos."
 )
