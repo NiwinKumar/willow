@@ -869,6 +869,41 @@ async function retailerGet<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+/** Shelf vs results (api shelf_routes.py): sign-in (guest ok), because the stock upload belongs to the account. */
+export const retailerShelf = (token: string, filters?: RetailerFilters) => request<ShelfView>(token, `/v1/retailer/shelf${retailerQs(filters)}`)
+export const uploadShelfStock = (token: string, filename: string, csv: string) =>
+  request<{ stock: ShelfStock }>(token, '/v1/retailer/shelf/stock', { method: 'PUT', body: JSON.stringify({ filename, csv }) })
+export const deleteShelfStock = (token: string) => request<void>(token, '/v1/retailer/shelf/stock', { method: 'DELETE' })
+export type ShelfKind = 'taking_space' | 'under_shelved' | 'stocked_unused' | 'used_understocked'
+export type ShelfProduct = {
+  product_id: string
+  product: string
+  brand: string
+  image_url: string | null
+  users: number
+  n: number
+  changed: number
+  tier: string | null
+  lift: number | null
+  lift_lo: number | null
+  cont8: number | null
+  /** Share of the category's users of measured products. */
+  use_share: number
+  /** Share of the uploaded stock, rescaled to the category; null when not in the file. */
+  stock_share: number | null
+  /** Share of the category's people with a visible change held to week 8. */
+  results_share: number
+  /** stock_share when uploaded, else use_share. */
+  shelf_share: number
+  basis: 'stock' | 'use'
+  /** results − shelf. */
+  gap: number
+}
+export type ShelfCategory = { category: string; label: string; users: number; changed: number; basis: 'stock' | 'use'; stocked: number; agreement: number | null; products: ShelfProduct[] }
+export type ShelfFlag = { product_id: string; product: string; brand: string; image_url: string | null; category: string; category_label: string; kind: ShelfKind; label: string; title: string; reason: string }
+export type ShelfStock = { filename: string; uploaded_at: string; matched: number; unmatched: string[]; column: string }
+/** `source` gemini: flags chosen and written by Gemini, checked; rules: the fixed flags. `pending`: Gemini is still writing them. */
+export type ShelfView = RetailerHead & { categories: ShelfCategory[]; stock: ShelfStock | null; note: string; flags: ShelfFlag[]; summary: string | null; source: 'gemini' | 'rules'; pending: boolean }
 export const retailerProducts = (filters?: RetailerFilters) => retailerGet<RetailerProducts>(`/v1/retailer/products${retailerQs(filters)}`)
 export const retailerProduct = (productId: string, filters?: RetailerFilters) =>
   retailerGet<RetailerProductDetail>(`/v1/retailer/products/${encodeURIComponent(productId)}${retailerQs(filters)}`)
