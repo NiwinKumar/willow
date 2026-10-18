@@ -13,6 +13,7 @@ import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { useJudge } from '../../lib/useJudge'
 import { useSamples } from '../../lib/useSamples'
 import { backButton, SoftBackdrop } from './Decor'
+import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH } from './destinations'
 import { journeyLine, journeyUnavailableLine, useJourney } from './hooks'
 
 const REPO = 'https://github.com/NiwinKumar/willow'
@@ -177,7 +178,7 @@ export default function Judge() {
             : `${journeyUnavailableLine(journey)} The sample run in stop 01 shows the same pipeline on real photos.`,
       cta: 'Open the journey',
       disabled: journey.state === 'ready' ? undefined : journey.state === 'loading' ? 'Checking' : 'Unavailable',
-      act: () => go('proof', '/journey'),
+      act: () => go('proof', JOURNEY_PATH),
     },
     {
       id: 'advisor',
@@ -203,7 +204,7 @@ export default function Judge() {
       tag: 'SYNTHETIC COHORT',
       body: `What ${status.status?.bigquery.synthetic ? `${status.status.bigquery.synthetic} simulated people` : 'a simulated cohort'} were trying to change, which products reached real change, and where the gaps are. Groups under 10 people are never shown.`,
       cta: 'Open dashboard',
-      act: () => go('retailer', '/retail'),
+      act: () => go('retailer', PROOF_PATH),
     },
   ]
 
@@ -294,6 +295,11 @@ export default function Judge() {
                       )
                     })}
                   </span>
+                ) : null}
+                {st.id === 'proof' ? (
+                  <Link to={BRAND_JOURNEY_PATH} className="flex min-h-11 items-center self-start text-[14px] underline underline-offset-4" style={{ color: look.fg }}>
+                    Explore a brand’s journey <span aria-hidden className="ml-1.5">→</span>
+                  </Link>
                 ) : null}
                 <button
                   type="button"
