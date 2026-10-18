@@ -402,7 +402,9 @@ class ChatRequest(BaseModel):
     images: list[ChatImage] = Field(default_factory=list, max_length=3)
 
 
-def _chat_start(body: ChatRequest, uid: str, store: Store) -> tuple[list[tuple[bytes, str]], int]:
+def _chat_start(
+    body: ChatRequest, uid: str, store: Store, action: str = "advisor"
+) -> tuple[list[tuple[bytes, str]], int]:
     """Checks that need no Gemini, then counts the question: (decoded photos, count today)."""
     if body.messages[-1].role != "user":
         raise HTTPException(422, {"code": "bad_request", "message": "last message must be yours"})
@@ -410,7 +412,7 @@ def _chat_start(body: ChatRequest, uid: str, store: Store) -> tuple[list[tuple[b
         images = [(label_scan.decode_image(i.data_base64), i.mime_type) for i in body.images]
     except label_scan.BadImage as exc:
         raise HTTPException(422, {"code": "bad_image", "message": str(exc)}) from exc
-    return images, limits.take(store, uid, "advisor")
+    return images, limits.take(store, uid, action)
 
 
 def _chat_answer(
@@ -420,14 +422,19 @@ def _chat_answer(
     images: list[tuple[bytes, str]],
     used: int,
     on_stage: advisor.Stage | None = None,
+    *,
+    action: str = "advisor",
+    keep: bool = True,
 ) -> dict[str, Any]:
+    """One answer from `uid`'s own data. `action` is the cap it counted on; `keep` stores the turn
+    in the person's history (the demo journey's chat is never stored)."""
     asked_at = datetime.now(UTC)
     try:
         reply = advisor.chat(
             [m.model_dump() for m in body.messages], store, uid, images=images, on_stage=on_stage
         )
     except Exception as exc:  # Vertex unavailable, quota, safety block
-        limits.refund(store, uid, "advisor")
+        limits.refund(store, uid, action)
         try:
             standard = advisor.standard_explanation(store, uid)
         except Exception:
@@ -441,11 +448,12 @@ def _chat_answer(
                 "standard": standard,
             },
         ) from exc
-    try:
-        advisor.remember(store, uid, body.messages[-1].text, len(images), reply, asked_at)
-    except Exception:  # the answer matters more than its copy in the history
-        log.exception("advisor history not saved")
-    return {**reply, "remaining_today": max(0, advisor.DAILY_LIMIT - used)}
+    if keep:
+        try:
+            advisor.remember(store, uid, body.messages[-1].text, len(images), reply, asked_at)
+        except Exception:  # the answer matters more than its copy in the history
+            log.exception("advisor history not saved")
+    return {**reply, "remaining_today": max(0, limits.CAPS[action][0] - used)}
 
 
 @router.post("/advisor/chat")
@@ -477,12 +485,32 @@ def advisor_chat_stream(
     really starts; the reply is only sent once validated (no partial text). Errors found before
     any work (422, 429) are plain HTTP errors, as on /advisor/chat."""
     images, used = _chat_start(body, user.uid, store)
+    return chat_stream(body, user.uid, store, images, used)
+
+
+def chat_stream(
+    body: ChatRequest,
+    uid: str,
+    store: Store,
+    images: list[tuple[bytes, str]],
+    used: int,
+    *,
+    action: str = "advisor",
+    keep: bool = True,
+) -> StreamingResponse:
     events: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
 
     def work() -> None:
         try:
             reply = _chat_answer(
-                body, user.uid, store, images, used, on_stage=lambda e, d: events.put((e, d))
+                body,
+                uid,
+                store,
+                images,
+                used,
+                on_stage=lambda e, d: events.put((e, d)),
+                action=action,
+                keep=keep,
             )
             events.put(("done", {"reply": reply}))
         except HTTPException as exc:

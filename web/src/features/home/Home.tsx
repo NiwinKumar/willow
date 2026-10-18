@@ -196,7 +196,7 @@ function HomeBody() {
         baseline={read.baseline}
         onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
         onProgress={() => navigate('/progress')}
-        onAsk={demo ? undefined : () => ask('How are my goals going since my baseline, and what should I do next?', 'Goals')}
+        onAsk={() => ask('How are my goals going since my baseline, and what should I do next?', 'Goals')}
       />
     ) : null
   const changedNode = (cls: string) =>
@@ -209,7 +209,7 @@ function HomeBody() {
         rows={4}
         onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
         onFull={() => openResult(measured)}
-        onAsk={demo ? undefined : () => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(measured.created_at)}`)}
+        onAsk={() => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(measured.created_at)}`)}
       />
     ) : null
 
@@ -288,7 +288,7 @@ function HomeBody() {
             name={me.guest ? null : me.first}
             next={heroNext}
             lines={heroLines}
-            onAsk={demo ? undefined : heroAsk.run}
+            onAsk={heroAsk.run}
             askLabel={heroAsk.label}
           />
         </div>

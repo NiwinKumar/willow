@@ -220,3 +220,15 @@ def test_search_step_reads_like_words():
         {"products": [1, 2, 3]},
     )
     assert line == "Searched the catalog (dark spots, eye care, under ₹1,000): 3 products found"
+
+
+def test_demo_journey_chat_is_public_unstored_and_on_a_shared_cap(client, fake, monkeypatch):
+    _fake_model(monkeypatch, [], {"message": "Hi.", "product_ids": [], "follow_up_suggestions": []})
+    anon = client.__class__(client.app)
+    ask = {"messages": [{"role": "user", "text": "How is my skin?"}]}
+    body = anon.post("/v1/demo/advisor/chat", json=ask).json()
+    assert body["message"] == "Hi." and body["remaining_today"] == 299
+    assert anon.post("/v1/demo/advisor/chat/stream", json=ask).status_code == 200
+    # answered from the demo account's data, never written to its history or the asker's
+    assert anon.get("/v1/demo/advisor/history").json()["messages"] == []
+    assert client.get("/v1/advisor/history").json()["messages"] == []
