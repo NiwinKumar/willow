@@ -19,6 +19,8 @@ type Entry<T> = { v: number; gen: number; data: T | undefined; error: unknown; s
 const cache = new Map<string, Entry<unknown>>()
 const listeners = new Map<string, Set<() => void>>()
 
+const noToken = () => Promise.resolve('')
+
 const keyOf = (parts: readonly unknown[]) => JSON.stringify(parts)
 
 function entry<T>(k: string): Entry<T> {
@@ -74,7 +76,8 @@ function run<T>(k: string): Promise<void> {
 export type QueryResult<T> = { data: T | undefined; status: QueryStatus; error: unknown; refetch: () => Promise<void> }
 
 /** Read `fetcher` once per key (and again after `staleMs`, default 60 s, when a screen mounts). */
-export function useQuery<T>(parts: readonly unknown[], fetcher: (token: string) => Promise<T>, opts: { enabled?: boolean; staleMs?: number } = {}): QueryResult<T> {
+/** `public`: a read that needs no sign-in (the demo journey), so it never waits for a token. */
+export function useQuery<T>(parts: readonly unknown[], fetcher: (token: string) => Promise<T>, opts: { enabled?: boolean; staleMs?: number; public?: boolean } = {}): QueryResult<T> {
   const { getIdToken } = useAuth()
   const enabled = opts.enabled ?? true
   const staleMs = opts.staleMs ?? 60_000
@@ -93,11 +96,11 @@ export function useQuery<T>(parts: readonly unknown[], fetcher: (token: string) 
     if (!enabled) return
     const e = entry<T>(k)
     e.fetcher = fetcher
-    e.token = getIdToken
+    e.token = opts.public ? noToken : getIdToken
     if (e.status === 'idle' || e.status === 'error' || Date.now() - e.at > staleMs) void run<T>(k)
     // fetcher identity changes every render; the key decides when to fetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [k, enabled, staleMs, getIdToken])
+  }, [k, enabled, staleMs, getIdToken, opts.public])
   const refetch = useCallback(() => run<T>(k), [k])
   const e = (cache.get(k) as Entry<T> | undefined) ?? null
   return { data: enabled ? e?.data : undefined, status: enabled ? (e?.status ?? 'loading') : 'idle', error: e?.error ?? null, refetch }

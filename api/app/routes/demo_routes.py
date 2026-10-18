@@ -5,11 +5,16 @@ judge works in an account of their own; the journey and status are public."""
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app import demo, limits
+from app import demo, limits, routine_check
 from app.auth import AuthUser, current_user
-from app.routes.products_routes import RoutineEntryIn, add_routine_entry
+from app.routes.products_routes import (
+    RoutineEntryIn,
+    add_routine_entry,
+    routine_entries,
+    routine_log_days,
+)
 from app.routes.sessions_routes import list_views
 from app.settings import get_settings
 from app.store import Store, get_store
@@ -79,6 +84,41 @@ def journey(store: Store = Depends(get_store)) -> dict[str, Any]:
     """The seeded, read-only demo account: real analyses of the team's consented captures."""
     uid = get_settings().demo_user_id
     return {"sessions": demo._cached(f"journey:{uid}", 300, lambda: list_views(store, uid))}
+
+
+@router.get("/routine")
+def journey_routine(
+    today: str | None = Query(default=None), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """The demo journey's routine, read-only: judges see Mei's products and recent use."""
+    uid = get_settings().demo_user_id
+    return demo._cached(f"routine:{uid}:{today}", 300, lambda: routine_entries(store, uid, today))
+
+
+@router.get("/routine/log")
+def journey_routine_log(
+    first: str | None = Query(default=None, alias="from"),
+    last: str | None = Query(default=None, alias="to"),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """The demo journey's ticks per day, read-only (ticks a judge adds stay in their browser)."""
+    uid = get_settings().demo_user_id
+    return demo._cached(
+        f"routine-log:{uid}:{first}:{last}", 300, lambda: routine_log_days(store, uid, first, last)
+    )
+
+
+@router.get("/routine/check")
+def journey_routine_check(store: Store = Depends(get_store)) -> dict[str, Any]:
+    """The routine check on the demo journey's routine: one Gemini run an hour, shared by every
+    judge, so the public demo never spends anyone's daily cap."""
+    uid = get_settings().demo_user_id
+
+    def run() -> dict[str, Any]:
+        entries = [{"id": eid, **e} for eid, e in store.routine_list(uid)]
+        return routine_check.check(entries)
+
+    return demo._cached(f"routine-check:{uid}", 3600, run)
 
 
 @router.get("/status")

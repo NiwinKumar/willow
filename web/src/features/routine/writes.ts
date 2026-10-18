@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
-import { refreshRoutine, useOwner, useRoutine, useRoutineLog } from '../../data/hooks'
+import { refreshRoutine, useOwner, useRoutine, useRoutineLog, useRoutineReader } from '../../data/hooks'
 import type { FeelTag, FeelVerdict, RoutineEntry, RoutineSchedule } from '../../data/types'
 import { ApiError, api, localDay, type NewRoutineEntry } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
@@ -11,12 +11,28 @@ import { weekOf } from './feel'
 import { entryName, slotWords } from './routineModel'
 import { alternatePair, scheduleWords } from './schedule'
 
+/** The demo journey's routine is Mei's and read-only: ticks stay in the tab, every other change is refused with this. */
+export const DEMO_READ_ONLY = "This is Mei's routine, read-only in the demo. Ticks stay on this device; adding or changing products works in your own account."
+const readOnly = async (): Promise<never> => {
+  throw new ApiError(403, DEMO_READ_ONLY, 'demo_read_only')
+}
+const demoWrites = {
+  add: readOnly,
+  stop: async () => void toast(DEMO_READ_ONLY),
+  remove: readOnly,
+  setSlots: readOnly,
+  setSchedule: readOnly,
+  alternate: readOnly,
+  setFeel: readOnly,
+}
+
 /**
  * Every routine write, each followed by refreshRoutine(uid) so Home, Routine, the check and the advisor's
  * context all read the new routine. Errors reach the caller (inline states) or a toast (one-tap actions).
  */
 export function useRoutineWrites() {
   const uid = useOwner()
+  const { demo } = useRoutineReader()
   const { getIdToken } = useAuth()
   const { refetch: refetchRoutine } = useRoutine()
   const { refetch: refetchLog } = useRoutineLog()
@@ -136,12 +152,12 @@ export function useRoutineWrites() {
     [uid, getIdToken, refresh],
   )
 
-  return { add, stop, remove, setSlots, setSchedule, alternate, setFeel }
+  return demo ? demoWrites : { add, stop, remove, setSlots, setSchedule, alternate, setFeel }
 }
 
 /** Honest words for a failed write or read. */
 export function failureText(e: unknown, fallback: string): string {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return "You're offline. Nothing was saved; try again when you're connected."
-  if (e instanceof ApiError && e.status === 429) return e.message
+  if (e instanceof ApiError && (e.status === 429 || e.code === 'demo_read_only')) return e.message
   return fallback
 }
