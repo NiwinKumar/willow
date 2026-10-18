@@ -17,16 +17,17 @@ import { identity } from '../../lib/identity'
 import { routineEffect } from '../../lib/routineEffect'
 import { addToCalendar } from '../../lib/reminders'
 import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
-import { fmtSigned, GOALS, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
+import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
-import { ChangedCard, RoutineEffectCard, RecentCard, SetupCard, WeekBand, type RecentRow, type SetupRow } from './cards'
+import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
 import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
 import { useProductTests } from '../routine/productTests'
 import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
+import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
@@ -214,8 +215,23 @@ function HomeBody() {
   const short = conflict ? /^([^:.]{3,24}):/.exec(conflict.suggestion)?.[1] : undefined
   const missingSunscreen = Boolean(check.data?.gaps.some((g) => /sunscreen/i.test(g.need)))
 
+  // Your goals sits beside Routine today (do it, then see what it did); with no measured check-in to read, Routine takes the row.
+  const trends = useMemo(() => (read.lead && !read.lead.is_baseline ? goalTrends(read.lead, read.baseline, face, goals) : []), [read.lead, read.baseline, face, goals])
+  const lastMeasured = read.lead
+  const goalsCard =
+    lastMeasured && trends.length ? (
+      <GoalsCard
+        className="col-span-12 @min-[960px]:col-span-6"
+        trends={trends}
+        baseline={read.baseline}
+        onOpen={(m) => navigate(`/result/${lastMeasured.id}?metric=${m}`)}
+        onProgress={() => navigate('/progress')}
+        onAsk={demo ? undefined : () => ask('How are my goals going since my baseline, and what should I do next?', 'Goals')}
+      />
+    ) : null
+
   let routineCard: ReactNode
-  const routineCls = 'col-span-12 @min-[960px]:col-span-6'
+  const routineCls = goalsCard ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12'
   if (demo) routineCard = <RoutineEmpty demo className={routineCls} onRoutine={() => navigate('/routine')} />
   else if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
   else if (routine.status === 'error') {
@@ -244,7 +260,6 @@ function HomeBody() {
     )
   }
 
-  const recent = recentRows({ all: data.all, entries: demo ? undefined : entries, joined: demo ? null : (user?.metadata?.creationTime ?? null), goals, navigate })
   const week = demo ? null : weekOf(own, read, goals, weeklyDayOf(checkin))
 
   return (
@@ -277,7 +292,7 @@ function HomeBody() {
           </SmallSlot>
         ))}
         {routineCard}
-        <RecentCard className={routineCls} rows={recent} onAll={() => navigate('/progress')} />
+        {goalsCard}
       </div>
     </Frame>
   )
@@ -297,8 +312,6 @@ function rowSpans(n: number): string[] {
   const desk = rows.flatMap((k) => Array.from({ length: k }, () => 12 / k))
   return desk.map((d, i) => `col-span-12 ${T[n % 2 === 1 && i === n - 1 ? 12 : 6]} ${Q[d]}`)
 }
-
-type Nav = ReturnType<typeof useNavigate>
 
 function leadFor({
   read,
@@ -524,42 +537,6 @@ function withTonight(lines: HeroLine[], tonight: HeroLine | null): HeroLine[] {
   if (lines.length < 3) return [...lines, tonight]
   const i = lines.findIndex((l) => l.g === '→')
   return i === -1 ? lines : [...lines.slice(0, i), ...lines.slice(i + 1), tonight]
-}
-
-function recentRows({ all, entries, joined, goals, navigate }: { all: Session[]; entries: RoutineEntry[] | undefined; joined: string | null; goals: string[]; navigate: Nav }): RecentRow[] {
-  const rows: RecentRow[] = []
-  for (const s of all) {
-    const at = Date.parse(s.created_at)
-    const open = () => navigate(`/result/${s.id}`)
-    const baseline = s.is_baseline && usable(s)
-    rows.push({ key: `s:${s.id}`, at, d: shortDay(s.created_at), t: `${s.sample_id ? 'Sample run' : baseline ? 'Baseline set' : 'Check-in'} · ${SITE_SHORT[s.site]}`, x: summaryOf(s), onClick: open })
-    if (s.note) rows.push({ key: `n:${s.id}`, at: at + 1, d: shortDay(s.created_at), t: 'Note', x: `“${s.note}”`, onClick: open })
-  }
-  for (const e of entries ?? []) {
-    rows.push({ key: `r:${e.id}`, at: parseDate(e.started_at).getTime(), tie: Date.parse(e.created_at ?? '') || 0, d: shortDay(e.started_at), t: 'Started a product', x: e.custom_name, onClick: () => navigate('/routine') })
-    if (e.ended_at) rows.push({ key: `e:${e.id}`, at: parseDate(e.ended_at).getTime(), d: shortDay(e.ended_at), t: 'Stopped a product', x: e.custom_name, onClick: () => navigate('/routine') })
-  }
-  if (joined) {
-    const iso = new Date(joined).toISOString()
-    const names = goals.map((g) => GOALS.find((x) => x.id === g)?.label.toLowerCase()).filter(Boolean)
-    rows.push({ key: 'joined', at: Date.parse(iso), d: shortDay(iso), t: 'Joined Willow', x: names.length ? `Goals: ${names.join(', ')}` : 'No goals chosen yet', onClick: () => navigate('/you') })
-  }
-  return rows.sort((a, b) => b.at - a.at || (b.tie ?? 0) - (a.tie ?? 0)).slice(0, 6)
-}
-
-function summaryOf(s: Session): string {
-  if (inFlight(s)) return stalled(s) ? "— Didn't finish" : '◐ Measuring'
-  if (s.status === 'failed') return "— Didn't finish"
-  if (s.measured === false) return 'Saved, not measured'
-  if (!s.result?.quality.passed) return '— Photos not usable'
-  if (s.is_baseline) {
-    const f = s.baseline_ref?.frames ?? s.result.frames_used
-    return `${plural(f, 'usable photo', 'usable photos')} · ${(s.baseline_ref?.has_noise_band ?? f >= BAND_FRAMES) ? 'normal range ready' : 'no normal range yet'}`
-  }
-  const { changed, normal } = splitVerdicts(s, [])
-  if (changed.length) return `◆ ${cap(listOf(changed, 2))} changed`
-  if (normal.length) return '○ Within normal range'
-  return '◌ Not enough data yet'
 }
 
 const WEEKDAY = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
