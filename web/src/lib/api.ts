@@ -821,8 +821,11 @@ export type BuyingItem = {
   brief: string
   candidates: BuyingCandidate[]
 }
-/** `source` gemini: the candidates' ingredient reasons were read by Gemini and checked; rules: the fixed ingredient table. */
-export type BuyingList = RetailerHead & { items: BuyingItem[]; source: 'gemini' | 'rules'; caveat: string }
+/**
+ * `source` gemini: Gemini wrote the list as an agent (gaps, order, briefs, candidates), every part checked; rules: the
+ * fixed-logic list. `pending`: Gemini is still writing it (the fixed list is shown meanwhile); ask again shortly.
+ */
+export type BuyingList = RetailerHead & { items: BuyingItem[]; source: 'gemini' | 'rules'; pending?: boolean; summary?: string | null; caveat: string }
 export const retailerBrands = (filters?: RetailerFilters) => retailerGet<{ brands: RetailerBrandSummary[]; note?: string }>(`/v1/retailer/brands${retailerQs(filters)}`)
 export const retailerBrand = (brand: string, filters?: RetailerFilters) =>
   retailerGet<RetailerBrandDetail>(`/v1/retailer/brands/${encodeURIComponent(brand)}${retailerQs(filters)}`)

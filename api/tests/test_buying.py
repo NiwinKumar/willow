@@ -7,7 +7,7 @@ from functools import lru_cache
 import pytest
 from fastapi.testclient import TestClient
 
-from app import buying, catalog, cohort, gemini, retailer
+from app import buying, catalog, cohort, retailer
 from app.main import app
 
 
@@ -104,41 +104,6 @@ def test_candidates_are_under_used_shelf_products_never_harsh_ones_for_redness()
     assert [p["product_id"] for p in pool["few"]] == [pid]
 
 
-NIA = "the-ordinary-niacinamide-10-zinc-1"
-
-
-def _fit(**over):
-    base = {
-        "gap": "g",
-        "product_id": NIA,
-        "ingredient": "Niacinamide",
-        "why": "Niacinamide is common in formulas for a more even-looking tone.",
-    }
-    return buying.Fit(**(base | over))
-
-
-@pytest.mark.parametrize(
-    ("over", "problem"),
-    [
-        ({}, None),
-        ({"ingredient": "Tranexamic Acid"}, "the ingredient is not on its INCI list"),
-        ({"ingredient": "Aqua"}, "not an ingredient Willow links to this goal"),
-        ({"why": "Niacinamide at 10% is common here."}, "a number"),
-        ({"why": "Niacinamide works for an even tone."}, "an efficacy claim"),
-        ({"why": "Niacinamide is clinically shown to even tone."}, "an efficacy claim"),
-        ({"why": "Niacinamide helps skin look brighter."}, "skin lightness wording"),
-    ],
-)
-def test_each_gemini_reading_is_checked(over, problem):
-    assert buying._fit_problem(_fit(**over), _by(NIA), "even_tone") == problem
-
-
-def test_digits_inside_a_product_name_are_not_numbers():
-    p = _by(NIA)
-    why = f"{p['name']} contains niacinamide, common in formulas for an even-looking tone."
-    assert buying._fit_problem(_fit(why=why), p, "even_tone") is None
-
-
 @lru_cache
 def _raw():
     return retailer.raw_from_tables(cohort.generate(date(2026, 10, 18)))
@@ -153,78 +118,254 @@ def rows(monkeypatch):
     monkeypatch.setattr(retailer, "_views", {})
     monkeypatch.setattr(retail_intel, "_facts", {})
     monkeypatch.setattr(buying, "_cache", {})
+    monkeypatch.setattr(buying, "_inflight", {})
 
 
-def test_the_list_uses_checked_readings_and_drops_the_rest(rows, monkeypatch):
-    seen = {}
+class Script:
+    """Plays the model: each round returns the next list of (tool, args); records the answers."""
 
-    def fake(prompt_id, contents, schema, **kw):
-        import json
+    def __init__(self, rounds):
+        self.rounds = list(rounds)
+        self.answers: list[tuple[str, dict]] = []
 
-        payload = json.loads(contents[0])["GAPS"]
-        seen["gaps"] = payload
-        first = payload[0]
-        good, bad = first["candidates"][0], first["candidates"][-1]
-        ing = buying.table_fit(_by(good["product_id"]), _gap_goal(first["gap"]))[0]
-        return buying.Fits(
-            fits=[
-                buying.Fit(
-                    gap=first["gap"],
-                    product_id=good["product_id"],
-                    ingredient=ing,
-                    why=f"{ing} is a common choice in formulas for this goal.",
-                ),
-                buying.Fit(
-                    gap=first["gap"],
-                    product_id=bad["product_id"],
-                    ingredient="Aqua",
-                    why="It works.",
-                ),
+    def __call__(self, contents, config):
+        for part in contents[-1].parts or []:
+            fr = getattr(part, "function_response", None)
+            if fr is not None:
+                self.answers.append((fr.name, dict(fr.response)))
+        if not self.rounds:
+            return [], "Done.", None
+        step = self.rounds.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        return step, None, None
+
+    def errors(self, tool):
+        return [a["error"] for n, a in self.answers if n == tool and not a.get("ok", True)]
+
+
+def _episode():
+    from app import buying_agent, retail_intel
+
+    ins = retailer.insights("mixed", "all")
+    prods = {r["product_id"]: r for r in retail_intel.products("mixed", "all")["products"]}
+    return buying_agent.Episode(ins, prods, "mixed", "all"), prods
+
+
+def _unused_fit(ep, prods, goal, tier):
+    """A shelf product in the tier, not sold for the goal, with an ingredient the table links."""
+    for p in catalog.products():
+        r = prods.get(p["product_id"]) or {}
+        if cohort.tier(p["price"]) == tier and goal not in (r.get("goal_ids") or []):
+            fit = buying.table_fit(p, goal)
+            if fit and not buying._avoid(p, goal):
+                return p, fit[0]
+    raise AssertionError("no candidate in the catalog")
+
+
+def test_the_agent_writes_the_list_and_code_checks_every_part(rows):
+    ep, prods = _episode()
+    gaps = ep.call("get_gaps", {})
+    pores = next(g for g in gaps["goals"] if g["goal"] == "pores_texture")
+    people, budget = pores["people"], pores["tiers"]["budget"]
+    ep.call("list_products", {"tier": "budget", "goal": "pores_texture"})
+    title = "Strengthen the budget pores range"
+    good = (
+        f"{people} people want help with pores and texture; budget options reach "
+        f"{round(budget['rate'] * 100)}% visible change (n={budget['n']})."
+    )
+    # an invented number is refused, the tools' numbers pass
+    assert (
+        "number no tool returned"
+        in ep.call(
+            "add_brief",
+            {
+                "goal": "pores_texture",
+                "tier": "budget",
+                "title": title,
+                "brief": "91% of shoppers are unhappy.",
+                "priority": 1,
+            },
+        )["error"]
+    )
+    bid = ep.call(
+        "add_brief",
+        {"goal": "pores_texture", "tier": "budget", "title": title, "brief": good, "priority": 2},
+    )["brief_id"]
+    p, ing = _unused_fit(ep, prods, "pores_texture", "budget")
+    ep.call("get_ingredients", {"product_id": p["product_id"]})
+    # off its INCI list, a base, an efficacy claim, skin-lightness wording: refused
+    assert (
+        "INCI"
+        in ep.call(
+            "add_candidate",
+            {
+                "brief_id": bid,
+                "product_id": p["product_id"],
+                "ingredient": "Tranexamic Acid",
+                "why": "Worth a look.",
+            },
+        )["error"]
+    )
+    assert (
+        "base"
+        in ep.call(
+            "add_candidate",
+            {
+                "brief_id": bid,
+                "product_id": p["product_id"],
+                "ingredient": "Aqua",
+                "why": "Worth a look.",
+            },
+        )["error"]
+    )
+    assert (
+        ep.call(
+            "add_candidate",
+            {
+                "brief_id": bid,
+                "product_id": p["product_id"],
+                "ingredient": ing,
+                "why": "It works on pores.",
+            },
+        )["ok"]
+        is False
+    )
+    assert (
+        ep.call(
+            "add_candidate",
+            {
+                "brief_id": bid,
+                "product_id": p["product_id"],
+                "ingredient": ing,
+                "why": "Gives a brighter look.",
+            },
+        )["ok"]
+        is False
+    )
+    assert ep.call(
+        "add_candidate",
+        {
+            "brief_id": bid,
+            "product_id": p["product_id"],
+            "ingredient": ing,
+            "why": f"Its {ing} is common in formulas aimed at pores.",
+        },
+    )["ok"]
+    # a product already measured for the goal is part of the gap: refused
+    measured = next(
+        pid
+        for pid, r in prods.items()
+        if "pores_texture" in (r.get("goal_ids") or [])
+        and r.get("tier") != "too_few"
+        and cohort.tier(catalog.by_id(pid)["price"]) == "budget"
+    )
+    assert (
+        "already measured"
+        in ep.call(
+            "add_candidate", {"brief_id": bid, "product_id": measured, "why": "Sold for pores."}
+        )["error"]
+    )
+    (item,) = ep.items()
+    assert item["title"] == title and item["brief"] == good and item["kind"] in buying.KIND_WORDS
+    (c,) = item["candidates"]
+    assert c["label"] == "Not measured for pores and texture yet" and c["ingredient"] == ing
+
+
+def test_strong_actives_are_never_candidates_for_redness(rows):
+    ep, prods = _episode()
+    ep.call("get_gaps", {})
+    bid = ep.call(
+        "add_brief",
+        {
+            "goal": "redness",
+            "tier": None,
+            "title": "Find calmer options",
+            "brief": "Redness options could be wider.",
+            "priority": 1,
+        },
+    )["brief_id"]
+    harsh = next(
+        p
+        for p in catalog.products()
+        if any("retin" in i.lower() for i in p["inci"])
+        and "redness" not in (prods.get(p["product_id"], {}).get("goal_ids") or [])
+    )
+    out = ep.call(
+        "add_candidate",
+        {
+            "brief_id": bid,
+            "product_id": harsh["product_id"],
+            "ingredient": "Retinol",
+            "why": "Worth a look.",
+        },
+    )
+    assert "strong active" in out["error"]
+
+
+def test_the_route_answers_at_once_then_the_agents_list_replaces_it(rows, monkeypatch):
+    from app import buying_agent
+
+    def scripted():
+        ep, prods = _episode()
+        gaps = ep.call("get_gaps", {})
+        tone = next(g for g in gaps["goals"] if g["goal"] == "even_tone")
+        return Script(
+            [
+                [("get_gaps", {})],
+                [
+                    (
+                        "add_brief",
+                        {
+                            "goal": "even_tone",
+                            "tier": None,
+                            "priority": 1,
+                            "title": "Find a stronger tone evenness option",
+                            "brief": f"{tone['people']} people want help with tone evenness.",
+                        },
+                    )
+                ],
+                [("finish", {"summary": "One gap stands out."})],
             ]
         )
 
-    monkeypatch.setattr(gemini, "generate_json", fake)
-    out = buying.buying_list()
-    assert out["source"] == "gemini" and out["items"] and "not evidence" in out["caveat"]
-    first = out["items"][0]
-    c = first["candidates"][0]
-    assert c["why"].endswith("a common choice in formulas for this goal.")
-    assert all(x["ingredient"] != "Aqua" for x in first["candidates"])
-    for it in out["items"]:
-        for x in it["candidates"]:
-            assert x["label"] in (
-                "Too few users to measure yet",
-                f"Not measured for {it['goal'].lower()} yet",
-            )
-            assert "proven" not in x["why"].lower()
+    script = scripted()
+    monkeypatch.setattr(buying_agent, "model_round", script)
+    monkeypatch.setattr(buying, "WAIT_S", 10.0)
+    client = TestClient(app)
+    out = client.get("/v1/retailer/buying-list").json()
+    assert out["source"] == "gemini" and out["pending"] is False
+    assert [i["title"] for i in out["items"]] == ["Find a stronger tone evenness option"]
+    assert out["summary"] == "One gap stands out." and "not evidence" in out["caveat"]
 
 
-def _gap_goal(gap_id):
-    return gap_id.split(":")[0]
-
-
-def test_without_gemini_the_fixed_table_gives_the_same_shape(rows, monkeypatch):
-    def down(*a, **k):
-        raise gemini.GeminiError("down")
-
-    monkeypatch.setattr(gemini, "generate_json", down)
-    out = buying.buying_list()
-    assert out["source"] == "rules" and out["items"]
+def test_without_gemini_the_fixed_list_is_shown(rows, monkeypatch):
+    monkeypatch.setattr(buying, "WAIT_S", 10.0)
+    out = TestClient(app).get("/v1/retailer/buying-list").json()
+    assert out["source"] == "rules" and out["items"] and out["pending"] is False
     assert all(
         c["ingredient"] for it in out["items"] for c in it["candidates"] if c["kind"] == "fit"
     )
 
 
-def test_route_answers_and_degrades_to_503(rows, monkeypatch):
-    def down(*a, **k):
-        raise gemini.GeminiError("down")
+def test_while_the_agent_works_the_fixed_list_is_pending(rows, monkeypatch):
+    import threading
 
-    monkeypatch.setattr(gemini, "generate_json", down)
-    client = TestClient(app)
-    res = client.get("/v1/retailer/buying-list")
-    assert res.status_code == 200 and res.json()["items"]
-    monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": None, "version": 0})
-    monkeypatch.setattr(retailer, "_views", {})
-    monkeypatch.setattr(buying, "_cache", {})
+    from app import buying_agent
+
+    gate = threading.Event()
+
+    def slow(contents, config):
+        gate.wait(5)
+        raise RuntimeError("released")
+
+    monkeypatch.setattr(buying_agent, "model_round", slow)
+    monkeypatch.setattr(buying, "WAIT_S", 0.05)
+    out = TestClient(app).get("/v1/retailer/buying-list").json()
+    gate.set()
+    assert out["pending"] is True and out["source"] == "rules" and out["items"]
+
+
+def test_route_degrades_to_503(rows, monkeypatch):
     monkeypatch.setattr(retailer, "fetch", lambda: (_ for _ in ()).throw(RuntimeError("bq")))
-    assert client.get("/v1/retailer/buying-list").status_code == 503
+    assert TestClient(app).get("/v1/retailer/buying-list").status_code == 503
