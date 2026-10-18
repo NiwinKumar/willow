@@ -14,9 +14,11 @@ import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { parseDate, plural } from '../../lib/format'
 import { identity } from '../../lib/identity'
+import { placesOf } from '../../lib/profile'
+import { minutesFor } from '../../lib/track'
 import { routineEffect } from '../../lib/routineEffect'
 import { addToCalendar } from '../../lib/reminders'
-import { dueChips, fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
+import { fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
 import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, type VerdictKind } from '../../lib/verdict'
@@ -130,14 +132,20 @@ function HomeBody() {
   }
 
   const checkIn = (site: Session['site'] = 'face_full', mode?: CaptureMode) => shell.openCheckIn({ site, mode })
+  // Today's check-in: every place the person tracks, in one go (the sheet lists them).
+  const checkInToday = () => shell.openCheckIn()
   const openResult = (s: Session) => navigate(`/result/${s.id}`)
   // Add the missing photos to a baseline without a normal range (the check-in's top-up mode).
   const topUp = (s: Session) => navigate(`/check-in?topup=${s.id}`, { state: { background: location } })
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
   const closeUp = { wanted: goals.includes('pores_texture') || goals.includes('smoother'), doneToday: (data.series('cheek_macro')?.sessions ?? EMPTY).some((s) => counts(s) && dayOf(s.created_at) === day) }
-  const placeChips = !demo && checkin && due ? dueChips(checkin, due, closeUp) : ['Face']
-  const lead = leadFor({ read, goals, demo, checkIn, openResult, topUp, placeChips })
+  const tracked = placesOf(data.profile)
+  const dueNow = !demo && checkin && due && (due.kind === 'due' || due.kind === 'late')
+  const placeChips = demo ? ['Face'] : [...tracked.map((p) => SITE_SHORT[p]), ...(dueNow ? ['Due'] : [])]
+  const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
+  const todayLine = `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}, about ${minutesFor(tracked)} min`
+  const lead = leadFor({ read, goals, demo, checkIn, checkInToday, openResult, topUp, placeChips, todayLine })
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), demo ? null : tonightLine(activeIn(entries, 'pm')))
   const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
@@ -315,17 +323,21 @@ function leadFor({
   goals,
   demo,
   checkIn,
+  checkInToday,
   openResult,
   topUp,
   placeChips,
+  todayLine,
 }: {
   read: HomeRead
   goals: string[]
   demo: boolean
   checkIn: (site?: Session['site'], mode?: CaptureMode) => void
+  checkInToday: () => void
   openResult: (s: Session) => void
   topUp: (s: Session) => void
   placeChips: string[]
+  todayLine: string
 }): Lead {
   const baseMode = read.baseline?.capture_mode
   if (demo) {
@@ -376,7 +388,7 @@ function leadFor({
   const f = read.baselineFrames ?? 0
   switch (read.person) {
     case 'new':
-      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Five face photos by a window, about three minutes. ${countWord(BAND_FRAMES)} need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: ['Face', 'Phone or RAW'], cta: { label: 'Start baseline', onClick: () => checkIn('face_full') }, aura: 'coral' }
+      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkInToday }, aura: 'coral' }
     case 'noBand': {
       // Photos kept (under 30 days): add the missing ones to this same baseline (design: "Add 2 photos").
       const need = topUpNeed(read.baseline)
@@ -403,7 +415,7 @@ function leadFor({
         bigLabel: 'usable baseline photos',
         prog: Math.min(1, f / BAND_FRAMES),
         chips: ['Face', ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
-        cta: { label: 'Check in', onClick: () => checkIn('face_full', baseMode) },
+        cta: { label: 'Check in', onClick: checkInToday },
         secondary: read.baseline ? { label: 'See baseline', onClick: () => openResult(read.baseline!) } : undefined,
         aura: 'coral',
       }
@@ -415,19 +427,19 @@ function leadFor({
         sub: 'Your baseline still holds. One check-in picks up where you left off.',
         big: read.lastFace ? String(daysSince(read.lastFace.created_at)) : undefined,
         bigLabel: 'days since your last check-in',
-        chips: [...placeChips, ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
-        cta: { label: 'Check in now', onClick: () => checkIn('face_full', baseMode) },
+        chips: placeChips,
+        cta: { label: 'Check in now', onClick: checkInToday },
         aura: 'sky',
       }
     default:
       return {
         eyebrow: read.lastFace ? `LAST CHECK-IN ${shortDay(read.lastFace.created_at).toUpperCase()}` : undefined,
-        title: 'Face check-in',
-        sub: 'Same window light as last time keeps results comparable.',
+        title: 'Your check-in',
+        sub: `${cap(todayLine)}. Same window light as last time keeps results comparable.`,
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
         bigLabel: 'days since your baseline',
-        chips: [...placeChips, ...(baseMode ? [MODE_LABEL[baseMode]] : [])],
-        cta: { label: 'Check in', onClick: () => checkIn('face_full', baseMode) },
+        chips: placeChips,
+        cta: { label: 'Check in', onClick: checkInToday },
         aura: 'violet',
       }
   }

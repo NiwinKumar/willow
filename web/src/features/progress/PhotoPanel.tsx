@@ -91,7 +91,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const spotsHere = siteHasSpots(session.site)
   const expired = !session.preview && photoExpired(session)
   const missing = expired ? 'Photos are deleted 30 days after upload. The measurements stay.' : 'No photo preview for this check-in. The numbers are measured from your photos.'
-  const caption = `${session.capture_mode === 'uncalibrated' ? 'QUICK PHOTO' : 'MEASURED REFERENCE PHOTO'} · ${fmtDate(session.created_at).toUpperCase()}${session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''}`
+  const caption = `${session.capture_mode === 'uncalibrated' ? 'CAMERA PHOTO' : 'MEASURED REFERENCE PHOTO'} · ${fmtDate(session.created_at).toUpperCase()}${session.capture_mode === 'uncalibrated' ? ' · UNCALIBRATED' : ''}`
   // The diary's box is in the pixels of the photo its spot was found on.
   const focusHere = !focusItem || candidateView(focusItem.c) === active
   const focusPos = focus?.bbox && focusHere ? toPct(box, focus.bbox[0] + focus.bbox[2] / 2, focus.bbox[1] + focus.bbox[3] / 2) : null

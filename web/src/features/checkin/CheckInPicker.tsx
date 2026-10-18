@@ -81,8 +81,8 @@ export default function CheckInPicker({
   const note = raw
     ? `${n ?? 'The'} DNG files from Lightroom${site.startsWith('forearm') ? ', with pen dots and white paper' : ', phone about 10 cm away'}. RAW is for close-ups and the forearms; take your whole face with the camera.`
     : first
-      ? `${n ?? 5} photos with this device’s camera. They become your quick-photo baseline.`
-      : `${n ?? 3} photos with this device’s camera, compared with your quick-photo baseline.`
+      ? `${n ?? 5} photos with this device’s camera. They become your camera baseline.`
+      : `${n ?? 3} photos with this device’s camera, compared with your camera baseline.`
   // The flow opens on the guide for a first session (or RAW before the one-time setup), else straight in.
   // Same rule as the flow (computedN === 5): a thin baseline (no normal range) also opens the guide.
   const cta = first || n === 5 ? 'Prepare your baseline' : raw ? (prefs.lightroomDone() ? 'Choose RAW files' : 'Set up RAW') : 'Open camera'
