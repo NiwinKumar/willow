@@ -33,7 +33,7 @@ import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
-import { ProductTestTile } from './Tiles'
+import { BaselineTile, ProductTestTile } from './Tiles'
 
 const POLL_MS = 10_000
 const EMPTY: Session[] = []
@@ -217,8 +217,12 @@ function HomeBody() {
   if (measured && trends.length) small.push({ key: 'goals', node: goalsNode })
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
   if (effect?.rows.length) small.push({ key: 'effect', node: (cls) => <RoutineEffectCard className={cls} effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
-  if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
+  // Routine today joins this row (it is the daily one); the product test and your baseline go small, at the foot.
+  small.push({ key: 'routine', node: () => routineCard })
   const spans = rowSpans(small.length)
+  const foot: { key: string; node: ReactNode }[] = []
+  if (forearm) foot.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
+  if (read.baseline && !demo) foot.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })
 
   const am = activeIn(entries, 'am')
   const pm = activeIn(entries, 'pm')
@@ -228,8 +232,7 @@ function HomeBody() {
   const missingSunscreen = Boolean(check.data?.gaps.some((g) => /sunscreen/i.test(g.need)))
 
   let routineCard: ReactNode
-  const beside = Boolean(measured)
-  const routineCls = beside ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12'
+  const routineCls = 'flex-1'
   if (demo) routineCard = <RoutineEmpty demo className={routineCls} onRoutine={() => navigate('/routine')} />
   else if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
   else if (routine.status === 'error') {
@@ -289,8 +292,17 @@ function HomeBody() {
             {c.node('flex-1')}
           </SmallSlot>
         ))}
-        {routineCard}
-        {changedNode('col-span-12 @min-[960px]:col-span-6')}
+        {changedNode(foot.length ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12')}
+        {foot.length ? (
+          // Beside "Since your baseline": the small tiles stacked; without it, side by side.
+          <div className={`col-span-12 flex min-w-0 gap-3.5 ${measured ? 'flex-col @min-[960px]:col-span-6' : 'flex-col @min-[560px]:flex-row'}`}>
+            {foot.map((f) => (
+              <div key={f.key} className="flex min-w-0 flex-1">
+                {f.node}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </Frame>
   )
