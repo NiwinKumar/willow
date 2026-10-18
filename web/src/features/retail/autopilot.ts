@@ -87,25 +87,25 @@ export function emptyRule(workspace: string): RuleBody {
 export const TEMPLATES: { title: string; blurb: string; text: string; rule: (workspace: string) => RuleBody }[] = [
   {
     title: 'Promote what becomes Proven',
-    blurb: 'Promote a product once it’s proven to work.',
+    blurb: 'As soon as a product is proven to work, share it with the people it helps.',
     text: 'When any of my serums becomes Proven for dark spots, promote it to the skin types it works for, for 14 days, with a 20% holdout, max 2 at a time.',
     rule: (w) => emptyRule(w),
   },
   {
     title: 'Reach a newly proven skin type',
-    blurb: 'Reach a new skin type it works for.',
+    blurb: 'When a product starts working for a new skin type, let those shoppers know.',
     text: 'When any of my products gains a new skin type with a positive lift, suggest a 7-day campaign for that group, with a 20% holdout, max 1 at a time.',
     rule: (w) => ({ ...emptyRule(w), name: 'New skin types', scope: { category: null, product_ids: [] }, trigger: { kind: 'new_segment', goals: [], unmet_min: 0.5 }, action: { days: 7, holdout_pct: 0.2, max_running: 1 } }),
   },
   {
     title: 'Ride rising demand',
-    blurb: 'Promote proven picks when demand grows.',
+    blurb: 'When more people are looking for a fix, put your proven picks in front of them.',
     text: 'When demand for redness is rising and one of my products is Proven for it, start it automatically for 14 days, with a 20% holdout, max 2 at a time.',
     rule: (w) => ({ ...emptyRule(w), name: 'Rising redness demand', level: 'auto', scope: { category: null, product_ids: [] }, trigger: { kind: 'rising_demand', goals: ['redness'], unmet_min: 0.5 } }),
   },
   {
     title: 'Help an under-served group',
-    blurb: 'Help people not seeing results yet.',
+    blurb: 'Reach shoppers who haven’t seen results yet with a product that works for them.',
     text: 'When 50% or more of a skin type see no change yet for blemishes and one of my products works for them, run it on autopilot for 30 days, with a 20% holdout, max 1 at a time.',
     rule: (w) => ({ ...emptyRule(w), name: 'Under-served blemishes', level: 'autopilot', scope: { category: null, product_ids: [] }, trigger: { kind: 'unmet_need', goals: ['blemishes'], unmet_min: 0.5 }, action: { days: 30, holdout_pct: 0.2, max_running: 1 } }),
   },
