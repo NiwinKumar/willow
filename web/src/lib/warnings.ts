@@ -4,7 +4,7 @@ import { isCloseUp, qualityCopy } from './metrics'
 const PEN_DOTS = /pen-dot square not found/i
 /** The engine's notes in the app's words (close-ups: docs/METRICS.md, pores and texture). */
 const PLAIN: [RegExp, string][] = [
-  [/^uncalibrated photo: results are a trend only/i, 'Phone photo, no colour reference: compared only with your phone baseline, whose normal range is usually wider than a RAW one'],
+  [/^uncalibrated photo: results are a trend only/i, 'Phone photo, no colour reference: read as a trend against your baseline, with a wider normal range'],
   [/^no colour card: colours as captured by the camera/i, 'No colour card: colours are as the camera captured them, so readings carry wider uncertainty'],
   [/^close-up scale assumed, not measured/i, 'Size on this close-up is estimated, not measured: pore and texture numbers compare with your own close-ups taken the same way, not as exact sizes'],
   [/^pores need a closer photo/i, 'Pores need a closer photo: hold the phone about 10 cm (a hand’s width) from your face, or closer'],

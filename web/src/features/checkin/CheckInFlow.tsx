@@ -408,7 +408,7 @@ export default function CheckInFlow() {
   }
 
   const onPick = (picked: File[]) => {
-    // A RAW set picked in quick mode is better than phone photos: it becomes a RAW check-in.
+    // A RAW set picked for camera photos is better than phone photos: it is measured as RAW, quietly.
     const anyPhoto = usable(upload.rows).some((r) => r.contentType !== 'image/x-adobe-dng')
     // (not once the session exists, or for a top-up: their capture mode is fixed)
     if (mode === 'uncalibrated' && picked.every(isDng) && !anyPhoto && !upload.locked && !topup) {
@@ -419,7 +419,6 @@ export default function CheckInFlow() {
       const rawN = known ? neededFor(sessionsOf(site), 'calibrated_raw') : (n ?? 5)
       upload.setRows(addFiles(upload.rows, picked, 'calibrated_raw', rawN))
       go({ mode: 'calibrated_raw', n: String(rawN) }, { replace: true })
-      toast('RAW files: this becomes a RAW check-in, with its own baseline.')
       return
     }
     upload.setRows(addFiles(upload.rows, picked, mode, shotsN || 5))
@@ -513,7 +512,6 @@ export default function CheckInFlow() {
         sessionsOf={sessionsOf}
         known={known}
         onSite={(s) => setSiteMode(s, mode)}
-        onMode={(m) => setSiteMode(site, m)}
         onContinue={() => go({ site, step: 'guide', n: String(computedN) })}
       />
     )

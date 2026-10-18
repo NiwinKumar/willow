@@ -9,7 +9,7 @@ import { Disclaimer } from '../../components/willow/Disclaimer'
 import { WillowLoader } from '../../components/willow/WillowLoader'
 import { useOwner, useSpots } from '../../data/hooks'
 import { SAME_WAY_COUNTS, SITE_ORDER, stalled } from '../../data/live'
-import type { CaptureMode, Metric, MetricId, Session, Site } from '../../data/types'
+import type { Metric, MetricId, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import type { SpotTrack } from '../../lib/api'
 import { clockOf, fmtDate } from '../../lib/format'
@@ -19,7 +19,7 @@ import { ExplanationCard, NextAction } from './ExplanationCard'
 import { LAST_LIKE_THIS } from './headline'
 import { MetricCard } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
-import { MODE_LABEL, REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, referenceFor, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
+import { REASON_SHORT, bandOf, canBeBaseline, baselineFor, counts, referenceFor, dayOf, deltaText, metricQuestion, optionLabel, orderMetrics, retryable, sessionState, shortWhen, usableLine } from './model'
 import { Crumb, Page, Pills, StatusCard, TomorrowSheet } from './parts'
 import { PhotoPanel, type DiaryFocus } from './PhotoPanel'
 import { heroFor } from './hero'
@@ -28,14 +28,13 @@ import { ZONE_NAME, statusText, tagText } from './diaryText'
 import { SpotDiary } from './SpotDiary'
 import { useSessionView } from './useSessionView'
 
-type SitePill = Site | 'forearm'
 const isSite = (v: string | null): v is Site => v !== null && (SITE_ORDER as string[]).includes(v)
-const isMode = (v: string | null): v is CaptureMode => v === 'calibrated_raw' || v === 'uncalibrated'
+const PLACES: Site[] = ['face_full', ...CLOSE_UPS]
 const TOMORROW_KEY = 'willow.tomorrowShown'
 
 /**
- * Result (design "Session results"). /result is the latest analysed face check-in (?site= and ?mode= pick
- * another), /result/:sessionId one check-in; ?metric= opens a metric's detail, ?track= puts a spot-diary mark
+ * Result (design "Session results"). /result is the latest analysed check-in (?site= picks a place),
+ * /result/:sessionId one check-in; the places of the same day are one tap apart; ?metric= opens a metric's detail, ?track= puts a spot-diary mark
  * on the photo, #spot-diary scrolls to the diary.
  */
 export default function Result() {
@@ -48,34 +47,44 @@ export default function Result() {
   const owner = useOwner()
 
   const qSite = params.get('site')
-  const qMode = params.get('mode')
   const byId = sessionId ? (data.all.find((s) => s.id === sessionId) ?? null) : null
-  const site: Site = byId?.site ?? (isSite(qSite) ? qSite : 'face_full')
+  // Without an id or a place: the place of the latest analysed check-in.
+  const latestPlace = useMemo(() => {
+    const pool = PLACES.flatMap((p) => data.series(p)?.sessions ?? []).filter((s) => s.status === 'done')
+    return pool.sort((a, b) => a.created_at.localeCompare(b.created_at)).at(-1)?.site ?? 'face_full'
+  }, [data])
+  const site: Site = byId?.site ?? (isSite(qSite) ? qSite : latestPlace)
   const siteSessions = useMemo(() => data.series(site)?.sessions ?? [], [data, site])
-  // Without an id: the latest analysed check-in of the site (and mode, if asked); else the latest of any state.
-  const latest = useMemo(() => {
-    const pool = siteSessions.filter((s) => !isMode(qMode) || s.capture_mode === qMode)
-    return [...pool].reverse().find((s) => s.status === 'done') ?? pool[pool.length - 1] ?? null
-  }, [siteSessions, qMode])
+  // Without an id: the latest analysed check-in of the place; else the latest of any state.
+  const latest = useMemo(() => [...siteSessions].reverse().find((s) => s.status === 'done') ?? siteSessions[siteSessions.length - 1] ?? null, [siteSessions])
   const session = sessionId ? byId : latest
-  const mode: CaptureMode = session?.capture_mode ?? (isMode(qMode) ? qMode : 'uncalibrated')
-  const modeSessions = useMemo(() => siteSessions.filter((s) => s.capture_mode === mode), [siteSessions, mode])
   const baseline = useMemo(() => baselineFor(session, siteSessions), [session, siteSessions])
   const state = session ? sessionState(session) : null
   const ordered = useMemo(() => orderMetrics(session?.result?.metrics ?? [], data.goals), [session, data.goals])
   const order = useMemo(() => ordered.map((m) => m.id), [ordered])
   // The single-session view signs what the list does not: the redness overlay, every frame, the spot crops.
   const view = useSessionView(session && state !== 'pending' ? session.id : null)
-  // The scrubber: this place's check-ins in this capture mode, oldest first.
+  // The scrubber: this place's check-ins, oldest first.
   const ticks = useMemo<ScrubberTick[]>(
     () =>
-      modeSessions.map((s) => {
+      siteSessions.map((s) => {
         const st = sessionState(s)
-        return { id: s.id, short: shortWhen(s, modeSessions), label: optionLabel(s, modeSessions), kind: st === 'baseline' ? 'baseline' : st === 'rejected' ? 'rejected' : st === 'compared' || st === 'former' ? 'measured' : 'unfinished' }
+        return { id: s.id, short: shortWhen(s, siteSessions), label: optionLabel(s, siteSessions), kind: st === 'baseline' ? 'baseline' : st === 'rejected' ? 'rejected' : st === 'compared' || st === 'former' ? 'measured' : 'unfinished' }
       }),
-    [modeSessions],
+    [siteSessions],
   )
-  const tickIndex = session ? modeSessions.findIndex((s) => s.id === session.id) : -1
+  const tickIndex = session ? siteSessions.findIndex((s) => s.id === session.id) : -1
+  // The other places of the same check-in day, one tap apart (the latest of each place that day).
+  const sameDay = useMemo(() => {
+    if (!session) return []
+    const d = dayOf(session)
+    const list = data.all.filter((s) => dayOf(s) === d).sort((a, b) => a.created_at.localeCompare(b.created_at))
+    return SITE_ORDER.flatMap((p) => {
+      const of = list.filter((s) => s.site === p)
+      if (!of.length) return []
+      return [p === session.site ? session : ([...of].reverse().find((s) => s.status === 'done') ?? of[of.length - 1])]
+    })
+  }, [data.all, session])
 
   // Still measuring: read again every few seconds until the api answers (no made-up progress). A session
   // stuck for 30 min will not move by waiting, so polling stops there.
@@ -221,33 +230,18 @@ export default function Result() {
     )
 
   // ---- header controls ----
-  const sitesWith = SITE_ORDER.filter((s) => (data.series(s)?.sessions.length ?? 0) > 0)
-  const siteOptions: { value: SitePill; label: string }[] = [
-    ...(['face_full', ...CLOSE_UPS] as Site[]).filter((s) => s === 'face_full' || sitesWith.includes(s) || s === site).map((s) => ({ value: s as SitePill, label: SITE_LABEL[s] })),
-    ...(sitesWith.some((s) => s.startsWith('forearm')) || site.startsWith('forearm') ? [{ value: 'forearm' as SitePill, label: 'Forearms' }] : []),
-  ]
-  const sitePill: SitePill = site.startsWith('forearm') ? 'forearm' : site
-  const pickSite = (v: SitePill) => (v === 'forearm' ? navigate('/test') : navigate(`/result?site=${v}`))
-  const pickMode = (m: CaptureMode) => navigate(`/result?site=${site}&mode=${m}`)
   const headerDate = session ? fmtDate(session.created_at) : SITE_LABEL[site]
   const header = (
     <>
-      <Crumb to={`/progress?site=${site.startsWith('forearm') ? 'face_full' : site}`} back="Progress" here={`Result · ${headerDate}`} />
+      <Crumb to="/progress" back="Progress" here={`Result · ${headerDate}`} />
       <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pt-[clamp(6px,1.4vw,16px)] pb-1">
         <h1 className="m-0 font-serif text-[clamp(34px,3.5vw,52px)] leading-[.9] font-normal tracking-[-0.015em]">
           Your <span className="italic">result</span>
         </h1>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <Pills label="Place" options={siteOptions} value={sitePill} onChange={pickSite} />
+          {sameDay.length > 1 && session ? <Pills label="Place in this check-in" options={sameDay.map((s) => ({ value: s.id, label: SITE_LABEL[s.site] }))} value={session.id} onChange={(id) => navigate(`/result/${id}`)} /> : null}
           <div className="flex flex-wrap justify-end gap-1.5">
-            <Pills
-              label="Capture mode"
-              tone="white"
-              options={(['calibrated_raw', 'uncalibrated'] as CaptureMode[]).map((m) => ({ value: m, label: MODE_LABEL[m] }))}
-              value={session ? mode : isMode(qMode) ? qMode : null}
-              onChange={pickMode}
-            />
-            {modeSessions.length ? (
+            {siteSessions.length ? (
               <label className="flex min-h-12 items-center gap-2 rounded-pill bg-white/55 py-0 pr-1.5 pl-4 text-[13px] text-ink-2">
                 Check-in
                 <select
@@ -255,9 +249,9 @@ export default function Result() {
                   onChange={(e) => navigate(`/result/${e.target.value}`)}
                   className="min-h-[38px] max-w-[min(62vw,280px)] cursor-pointer rounded-pill border-0 bg-white px-3 text-[14px] text-ink"
                 >
-                  {[...modeSessions].reverse().map((s) => (
+                  {[...siteSessions].reverse().map((s) => (
                     <option key={s.id} value={s.id}>
-                      {optionLabel(s, modeSessions)}
+                      {optionLabel(s, siteSessions)}
                     </option>
                   ))}
                 </select>
@@ -267,12 +261,12 @@ export default function Result() {
         </div>
       </div>
       {tickIndex >= 0 && ticks.length > 1 ? (
-        <section aria-label={`Your ${MODE_LABEL[mode]} check-ins`} className="flex flex-col gap-1 rounded-[28px] bg-white/55 px-3 pt-2.5 pb-2 squircle">
+        <section aria-label={`Your ${SITE_LABEL[site].toLowerCase()} check-ins`} className="flex flex-col gap-1 rounded-[28px] bg-white/55 px-3 pt-2.5 pb-2 squircle">
           <div className="flex items-baseline justify-between gap-3 px-1">
-            <span className="font-mono text-[11px] tracking-[.08em] whitespace-nowrap text-ink-2">■ {MODE_LABEL[mode].toUpperCase()} CHECK-INS · {ticks.length}</span>
+            <span className="font-mono text-[11px] tracking-[.08em] whitespace-nowrap text-ink-2">■ {SITE_LABEL[site].toUpperCase()} CHECK-INS · {ticks.length}</span>
             <span className="text-[12px] text-ink-2">Drag, or use ← →</span>
           </div>
-          <Scrubber ticks={ticks} index={tickIndex} label={`${SITE_LABEL[site]} check-in`} onChange={(i) => navigate(`/result/${modeSessions[i].id}`, { replace: true })} />
+          <Scrubber ticks={ticks} index={tickIndex} label={`${SITE_LABEL[site]} check-in`} onChange={(i) => navigate(`/result/${siteSessions[i].id}`, { replace: true })} />
         </section>
       ) : null}
     </>
@@ -294,7 +288,7 @@ export default function Result() {
         {retry}
         <StatusCard
           eyebrow="NO CHECK-INS YET"
-          title={`Your first ${isMode(qMode) ? MODE_LABEL[qMode] + ' ' : ''}check-in of your ${SITE_LABEL[site].toLowerCase()} becomes your baseline.`}
+          title="Your first check-in becomes your baseline."
           body="Follow the light and distance checklist. With 3 or more usable photos, Willow measures how much your readings wobble on their own. Results appear here."
           action={
             <Button variant="ink" size="lg" onClick={() => shell.openCheckIn()}>
@@ -327,7 +321,7 @@ export default function Result() {
   const actions = {
     compared: [
       <NextAction key="a" onClick={ask}>Ask Wisp about this result</NextAction>,
-      <NextAction key="t" to={`/progress?site=${site}&mode=${mode}`}>See this on your timeline</NextAction>,
+      <NextAction key="t" to={`/progress?site=${site}`}>See this on your timeline</NextAction>,
       ...(session.baseline_ref && !session.baseline_ref.has_noise_band && canBeBaseline(session) && (session.result?.frames_used ?? 0) >= 3
         ? [<NextAction key="b" to={`/progress/${day}?site=${site}&session=${session.id}`}>Make this check-in your baseline</NextAction>]
         : [<NextAction key="c" onClick={checkIn}>Check in again, same light and distance</NextAction>]),
@@ -337,7 +331,7 @@ export default function Result() {
       <NextAction key="r" to="/routine">Add the products you’re starting</NextAction>,
     ],
     former: [
-      <NextAction key="l" to={`/result?site=${site}&mode=${mode}`}>Go to your latest check-in</NextAction>,
+      <NextAction key="l" to={`/result?site=${site}`}>Go to your latest check-in</NextAction>,
       <NextAction key="b" to={`/progress/${day}?site=${site}&session=${session.id}`}>Change your baseline</NextAction>,
     ],
     rejected: [<NextAction key="c" onClick={checkIn}>Retake this check-in</NextAction>, <NextAction key="a" onClick={ask}>Ask Wisp how to retake it</NextAction>],

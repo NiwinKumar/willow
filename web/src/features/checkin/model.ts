@@ -111,7 +111,6 @@ export function cheeksByDefault(sessions: Session[]): boolean {
   return last ? hasCheeks(last) : true
 }
 
-export const modeWord = (mode: CaptureMode) => (mode === 'calibrated_raw' ? 'RAW' : 'camera')
 
 /**
  * Photos this check-in needs: 5 when it will become the baseline for this site and mode (no
@@ -130,12 +129,12 @@ export function thinBaseline(s: Session): boolean {
   return used < 3 || s.baseline_ref?.has_noise_band === false
 }
 
-/** One line about a site's baseline in a mode, for the picker and the site cards. */
+/** One line about a site's baseline, for the picker and the site cards. */
 export function baselineLine(sessions: Session[], mode: CaptureMode): { text: string; set: boolean } {
   const st = baselineState(sessions, mode)
-  if (st.state === 'set') return { text: `${mode === 'calibrated_raw' ? 'RAW baseline' : 'Baseline'} · ${fmtDate(st.session.created_at)}`, set: true }
-  if (st.state === 'saved') return { text: `${mode === 'calibrated_raw' ? 'RAW photos' : 'Photos'} saved, not measured yet`, set: false }
-  return { text: sessions.length ? `No ${modeWord(mode)} baseline yet` : 'No photos yet', set: false }
+  if (st.state === 'set') return { text: `Baseline · ${fmtDate(st.session.created_at)}`, set: true }
+  if (st.state === 'saved') return { text: 'Photos saved, not measured yet', set: false }
+  return { text: sessions.length ? 'No baseline yet' : 'No photos yet', set: false }
 }
 
 export type Check = { title: string; hint: string }
@@ -210,21 +209,6 @@ export function lightroomSteps(site: Site): string[] {
     'Take the photos. In Lightroom select them, then Share, Export Original (not Camera Roll: that hands over a JPEG), Save to Files.',
     'iCloud files must finish downloading. Then come back here, choose Upload files and pick the DNGs.',
   ]
-}
-
-/** Mode facts on the site step (CAP modeFacts), true for today's engine. */
-export function modeFacts(mode: CaptureMode): { g: string; t: string }[] {
-  return mode === 'calibrated_raw'
-    ? [
-        { g: '◆', t: 'DNG files from Lightroom with locked settings, uploaded from Files.' },
-        { g: '◆', t: 'Your baseline photos give each reading a personal normal range.' },
-        { g: '!', t: 'Face colours are not card-corrected yet; the card keeps your sessions comparable.' },
-      ]
-    : [
-        { g: '◌', t: 'This device’s camera, or phone photos (JPEG, HEIC, HEIF).' },
-        { g: '◌', t: 'No colour reference, so readings carry wider uncertainty than RAW.' },
-        { g: '■', t: 'Camera photos keep their own baseline, separate from RAW.' },
-      ]
 }
 
 export { plural } from '../../lib/format'
