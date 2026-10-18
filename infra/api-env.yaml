@@ -8,7 +8,7 @@ GEMINI_MODEL: "gemini-3.8-flash"
 BQ_DATASET: "willow_insights"
 DEMO_USER_ID: "demo_willow"
 SIGNING_SERVICE_ACCOUNT: "sa-api@willow-511508.iam.gserviceaccount.com"
-ALLOWED_ORIGINS: "http://localhost:5173,https://willow-511508.web.app,https://willow-511508.firebaseapp.com"
+ALLOWED_ORIGINS: "http://localhost:5173,https://willow-511508.web.app,https://meetwillow.web.app,https://willow-511508.firebaseapp.com"
 # Check-in reminders (api/app/reminders.py). Push stays off until the VAPID key secrets are mounted
 # (infra/setup.sh, "Check-in reminders"); the subject is the app's own URL, so no email is published.
 VAPID_SUBJECT: "https://willow-511508.web.app"
