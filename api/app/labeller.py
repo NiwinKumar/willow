@@ -6,11 +6,13 @@ diagnoses: the engine's numbers stay the engine's.
 
 Agreement rule: every batch is asked twice (temperature 0, candidates in reverse order the second
 time). A label is kept only when both runs give the same label and neither says "low" confidence;
-otherwise the candidate is "uncertain". Up to 10 candidates per request; batches run in parallel.
+otherwise the candidate is "uncertain". Up to 5 candidates per request; batches run in parallel,
+within LABEL_BUDGET_S: a batch still unanswered then is left unlabelled, so a slow Gemini never
+holds up a check-in's result.
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any, Literal
 
 from google.genai import types
@@ -21,8 +23,13 @@ from app.explain import BANNED
 
 log = logging.getLogger("willow.labeller")
 
-BATCH = 10
+# 20 images per call (10 candidates) took about 50 s and often hit Vertex's deadline (Oct 18);
+# 5 per call answer in about 10 s.
+BATCH = 5
 MAX_CANDIDATES = 40
+WORKERS = 8
+# The check-in waits for the labels: past this, unanswered batches stay unlabelled.
+LABEL_BUDGET_S = 30.0
 
 Label = Literal[
     "papule_pustule",
@@ -133,8 +140,19 @@ def label_candidates(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
     batches = [ready[i : i + BATCH] for i in range(0, len(ready), BATCH)]
     site = result.get("site", "")
     jobs = [(b, site) for b in batches] + [(list(reversed(b)), site) for b in batches]
-    with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as pool:
-        runs = list(pool.map(_ask_or_none, jobs))
+    pool = ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs)))
+    futures = [pool.submit(_ask_or_none, job) for job in jobs]
+    done, late = wait(futures, timeout=LABEL_BUDGET_S)
+    # Don't wait for the late ones: their spots stay unlabelled (the threads finish on their own).
+    pool.shutdown(wait=False, cancel_futures=True)
+    if late:
+        log.warning(
+            "candidate labels: %d of %d calls missed the %.0f s budget",
+            len(late),
+            len(jobs),
+            LABEL_BUDGET_S,
+        )
+    runs = [f.result() if f in done else None for f in futures]
     first, second = runs[: len(batches)], runs[len(batches) :]
     out: dict[str, dict[str, Any]] = {}
     for a_run, b_run, batch in zip(first, second, batches, strict=True):

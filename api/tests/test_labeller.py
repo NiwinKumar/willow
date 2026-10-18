@@ -62,16 +62,16 @@ def test_labels_are_kept_only_when_both_runs_agree_confidently(monkeypatch):
     assert calls[1] == list(reversed(calls[0]))  # second run sees the reverse order
 
 
-def test_batches_of_ten_and_banned_words_dropped(monkeypatch):
+def test_batches_of_five_and_banned_words_dropped(monkeypatch):
     same = {
         "label": "papule_pustule",
         "confidence": "medium",
         "visible_features": ["raised", "looks like rosacea"],
     }
     table = {f"c_{i}": same for i in range(12)}
-    calls = _model(monkeypatch, [table] * 4)
+    calls = _model(monkeypatch, [table] * 6)
     out = labeller.label_candidates(_result(12))
-    assert sorted(len(c) for c in calls) == [2, 2, 10, 10]
+    assert sorted(len(c) for c in calls) == [2, 2, 5, 5, 5, 5]
     assert out["c_11"]["visible_features"] == ["raised"]
 
 
@@ -104,3 +104,27 @@ def test_analysis_stores_labels_next_to_the_result(client, fake, monkeypatch):
     view = client.post(f"/v1/sessions/{res['session_id']}/analyze").json()
     assert view["labels"] == {"c_0": "freckle"}
     assert view["session"]["label_details"]["c_0"]["confidence"] == "high"
+
+
+def test_a_slow_batch_is_left_unlabelled_within_the_budget(monkeypatch):
+    """A batch Gemini has not answered within LABEL_BUDGET_S stays unlabelled; the rest are kept."""
+    import threading
+    import time
+
+    same = {"label": "open_comedone", "confidence": "high", "visible_features": []}
+    release = threading.Event()
+
+    def fake(prompt_id, parts, schema, **kw):
+        asked = [p.split(" ")[1] for p in parts if isinstance(p, str) and p.startswith("Candidate")]
+        if "c_5" in asked:  # the second batch hangs until the test ends
+            release.wait(5)
+        return BatchLabels(labels=[CandidateLabel(id=i, **same) for i in asked])
+
+    monkeypatch.setattr(gemini, "generate_json", fake)
+    monkeypatch.setattr(storage, "read_bytes", lambda name: b"\xff\xd8jpeg")
+    monkeypatch.setattr(labeller, "LABEL_BUDGET_S", 0.3)
+    t = time.monotonic()
+    out = labeller.label_candidates(_result(7))
+    release.set()
+    assert time.monotonic() - t < 2
+    assert sorted(out) == ["c_0", "c_1", "c_2", "c_3", "c_4"]
