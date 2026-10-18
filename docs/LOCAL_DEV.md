@@ -35,7 +35,7 @@ Env vars:
 | GEMINI_MODEL | gemini-3.8-flash | latest GA Flash (GA Sep 2, 2026) |
 | VERTEX_LOCATION | global | Gemini 3.x GA models are served only from the global endpoint; everything else stays in us-central1 |
 | BQ_DATASET | willow_insights | |
-| ALLOWED_ORIGINS | http://localhost:5173,https://willow-511508.web.app,https://willow-511508.firebaseapp.com | CORS |
+| ALLOWED_ORIGINS | http://localhost:5173,https://willow-511508.web.app,https://meetwillow.web.app,https://willow-511508.firebaseapp.com | CORS |
 | DEMO_USER_ID | demo_willow | read-only seeded account |
 | VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY | (Secret Manager `willow-vapid-public` / `willow-vapid-private`) | Web Push keys (base64url, raw P-256). Unset = push off and the app offers calendar reminders only; tests and fixture mode need neither. Generate a local pair with the one-liner in `infra/setup.sh` ("Check-in reminders"); never commit them |
 | VAPID_SUBJECT | https://willow-511508.web.app | contact for the push services (`mailto:` or https); push needs all three VAPID values |

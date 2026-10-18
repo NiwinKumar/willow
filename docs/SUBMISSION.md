@@ -7,7 +7,7 @@
 - [ ] Demo video on YouTube/Vimeo/Drive (public/unlisted link). Length: the dashboard's rules say "3 to 4 minute" and penalise going over, while the same form's field says "up to 3 minutes": make it exactly 3:00
 - [ ] Deck on the template from the submission page ("Template: Download"), exported to PDF, 5 MB max
 - [ ] Deadline: Oct 18, 11:59 PM IST. Submissions also get an "AI evaluation score", so the description and README must be explicit
-- [ ] Live link to submit: https://willow-511508.web.app/judge (guided tour, guest account, no sign-in)
+- [ ] Live link to submit: https://meetwillow.web.app/judge (guided tour, guest account, no sign-in)
 - [ ] Brief description (below) pasted into the form
 - [ ] Category: Retail & Commerce: Intelligent Customer and Business Experiences
 - [ ] Services stay up until judging ends (Nov 6); budget alerts on
