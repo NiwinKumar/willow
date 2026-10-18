@@ -78,16 +78,10 @@ export function SpotDiary({
   const doneToday = Boolean(lastSess && isToday(lastSess.created_at))
   // The api starts the diary at 3 usable photos over 2 or more days (enough_data); say what is still missing.
   const photoDays = new Set(sess.map((x) => new Date(x.created_at).toDateString())).size
-  const startsWhen =
-    photoDays < 2 && sess.length >= 2 ? 'Spot diary starts tomorrow' : photoDays >= 2 && sess.length < 3 ? 'Spot diary starts with your next photo' : 'Spot diary starts on day 3'
+  const startsWhen = photoDays < 2 && sess.length >= 2 ? 'Spot diary starts tomorrow' : photoDays >= 2 && sess.length < 3 ? 'Spot diary starts with your next photo' : 'Spot diary starts on day 3'
 
   const title = ready && d ? `Your spots over ${fmtDays(Math.max(1, d.days_covered))}` : first ? 'Your spot diary' : 'Your spots'
-  const sub =
-    ready && d && lastSess
-      ? `${sess.length} photos, ${fmtDate(sess[0].created_at)} to ${fmtDate(lastSess.created_at)}. Names are AI-suggested.`
-      : status === 'loading'
-        ? 'Matching spots across your face photos…'
-        : 'Follows each spot from one face photo to the next.'
+  const sub = ready && d && lastSess ? `${sess.length} photos, ${fmtDate(sess[0].created_at)} to ${fmtDate(lastSess.created_at)}. Names are AI-suggested.` : status === 'loading' ? 'Matching spots across your face photos…' : 'Follows each spot from one face photo to the next.'
   // The map shows the spots the list shows: the area and the status picked.
   // With cheek photos: Front face / Left cheek / Right cheek, each with the spots of the zones it shows (picking a
   // cheek area or a cheek spot turns to its photo).
@@ -117,22 +111,20 @@ export function SpotDiary({
   const notes = d ? [d.unconfirmed ? `${d.unconfirmed} ${d.unconfirmed === 1 ? 'spot seen once is' : 'spots seen once are'} hidden` : '', d.sessions_not_mapped ? `${d.sessions_not_mapped} earlier ${d.sessions_not_mapped === 1 ? 'photo is' : 'photos are'} not in the diary yet` : ''].filter(Boolean).join(' · ') : ''
 
   return (
-    <section id="spot-diary" aria-labelledby="diary-h" className="flex scroll-mt-24 flex-col gap-4 pt-12">
-      <div className="flex flex-wrap items-end justify-between gap-x-7 gap-y-[18px]">
-        <div className="flex max-w-[640px] min-w-0 flex-col gap-2.5">
-          <span className="eyebrow text-[12px]">■ Spot diary</span>
-          <h2 id="diary-h" className="m-0 font-serif text-[clamp(28px,3.51vw,47px)] leading-[.95] font-normal tracking-[-0.01em]">
+    <section id="spot-diary" aria-labelledby="diary-h" className="@container flex scroll-mt-24 flex-col gap-3 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
+        <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
+          <span className="eyebrow text-[11px]">■ Spot diary</span>
+          <h2 id="diary-h" className="m-0 text-[20px] leading-tight font-normal tracking-[-0.01em]">
             {title}
           </h2>
-          <p className="m-0 text-[15px] leading-normal text-ink-2">{sub}</p>
-          {ready && busiest && busiest.appeared > 1 ? (
-            <p className="m-0 text-[18px] leading-[1.45]">
-              {ZONE_NAME[busiest.zone]} gets the most new spots: {busiest.appeared} of the {tracks.length} followed.
-            </p>
-          ) : null}
+          <p className="m-0 text-[13px] leading-snug text-ink-2">
+            {sub}
+            {ready && busiest && busiest.appeared > 1 ? ` ${ZONE_NAME[busiest.zone]} gets the most new spots: ${busiest.appeared} of the ${tracks.length} followed.` : ''}
+          </p>
         </div>
         {ready ? (
-          <div role="group" aria-label="Show spots that are" className="flex flex-wrap gap-1 rounded-[24px] bg-white/55 p-1.5 backdrop-blur-[12px]">
+          <div role="group" aria-label="Show spots that are" className="flex max-w-full shrink-0 flex-wrap gap-0.5 rounded-[20px] bg-white/55 p-0.5 backdrop-blur-[12px]">
             {ORDER.map((p) => {
               const n = tracks.filter((t) => t.status === p).length
               const on = show === p
@@ -146,13 +138,13 @@ export function SpotDiary({
                     setShow(on ? null : p)
                     setAll(false)
                   }}
-                  className={`hit44 flex min-h-9 items-center gap-2 rounded-pill px-3 text-[13px] whitespace-nowrap transition-colors duration-200 disabled:opacity-45 ${on ? 'bg-selected text-inverse' : 'bg-surface hover:bg-muted'}`}
+                  className={`hit44 flex min-h-9 items-center gap-1.5 rounded-pill px-2 text-[12px] whitespace-nowrap transition-colors duration-200 disabled:opacity-45 ${on ? 'bg-selected text-inverse' : 'hover:bg-white/70'}`}
                 >
                   <span className={`grid place-items-center rounded-full ${on ? 'bg-white p-[3px]' : ''}`}>
-                    <Shape status={p} size={on ? 10 : 12} />
+                    <Shape status={p} size={on ? 9 : 11} />
                   </span>
                   {STATUS_SHAPE[p].word}
-                  <span className="font-dot text-[16px] font-extrabold">{n}</span>
+                  <span className="font-dot text-[13px] font-extrabold">{n}</span>
                 </button>
               )
             })}
@@ -161,20 +153,20 @@ export function SpotDiary({
       </div>
 
       {status === 'loading' || status === 'idle' ? (
-        <div aria-busy="true" aria-label="Loading spot diary" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] gap-4">
-          <Skeleton className="aspect-[1/1.1]" rounded="rounded-[44px]" />
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-[150px]" rounded="rounded-[32px]" />
-            <Skeleton className="h-[150px]" rounded="rounded-[32px]" />
-            <Skeleton className="h-24" rounded="rounded-[32px]" />
+        <div aria-busy="true" aria-label="Loading spot diary" className="grid gap-3 @[640px]:grid-cols-[224px_minmax(0,1fr)]">
+          <Skeleton className="h-[220px]" rounded="rounded-[22px]" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-11" rounded="rounded-[16px]" />
+            <Skeleton className="h-11" rounded="rounded-[16px]" />
+            <Skeleton className="h-11" rounded="rounded-[16px]" />
           </div>
         </div>
       ) : null}
 
       {status === 'error' ? (
-        <div role="alert" className="flex animate-[wRise_.4s_both] flex-wrap items-center justify-between gap-4 rounded-[32px] bg-surface py-5 pr-5 pl-[26px]">
-          <span className="text-[16px]">The spot diary did not load.</span>
-          <Button variant="ink" onClick={onRetry}>
+        <div role="alert" className="flex animate-[wRise_.4s_both] flex-wrap items-center justify-between gap-3 rounded-[20px] bg-surface py-2.5 pr-3 pl-4">
+          <span className="text-[14px]">The spot diary did not load.</span>
+          <Button variant="ink" size="sm" onClick={onRetry}>
             Try again
           </Button>
         </div>
@@ -182,39 +174,36 @@ export function SpotDiary({
 
       {first ? (
         <div
-          className="relative grid animate-[wRise_.5s_both] grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-7 overflow-hidden rounded-[44px] p-[clamp(24px,4vw,44px)] squircle"
+          className="relative grid animate-[wRise_.5s_both] grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-center gap-4 overflow-hidden rounded-[24px] p-4 squircle"
           style={{
             background: 'radial-gradient(70% 80% at 90% 10%, #FFFFFF 0%, transparent 55%), radial-gradient(80% 90% at 10% 100%, var(--aura-sky) 0%, transparent 60%), radial-gradient(70% 70% at 80% 90%, var(--aura-ice) 0%, transparent 65%), #C9DEFF',
-            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.6), inset 0 0 70px rgba(255,255,255,.45), 0 40px 80px -50px rgba(31,92,255,.5)',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.6), inset 0 0 40px rgba(255,255,255,.45)',
             color: '#0A1840',
           }}
         >
-          <div className="flex flex-col items-start gap-4">
-            <h3 className="m-0 font-serif text-[clamp(25px,2.86vw,36px)] leading-[.95] font-normal">{startsWhen}</h3>
-            <p className="m-0 max-w-[440px] text-[16px] leading-[1.55]">Take a face photo each day in the same place and light. From the third photo on a second day, Willow shows which spots are new, which are fading and which have gone.</p>
+          <div className="flex flex-col items-start gap-2">
+            <h3 className="m-0 text-[18px] leading-tight font-normal">{startsWhen}</h3>
+            <p className="m-0 max-w-[440px] text-[13px] leading-[1.45]">Take a face photo each day in the same place and light. From the third photo on a second day, Willow shows which spots are new, which are fading and which have gone.</p>
             {doneToday ? (
-              <span className="flex min-h-[52px] items-center rounded-pill bg-white/60 px-6 text-[15px] text-ink-2">✓ Done for today</span>
+              <span className="flex min-h-9 items-center rounded-pill bg-white/60 px-4 text-[13px] text-ink-2">✓ Done for today</span>
             ) : onTake ? (
-              <Button variant="primary" size="lg" onClick={onTake} trailing={<span aria-hidden>→</span>}>
+              <Button variant="primary" size="sm" onClick={onTake} trailing={<span aria-hidden>→</span>}>
                 {sess.length ? 'Take today’s photo' : 'Take your first face photo'}
               </Button>
             ) : null}
           </div>
-          <ol aria-label="Your first three photos" className="m-0 grid list-none grid-cols-3 gap-2.5 p-0">
+          <ol aria-label="Your first three photos" className="m-0 grid max-w-[220px] list-none grid-cols-3 gap-2 p-0">
             {[0, 1, 2].map((i) => {
               const se = sess[i]
               const k = i - sess.length
               const label = se ? fmtDate(se.created_at) : doneToday ? (k === 0 ? 'Tomorrow' : `Day ${i + 1}`) : k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : `Day ${i + 1}`
               return (
-                <li key={i} className="flex animate-[wRise_.5s_both] flex-col gap-2" style={{ animationDelay: `${i * 80}ms` }}>
-                  <span
-                    className="grid aspect-[3/4] place-items-center rounded-[24px] font-dot text-[22px] font-extrabold"
-                    style={se ? { background: 'radial-gradient(70% 60% at 50% 40%, #E9C8B4, #B98D76 70%)', color: '#2A1810' } : { background: 'rgba(255,255,255,.28)', border: '1.5px dashed rgba(10,24,64,.45)', color: 'rgba(10,24,64,.55)' }}
-                  >
+                <li key={i} className="flex animate-[wRise_.5s_both] flex-col gap-1" style={{ animationDelay: `${i * 80}ms` }}>
+                  <span className="grid aspect-[4/3] place-items-center rounded-[14px] font-dot text-[15px] font-extrabold" style={se ? { background: 'radial-gradient(70% 60% at 50% 40%, #E9C8B4, #B98D76 70%)', color: '#2A1810' } : { background: 'rgba(255,255,255,.28)', border: '1.5px dashed rgba(10,24,64,.45)', color: 'rgba(10,24,64,.55)' }}>
                     <span aria-hidden>D{i + 1}</span>
                     <span className="sr-only">{se ? `Photo ${i + 1}, taken` : `Photo ${i + 1}, not taken yet`}</span>
                   </span>
-                  <span className="pl-1 text-[13px]">{label}</span>
+                  <span className="pl-0.5 text-[12px]">{label}</span>
                 </li>
               )
             })}
@@ -223,160 +212,169 @@ export function SpotDiary({
       ) : null}
 
       {ready && d ? (
-        <div className="flex flex-wrap items-start gap-4">
-          <div
-            className="flex min-w-0 flex-[1_1_300px] animate-[wRise_.5s_both] flex-col gap-[18px] rounded-[36px] p-5 transition-[background,box-shadow] duration-500 squircle"
-            style={{
-              background: top
-                ? 'radial-gradient(80% 90% at 88% 8%, #FFB27A 0%, transparent 60%), radial-gradient(90% 90% at 8% 100%, #F25FA8 0%, transparent 62%), #FF7A57'
-                : zSel
-                  ? 'radial-gradient(90% 100% at 90% 0%, #E6DAFF 0%, transparent 60%), var(--bg-surface)'
-                  : 'radial-gradient(90% 100% at 90% 0%, #FFD9C7 0%, transparent 60%), radial-gradient(80% 90% at 0% 100%, #E6DAFF 0%, transparent 60%), var(--bg-surface)',
-              boxShadow: top ? 'inset 0 1px 0 rgba(255,255,255,.5), inset 0 0 50px rgba(255,255,255,.25), 0 30px 60px -36px rgba(255,90,60,.6)' : '0 30px 70px -50px rgba(0,0,0,.35)',
-            }}
-          >
-            <div role="tablist" aria-label="Face area" className="flex flex-wrap gap-[3px] rounded-[22px] bg-white/45 p-1 backdrop-blur-[12px]">
-              {[{ k: null as SpotZone | null, label: 'All', n: tracks.length }, ...areas.map((z) => ({ k: z.zone, label: ZONE_NAME[z.zone], n: z.appeared }))].map((t) => (
-                <button
-                  key={t.label}
-                  type="button"
-                  role="tab"
-                  aria-selected={zSel === t.k}
-                  onClick={() => {
-                    setZone(t.k)
-                    setAll(false)
-                    setViewPick(null)
-                  }}
-                  className={`flex min-h-9 items-center gap-1.5 rounded-pill px-3 text-[13px] transition-[background,box-shadow] ${zSel === t.k ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,.08)]' : ''}`}
-                >
-                  {t.label}
-                  <span className="font-dot text-[13px] font-extrabold opacity-75">{t.n}</span>
-                </button>
-              ))}
-            </div>
-            <div className="relative">
-              {placed ? <PhotoMap place={placed} tracks={mapped} selected={selected} onPick={pick} /> : <FaceMap diary={d} tracks={mapped} zone={zSel} selected={selected} onPick={pick} onZone={(z) => setZone(z)} />}
+        <>
+          <div className="grid gap-3 @[640px]:grid-cols-[224px_minmax(0,1fr)]">
+            <div
+              className="flex min-w-0 animate-[wRise_.5s_both] flex-col gap-2 rounded-[22px] p-3 transition-[background,box-shadow] duration-500 squircle"
+              style={{
+                background: top
+                  ? 'radial-gradient(80% 90% at 88% 8%, #FFB27A 0%, transparent 60%), radial-gradient(90% 90% at 8% 100%, #F25FA8 0%, transparent 62%), #FF7A57'
+                  : zSel
+                    ? 'radial-gradient(90% 100% at 90% 0%, #E6DAFF 0%, transparent 60%), var(--bg-surface)'
+                    : 'radial-gradient(90% 100% at 90% 0%, #FFD9C7 0%, transparent 60%), radial-gradient(80% 90% at 0% 100%, #E6DAFF 0%, transparent 60%), var(--bg-surface)',
+                boxShadow: top ? 'inset 0 1px 0 rgba(255,255,255,.5), inset 0 0 40px rgba(255,255,255,.25)' : '0 18px 40px -32px rgba(0,0,0,.35)',
+              }}
+            >
               {multi ? (
-                <div className="absolute top-2.5 left-1/2 z-[2] w-max max-w-[calc(100%-16px)] -translate-x-1/2">
-                  <SegmentedControl
-                    glass
-                    label="Which photo"
-                    options={views.map((v) => ({ value: v.view, label: VIEW_LABEL[v.view] }))}
-                    value={active}
-                    onChange={(v) => {
-                      setViewPick(v)
-                      if (zSel && viewOfZone(zSel) !== v) setZone(null)
-                    }}
-                  />
-                </div>
+                <SegmentedControl
+                  glass
+                  className="w-full"
+                  label="Which photo"
+                  options={views.map((v) => ({ value: v.view, label: VIEW_LABEL[v.view] }))}
+                  value={active}
+                  onChange={(v) => {
+                    setViewPick(v)
+                    if (zSel && viewOfZone(zSel) !== v) setZone(null)
+                  }}
+                />
               ) : null}
-            </div>
-            {placed ? <span className="-mt-2 px-1 font-mono text-[11px] tracking-[.06em] text-ink-2">ON YOUR PHOTO · {fmtDate(placed.session.created_at).toUpperCase()}</span> : null}
-            <div className="flex flex-wrap items-baseline justify-between gap-2.5 px-1">
-              <span className="text-[20px] tracking-[-0.01em]">{zSel ? ZONE_NAME[zSel] : 'Whole face'}</span>
-              {top ? <span className="font-mono text-[11px] tracking-[.08em]">■ MOST NEW SPOTS</span> : null}
-            </div>
-            <div className="grid grid-cols-4 gap-2 px-1">
-              {(
-                [
-                  [zs ? zs.visible_now : sum('visible_now'), 'visible now'],
-                  [zs ? zs.appeared : sum('appeared'), 'appeared'],
-                  [zs ? zs.faded : sum('faded'), 'faded'],
-                  [zs ? zs.came_back : sum('came_back'), 'came back'],
-                ] as const
-              ).map(([v, k], i) => (
-                <span key={k} className="flex min-w-0 animate-[wRise_.4s_both] flex-col gap-1.5" style={{ animationDelay: `${i * 50}ms` }}>
-                  <span className="font-dot text-[28px] leading-none font-extrabold">{String(v).padStart(2, '0')}</span>
-                  <span className={`text-[12px] leading-[1.3] ${top ? '' : 'text-ink-2'}`}>{k}</span>
-                </span>
-              ))}
-            </div>
-            <span className="px-1 text-[13px] leading-[1.45]">
-              {zSel
-                ? zs?.typical_days_visible
-                  ? `Spots here usually stay visible ${fmtDays(zs.typical_days_visible.at_least) === fmtDays(zs.typical_days_visible.at_most) ? `about ${fmtDays(zs.typical_days_visible.at_most)}` : `between ${fmtDays(zs.typical_days_visible.at_least)} and ${fmtDays(zs.typical_days_visible.at_most)}`} (from ${zs.typical_days_visible.from} that faded).`
-                  : 'How long spots last here shows after 3 have faded.'
-                : 'Pick an area to see its spots and how long they usually last.'}
-            </span>
-          </div>
-
-          <div className="flex min-w-0 flex-[2_1_460px] animate-[wRise_.5s_.08s_both] flex-col gap-0.5 rounded-[36px] bg-surface p-2.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-            {!tracks.length ? (
-              <p className="m-0 p-[18px] text-[15px] leading-normal">No spots followed so far. Spots seen only once are left out.</p>
-            ) : !ordered.length ? (
-              <p className="m-0 p-[18px] text-[15px] leading-normal">No {show ? `${STATUS_SHAPE[show].word.toLowerCase()} ` : ''}spots{zSel ? ` on the ${ZONE_NAME[zSel].toLowerCase()}` : ''}.</p>
-            ) : (
-              <>
-                <div aria-hidden className="flex items-end gap-2.5 px-2.5 pt-2 pb-1.5">
-                  <span className="min-w-0 flex-1 font-mono text-[10px] tracking-[.08em] text-ink-2">TAP A SPOT TO SEE IT ON THE PHOTO</span>
-                  <span className="flex shrink-0 gap-1">
-                    {cols.map((c) => (
-                      <span key={c.id} className={`w-9 text-center font-mono text-[9.5px] leading-[1.3] tracking-[.02em] ${c.id === stageSessionId ? 'text-ink' : 'text-ink-2'}`}>
-                        {fmtDate(c.created_at).toUpperCase()}
+              <div className="flex items-center gap-3 @[640px]:flex-col @[640px]:items-stretch @[640px]:gap-2">
+                <div className="flex w-[140px] shrink-0 flex-col gap-1.5 @[640px]:w-full">
+                  {placed ? <PhotoMap place={placed} tracks={mapped} selected={selected} onPick={pick} /> : <FaceMap diary={d} tracks={mapped} zone={zSel} selected={selected} onPick={pick} onZone={(z) => setZone(z)} />}
+                  {placed ? <span className="px-0.5 font-mono text-[10px] tracking-[.06em] text-ink-2">ON YOUR PHOTO · {fmtDate(placed.session.created_at).toUpperCase()}</span> : null}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 px-0.5">
+                    <span className="text-[14px] tracking-[-0.01em]">{zSel ? ZONE_NAME[zSel] : 'Whole face'}</span>
+                    {top ? <span className="font-mono text-[10px] tracking-[.08em]">■ MOST NEW SPOTS</span> : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 px-0.5 @[640px]:grid-cols-4">
+                    {(
+                      [
+                        [zs ? zs.visible_now : sum('visible_now'), 'visible now'],
+                        [zs ? zs.appeared : sum('appeared'), 'appeared'],
+                        [zs ? zs.faded : sum('faded'), 'faded'],
+                        [zs ? zs.came_back : sum('came_back'), 'came back'],
+                      ] as const
+                    ).map(([v, k], i) => (
+                      <span key={k} className="flex min-w-0 animate-[wRise_.4s_both] flex-col gap-0.5" style={{ animationDelay: `${i * 50}ms` }}>
+                        <span className="font-dot text-[18px] leading-none font-extrabold">{String(v).padStart(2, '0')}</span>
+                        <span className={`text-[11px] leading-[1.25] ${top ? '' : 'text-ink-2'}`}>{k}</span>
                       </span>
                     ))}
+                  </div>
+                  <span className="px-0.5 text-[12px] leading-[1.4]">
+                    {zSel
+                      ? zs?.typical_days_visible
+                        ? `Spots here usually stay visible ${fmtDays(zs.typical_days_visible.at_least) === fmtDays(zs.typical_days_visible.at_most) ? `about ${fmtDays(zs.typical_days_visible.at_most)}` : `between ${fmtDays(zs.typical_days_visible.at_least)} and ${fmtDays(zs.typical_days_visible.at_most)}`} (from ${zs.typical_days_visible.from} that faded).`
+                        : 'How long spots last here shows after 3 have faded.'
+                      : 'Pick an area to see its spots and how long they usually last.'}
                   </span>
                 </div>
-                {rows.map((t, i) => {
-                  const on = t.id === selected
-                  const o0 = t.observations[t.observations.length - 1]
-                  const col = STAGE_COLOUR[o0.stage] ?? ['#9A978F', '#DDD']
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => onPick(t)}
-                      aria-pressed={on}
-                      className={`flex w-full animate-[wRise_.4s_both] items-center gap-2.5 rounded-[18px] px-2.5 py-2 text-left transition-[background,box-shadow] duration-300 hover:bg-sunken ${on ? 'bg-[#EFE9F8] shadow-[inset_0_0_0_1.5px_var(--text-primary)]' : ''}`}
-                      style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}
-                    >
-                      <Shape status={t.status} />
-                      <span className="flex min-w-0 flex-1 flex-col gap-px">
-                        <span className="flex min-w-0 items-baseline gap-2">
-                          <span className="text-[15px] whitespace-nowrap">{t.zone ? ZONE_NAME[t.zone] : 'On the face'}</span>
-                          <span className="truncate font-mono text-[10px] tracking-[.05em] text-ink-2">
-                            {stageName(o0).toUpperCase()}
-                            {o0.label ? ' · AI-SUGGESTED' : ''}
+              </div>
+            </div>
+
+            <div className="flex min-w-0 animate-[wRise_.5s_.08s_both] flex-col rounded-[22px] bg-surface p-1.5 shadow-[0_18px_40px_-32px_rgba(0,0,0,.35)] squircle">
+              <div role="tablist" aria-label="Face area" className="flex flex-wrap gap-0.5 px-0.5 pb-1">
+                {[{ k: null as SpotZone | null, label: 'All', n: tracks.length }, ...areas.map((z) => ({ k: z.zone, label: ZONE_NAME[z.zone], n: z.appeared }))].map((t) => (
+                  <button
+                    key={t.label}
+                    type="button"
+                    role="tab"
+                    aria-selected={zSel === t.k}
+                    onClick={() => {
+                      setZone(t.k)
+                      setAll(false)
+                      setViewPick(null)
+                    }}
+                    className={`hit44 flex min-h-9 items-center gap-1.5 rounded-pill px-2 text-[12px] transition-[background,box-shadow] ${zSel === t.k ? 'bg-selected text-inverse' : 'hover:bg-sunken'}`}
+                  >
+                    {t.label}
+                    <span className="font-dot text-[12px] font-extrabold opacity-75">{t.n}</span>
+                  </button>
+                ))}
+              </div>
+              {!tracks.length ? (
+                <p className="m-0 p-3 text-[13px] leading-normal">No spots followed so far. Spots seen only once are left out.</p>
+              ) : !ordered.length ? (
+                <p className="m-0 p-3 text-[13px] leading-normal">
+                  No {show ? `${STATUS_SHAPE[show].word.toLowerCase()} ` : ''}spots{zSel ? ` on the ${ZONE_NAME[zSel].toLowerCase()}` : ''}.
+                </p>
+              ) : (
+                <>
+                  <div aria-hidden className="flex items-end gap-2 px-2 pt-1 pb-1">
+                    <span className="min-w-0 flex-1 font-mono text-[9.5px] tracking-[.08em] text-ink-2">TAP A SPOT TO SEE IT ON THE PHOTO</span>
+                    <span className="flex shrink-0 gap-1">
+                      {cols.map((c) => (
+                        <span key={c.id} className={`w-7 text-center font-mono text-[9px] leading-[1.2] tracking-[.02em] ${c.id === stageSessionId ? 'text-ink' : 'text-ink-2'}`}>
+                          {fmtDate(c.created_at).toUpperCase()}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  {rows.map((t, i) => {
+                    const on = t.id === selected
+                    const o0 = t.observations[t.observations.length - 1]
+                    const col = STAGE_COLOUR[o0.stage] ?? ['#9A978F', '#DDD']
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => onPick(t)}
+                        aria-pressed={on}
+                        className={`flex min-h-11 w-full animate-[wRise_.4s_both] items-center gap-2 rounded-[14px] px-2 py-1 text-left transition-[background,box-shadow] duration-300 hover:bg-sunken ${on ? 'bg-[#EFE9F8] shadow-[inset_0_0_0_1.5px_var(--text-primary)]' : ''}`}
+                        style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}
+                      >
+                        <Shape status={t.status} size={10} />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="flex min-w-0 items-baseline gap-2">
+                            <span className="text-[13px] leading-[1.35] whitespace-nowrap">{t.zone ? ZONE_NAME[t.zone] : 'On the face'}</span>
+                            <span className="truncate font-mono text-[9.5px] tracking-[.05em] text-ink-2">
+                              {stageName(o0).toUpperCase()}
+                              {o0.label ? ' · AI-SUGGESTED' : ''}
+                            </span>
+                          </span>
+                          <span className="truncate text-[12px] leading-[1.35] text-ink-2">
+                            {statusText(t, d)}
+                            {t.came_back ? <span title="Came back where an earlier spot faded"> · ↺ came back</span> : null}
                           </span>
                         </span>
-                        <span className="text-[13px] leading-[1.35] text-ink-2">
-                          {statusText(t, d)}
-                          {t.came_back ? <span title="Came back where an earlier spot faded"> · ↺ came back</span> : null}
+                        <span className="flex shrink-0 gap-1">
+                          {cols.map((se) => {
+                            const o = t.observations.find((q) => q.session_id === se.id)
+                            const cur = on && se.id === stageSessionId
+                            return (
+                              <span
+                                key={se.id}
+                                title={`${fmtDate(se.created_at)}: ${o ? 'seen' : 'not seen'}`}
+                                className="box-border size-7 rounded-[9px] transition-shadow duration-300"
+                                style={{
+                                  border: o ? 0 : '1.5px dashed rgba(18,18,18,.3)',
+                                  background: o?.crop_url ? `center/cover no-repeat url("${o.crop_url}")` : o ? `radial-gradient(circle at 50% 46%, ${col[0]} 0 20%, ${col[1]} 62%)` : 'transparent',
+                                  boxShadow: cur ? '0 0 0 1.5px var(--bg-surface), 0 0 0 3px var(--text-primary)' : 'none',
+                                }}
+                              />
+                            )
+                          })}
                         </span>
-                      </span>
-                      <span className="flex shrink-0 gap-1">
-                        {cols.map((se) => {
-                          const o = t.observations.find((q) => q.session_id === se.id)
-                          const cur = on && se.id === stageSessionId
-                          return (
-                            <span
-                              key={se.id}
-                              title={`${fmtDate(se.created_at)}: ${o ? 'seen' : 'not seen'}`}
-                              className="box-border size-9 rounded-[12px] transition-shadow duration-300"
-                              style={{
-                                border: o ? 0 : '1.5px dashed rgba(18,18,18,.3)',
-                                background: o?.crop_url ? `center/cover no-repeat url("${o.crop_url}")` : o ? `radial-gradient(circle at 50% 46%, ${col[0]} 0 20%, ${col[1]} 62%)` : 'transparent',
-                                boxShadow: cur ? '0 0 0 2px var(--bg-surface), 0 0 0 3.5px var(--text-primary)' : 'none',
-                              }}
-                            />
-                          )
-                        })}
-                      </span>
-                    </button>
-                  )
-                })}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 px-2.5 pt-2 pb-1">
-                  <span className="text-[12px] text-ink-2">{notes}</span>
-                  {ordered.length > 5 ? (
-                    <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="min-h-11 rounded-pill bg-sunken px-4 text-[13px] hover:bg-muted">
-                      {all ? 'Show fewer' : `Show all ${ordered.length}`}
-                    </button>
+                      </button>
+                    )
+                  })}
+                  {notes || ordered.length > 5 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1 pb-0.5">
+                      <span className="text-[11px] text-ink-2">{notes}</span>
+                      {ordered.length > 5 ? (
+                        <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="hit44 min-h-9 rounded-pill bg-sunken px-3 text-[12px] hover:bg-muted">
+                          {all ? 'Show fewer' : `Show all ${ordered.length}`}
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
     </section>
   )
@@ -394,27 +392,14 @@ function FaceMap({ diary, tracks, zone, selected, onPick, onZone }: { diary: Dia
   const pts = (list: [number, number][]) => list.map(([x, y]) => `${x},${-y}`).join(' ')
   const maxApp = Math.max(1, ...diary.zones.map((z) => z.appeared))
   return (
-    <svg viewBox={vb} className="mx-auto block h-auto w-full max-w-[260px]" role="group" aria-label="Face map of followed spots">
+    <svg viewBox={vb} className="mx-auto block h-auto w-full max-w-[152px]" role="group" aria-label="Face map of followed spots">
       <polygon points={pts(FACE_MAP.outline)} fill="rgba(255,255,255,.55)" stroke="rgba(18,18,18,.25)" strokeWidth={1} />
       {Object.entries(FACE_MAP.zones).map(([k, polys]) => {
         const z = diary.zones.find((q) => q.zone === k)
         const op = z && z.appeared ? 0.15 + (0.45 * z.appeared) / maxApp : 0
-        return polys.map((poly, i) => (
-          <polygon
-            key={`${k}${i}`}
-            points={pts(poly)}
-            fill="var(--aura-coral)"
-            fillOpacity={op}
-            stroke={zone === k ? 'var(--text-primary)' : 'none'}
-            strokeWidth={1.2}
-            onClick={() => z?.appeared && onZone(zone === k ? null : (k as SpotZone))}
-            className={z?.appeared ? 'cursor-pointer' : undefined}
-          />
-        ))
+        return polys.map((poly, i) => <polygon key={`${k}${i}`} points={pts(poly)} fill="var(--aura-coral)" fillOpacity={op} stroke={zone === k ? 'var(--text-primary)' : 'none'} strokeWidth={1.2} onClick={() => z?.appeared && onZone(zone === k ? null : (k as SpotZone))} className={z?.appeared ? 'cursor-pointer' : undefined} />)
       })}
-      {Object.values(FACE_MAP.features).map((f, i) =>
-        f.closed ? <polygon key={i} points={pts(f.points)} fill="none" stroke="rgba(18,18,18,.35)" strokeWidth={0.8} /> : <polyline key={i} points={pts(f.points)} fill="none" stroke="rgba(18,18,18,.35)" strokeWidth={0.8} />,
-      )}
+      {Object.values(FACE_MAP.features).map((f, i) => (f.closed ? <polygon key={i} points={pts(f.points)} fill="none" stroke="rgba(18,18,18,.35)" strokeWidth={0.8} /> : <polyline key={i} points={pts(f.points)} fill="none" stroke="rgba(18,18,18,.35)" strokeWidth={0.8} />))}
       {tracks.map((t, i) => {
         const on = t.id === selected
         const s = STATUS_SHAPE[t.status]
@@ -496,12 +481,7 @@ function placeOnPhoto(s: Session, frontOnly: boolean): Placed | null {
     // and its extent: the front's own areas run down the middle of the face, so their centres alone cannot
     // tell how wide the face is (the subject's right, x < 0, is on the photo's left; y is up in mm, down in px)
     const [a, b] = [extent(zone[0]), extent(roi.polygon)]
-    pairs.push(
-      { mm: [a.x0, a.y1], px: [b.x0, b.y0] },
-      { mm: [a.x1, a.y1], px: [b.x1, b.y0] },
-      { mm: [a.x0, a.y0], px: [b.x0, b.y1] },
-      { mm: [a.x1, a.y0], px: [b.x1, b.y1] },
-    )
+    pairs.push({ mm: [a.x0, a.y1], px: [b.x0, b.y0] }, { mm: [a.x1, a.y1], px: [b.x1, b.y0] }, { mm: [a.x0, a.y0], px: [b.x0, b.y1] }, { mm: [a.x1, a.y0], px: [b.x1, b.y1] })
   }
   const t = fitAffine(pairs)
   if (!t) return null
@@ -537,7 +517,7 @@ function PhotoMap({ place, tracks, selected, onPick }: { place: Placed; tracks: 
   // the marks found on this very photo (a cheek photo carries only its own)
   const here = useMemo(() => new Set((place.session.result?.candidates ?? []).map((c) => c.id)), [place.session])
   return (
-    <div className="relative mx-auto aspect-[4/5] w-full max-w-[320px] overflow-hidden rounded-[28px] squircle" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
+    <div className="relative mx-auto aspect-[4/5] w-full max-w-[152px] overflow-hidden rounded-[20px] squircle" style={{ background: 'repeating-linear-gradient(135deg, #E2DFD9 0 8px, #ECEAE5 8px 16px)' }}>
       <svg viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" role="group" aria-label={`Followed spots on your photo from ${fmtDate(place.session.created_at)}`}>
         <image href={url} width={size.width} height={size.height} preserveAspectRatio="xMidYMid slice" className="transition-opacity duration-200" style={{ opacity: status === 'ready' ? 1 : 0 }} />
         {tracks.map((tr, i) => {
