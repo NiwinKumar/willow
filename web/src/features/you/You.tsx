@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -21,94 +21,55 @@ import { useAuth } from '../../lib/useAuth'
 import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
-import { RemindersCard } from './Reminders'
+import { ReminderRows } from './Reminders'
+import { Group, Row, ToggleRow } from './settings'
+import { chip, outline } from './settingsClasses'
 
 /**
- * You (Willow App.dc.html, isProfile): who is signed in, goals, photo time, skin type and check-in days (the
- * account's profile, lib/profile), the privacy receipt with the
- * sharing switch, capture setup, service status, delete my data, sign out. Everything shown is the
- * person’s own: Firebase for the account, the api for consent, profile, sessions and routine, this device for the rest.
+ * You: the person's settings, one column of labelled groups (Account, What Willow tracks, Check-ins, Privacy,
+ * Photo setup and help, Delete my data), each a card of rows: the setting on the left, its control on the right.
+ * Everything shown is the person's own: Firebase for the account, the api for consent, profile, sessions and
+ * routine, this device for the rest.
  */
 export default function You() {
   const data = useData()
-  const { user } = useAuth()
-  const me = identity(user)
   const demo = data.mode === 'demo'
-  const goals = data.goals
-  const done = data.all.filter((s) => s.status === 'done')
-  // Sessions take a few seconds to arrive on a cold load: no false zeros meanwhile.
-  const counting = data.status !== 'ready' && !data.all.length
-  const stats = [
-    { k: 'Sessions', v: counting ? '–' : done.length },
-    { k: 'Goals', v: goals.length },
-    { k: 'Days tracked', v: counting ? '–' : new Set(data.all.map((s) => dayOf(s.created_at))).size },
-  ]
   return (
-    <main className="relative mx-auto flex max-w-[1100px] flex-col gap-3.5" style={{ padding: '8px clamp(16px,4vw,40px) 24px' }}>
-      <section
-        aria-label="Profile"
-        className="relative flex flex-wrap items-center gap-[22px] overflow-hidden rounded-[44px] squircle"
-        style={{ padding: 'clamp(24px,4vw,40px)', background: 'radial-gradient(60% 80% at 85% 0%, #D8B8FF 0%, #A58BFF 30%, rgba(122,92,255,.35) 55%, #FAFAF8 85%)' }}
-      >
-        <span
-          aria-hidden
-          className="grid size-24 flex-none place-items-center rounded-full text-[30px] text-white"
-          style={{ background: 'radial-gradient(circle at 40% 30%, #E9DAFF, #7A5CFF 60%, #3A1F9E)', boxShadow: 'inset 0 0 0 2px rgba(255,255,255,.6), 0 20px 40px -20px rgba(122,92,255,.8)' }}
-        >
-          {me.initials}
-        </span>
-        <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
-          <h1 className="m-0 font-serif text-[clamp(28px,3.25vw,42px)] leading-none font-normal">{demo ? 'Demo journey' : me.name}</h1>
-          <span className="text-[15px] text-[#3E3C38]">{demo ? "Our team's own measured check-ins, read-only" : me.guest ? 'Guest on this browser · sessions aren’t backed up' : `${me.email ?? 'Google account'} · signed in with Google`}</span>
-        </div>
-        {demo ? null : (
-          <dl className="m-0 flex flex-wrap gap-2.5">
-            {stats.map((s) => (
-              <div key={s.k} className="flex min-w-[110px] flex-col-reverse gap-1 rounded-[24px] bg-white/70 px-4 py-3.5">
-                <dt className="text-caption text-ink-2">{s.k}</dt>
-                <dd className="m-0 font-dot text-[30px] leading-none">{s.v}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </section>
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-3.5">
-        {demo ? <DemoCard /> : <AccountCard />}
-        <GoalsCard demo={demo} />
-        {demo ? null : <PlacesCard />}
-        {demo ? null : <CheckinCard />}
-        {demo ? null : <RemindersCard />}
-        {demo ? null : <PrivacyCard />}
-        <CaptureSetupCard />
-      </div>
-
-      <ServiceStatus />
-      {demo ? null : <DeleteCard />}
+    <main className="relative mx-auto flex w-full max-w-[760px] flex-col gap-6" style={{ padding: '8px clamp(16px,4vw,40px) 32px' }}>
+      <h1 className="m-0 font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">You</h1>
+      <Group id="account" title="Account">{demo ? <DemoRow /> : <AccountRows />}</Group>
+      <Group id="tracking" title="What Willow tracks">
+        <GoalsRows demo={demo} />
+      </Group>
+      {demo ? null : (
+        <Group id="checkins" title="Check-ins">
+          <CheckinRows />
+          <ReminderRows />
+        </Group>
+      )}
+      {demo ? null : (
+        <Group id="privacy" title="Privacy">
+          <PrivacyRows />
+        </Group>
+      )}
+      <Group id="setup" title="Photo setup and help">
+        <CaptureSetupRow />
+        <Row label="How Willow measures" hint="The science behind the readings, and what they can't tell you.">
+          <Link to="/science" className={`${outline} inline-flex items-center`}>
+            Science and limitations
+          </Link>
+        </Row>
+        <ServiceStatus />
+      </Group>
+      {demo ? null : <DeleteGroup />}
     </main>
   )
 }
 
-function Panel({ label, eyebrow, aside, children, id }: { label: string; eyebrow: string; aside?: ReactNode; children: ReactNode; id?: string }) {
-  return (
-    <section id={id} aria-label={label} className="flex flex-col gap-3 rounded-[36px] squircle bg-surface p-6">
-      <span className="flex justify-between gap-2.5">
-        <span className="font-mono text-[12px] text-ink-2">■ {eyebrow}</span>
-        {aside}
-      </span>
-      {children}
-    </section>
-  )
-}
-
-const outline = 'min-h-[46px] self-start rounded-pill bg-white px-[18px] text-[14px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)] hover:bg-ink/[.03]'
-
-function DemoCard() {
+function DemoRow() {
   const navigate = useNavigate()
   return (
-    <Panel label="Demo" eyebrow="DEMO">
-      <span className="text-[20px]">You're looking at the demo journey</span>
-      <span className="text-[14px] leading-normal text-[#3E3C38]">It is our team's own photos, measured by the live engine, and read-only. Your account, privacy receipt and delete controls are in your own account.</span>
+    <Row label="You're looking at the demo journey" hint="Our team's own photos, measured by the live engine, read-only. Your own account, privacy and delete controls are in your account.">
       <button
         type="button"
         className={outline}
@@ -119,11 +80,12 @@ function DemoCard() {
       >
         Leave demo
       </button>
-    </Panel>
+    </Row>
   )
 }
 
-function AccountCard() {
+function AccountRows() {
+  const data = useData()
   const { user, signInWithGoogle, signOutUser } = useAuth()
   const me = identity(user)
   const navigate = useNavigate()
@@ -166,32 +128,42 @@ function AccountCard() {
     }
   }
 
+  const done = data.all.filter((s) => s.status === 'done').length
+  const days = new Set(data.all.map((s) => dayOf(s.created_at))).size
+  // Sessions take a few seconds to arrive on a cold load: no false zeros meanwhile.
+  const counting = data.status !== 'ready' && !data.all.length
   return (
-    <Panel label="Account" eyebrow="ACCOUNT">
-      <span className="text-[20px]">{me.guest ? 'Guest access' : 'Signed in with Google'}</span>
-      <span className="text-[14px] leading-normal text-[#3E3C38]">
-        {me.guest
-          ? 'Sign in with Google to keep your sessions across devices. Your guest account becomes your Google account, so the sessions stay with you.'
-          : 'Your sessions are tied to your Google account and available on any device you sign in on.'}
-      </span>
+    <>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4">
+        <span aria-hidden className="grid size-12 flex-none place-items-center rounded-full text-[17px] text-white" style={{ background: 'radial-gradient(circle at 40% 30%, #E9DAFF, #7A5CFF 60%, #3A1F9E)' }}>
+          {me.initials}
+        </span>
+        <span className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
+          <span className="truncate text-[17px]">{me.name}</span>
+          <span className="truncate text-[13px] text-ink-2">{me.guest ? 'Guest on this browser · not backed up' : (me.email ?? 'Google account')}</span>
+        </span>
+        <span className="text-[13px] text-ink-2 tnum">{counting ? 'Loading…' : `${done} ${done === 1 ? 'check-in' : 'check-ins'} · ${days} ${days === 1 ? 'day' : 'days'} tracked`}</span>
+      </div>
       {me.guest ? (
-        <>
-          <button type="button" onClick={() => void signIn()} disabled={pending} aria-busy={pending || undefined} className="flex min-h-[50px] items-center gap-2.5 self-start rounded-pill bg-white pr-5 pl-2 text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]">
-            <span aria-hidden className="grid size-9 place-items-center rounded-full bg-sunken font-semibold">
+        <Row label="Save with Google" hint="Keep your check-ins across devices. Your guest account becomes your Google account, so nothing is lost.">
+          <button type="button" onClick={() => void signIn()} disabled={pending} aria-busy={pending || undefined} className={`${outline} inline-flex items-center gap-2 pl-1.5`}>
+            <span aria-hidden className="grid size-8 place-items-center rounded-full bg-sunken text-[13px] font-semibold">
               G
             </span>
             {pending ? 'Signing in…' : 'Continue with Google'}
           </button>
           {failed ? (
-            <p role="alert" className="m-0 rounded-[16px] bg-avoid-bg px-3.5 py-3 text-[14px]">
+            <p role="alert" className="m-0 basis-full rounded-[14px] bg-avoid-bg px-3.5 py-2.5 text-[13px]">
               {failed}
             </p>
           ) : null}
-        </>
+        </Row>
       ) : null}
-      <button type="button" onClick={() => setAskOut(true)} className={`${outline} bg-transparent`}>
-        Sign out
-      </button>
+      <Row label="Sign out" hint={me.guest ? 'Guest check-ins live only in this browser.' : 'Your check-ins stay in your account.'}>
+        <button type="button" onClick={() => setAskOut(true)} className={outline}>
+          Sign out
+        </button>
+      </Row>
       <Sheet open={askOut} onClose={() => setAskOut(false)} title={me.guest ? 'Sign out as guest?' : 'Sign out?'} variant="modal" size="sm">
         <p className="m-0 leading-[1.55] text-[#3E3C38]">
           {me.guest
@@ -208,14 +180,13 @@ function AccountCard() {
           </button>
         </div>
       </Sheet>
-    </Panel>
+    </>
   )
 }
 
-const chip = (on: boolean) => `min-h-11 rounded-pill px-4 text-[14px] transition-colors duration-200 ${on ? 'bg-selected text-inverse' : 'bg-white text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]'}`
 const offline = 'Saved on this device; your account updates when you are back online.'
 
-function GoalsCard({ demo }: { demo: boolean }) {
+function GoalsRows({ demo }: { demo: boolean }) {
   const { goals, setGoals, profile, saveProfile } = useData()
   const [hint, setHint] = useState(false)
   const save = (next: string[]) => {
@@ -228,47 +199,28 @@ function GoalsCard({ demo }: { demo: boolean }) {
       .then(() => toast(done))
       .catch(() => toast.error(offline))
   return (
-    <Panel
-      label="Goals and preferences"
-      eyebrow="GOALS · UP TO THREE"
-      aside={
-        <span className="font-dot text-[18px]" aria-live="polite">
-          <span className="sr-only">Goals chosen: </span>
-          {goals.length}/{MAX_GOALS}
-        </span>
-      }
-    >
-      <div className="flex flex-wrap gap-1.5">
-        {GOALS.map((g) => {
-          const on = goals.includes(g.id)
-          return (
-            <button key={g.id} type="button" aria-pressed={on} onClick={() => (on ? save(goals.filter((x) => x !== g.id)) : goals.length >= MAX_GOALS ? setHint(true) : save([...goals, g.id]))} className={chip(on)}>
-              {on ? '✓ ' : ''}
-              {g.label}
-            </button>
-          )
-        })}
-      </div>
-      {hint ? (
-        <span role="status" className="text-[13px] text-avoid">
-          Three is the limit. Remove one first.
-        </span>
-      ) : null}
-      <span className="text-[13px] text-ink-2">Goals put their measures first in your results{demo ? ', the demo journey included' : ''}.</span>
-      {demo ? null : (
-        <>
-          <span className="text-[14px] text-ink-2">Usual photo time</span>
-          <SegmentedControl
-            label="Usual photo time"
-            className="self-start"
-            options={PHOTO_TIMES.map((t) => ({ value: t.id as string, label: t.label }))}
-            value={profile.photo_time ?? ''}
-            onChange={(v) => void saveOne({ photo_time: v as PhotoTime }, `Usual photo time: ${v}`)}
-          />
-          <span className="text-[13px] text-ink-2">The same time of day keeps the light comparable.</span>
-          <span id="skin-type-label" className="text-[14px] text-ink-2">
-            Skin type · optional
+    <>
+      <Row stack label={`Goals · ${goals.length} of ${MAX_GOALS}`} hint={`Up to three. Their readings come first in your results${demo ? ', the demo journey included' : ''}.`}>
+        <div className="flex flex-wrap gap-1.5">
+          {GOALS.map((g) => {
+            const on = goals.includes(g.id)
+            return (
+              <button key={g.id} type="button" aria-pressed={on} onClick={() => (on ? save(goals.filter((x) => x !== g.id)) : goals.length >= MAX_GOALS ? setHint(true) : save([...goals, g.id]))} className={chip(on)}>
+                {on ? '✓ ' : ''}
+                {g.label}
+              </button>
+            )
+          })}
+        </div>
+        {hint ? (
+          <span role="status" className="text-[13px] text-avoid">
+            Three is the limit. Remove one first.
           </span>
+        ) : null}
+      </Row>
+      {demo ? null : <PlacesRow />}
+      {demo ? null : (
+        <Row stack label={<span id="skin-type-label">Skin type</span>} hint="Optional. It never changes a measurement.">
           <div role="radiogroup" aria-labelledby="skin-type-label" className="flex flex-wrap gap-1.5">
             {[...SKIN_TYPES, { id: null, label: 'Prefer not to say' }].map((t) => (
               <button key={t.label} type="button" role="radio" aria-checked={profile.skin_type === t.id} onClick={() => void saveOne({ skin_type: t.id }, t.id ? `Skin type: ${t.label.toLowerCase()}` : 'Skin type cleared')} className={chip(profile.skin_type === t.id)}>
@@ -276,15 +228,14 @@ function GoalsCard({ demo }: { demo: boolean }) {
               </button>
             ))}
           </div>
-          <span className="text-[13px] text-ink-2">It never changes a measurement.</span>
-        </>
+        </Row>
       )}
-    </Panel>
+    </>
   )
 }
 
 /** "Places to track" (profile.track): every check-in walks through these, in this order. At least one stays on. */
-function PlacesCard() {
+function PlacesRow() {
   const { profile, saveProfile } = useData()
   const { hash } = useLocation()
   const picked = choicesOf(placesOf(profile))
@@ -302,7 +253,7 @@ function PlacesCard() {
   }
   const places = placesOf(profile)
   return (
-    <Panel id="places" label="Places to track" eyebrow="PLACES TO TRACK">
+    <Row id="places" stack label="Places" hint={`Every check-in covers ${places.length === 1 ? 'this place' : `these ${places.length} places`}, about ${minutesFor(places)} min. Close-ups use the back camera.`}>
       <div className="flex flex-wrap gap-1.5">
         {TRACK_CHOICES.map((c) => {
           const on = picked.includes(c)
@@ -314,15 +265,12 @@ function PlacesCard() {
           )
         })}
       </div>
-      <span className="text-[13px] text-ink-2">
-        Every check-in covers {places.length === 1 ? 'this place' : `these ${places.length} places`}, about {minutesFor(places)} min. Close-ups use the back camera. Photos you already took can be uploaded instead.
-      </span>
-    </Panel>
+    </Row>
   )
 }
 
 /** "Your check-in days": weekdays and a time in this browser's time zone, saved to the account (profile.checkin). */
-function CheckinCard() {
+function CheckinRows() {
   const { profile, saveProfile } = useData()
   const saved = profile.checkin
   const days = saved?.days ?? []
@@ -339,37 +287,43 @@ function CheckinCard() {
       .then(() => toast(done))
       .catch(() => toast.error(offline))
   const names = days.map((d) => WEEKDAYS[d])
+  const saveTime = (v: string) =>
+    saveProfile({ photo_time: v as PhotoTime })
+      .then(() => toast(`Usual photo time: ${v}`))
+      .catch(() => toast.error(offline))
   return (
-    <Panel label="Your check-in days" eyebrow="CHECK-IN DAYS" aside={<span className="font-dot text-[18px]">{days.length}/7</span>}>
-      <span className="text-[20px]">{days.length ? `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} at ${time}` : 'No check-in days set'}</span>
-      <div role="group" aria-label="Check-in days" className="flex flex-wrap gap-1.5">
-        {WEEKDAYS.map((d, i) => {
-          const on = days.includes(i)
-          const next = on ? days.filter((x) => x !== i) : [...days, i]
-          return (
-            <button key={d} type="button" aria-pressed={on} onClick={() => void save(next, time, next.length ? 'Check-in days saved' : 'Check-in days cleared')} className={`${chip(on)} min-w-[56px]`}>
-              {d}
-            </button>
-          )
-        })}
-      </div>
-      <label className="flex flex-wrap items-center gap-3 text-[14px] text-ink-2">
-        Time
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          onBlur={() => {
-            if (days.length && /^\d{2}:\d{2}$/.test(time) && time !== saved?.time) void save(days, time, `Check-in time: ${time}`)
-          }}
-          className="min-h-11 rounded-pill bg-white px-4 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]"
-        />
-      </label>
-      <span className="text-[13px] text-ink-2">
-        Saved to your account. Times are in {tz}
-        {saved && saved.tz !== browserTz() ? `; this browser is in ${browserTz()}, and the next change uses it` : ', this browser’s time zone'}. Once a week is enough; the same day and time keeps photos comparable.
-      </span>
-    </Panel>
+    <>
+      <Row stack label="Check-in days" hint={`${days.length ? `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} at ${time}. ` : ''}Once a week is enough; the same day and time keeps photos comparable. Times are in ${tz}${saved && saved.tz !== browserTz() ? `; this browser is in ${browserTz()}, and the next change uses it` : ''}.`}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div role="group" aria-label="Check-in days" className="flex flex-wrap gap-1.5">
+            {WEEKDAYS.map((d, i) => {
+              const on = days.includes(i)
+              const next = on ? days.filter((x) => x !== i) : [...days, i]
+              return (
+                <button key={d} type="button" aria-pressed={on} onClick={() => void save(next, time, next.length ? 'Check-in days saved' : 'Check-in days cleared')} className={`${chip(on)} min-w-[52px]`}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+          <label className="ml-1 flex items-center gap-2 text-[14px] text-ink-2">
+            at
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              onBlur={() => {
+                if (days.length && /^\d{2}:\d{2}$/.test(time) && time !== saved?.time) void save(days, time, `Check-in time: ${time}`)
+              }}
+              className="min-h-10 rounded-pill bg-white px-3.5 text-[15px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]"
+            />
+          </label>
+        </div>
+      </Row>
+      <Row label="Usual photo time" hint="The same time of day keeps the light comparable.">
+        <SegmentedControl label="Usual photo time" options={PHOTO_TIMES.map((t) => ({ value: t.id as string, label: t.label }))} value={profile.photo_time ?? ''} onChange={(v) => void saveTime(v)} />
+      </Row>
+    </>
   )
 }
 
@@ -380,7 +334,7 @@ function fmtVersion(v: string): string {
 }
 const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-function PrivacyCard() {
+function PrivacyRows() {
   const { getIdToken } = useAuth()
   const uid = useOwner()
   const me = useMe()
@@ -417,33 +371,38 @@ function PrivacyCard() {
     ['Scope', 'Cosmetic appearance only'],
   ]
   return (
-    <Panel label="Privacy receipt" eyebrow="PRIVACY RECEIPT">
-      <dl className="m-0 flex flex-col">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-3 border-b border-line/60 py-2.5 text-[14px]">
-            <dt className="text-ink-2">{k}</dt>
-            <dd className="m-0 text-right">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="rounded-[20px] bg-sunken px-4 py-2">
+    <>
+      <ToggleRow>
         <Toggle
-          label="Anonymized aggregate sharing"
+          label="Share anonymized results"
           checked={share}
           disabled={!consent}
           onChange={onShare}
-          description={!consent ? 'Available once you have accepted the terms before your first photo.' : share ? 'On · included only in groups of 10 or more' : 'Off · your results stay out of retailer aggregates'}
+          description={!consent ? 'Available once you have accepted the terms before your first photo.' : share ? 'On · only ever in groups of 10 or more, to help skin brands learn what works' : 'Off · your results stay out of retailer aggregates'}
         />
-      </div>
+      </ToggleRow>
       <SponsoredToggle />
-
-      <details className="text-[14px] leading-[1.55]">
-        <summary className="flex min-h-11 cursor-pointer items-center">{consent ? 'Read the consent you agreed to' : 'Read the consent'}</summary>
-        <p className="mt-1.5 mb-0 text-[#3E3C38]">
+      <details className="group py-2">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-[15px]">
+          <span className="flex flex-col gap-0.5">
+            Privacy receipt
+            <span className="text-[13px] text-ink-2">What Willow keeps, for how long, and the consent you agreed to.</span>
+          </span>
+          <span aria-hidden className="text-ink-2 transition-transform group-open:rotate-90">›</span>
+        </summary>
+        <dl className="m-0 mt-2 flex flex-col">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3 border-t border-ink/[.06] py-2.5 text-[14px]">
+              <dt className="text-ink-2">{k}</dt>
+              <dd className="m-0 text-right">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-2 mb-1 text-[13px] leading-[1.55] text-ink-2">
           Willow stores your original photos privately for 30 days, then deletes them, with their small previews and spot close-ups. Measurements, verdicts and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers your questions to Wisp; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
         </p>
       </details>
-    </Panel>
+    </>
   )
 }
 
@@ -475,7 +434,7 @@ function SponsoredToggle() {
       })
   }
   return (
-    <div className="rounded-[20px] bg-sunken px-4 py-2">
+    <ToggleRow>
       <Toggle
         label="Sponsored suggestions"
         checked={on}
@@ -483,27 +442,22 @@ function SponsoredToggle() {
         onChange={onChange}
         description={on ? 'On · at most one labelled card on Routine, only for products that meet Willow’s evidence bar' : 'Off · no sponsored cards; your recommendations are the same either way'}
       />
-    </div>
+    </ToggleRow>
   )
 }
 
-function CaptureSetupCard() {
+function CaptureSetupRow() {
   const [recorded, setRecorded] = useState(() => prefs.lightroomDone())
   const [step, setStep] = useState<'idle' | 'confirm' | 'done'>('idle')
-  const title = step === 'done' ? '✓ Reset · setup guide will show next time' : recorded ? 'RAW setup recorded on this device' : 'No RAW setup recorded on this device'
   return (
-    <Panel label="Capture setup" eyebrow="CAPTURE SETUP">
-      <span className="text-[18px]">{title}</span>
-      <span className="text-[14px] leading-normal text-[#3E3C38]">
-        {recorded || step === 'done' ? 'Resetting shows the Lightroom setup guide again on your next RAW session. Your sessions and baselines are not affected.' : 'The Lightroom setup guide shows on your next RAW session.'}
-      </span>
+    <Row label="RAW photo setup" hint={step === 'done' ? 'Reset. The Lightroom setup guide shows on your next RAW check-in.' : recorded ? 'Recorded on this device. Resetting shows the Lightroom guide again; check-ins and baselines are not affected.' : 'Not set up on this device. The Lightroom guide shows on your next RAW check-in.'}>
       {recorded && step === 'idle' ? (
         <button type="button" onClick={() => setStep('confirm')} className={outline}>
-          Reset capture setup
+          Reset
         </button>
       ) : null}
       {step === 'confirm' ? (
-        <div className="flex flex-wrap gap-2">
+        <>
           <button
             type="button"
             onClick={() => {
@@ -512,19 +466,16 @@ function CaptureSetupCard() {
               setStep('done')
               toast('Capture setup reset')
             }}
-            className="min-h-[46px] rounded-pill bg-selected px-[18px] text-[14px] text-inverse"
+            className="min-h-11 rounded-pill bg-selected px-4 text-[14px] text-inverse"
           >
             Yes, reset
           </button>
           <button type="button" onClick={() => setStep('idle')} className={outline}>
             Cancel
           </button>
-        </div>
+        </>
       ) : null}
-      <Link to="/science" className="min-h-11 self-start py-2 text-[14px] underline underline-offset-4">
-        Science and limitations
-      </Link>
-    </Panel>
+    </Row>
   )
 }
 
@@ -533,33 +484,28 @@ function ServiceStatus() {
   const { status, failed, gaveUp } = useDemoStatus()
   const chips = status ? serviceChips(status, gaveUp).filter((c) => c.key !== 'catalog') : []
   return (
-    <section aria-label="Service status" className="flex flex-wrap items-center gap-2.5 rounded-[36px] squircle bg-surface/70 px-6 py-5" aria-live="polite">
-      <span className="mr-1.5 font-mono text-[12px] text-ink-2">■ SERVICE</span>
-      {failed ? (
-        <span className="text-[13px] text-ink-2">Service status unavailable</span>
-      ) : !status ? (
-        <span className="text-[13px] text-ink-2">Checking…</span>
-      ) : (
-        chips.map((c) => (
-          <span key={c.key} className="flex items-center gap-2 rounded-pill bg-white px-3.5 py-2 text-[13px]">
-            <span aria-hidden className="size-2 rounded-full" style={{ background: CHIP_DOT[c.state] }} />
-            {c.label}
-            {c.note ? <span className="font-mono text-[11px] text-ink-2">{c.note}</span> : null}
-          </span>
-        ))
-      )}
-      {status ? (
-        <span className="text-caption text-ink-2">
-          Checked live at {new Date(status.checked_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.
+    <div aria-label="Service status" aria-live="polite" className="flex flex-wrap items-center gap-x-6 gap-y-2.5 py-4">
+      <span className="flex min-w-0 flex-[1_1_240px] flex-col gap-0.5">
+        <span className="text-[15px]">Service status</span>
+        <span className="text-[13px] text-ink-2">{failed ? 'Unavailable right now.' : !status ? 'Checking…' : `Checked live at ${new Date(status.checked_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.`}</span>
+      </span>
+      {status && !failed ? (
+        <span className="flex flex-wrap gap-1.5">
+          {chips.map((c) => (
+            <span key={c.key} className="flex items-center gap-1.5 rounded-pill bg-sunken px-3 py-1.5 text-[12.5px]">
+              <span aria-hidden className="size-2 rounded-full" style={{ background: CHIP_DOT[c.state] }} />
+              {c.label}
+            </span>
+          ))}
         </span>
       ) : null}
-    </section>
+    </div>
   )
 }
 
 type DelState = 'idle' | 'confirm' | 'deleting' | 'done' | 'failed'
 
-function DeleteCard() {
+function DeleteGroup() {
   const { user, getIdToken, signOutUser } = useAuth()
   const data = useData()
   const routine = useRoutine()
@@ -630,62 +576,65 @@ function DeleteCard() {
     failed: ['Deletion didn’t finish', 'The connection dropped part-way. Run it again to finish; anything not yet removed is removed then.'],
   }
   const [title, text] = TEXT[state]
-  const btn = 'min-h-[50px] rounded-pill px-5 text-[15px]'
+  const btn = 'min-h-11 rounded-pill px-4 text-[14px]'
   return (
-    <section aria-label="Delete my data" aria-live="polite" aria-busy={state === 'deleting' || undefined} className="flex flex-col gap-3.5 rounded-xl squircle bg-selected text-inverse" style={{ padding: 'clamp(22px,3vw,32px)' }}>
-      <span className="font-mono text-[12px] text-[#BDBAB4]">■ DELETE MY DATA</span>
-      <h2 className="m-0 text-[20px] font-normal">{title}</h2>
-      <p className="m-0 max-w-[720px] text-[15px] leading-normal text-[#E4E1DB]">{text}</p>
-      {state === 'deleting' ? (
-        <span aria-hidden className="block h-1.5 max-w-[420px] overflow-hidden rounded-[6px] bg-[#2A2A2A]">
-          <span className="block h-full w-2/5 animate-[wShimmer_1.2s_linear_infinite] rounded-[6px] bg-[length:200%_100%]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, #FF6B4A, transparent)' }} />
+    <Group id="delete" title="Delete my data" tone="danger">
+      <div aria-live="polite" aria-busy={state === 'deleting' || undefined} className="flex flex-col gap-3 py-4">
+        <span className="flex flex-col gap-0.5">
+          <span className="text-[15px]">{title}</span>
+          <span className="max-w-[620px] text-[13px] leading-[1.5] text-ink-2">{text}</span>
         </span>
-      ) : null}
-      {state === 'idle' ? (
-        <button
-          type="button"
-          onClick={() => {
-            setWord('')
-            setState('confirm')
-          }}
-          className={`${btn} self-start bg-coral text-ink`}
-        >
-          Delete everything
-        </button>
-      ) : null}
-      {state === 'confirm' ? (
-        <>
-          <label className="flex max-w-[360px] flex-col gap-1.5 text-[14px] text-[#BDBAB4]">
-            Type DELETE to confirm
-            {/* the button pressed to get here is gone: the confirmation field takes focus */}
-            <input type="text" autoFocus value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} className="min-h-12 rounded-[14px] border border-[#333] bg-[#1C1C1C] px-3.5 text-[16px] text-inverse" />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void run()} disabled={word.trim().toUpperCase() !== 'DELETE'} className={`${btn} bg-coral text-ink`}>
-              Delete permanently
-            </button>
-            <button type="button" onClick={() => setState('idle')} className={`${btn} border border-[#444] bg-transparent text-inverse`}>
-              Cancel
-            </button>
-          </div>
-        </>
-      ) : null}
-      {state === 'failed' ? (
-        <button type="button" onClick={() => void run()} className={`${btn} self-start bg-white text-ink`}>
-          Try again
-        </button>
-      ) : null}
-      {state === 'done' ? (
-        <button
-          type="button"
-          onClick={() => {
-            void removeAccount().then(() => navigate('/', { replace: true }))
-          }}
-          className={`${btn} self-start bg-white text-ink`}
-        >
-          Back to start
-        </button>
-      ) : null}
-    </section>
+        {state === 'deleting' ? (
+          <span aria-hidden className="block h-1.5 max-w-[420px] overflow-hidden rounded-[6px] bg-sunken">
+            <span className="block h-full w-2/5 animate-[wShimmer_1.2s_linear_infinite] rounded-[6px] bg-[length:200%_100%]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, #FF6B4A, transparent)' }} />
+          </span>
+        ) : null}
+        {state === 'idle' ? (
+          <button
+            type="button"
+            onClick={() => {
+              setWord('')
+              setState('confirm')
+            }}
+            className={`${btn} self-start bg-coral text-ink`}
+          >
+            Delete everything
+          </button>
+        ) : null}
+        {state === 'confirm' ? (
+          <>
+            <label className="flex max-w-[360px] flex-col gap-1.5 text-[13px] text-ink-2">
+              Type DELETE to confirm
+              {/* the button pressed to get here is gone: the confirmation field takes focus */}
+              <input type="text" autoFocus value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} className="min-h-11 rounded-[14px] bg-white px-3.5 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => void run()} disabled={word.trim().toUpperCase() !== 'DELETE'} className={`${btn} bg-coral text-ink disabled:opacity-55`}>
+                Delete permanently
+              </button>
+              <button type="button" onClick={() => setState('idle')} className={outline}>
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : null}
+        {state === 'failed' ? (
+          <button type="button" onClick={() => void run()} className={`${outline} self-start`}>
+            Try again
+          </button>
+        ) : null}
+        {state === 'done' ? (
+          <button
+            type="button"
+            onClick={() => {
+              void removeAccount().then(() => navigate('/', { replace: true }))
+            }}
+            className={`${outline} self-start`}
+          >
+            Back to start
+          </button>
+        ) : null}
+      </div>
+    </Group>
   )
 }
