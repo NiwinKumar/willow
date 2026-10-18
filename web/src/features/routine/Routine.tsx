@@ -1,8 +1,9 @@
+import { History } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { useRoutine, useRoutineCheck, useRoutineLog } from '../../data/hooks'
 import type { Product, RoutineEntry } from '../../data/types'
@@ -10,15 +11,18 @@ import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { fmtDate, plural } from '../../lib/format'
 import { AddProductSheet, type AddPreset } from './AddProductSheet'
-import { CategoryOrb, ProductImage } from './productUi'
+import { readForearm } from '../home/forearm'
+import { CategoryOrb } from './productUi'
 import { ProductSheet, type ProductTarget } from './ProductSheet'
 import { useProductTests } from './productTests'
-import { entryName, findingsOf, imageOf, useOutcomeSessions, type Finding } from './routineModel'
+import { entryName, findingsOf, useOutcomeSessions, type Finding } from './routineModel'
 import { addDays } from './schedule'
 import { RoutineCheckCard } from './RoutineCheckCard'
 import { SlotCard } from './SlotCard'
 import { SponsoredCard } from './SponsoredCard'
-import { ProductTestCard, Suggestions } from './Suggestions'
+import { ProductTests, TestStrip } from './TestsTab'
+import { RoutineHistory } from './RoutineHistory'
+import { Suggestions } from './Suggestions'
 import { AvailableInOwnAccount } from './OwnAccountNotice'
 import { FeelNudge } from './FeelCard'
 import { RequestNotice } from './RequestNotice'
@@ -57,6 +61,10 @@ function LiveRoutine() {
   const faceMeasured = sessions.some((s) => s.site === 'face_full' && s.status === 'done' && s.measured !== false && s.result?.quality.passed)
   const writes = useRoutineWrites()
 
+  const [params, setParams] = useSearchParams()
+  const tab: 'routine' | 'tests' = params.get('tab') === 'tests' ? 'tests' : 'routine'
+  const setTab = (t: 'routine' | 'tests') => setParams(t === 'tests' ? { tab: 'tests' } : {}, { replace: true })
+  const [history, setHistory] = useState(false)
   const [add, setAdd] = useState<AddPreset | null>(null)
   const [info, setInfo] = useState<ProductTarget | null>(null)
   // A product the advisor offered ("Add to routine" in its product sheet) arrives as router state.
@@ -94,88 +102,119 @@ function LiveRoutine() {
     await (usedLastNight(b.id) && !usedLastNight(a.id) ? alternate(a, b) : alternate(b, a))
   }
 
+  const testRead = readForearm(treated, controls, tests.running)
+  const showTests = tab === 'tests' && !loading && !failed
+  const attention = !loading && !failed
+
   return (
-    <main className="relative mx-auto flex max-w-[1320px] flex-col gap-[18px] px-[clamp(16px,4vw,40px)] pt-2">
-      <div className="flex flex-wrap items-end justify-between gap-4 pt-[clamp(8px,2vw,24px)] pb-1">
-        <div className="flex flex-col gap-2.5">
-          <h1 className="font-serif text-[clamp(34px,3.5vw,52px)] leading-[.9] font-normal">Your routine</h1>
-          <span className="text-[15px] text-ink-2">{meta}</span>
+    <main className="relative mx-auto flex max-w-[1320px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-2">
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">Your routine</h1>
+          <span className="text-[14px] text-ink-2">{meta}</span>
         </div>
-        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="flex min-h-[46px] items-center gap-3 rounded-pill bg-selected pr-1.5 pl-5 text-[16px] text-inverse transition-transform hover:-translate-y-0.5">
+        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
           Add product
-          <span aria-hidden className="grid size-[34px] place-items-center rounded-full bg-white text-[22px] text-ink">
+          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-white text-[18px] leading-none text-ink">
             +
           </span>
         </button>
+        <div className="order-3 flex basis-full flex-wrap items-center gap-2 sm:order-2 sm:basis-auto">
+          <SegmentedControl
+            label="Routine or product tests"
+            size="sm"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'routine', label: 'Routine' },
+              { value: 'tests', label: tests.running ? 'Product test · running' : 'Product tests' },
+            ]}
+          />
+          <button type="button" onClick={() => setHistory(true)} className="hit44 flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-colors hover:bg-ink/5">
+            <History size={15} strokeWidth={1.7} aria-hidden />
+            History{stopped.length ? <span className="font-mono text-[11px] text-ink-2">{stopped.length}</span> : null}
+          </button>
+        </div>
       </div>
 
-      {!loading && !failed ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
-      {!loading && !failed ? <RequestNotice onAdd={(p) => setAdd({ product: p })} /> : null}
-      {!loading && !failed ? <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} /> : null}
-      {!loading && !failed && current.length ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : null}
+      {attention && !showTests && current.length ? <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} /> : null}
 
-      {loading ? (
-        <div role="status" aria-label="Loading routine" className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,460px),1fr))' }}>
-          {[
-            { bg: 'var(--bg-surface)', a: 'var(--bg-canvas)', b: '#F7F6F3', card: 'rgba(255,255,255,.7)', rows: 2 },
-            { bg: '#15122A', a: 'rgba(255,255,255,.06)', b: 'rgba(255,255,255,.16)', card: 'rgba(255,255,255,.05)', rows: 3 },
-          ].map((sk, k) => {
-            const shimmer = { background: `linear-gradient(90deg, ${sk.a} 0%, ${sk.b} 50%, ${sk.a} 100%)`, backgroundSize: '200% 100%' }
-            return (
-              <div key={k} className="flex flex-col gap-3 rounded-[44px] p-6" style={{ background: sk.bg }}>
-                <span className="block h-[30px] w-[140px] rounded-[12px] motion-safe:animate-[wShimmer_1.4s_linear_infinite]" style={shimmer} />
-                {Array.from({ length: sk.rows }, (_, r) => (
-                  <span key={r} className="flex items-center gap-4 rounded-[30px] p-3.5" style={{ background: sk.card }}>
-                    <span className="block size-[84px] shrink-0 rounded-[26px] motion-safe:animate-[wShimmer_1.4s_linear_infinite]" style={shimmer} />
-                    <span className="flex flex-1 flex-col gap-2">
-                      {['40%', '75%', '55%'].map((w, i) => (
-                        <span key={w} className="block rounded-[6px] motion-safe:animate-[wShimmer_1.4s_linear_infinite]" style={{ ...shimmer, width: w, height: i === 1 ? 18 : 12 }} />
-                      ))}
+      {attention && !showTests ? (
+        <>
+          <RequestNotice onAdd={(p) => setAdd({ product: p })} />
+          <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} />
+        </>
+      ) : null}
+
+      {showTests ? (
+        <ProductTests current={current} tests={tests} treated={treated} controls={controls} />
+      ) : loading ? (
+        <div className="@container"><div role="status" aria-label="Loading routine" className="grid gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid gap-3 @min-[600px]:grid-cols-2">
+            {[
+              { bg: 'var(--bg-surface)', a: 'var(--bg-canvas)', b: '#F7F6F3', card: 'rgba(255,255,255,.7)', rows: 4 },
+              { bg: '#15122A', a: 'rgba(255,255,255,.06)', b: 'rgba(255,255,255,.16)', card: 'rgba(255,255,255,.05)', rows: 4 },
+            ].map((sk, k) => {
+              const shimmer = { background: `linear-gradient(90deg, ${sk.a} 0%, ${sk.b} 50%, ${sk.a} 100%)`, backgroundSize: '200% 100%' }
+              return (
+                <div key={k} className="flex flex-col gap-2 rounded-[28px] p-3" style={{ background: sk.bg }}>
+                  <span className="mx-2 mt-1 mb-0.5 block h-[22px] w-[110px] rounded-[8px] motion-safe:animate-[wShimmer_1.4s_linear_infinite]" style={shimmer} />
+                  {Array.from({ length: sk.rows }, (_, r) => (
+                    <span key={r} className="flex items-center gap-2.5 rounded-[20px] p-1.5" style={{ background: sk.card }}>
+                      <span className="block size-[46px] shrink-0 rounded-[16px] motion-safe:animate-[wShimmer_1.4s_linear_infinite]" style={shimmer} />
+                      <span className="flex flex-1 flex-col gap-1.5">
+                        {['70%', '45%'].map((w, i) => (
+                          <span key={w} className="block rounded-[5px] motion-safe:animate-[wShimmer_1.4s_linear_infinite]" style={{ ...shimmer, width: w, height: i ? 10 : 13 }} />
+                        ))}
+                      </span>
                     </span>
-                  </span>
-                ))}
-              </div>
-            )
-          })}
-        </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+          <span className="hidden h-[220px] rounded-[28px] bg-surface @min-[1020px]:block" />
+        </div></div>
       ) : failed ? (
-        <div role="alert" className="flex flex-col items-start gap-3.5 rounded-[44px] bg-surface p-[clamp(28px,5vw,48px)]">
-          <span className="font-dot text-[56px] leading-none font-extrabold text-coral">—</span>
-          <span className="text-[22px]">Your routine didn’t load</span>
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-[32px] bg-surface p-[clamp(24px,4vw,40px)]">
+          <span className="font-dot text-[44px] leading-none font-extrabold text-coral">—</span>
+          <span className="text-[20px]">Your routine didn’t load</span>
           <span className="leading-[1.5] text-ink-2">{navigator.onLine ? 'Nothing has been lost. Check your connection and try again.' : 'You’re offline. Nothing has been lost; try again when you’re connected.'}</span>
-          <button type="button" onClick={() => void routine.refetch()} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-[15px] text-inverse">
+          <button type="button" onClick={() => void routine.refetch()} className="min-h-11 rounded-pill bg-selected px-[22px] text-[15px] text-inverse">
             Try again
           </button>
         </div>
       ) : current.length === 0 ? (
-        <div className="relative grid items-center gap-7 overflow-hidden rounded-[44px] bg-surface p-[clamp(28px,5vw,56px)]" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))' }}>
-          <div className="flex flex-col gap-3.5">
-            <span className="font-dot text-[64px] leading-none font-extrabold">00</span>
-            <span className="text-[clamp(24px,2.6vw,32px)] leading-[1.15] tracking-[-0.02em]">No products yet</span>
-            <span className="max-w-[440px] leading-[1.55] text-[#3E3C38]">Add what you use and when you started. Willow lines start dates up with your readings and checks the ingredients against each other.</span>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-[15px] text-inverse">
-                Search catalog
-              </button>
-              <button type="button" onClick={() => setAdd({ mode: 'request' })} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] text-[15px]">
-                Request a product
-              </button>
+        <div className="flex flex-col gap-3">
+          <div className="relative grid items-center gap-6 overflow-hidden rounded-[32px] bg-surface p-[clamp(24px,4vw,40px)]" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))' }}>
+            <div className="flex flex-col gap-3">
+              <span className="font-dot text-[48px] leading-none font-extrabold">00</span>
+              <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.02em]">No products yet</span>
+              <span className="max-w-[440px] leading-[1.55] text-[#3E3C38]">Add what you use and when you started. Willow lines start dates up with your readings and checks the ingredients against each other.</span>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-11 rounded-pill bg-selected px-5 text-[15px] text-inverse">
+                  Search catalog
+                </button>
+                <button type="button" onClick={() => setAdd({ mode: 'request' })} className="min-h-11 rounded-pill border border-ink/15 bg-white px-5 text-[15px]">
+                  Request a product
+                </button>
+              </div>
+            </div>
+            <div aria-hidden className="flex justify-center gap-3">
+              {['serum', 'exfoliant', 'toner'].map((c, i) => (
+                <span key={c} className="opacity-35">
+                  <span className="block motion-safe:animate-[wBreathe_5s_ease-in-out_infinite]" style={{ animationDelay: `${-i * 1.6}s` }}>
+                    <CategoryOrb category={c} size={72} />
+                  </span>
+                </span>
+              ))}
             </div>
           </div>
-          <div aria-hidden className="flex justify-center gap-3.5">
-            {['serum', 'exfoliant', 'toner'].map((c, i) => (
-              <span key={c} className="opacity-35">
-                <span className="block motion-safe:animate-[wBreathe_5s_ease-in-out_infinite]" style={{ animationDelay: `${-i * 1.6}s` }}>
-                  <CategoryOrb category={c} size={90} />
-                </span>
-              </span>
-            ))}
-          </div>
+          <RoutineCheckCard check={check} findings={findings} count={0} onFind={find} onAlternate={alternateFinding} />
         </div>
       ) : (
-        <>
-          {!faceMeasured ? <p className="mx-2 text-[14px] text-ink-2">Take a face check-in to see, over the weeks, whether each product lines up with a change in your readings.</p> : null}
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,460px),1fr))' }}>
+        <div className="@container flex flex-col gap-3">
+          <div className="grid gap-3 @min-[620px]:grid-cols-2">
             {(['am', 'pm'] as const).map((slot) => (
               <SlotCard
                 key={slot}
@@ -183,44 +222,45 @@ function LiveRoutine() {
                 entries={slot === 'am' ? am : pm}
                 ticked={(id) => (ticks[id] ?? []).includes(slot)}
                 sessions={sessions}
-                faceMeasured={faceMeasured}
                 onOpen={(e) => setInfo({ entry: e })}
-                onFeel={(e) => setInfo({ entry: e, focus: 'feel' })}
                 onStop={(e) => void writes.stop(e)}
                 onAdd={() => setAdd({ mode: 'search', slot })}
               />
             ))}
           </div>
-          <p className="mx-2 max-w-[820px] text-[14px] leading-[1.5] text-ink-2">Outcome lines show what your readings did after a start date. Timing is an association: light, season and other products change too, so it isn’t proof a product caused a change.</p>
-        </>
+          <div className="grid gap-3 @min-[760px]:grid-cols-1 @min-[760px]:has-[.sug>*]:grid-cols-2 @min-[760px]:items-start">
+            <div className="sug empty:hidden">
+              <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} />
+            </div>
+            <div className="flex flex-col gap-3">
+              <TestStrip read={testRead} onStart={() => setTab('tests')} />
+              <SponsoredCard inRoutine={everAdded} onView={(productId) => setInfo({ productId })} />
+            </div>
+          </div>
+        </div>
       )}
 
-      {!loading && !failed ? <SponsoredCard inRoutine={everAdded} onView={(productId) => setInfo({ productId })} /> : null}
+      <div className="mx-1 mt-1 flex flex-col gap-2">
+        {!loading && !failed && !showTests && current.length ? (
+          <p className="max-w-[820px] text-[12.5px] leading-[1.5] text-ink-2">
+            {faceMeasured ? '◆ marks a change in your readings after you started a product. ' : 'Take a face check-in to see, over the weeks, whether each product lines up with a change in your readings. '}
+            Timing is an association: light, season and other products change too, so it isn’t proof a product caused a change.
+          </p>
+        ) : null}
+        <Disclaimer />
+      </div>
+      <div className="h-[clamp(24px,5vw,72px)]" />
 
-      {stopped.length && !loading ? (
-        <details className="card px-5 py-1">
-          <summary className="flex min-h-12 cursor-pointer items-center text-[15px]">Stopped ({stopped.length})</summary>
-          <ul className="flex flex-col pb-3">
-            {stopped.map((e) => (
-              <li key={e.id} className="flex items-center gap-3 border-t border-line py-2.5">
-                <ProductImage product={imageOf(e)} size={36} muted decorative />
-                <button type="button" onClick={() => setInfo({ entry: e })} className="flex min-w-0 flex-1 flex-col text-left">
-                  <span className="truncate text-[15px]">{entryName(e)}</span>
-                  <span className="text-[12px] text-ink-2">
-                    {fmtDate(e.started_at)} to {fmtDate(e.ended_at!)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="pb-3 text-[12px] text-ink-2">Stopped products keep their dates, so their link to your readings stays.</p>
-        </details>
-      ) : null}
-
-      {tests.status === 'ready' || treated.length ? <ProductTestCard treated={treated} controls={controls} test={tests.running} /> : null}
-      <Disclaimer className="mx-2" />
-      <div className="h-[clamp(40px,8vw,120px)]" />
-
+      <RoutineHistory
+        open={history}
+        onClose={() => setHistory(false)}
+        current={current}
+        stopped={stopped}
+        onOpen={(e) => {
+          setHistory(false)
+          setInfo({ entry: e })
+        }}
+      />
       <AddProductSheet open={sheetPreset !== null} preset={sheetPreset} inRoutine={inRoutine} onClose={closeAdd} />
       <ProductSheet
         target={info}
