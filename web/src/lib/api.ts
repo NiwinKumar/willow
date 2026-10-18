@@ -263,7 +263,10 @@ export type Profile = {
   updated_at: string | null
   /** Routine's "Sponsored · Willow Proven" card off (default false; absent from older apis). */
   hide_sponsored?: boolean
+  /** Places every check-in covers, in capture order; null = the app's default (absent from older apis). */
+  track?: TrackPlace[] | null
 }
+export type TrackPlace = 'cheek_macro' | 'nose_macro' | 'face_full' | 'forearm_treated' | 'forearm_control'
 export type ProfilePatch = Partial<Omit<Profile, 'updated_at'>>
 
 /** A product someone asked Willow to add to the catalog (api app/product_requests.py). */

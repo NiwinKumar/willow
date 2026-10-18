@@ -12,7 +12,7 @@ import { usedFrames } from './model'
 
 /**
  * "Make {day} your baseline?" (design confirm dialog): POST /v1/baselines/{site}, then every session is read
- * again (later sessions are compared with the new one). Works for RAW and Quick: each mode has its own.
+ * again (later sessions are compared with the new one). Works for RAW and camera photos: each mode has its own.
  */
 /** `withTime`: the day has several check-ins, so the time says which one becomes the baseline. */
 export function BaselineDialog({ session, withTime = false, open, onClose }: { session: Session; withTime?: boolean; open: boolean; onClose: () => void }) {
@@ -44,7 +44,7 @@ export function BaselineDialog({ session, withTime = false, open, onClose }: { s
       <div className="flex flex-col gap-4">
         <h2 className="m-0 text-[28px] leading-[1.1] font-normal tracking-[-0.02em]">Make {day} your baseline?</h2>
         <p className="m-0 leading-[1.55] text-ink-2">
-          Every later {session.capture_mode === 'uncalibrated' ? 'Quick' : 'RAW'} check-in will be compared with this one instead. Earlier check-ins keep the comparison they had. A baseline should come before you start the products you’re testing.
+          Every later {session.capture_mode === 'uncalibrated' ? 'camera' : 'RAW'} check-in will be compared with this one instead. Earlier check-ins keep the comparison they had. A baseline should come before you start the products you’re testing.
         </p>
         {used < 3 ? (
           <p className="m-0 rounded-[16px] bg-[var(--action-primary)] px-3.5 py-3 text-[14px] leading-[1.45]">

@@ -27,7 +27,7 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
           {(
             [
               ['calibrated_raw', 'RAW · calibrated'],
-              ['uncalibrated', 'Quick photo'],
+              ['uncalibrated', 'Camera'],
             ] as const
           ).map(([m, label]) => (
             <button
@@ -100,7 +100,7 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onMode, onCont
           <span className="flex flex-col gap-0.5">
             <span className="text-[17px]">{n === null ? 'Checking your baselines…' : first ? `First session · ${n} photos for a baseline` : `Later session · ${n} photos`}</span>
             <span className="text-[14px] text-ink-2">
-              {SITE_NAME[site]} · {raw ? 'RAW' : 'Quick photo'}
+              {SITE_NAME[site]} · {raw ? 'RAW' : 'Camera'}
             </span>
           </span>
         </span>

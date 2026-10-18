@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 
 import type { CaptureMode, Site } from '../../data/types'
+import type { TrackPlace } from '../../lib/track'
 
 /**
  * What any screen inside the app shell can ask the shell to do. The shell owns the check-in picker, the
@@ -14,7 +15,7 @@ export type ShellApi = {
   closeCheckIn: () => void
   checkInOpen: boolean
   /** Start the check-in flow directly (skips the picker): /check-in?site=&mode= over the current page. */
-  startCheckIn: (site: Site, mode: CaptureMode, opts?: { sample?: string }) => void
+  startCheckIn: (site: Site, mode: CaptureMode, opts?: { sample?: string; places?: TrackPlace[] }) => void
   /** Open the advisor panel; with `text`, that question is asked straight away. `context` labels the chip. */
   openAdvisor: (text?: string, context?: string) => void
   closeAdvisor: () => void

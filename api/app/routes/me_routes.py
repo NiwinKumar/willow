@@ -222,7 +222,18 @@ Goal = Literal[
     "oil_glow",
 ]
 MAX_GOALS = 3
-PROFILE_FIELDS = ("goals", "photo_time", "display_name", "skin_type", "checkin", "hide_sponsored")
+# Places a check-in walks through, chosen once in onboarding (web lib/places.ts). The forearms are
+# one choice in the app and two places here (treated and untreated arm).
+TrackPlace = Literal["cheek_macro", "nose_macro", "face_full", "forearm_treated", "forearm_control"]
+PROFILE_FIELDS = (
+    "goals",
+    "photo_time",
+    "display_name",
+    "skin_type",
+    "checkin",
+    "hide_sponsored",
+    "track",
+)
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
@@ -281,6 +292,13 @@ class ProfileUpdate(BaseModel):
     checkin: Checkin | None = None
     # Routine's "Sponsored · Willow Proven" card off (null = back to the default, shown)
     hide_sponsored: bool | None = None
+    # the places every check-in covers, in capture order (null = the app's default)
+    track: list[TrackPlace] | None = Field(default=None, min_length=1, max_length=5)
+
+    @field_validator("track")
+    @classmethod
+    def _track(cls, v: list[str] | None) -> list[str] | None:
+        return list(dict.fromkeys(v)) if v else v
 
     @field_validator("goals")
     @classmethod
@@ -303,6 +321,7 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
         "skin_type": p.get("skin_type"),
         "checkin": p.get("checkin"),
         "hide_sponsored": bool(p.get("hide_sponsored")),
+        "track": list(p["track"]) if p.get("track") else None,
     }
     out["updated_at"] = iso(p.get("updated_at"))
     return out

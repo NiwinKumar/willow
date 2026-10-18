@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
@@ -13,7 +13,8 @@ import { syncConsent } from '../../lib/consent'
 import { identity } from '../../lib/identity'
 import type { PhotoTime, ProfilePatch } from '../../lib/api'
 import { GOALS, MAX_GOALS } from '../../lib/metrics'
-import { browserTz, localProfile, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
+import { browserTz, localProfile, PHOTO_TIME_CLOCK, PHOTO_TIMES, placesOf, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
+import { CHOICE_COPY, choicesOf, minutesFor, TRACK_CHOICES, trackOf } from '../../lib/track'
 import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
@@ -75,6 +76,7 @@ export default function You() {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-3.5">
         {demo ? <DemoCard /> : <AccountCard />}
         <GoalsCard demo={demo} />
+        {demo ? null : <PlacesCard />}
         {demo ? null : <CheckinCard />}
         {demo ? null : <RemindersCard />}
         {demo ? null : <PrivacyCard />}
@@ -87,9 +89,9 @@ export default function You() {
   )
 }
 
-function Panel({ label, eyebrow, aside, children }: { label: string; eyebrow: string; aside?: ReactNode; children: ReactNode }) {
+function Panel({ label, eyebrow, aside, children, id }: { label: string; eyebrow: string; aside?: ReactNode; children: ReactNode; id?: string }) {
   return (
-    <section aria-label={label} className="flex flex-col gap-3 rounded-[36px] squircle bg-surface p-6">
+    <section id={id} aria-label={label} className="flex flex-col gap-3 rounded-[36px] squircle bg-surface p-6">
       <span className="flex justify-between gap-2.5">
         <span className="font-mono text-[12px] text-ink-2">■ {eyebrow}</span>
         {aside}
@@ -277,6 +279,44 @@ function GoalsCard({ demo }: { demo: boolean }) {
           <span className="text-[13px] text-ink-2">It never changes a measurement.</span>
         </>
       )}
+    </Panel>
+  )
+}
+
+/** "Places to track" (profile.track): every check-in walks through these, in this order. At least one stays on. */
+function PlacesCard() {
+  const { profile, saveProfile } = useData()
+  const { hash } = useLocation()
+  const picked = choicesOf(placesOf(profile))
+  // "Change places" in the check-in sheet links here.
+  useEffect(() => {
+    if (hash === '#places') document.getElementById('places')?.scrollIntoView({ block: 'center' })
+  }, [hash])
+  const toggle = (c: (typeof TRACK_CHOICES)[number]) => {
+    const on = picked.includes(c)
+    if (on && picked.length === 1) return
+    const next = on ? picked.filter((x) => x !== c) : [...picked, c]
+    saveProfile({ track: trackOf(next) })
+      .then(() => toast(`Places saved · ${CHOICE_COPY[c].title} ${on ? 'off' : 'on'}`))
+      .catch(() => toast.error(offline))
+  }
+  const places = placesOf(profile)
+  return (
+    <Panel id="places" label="Places to track" eyebrow="PLACES TO TRACK">
+      <div className="flex flex-wrap gap-1.5">
+        {TRACK_CHOICES.map((c) => {
+          const on = picked.includes(c)
+          return (
+            <button key={c} type="button" aria-pressed={on} aria-disabled={(on && picked.length === 1) || undefined} onClick={() => toggle(c)} className={chip(on)}>
+              {on ? '✓ ' : ''}
+              {CHOICE_COPY[c].title}
+            </button>
+          )
+        })}
+      </div>
+      <span className="text-[13px] text-ink-2">
+        Every check-in covers {places.length === 1 ? 'this place' : `these ${places.length} places`}, about {minutesFor(places)} min. Close-ups use the back camera; RAW files can still be uploaded for one place from the check-in.
+      </span>
     </Panel>
   )
 }
