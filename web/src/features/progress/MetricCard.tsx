@@ -2,7 +2,7 @@ import { BandBar } from '../../components/charts'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
-import { VERDICT_WORDS, changeWay, confidenceOf, verdictKind, wordsFor } from '../../lib/verdict'
+import { changeWay, verdictKind, wordsFor } from '../../lib/verdict'
 import { EMPTY_CARD, METRIC_LOOK } from './metricLook'
 import { verdictHeadline } from './headline'
 import { bandText, deltaText, valueText } from './model'
@@ -20,58 +20,8 @@ function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Sessi
   )
 }
 
-/**
- * A measurement card (design "Measurements"): verdict pill, name and what the number is, then the baseline
- * reading's number in Doto or, after the baseline, the verdict in words ("Calmer than your start") with the
- * numbers small below it; the band bar (the white block is the baseline's normal range) and the change.
- */
-export function MetricCard({ metric: m, session, band, compared, against, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; compared: boolean; against?: string; onOpen: () => void; delay?: number }) {
-  const look = METRIC_LOOK[m.id]
-  const none = m.value === null
-  const unit = unitOf(m).trim()
-  const ratio = compared && band && m.delta !== null ? m.delta / band : null
-  const deltaLabel = none ? 'No reading' : session.is_baseline ? 'Baseline value' : !compared ? VERDICT_WORDS.notCompared.short : `Δ ${deltaText(m)}`
-  const said = verdictHeadline(m, session, against)
-  const bandLabel = band !== null ? `range ${bandText(m, band)} · ${confidenceOf(m, session).label.toLowerCase()}` : 'no normal range yet'
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={`${METRIC_META[m.id].label}: ${said ? `${said.headline}, ${said.numbers ?? ''}` : `${none ? 'not measured' : valueText(m)}, ${wordsFor(m, session).label}`}. Open detail`}
-      className="relative flex min-h-[320px] animate-[wRise_.5s_both] flex-col justify-between gap-[18px] rounded-[40px] p-6 text-left shadow-[inset_0_0_40px_8px_rgba(255,255,255,.4),0_30px_60px_-44px_rgba(0,0,0,.5)] transition-transform duration-[400ms] ease-[cubic-bezier(.2,.7,.2,1)] squircle hover:-translate-y-[5px]"
-      style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
-    >
-      <span className="flex flex-col items-start gap-3">
-        <Pill metric={m} session={session} />
-        <span className="flex flex-col gap-[3px]">
-          <span className="text-[20px]">{METRIC_META[m.id].label}</span>
-          <span className="text-[13px] opacity-85">{look.unitLabel}</span>
-        </span>
-      </span>
-      {said ? (
-        <span className="flex flex-col gap-1.5">
-          <span className="text-[clamp(24px,2.3vw,30px)] font-medium leading-[1.1] tracking-[-0.01em]">{said.headline}</span>
-          {said.numbers ? <span className="text-[14px] opacity-85 tnum">{said.numbers}</span> : null}
-        </span>
-      ) : (
-        <span className="flex items-baseline gap-2">
-          <span className="font-dot text-[clamp(39px,3.9vw,49px)] leading-[.9] tnum">{none ? '—' : fmtValue(m.value, m)}</span>
-          {!none && unit ? <span className="text-[16px] opacity-85">{unit}</span> : null}
-        </span>
-      )}
-      <span className="flex flex-col gap-2.5">
-        <BandBar ratio={ratio} hasBand={band !== null && compared} hasValue={!none} />
-        <span className="flex flex-wrap justify-between gap-2 text-[14px]">
-          <span className="whitespace-nowrap">{deltaLabel}</span>
-          <span className="opacity-85">{bandLabel}</span>
-        </span>
-      </span>
-    </button>
-  )
-}
-
-/** Day-detail tile: smaller number, a track with a round marker, one line of change text. */
-export function MetricTile({ metric: m, session, band, baselineDay, delay = 0 }: { metric: Metric; session: Session; band: number | null; baselineDay: string | null; delay?: number }) {
+/** Day-detail tile: smaller number, a track with a round marker, one line of change text. With `onOpen` it is a button that opens the metric's detail. */
+export function MetricTile({ metric: m, session, band, baselineDay, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; baselineDay: string | null; onOpen?: () => void; delay?: number }) {
   const look = METRIC_LOOK[m.id]
   const none = m.value === null
   const unit = unitOf(m).trim()
@@ -83,9 +33,12 @@ export function MetricTile({ metric: m, session, band, baselineDay, delay = 0 }:
       : !compared
         ? 'Not compared with a baseline'
         : `Δ ${deltaText(m)}${baselineDay ? ` vs ${baselineDay}` : ''}${band !== null ? ` · normal range ${bandText(m, band)}` : ' · no normal range yet'}`
+  const said = verdictHeadline(m, session)
+  const Tag = onOpen ? 'button' : 'div'
   return (
-    <div
-      className="flex min-h-[230px] animate-[wRise_.5s_both] flex-col justify-between gap-3.5 rounded-[36px] p-[22px] shadow-[inset_0_0_40px_rgba(255,255,255,.3),0_30px_60px_-46px_rgba(0,0,0,.5)] squircle"
+    <Tag
+      {...(onOpen ? { type: 'button' as const, onClick: onOpen, 'aria-label': `${METRIC_META[m.id].label}: ${said ? said.headline : none ? 'not measured' : valueText(m)}. ${text}. Open detail` } : {})}
+      className={`flex min-h-[230px] animate-[wRise_.5s_both] flex-col justify-between gap-3.5 rounded-[36px] p-[22px] text-left shadow-[inset_0_0_40px_rgba(255,255,255,.3),0_30px_60px_-46px_rgba(0,0,0,.5)] squircle ${onOpen ? 'transition-transform duration-300 ease-standard hover:-translate-y-0.5 active:scale-[.98]' : ''}`}
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -98,8 +51,9 @@ export function MetricTile({ metric: m, session, band, baselineDay, delay = 0 }:
       </div>
       <div className="flex flex-col gap-2">
         <BandBar variant="tile" ratio={compared && band && m.delta !== null ? m.delta / band : null} hasBand={band !== null && compared} hasValue={!none} />
+        {said ? <span className="text-[15px] leading-[1.3]">{said.headline}</span> : null}
         <span className="text-[13px] leading-[1.4]">{text}</span>
       </div>
-    </div>
+    </Tag>
   )
 }

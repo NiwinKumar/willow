@@ -1,33 +1,38 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { CompareSplit } from '../../components/charts'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner } from '../../data/hooks'
-import type { RoutineEntry, Session, Site } from '../../data/types'
+import { stalled } from '../../data/live'
+import type { MetricId, RoutineEntry, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
 import { clockOf, fmtDate, parseDate } from '../../lib/format'
-import { SITE_LABEL } from '../../lib/metrics'
+import { METRIC_META, SITE_LABEL } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { VERDICT_WORDS, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
-import { frameFor, photoSize } from './frame'
+import { ExplanationCard, NextAction } from './ExplanationCard'
 import { MetricTile } from './MetricCard'
-import { DAY_HERO, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, optionLabel, orderMetrics, photoExpired, sessionState, usableLine, usedFrames } from './model'
-import { Page, Pills } from './parts'
-import { PhotoFrame } from './PhotoFrame'
+import { MetricSheet } from './MetricSheet'
+import { DAY_HERO, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, metricQuestion, orderMetrics, retryable, sessionState, usableLine, usedFrames } from './model'
+import { Page, Pills, StatusCard, TomorrowSheet } from './parts'
+import { PhotoPanel } from './PhotoPanel'
+import { RejectedPhotos, UnmeasuredPhotos } from './photos'
 import { NOTE_DOT, productName, rejectNote, sessionNotes } from './timeline'
+import { useSessionView } from './useSessionView'
 
 const NONE: Session[] = []
+const TOMORROW_KEY = 'willow.tomorrowShown'
 
 /**
- * Day detail (design "Day detail"): one day's check-in of every place, its readings, a photo comparison, notes and
+ * A day's result (design "Day detail"), the one result page: one day's check-in of every place, the
+ * explanation, its readings (tap one for its detail, ?metric=), the photo with its spots and areas, notes and
  * actions. ?session= picks a check-in of the day, else ?site= a place, else the latest analysed one.
  */
 export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<string, Session[]>; entries: RoutineEntry[] }) {
@@ -49,6 +54,77 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   const nextDay = di >= 0 && di < daysSorted.length - 1 ? daysSorted[di + 1] : null
   const [asking, setAsking] = useState(false)
   const date = parseDate(day)
+
+  // Still measuring: read again every few seconds until the api answers (no made-up progress). A session
+  // stuck for 30 min will not move by waiting, so polling stops there.
+  const pending = session ? sessionState(session) === 'pending' : false
+  const polling = pending && session !== null && !stalled(session)
+  const { refresh } = data
+  useEffect(() => {
+    if (!polling) return
+    const t = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, 6000)
+    return () => window.clearInterval(t)
+  }, [polling, refresh])
+  // The single-session view signs what the list does not: the redness overlay, every frame, the spot crops.
+  const view = useSessionView(session && !pending ? session.id : null)
+
+  // Metric detail in the URL (?metric=); opening pushes, so Back closes it.
+  const metricId = params.get('metric') as MetricId | null
+  const showMetric = (id: MetricId) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p)
+        n.set('metric', id)
+        return n
+      },
+      { state: { ...(location.state as object | null), sheet: true } },
+    )
+  const closeMetric = () => {
+    if ((location.state as { sheet?: boolean } | null)?.sheet) navigate(-1)
+    else
+      setParams(
+        (p) => {
+          const n = new URLSearchParams(p)
+          n.delete('metric')
+          return n
+        },
+        { replace: true, state: location.state },
+      )
+  }
+
+  // "Same time tomorrow?" once after a face check-in (the check-in flow lands on ?from=check-in).
+  const [tomorrow, setTomorrow] = useState(false)
+  const fromCheckIn = params.get('from') === 'check-in'
+  useEffect(() => {
+    if (!fromCheckIn || !session) return
+    let shown: string[] = []
+    try {
+      shown = JSON.parse(sessionStorage.getItem(TOMORROW_KEY) ?? '[]') as string[]
+    } catch {
+      /* private mode */
+    }
+    const t = window.setTimeout(() => {
+      if (session.site === 'face_full' && sessionState(session) !== 'pending' && !shown.includes(session.id)) {
+        setTomorrow(true)
+        try {
+          sessionStorage.setItem(TOMORROW_KEY, JSON.stringify([...shown.slice(-20), session.id]))
+        } catch {
+          /* private mode */
+        }
+      }
+      setParams(
+        (p) => {
+          const n = new URLSearchParams(p)
+          n.delete('from')
+          return n
+        },
+        { replace: true, state: location.state },
+      )
+    }, 1400)
+    return () => window.clearTimeout(t)
+  }, [fromCheckIn, session, setParams, location.state])
   // Forearm days have no calendar of their own: their page is the product test.
   const back = () => ((location.state as { fromCalendar?: boolean } | null)?.fromCalendar ? navigate(-1) : navigate(site.startsWith('forearm') ? '/test' : '/progress'))
   const go = (d: string) => navigate(`/progress/${d}`, { replace: true, state: location.state })
@@ -104,6 +180,22 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
   const notes = [...started.map((e) => ({ text: `Started ${productName(e)}`, dot: NOTE_DOT.routine })), ...sessionNotes(session).filter((n) => n.kind !== 'note')]
   const others = list.filter((s) => s.id !== session.id)
+  const order = ordered.map((m) => m.id)
+  const openMetric = ordered.find((m) => m.id === metricId) ?? null
+  const sheetRef = session.is_baseline ? session : openMetric ? referenceFor(openMetric.id, session, baseline, sessions) : baseline
+  const sheetRefLabel = sheetRef && sheetRef !== baseline && sheetRef !== session ? `Check-in, ${fmtDate(sheetRef.created_at) === fmtDate(session.created_at) ? clockOf(sheetRef.created_at) : fmtDate(sheetRef.created_at)}` : 'Baseline'
+  const checkIn = () => shell.openCheckIn()
+  const measureAgain = () => navigate(`/check-in?session=${session.id}`, { state: { background: location } })
+  // Under the explanation: what to do next (asking Wisp and the baseline live in the actions card below).
+  const next: Record<string, ReactNode[]> = {
+    compared: [<NextAction key="c" onClick={checkIn}>Check in again, same light and distance</NextAction>],
+    baseline: [
+      <NextAction key="c" onClick={checkIn}>{(session.result?.frames_used ?? 0) >= 3 ? 'Next check-in: same light and distance' : 'Check in again with more photos'}</NextAction>,
+      <NextAction key="r" to="/routine">Add the products you’re starting</NextAction>,
+    ],
+    rejected: [<NextAction key="c" onClick={checkIn}>Retake this check-in</NextAction>],
+    unmeasured: [<NextAction key="f" onClick={checkIn}>Check in instead</NextAction>],
+  }
   // Two check-ins of one place on a day are told apart by their time.
   const pillLabel = (s: Session) => `${SITE_LABEL[s.site]}${list.filter((x) => x.site === s.site).length > 1 ? ` · ${clockOf(s.created_at)}` : ''}`
   const sameSite = list.filter((s) => s.site === session.site).length > 1
@@ -151,31 +243,85 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           </div>
         </section>
 
-        {st === 'rejected' || st === 'failed' ? (
+        {st === 'pending' && stalled(session) ? (
+          // Home's "didn't finish" links here: waiting longer will not change this one (polling has stopped).
+          <StatusCard
+            eyebrow="DID NOT FINISH"
+            title="This check-in did not finish."
+            body={<>{session.status === 'uploading' ? 'The photos never finished uploading, so nothing was measured.' : 'Measuring stopped before a result came back. The photos are saved, so it can be measured again.'}</>}
+            action={
+              session.status === 'uploading' ? (
+                <Button variant="ink" size="lg" onClick={checkIn}>
+                  Take a new check-in
+                </Button>
+              ) : (
+                <Button variant="ink" size="lg" onClick={measureAgain}>
+                  Measure again
+                </Button>
+              )
+            }
+          />
+        ) : st === 'pending' ? (
+          <StatusCard
+            busy
+            eyebrow="STILL MEASURING"
+            title="This check-in is still being measured."
+            body={<>Your photos are uploaded. Results show here as soon as the measurement finishes; this page checks again on its own.</>}
+            action={
+              <Button variant="outline" onClick={() => void data.refresh()}>
+                Check now
+              </Button>
+            }
+          />
+        ) : st === 'failed' ? (
+          <StatusCard
+            eyebrow="DID NOT FINISH"
+            title="This check-in did not finish measuring."
+            body={<>{retryable(session) ? 'The photos are saved, so it can be measured again.' : (session.error?.message ?? 'The photos could not be read.')}</>}
+            action={
+              retryable(session) ? (
+                <Button variant="ink" size="lg" onClick={measureAgain}>
+                  Try again
+                </Button>
+              ) : (
+                <Button variant="ink" size="lg" onClick={checkIn}>
+                  Take new photos
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <ExplanationCard key={session.id} session={session} measured={measured} actions={next[st] ?? null} />
+        )}
+
+        {st === 'rejected' ? (
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-[36px] bg-surface p-[clamp(22px,3vw,30px)] squircle">
             <span className="flex max-w-[620px] flex-col gap-1.5">
               <span className="text-[20px]">No readings from this day</span>
-              <span className="text-[15px] leading-normal text-ink-2">{st === 'rejected' ? `${rejectNote(session)}${baseline ? ' Your baseline is unchanged.' : ''}` : 'This check-in did not finish measuring.'}</span>
+              <span className="text-[15px] leading-normal text-ink-2">{`${rejectNote(session)}${baseline ? ' Your baseline is unchanged.' : ''}`}</span>
             </span>
-            <Button variant="primary" size="lg" onClick={() => shell.openCheckIn()} trailing={<span aria-hidden>→</span>}>
+            <Button variant="primary" size="lg" onClick={checkIn} trailing={<span aria-hidden>→</span>}>
               Take new photos
             </Button>
           </div>
         ) : null}
+        {st === 'rejected' ? <RejectedPhotos session={session} frameUrls={view?.session.frame_urls} /> : null}
+        {st === 'unmeasured' ? <UnmeasuredPhotos session={session} frameUrls={view?.session.frame_urls} /> : null}
 
         {measured && ordered.length ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
             {ordered.map((m, i) => {
               // counts of a check-in with (or without) cheek photos compare with one taken the same way
               const ref = referenceFor(m.id, session, baseline, sessions)
-              return <MetricTile key={m.id} metric={m} session={session} band={session.is_baseline ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null} baselineDay={ref ? (fmtDate(ref.created_at) === fmtDate(session.created_at) ? `${ref === baseline ? 'baseline' : 'check-in'}, ${clockOf(ref.created_at)}` : fmtDate(ref.created_at)) : null} delay={i * 60} />
+              return <MetricTile key={m.id} metric={m} session={session} onOpen={() => showMetric(m.id)} band={session.is_baseline || st === 'former' ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null} baselineDay={ref ? (fmtDate(ref.created_at) === fmtDate(session.created_at) ? `${ref === baseline ? 'baseline' : 'check-in'}, ${clockOf(ref.created_at)}` : fmtDate(ref.created_at)) : null} delay={i * 60} />
             })}
           </div>
         ) : null}
 
+        {measured ? <PhotoPanel session={session} baseline={st === 'compared' ? baseline : null} view={view} order={order} onOpenMetric={showMetric} /> : null}
+
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4">
-          {measured ? <Compare session={session} sessions={sessions} baseline={baseline} /> : null}
-          <div className="flex flex-col gap-3">
+          <div className="contents">
             <section aria-label="Notes from this day" className="flex flex-col gap-1 rounded-[36px] bg-surface p-[clamp(20px,3vw,28px)] squircle">
               <span className="mb-2 font-mono text-[11px] tracking-[.08em] text-ink-2">■ NOTES FROM THIS DAY</span>
               {notes.map((n) => (
@@ -187,11 +333,6 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
               <NoteEditor key={session.id} session={session} empty={!notes.length} />
             </section>
             <section aria-label="Actions" className="flex flex-col items-start gap-2.5 rounded-[36px] bg-surface/70 p-[clamp(20px,3vw,28px)] squircle">
-              {st !== 'pending' ? (
-                <ButtonLink to={`/result/${session.id}`} variant="ink" size="lg" trailing={<span aria-hidden>→</span>}>
-                  Open the full report
-                </ButtonLink>
-              ) : null}
               {data.mode === 'live' ? (
                 <Button variant="outline" disabled={!canBeBaseline(session)} onClick={() => setAsking(true)}>
                   {session.is_baseline ? 'This is your baseline' : st === 'rejected' ? 'Not eligible · no usable photos' : canBeBaseline(session) ? `Use ${fmtDate(session.created_at)}${sameSite ? `, ${clockOf(session.created_at)}` : ''} as your ${SITE_LABEL[site].toLowerCase()} baseline` : 'Not eligible as a baseline'}
@@ -212,45 +353,25 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             </section>
           </div>
         </div>
+        <p className="m-0 pt-2 text-caption text-ink-2">Photos delete 30 days after upload; measurements stay in your account until you delete them.</p>
         <Disclaimer />
       </div>
       <BaselineDialog session={session} withTime={sameSite} open={asking} onClose={() => setAsking(false)} />
+      <MetricSheet
+        metric={openMetric}
+        session={session}
+        baseline={sheetRef}
+        baselineLabel={sheetRefLabel}
+        sessions={sessions}
+        onClose={closeMetric}
+        onAsk={(m) => {
+          // The sheet is a modal <dialog> (top layer): close it, or the advisor opens hidden behind it.
+          closeMetric()
+          shell.openAdvisor(metricQuestion(m, session, baseline), `${METRIC_META[m.id].label} · ${fmtDate(session.created_at)}`)
+        }}
+      />
+      <TomorrowSheet open={tomorrow} onClose={() => setTomorrow(false)} />
     </Page>
-  )
-}
-
-/** Earlier / Later photo comparison over this place's check-ins (design split slider). */
-function Compare({ session, sessions, baseline }: { session: Session; sessions: Session[]; baseline: Session | null }) {
-  const pool = sessions.filter((s) => s.status === 'done' && s.measured !== false)
-  const [a, setA] = useState<string>(baseline && baseline.id !== session.id ? baseline.id : (pool[0]?.id ?? session.id))
-  const [b, setB] = useState<string>(session.id)
-  const A = pool.find((s) => s.id === a) ?? session
-  const B = pool.find((s) => s.id === b) ?? session
-  // Two check-ins on one day are told apart by their time.
-  const label = (s: Session) => optionLabel(s, pool).replace(/ · .*$/, '').toUpperCase()
-  const layer = (s: Session) => (
-    <PhotoFrame session={s} box={frameFor(s.site, s.result, photoSize(s))} alt={`Photo from ${fmtDate(s.created_at, { day: 'numeric', month: 'long' })}`} missing={photoExpired(s) ? 'Photo deleted after 30 days' : 'No photo preview'} rounded="rounded-none" />
-  )
-  const select = (lbl: string, value: string, set: (v: string) => void) => (
-    <label className="flex min-w-[150px] flex-1 flex-col gap-1 text-[12px] text-ink-2">
-      {lbl}
-      <select value={value} onChange={(e) => set(e.target.value)} className="min-h-11 rounded-[14px] border-0 bg-canvas px-3 text-[14px] text-ink">
-        {pool.map((s) => (
-          <option key={s.id} value={s.id}>
-            {optionLabel(s, pool)}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-  return (
-    <section aria-label="Photo comparison" className="flex flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-      <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
-        {select('Earlier', a, setA)}
-        {select('Later', b, setB)}
-      </div>
-      <CompareSplit left={layer(A)} right={layer(B)} leftLabel={label(A)} rightLabel={label(B)} />
-    </section>
   )
 }
 
