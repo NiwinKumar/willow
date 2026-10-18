@@ -224,7 +224,7 @@ Spacing (4px base): `0`=0, `0.5`=2, `1`=4, `1.5`=6, `2`=8, `2.5`=10, `3`=12, `3.
 - 12 columns, gap 14px (space-3.5) at every width.
 - Page padding: clamp(16px, 4vw, 40px).
 - Cards in a row stretch to equal height (align-items: stretch). Never leave a hole in a row: if a card is absent, the neighbour spans the space.
-- Home rows (active user, desktop): [Hero 6 | Check-in 6] · [What changed 3 | Next step 3 | Product test 3 | Spot diary 3] · [Routine 6 | Your goals 6]. Tablet: everything span 6, routine/goals span 12. Phone: span 12.
+- Home rows (active user, desktop): [Hero 6 | Check-in 6] · [What changed 3 | Next step 3 | Product test 3 | Spot diary 3] · [Routine 6 | What changed 6]. Tablet: everything span 6, routine/goals span 12. Phone: span 12.
 - Touch targets ≥ 44×44px; buttons are 48px tall on phone.
 
 | Radius | px | Use |
@@ -650,5 +650,5 @@ The retail dashboard is branded **Willow Proof** (“Retail intelligence by Will
 ### Home: compact cards
 - Home cards are kept small and quiet: a bigger card is shrunk to match its neighbour, never the other way round. Product and measure rows are one line (name, a short status, a small chart), with no tally lines or long legends.
 - What changed: the three leading measures (changed first) with value and move against the baseline; the rest are one count.
-- Your goals replaced Recent: up to three goal measures as small trends against the person's normal range, beside Routine today once a measured check-in follows the baseline (otherwise Routine today takes the row).
+- Your goals replaced Recent: up to three goal measures as small trends against the person's normal range. It leads the small-card row (where What changed used to be); What changed now sits beside Routine today. With no measured check-in after the baseline, Routine today takes its row.
 - Check-in card: the big number (days since baseline) sits above the title; the Check in button is bottom right.

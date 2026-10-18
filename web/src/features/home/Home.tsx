@@ -183,25 +183,36 @@ function HomeBody() {
     { t: 'Save with Google', d: 'Keep photos and results', state: me.guest ? 'todo' : 'done', onClick: () => navigate('/you') },
   ]
 
+  // Your goals (trends since the baseline) leads the small-card row; What changed (the latest check-in's numbers) sits beside Routine today.
+  const trends = useMemo(() => (read.lead && !read.lead.is_baseline ? goalTrends(read.lead, read.baseline, face, goals) : []), [read.lead, read.baseline, face, goals])
+  const measured = showChanged ? read.lead : null
+  const goalsNode = (cls: string) =>
+    measured && trends.length ? (
+      <GoalsCard
+        className={cls}
+        trends={trends}
+        baseline={read.baseline}
+        onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
+        onProgress={() => navigate('/progress')}
+        onAsk={demo ? undefined : () => ask('How are my goals going since my baseline, and what should I do next?', 'Goals')}
+      />
+    ) : null
+  const changedNode = (cls: string) =>
+    measured ? (
+      <ChangedCard
+        className={cls}
+        session={measured}
+        baseline={read.baseline}
+        goals={goals}
+        onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
+        onFull={() => openResult(measured)}
+        onAsk={demo ? undefined : () => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(measured.created_at)}`)}
+      />
+    ) : null
+
   // Row of smaller cards: as many as exist share the row, so no row has a hole.
   const small: { key: string; node: (cls: string) => ReactNode }[] = []
-  if (showChanged && read.lead) {
-    const s = read.lead
-    small.push({
-      key: 'changed',
-      node: (cls) => (
-        <ChangedCard
-          className={cls}
-          session={s}
-          baseline={read.baseline}
-          goals={goals}
-          onOpen={(m) => navigate(`/result/${s.id}?metric=${m}`)}
-          onFull={() => openResult(s)}
-          onAsk={demo ? undefined : () => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(s.created_at)}`)}
-        />
-      ),
-    })
-  }
+  if (measured && trends.length) small.push({ key: 'goals', node: goalsNode })
   if (showSetup) small.push({ key: 'setup', node: (cls) => <SetupCard className={cls} rows={setupRows} /> })
   if (effect?.rows.length) small.push({ key: 'effect', node: (cls) => <RoutineEffectCard className={cls} effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
   if (forearm) small.push({ key: 'test', node: (cls) => <ProductTestTile className={cls} read={forearm} onOpen={() => navigate('/test')} /> })
@@ -215,23 +226,9 @@ function HomeBody() {
   const short = conflict ? /^([^:.]{3,24}):/.exec(conflict.suggestion)?.[1] : undefined
   const missingSunscreen = Boolean(check.data?.gaps.some((g) => /sunscreen/i.test(g.need)))
 
-  // Your goals sits beside Routine today (do it, then see what it did); with no measured check-in to read, Routine takes the row.
-  const trends = useMemo(() => (read.lead && !read.lead.is_baseline ? goalTrends(read.lead, read.baseline, face, goals) : []), [read.lead, read.baseline, face, goals])
-  const lastMeasured = read.lead
-  const goalsCard =
-    lastMeasured && trends.length ? (
-      <GoalsCard
-        className="col-span-12 @min-[960px]:col-span-6"
-        trends={trends}
-        baseline={read.baseline}
-        onOpen={(m) => navigate(`/result/${lastMeasured.id}?metric=${m}`)}
-        onProgress={() => navigate('/progress')}
-        onAsk={demo ? undefined : () => ask('How are my goals going since my baseline, and what should I do next?', 'Goals')}
-      />
-    ) : null
-
   let routineCard: ReactNode
-  const routineCls = goalsCard ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12'
+  const beside = Boolean(measured)
+  const routineCls = beside ? 'col-span-12 @min-[960px]:col-span-6' : 'col-span-12'
   if (demo) routineCard = <RoutineEmpty demo className={routineCls} onRoutine={() => navigate('/routine')} />
   else if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
   else if (routine.status === 'error') {
@@ -292,7 +289,7 @@ function HomeBody() {
           </SmallSlot>
         ))}
         {routineCard}
-        {goalsCard}
+        {changedNode('col-span-12 @min-[960px]:col-span-6')}
       </div>
     </Frame>
   )
