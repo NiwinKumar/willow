@@ -489,7 +489,68 @@ export const api = {
   listCampaigns: (token: string) => request<{ campaigns: Campaign[] }>(token, '/v1/retailer/campaigns'),
   updateCampaign: (token: string, id: string, body: { status: 'active' | 'paused' | 'ended' }) => request<Campaign>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', ...json(body) }),
   deleteCampaign: (token: string, id: string) => request<void>(token, `/v1/retailer/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** AutoCampaign (api autopilot_routes.py): standing rules, their activity feed and the check that runs them. */
+  autopilot: (token: string) => request<AutopilotView>(token, '/v1/retailer/autopilot'),
+  createRule: (token: string, body: RuleBody) => request<AutoRule>(token, '/v1/retailer/autopilot/rules', { method: 'POST', ...json(body) }),
+  replaceRule: (token: string, id: string, body: RuleBody) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PUT', ...json(body) }),
+  toggleRule: (token: string, id: string, enabled: boolean) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PATCH', ...json({ enabled }) }),
+  deleteRule: (token: string, id: string) => request<void>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  parseRule: (token: string, text: string, workspace: string) => request<{ rule: RuleBody; sentence: string; missed: string[]; source?: 'gemini' | 'rules' }>(token, '/v1/retailer/autopilot/parse', { method: 'POST', ...json({ text, workspace }) }),
+  /** "Run check now"; `ifStale`: only when the last check is over 30 minutes old (the Campaigns page on open). */
+  runAutopilot: (token: string, ifStale = false) => request<AutopilotView & { result: AutopilotResult | null }>(token, `/v1/retailer/autopilot/run${ifStale ? '?if_stale=true' : ''}`, { method: 'POST' }),
+  autopilotAct: (token: string, activityId: string, act: 'approve' | 'dismiss' | 'undo') => request<AutopilotView & { campaign_id?: string; outcome?: string }>(token, `/v1/retailer/autopilot/activity/${encodeURIComponent(activityId)}/${act}`, { method: 'POST' }),
 }
+
+/** AutoCampaign (docs/RETAILER_INSIGHTS.md "AutoCampaign"). */
+export type RuleTrigger = 'proven' | 'new_segment' | 'rising_demand' | 'unmet_need'
+export type RuleLevel = 'suggest' | 'auto' | 'autopilot'
+export type RuleBody = {
+  name: string
+  /** 'retailer' or a catalog brand (a brand rule only touches its own products). */
+  workspace: string
+  enabled: boolean
+  level: RuleLevel
+  /** category null: every category; product_ids []: every product. */
+  scope: { category: string | null; product_ids: string[] }
+  /** goals []: any goal. unmet_min: unmet_need's share with no visible change by week 8 (0.3-0.9). */
+  trigger: { kind: RuleTrigger; goals: string[]; unmet_min: number }
+  conditions: { in_store: boolean; start_on: string | null; stop_after: string | null; monthly_cap: number | null }
+  action: { days: 7 | 14 | 30; holdout_pct: number; max_running: number }
+}
+export type AutopilotKind = 'proposed' | 'started' | 'paused' | 'resumed' | 'ended' | 'extended' | 'narrowed' | 'held' | 'undone' | 'summary' | 'reviewed'
+export type AutopilotActivity = {
+  id: string
+  at: string
+  kind: AutopilotKind
+  /** proposals: open | approved | dismissed; others: done | undone. */
+  status: string
+  text: string
+  rule_id: string | null
+  rule_name: string | null
+  level: RuleLevel | null
+  product_id: string | null
+  product: string | null
+  brand: string | null
+  image_url: string | null
+  campaign_id: string | null
+  proposal: ({ action: 'start' | 'pause' | 'resume' | 'end' | 'extend' | 'narrow' } & Record<string, unknown>) | null
+  numbers: { lift?: number | null; lift_lo?: number | null; n?: number | null }
+  /** 'gemini': the agent decided and wrote it; null: the fixed logic, an approval or an undo. */
+  by?: 'gemini' | null
+  can_undo: boolean
+}
+export type AutoRule = RuleBody & {
+  id: string
+  sentence: string
+  running: number
+  started: number
+  last_run_at: string | null
+  last_action: AutopilotActivity | null
+  created_at: string
+}
+export type AutopilotView = { rules: AutoRule[]; activity: AutopilotActivity[] }
+/** source: 'gemini' when the agent ran the rules; 'rules' when Gemini was unreachable and the fixed logic ran. */
+export type AutopilotResult = { ran_at: string; rules: number; source?: 'gemini' | 'rules'; started: number; proposed: number; paused: number; resumed: number; ended: number; extended: number; narrowed: number; held: number }
 
 /** Proof-gated promotion types (docs/CONTRACT.md section 3, docs/RETAILER_INSIGHTS.md). */
 export type SponsoredPlacement = 'routine'
@@ -563,6 +624,8 @@ export type Campaign = {
   starts_at: string
   ends_at: string
   created_at: string
+  /** Started by an AutoCampaign rule; null for one a person created. Missing from older api builds. */
+  rule?: { id: string; name: string } | null
   product: string | null
   brand: string | null
   category: string | null
@@ -806,6 +869,41 @@ async function retailerGet<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+/** Shelf vs results (api shelf_routes.py): sign-in (guest ok), because the stock upload belongs to the account. */
+export const retailerShelf = (token: string, filters?: RetailerFilters) => request<ShelfView>(token, `/v1/retailer/shelf${retailerQs(filters)}`)
+export const uploadShelfStock = (token: string, filename: string, csv: string) =>
+  request<{ stock: ShelfStock }>(token, '/v1/retailer/shelf/stock', { method: 'PUT', body: JSON.stringify({ filename, csv }) })
+export const deleteShelfStock = (token: string) => request<void>(token, '/v1/retailer/shelf/stock', { method: 'DELETE' })
+export type ShelfKind = 'taking_space' | 'under_shelved' | 'stocked_unused' | 'used_understocked'
+export type ShelfProduct = {
+  product_id: string
+  product: string
+  brand: string
+  image_url: string | null
+  users: number
+  n: number
+  changed: number
+  tier: string | null
+  lift: number | null
+  lift_lo: number | null
+  cont8: number | null
+  /** Share of the category's users of measured products. */
+  use_share: number
+  /** Share of the uploaded stock, rescaled to the category; null when not in the file. */
+  stock_share: number | null
+  /** Share of the category's people with a visible change held to week 8. */
+  results_share: number
+  /** stock_share when uploaded, else use_share. */
+  shelf_share: number
+  basis: 'stock' | 'use'
+  /** results − shelf. */
+  gap: number
+}
+export type ShelfCategory = { category: string; label: string; users: number; changed: number; basis: 'stock' | 'use'; stocked: number; agreement: number | null; products: ShelfProduct[] }
+export type ShelfFlag = { product_id: string; product: string; brand: string; image_url: string | null; category: string; category_label: string; kind: ShelfKind; label: string; title: string; reason: string }
+export type ShelfStock = { filename: string; uploaded_at: string; matched: number; unmatched: string[]; column: string }
+/** `source` gemini: flags chosen and written by Gemini, checked; rules: the fixed flags. `pending`: Gemini is still writing them. */
+export type ShelfView = RetailerHead & { categories: ShelfCategory[]; stock: ShelfStock | null; note: string; flags: ShelfFlag[]; summary: string | null; source: 'gemini' | 'rules'; pending: boolean }
 export const retailerProducts = (filters?: RetailerFilters) => retailerGet<RetailerProducts>(`/v1/retailer/products${retailerQs(filters)}`)
 export const retailerProduct = (productId: string, filters?: RetailerFilters) =>
   retailerGet<RetailerProductDetail>(`/v1/retailer/products/${encodeURIComponent(productId)}${retailerQs(filters)}`)

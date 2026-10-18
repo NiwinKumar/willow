@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 
 import { Disclaimer } from '../../../components/willow/Disclaimer'
 import { retailerBrief } from '../../../lib/api'
+import { useAuth } from '../../../lib/useAuth'
+import { openProposals } from '../autopilot'
 import { useRetailData } from '../context'
 import { DATA_STUDIO } from '../data'
 import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipeline'
@@ -13,6 +15,7 @@ import { sectionPath, useRetailState } from '../state'
 import type { Brief, BriefCard, BrandSummary, Insights, ProductRow, Products } from '../types'
 import { Badge, Bone, Button, cohortKind, CurveChart, EmptyState, ErrorState, int, KpiStrip, MIN_GROUP, PageHeader, Panel, pct, pts, SkeletonKpis, SkeletonPanel, TierDot, ToolButton, type Kpi } from '../ui'
 import { briefHref, cardFigure } from '../ui/insight'
+import { useAutopilot } from './promote/useAutopilot'
 import { InsightsGate } from './shared'
 
 /*
@@ -348,6 +351,7 @@ function BriefPanel({ brand, className }: { brand: string | null; className?: st
         </div>
       ) : state.brief.cards.length ? (
         <ul className="m-0 flex list-none flex-col p-0">
+          <AutoReady />
           {state.brief.cards.map((c) => (
             <li key={c.id}>
               <BriefRow c={c} />
@@ -360,6 +364,41 @@ function BriefPanel({ brand, className }: { brand: string | null; className?: st
         </div>
       )}
     </Panel>
+  )
+}
+
+/**
+ * "Ready to auto-promote": AutoCampaign proposals waiting for this viewer (their own rules, so not part of the
+ * shared brief the api caches). Nothing when there are none or there is no session.
+ */
+function AutoReady() {
+  const { user } = useAuth()
+  const { carry } = useRetailState()
+  const q = useAutopilot(user?.uid ?? null)
+  const waiting = openProposals(q.data?.activity ?? [])
+  if (!waiting.length) return null
+  const first = waiting[0]
+  return (
+    <li>
+      <Link to={`${sectionPath('campaigns')}${carry}#autocampaign`} className="group grid min-h-[72px] grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 border-t border-line px-5 py-3 no-underline transition-colors hover:bg-pf-hover">
+        <span className="grid size-8 place-items-center rounded-ctl bg-proof-leaf-soft text-proof-leaf" title="Ready">
+          <Megaphone size={15} strokeWidth={1.8} aria-hidden />
+          <span className="sr-only">Ready: </span>
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-proof-body font-medium text-ink">Ready to auto-promote</span>
+          <span className="line-clamp-1 text-proof-small text-ink-2" title={first.text}>
+            {first.rule_name ? `${first.rule_name}: ` : ''}
+            {first.text.replace(/^Proposed: /, '')}
+          </span>
+        </span>
+        <span className="flex flex-col items-end">
+          <span className="text-proof-h text-ink tnum">{waiting.length}</span>
+          <span className="text-proof-label text-ink-3">to review</span>
+        </span>
+        <ChevronRight size={16} strokeWidth={1.6} aria-hidden className="text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+      </Link>
+    </li>
   )
 }
 
