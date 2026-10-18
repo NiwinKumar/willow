@@ -8,8 +8,9 @@ import { baselineState, photoSteps } from '../../lib/baselineGuide'
 import { fmtDate } from '../../lib/format'
 import { closeUpPlace, isCloseUp, SITE_LABEL } from '../../lib/metrics'
 
-export type Step = 'site' | 'guide' | 'camera' | 'review' | 'files' | 'processing' | 'samples'
-export const STEPS: Step[] = ['site', 'guide', 'camera', 'review', 'files', 'processing', 'samples']
+/** `place` and `sent` belong to a whole check-in (?places=): the card before each place, and the end. */
+export type Step = 'site' | 'guide' | 'place' | 'camera' | 'review' | 'files' | 'processing' | 'samples' | 'sent'
+export const STEPS: Step[] = ['site', 'guide', 'place', 'camera', 'review', 'files', 'processing', 'samples', 'sent']
 
 export const SITES: Site[] = ['face_full', 'cheek_macro', 'left_cheek_macro', 'right_cheek_macro', 'forehead_macro', 'chin_macro', 'nose_macro', 'forearm_treated', 'forearm_control']
 
@@ -132,8 +133,8 @@ export function thinBaseline(s: Session): boolean {
 /** One line about a site's baseline in a mode, for the picker and the site cards. */
 export function baselineLine(sessions: Session[], mode: CaptureMode): { text: string; set: boolean } {
   const st = baselineState(sessions, mode)
-  if (st.state === 'set') return { text: `${mode === 'calibrated_raw' ? 'RAW' : 'Quick'} baseline · ${fmtDate(st.session.created_at)}`, set: true }
-  if (st.state === 'saved') return { text: `${mode === 'calibrated_raw' ? 'RAW' : 'Quick'} photos saved, not measured yet`, set: false }
+  if (st.state === 'set') return { text: `${mode === 'calibrated_raw' ? 'RAW baseline' : 'Baseline'} · ${fmtDate(st.session.created_at)}`, set: true }
+  if (st.state === 'saved') return { text: `${mode === 'calibrated_raw' ? 'RAW photos' : 'Photos'} saved, not measured yet`, set: false }
   return { text: sessions.length ? `No ${modeWord(mode)} baseline yet` : 'No photos yet', set: false }
 }
 
@@ -189,7 +190,7 @@ export function quickChecks(site: Site): string[] {
     case 'arm':
       return ['Four pen dots on the square, all in the frame', 'White paper beside the arm, same light', 'Arm flat in the same spot on the table']
     case 'close':
-      return ['Phone about 10 cm (a hand’s width) away', 'One eye still in the photo', 'Bare skin, facing the light']
+      return ['Back camera, a hand’s width from your skin', 'One eye near the edge of the photo', 'Bare skin, facing the light']
     default:
       return ['Same room and light, facing the window', 'Clean face, nothing applied', 'Hair back, face the camera straight on']
   }
@@ -222,7 +223,7 @@ export function modeFacts(mode: CaptureMode): { g: string; t: string }[] {
     : [
         { g: '◌', t: 'This device’s camera, or phone photos (JPEG, HEIC, HEIF).' },
         { g: '◌', t: 'No colour reference, so readings carry wider uncertainty than RAW.' },
-        { g: '■', t: 'Quick photos keep their own baseline, separate from RAW.' },
+        { g: '■', t: 'Camera photos keep their own baseline, separate from RAW.' },
       ]
 }
 

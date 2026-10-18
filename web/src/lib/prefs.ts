@@ -59,6 +59,9 @@ export const prefs = {
   skinType: () => read<SkinType>('willow.skinType'),
   setSkinType: (t: SkinType | null) => write('willow.skinType', t),
   checkin: () => read<CheckinSchedule>('willow.checkin'),
+  /** Places to track (lib places.ts TrackPlace), null until chosen. */
+  track: () => read<string[]>('willow.track'),
+  setTrack: (t: string[] | null) => write('willow.track', t),
   setCheckin: (c: CheckinSchedule | null) => write('willow.checkin', c),
   /** A profile change made here that the account has not confirmed yet (offline): sent on the next sync. */
   profileDirty: () => read<boolean>('willow.profileDirty') ?? false,

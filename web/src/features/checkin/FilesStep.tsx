@@ -56,7 +56,7 @@ export function FilesStep({
   const failed = ok.filter((r) => r.state === 'failed').length
   const allUp = ok.length > 0 && done === ok.length
   const canPick = !busy
-  // Quick mode also takes DNGs: a RAW set is better than phone photos and becomes a RAW check-in.
+  // Camera mode also takes DNGs: a RAW set is better than phone photos and becomes a RAW check-in.
   const accept = raw ? '.dng,image/x-adobe-dng,image/dng' : '.jpg,.jpeg,image/jpeg,.heic,image/heic,.heif,image/heif,.dng,image/x-adobe-dng,image/dng'
   const dups = ok.filter((r) => r.duplicate).length
 
@@ -75,7 +75,7 @@ export function FilesStep({
     <div className="relative mx-auto flex max-w-[900px] animate-rise flex-col gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <MonoEyebrow>{raw ? 'RAW · DNG originals only · up to 120 MB each' : 'Quick · JPEG, HEIC or HEIF · up to 120 MB each'}</MonoEyebrow>
+          <MonoEyebrow>{raw ? 'RAW · DNG originals only · up to 120 MB each' : 'Photos · JPEG, HEIC or HEIF · up to 120 MB each'}</MonoEyebrow>
           <div className="mt-3">
             <SerifTitle id="ck-title" size="md">
               {allUp && held ? 'Photos you’ve uploaded before' : allUp ? 'All photos uploaded' : busy ? 'Uploading' : topup ? 'Add to your baseline' : 'Review your photos'}

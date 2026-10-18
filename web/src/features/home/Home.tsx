@@ -32,7 +32,7 @@ import { ProductTestTile, SpotDiaryTile } from './Tiles'
 
 const POLL_MS = 10_000
 const EMPTY: Session[] = []
-const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Quick' }
+const MODE_LABEL: Record<CaptureMode, string> = { calibrated_raw: 'RAW', uncalibrated: 'Camera' }
 
 /**
  * Home (Willow App.dc.html, isHome): greeting, today's check-in, what changed, routine today, product test,

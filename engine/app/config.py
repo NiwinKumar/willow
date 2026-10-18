@@ -263,6 +263,15 @@ MACRO_MIN_PX_PER_MM = 20.0
 # to measure it): an ordinary photo mistaken for a macro shot is then read at 2-3x its real
 # detail (Oct 14: a 736 px cheek photo, really ~10 px/mm, read as 25 and gave pores)
 MACRO_MIN_PX_ASSUMED = 40.0
+# A photo may only use the assumed scale when its EXIF does not say it is no macro shot
+# (Oct 18 camera test, iPhone 17 Pro Max ultra wide in the browser, 14 mm equivalent):
+# - a longer lens (main camera 24-26 mm, or digital zoom: 103 mm seen) never focuses close
+#   enough; with no eye in view the photo fails as face_not_found ("keep one eye in view")
+# - Apple FocusPosition 111 at ~12 cm, 165 at ~3.5 cm, 255 at the closest: under this, too far
+# - Apple AFConfidence 0 on a slanted shot sharp in one band only, 88-94 on flat ones: blurry
+MACRO_MAX_FOCAL_35MM = 18.0
+MACRO_MIN_FOCUS_POSITION = 150
+MACRO_MIN_AF_CONFIDENCE = 50
 # Close-ups with part of the face in view (a nose close-up shows an eye): the landmarker
 # needs most of a face, so the photo is also tried shrunk to these sizes on a plain canvas
 CLOSEUP_SHRINK = (0.5, 0.33)

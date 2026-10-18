@@ -97,3 +97,19 @@ def test_export_carries_real_goals_and_skin_type(client, fake):
     assert rows
     # goal ids as the app stores them (retail reads ids and concerns alike), with skin type
     assert all(r["goals"] == ["oil_glow", "dark_spots"] and r["skin_type"] == "oily" for r in rows)
+
+
+def test_places_to_track_keep_their_order_and_clear_with_null(client, fake):
+    first = client.put("/v1/me/profile", json={"goals": ["redness"]}).json()["profile"]
+    assert first["track"] is None
+    res = client.put("/v1/me/profile", json={"track": ["cheek_macro", "face_full", "cheek_macro"]})
+    assert res.status_code == 200
+    assert res.json()["profile"]["track"] == ["cheek_macro", "face_full"]
+    assert client.get("/v1/me").json()["profile"]["goals"] == ["redness"]  # untouched
+    client.put("/v1/me/profile", json={"track": None})
+    assert client.get("/v1/me").json()["profile"]["track"] is None
+
+
+@pytest.mark.parametrize("track", [[], ["left_cheek_macro"], ["moon"]])
+def test_places_to_track_refuse_none_or_a_place_the_camera_lacks(client, fake, track):
+    assert client.put("/v1/me/profile", json={"track": track}).status_code == 422

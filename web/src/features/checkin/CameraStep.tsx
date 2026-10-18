@@ -1,9 +1,10 @@
-import { ArrowLeft, SwitchCamera } from 'lucide-react'
+import { ArrowLeft, SwitchCamera, Volume2, VolumeX } from 'lucide-react'
 import { useState } from 'react'
 
 import type { Site } from '../../data/types'
 import { photoSteps, WHY_FIVE } from '../../lib/baselineGuide'
 import { closeUpPlace, isCloseUp } from '../../lib/metrics'
+import { setVoice, unlockCues, voiceOn } from './cue'
 import { POSE_NAME, SITE_NAME, type Pose } from './model'
 import { useCamera } from './useCamera'
 
@@ -22,6 +23,7 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
   const { video, ...cam } = useCamera({ site, n, taken: shots.length, pose, onShot })
   // The previous photo at 30% helps line the next one up (old web: always on); the design lets it be turned off.
   const [ghost, setGhost] = useState(true)
+  const [voice, setVoiceState] = useState(voiceOn)
   const arm = site.startsWith('forearm')
   const close = isCloseUp(site)
   const taken = shots.length
@@ -51,7 +53,15 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
                 Willow needs your camera
               </h1>
               <p className="m-0 leading-normal text-[#BDBAB4]">The preview stays on this device; only the photos you keep are uploaded, to your private space, and deleted after 30 days. Your browser asks for permission next.</p>
-              <button type="button" onClick={cam.start} disabled={cam.phase === 'starting'} className="min-h-14 rounded-pill bg-white px-[30px] text-[16px] text-ink">
+              <button
+                type="button"
+                onClick={() => {
+                  unlockCues()
+                  cam.start()
+                }}
+                disabled={cam.phase === 'starting'}
+                className="min-h-14 rounded-pill bg-white px-[30px] text-[16px] text-ink"
+              >
                 {cam.phase === 'starting' ? 'Opening the camera…' : 'Allow camera'}
               </button>
               <button type="button" onClick={onFiles} className="min-h-11 text-[15px] text-white underline underline-offset-4">
@@ -91,8 +101,8 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
               </>
             ) : close ? (
               <>
-                <li>Hold the phone about 10 cm from your face (a hand’s width), much closer than a selfie: pores need that much detail.</li>
-                <li>Keep one eye in the photo: Willow measures size from your iris.</li>
+                <li>Willow uses the back camera: it is much sharper than the front one. You won’t see the screen, so a tone marks each photo and a voice says what to do.</li>
+                <li>Hold it a hand’s width from your cheek: about 7 cm on a Pro iPhone, 15 cm on other phones. Keep one eye near the edge of the photo: Willow measures size from your iris.</li>
                 <li>{closeUpPlace(site, true)} in the middle, facing a window or lamp. Hair back, nothing on the skin.</li>
                 <li>Use a phone: a laptop camera is too far away and too soft to show pores.</li>
               </>
@@ -146,15 +156,33 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
               <span aria-live="polite" className="font-mono text-[11px] tracking-[.1em] whitespace-nowrap">
                 {all ? `ALL ${n} TAKEN` : `${shotName.toUpperCase()} · ${taken + 1} OF ${n}`}
               </span>
+              {close && cam.lens && cam.lens !== 'front' ? <span className="text-[11.5px] text-white/75">{cam.lens === 'macro' ? 'Ultra wide · about 7 cm away' : 'About 15 cm away'}</span> : null}
               <span aria-hidden className="flex items-center gap-1">
                 {Array.from({ length: n }, (_, i) => (
                   <span key={i} className="h-1.5 rounded-[6px] transition-[width,background] duration-[400ms] ease-standard" style={{ width: i === taken ? 20 : 6, background: i < taken ? 'var(--signal-baseline)' : i === taken ? '#fff' : 'rgba(255,255,255,.3)' }} />
                 ))}
               </span>
             </div>
-            <button type="button" onClick={cam.flip} disabled={all} aria-label={`Switch to ${cam.facing === 'user' ? 'rear' : 'front'} camera`} className={`${DARK_BTN} size-12`}>
-              <SwitchCamera size={18} aria-hidden />
-            </button>
+            <span className="flex gap-2">
+              {cam.facing === 'environment' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVoice(!voice)
+                    setVoiceState(!voice)
+                    if (!voice) unlockCues()
+                  }}
+                  aria-pressed={voice}
+                  aria-label={voice ? 'Turn off sound and voice' : 'Turn on sound and voice'}
+                  className={`${DARK_BTN} size-12`}
+                >
+                  {voice ? <Volume2 size={18} aria-hidden /> : <VolumeX size={18} aria-hidden />}
+                </button>
+              ) : null}
+              <button type="button" onClick={cam.flip} disabled={all} aria-label={`Switch to ${cam.facing === 'user' ? 'rear' : 'front'} camera`} className={`${DARK_BTN} size-12`}>
+                <SwitchCamera size={18} aria-hidden />
+              </button>
+            </span>
           </div>
 
           {last && !all ? (

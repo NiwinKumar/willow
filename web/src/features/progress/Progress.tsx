@@ -143,7 +143,7 @@ export default function Progress() {
           </div>
         </div>
         <p className="-mt-1 mb-1 text-[15px] text-ink-2">
-          {mode === 'uncalibrated' ? 'Quick photos are uncalibrated and have their own baseline. They are never mixed with RAW.' : 'RAW check-ins, compared with your RAW baseline only.'} The calendar shows both.
+          {mode === 'uncalibrated' ? 'Camera check-ins have their own baseline. They are never mixed with RAW.' : 'RAW check-ins, compared with your RAW baseline only.'} The calendar shows both.
           {hasForearm ? (
             <>
               {' '}
