@@ -55,7 +55,7 @@ export function AppShell() {
   // The check-in schedule: the Check in button says when one is due today or late (null otherwise).
   const due = useCheckinDue()?.short ?? null
 
-  // A new page starts at the top (a #anchor such as #spot-diary scrolls itself); query changes keep the scroll.
+  // A new page starts at the top (a #anchor scrolls itself); query changes keep the scroll.
   useEffect(() => {
     if (!window.location.hash) window.scrollTo({ top: 0 })
   }, [location.pathname])

@@ -55,7 +55,6 @@ WIDGET_KINDS = (
     "session_summary",
     "routine",
     "product",
-    "spot_diary",
     "product_test",
 )
 MAX_WIDGETS = 2
@@ -145,7 +144,9 @@ def widget_params(w: WidgetSpec, session_ids: set[str], product_ids: set[str]) -
         return {"slot": w.slot} if w.slot else {}
     if w.kind == "product":
         return {"product_id": w.product_id} if w.product_id in product_ids else None
-    return {}  # spot_diary, product_test: no parameters
+    if w.kind == "spot_diary":
+        return None  # the spot diary is gone from the app (Oct 18); older answers may still ask
+    return {}  # product_test: no parameters
 
 
 def normalize(

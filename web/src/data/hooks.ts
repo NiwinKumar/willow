@@ -119,12 +119,6 @@ export function useRoutineCheck(entries: RoutineEntry[] | undefined) {
   return { ...query, rerun }
 }
 
-export function useSpots() {
-  const uid = useOwner()
-  // signed crop URLs last about an hour
-  return useQuery(['spots', uid], (t) => api.spots(t), { enabled: Boolean(uid), staleMs: 10 * 60_000 })
-}
-
 /** The account as the api knows it (consent on record). */
 export function useMe() {
   const uid = useOwner()
