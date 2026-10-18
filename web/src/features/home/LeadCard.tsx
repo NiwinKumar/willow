@@ -62,17 +62,17 @@ export function LeadCard({ lead }: { lead: Lead }) {
           </span>
         ) : null}
       </div>
-      <div className="relative flex flex-1 items-end justify-between gap-3.5">
-        <div className="flex min-w-0 flex-auto flex-col gap-2">
-          <h2 className="m-0 text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
-          <p className="m-0 text-[14px] leading-[1.45]">{lead.sub}</p>
-        </div>
+      <div className="relative flex flex-1 flex-col justify-end gap-3">
         {lead.big ? (
-          <div className="flex flex-none flex-col items-end gap-1 text-right">
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
             <span className="font-dot text-[clamp(48px,4.4vw,64px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">{lead.big}</span>
-            {lead.bigLabel ? <span className="max-w-[120px] text-[12px]">{lead.bigLabel}</span> : null}
+            {lead.bigLabel ? <span className="max-w-[140px] pb-0.5 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
           </div>
         ) : null}
+        <div className="flex min-w-0 flex-col gap-2">
+          <h2 className="m-0 text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
+          <p className="m-0 max-w-[46ch] text-[14px] leading-[1.45]">{lead.sub}</p>
+        </div>
       </div>
       {lead.prog !== undefined ? (
         <div role="progressbar" aria-label={lead.bigLabel ?? 'Progress'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(lead.prog * 100)} className="relative h-[5px] overflow-hidden rounded-[5px] bg-white/45">
@@ -93,7 +93,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
         </div>
       ) : null}
       {lead.cta || lead.note ? (
-        <div className="relative flex flex-wrap items-center gap-2">
+        <div className="relative flex flex-wrap items-center justify-end gap-2">
           {lead.cta ? (
             <button
               type="button"
@@ -105,7 +105,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
             </button>
           ) : null}
           {lead.secondary ? (
-            <button type="button" onClick={lead.secondary.onClick} className="min-h-11 rounded-pill bg-white/60 px-4 text-[13px] text-ink backdrop-blur-[10px] hover:bg-white/80">
+            <button type="button" onClick={lead.secondary.onClick} className="order-first min-h-11 rounded-pill bg-white/60 px-4 text-[13px] text-ink backdrop-blur-[10px] hover:bg-white/80">
               {lead.secondary.label}
             </button>
           ) : null}

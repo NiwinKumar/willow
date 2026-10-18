@@ -58,7 +58,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           </button>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-1 flex-wrap gap-2.5">
         {(['am', 'pm'] as const).map((slot) => {
           const list = slot === 'am' ? am : pm
           const p = PANEL[slot]
@@ -78,7 +78,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                   Nothing in your {slot === 'am' ? 'morning' : 'evening'} routine yet
                 </button>
               ) : (
-                <div className="relative flex flex-wrap justify-between gap-x-1 gap-y-3">
+                <div className="relative my-auto flex flex-wrap justify-between gap-x-1 gap-y-3">
                   <span aria-hidden className="absolute top-[22px] right-[34px] left-[34px] h-[1.5px]" style={{ background: p.line }} />
                   {list.map((e) => (
                     <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />

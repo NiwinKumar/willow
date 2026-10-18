@@ -5,9 +5,10 @@ import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
 import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
 import { imageOf } from '../routine/routineModel'
-import { fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
-import { verdictKind } from '../../lib/verdict'
-import { byGoals, metricAura, shortDay, shortName } from './derive'
+import { fmtSigned, fmtValue, METRIC_META, unitOf } from '../../lib/metrics'
+import { VERDICT_WORDS, verdictKind } from '../../lib/verdict'
+import { byGoals, cap, metricAura, shortDay, shortName, verdictSentence } from './derive'
+import type { GoalTrend } from './goals'
 import { CardHead, Pill, VerdictLine } from './parts'
 
 /** Standard Home card shell: surface, radius 30, rise in. */
@@ -19,38 +20,67 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
   )
 }
 
-/** What changed: the latest measured face check-in's first three measures, in goal order, against the baseline. */
+/** Rows What changed lists before folding the rest into one line. */
+const ROWS = 6
+
+/** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
 export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string }) {
-  const rows = byGoals(session.result?.metrics ?? [], goals).slice(0, 3)
+  const metrics = byGoals(session.result?.metrics ?? [], goals).map((m) => ({ m, kind: verdictKind(m, session) }))
+  const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
+  const rows = sorted.slice(0, ROWS)
+  const rest = sorted.slice(ROWS)
+  const compared = metrics.filter((x) => x.kind === 'changed' || x.kind === 'normal')
+  const sentence = verdictSentence(session, goals)
   const note = baseline ? `vs baseline · ${shortDay(baseline.created_at)}` : shortDay(session.created_at)
   return (
     <HomeCard label="What changed" className={className} delay={120}>
       <CardHead title="What changed" note={note} />
-      <div className="flex flex-col gap-1.5">
-        {rows.map((m, i) => {
-          const kind = verdictKind(m, session)
+      {sentence ? <p className="m-0 -mt-1 text-[13px] leading-[1.4] text-balance">{sentence}</p> : null}
+      {compared.length ? (
+        <div role="img" aria-label={`${compared.filter((x) => x.kind === 'changed').length} of ${compared.length} measures changed beyond your normal range`} className="flex gap-1">
+          {compared.map(({ m, kind }) => (
+            <span key={m.id} className={`h-1.5 flex-1 rounded-full ${kind === 'changed' ? 'bg-signal' : 'bg-ink/[.14]'}`} />
+          ))}
+        </div>
+      ) : null}
+      <div className="flex flex-1 flex-col gap-1.5">
+        {rows.map(({ m, kind }, i) => {
           const unit = m.value === null ? '' : unitOf(m).trim()
+          const moved = kind === 'changed' ? (m.direction === 'decrease' ? METRIC_META[m.id].decrease : m.direction === 'increase' ? METRIC_META[m.id].increase : null) : null
           return (
             <button
               key={m.id}
               type="button"
               onClick={() => onOpen(m.id)}
               aria-label={`${METRIC_META[m.id].label}: ${fmtValue(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
-              className="flex min-h-11 animate-[wRise_.5s_both] items-center gap-2.5 rounded-[18px] squircle bg-ink/[.035] py-2 pr-2.5 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-11 max-h-[88px] flex-1 animate-[wRise_.5s_both] items-center gap-2.5 rounded-[18px] squircle bg-ink/[.035] py-2 pr-3 pl-2 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
               style={{ animationDelay: `${i * 70 + 120}ms` }}
             >
               <span aria-hidden className="size-8 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[13.5px]">{METRIC_META[m.id].label}</span>
                 <VerdictLine kind={kind} className="text-[11.5px] text-ink-2" />
+                {moved && moved !== 'change detected' ? <span className="truncate text-[11.5px] text-ink-2">{cap(moved)}</span> : null}
               </span>
-              <span className="flex items-baseline gap-[3px]">
-                <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
-                {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
+              <span className="flex flex-none flex-col items-end">
+                <span className="flex items-baseline gap-[3px]">
+                  <span className="font-dot text-[18px]">{fmtValue(m.value, m)}</span>
+                  {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
+                </span>
+                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? (
+                  <span className="text-[11px] text-ink-2">
+                    {fmtSigned(m.delta, m)} vs baseline
+                  </span>
+                ) : null}
               </span>
             </button>
           )
         })}
+        {rest.length ? (
+          <button type="button" onClick={onFull} className="min-h-9 self-start px-1 text-[12px] text-ink-2 hover:text-ink">
+            {rest.length} more {rest.every((x) => x.kind === 'normal') ? 'within your normal range' : 'in the full result'} →
+          </button>
+        ) : null}
       </div>
       <div className="mt-auto flex flex-wrap gap-1.5">
         <Pill onClick={onFull}>Full result</Pill>
@@ -197,49 +227,53 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
   )
 }
 
-/** tie: orders rows on the same `at` (products started the same day: the one added last first). */
-export type RecentRow = { key: string; at: number; tie?: number; d: string; t: string; x: string; onClick?: () => void }
-
-/** Recent: sessions, notes, baselines and routine changes, newest first, each opening its place. */
-export function RecentCard({ rows, onAll, className }: { rows: RecentRow[]; onAll: () => void; className?: string }) {
+/** Your goals: each measure the person chose, as a trend since the baseline against their own normal range. */
+export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, className }: { trends: GoalTrend[]; baseline: Session | null; onOpen: (metricId: string) => void; onProgress: () => void; onAsk?: () => void; className?: string }) {
   return (
-    <HomeCard label="Recent activity" className={`gap-2 ${className ?? ''}`} delay={320}>
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="m-0 text-h3 font-normal">Recent</h2>
-        <button type="button" onClick={onAll} className="min-h-11 px-0 py-1 text-[13px] text-ink-2 hover:text-ink">
-          All in Progress →
-        </button>
-      </div>
-      {rows.length ? (
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-x-4 p-0">
-          {rows.map((a) => {
-            const inner = (
-              <>
-                <span className="pt-[3px] font-mono text-[10.5px] text-ink-2">{a.d}</span>
-                <span aria-hidden className="mt-1.5 size-[7px] rounded-full bg-selected" />
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-[13.5px]">{a.t}</span>
-                  <span className="truncate text-[12px] text-ink-2">{a.x}</span>
+    <HomeCard label="Your goals" className={`@container ${className ?? ''}`} delay={320}>
+      <CardHead title="Your goals" note={baseline ? `since baseline · ${shortDay(baseline.created_at)}` : undefined} />
+      <ul className="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
+        {trends.map((t) => (
+          <li key={t.id} className="flex">
+            <button
+              type="button"
+              onClick={() => onOpen(t.id)}
+              aria-label={`${t.label}: ${t.line}. Open in the result.`}
+              className="flex min-h-11 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-3 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+            >
+              <span className="flex min-w-0 flex-[1_1_180px] items-center gap-2.5">
+                <span aria-hidden className="size-8 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[13.5px]">{t.label}</span>
+                  <span className="flex items-start gap-1.5 text-[11.5px] leading-[1.35] text-ink-2">
+                    <span aria-hidden className={`w-3 flex-none ${t.kind === 'changed' ? 'text-signal' : ''}`}>
+                      {VERDICT_WORDS[t.kind].glyph}
+                    </span>
+                    {t.line}
+                  </span>
                 </span>
-              </>
-            )
-            const cls = 'grid w-full grid-cols-[56px_10px_1fr] items-start gap-2.5 rounded-[14px] px-1.5 py-[7px] text-left text-ink'
-            return (
-              <li key={a.key}>
-                {a.onClick ? (
-                  <button type="button" onClick={a.onClick} className={`${cls} min-h-11 transition-[background] duration-200 hover:bg-ink/[.04]`}>
-                    {inner}
-                  </button>
-                ) : (
-                  <div className={cls}>{inner}</div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      ) : (
-        <p className="m-0 text-[13px] text-ink-2">Nothing yet. Your check-ins, notes and routine changes will show here.</p>
-      )}
+              </span>
+              {t.points.length > 1 ? (
+                <span className="ml-auto flex flex-none flex-col items-end gap-0.5 text-ink-2">
+                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={132} height={40} stroke={t.kind === 'changed' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
+                  {t.reading ? <span className="text-[11px] leading-none">{t.reading}</span> : null}
+                </span>
+              ) : t.reading ? (
+                <span className="ml-auto text-[11px] text-ink-2">{t.reading}</span>
+              ) : null}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="m-0 text-[11.5px] leading-[1.4] text-ink-2">Dashed line: your baseline. Shaded: your normal range. Leaving the shade means a real change.</p>
+      <div className="flex flex-wrap gap-1.5">
+        <Pill onClick={onProgress}>See progress</Pill>
+        {onAsk ? (
+          <Pill tone="outline" onClick={onAsk}>
+            Ask about my goals
+          </Pill>
+        ) : null}
+      </div>
     </HomeCard>
   )
 }
