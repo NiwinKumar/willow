@@ -261,7 +261,7 @@ Validator: every number in `summary` must appear in the metrics JSON sent to Gem
 users/{uid}
   display_name, created_at, goal, is_demo,
   consent: {version, accepted_at, aggregate_insights_opt_in}
-  profile: {goals: string[] (<= 3 of dark_spots|even_tone|redness|blemishes|pores_texture|lines|
+  profile: {goals: string[] (<= 5 of dark_spots|even_tone|redness|blemishes|pores_texture|lines|
              under_eye|oil_glow), photo_time: morning|midday|evening|null, display_name: string|null (<= 60),
              skin_type: oily|combination|dry|normal|sensitive|null,
              checkin: {days: int[] (0 = Mon .. 6 = Sun), time: "HH:MM", tz: IANA name} | null, updated_at,

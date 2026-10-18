@@ -15,7 +15,7 @@ import { cellFill, cellKey, MATRIX_MODES, type MatrixMode, type SegCell } from '
 
 const DESCRIPTION: Record<MatrixMode, string> = {
   unmet: 'Share of people with no visible change by week 8. Select a group for the products that work in it.',
-  people: 'People who chose each goal, by skin type (up to 3 goals each).',
+  people: 'People who chose each goal, by skin type (up to 5 goals each).',
   best: 'The product with the highest visible-change rate in each group (10+ users).',
 }
 
