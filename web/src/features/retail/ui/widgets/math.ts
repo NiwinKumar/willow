@@ -18,14 +18,12 @@ export type XY = readonly [number, number]
 
 const f2 = (v: number) => +v.toFixed(2)
 
-/**
- * A smooth curve through the points that never overshoots them (monotone cubic, Fritsch–Carlson): a rising
- * series never dips between two readings, so the curve claims nothing the data does not. x must increase.
- */
-export function smooth(pts: readonly XY[]): string {
+type Seg = readonly [number, number, number, number, number, number]
+
+/** Monotone cubic (Fritsch–Carlson) segments through the points: [c1x, c1y, c2x, c2y, x, y] from each point to the next. x must increase. */
+function segments(pts: readonly XY[]): Seg[] {
   const n = pts.length
-  if (n === 0) return ''
-  if (n === 1) return `M${f2(pts[0][0])},${f2(pts[0][1])}`
+  if (n < 2) return []
   const dx: number[] = []
   const m: number[] = []
   for (let i = 0; i < n - 1; i++) {
@@ -50,12 +48,37 @@ export function smooth(pts: readonly XY[]): string {
       t[i + 1] = tau * b * m[i]
     }
   }
-  let d = `M${f2(pts[0][0])},${f2(pts[0][1])}`
+  const out: Seg[] = []
   for (let i = 0; i < n - 1; i++) {
     const h = dx[i] / 3
-    d += ` C${f2(pts[i][0] + h)},${f2(pts[i][1] + t[i] * h)} ${f2(pts[i + 1][0] - h)},${f2(pts[i + 1][1] - t[i + 1] * h)} ${f2(pts[i + 1][0])},${f2(pts[i + 1][1])}`
+    out.push([pts[i][0] + h, pts[i][1] + t[i] * h, pts[i + 1][0] - h, pts[i + 1][1] - t[i + 1] * h, pts[i + 1][0], pts[i + 1][1]])
   }
+  return out
+}
+
+/**
+ * A smooth curve through the points that never overshoots them (monotone cubic, Fritsch–Carlson): a rising
+ * series never dips between two readings, so the curve claims nothing the data does not. x must increase.
+ */
+export function smooth(pts: readonly XY[]): string {
+  if (pts.length === 0) return ''
+  let d = `M${f2(pts[0][0])},${f2(pts[0][1])}`
+  for (const [a, b, c, e, x, y] of segments(pts)) d += ` C${f2(a)},${f2(b)} ${f2(c)},${f2(e)} ${f2(x)},${f2(y)}`
   return d
+}
+
+/** A closed shape between two smooth edges (a stream band): along `top` left to right, then back along `bottom`. Both need increasing x and the same xs. */
+export function smoothBand(top: readonly XY[], bottom: readonly XY[]): string {
+  if (top.length < 2 || bottom.length < 2) return ''
+  let d = smooth(top)
+  const last = bottom[bottom.length - 1]
+  d += ` L${f2(last[0])},${f2(last[1])}`
+  const segs = segments(bottom)
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const [c1x, c1y, c2x, c2y] = segs[i]
+    d += ` C${f2(c2x)},${f2(c2y)} ${f2(c1x)},${f2(c1y)} ${f2(bottom[i][0])},${f2(bottom[i][1])}`
+  }
+  return `${d} Z`
 }
 
 /** Index of the x closest to `px`. */

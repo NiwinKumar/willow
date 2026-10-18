@@ -730,3 +730,13 @@ a.wg-rank-row:hover {
     transition-duration: .01ms !important;
   }
 }
+
+/* ───── stream chart (campaign page) ───── */
+.wg-stream-in {
+  animation: wgWipe 1s cubic-bezier(.2, .7, .2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wg-stream-in {
+    animation-duration: .01ms !important;
+  }
+}

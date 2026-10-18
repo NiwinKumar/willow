@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Local end-to-end runs only (needs auth_mode=dev): upload links point at this api, which
     # writes to the real bucket with your ADC, so no signing permission is needed on a laptop.
     dev_uploads: bool = False
+    # Local runs only (needs auth_mode=dev): keep everything in this process's memory, not the
+    # project's Firestore, with one demo campaign that has ten days of history (app/dev_seed.py).
+    dev_store: Literal["firestore", "memory"] = "firestore"
     dev_public_url: str = "http://localhost:8080"
     # Check-in reminders (app/reminders.py). Web Push is off unless all three VAPID values are set
     # (Secret Manager in production, never committed); without them reminders are calendar only.
