@@ -53,6 +53,7 @@ const deps: EffectDeps = {
   words: () => ({ label: 'Redness', decrease: 'calmer', increase: 'more redness', sites: ['face_full'] }),
   sites: ['face_full'],
   day: (iso) => new Date(iso),
+  baseline: (_s, all) => all.find((x) => x.is_baseline) ?? null,
 }
 const routineEffect = (entries: RoutineEntry[], sessions: Session[], check?: Parameters<typeof effectOf>[2]) => effectOf(entries, sessions, check, deps, NOW)
 
@@ -63,6 +64,9 @@ test('a real drop in redness since the start is helping; a real rise is away and
   assert.equal(r1.rows[0].flag, null)
   assert.match(r1.rows[0].line, /Redness: calmer/)
   assert.equal(r1.rows[0].points.length, 3)
+  assert.equal(r1.rows[0].baseline, 10)
+  assert.equal(r1.rows[0].band, 0.5)
+  assert.equal(r1.rows[0].reading, 'Redness · lower is calmer')
   const up = [baseline, session('a', 20, 10.5, 'within_noise', 0.5), session('c', 3, 12, 'real_change', 2)]
   const r2 = routineEffect([entry('serum', 40, ['redness_sensitivity'])], up, undefined)
   assert.equal(r2.rows[0].effect, 'away')
