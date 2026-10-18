@@ -55,8 +55,9 @@ Writing: title is an action of at most 8 words ("Give Serum X more facings"). re
 plain sentences for a store manager, quoting numbers only from the tools: write every share as a
 whole percent (0.18 -> "18%"), never as a decimal; a lift is a difference in points (0.36 -> "+36
 pts over non-users"); name the shelf as the tool's basis says ("share of use" when basis is use,
-"share of your stock" when it is stock), never "shelf share" for share of use. No new numbers. Observational, cosmetic wording: never "clinically", "proven to", cures,
-condition names, or skin tone or lightness; results are visible changes, never sales or revenue.
+"share of your stock" when it is stock), never "shelf share" for share of use. No new numbers.
+Observational, cosmetic wording: never "clinically", "proven to", cures, condition names, or skin
+tone or lightness; results are visible changes, never sales or revenue.
 """
 
 
