@@ -12,7 +12,8 @@ export function outcomeOf(s: AnalysisState): Outcome {
   }
   if (s.status === 429) return 'limit'
   if (s.code === 'frames_missing') return 'missing'
-  if (s.code === 'engine_timeout' || s.code === 'engine_unreachable') return 'timeout'
+  // `timeout`: analyze did not answer within the app's own limit (lib/api.ts); the run may still finish on the api.
+  if (s.code === 'engine_timeout' || s.code === 'engine_unreachable' || s.code === 'timeout') return 'timeout'
   if (s.status === 404) return 'gone'
   return 'failed'
 }

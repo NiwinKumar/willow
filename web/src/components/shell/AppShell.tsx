@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'rea
 
 import type { CaptureMode, Site } from '../../data/types'
 import type { TrackPlace } from '../../lib/track'
-import { useData } from '../../data/useData'
+import { useActivateData, useData } from '../../data/useData'
 import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
 import { useMediaQuery } from '../../lib/useMediaQuery'
@@ -39,6 +39,7 @@ const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isConte
 export function AppShell() {
   const { user, loading } = useAuth()
   const data = useData()
+  useActivateData()
   const location = useLocation()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()

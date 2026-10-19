@@ -48,6 +48,22 @@ export function serviceChips(s: DemoStatus, gaveUp: boolean): ServiceChip[] {
 
 const WAKE_RETRY_MS = 12_000
 const WAKE_RETRIES = 4
+/** The api caches its live checks for 60 s, so every screen shares one answer for that long. */
+const STATUS_TTL_MS = 60_000
+
+let shared: { promise: Promise<DemoStatus>; at: number } | null = null
+
+/** /v1/demo/status, shared by every mounted reader: an answer (or a request on its way) under `maxAgeMs` old is reused. */
+function readStatus(maxAgeMs: number): Promise<DemoStatus> {
+  if (shared && Date.now() - shared.at < maxAgeMs) return shared.promise
+  const entry = { promise: api.demoStatus(), at: Date.now() }
+  shared = entry
+  // A failure is never reused: the next reader asks again.
+  entry.promise.catch(() => {
+    if (shared === entry) shared = null
+  })
+  return entry.promise
+}
 
 /**
  * /v1/demo/status, asked again while the engine is waking (it sleeps when idle): every 12 s, at
@@ -64,7 +80,8 @@ export function useDemoStatus(): { status: DemoStatus | null; failed: boolean; w
     let retries = 0
     const ask = async () => {
       try {
-        const s = await api.demoStatus()
+        // A wake retry wants a newer answer than the one that said "waking" (another reader's retry may already be on its way).
+        const s = await readStatus(retries === 0 ? STATUS_TTL_MS : WAKE_RETRY_MS / 2)
         if (!alive) return
         setStatus(s)
         if (s.engine.status === 'waking' && retries < WAKE_RETRIES) {

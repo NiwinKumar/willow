@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { api, retailerBrands } from '../../lib/api'
+import { api } from '../../lib/api'
+import { fetchBrandList } from './productData'
 import { totalUsers } from './data'
 import { useRetailState } from './state'
 import type { BrandSummary, Filters, Insights, Workspace } from './types'
@@ -43,7 +44,7 @@ function fetchBrands(f: Filters): Promise<BrandSummary[] | null> {
   let p = brandsCache.get(key)
   if (!p) {
     // Not on every api build yet (slice A): a failure means "use the insights' brands".
-    p = retailerBrands(f).then(
+    p = fetchBrandList(f).then(
       (r) => r.brands,
       () => null,
     )

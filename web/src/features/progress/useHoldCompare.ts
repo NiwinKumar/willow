@@ -38,6 +38,8 @@ export function useHoldCompare(enabled: boolean, resetKey: string) {
     flickTimer.current = null
   }
   const begin = useCallback(() => {
+    // A second begin (B pressed while a hold is on) must not leave the first flicker running.
+    clear()
     held.current = true
     setHolding(true)
     setFlick(true)

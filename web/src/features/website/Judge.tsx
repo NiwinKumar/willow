@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import type { Session } from '../../data/types'
-import { enterDemo, leaveDemo, useData } from '../../data/useData'
+import { enterDemo, leaveDemo, useActivateData, useData } from '../../data/useData'
 import { api } from '../../lib/api'
 import { identity } from '../../lib/identity'
 import { judge, JUDGE_STOPS, type JudgeStop } from '../../lib/judge'
@@ -116,6 +116,7 @@ export default function Judge() {
 
   // Previous sample runs come from the sessions the app already loads for this account (no second fetch).
   const data = useData()
+  useActivateData()
   const prevRuns = data.mode === 'live' ? data.all.filter((s) => s.sample_id).reverse().slice(0, 3) : []
 
   const retry = () => {

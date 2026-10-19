@@ -307,7 +307,7 @@ export default function CheckInFlow() {
 
   const close = useCallback(() => {
     setConfirm(false)
-    // Home polls a session that is still measuring; make sure it knows about this one.
+    // The app reads a session that is still measuring until it lands (data/store.tsx); make sure it knows about this one.
     if (held || analysis.state.kind === 'running') void data.refresh()
     setExiting(true)
     if (hasBackground) navigate(-(depth + 1))
@@ -383,10 +383,10 @@ export default function CheckInFlow() {
   // if this page closes); Home and Progress show each result when it lands.
   placeDone.current = walk
     ? (id) => {
+        // The answer goes straight into the cache; if it never comes, the sessions are read again.
         void getIdToken()
           .then((t) => api.analyze(t, id))
-          .catch(() => undefined)
-          .finally(() => void data.refresh())
+          .then(data.upsert, () => void data.refresh())
         void data.refresh()
         setSent((s) => [...s, site])
         toNext()

@@ -44,10 +44,12 @@ export default function Journey() {
   const iRef = useRef(0)
 
   useEffect(() => {
+    let alive = true
     // The landing page has usually asked for the journey already; her first photo starts loading with it.
     journeyViews()
       .then((views) => {
         warmFirstPhoto(views)
+        if (!alive) return
         const done = views.map(toSession).filter((s) => s.status === 'done' && s.result)
         const faces = done.filter((s) => s.site === 'face_full').sort((a, b) => a.created_at.localeCompare(b.created_at))
         const closes = done.filter((s) => s.site !== 'face_full')
@@ -55,7 +57,10 @@ export default function Journey() {
         setWeeks(faces.map((f) => ({ face: f, close: closes.find((c) => dayOf(c.created_at) === dayOf(f.created_at)) ?? null, week: Math.round((new Date(f.created_at).getTime() - start) / (7 * DAY_MS)) })))
         setState(faces.length ? 'ready' : 'error')
       })
-      .catch(() => setState('error'))
+      .catch(() => alive && setState('error'))
+    return () => {
+      alive = false
+    }
   }, [])
 
   const slides: Slide[] = useMemo(() => [{ kind: 'intro' }, ...weeks.map((w, k) => ({ kind: 'week' as const, w, i: k })), { kind: 'end' }], [weeks])

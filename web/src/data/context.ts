@@ -24,10 +24,13 @@ export type DataState = {
   /** Change part of the profile: here at once, then on the account (rejects when the account could not be
    * reached; the change is kept here and sent on the next sign-in or load). */
   saveProfile: (patch: ProfilePatch) => Promise<void>
-  /** Re-read every session from the api (live) or do nothing (demo). */
+  /** Re-read every session from the api (live), or the demo journey when it could not be read (demo). */
   refresh: () => Promise<void>
   /** Put one fresh SessionView into the cache without a full reload. */
   upsert: (view: SessionView) => void
 }
 
 export const DataContext = createContext<DataState | null>(null)
+
+/** Starts the account reads (sessions, profile, consent): only the skincare app's screens need them (useActivateData). */
+export const DataActivateContext = createContext<(() => void) | null>(null)

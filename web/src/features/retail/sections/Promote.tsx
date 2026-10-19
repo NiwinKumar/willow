@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { api, retailerProducts, type Campaign } from '../../../lib/api'
+import { api, type Campaign } from '../../../lib/api'
 import { setQueryData, useQuery } from '../../../lib/query'
 import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
+import { fetchProducts } from '../productData'
 import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, runningCount, workspaceId } from '../promote'
 import { sectionPath, useRetailState } from '../state'
 import type { ProductRow, Products } from '../types'
@@ -15,6 +16,7 @@ import { AutoCampaigns } from './promote/AutoCampaigns'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
 import { EligibleList } from './promote/EligibleList'
+import { useCampaignPoll } from './promote/useCampaignPoll'
 
 /*
  * Campaigns (docs/RETAILER_INSIGHTS.md "Proof-gated promotion"), the end of the demo story: measure → prove →
@@ -28,7 +30,6 @@ import { EligibleList } from './promote/EligibleList'
  * campaigns (#autocampaign).
  */
 
-const REFRESH_MS = 30_000
 /** My campaigns and when the api answered (ms; null after only local edits). */
 type Listed = { list: Campaign[]; at: number | null }
 
@@ -108,7 +109,7 @@ function Body({ uid }: { uid: string }) {
 
   const elig = useQuery(['promo-eligibility', uid], (t) => api.eligibility(t).then((r) => r.products), { enabled: Boolean(uid), staleMs: 5 * 60_000 })
   // Each answer carries the time it arrived; local edits keep that time.
-  const camps = useQuery<Listed>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 10_000 })
+  const camps = useQuery<Listed>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
   const editList = (f: (l: Campaign[]) => Campaign[]) => setQueryData<Listed>(['campaigns', uid], (prev) => ({ list: f(prev?.list ?? []), at: prev?.at ?? null }))
 
   // The same evidence as eligibility (mixed, all time), for packshots, rates and lifts. Optional: without it the
@@ -116,7 +117,7 @@ function Body({ uid }: { uid: string }) {
   const [products, setProducts] = useState<Products | null>(null)
   useEffect(() => {
     let alive = true
-    retailerProducts({ cohort: 'mixed', range: 'all' }).then(
+    fetchProducts({ cohort: 'mixed', range: 'all' }).then(
       (r) => alive && setProducts(r),
       () => undefined,
     )
@@ -126,19 +127,9 @@ function Body({ uid }: { uid: string }) {
   }, [])
   const rows = useMemo(() => new Map<string, ProductRow>((products?.products ?? []).map((p) => [p.product_id, p])), [products])
 
-  // Live stats: every 30 s while the tab is visible, and at once when it becomes visible again.
+  // Live stats: every 30 s while a campaign runs and the tab is visible (promote/useCampaignPoll).
   const refetch = camps.refetch
-  useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState === 'visible') void refetch()
-    }
-    const t = window.setInterval(tick, REFRESH_MS)
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      window.clearInterval(t)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [refetch])
+  useCampaignPoll(camps.data, refetch)
 
   // A just-launched campaign: its row scrolled to, focused and tinted for a moment.
   const [highlight, setHighlight] = useState<string | null>(null)

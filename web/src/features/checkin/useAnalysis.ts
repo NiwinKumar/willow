@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { watchSession } from '../../data/live'
 import { useData } from '../../data/useData'
 import { ApiError, api, type AnalysisStage, type SessionView } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
@@ -139,6 +140,8 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
         setState({ kind: 'offline', startedAt })
         return
       }
+      // This run reads the session itself (every 2 s): the DataProvider's own poll leaves it alone meanwhile.
+      const unwatch = watchSession(sessionId)
       try {
         const token = await getIdToken()
         const { note, deviation } = extraRef.current
@@ -165,6 +168,8 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
         const status = e instanceof ApiError ? e.status : null
         const code = e instanceof ApiError ? e.code : e instanceof TypeError ? 'network' : null
         setState({ kind: 'error', status, code, message: e instanceof Error ? e.message : '', startedAt, endedAt: Date.now() })
+      } finally {
+        unwatch()
       }
     })()
   }, [sessionId, attempt, authLoading, user, getIdToken])

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
+import { useActivateData } from '../../data/useData'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { WillowLoader } from '../willow/WillowLoader'
 
@@ -11,6 +12,8 @@ const CheckInFlow = lazy(() => import('../../features/checkin/CheckInFlow'))
  * (APP_PLAN.md). The flow itself decides when it may close (never silently during upload or measuring).
  */
 export function CheckInOverlay() {
+  // The check-in reads and writes the person's sessions (opened directly, it may be the first app screen).
+  useActivateData()
   const phone = useMediaQuery('(max-width: 639px)')
   // The control that opened the flow (read before the page behind turns inert). The picker's own button is
   // gone by then, so a check-in started from the picker returns focus to the shell's Check in button.

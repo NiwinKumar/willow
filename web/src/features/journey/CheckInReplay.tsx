@@ -29,10 +29,19 @@ export default function CheckInReplay() {
   const [shots, setShots] = useState(0)
   const [ticks, setTicks] = useState(0)
   const n = face?.n_frames ?? 3
+  // Keyed on ids, not objects: a re-render of the data never restarts the replay.
+  const faceId = face?.id ?? null
+  const hasClose = Boolean(close)
+
+  // Nothing to replay (the journey could not be read, or has no check-in that day): straight to that day's page.
+  const missing = data.status === 'error' || (data.status === 'ready' && !face)
+  useEffect(() => {
+    if (missing) navigate(`/progress/${day}`, { replace: true })
+  }, [missing, day, navigate])
 
   // The whole replay runs on one timeline (about 9 s, or 14 s the first time).
   useEffect(() => {
-    if (!face) return
+    if (!faceId) return
     const k = full ? 1.5 : 1
     const plan: [number, () => void][] = []
     let t = 900 * k
@@ -40,7 +49,7 @@ export default function CheckInReplay() {
       plan.push([t, () => setShots(i)])
       t += 420 * k
     }
-    if (close) {
+    if (hasClose) {
       plan.push([t + 200, () => setPhase('closeup')])
       t += 1500 * k
     }
@@ -53,7 +62,7 @@ export default function CheckInReplay() {
     plan.push([t + 500, () => navigate(`/progress/${day}`, { replace: true })])
     const timers = plan.map(([at, fn]) => window.setTimeout(fn, at))
     return () => timers.forEach(clearTimeout)
-  }, [face, close, full, n, day, navigate])
+  }, [faceId, hasClose, full, n, day, navigate])
 
   if (!face) return createPortal(<div className="fixed inset-0 z-[70] grid place-items-center bg-[#0c0c0e] text-white/70">Loading her check-in…</div>, document.body)
   const url = face.preview?.url ?? null

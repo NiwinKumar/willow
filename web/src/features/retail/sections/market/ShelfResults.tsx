@@ -56,6 +56,7 @@ export function ShelfResults({ category }: { category: string }) {
     if (!user) return
     let alive = true
     let left = POLLS
+    let timer: number | undefined
     const load = (quiet: boolean) =>
       getIdToken()
         .then((t) => retailerShelf(t, filters))
@@ -64,13 +65,14 @@ export function ShelfResults({ category }: { category: string }) {
             if (!alive) return
             setView({ key, v })
             setFailed(null)
-            if (v.pending && left-- > 0) window.setTimeout(() => void load(true), POLL_MS)
+            if (v.pending && left-- > 0) timer = window.setTimeout(() => void load(true), POLL_MS)
           },
           () => alive && !quiet && setFailed(key),
         )
     void load(false)
     return () => {
       alive = false
+      window.clearTimeout(timer)
     }
   }, [key, attempt]) // eslint-disable-line react-hooks/exhaustive-deps
 
