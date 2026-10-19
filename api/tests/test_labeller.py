@@ -1,4 +1,4 @@
-from app import gemini, labeller, storage
+from app import analysis, gemini, labeller, storage
 from app.labeller import BatchLabels, CandidateLabel
 
 
@@ -148,14 +148,13 @@ def test_features_with_digits_are_dropped(monkeypatch):
     assert out["c_0"]["visible_features"] == ["flat", "even brown"]
 
 
-def test_every_call_runs_at_once_with_a_deadline_inside_the_budget(monkeypatch):
-    """40 candidates: 8 batches asked twice, all 16 calls side by side (with fewer workers the
-    second runs queued behind the first ones), each a batch's pair, one try, a deadline that
-    fits the budget."""
+def test_calls_run_a_wave_at_a_time_with_a_deadline_inside_the_budget(monkeypatch):
+    """40 candidates: 8 batches asked twice (16 calls), WORKERS at a time, each a batch's pair
+    queued side by side, one try, a deadline that fits the budget."""
     import threading
 
     same = {"label": "pore", "confidence": "high", "visible_features": []}
-    all_in = threading.Barrier(16, timeout=3)  # breaks unless all 16 calls run together
+    wave = threading.Barrier(labeller.WORKERS, timeout=3)  # breaks unless a full wave runs
     seen = []
     lock = threading.Lock()
 
@@ -163,7 +162,7 @@ def test_every_call_runs_at_once_with_a_deadline_inside_the_budget(monkeypatch):
         asked = [p.split(" ")[1] for p in parts if isinstance(p, str) and p.startswith("Candidate")]
         with lock:
             seen.append((asked, kw["attempts"], kw["timeout_ms"]))
-        all_in.wait()
+        wave.wait()
         return BatchLabels(labels=[CandidateLabel(id=i, **same) for i in asked])
 
     monkeypatch.setattr(gemini, "generate_json", fake)
@@ -172,7 +171,7 @@ def test_every_call_runs_at_once_with_a_deadline_inside_the_budget(monkeypatch):
     assert len(out) == 40 and len(seen) == 16
     assert {a for _, a, _ in seen} == {1}
     assert all(0 < t <= labeller.LABEL_BUDGET_S * 1000 for _, _, t in seen)
-    assert labeller.LABEL_BUDGET_S <= 15
+    assert labeller.LABEL_BUDGET_S < analysis.GEMINI_BUDGET_S
 
 
 def test_a_smaller_budget_wins_and_no_budget_means_no_labels(monkeypatch):
