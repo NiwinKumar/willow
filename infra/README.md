@@ -9,7 +9,10 @@ gcloud builds submit --config infra/cloudbuild.engine.yaml --substitutions=_TAG=
 gcloud run deploy willow-engine --image us-central1-docker.pkg.dev/$PROJECT_ID/willow/engine:<tag> --region us-central1 \
   --service-account sa-engine@$PROJECT_ID.iam.gserviceaccount.com \
   --no-allow-unauthenticated --cpu 2 --memory 4Gi --concurrency 1 \
-  --min-instances 0 --max-instances 3 --timeout 300
+  --min-instances 0 --max-instances 8 --timeout 300 --cpu-boost
+# max 8: a check-in sends its places at once (cheek + face = 2 requests), so 3 instances made a
+# second person wait or fail. 8 x 2 vCPU + the api's 3 x 1 vCPU fits the region's 20 vCPU / 40 GiB
+# Cloud Run quota (4 vCPU x 20 was refused). Idle instances above the minimum cost nothing.
 
 # api (env vars go in a file: ALLOWED_ORIGINS has commas and the service account has an @)
 gcloud run deploy willow-api --source api --region us-central1 \
@@ -40,4 +43,4 @@ Gotcha: `GET /healthz` on any `*.run.app` host is answered by Google's frontend 
 Local signed URLs: the api impersonates `sa-api` to sign. Project Owner does not include that permission, so grant your user once:
 `gcloud iam service-accounts add-iam-policy-binding sa-api@$PROJECT_ID.iam.gserviceaccount.com --member=user:<you> --role=roles/iam.serviceAccountTokenCreator`
 
-During judging (Oct 19 - Nov 6) consider `--min-instances 1` on `willow-api` only if cold starts hurt the demo; it costs a little.
+Judging (Oct 19 - Nov 7): kept warm since Oct 19 with `--min-instances 2` on `willow-engine` (both places of one check-in start warm) and `--min-instances 1` on `willow-api`. Idle cost about $3.05/day (about ₹255/day; ₹4,900 to Nov 7) against a ₹10,000 judging budget (₹15,000 at most) from the ₹28k credit. On Nov 7 set both back to `--min-instances 0` (`gcloud run services update <service> --region us-central1 --min-instances 0`): warm after that would cost about ₹7,700/month.

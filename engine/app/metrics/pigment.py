@@ -149,7 +149,8 @@ def find_spots(
     # on deep skin (dL* ~ (L* + 16) / 3 * dlnY), so the L* thresholds shrink with this
     # person's own skin lightness below the tone they were tuned on (never grow above it).
     tone = tone_scale(float(np.median(l_star[skin])) if skin.any() else config.SPOT_TUNE_L)
-    yy, xx = np.ogrid[: skin.shape[0], : skin.shape[1]]
+    h, w = skin.shape
+    hair_out = max(config.SPOT_HAIR_RING_MM) * px_per_mm
     min_area = np.pi * (config.SPOT_MIN_CORE_MM / 2 * px_per_mm) ** 2
     holes = outline & ~skin  # eyes, lips, nostrils, brows, hair
     found = []
@@ -158,10 +159,16 @@ def find_spots(
         if not inner[y, x]:
             continue
         r = s * 1.414
-        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin
-        score = float(z[disk].mean())
-        dc = float((chroma - c_bg)[disk].mean())
-        dl = float((l_bg - lab[..., 0])[disk].mean())  # L* darker than nearby skin
+        # every per-blob test within a box that holds its widest ring (a whole-image mask per
+        # blob is slow)
+        ri = int(np.ceil(max(2 * r, r + hair_out)))
+        win = np.s_[max(y - ri, 0) : min(y + ri + 1, h), max(x - ri, 0) : min(x + ri + 1, w)]
+        yy, xx = np.ogrid[win]
+        sk = skin[win]
+        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & sk
+        score = float(z[win][disk].mean())
+        dc = float((chroma[win] - c_bg[win])[disk].mean())
+        dl = float((l_bg[win] - lab[win][..., 0])[disk].mean())  # L* darker than nearby skin
         min_dl = tone * config.SPOT_MIN_DL * max(1.0, 2 * r / px_per_mm / config.SPOT_LARGE_MM)
         min_score = config.SPOT_STRICT_SCORE if strict[y, x] else config.SPOT_MIN_SCORE
         # (no colour test: on deep skin post-acne marks go grey-violet just like shading;
@@ -171,9 +178,9 @@ def find_spots(
         # true size: pixels at least half as dark as the spot's peak (the blob search blurs
         # a 0.4 mm speck, e.g. a stray lash, up to its smallest scale)
         # (peak of the lightly smoothed map: one noisy pixel would make a soft mark look tiny)
-        near = ((yy - y) ** 2 + (xx - x) ** 2 <= (2 * r) ** 2) & skin
-        peak = darker[near].max()
-        if np.count_nonzero(near & (darker >= peak / 2)) < min_area:
+        near = ((yy - y) ** 2 + (xx - x) ** 2 <= (2 * r) ** 2) & sk
+        peak = darker[win][near].max()
+        if np.count_nonzero(near & (darker[win] >= peak / 2)) < min_area:
             continue
         # round: lighter skin on EVERY side. A shadow edge (lips, jaw) or a hair strand
         # crossing the skin is as dark as the centre on at least one side.
@@ -187,8 +194,8 @@ def find_spots(
         # hair around it (baby hairs at the hairline, brow strands): not a mark
         d2 = (yy - y) ** 2 + (xx - x) ** 2
         r0, r1 = (r + m * px_per_mm for m in config.SPOT_HAIR_RING_MM)
-        ring = (d2 >= r0 * r0) & (d2 <= r1 * r1) & skin
-        hair_ring = float(strands[ring].mean()) if ring.any() else 0.0
+        ring = (d2 >= r0 * r0) & (d2 <= r1 * r1) & sk
+        hair_ring = float(strands[win][ring].mean()) if ring.any() else 0.0
         if hair_ring > config.SPOT_HAIR_DENSITY:
             continue
         found.append(
