@@ -431,3 +431,44 @@ def test_the_deadline_caps_each_call_and_skips_a_late_second_try(monkeypatch):
     timeouts.clear()
     assert explain.generate(result, {}, deadline=time.monotonic())[1] == "template"
     assert timeouts == []
+
+
+def test_a_hung_explanation_call_is_hedged_and_the_first_answer_wins():
+    import threading
+    import time as _time
+
+    from app import explain as ex
+
+    calls = []
+    release = threading.Event()
+
+    def call():
+        calls.append(1)
+        if len(calls) == 1:
+            release.wait(2)  # the first call hangs
+            return "late"
+        return "quick"
+
+    started = _time.monotonic()
+    assert ex._hedged(call, after_s=0.05) == "quick"
+    assert len(calls) == 2 and _time.monotonic() - started < 1
+    release.set()
+
+
+def test_a_quick_call_is_not_hedged_and_two_failures_raise():
+    import pytest
+
+    from app import explain as ex
+    from app import gemini
+
+    calls = []
+    assert ex._hedged(lambda: calls.append(1) or "ok", after_s=1) == "ok" and len(calls) == 1
+
+    def fail():
+        import time as _time
+
+        _time.sleep(0.1)
+        raise gemini.GeminiError("busy")
+
+    with pytest.raises(gemini.GeminiError):
+        ex._hedged(fail, after_s=0.01)
