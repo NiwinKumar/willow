@@ -139,35 +139,39 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
         <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
-          <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="purple" icon={PlayCircle} title="Explore Mei’s journey" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
-          <WayIn to={BRAND_JOURNEY_PATH} tone="green" icon={Building2} title="Explore a brand’s journey" sub="How a skincare brand uses Proof, played for you" />
-          <WayIn onClick={app.open} tone="cta" icon={Smartphone} title="Open the Willow app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
-          <WayIn to={PROOF_PATH} tone="glass" icon={BarChart3} title="Open Willow Proof" sub="For brands: which products measurably work, for whom" />
+          <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
+          <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
+          <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
+          <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
         </nav>
       </div>
     </section>
   )
 }
 
+/** The design's aura gradients (Willow App.dc.html AURA): violet, leaf, coral, sky, each with its own coloured glow. */
+const glow = (c: string) => `0 26px 48px -24px ${c}, inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 50px rgba(255,255,255,.3)`
 const WAY_TONE = {
-  purple: { cls: 'text-white', bg: 'linear-gradient(180deg, #7B6BEE 0%, #5642D0 100%)', shadow: '0 26px 50px -20px rgba(70,50,190,.65), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -2px 0 rgba(20,10,80,.3)', icon: 'bg-white text-[#4A38BE]' },
-  green: { cls: 'text-white', bg: 'linear-gradient(180deg, #3F9566 0%, #236645 100%)', shadow: '0 26px 50px -20px rgba(25,95,60,.65), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,40,20,.3)', icon: 'bg-white text-[#1F5C3D]' },
-  cta: { cls: 'text-ink', bg: 'linear-gradient(180deg, color-mix(in oklab, var(--color-cta) 55%, white) 0%, var(--color-cta) 100%)', shadow: '0 24px 46px -20px rgba(120,110,0,.55), inset 0 1px 0 rgba(255,255,255,.8), inset 0 -2px 0 rgba(0,0,0,.08)', icon: 'bg-ink text-inverse' },
-  glass: { cls: 'text-ink', bg: 'linear-gradient(180deg, rgba(255,255,255,.92) 0%, rgba(255,255,255,.66) 100%)', shadow: '0 22px 44px -22px rgba(30,20,60,.45), inset 0 1px 0 #fff, inset 0 0 0 1px rgba(18,18,18,.08)', icon: 'bg-ink text-inverse' },
+  violet: { bg: 'radial-gradient(90% 90% at 0% 0%, #D8B8FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #7A5CFF 0%, transparent 62%), radial-gradient(60% 60% at 85% 15%, #F25FA8 0%, transparent 70%), #A994FF', shadow: glow('rgba(122,92,255,.6)') },
+  leaf: { bg: 'radial-gradient(90% 90% at 0% 0%, #B8E986 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #4FB866 0%, transparent 62%), #9FD98A', shadow: glow('rgba(79,184,102,.55)') },
+  coral: { bg: 'radial-gradient(90% 90% at 0% 0%, #FFB27A 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #F25FA8 0%, transparent 62%), radial-gradient(70% 70% at 80% 10%, #FFD9C2 0%, transparent 70%), #FF8A70', shadow: glow('rgba(242,95,168,.55)') },
+  sky: { bg: 'radial-gradient(90% 90% at 0% 0%, #9CD3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #3D7BFF 0%, transparent 62%), radial-gradient(60% 60% at 85% 10%, #E6F3FF 0%, transparent 70%), #7FA6FF', shadow: glow('rgba(61,123,255,.55)') },
 } as const
 
-/** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). */
-function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, sub }: { to?: string; onClick?: () => void; onWarm?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; sub: string }) {
+/** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). The tag says which are played for judges and which are the live app. */
+function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, tag, sub }: { to?: string; onClick?: () => void; onWarm?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string }) {
   const t = WAY_TONE[tone]
-  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] ${t.cls}`
+  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] text-ink`
   const body = (
     <>
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-1 h-[45%] rounded-[24px] bg-gradient-to-b from-white/35 to-transparent" />
       <span className="relative flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[clamp(19px,1.7vw,23px)] leading-[1.15] font-medium tracking-[-0.01em]">{title}</span>
-        <span className={`text-[13.5px] leading-[1.35] ${tone === 'purple' || tone === 'green' ? 'opacity-90' : 'opacity-75'}`}>{sub}</span>
+        <span className="text-[clamp(19px,1.7vw,23px)] leading-[1.15] font-medium tracking-[-0.01em]">
+          {title} <span className="text-[.8em] font-normal whitespace-nowrap opacity-70">({tag})</span>
+        </span>
+        <span className="text-[13.5px] leading-[1.35] opacity-80">{sub}</span>
       </span>
-      <span aria-hidden className={`relative grid size-12 flex-none place-items-center rounded-full transition-transform duration-200 group-hover:translate-x-0.5 ${t.icon}`}>
+      <span aria-hidden className={`relative grid size-12 flex-none place-items-center rounded-full transition-transform duration-200 group-hover:translate-x-0.5 bg-ink text-inverse`}>
         <Icon size={22} strokeWidth={1.8} />
       </span>
     </>
