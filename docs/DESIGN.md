@@ -308,13 +308,14 @@ Grain: body::before { content:""; position:fixed; inset:0; pointer-events:none; 
 | Chart line draw | stroke-dashoffset · 1200ms standard, once on first view | Drawn statically |
 | Gemini text reveal | per-word fade + 4px blur clear, 30ms/word | Text appears whole |
 | Processing orb | scale 1↔1.08, opacity .85↔1 · 6s ambient loop | Static orb; stage tracker still advances |
+| Measuring card (Home lead) | bar: a highlight sweeps (translate) 1.8s, no fill since nothing reports how far along; current step mark (◐) turns 2.4s linear; a light band reads across a dot field (band and dots counter-translate) 4.2s ambient alternate; a finished step's dot pops in (scale) and its new label fades | Static dot field, static ◐, solid bar; steps still advance |
 | Canvas blobs | translate 46px/−34px, scale 1.14 · 20–25s alternate | Static |
 | Skeleton shimmer | background-position sweep 1.4s linear | Static grey |
 
 Never:
 - Metric numbers never count up or tick; values appear final.
 - Verdict badges never animate in a way that suggests celebration (no bounce, glow pulse, confetti).
-- No looping motion on data marks. Ambient motion is only background blobs and the processing orb.
+- No looping motion on data marks. Ambient motion is only background blobs, the processing orb and the measuring card (none of it shows a number or a percentage).
 - No parallax on photos of skin.
 - No streak, flame or score animations (none of those exist).
 

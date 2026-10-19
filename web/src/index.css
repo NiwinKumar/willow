@@ -388,6 +388,12 @@
 @keyframes wDotIn { from { scale: 0; opacity: 0 } to { scale: 1; opacity: 1 } }
 @keyframes wRingPulse { 0% { box-shadow: 0 0 0 0 rgba(18, 18, 18, .4) } 100% { box-shadow: 0 0 0 18px rgba(18, 18, 18, 0) } }
 @keyframes wPageIn { from { opacity: 0; filter: blur(8px); translate: 0 14px } to { opacity: 1; filter: blur(0); translate: 0 0 } }
+/* The measuring card (home/LeadCard.tsx): an indeterminate bar sweep, the active step turning, and a light band
+   reading across a dot field. Transform and opacity only; the band and its dots counter-move so the dots stay put. */
+@keyframes wSweep { from { translate: -100% 0 } to { translate: 250% 0 } }
+@keyframes wTurn { to { rotate: 360deg } }
+@keyframes wScanBand { from { translate: -24cqw 0 } to { translate: 100cqw 0 } }
+@keyframes wScanDots { from { translate: 24cqw 0 } to { translate: -100cqw 0 } }
 
 @media (prefers-reduced-motion: reduce) {
   *,
