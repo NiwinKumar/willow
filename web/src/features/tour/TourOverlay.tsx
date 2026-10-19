@@ -91,7 +91,7 @@ export function TourOverlay() {
         const open = [...document.querySelectorAll('dialog[open]')].at(-1)
         open?.dispatchEvent(new Event('cancel', { cancelable: true }))
       }
-      if (step.until) for (let waited = 0; waited < 30_000 && !step.until(); waited += 250) await sleep(250)
+      if (step.until) for (let waited = 0; waited < (step.wait ?? 30_000) && !step.until(); waited += 250) await sleep(250)
       await sleep(step.hold ?? 2600)
       goStep(run.i + 1)
     })().catch((e) => {
