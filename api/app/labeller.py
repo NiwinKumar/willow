@@ -29,12 +29,13 @@ log = logging.getLogger("willow.labeller")
 # 5 per call answer in about 10 s.
 BATCH = 5
 MAX_CANDIDATES = 40
-# Every call at once: 40 candidates are 8 batches asked twice, 16 calls. With 8 workers the
-# second runs queued behind the first ones and agreement waited for a second wave (20-30 s).
-WORKERS = 16
+# A batch's two runs are queued side by side, so pairs finish together. Oct 19: all 16 calls at
+# once slowed every call (and the explanation running alongside) past the budget; 8 at a time
+# answer in about 5-8 s each, so two waves fit the budget.
+WORKERS = 8
 # The check-in waits for the labels: past this, unanswered batches stay unlabelled. Each call's
 # own deadline is the same, so a slow call is not left running long after nobody waits for it.
-LABEL_BUDGET_S = 15.0
+LABEL_BUDGET_S = 25.0
 DIGIT = re.compile(r"\d")
 
 Label = Literal[

@@ -19,7 +19,10 @@ log = logging.getLogger("willow.analysis")
 
 # The Gemini work after the engine (explanation, spot labels, the preview WebP alongside) shares
 # one deadline: past it the template explanation and no labels are saved instead of waiting.
-GEMINI_BUDGET_S = 20.0
+# Oct 19: at 20 s, a 5-photo face check-in lost its Gemini explanation (it competed with 16
+# label calls); the explanation is what a person reads first, so it gets a single call's full
+# time and the labels a shorter budget (labeller.LABEL_BUDGET_S).
+GEMINI_BUDGET_S = 35.0
 # Cloud Run cuts a request off at 300 s. With less than GEMINI_MIN_LEFT_S of it left after the
 # engine, Gemini is skipped (template, no labels): the result is saved and the request answers,
 # instead of being cut off with the session left "processing" and the daily analysis spent.
