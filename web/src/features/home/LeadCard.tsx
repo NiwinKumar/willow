@@ -38,7 +38,40 @@ export type Lead = {
   aura: keyof typeof AURA
 }
 
-const STEP_GLYPH = { done: '●', current: '◐', todo: '○' } as const
+/** The step marks (●, ◐, ○) drawn as dots so the current one turns on its own centre; done pops in when a step finishes. */
+function StepMark({ state }: { state: LeadStep['state'] }) {
+  if (state === 'done') return <span aria-hidden className="size-[9px] shrink-0 animate-[wDotIn_.45s_.3s_var(--ease-standard)_both] rounded-full bg-current" />
+  if (state === 'current')
+    return (
+      <span
+        aria-hidden
+        className="size-[9px] shrink-0 animate-[wTurn_2.4s_linear_infinite] rounded-full border-[1.5px] border-current motion-reduce:animate-none"
+        style={{ background: 'linear-gradient(90deg, currentColor 50%, transparent 50%)' }}
+      />
+    )
+  return <span aria-hidden className="size-[9px] shrink-0 rounded-full border-[1.5px] border-current" />
+}
+
+/** While a check-in is measuring, a soft band reads across a dot field in the card's empty top: no numbers, just "working". */
+function ScanField() {
+  const dot = (r: number) => `radial-gradient(circle, rgba(255,255,255,.95) ${r}px, transparent ${r + 0.5}px)`
+  const fade = 'radial-gradient(ellipse 60% 75% at 62% 50%, #000 30%, transparent 100%)'
+  const field = { backgroundSize: '14px 14px', backgroundPosition: 'center', maskImage: fade, WebkitMaskImage: fade }
+  const soft = (m: string) => ({ maskImage: m, WebkitMaskImage: m })
+  const ride = 'animate-[wScanBand_4.2s_ease-in-out_infinite_alternate] motion-reduce:hidden'
+  return (
+    <div aria-hidden className="@container pointer-events-none absolute inset-x-0 -inset-y-1 overflow-hidden">
+      <div className="absolute inset-0 opacity-40" style={{ ...field, backgroundImage: dot(1.3) }} />
+      {/* The band shows the same grid with bigger, brighter dots, as if read through a lens. */}
+      <div className={`absolute inset-y-0 left-0 w-[24cqw] overflow-hidden ${ride}`} style={soft('linear-gradient(90deg, transparent, #000 50%, transparent)')}>
+        <div className="absolute inset-y-0 left-0 w-[100cqw] animate-[wScanDots_4.2s_ease-in-out_infinite_alternate]" style={{ ...field, backgroundImage: dot(2) }} />
+      </div>
+      <div className={`absolute inset-y-[10%] left-0 flex w-[24cqw] justify-center ${ride}`}>
+        <span className="w-px bg-white/85 shadow-[0_0_14px_3px_rgba(255,255,255,.6)]" style={soft('linear-gradient(transparent, #000 25%, #000 75%, transparent)')} />
+      </div>
+    </div>
+  )
+}
 
 /** Today's check-in: one aura card whose variant comes from the person's real sessions (see Home.tsx). */
 export function LeadCard({ lead }: { lead: Lead }) {
@@ -62,7 +95,8 @@ export function LeadCard({ lead }: { lead: Lead }) {
           </span>
         ) : null}
       </div>
-      <div className="relative flex flex-1 items-center">
+      <div className={`relative flex flex-1 items-center ${lead.steps ? 'min-h-16' : ''}`}>
+        {lead.steps ? <ScanField /> : null}
         {lead.big ? (
           <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
             <span className="font-dot text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">{lead.big}</span>
@@ -77,12 +111,18 @@ export function LeadCard({ lead }: { lead: Lead }) {
       ) : null}
       {lead.steps ? (
         <div className="relative flex flex-col gap-2.5" aria-live="polite">
-          <div aria-hidden className="h-[5px] animate-[wShimmer_1.6s_linear_infinite] rounded-[5px] bg-[length:200%_100%]" style={{ backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,.95) 50%, rgba(255,255,255,.35) 100%)' }} />
+          {/* Indeterminate: nothing reports how far along measuring is, so a highlight sweeps instead of a fill. */}
+          <div aria-hidden className="relative h-[5px] overflow-hidden rounded-[5px] bg-white/45 motion-reduce:bg-white/70">
+            <span className="absolute inset-y-0 left-0 w-[40%] animate-[wSweep_1.8s_ease-in-out_infinite] rounded-[5px] motion-reduce:hidden" style={{ backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.95) 50%, rgba(255,255,255,0))' }} />
+          </div>
           <ol className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1.5 p-0">
-            {lead.steps.map((st) => (
-              <li key={st.t} aria-current={st.state === 'current' ? 'step' : undefined} className={`flex items-center gap-1.5 text-[12.5px] ${st.state === 'todo' ? 'opacity-55' : ''}`}>
-                <span aria-hidden>{STEP_GLYPH[st.state]}</span>
-                {st.t}
+            {/* Keyed by position so a step finishing keeps its row: the mark pops to done, the label fades to its new wording. */}
+            {lead.steps.map((st, i) => (
+              <li key={i} aria-current={st.state === 'current' ? 'step' : undefined} className={`flex items-center gap-1.5 text-[12.5px] transition-opacity duration-[360ms] ${st.state === 'todo' ? 'opacity-55' : ''}`}>
+                <StepMark key={st.state} state={st.state} />
+                <span key={st.t} className="animate-[wFadeIn_.36s_both]">
+                  {st.t}
+                </span>
               </li>
             ))}
           </ol>
