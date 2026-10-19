@@ -106,7 +106,7 @@ export default function BrandJourney() {
     }
   }, [])
 
-  const slides: Kind[] = useMemo(() => ['intro', 'proof', ...(data?.cmp ? (['compare'] as const) : []), 'customers', 'claims', 'campaign', 'end'], [data])
+  const slides: Kind[] = useMemo(() => ['intro', 'proof', ...(data?.cmp ? (['compare'] as const) : []), 'customers', 'ask', 'claims', 'campaign', 'end'], [data])
   const segments = useMemo(() => (data ? brandSegments({ hero: data.hero.product.product_id, compare: data.cmp?.product.product_id ?? null }) : null), [data])
   const last = slides.length - 1
   const at = Math.min(i, last)
@@ -224,6 +224,7 @@ export default function BrandJourney() {
             {kind === 'proof' ? <ProofSlide d={data} /> : null}
             {kind === 'compare' && data.cmp ? <CompareSlide x={data.cmp} d={data} /> : null}
             {kind === 'customers' ? <CustomersSlide d={data} /> : null}
+            {kind === 'ask' ? <AskSlide /> : null}
             {kind === 'claims' ? <ClaimsSlide d={data} /> : null}
             {kind === 'campaign' ? <CampaignSlide d={data} /> : null}
             {kind === 'end' ? <End onProof={() => navigate(`/retail?as=brand:${BRAND_SLUG}`)} onMei={() => navigate('/journey')} onApp={openApp} /> : null}
@@ -514,6 +515,38 @@ function CustomersSlide({ d }: { d: Data }) {
   )
 }
 
+/** Where Gemini works in Proof: each job, and the check that keeps its numbers honest. */
+const AI_JOBS: [string, string][] = [
+  ['This week’s brief', 'Summarises what moved, from the brief’s own cards'],
+  ['Next steps', 'Picks what to do next from what the data supports'],
+  ['Ask anything', 'Answers questions from the aggregates on screen'],
+  ['Claim drafts', 'Writes pack, product-page and social copy from the claim-ready statements'],
+  ['AutoCampaign', 'Turns a rule written in plain words into a campaign rule'],
+  ['Shelf vs results', 'Flags, for retailers, what to stock up on or rethink'],
+]
+
+function AskSlide() {
+  return (
+    <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
+      <div className="flex flex-col gap-4">
+        <Title kicker="4 · Gemini in Proof">An analyst that can’t make things up</Title>
+        <Lead>
+          Gemini works across Proof: it summarises, recommends, answers questions, drafts claims and sets up campaigns. It never measures anything. It only reads the aggregates Proof already computed, and any number it writes that isn’t in them is rejected before it shows.
+        </Lead>
+        <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">No one person can be looked up: groups under 10 people are hidden, and every answer says which data it used.</p>
+      </div>
+      <ul className="m-0 grid list-none gap-2 p-0">
+        {AI_JOBS.map(([t, d]) => (
+          <li key={t} className="flex flex-col gap-0.5 rounded-[18px] bg-white/80 px-4 py-3">
+            <span className="text-[15px]">{t}</span>
+            <span className="text-[13.5px] leading-[1.4] text-ink-2">{d}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function ClaimsSlide({ d }: { d: Data }) {
   const ev = d.hero.evidence
   const pick = [ev.find((e) => e.id === 'efficacy'), ev.find((e) => e.kind === 'segment'), ev.find((e) => e.kind === 'speed')].filter((e): e is NonNullable<typeof e> => Boolean(e))
@@ -522,7 +555,7 @@ function ClaimsSlide({ d }: { d: Data }) {
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="4 · Claim drafts">Claims it can stand behind</Title>
+        <Title kicker="5 · Claim drafts">Claims it can stand behind</Title>
         <Lead>Proof turns the measurements into claim-ready statements, each with its number of people, window and cohort. Gemini drafts copy for a pack, a product page or social only from those statements, and every number is checked before it shows.</Lead>
         {caveat ? <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">{caveat}</p> : null}
       </div>
@@ -546,7 +579,7 @@ function CampaignSlide({ d }: { d: Data }) {
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="5 · Campaigns">Promote it where it’s proven</Title>
+        <Title kicker="6 · Campaigns">Promote it where it’s proven</Title>
         <Lead>
           Only a Proven product can be promoted in the Willow app, and only to people whose goals and skin type its evidence covers. A randomised holdout never sees the card, so the lift the campaign causes is measured, not assumed.
         </Lead>

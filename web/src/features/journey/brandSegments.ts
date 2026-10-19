@@ -15,7 +15,7 @@ export const BRAND = 'The Derma Co'
 export const BRAND_SLUG = slugOf(BRAND)
 const AS = `as=brand:${BRAND_SLUG}`
 
-export type BrandChapter = 'proof' | 'compare' | 'customers' | 'claims' | 'campaign'
+export type BrandChapter = 'proof' | 'compare' | 'customers' | 'ask' | 'claims' | 'campaign'
 
 /** The product the story is about (the Overview spotlight) and the one with a category rival to compare. */
 export type BrandIds = { hero: string; compare: string | null }
@@ -23,6 +23,12 @@ export type BrandIds = { hero: string; compare: string | null }
 const product = (id: string) => `/retail/products/${encodeURIComponent(id)}?${AS}`
 
 /** The claim drafts have arrived (or said why not): a draft's copy button, or the panel's alert. */
+/** Ask: Gemini's answer has finished writing itself out (or the panel said why there is none). */
+const askDone = () => Boolean(document.querySelector('dialog[open] [aria-busy="false"], dialog[open] [role="alert"]'))
+/** AutoCampaign: Gemini has read the typed words into a rule (or the fixed patterns did). */
+const ruleRead = () => Boolean(document.querySelector('dialog[open] p[role="status"], dialog[open] [role="alert"]'))
+const RULE_WORDS = 'When a product becomes Proven for dark spots, promote it to oily and combination skin for 14 days'
+
 const claimsDone = () => Boolean(document.querySelector('section[aria-labelledby="claims-h"] [aria-label="Copy draft"], section[aria-labelledby="claims-h"] [role="alert"]'))
 
 export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment | null> {
@@ -32,9 +38,11 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
       title: 'Proof by Willow · the proof',
       steps: [
         { route: `/retail?${AS}`, target: 'css:#spot-h', action: 'point', caption: `Proof opens on ${BRAND}’s workspace, with its strongest proof first.`, hold: 2200 },
+        { target: 'css:#brief-h', action: 'point', caption: 'This week’s brief: what moved in its data, summarised by Gemini. Every number is checked against the cards.', hold: 3000 },
         { target: 'text:View proof', action: 'click', caption: 'View proof opens what was measured for this product.', hold: 1200 },
         { target: 'css:section[aria-label="Key facts"]', action: 'point', caption: 'Visible change in its users, beside people with the same goals who don’t use it.', hold: 2600 },
         { target: 'css:#journey', action: 'point', caption: 'Every user from trying it to week 8, read from their own check-ins.', hold: 2400 },
+        { target: 'css:#next-h', action: 'point', caption: 'Next steps: Gemini picks what to do next from what the data supports. Each one opens where it’s done.', hold: 3000 },
       ],
     },
     compare: ids.compare
@@ -59,6 +67,16 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
         { target: 'text:Best product for this group', action: 'point', caption: 'The leader, the runner-up and your other products for this goal.', hold: 2600 },
       ],
     },
+    ask: {
+      id: 'brand-ask',
+      title: 'Proof by Willow · ask',
+      steps: [
+        { route: `/retail?${AS}`, target: 'text:Ask anything', action: 'click', caption: 'Ask anything: a question in plain words, about the same data on screen.', hold: 1200 },
+        { target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, caption: 'Gemini answers from the aggregates only. Any number it writes that isn’t in them is rejected, and no one person can be looked up.', hold: 1200 },
+        { target: 'css:dialog[open] [aria-busy="false"]', action: 'point', caption: 'The answer, its chart drawn from the same numbers, and follow-up questions.', hold: 3600 },
+        { action: 'escape', caption: 'Back to the workspace.', hold: 800 },
+      ],
+    },
     claims: {
       id: 'brand-claims',
       title: 'Proof by Willow · claims',
@@ -76,6 +94,12 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
         { target: 'text:Matching profiles', action: 'point', caption: 'The audience is only the goals and skin types its evidence covers.', hold: 2400 },
         { target: 'text:Randomised holdout', action: 'point', caption: 'A random holdout never sees the card, so the lift can be measured.', hold: 2400 },
         { target: 'text:The card exactly as a matching shopper sees it', action: 'point', caption: 'The card a matching shopper sees in the Willow app. Nothing is launched here.', hold: 2400 },
+        { action: 'escape', caption: 'Or let Proof promote for you…', hold: 900 },
+        { target: 'text:New rule', action: 'click', caption: 'AutoCampaign: rules that promote a product the moment its proof allows.', hold: 1200 },
+        { target: 'css:dialog[open] textarea', action: 'type', text: RULE_WORDS, caption: 'A rule in plain words.', hold: 400 },
+        { target: 'text:Read it', action: 'click', until: ruleRead, caption: 'Gemini reads the words into the rule, and the form checks it against the guardrails.', hold: 1200 },
+        { target: 'text:Reads as', action: 'point', caption: 'The rule it read: which proof triggers it, who sees the card, for how long. Nothing is saved here.', hold: 3400 },
+        { action: 'escape', caption: 'Measured, proven, claimed, promoted: with AI at each step, and every number checked.', hold: 1400 },
       ],
     },
   }
