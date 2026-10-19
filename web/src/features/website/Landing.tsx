@@ -41,7 +41,7 @@ function Anchor({ to, className = '', style, children }: { to: string; className
 }
 
 /**
- * The website (Willow.dc.html): intro loader once per session, hero, four ways in, how it works, science,
+ * The website (Willow.dc.html): intro loader each time the site opens, hero, four ways in, how it works, science,
  * limits, fairness and the privacy footer, with the section rail. `/science` opens at the science section.
  */
 export default function Landing() {

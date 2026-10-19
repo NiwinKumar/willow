@@ -9,8 +9,9 @@ import { AuthContext } from '../../lib/auth'
  *
  *   <WillowLoader />                 full-screen white cover while the app or a page opens
  *   <WillowLoader inline label=… />  a compact tulip inside a card or panel, looping while it waits
- *   <WillowIntro onDone={…} />       the landing's intro: plays once per browser session, then opens
- *                                    with the design's iris reveal (the page shows through a growing hole)
+ *   <WillowIntro onDone={…} />       the landing's intro: plays each time the site opens (a fresh load or
+ *                                    reload), then opens with the design's iris reveal (the page shows
+ *                                    through a growing hole)
  *
  * Under reduced motion the tulip is drawn once, fully formed, and nothing moves.
  */
@@ -233,23 +234,17 @@ function StuckHelp() {
   )
 }
 
-const INTRO_KEY = 'willow.intro'
-
-function introSeen(): boolean {
-  try {
-    return sessionStorage.getItem(INTRO_KEY) === '1'
-  } catch {
-    return false
-  }
-}
+/** Set once the intro has played in this page load, so going back to the landing from inside the site skips it. */
+let introPlayed = false
 
 /**
- * The landing's intro (once per browser session). It leaves only while the bud is fully formed, and only
- * once the page has loaded (or after 5 s regardless); a click or Esc skips it. `onDone` fires when the
- * page is fully revealed, or straight away when the intro is skipped (seen already, or reduced motion).
+ * The landing's intro (once per page load: opening the site or reloading plays it, coming back to the landing
+ * from inside the site does not). It leaves only while the bud is fully formed, and only once the page has
+ * loaded (or after 5 s regardless); a click or Esc skips it. `onDone` fires when the page is fully revealed,
+ * or straight away when the intro is skipped (played already, or reduced motion).
  */
 export function WillowIntro({ onDone }: { onDone?: () => void }) {
-  const [phase, setPhase] = useState<'on' | 'out' | 'gone'>(() => (introSeen() || reducedMotion() ? 'gone' : 'on'))
+  const [phase, setPhase] = useState<'on' | 'out' | 'gone'>(() => (introPlayed || reducedMotion() ? 'gone' : 'on'))
   const canvas = useRef<HTMLCanvasElement>(null)
   const ready = useRef(false)
   const done = useRef(onDone)
@@ -258,11 +253,7 @@ export function WillowIntro({ onDone }: { onDone?: () => void }) {
   })
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem(INTRO_KEY, '1')
-    } catch {
-      /* private mode: it may play again next time, which is harmless */
-    }
+    introPlayed = true
   }, [])
 
   useEffect(() => {
