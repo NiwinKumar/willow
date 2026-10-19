@@ -101,6 +101,28 @@ def apple_focus(note: bytes) -> tuple[int | None, int | None]:
     return out.get(APPLE_FOCUS_POSITION), out.get(APPLE_AF_CONFIDENCE)
 
 
+def _info(exif: Image.Exif, fmt: str, size: tuple[int, int], profile: str) -> PhotoInfo:
+    """PhotoInfo from a photo's EXIF (camera, lens, exposure, Apple focus tags)."""
+    sub = exif.get_ifd(EXIF_IFD)
+    iso = sub.get(TAG_ISO)
+    exposure = sub.get(TAG_EXPOSURE)
+    note = sub.get(TAG_MAKER_NOTE)
+    focus, af = apple_focus(note) if isinstance(note, bytes) else (None, None)
+    focal = sub.get(TAG_FOCAL_35MM)
+    return PhotoInfo(
+        format=fmt,
+        size=size,
+        color_profile=profile,
+        camera=exif.get(TAG_MODEL),
+        iso=int(iso[0] if isinstance(iso, tuple) else iso) if iso else None,
+        exposure_s=float(exposure) if exposure else None,
+        lens=sub.get(TAG_LENS_MODEL),
+        focal_35mm=float(focal) if focal else None,
+        focus_position=focus,
+        af_confidence=af,
+    )
+
+
 def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
     """JPEG/HEIC -> upright 8-bit sRGB array.
 
@@ -124,31 +146,40 @@ def load_photo_srgb8(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:
                 renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC,
             )
         rgb8 = np.asarray(img, dtype=np.uint8)
-    sub = exif.get_ifd(EXIF_IFD)
-    iso = sub.get(TAG_ISO)
-    exposure = sub.get(TAG_EXPOSURE)
-    note = sub.get(TAG_MAKER_NOTE)
-    focus, af = apple_focus(note) if isinstance(note, bytes) else (None, None)
-    focal = sub.get(TAG_FOCAL_35MM)
-    info = PhotoInfo(
-        format=fmt,
-        size=(rgb8.shape[1], rgb8.shape[0]),
-        color_profile=profile_name,
-        camera=exif.get(TAG_MODEL),
-        iso=int(iso[0] if isinstance(iso, tuple) else iso) if iso else None,
-        exposure_s=float(exposure) if exposure else None,
-        lens=sub.get(TAG_LENS_MODEL),
-        focal_35mm=float(focal) if focal else None,
-        focus_position=focus,
-        af_confidence=af,
-    )
-    return rgb8, info
+    return rgb8, _info(exif, fmt, (rgb8.shape[1], rgb8.shape[0]), profile_name)
+
+
+def read_photo_info(path: str | Path) -> PhotoInfo:
+    """load_photo_srgb8's PhotoInfo without decoding the pixels (EXIF and header only)."""
+    with Image.open(path) as img:
+        fmt = img.format or "unknown"
+        exif = img.getexif()
+        icc = img.info.get("icc_profile")
+        w, h = img.size
+        if exif.get(0x0112) in (5, 6, 7, 8):  # EXIF orientation: stored turned a quarter
+            w, h = h, w
+        profile_name = "none (assumed sRGB)"
+        if icc:
+            profile_name = ImageCms.getProfileDescription(
+                ImageCms.ImageCmsProfile(io.BytesIO(icc))
+            ).strip()
+    return _info(exif, fmt, (w, h), profile_name)
+
+
+def _srgb_curve(c: np.ndarray) -> np.ndarray:
+    """IEC 61966-2-1 decoding of float32 values 0..1."""
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4).astype(np.float32)
+
+
+# every 8-bit value through the curve once: a 12 MP photo is a table lookup, not 36 M powers
+_SRGB8_TO_LINEAR = _srgb_curve(np.arange(256, dtype=np.uint8).astype(np.float32) / 255.0)
 
 
 def srgb_to_linear(rgb8: np.ndarray) -> np.ndarray:
     """Undo the sRGB gamma curve so values are proportional to light again (IEC 61966-2-1)."""
-    c = rgb8.astype(np.float32) / 255.0
-    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4).astype(np.float32)
+    if rgb8.dtype == np.uint8:
+        return _SRGB8_TO_LINEAR[rgb8]
+    return _srgb_curve(rgb8.astype(np.float32) / 255.0)
 
 
 def decode_photo(path: str | Path) -> tuple[np.ndarray, PhotoInfo]:

@@ -24,9 +24,12 @@ def tone_evenness(
     """
     sigma = max(config.EVENNESS_SMOOTH_MM * px_per_mm, 0.5)
     medians, within = [], []
+    smoothed: dict[int, tuple[np.ndarray, np.ndarray]] = {}  # regions often share one red crop
     for L, red, skin in regions.values():
         medians.append(float(np.median(L[skin])))
-        mi = ndimage.gaussian_filter(melanin_index(red), sigma=sigma)
-        within.append(float(np.std(mi[skin])))
+        if id(red) not in smoothed:
+            mi = ndimage.gaussian_filter(melanin_index(red), sigma=sigma)
+            smoothed[id(red)] = (red, mi)  # (keeps `red` alive, so its id stays its own)
+        within.append(float(np.std(smoothed[id(red)][1][skin])))
     between = float(np.std(medians, ddof=1)) if len(medians) > 1 else 0.0
     return between + float(np.mean(within)), {}

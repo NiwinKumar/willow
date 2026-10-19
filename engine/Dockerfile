@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgles2 libegl
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/srv/.venv
+# 2 CPUs: the engine measures 2 photos at once (threads) and OpenCV uses 2 threads per call
+# (app/config.py); BLAS / OpenMP pools on top of that would only oversubscribe the CPUs
+ENV OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 WORKDIR /srv/engine
 COPY engine/pyproject.toml engine/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project

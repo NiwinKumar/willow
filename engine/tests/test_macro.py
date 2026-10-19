@@ -245,3 +245,91 @@ def test_a_close_up_with_a_mark_gives_a_candidate(tmp_path):
     assert r["quality"]["passed"] is True
     assert r["candidates"]
     assert all(c["features"]["view"] == 0.0 for c in r["candidates"])
+
+
+def test_a_close_up_the_measurements_trip_over_fails_alone(tmp_path, monkeypatch):
+    # as face photos: one close-up that raises fails that photo (no reason code), not the request
+    import app.pipeline_macro as pm
+
+    _macro(tmp_path / "a.jpg")
+    _macro(tmp_path / "b.jpg", seed=1)
+    real = pm._frame
+
+    def frame(path, site, overlays=False, **kw):
+        if path.endswith("b.jpg"):
+            raise IndexError("index 0 is out of bounds")
+        return real(path, site, overlays, **kw)
+
+    monkeypatch.setattr(pm, "_frame", frame)
+    r = analyze_macro([str(tmp_path / "a.jpg"), str(tmp_path / "b.jpg")], "cheek_macro")
+    assert r["frames_used"] == 1 and r["quality"]["passed"]
+    assert r["quality"]["per_frame"][1] == {"index": 1, "passed": False, "reasons": []}
+    assert "photo 2 could not be measured" in r["warnings"]
+
+
+def test_pore_disk_means_match_a_per_blob_mask():
+    # all blobs of one radius at once give each blob's own disk mean (skin pixels only)
+    from app.metrics.pores import _disk_means
+
+    rng = np.random.default_rng(3)
+    z = rng.random((60, 80)).astype(np.float32)
+    skin = rng.random((60, 80)) > 0.2
+    ys, xs = rng.integers(0, 60, 200), rng.integers(0, 80, 200)
+    radii = [np.float32(rng.choice([0.7, 1.0, 2.5, 4.2])) for _ in ys]
+    (got,), n = _disk_means([z], skin, ys, xs, radii)
+    yy, xx = np.ogrid[:60, :80]
+    for y, x, r, g, k in zip(ys, xs, radii, got, n, strict=True):
+        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin
+        assert k == disk.sum()
+        if k:
+            assert g == pytest.approx(float(z[disk].mean()), rel=1e-6)
+
+
+def test_pore_chains_match_the_all_pairs_rule():
+    from app.metrics.pores import Pore, _drop_chains
+
+    rng = np.random.default_rng(4)
+    pts = [(x, y) for x, y in rng.uniform(0, 800, (400, 2))]
+    pts += [(100 + 3 * i, 200 + 0.5 * i) for i in range(12)]  # a hair: a row of "pores"
+    pores = [Pore(x=float(x), y=float(y), diameter_mm=0.1, dark_l=1.0) for x, y in pts]
+    px = 20.0
+    xy = np.array(pts)
+    reach = config.PORE_CHAIN_MM * px
+    drop = np.zeros(len(pts), bool)
+    for i in range(len(pts)):  # the rule, every pore against every pore
+        near = np.hypot(*(xy - xy[i]).T) <= reach
+        if near.sum() >= config.PORE_CHAIN_MIN + 1:
+            ev = np.linalg.eigvalsh(np.cov(xy[near].T))
+            if ev[1] > config.PORE_CHAIN_ELONGATION**2 * max(ev[0], 1e-9):
+                drop |= near
+    expected = [p for p, d in zip(pores, drop, strict=True) if not d]
+    assert drop.sum() >= 10 and _drop_chains(pores, px) == expected
+
+
+def test_a_lost_face_is_kept_on_the_second_try_only_at_the_sessions_scale(monkeypatch):
+    # the less strict landmarker finds a face the default one missed; it counts only if its
+    # iris gives about the scale of the session's other close-ups
+    import app.pipeline_macro as pm
+    from app.landmarks import Face, FaceNotFound
+
+    r_px = 117.0  # iris radius on the canvas the landmarker sees
+
+    def detect(canvas, min_confidence=None):
+        if min_confidence is None:
+            raise FaceNotFound("no face")
+        assert min_confidence == config.CLOSEUP_RETRY_CONFIDENCE
+        h, w = canvas.shape[:2]
+        points = np.zeros((478, 2))
+        for idx in (range(468, 473), range(473, 478)):
+            c = (w / 2, h / 2)
+            ring = [np.add(c, d) for d in ((r_px, 0), (0, r_px), (-r_px, 0), (0, -r_px))]
+            points[list(idx)] = np.array([c, *ring])
+        return Face(points=points, yaw=30.0, pitch=0.0, roll=0.0)
+
+    monkeypatch.setattr(pm, "detect_face", detect)
+    img = np.zeros((1500, 2000, 3), np.uint8)
+    found_px = 2 * r_px / config.CLOSEUP_IRIS_MM  # on the photo itself (no shrink)
+    assert pm._find_face(img) is None  # the default landmarker finds nothing
+    assert pm._find_face(img, retry_px_per_mm=found_px * 1.1) is not None
+    # every shrink gives a different scale (2x, 3x, 4x): none is near 1.5x
+    assert pm._find_face(img, retry_px_per_mm=found_px * 1.5) is None

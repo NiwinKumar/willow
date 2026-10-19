@@ -6,41 +6,56 @@ Every contract site runs a real pipeline: forearm sites (pipeline), face_full
 
 import json
 import logging
+import os
 import tempfile
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import anyio
+import cv2
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from jsonschema import ValidationError, validate
+from jsonschema import ValidationError
 
-from app import __version__
+from app import __version__, config
 from app.errors import EngineError
 from app.io import fetch_frames
 from app.pipeline import analyze_forearm
 from app.pipeline_face import analyze_face
 from app.pipeline_macro import MACRO_SITES, analyze_macro
+from app.schemas import REQUEST, RESULT, validate
 
-ROOT = Path(__file__).resolve().parents[2]
-SCHEMAS = ROOT / "schemas"
-REQUEST_SCHEMA = json.loads((SCHEMAS / "analyze_request.schema.json").read_text())
-RESULT_SCHEMA = json.loads((SCHEMAS / "analysis_result.schema.json").read_text())
 MODE_FOR_EXT = {".dng": "calibrated_raw"}  # anything else is a normal photo -> uncalibrated
 
 log = logging.getLogger("willow.engine")
+if not logging.getLogger().handlers:  # uvicorn sets up its own loggers only: ours to stderr
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # OpenCV's threads per call: the instance has 2 CPUs and measures 2 photos at once
+    # (config.FRAME_WORKERS); BLAS / OpenMP stay at 1 thread (Dockerfile)
+    cv2.setNumThreads(config.CV_THREADS)
+    log.info(
+        "startup: cpu_count=%s cv2_threads=%s frame_workers=%s",
+        os.cpu_count(),
+        cv2.getNumThreads(),
+        config.FRAME_WORKERS,
+    )
     # Load both face models before the first request, not during it (a judge's first selfie
     # otherwise waited for them).
     try:
-        from app.landmarks import _hand_landmarker, _landmarker
+        from app.landmarks import MEDIAPIPE_LOCK, _hand_landmarker, _landmarker
 
-        await anyio.to_thread.run_sync(_landmarker)
-        await anyio.to_thread.run_sync(_hand_landmarker)
+        def load() -> None:
+            with MEDIAPIPE_LOCK:
+                _landmarker()
+                _landmarker(config.CLOSEUP_RETRY_CONFIDENCE)  # close-ups' second try
+                _hand_landmarker()
+
+        await anyio.to_thread.run_sync(load)
     except Exception:  # a missing model is reported by the request that needs it
         log.exception("face models did not load at startup")
     yield
@@ -83,7 +98,7 @@ async def analyze(http_request: Request) -> dict:
     t0 = time.perf_counter()
     try:
         request = await http_request.json()
-        validate(request, REQUEST_SCHEMA)
+        validate(request, REQUEST)
     except ValidationError as exc:
         raise EngineError("bad_request", exc.message) from exc
     except ValueError as exc:  # body is not JSON
@@ -93,7 +108,7 @@ async def analyze(http_request: Request) -> dict:
     # (health checks, a second request) while a photo is being measured.
     result = await anyio.to_thread.run_sync(_run, request)
     result["timings_ms"]["request"] = round((time.perf_counter() - t0) * 1000, 1)
-    validate(result, RESULT_SCHEMA)  # never send a response that breaks the contract
+    validate(result, RESULT)  # never send a response that breaks the contract
     log.info(
         json.dumps(
             {

@@ -1,13 +1,11 @@
 """face_full analysis (M2): landmarks -> ROIs + face skin mask -> Lab -> A-tier face metrics."""
 
 import dataclasses
-import json
 import logging
 import time
 
 import cv2
 import numpy as np
-from jsonschema import validate
 from scipy import ndimage
 
 from app import config, facemap
@@ -25,6 +23,7 @@ from app.landmarks import (
     FaceNotFound,
     detect_face,
     detect_hands,
+    dilate_local,
     edge_hair,
     hand_mask,
     polygon_mask,
@@ -40,9 +39,10 @@ from app.metrics.redness import erythema_index
 from app.metrics.shine import shine
 from app.metrics.tone import ita_band, ita_degrees
 from app.overlay import redness_rgba, to_preview
-from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
+from app.pipeline import _load, _mean_extras, capture_mode_for, finite_frame, map_frames
 from app.quality import FrameQuality, check_frame, region_reasons
 from app.roi import Box
+from app.schemas import validate
 
 log = logging.getLogger("willow.face")
 
@@ -139,8 +139,13 @@ def _frame(path: str, overlays: bool = False) -> dict:
         log.warning("quality regions not attributed: %s", exc)
         regions = []
 
-    skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items()}
-    cheek_skin = np.logical_or.reduce([skin[c] for c in face.cheeks])
+    # a region the photo cuts off (a forehead above the top edge) has no pixels: it is left
+    # out, and only the metrics read from it are not measured on this photo
+    skin = {n: m & _skin_tails(lab[..., 0], m) for n, m in masks.items() if m.any()}
+    if len(skin) < len(masks):
+        log.info("regions outside the photo: %s", sorted(set(masks) - set(skin)))
+    none = np.zeros(lab.shape[:2], bool)
+    cheek_skin = np.logical_or.reduce([skin.get(c, none) for c in face.cheeks])
     px_per_mm = face.px_per_mm
     # whole-face skin (outline minus eyes, lids, brows, nostrils, lips, hair) for blemishes
     # and dark spots
@@ -178,26 +183,35 @@ def _frame(path: str, overlays: bool = False) -> dict:
     def med(channel: int, n: str) -> float:
         return float(np.median(lab[..., channel][roi_skin[n]]))
 
+    def inside(names) -> bool:  # every region a metric reads is in the photo
+        return all(n in roi_skin for n in names)
+
     # Tone: each cheek's own median, then their mean. Pooling both cheeks put the median in
     # the gap between a lit and a shaded cheek and swung ITA by 6 degrees between photos
     # (Oct 14); per cheek it was 1.9.
-    l_star = float(np.mean([med(0, c) for c in face.cheeks]))
-    b_star = float(np.mean([med(2, c) for c in face.cheeks]))
+    tone_ok = inside(face.cheeks)
+    l_star = float(np.mean([med(0, c) for c in face.cheeks])) if tone_ok else None
+    b_star = float(np.mean([med(2, c) for c in face.cheeks])) if tone_ok else None
     # Redness: each region weighs the same (the nose is small and redder; pixel pooling let
     # its share of the pixels move the value)
     red_rois = _rois(face, REDNESS_ROIS)
-    redness_a = float(np.mean([med(1, n) for n in red_rois]))
-    red_skin = np.logical_or.reduce([roi_skin[n] for n in red_rois])
+    red_ok = inside(red_rois)
+    redness_a = float(np.mean([med(1, n) for n in red_rois])) if red_ok else None
+    red_skin = np.logical_or.reduce([roi_skin.get(n, none) for n in red_rois])
     t_map = time.perf_counter()
     # the redness metric's own a* and skin, on the preview grid (drawn for the reference photo)
     redness_map = (
         to_preview(lab[..., 1], red_skin, srgb8.shape[:2], origin=(box.x, box.y))
-        if overlays
+        if overlays and red_ok
         else None
     )
     map_ms = (time.perf_counter() - t_map) * 1000
-    evenness, _ = tone_evenness(
-        {n: (lab[..., 0], lin[..., 0], roi_skin[n]) for n in _rois(face, EVENNESS_ROIS)}, px_per_mm
+    l_map, red = lab[..., 0], lin[..., 0]  # one crop for every region: smoothed once
+    even_rois = _rois(face, EVENNESS_ROIS)
+    evenness = (
+        tone_evenness({n: (l_map, red, roi_skin[n]) for n in even_rois}, px_per_mm)[0]
+        if inside(even_rois)
+        else None
     )
     # Dark circles: under-eye skin minus the same side's cheek, in L* (docs/METRICS.md B1);
     # relative to the person's own cheek, so it works at every tone and cancels exposure.
@@ -250,7 +264,7 @@ def _frame(path: str, overlays: bool = False) -> dict:
     )
     # blemishes over the whole face skin, skipping a thin band around the nostrils, whose
     # red crease looks like a spot
-    guard = cv2.dilate(
+    guard = dilate_local(
         zones["nostril_zone"].astype(np.uint8), face._disk(config.NOSTRIL_GUARD_MM)
     ).astype(bool)
     blemishes = find_blemishes(
@@ -292,7 +306,7 @@ def _frame(path: str, overlays: bool = False) -> dict:
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
 
     values = {
-        "tone_ita": ita_degrees(l_star, b_star),
+        "tone_ita": ita_degrees(l_star, b_star) if tone_ok else None,
         "pigment_spots": spots_pct,
         "tone_evenness": evenness,
         "redness": redness_a,
@@ -303,10 +317,10 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "lines": lines_val,
     }
     extras = {
-        "tone_ita": {"l_star": l_star, "b_star": b_star},
+        "tone_ita": {"l_star": l_star, "b_star": b_star} if tone_ok else {},
         "pigment_spots": spot_extras,
         "tone_evenness": {},
-        "redness": {"erythema_index": erythema_index(lin, red_skin)},
+        "redness": {"erythema_index": erythema_index(lin, red_skin)} if red_ok else {},
         "blemishes": {},
         "dark_circles": {"delta_a_star": float(np.mean([c[1] for c in circles]))}
         if circles
@@ -761,11 +775,23 @@ def _area_outlines(
     eps = config.AREA_OUTLINE_MM * face.px_per_mm
     min_px = config.AREA_MIN_MM2 * face.px_per_mm**2
     out: dict[str, np.ndarray] = {}
+    # each zone is smoothed within its own box plus 2r + 1 px (an open then a close by r
+    # reaches no further, so the outline is the same as over the whole crop)
+    boxes = ndimage.find_objects(label, max_label=len(facemap.ZONES))
+    pad = 2 * r + 2
+    h, w = label.shape
     for code, name in enumerate(facemap.ZONES, start=1):
+        if boxes[code - 1] is None:
+            continue  # no skin in this zone
+        ys, xs = boxes[code - 1]
+        y0, x0 = max(ys.start - pad, 0), max(xs.start - pad, 0)
+        win = np.s_[y0 : min(ys.stop + pad, h), x0 : min(xs.stop + pad, w)]
         # smoothed: zone edges follow the mesh's triangles and looked jagged
-        mask = cv2.morphologyEx((label == code).astype(np.uint8), cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx((label[win] == code).astype(np.uint8), cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE, offset=(x0, y0)
+        )
         if not contours:
             continue
         big = max(contours, key=cv2.contourArea)  # one outline per zone: its main piece
@@ -823,7 +849,10 @@ def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list
 
 
 def _skin_tails(l_star: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Drop the ROI's own darkest 1% and brightest 1% (shadow, shine, stray hair)."""
+    """Drop the ROI's own darkest 1% and brightest 1% (shadow, shine, stray hair). An empty
+    ROI (cut off by the photo's edge) stays empty."""
+    if not mask.any():
+        return np.zeros(l_star.shape, bool)
     lo, hi = np.percentile(l_star[mask], [config.SKIN_LOW_PCT, config.SKIN_HIGH_PCT])
     return (l_star >= lo) & (l_star <= hi)
 
@@ -853,15 +882,23 @@ def analyze_face(
     confidence = "indicative"
     draw = compute_overlays and bool(output_prefix)  # overlays need somewhere to go
 
-    per_frame, frames, warnings = [], [], []
-    for i, path in enumerate(files):
+    def measure(item: tuple[int, str]) -> dict | str:
+        """One photo's frame, or why it has none ("face_not_found" / "failed")."""
+        i, path = item
         try:
-            f = _frame(path, overlays=draw)
+            return finite_frame(_frame(path, overlays=draw), f"face photo {i + 1}")
         except FaceNotFound:
+            return "face_not_found"
+        except (IndexError, ValueError) as exc:  # a photo the measurements trip over
+            log.warning("face photo %d could not be measured: %s", i + 1, exc)
+            return "failed"
+
+    per_frame, frames, warnings = [], [], []
+    for i, f in enumerate(map_frames(measure, list(enumerate(files)))):  # photos in parallel
+        if f == "face_not_found":
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
-        except (IndexError, ValueError) as exc:  # an empty region at the photo edge, etc.
-            log.warning("face photo %d could not be measured: %s", i + 1, exc)
+        if f == "failed":
             per_frame.append({"index": i, "passed": False, "reasons": []})
             warnings.append(f"photo {i + 1} could not be measured")
             continue
@@ -1048,5 +1085,5 @@ def analyze_face(
     }
     if ref:
         result["image_size"] = {"width": int(ref["shape"][1]), "height": int(ref["shape"][0])}
-    validate(result, json.loads(SCHEMA.read_text()))
+    validate(result)  # the contract's result schema (app.schemas, loaded once)
     return result

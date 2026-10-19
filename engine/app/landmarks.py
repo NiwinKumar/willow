@@ -6,6 +6,7 @@ stays on skin when the landmarks are a few pixels off.
 """
 
 import math
+import threading
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +19,9 @@ from app import config
 
 MODEL = Path(__file__).resolve().parents[1] / "models" / "face_landmarker.task"
 HAND_MODEL = MODEL.with_name("hand_landmarker.task")
+# MediaPipe's landmarkers are not thread-safe: the photos of a session are measured in
+# parallel, so every model load and detect call takes this lock (each is ~10-50 ms)
+MEDIAPIPE_LOCK = threading.Lock()
 
 # Mirrored pairs on the canonical mesh (e.g. 50 <-> 280 are the two cheekbones).
 ROI_POINTS = {
@@ -138,6 +142,9 @@ class Face:
     roll: float
     # MediaPipe expression scores 0-1 (e.g. mouthSmileLeft, eyeSquintRight); empty if unknown
     expression: dict[str, float] = field(default_factory=dict)
+    # masks worked out once per photo (brow_guard); not copied by dataclasses.replace, so a
+    # face moved or scaled that way starts empty
+    _masks: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     @property
     def eye_distance_px(self) -> float:
@@ -212,7 +219,7 @@ class Face:
     def _shape(self, shape, idx, margin_mm: float = 0.0) -> np.ndarray:
         """Mask of an ordered landmark contour, grown by margin_mm."""
         m = polygon_mask(shape, self.points[idx]).astype(np.uint8)
-        return (cv2.dilate(m, self._disk(margin_mm)) if margin_mm > 0 else m).astype(bool)
+        return (dilate_local(m, self._disk(margin_mm)) if margin_mm > 0 else m).astype(bool)
 
     def outline(self) -> np.ndarray:
         """Face outline, with the top pushed up past the hairline (the mesh stops short of
@@ -260,7 +267,7 @@ class Face:
         if self.view != "front":  # a turned nose: shine on the ridge, shadow on the far side
             hull = cv2.convexHull(self.points[NOSE_ALL].astype(np.float32)).reshape(-1, 2)
             guard |= polygon_mask(shape, hull)
-        grown = cv2.dilate(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
+        grown = dilate_local(guard.astype(np.uint8), self._disk(config.SHADOW_GUARD_MM))
         if self.view != "front":  # and the fold from the nose wing to the mouth corner, whose
             # shadow read as a 10 mm "spot" beside the nose (Oct 15)
             width = max(round(2 * config.SIDE_FOLD_GUARD_MM * self.px_per_mm), 1)
@@ -282,7 +289,7 @@ class Face:
     def nose_mask(self, shape: tuple[int, int]) -> np.ndarray:
         """The whole nose (bridge, sides, tip, wings), grown by SHADOW_GUARD_MM."""
         hull = cv2.convexHull(self.points[NOSE_ALL].astype(np.float32)).reshape(-1, 2)
-        grown = cv2.dilate(
+        grown = dilate_local(
             polygon_mask(shape, hull).astype(np.uint8), self._disk(config.SHADOW_GUARD_MM)
         )
         return grown.astype(bool)
@@ -309,7 +316,7 @@ class Face:
         guard |= polygon_mask(shape, hull)
         guard |= self.lip_band(shape, config.SPOT_LIP_GUARD_MM)
         nose = cv2.convexHull(self.points[NOSE_BASE].astype(np.float32)).reshape(-1, 2)
-        guard |= cv2.dilate(
+        guard |= dilate_local(
             polygon_mask(shape, nose).astype(np.uint8), self._disk(config.SPOT_NOSTRIL_GUARD_MM)
         ).astype(bool)
         corners = np.zeros(shape, np.uint8)
@@ -319,9 +326,15 @@ class Face:
         return guard | corners.astype(bool)
 
     def brow_guard(self, shape: tuple[int, int]) -> np.ndarray:
-        """The brows grown by BROW_GUARD_MM (stray brow hairs; brow edges look red too)."""
-        guard = self._shape(shape, RIGHT_BROW, config.BROW_GUARD_MM)
-        return guard | self._shape(shape, LEFT_BROW, config.BROW_GUARD_MM)
+        """The brows grown by BROW_GUARD_MM (stray brow hairs; brow edges look red too).
+        Worked out once per photo size (read-only: callers combine it, never edit it)."""
+        key = ("brow_guard", tuple(shape))
+        if key not in self._masks:
+            guard = self._shape(shape, RIGHT_BROW, config.BROW_GUARD_MM)
+            guard |= self._shape(shape, LEFT_BROW, config.BROW_GUARD_MM)
+            guard.flags.writeable = False
+            self._masks[key] = guard
+        return self._masks[key]
 
     def border_band(
         self,
@@ -352,9 +365,9 @@ class Face:
     def feature_zones(self, shape: tuple[int, int]) -> dict[str, np.ndarray]:
         """Where brows and nostrils can be; refine_skin removes only their dark pixels."""
         brow_core = self._shape(shape, RIGHT_BROW) | self._shape(shape, LEFT_BROW)
-        brow_zone = cv2.dilate(brow_core.astype(np.uint8), self._disk(config.BROW_ZONE_MM))
+        brow_zone = dilate_local(brow_core.astype(np.uint8), self._disk(config.BROW_ZONE_MM))
         nose = cv2.convexHull(self.points[NOSE_BASE].astype(np.float32)).reshape(-1, 2)
-        nose_zone = cv2.dilate(polygon_mask(shape, nose).astype(np.uint8), self._disk(1.0))
+        nose_zone = dilate_local(polygon_mask(shape, nose).astype(np.uint8), self._disk(1.0))
         # below the nose (where a beard / stubble grows), as a half-plane across the face
         up = self.points[10] - self.points[152]
         up = up / np.linalg.norm(up)
@@ -378,18 +391,29 @@ def _euler_degrees(matrix: np.ndarray) -> tuple[float, float, float]:
     return yaw, pitch, roll
 
 
-@lru_cache(maxsize=1)
-def _landmarker():
+@lru_cache(maxsize=2)
+def _landmarker(min_confidence: float | None = None):
+    """The face landmarker; min_confidence: detection and presence confidence (None:
+    MediaPipe's default 0.5). The close-up retry uses a second, lower one."""
     import mediapipe as mp  # heavy import, only when a face photo is analysed
 
     if not MODEL.exists():
         raise FileNotFoundError(f"{MODEL} missing: download face_landmarker.task (see README)")
+    low = (
+        {
+            "min_face_detection_confidence": min_confidence,
+            "min_face_presence_confidence": min_confidence,
+        }
+        if min_confidence is not None
+        else {}
+    )
     options = mp.tasks.vision.FaceLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=str(MODEL)),
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
         num_faces=1,
         output_facial_transformation_matrixes=True,
         output_face_blendshapes=True,  # expression scores, for the lines metric's gate
+        **low,
     )
     return mp.tasks.vision.FaceLandmarker.create_from_options(options)
 
@@ -415,15 +439,18 @@ def detect_hands(srgb8: np.ndarray, min_span_px: float) -> list[np.ndarray]:
     hand on a face spans at least about the eye distance; specks of skin texture do not)."""
     import mediapipe as mp
 
-    model = _hand_landmarker()
+    with MEDIAPIPE_LOCK:
+        model = _hand_landmarker()
     if model is None:
         return []
     h, w = srgb8.shape[:2]
     scale = min(1.0, config.LANDMARK_MAX_SIDE / max(h, w))
     small = cv2.resize(srgb8, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA)
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(small))
+    with MEDIAPIPE_LOCK:
+        found = model.detect(image).hand_landmarks
     hands = []
-    for lm in model.detect(image).hand_landmarks:
+    for lm in found:
         pts = np.array([[p.x * w, p.y * h] for p in lm], dtype=np.float64)
         if np.ptp(pts, axis=0).max() >= min_span_px:
             hands.append(pts)
@@ -438,21 +465,23 @@ def hand_mask(shape: tuple[int, int], hands: list[np.ndarray], margin_px: float)
         cv2.fillConvexPoly(mask, cv2.convexHull(pts.astype(np.float32)).astype(np.int32), 1)
     if hands and margin_px >= 1:
         r = round(margin_px)
-        mask = cv2.dilate(
+        mask = dilate_local(
             mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
         )
     return mask.astype(bool)
 
 
-def detect_face(srgb8: np.ndarray) -> Face:
-    """Run the landmarker on an upright 8-bit sRGB photo (downscaled for speed)."""
+def detect_face(srgb8: np.ndarray, min_confidence: float | None = None) -> Face:
+    """Run the landmarker on an upright 8-bit sRGB photo (downscaled for speed).
+    min_confidence: a landmarker that accepts less certain faces (None: the default one)."""
     import mediapipe as mp
 
     h, w = srgb8.shape[:2]
     scale = min(1.0, config.LANDMARK_MAX_SIDE / max(h, w))
     small = cv2.resize(srgb8, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA)
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(small))
-    result = _landmarker().detect(image)
+    with MEDIAPIPE_LOCK:
+        result = _landmarker(min_confidence).detect(image)
     if not result.face_landmarks:
         raise FaceNotFound("no face found")
     lm = result.face_landmarks[0]
@@ -464,6 +493,22 @@ def detect_face(srgb8: np.ndarray) -> Face:
         else {}
     )
     return Face(points=points, yaw=yaw, pitch=pitch, roll=roll, expression=expression)
+
+
+def dilate_local(mask: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    """cv2.dilate(mask, kernel) of a 0/1 uint8 mask, worked out only around its pixels: a
+    dilation reaches no further than the kernel's half size, so the result is the same,
+    without sliding a large kernel (a 1 cm margin is ~170 px on a close-up) over the whole
+    photo."""
+    x, y, w, h = cv2.boundingRect(mask)  # box of the non-zero pixels
+    out = np.zeros_like(mask)
+    if w == 0 or h == 0:
+        return out
+    ky, kx = kernel.shape[0] // 2, kernel.shape[1] // 2
+    y0, y1 = max(y - ky, 0), min(y + h + ky, mask.shape[0])
+    x0, x1 = max(x - kx, 0), min(x + w + kx, mask.shape[1])
+    out[y0:y1, x0:x1] = cv2.dilate(np.ascontiguousarray(mask[y0:y1, x0:x1]), kernel)
+    return out
 
 
 def polygon_mask(shape: tuple[int, int], polygon: np.ndarray) -> np.ndarray:

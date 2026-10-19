@@ -8,10 +8,10 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 from scipy import ndimage
-from skimage.feature import blob_log
 
 from app import config
 from app.metrics.blemish import _local_mean, robust_spread, working_scale
+from app.metrics.blobs import blob_log_fast
 
 
 @dataclass
@@ -135,7 +135,7 @@ def find_spots(
     z = np.clip(darker / spread, 0, None)
 
     r_min, r_max = (d * px_per_mm / 2 for d in config.SPOT_DIAMETER_MM)
-    blobs = blob_log(
+    blobs = blob_log_fast(
         z / 10,
         min_sigma=r_min / 1.414,
         max_sigma=r_max / 1.414,

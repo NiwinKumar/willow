@@ -1,5 +1,7 @@
 """All engine thresholds and constants in one place (tunable, see docs/CONTRACT.md 2.3)."""
 
+import os
+
 from app import __version__
 
 ENGINE_VERSION = __version__  # single source of truth: app/__init__.py
@@ -275,6 +277,15 @@ MACRO_MIN_AF_CONFIDENCE = 50
 # Close-ups with part of the face in view (a nose close-up shows an eye): the landmarker
 # needs most of a face, so the photo is also tried shrunk to these sizes on a plain canvas
 CLOSEUP_SHRINK = (0.5, 0.33)
+# A close-up whose face the landmarker does not find is tried once more with a second
+# landmarker at this detection / presence confidence (MediaPipe's default 0.5), also shrunk
+# to CLOSEUP_RETRY_SHRINK; the face is kept only if its iris is in the photo and gives a scale
+# within CLOSEUP_RETRY_SCALE_TOL of the session's other close-ups (their median), and the
+# site's region is not empty. Week-9 sample (Oct 19): 2 of 7 failed cheek close-ups pass, at
+# 15.0-15.1 px/mm beside 15.1-15.3; the rest gave 9-11 px/mm beside ~15 and stay failed.
+CLOSEUP_RETRY_CONFIDENCE = 0.15
+CLOSEUP_RETRY_SHRINK = 0.25
+CLOSEUP_RETRY_SCALE_TOL = 0.15
 CLOSEUP_IRIS_MM = 11.7  # visible iris diameter, nearly the same in all adults: the scale
 # in a face region, hair = this much darker than the region's median AND under
 # CLOSEUP_HAIR_CHROMA of its chroma (black hair is grey; shaded skin keeps its colour: one
@@ -296,6 +307,11 @@ TEXTURE_MAX_MDC_FRAC = 0.25  # texture becomes indicative when MDC95 > 25% of th
 PREVIEW_MAX_SIDE = 1600  # long edge; larger photos are shrunk by a whole factor
 PREVIEW_QUALITY = 85
 UPLOAD_WORKERS = 8  # parallel GCS transfers (frames in, crops out)
+# photos of a session measured at once (threads): Cloud Run gives the engine 2 CPUs, and most
+# of a photo's time is single-threaded SciPy / Python, so two photos share them. Both can be
+# set per deployment (env) without a code change.
+FRAME_WORKERS = int(os.environ.get("ENGINE_FRAME_WORKERS", "2"))
+CV_THREADS = int(os.environ.get("ENGINE_CV_THREADS", "2"))  # cv2.setNumThreads at startup
 
 # Redness overlay (overlays/redness.png, engine 0.3.4): where the camera sees more red than
 # this person's own skin median, on the skin the redness metric measures (face: cheeks and
