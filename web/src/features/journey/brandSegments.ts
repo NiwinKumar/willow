@@ -1,4 +1,5 @@
 import { slugOf } from '../retail/ui/format'
+import { findTarget } from '../tour/find'
 import type { TourSegment } from '../tour/types'
 
 /**
@@ -27,6 +28,12 @@ const product = (id: string) => `/retail/products/${encodeURIComponent(id)}?${AS
 const askDone = () => Boolean(document.querySelector('dialog[open] [aria-busy="false"], dialog[open] [role="alert"]'))
 /** AutoCampaign: Gemini has read the typed words into a rule (or the fixed patterns did). */
 const ruleRead = () => Boolean(document.querySelector('dialog[open] p[role="status"], dialog[open] [role="alert"]'))
+/** The Ask panel is open (?ask=1); if the page dropped it while loading, open it again. */
+const ensureAsk = async () => {
+  if (document.querySelector('dialog[open]')) return
+  findTarget('text:Ask anything')?.click()
+  await new Promise((r) => window.setTimeout(r, 700))
+}
 const RULE_WORDS = 'When a product becomes Proven for dark spots, promote it to oily and combination skin for 14 days'
 
 const claimsDone = () => Boolean(document.querySelector('section[aria-labelledby="claims-h"] [aria-label="Copy draft"], section[aria-labelledby="claims-h"] [role="alert"]'))
@@ -71,8 +78,8 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
       id: 'brand-ask',
       title: 'Proof by Willow · ask',
       steps: [
-        { route: `/retail?${AS}`, target: 'text:Ask anything', action: 'click', caption: 'Ask anything: a question in plain words, about the same data on screen.', hold: 1200 },
-        { target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, wait: 75_000, caption: 'Gemini answers from the aggregates only. Any number it writes that isn’t in them is rejected, and no one person can be looked up.', hold: 1200 },
+        { route: `/retail?${AS}&ask=1`, target: 'text:Ask anything', action: 'point', caption: 'Ask anything: a question in plain words, about the same data on screen.', hold: 1600 },
+        { run: ensureAsk, target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, wait: 75_000, caption: 'Gemini answers from the aggregates only. Any number it writes that isn’t in them is rejected, and no one person can be looked up.', hold: 1200 },
         { target: 'css:dialog[open] [aria-busy="false"]', action: 'point', caption: 'The answer, its chart drawn from the same numbers, and follow-up questions.', hold: 3600 },
         { action: 'escape', caption: 'Back to the workspace.', hold: 800 },
       ],
