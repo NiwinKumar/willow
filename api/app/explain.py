@@ -8,6 +8,8 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -497,6 +499,35 @@ SECOND_TRY_MIN_S = 12.0
 FIRST_TRY_MIN_S = 2.0
 
 
+# An explanation answers in about 3-7 s, but now and then a call hangs until Gemini's own 504
+# (Oct 19: 22 s on a judge's check-in). Past HEDGE_AFTER_S the same small request (~2k tokens)
+# is sent once more and whichever answers first is used.
+HEDGE_AFTER_S = 8.0
+
+
+def _hedged[T](call: Callable[[], T], after_s: float | None = None) -> T:
+    """call(), or a second call() started after `after_s` if the first is still out: the first
+    to succeed wins; raises the last error when both fail."""
+    after_s = HEDGE_AFTER_S if after_s is None else after_s
+    pool = ThreadPoolExecutor(max_workers=2)
+    try:
+        pending = {pool.submit(call)}
+        done, _ = wait(pending, timeout=after_s)
+        if not done:
+            pending.add(pool.submit(call))
+        error: BaseException | None = None
+        while pending:
+            done, pending = wait(pending, return_when=FIRST_COMPLETED)
+            for f in done:
+                if f.exception() is None:
+                    return f.result()
+                error = f.exception()
+        assert error is not None
+        raise error
+    finally:
+        pool.shutdown(wait=False)
+
+
 def fallback(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """(template explanation, "template"): the deterministic text, numbers from the metrics."""
     context = dict(context)
@@ -527,17 +558,19 @@ def generate(
                 break
             timeout_s = min(timeout_s, left)
         try:
-            exp = gemini.generate_json(
-                "explanation",
-                [prompt],
-                _Explanation,
-                instructions=INSTRUCTIONS,
-                temperature=0.3,
-                max_output_tokens=4096,
-                # the loop is the retry (GEMINI_SPEC: retry once): two calls at most, so with
-                # the engine the analysis stays well inside Cloud Run's 300 s
-                attempts=1,
-                timeout_ms=max(1_000, round(timeout_s * 1000)),
+            exp = _hedged(
+                lambda t=timeout_s: gemini.generate_json(
+                    "explanation",
+                    [prompt],
+                    _Explanation,
+                    instructions=INSTRUCTIONS,
+                    temperature=0.3,
+                    max_output_tokens=4096,
+                    # the loop is the retry (GEMINI_SPEC: retry once): two tries at most, so
+                    # with the engine the analysis stays well inside Cloud Run's 300 s
+                    attempts=1,
+                    timeout_ms=max(1_000, round(t * 1000)),
+                )
             )
         except gemini.GeminiError:
             break
