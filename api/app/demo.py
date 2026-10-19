@@ -192,21 +192,32 @@ def add_starter_sessions(store: Store, uid: str) -> int:
     """Copy the starter check-ins into a guest's account; returns how many were added."""
     demo_uid = get_settings().demo_user_id
     now = datetime.now(UTC)
-    added = 0
+    todo = []
     for i, (source_id, sample_id) in enumerate(STARTER_SESSIONS.items()):
         src = store.session_get(demo_uid, source_id)
         if not src or src.get("status") != "done" or not src.get("result_json"):
             continue
         sid = starter_session_id(uid, source_id, now)
-        if store.session_get(uid, sid):
-            continue
-        for prefix in (views.uploads_prefix, views.results_prefix):
-            storage.copy_prefix(prefix(demo_uid, source_id), prefix(uid, sid))
+        if not store.session_get(uid, sid):
+            todo.append((i, source_id, sample_id, sid, src))
+    # Every folder at once (photos and results of both check-ins, about 180 objects): the guest
+    # is waiting on the sign-in page.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        copies = [
+            pool.submit(storage.copy_prefix, prefix(demo_uid, source_id), prefix(uid, sid))
+            for _, source_id, _, sid, _ in todo
+            for prefix in (views.uploads_prefix, views.results_prefix)
+        ]
+        for f in copies:
+            f.result()
+    for i, source_id, sample_id, sid, src in todo:
         old_path, new_path = f"{demo_uid}/{source_id}", f"{uid}/{sid}"
+        result_json = src["result_json"].replace(old_path, new_path).replace(source_id, sid)
+        result_json = result_json.replace(f'"user_id": "{demo_uid}"', f'"user_id": "{uid}"')
         doc = {k: src[k] for k in STARTER_FIELDS if k in src}
         doc.update(
             frame_uris=[u.replace(old_path, new_path) for u in src.get("frame_uris") or []],
-            result_json=src["result_json"].replace(old_path, new_path).replace(source_id, sid),
+            result_json=result_json,
             # a few minutes ago, face first: the newest check-in on Home is the close-up's pair
             created_at=now - timedelta(minutes=10 - i),
             analyzed_at=now,
@@ -219,8 +230,7 @@ def add_starter_sessions(store: Store, uid: str) -> int:
             sample_id=sample_id,
         )
         store.session_set(uid, sid, doc)
-        added += 1
-    return added
+    return len(todo)
 
 
 def judge_routine_entries() -> list[tuple[dict[str, Any], list[str]]]:

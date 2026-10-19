@@ -223,7 +223,7 @@ def copy_object(source_name: str, dest_name: str) -> None:
 
 def copy_prefix(source: str, dest: str) -> int:
     """Server-side copy of every object under `source` to the same names under `dest` (a guest's
-    starter check-ins from the demo account), 16 at a time. Returns how many were copied."""
+    starter check-ins from the demo account), 32 at a time. Returns how many were copied."""
     client = gcp.storage_client()
     bucket = client.bucket(get_settings().bucket)
     names = [
@@ -234,7 +234,7 @@ def copy_prefix(source: str, dest: str) -> int:
     def copy(name: str) -> None:
         bucket.copy_blob(bucket.blob(name), bucket, dest + name[len(source) :])
 
-    with ThreadPoolExecutor(max_workers=16) as pool:
+    with ThreadPoolExecutor(max_workers=32) as pool:
         list(pool.map(copy, names))
     return len(names)
 
