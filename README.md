@@ -7,7 +7,7 @@ Built for the **Google Cloud AI Builder Cup 2026** (Hack2skill), theme **Retail 
 > Cosmetic appearance tracking. Not a medical device and not a diagnosis.
 
 ## Try it
-- **Judges: https://meetwillow.web.app/judge** (about four minutes, no sign-in). You get a guest account of your own; every stop runs live: the measurement engine on Cloud Run, Gemini on Vertex AI, Firestore and BigQuery. A side panel shows the live status of each service.
+- **Judges: https://meetwillow.web.app/** (about four minutes, no sign-in). You get a guest account of your own; every stop runs live: the measurement engine on Cloud Run, Gemini on Vertex AI, Firestore and BigQuery. A side panel shows the live status of each service.
 - App: https://meetwillow.web.app (also reachable at willow-511508.web.app)
 
 ## The problem
