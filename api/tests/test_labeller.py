@@ -149,8 +149,8 @@ def test_features_with_digits_are_dropped(monkeypatch):
 
 
 def test_calls_run_a_wave_at_a_time_with_a_deadline_inside_the_budget(monkeypatch):
-    """40 candidates: 8 batches asked twice (16 calls), WORKERS at a time, each a batch's pair
-    queued side by side, one try, a deadline that fits the budget."""
+    """40 candidates: the first 20 labelled, 4 batches asked twice (8 calls) in one wave, each
+    a batch's pair queued side by side, one try, a deadline that fits the budget."""
     import threading
 
     same = {"label": "pore", "confidence": "high", "visible_features": []}
@@ -168,7 +168,7 @@ def test_calls_run_a_wave_at_a_time_with_a_deadline_inside_the_budget(monkeypatc
     monkeypatch.setattr(gemini, "generate_json", fake)
     monkeypatch.setattr(storage, "read_bytes", lambda name: b"\xff\xd8jpeg")
     out = labeller.label_candidates(_result(40))
-    assert len(out) == 40 and len(seen) == 16
+    assert len(out) == labeller.MAX_CANDIDATES == 20 and len(seen) == 8
     assert {a for _, a, _ in seen} == {1}
     assert all(0 < t <= labeller.LABEL_BUDGET_S * 1000 for _, _, t in seen)
     assert labeller.LABEL_BUDGET_S < analysis.GEMINI_BUDGET_S

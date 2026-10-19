@@ -28,14 +28,15 @@ log = logging.getLogger("willow.labeller")
 # 20 images per call (10 candidates) took about 50 s and often hit Vertex's deadline (Oct 18);
 # 5 per call answer in about 10 s.
 BATCH = 5
-MAX_CANDIDATES = 40
-# A batch's two runs are queued side by side, so pairs finish together. Oct 19: all 16 calls at
-# once slowed every call (and the explanation running alongside) past the budget; 8 at a time
-# answer in about 5-8 s each, so two waves fit the budget.
+# Oct 19: 40 candidates (16 calls of ~12k tokens) drew Gemini 504s and 429s and took 25 s or
+# more; 20 (8 calls) answer in one wave of about 5-8 s. The rest stay listed, typed by the engine.
+MAX_CANDIDATES = 20
+# A batch's two runs are queued side by side, so pairs finish together: 20 candidates are 4
+# batches asked twice, 8 calls, one wave.
 WORKERS = 8
 # The check-in waits for the labels: past this, unanswered batches stay unlabelled. Each call's
 # own deadline is the same, so a slow call is not left running long after nobody waits for it.
-LABEL_BUDGET_S = 25.0
+LABEL_BUDGET_S = 15.0
 DIGIT = re.compile(r"\d")
 
 Label = Literal[
