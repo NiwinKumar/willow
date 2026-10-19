@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 
-import { retailerBrand, retailerBrands } from '../../../../lib/api'
+import { retailerBrand } from '../../../../lib/api'
 import { useRetailData } from '../../context'
 import { csvMeta, csvName } from '../../data'
 import { useRetailState } from '../../state'
 import type { BrandDetail, BrandSummary, Insights } from '../../types'
 import { Button, DataTable, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, Panel, pct, PositioningChart, ShareBar, SidePanel, slugOf, Stat, Suppressed, type Column } from '../../ui'
 import { brandLeaders, brandRank, niceDomain } from '../../ui/insight'
+import { fetchBrandList } from '../../productData'
 import { useView } from '../../useView'
 import { HeroBone, MarketFrame, PanelBone } from './Frame'
 import { byGap, NOTE, type VsRow } from './model'
@@ -27,7 +28,7 @@ type Goal = BrandDetail['goals'][number]
 
 export function BrandsView({ d }: { d: Insights }) {
   const { filters, workspace } = useRetailData()
-  const list = useView(`brands|${filters.cohort}|${filters.range}`, () => retailerBrands(filters))
+  const list = useView(`brands|${filters.cohort}|${filters.range}`, () => fetchBrandList(filters))
   if (list.status === 'loading')
     return (
       <MarketFrame view="brands">

@@ -228,8 +228,25 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+/** Every api call gives up after this (a hung connection must end in an error, never wait forever). */
+const TIMEOUT_MS = 30_000
+/** Calls that wait on Gemini (stories, answers, drafts, rule parsing, autopilot checks) or on long server work. */
+const LONG_TIMEOUT_MS = 90_000
+/** analyze is one synchronous call (about 35 s on a cold engine, up to the api's own engine limits). */
+const ANALYZE_TIMEOUT_MS = 150_000
+
+/** fetch with a deadline (unless the caller passes its own signal); a timeout throws an ApiError (code `timeout`). */
+async function timedFetch(url: string, init: RequestInit | undefined, timeoutMs: number): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(timeoutMs) })
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') throw new ApiError(408, 'Willow took too long to answer. Try again.', 'timeout')
+    throw e
+  }
+}
+
+async function request<T>(token: string, path: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
+  const res = await timedFetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -237,7 +254,7 @@ async function request<T>(token: string, path: string, init?: RequestInit): Prom
       ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}),
       ...(init?.headers ?? {}),
     },
-  })
+  }, timeoutMs)
   if (!res.ok) {
     const text = await res.text()
     let code: string | null = null
@@ -295,7 +312,7 @@ export type DemoStatus = {
 const RETAILER_TIMEOUT_MS = 30_000
 
 async function publicGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`)
+  const res = await timedFetch(`${API_URL}${path}`, undefined, TIMEOUT_MS)
   if (!res.ok) throw new ApiError(res.status, `${path} unavailable`)
   return (await res.json()) as T
 }
@@ -309,7 +326,7 @@ export const api = {
   /** Public aggregates (synthetic cohort, groups under 10 suppressed): no sign-in. */
   retailerInsights: async (filters?: { cohort: RetailerCohort; range: RetailerRange }) => {
     const qs = filters ? `?${new URLSearchParams(filters).toString()}` : ''
-    const res = await fetch(`${API_URL}/v1/retailer/insights${qs}`, { signal: AbortSignal.timeout(RETAILER_TIMEOUT_MS) })
+    const res = await timedFetch(`${API_URL}/v1/retailer/insights${qs}`, undefined, RETAILER_TIMEOUT_MS)
     if (!res.ok) throw new ApiError(res.status, 'insights unavailable')
     return (await res.json()) as RetailerInsights
   },
@@ -323,12 +340,12 @@ export const api = {
     request<{ sessions: SessionView[] }>(token, `/v1/sessions${site ? `?site=${site}` : ''}`),
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
   /** What changed for one metric since the previous check-in, in points (api app/metric_story.py). */
-  metricStory: (token: string, sessionId: string, metricId: string) => request<MetricStory>(token, `/v1/sessions/${sessionId}/story/${metricId}`),
+  metricStory: (token: string, sessionId: string, metricId: string) => request<MetricStory>(token, `/v1/sessions/${sessionId}/story/${metricId}`, undefined, LONG_TIMEOUT_MS),
   patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
   /** `force`: measure a done session again with every frame (counts as an analysis). */
   analyze: (token: string, sessionId: string, force = false) =>
-    request<SessionView>(token, `/v1/sessions/${sessionId}/analyze${force ? '?force=1' : ''}`, { method: 'POST' }),
+    request<SessionView>(token, `/v1/sessions/${sessionId}/analyze${force ? '?force=1' : ''}`, { method: 'POST' }, ANALYZE_TIMEOUT_MS),
   /** More photos for a session (an edit before analyze, or a baseline top-up). */
   addFrames: (token: string, sessionId: string, body: { add: number; content_types: string[] }) =>
     request<AddFramesResponse>(token, `/v1/sessions/${sessionId}/frames`, { method: 'POST', ...json(body) }),
@@ -337,7 +354,7 @@ export const api = {
     request<CreateSessionResponse>(token, `/v1/sessions/${sessionId}/frames/${index}`, { method: 'DELETE' }),
   setBaseline: (token: string, site: Site, sessionId: string) =>
     request<{ site: Site; session_id: string }>(token, `/v1/baselines/${site}`, { method: 'POST', ...json({ session_id: sessionId }) }),
-  deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }),
+  deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }, LONG_TIMEOUT_MS),
   /** The account as the api knows it: uid, the consent and the profile on record (each null before any). */
   me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null; profile: Profile | null }>(token, '/v1/me'),
   /** `concern` may be several: products made for every one of them. `total` counts every match (past `limit`). */
@@ -352,7 +369,7 @@ export const api = {
   seenProductRequest: (token: string, id: string) => request<void>(token, `/v1/product-requests/${id}`, { method: 'PATCH', ...json({ seen: true }) }),
   catalogProduct: (token: string, productId: string) => request<Product>(token, `/v1/catalog/${productId}`),
   labelScan: (token: string, images: { mime_type: string; data_base64: string }[]) =>
-    request<LabelScanResponse>(token, '/v1/label-scan', { method: 'POST', ...json({ images }) }),
+    request<LabelScanResponse>(token, '/v1/label-scan', { method: 'POST', ...json({ images }) }, LONG_TIMEOUT_MS),
   // `today`: the person's own calendar day, so recent use counts their days, not the server's
   routine: (token: string) => request<{ entries: RoutineEntry[] }>(token, `/v1/routine?today=${localDay()}`),
   addRoutine: (token: string, entry: NewRoutineEntry) => request<RoutineEntry>(token, '/v1/routine', { method: 'POST', ...json(entry) }),
@@ -374,12 +391,12 @@ export const api = {
     request<{ consent: Record<string, unknown> }>(token, '/v1/me/consent', { method: 'PUT', ...json(body) }),
   /** Partial: only the fields sent change; null clears one. */
   putProfile: (token: string, patch: ProfilePatch) => request<{ profile: Profile }>(token, '/v1/me/profile', { method: 'PUT', ...json(patch) }),
-  routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }),
+  routineCheck: (token: string) => request<RoutineCheck>(token, '/v1/routine/check', { method: 'POST' }, LONG_TIMEOUT_MS),
   retailerAsk: (token: string, question: string, filters?: { cohort: RetailerCohort; range: RetailerRange }) =>
-    request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question, ...filters }) }),
+    request<RetailerAnswer>(token, '/v1/retailer/ask', { method: 'POST', ...json({ question, ...filters }) }, LONG_TIMEOUT_MS),
   /** Claim drafts for one channel (api proof_ai.claims): sign-in, 30 a day; 429 `daily_limit`. */
   retailerClaims: (token: string, productId: string, body: { channel: RetailerClaimChannel } & RetailerFilters) =>
-    request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }),
+    request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }, LONG_TIMEOUT_MS),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),
@@ -389,10 +406,10 @@ export const api = {
     publicGet<{ from: string; to: string; days: RoutineLogDay[] }>(`/v1/demo/routine/log?${new URLSearchParams(range).toString()}`),
   demoRoutineCheck: () => publicGet<RoutineCheck>('/v1/demo/routine/check'),
   startSample: (token: string, sampleId: string) =>
-    request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }),
-  judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }),
+    request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }, LONG_TIMEOUT_MS),
+  judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }, LONG_TIMEOUT_MS),
   advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) =>
-    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json(images.length ? { messages, images } : { messages }) }),
+    request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json(images.length ? { messages, images } : { messages }) }, LONG_TIMEOUT_MS),
   /** Product tests (forearm): the running one first. */
   productTests: (token: string) => request<{ tests: ProductTest[] }>(token, '/v1/product-tests'),
   startProductTest: (token: string, body: { entry_id?: string; product_id?: string; name?: string; length_days?: number; started_at?: string }) =>
@@ -439,10 +456,10 @@ export const api = {
   replaceRule: (token: string, id: string, body: RuleBody) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PUT', ...json(body) }),
   toggleRule: (token: string, id: string, enabled: boolean) => request<AutoRule>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'PATCH', ...json({ enabled }) }),
   deleteRule: (token: string, id: string) => request<void>(token, `/v1/retailer/autopilot/rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  parseRule: (token: string, text: string, workspace: string) => request<{ rule: RuleBody; sentence: string; missed: string[]; source?: 'gemini' | 'rules' }>(token, '/v1/retailer/autopilot/parse', { method: 'POST', ...json({ text, workspace }) }),
+  parseRule: (token: string, text: string, workspace: string) => request<{ rule: RuleBody; sentence: string; missed: string[]; source?: 'gemini' | 'rules' }>(token, '/v1/retailer/autopilot/parse', { method: 'POST', ...json({ text, workspace }) }, LONG_TIMEOUT_MS),
   /** "Run check now"; `ifStale`: only when the last check is over 30 minutes old (the Campaigns page on open). */
-  runAutopilot: (token: string, ifStale = false) => request<AutopilotView & { result: AutopilotResult | null }>(token, `/v1/retailer/autopilot/run${ifStale ? '?if_stale=true' : ''}`, { method: 'POST' }),
-  autopilotAct: (token: string, activityId: string, act: 'approve' | 'dismiss' | 'undo') => request<AutopilotView & { campaign_id?: string; outcome?: string }>(token, `/v1/retailer/autopilot/activity/${encodeURIComponent(activityId)}/${act}`, { method: 'POST' }),
+  runAutopilot: (token: string, ifStale = false) => request<AutopilotView & { result: AutopilotResult | null }>(token, `/v1/retailer/autopilot/run${ifStale ? '?if_stale=true' : ''}`, { method: 'POST' }, LONG_TIMEOUT_MS),
+  autopilotAct: (token: string, activityId: string, act: 'approve' | 'dismiss' | 'undo') => request<AutopilotView & { campaign_id?: string; outcome?: string }>(token, `/v1/retailer/autopilot/activity/${encodeURIComponent(activityId)}/${act}`, { method: 'POST' }, LONG_TIMEOUT_MS),
 }
 
 /** AutoCampaign (docs/RETAILER_INSIGHTS.md "AutoCampaign"). */
@@ -826,7 +843,7 @@ function retailerQs(filters?: Partial<RetailerFilters> & { brand?: string }): st
 
 /** GETs that keep the api's status on failure (404 = unknown id, or an endpoint this api build doesn't have yet). */
 async function retailerGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { signal: AbortSignal.timeout(RETAILER_TIMEOUT_MS) })
+  const res = await timedFetch(`${API_URL}${path}`, undefined, RETAILER_TIMEOUT_MS)
   if (!res.ok) throw new ApiError(res.status, `${path.split('?')[0]} unavailable`)
   return (await res.json()) as T
 }

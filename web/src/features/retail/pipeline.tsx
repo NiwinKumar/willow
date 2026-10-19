@@ -22,7 +22,7 @@ export type Step = { id: string; title: string; state: StepState; detail: ReactN
 export function useCampaigns(): Campaign[] {
   const { user } = useAuth()
   const uid = user?.uid ?? null
-  const q = useQuery<{ list: Campaign[]; at: number | null }>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 10_000 })
+  const q = useQuery<{ list: Campaign[]; at: number | null }>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
   return q.data?.list ?? []
 }
 

@@ -22,7 +22,7 @@ function fresh(): SessionView[] | null {
 
 /** The journey for this demo entry (one request at a time; an answer under 10 minutes old is reused). */
 export function pickDemo(): Promise<DemoPick> {
-  if (held && pick) return Promise.resolve(pick)
+  if (held && pick?.source === 'real') return Promise.resolve(pick)
   const views = fresh()
   if (views) return Promise.resolve((pick = views.length ? { source: 'real', views } : { source: 'unavailable', views: null, reason: 'empty' }))
   return request()
@@ -87,10 +87,10 @@ export function peekDemo(): DemoPick | null {
   return pick
 }
 
-/** Demo mode holds its pick from entry until it is left. */
+/** Demo mode holds its pick from entry until it is left. An unavailable pick is never held: the next ask tries again. */
 export function holdDemo(p: DemoPick) {
   pick = p
-  held = true
+  held = p.source === 'real'
 }
 export function releaseDemo() {
   held = false

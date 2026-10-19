@@ -16,6 +16,7 @@ import { BlobRadial, StreamChart } from '../ui/widgets'
 import { ErrorBox, StatusBadge, type Confirm } from './promote/CampaignCard'
 import { ShopperPreview } from './promote/ShopperPreview'
 import { useCampaignActions } from './promote/useCampaignActions'
+import { useCampaignPoll } from './promote/useCampaignPoll'
 
 /*
  * One campaign's dashboard (/retail/campaigns/:id). Everything on it is what Willow counts for that campaign:
@@ -25,7 +26,6 @@ import { useCampaignActions } from './promote/useCampaignActions'
  * URL: ?confirm=end|delete asks before ending or deleting (the Campaigns table's menu links here).
  */
 
-const REFRESH_MS = 30_000
 type Listed = { list: Campaign[]; at: number | null }
 
 export default function CampaignDashboard() {
@@ -70,21 +70,11 @@ function Body({ uid }: { uid: string }) {
   const { carry, param, setParam } = useRetailState()
   const back = `${sectionPath('campaigns')}${carry}`
 
-  const camps = useQuery<Listed>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 10_000 })
+  const camps = useQuery<Listed>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
   const elig = useQuery(['promo-eligibility', uid], (t) => api.eligibility(t).then((r) => r.products), { enabled: Boolean(uid), staleMs: 5 * 60_000 })
-  // Live numbers: every 30 s while the tab is visible, and at once when it becomes visible again.
+  // Live numbers: every 30 s while a campaign runs and the tab is visible (promote/useCampaignPoll).
   const refetch = camps.refetch
-  useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState === 'visible') void refetch()
-    }
-    const t = window.setInterval(tick, REFRESH_MS)
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      window.clearInterval(t)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [refetch])
+  useCampaignPoll(camps.data, refetch)
 
   const c = camps.data?.list.find((x) => x.id === campaignId) ?? null
   useEffect(() => {

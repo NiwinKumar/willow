@@ -95,7 +95,8 @@ export function TourOverlay() {
       await sleep(step.hold ?? 2600)
       goStep(run.i + 1)
     })().catch((e) => {
-      if (e !== STOP) goStep(run.i + 1)
+      // A step that failed moves on, unless a newer step (or a stop) already replaced it.
+      if (e !== STOP && alive) goStep(run.i + 1)
     })
     return () => {
       alive = false

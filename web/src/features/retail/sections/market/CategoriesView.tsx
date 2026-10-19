@@ -1,10 +1,9 @@
 import { ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-import { retailerBrands } from '../../../../lib/api'
 import { useRetailData } from '../../context'
 import { csvMeta, csvName, type Category, type Flow, type Insights } from '../../data'
-import { useProducts } from '../../productData'
+import { fetchBrandList, useProducts } from '../../productData'
 import { TIER_ORDER } from '../../productModel'
 import { sectionPath, useRetailState } from '../../state'
 import type { ProductRow } from '../../types'
@@ -145,7 +144,7 @@ function FlowCell({ f, on }: { f: Flow; on: boolean }) {
 function BrandsInCategory({ cat, ranked, mine, className }: { cat: Category; ranked: Category['brands']; mine: string | null; className?: string }) {
   const { filters } = useRetailData()
   // The api's comparison note rides on /brands (shared, cached with the Brands view).
-  const list = useView(`brands|${filters.cohort}|${filters.range}`, () => retailerBrands(filters))
+  const list = useView(`brands|${filters.cohort}|${filters.range}`, () => fetchBrandList(filters))
   const note = (list.status === 'ready' ? list.data.note : null) ?? NOTE
   const max = Math.min(1, Math.max(0.5, ...ranked.map((b) => b.hi)) + 0.05)
   return (

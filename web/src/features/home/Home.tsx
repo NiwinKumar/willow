@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -23,7 +23,7 @@ import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, changeTitle, changeWay, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
-import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, inFlight, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, stalled, today, usable, verdictSentence, type HomeRead } from './derive'
+import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, today, usable, verdictSentence, type HomeRead } from './derive'
 import { useProductTests } from '../routine/productTests'
 import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
@@ -35,7 +35,6 @@ import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
 import { BaselineTile, PhotosTile, ProductTestTile } from './Tiles'
 
-const POLL_MS = 10_000
 const EMPTY: Session[] = []
 
 /**
@@ -103,16 +102,8 @@ function HomeBody() {
   const due = useCheckinDue()
   const read = useMemo(() => readHome(own, face, gapDaysFor(checkin)), [own, face, checkin])
 
-  // A check-in still uploading or measuring: re-read sessions every 10 s until its result lands.
-  const running = !demo && data.all.some((s) => inFlight(s) && !stalled(s))
-  const { refresh } = data
-  useEffect(() => {
-    if (!running) return
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh()
-    }, POLL_MS)
-    return () => window.clearInterval(id)
-  }, [running, refresh])
+  // A check-in still uploading or measuring is read again by the DataProvider (one session at a time, backing
+  // off) until its result lands; Home redraws from the cache.
 
   const routine = useRoutine()
   const entries = routine.data

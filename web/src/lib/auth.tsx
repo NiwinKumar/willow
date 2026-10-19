@@ -26,6 +26,16 @@ export { AuthContext }
 /** Local end-to-end runs: a fixed test person, no Firebase sign-in (see lib/devAuth.ts). */
 const devUser = DEV_UID ? ({ uid: DEV_UID, isAnonymous: true, email: null } as unknown as User) : null
 
+/** The signed-in person's ID token. One stable function: screens' effects never re-run just because auth re-rendered. */
+async function getIdToken(): Promise<string> {
+  if (devUser) return 'dev'
+  const auth = (await loadSdk()).firebaseAuth
+  await auth.authStateReady()
+  const u = auth.currentUser
+  if (!u) throw new Error('Not signed in')
+  return u.getIdToken()
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(devUser)
   const [loading, setLoading] = useState(!devUser)
@@ -94,14 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const f = await loadSdk()
         await f.signOut(f.firebaseAuth)
       },
-      getIdToken: async () => {
-        if (devUser) return 'dev'
-        const auth = (await loadSdk()).firebaseAuth
-        await auth.authStateReady()
-        const u = auth.currentUser
-        if (!u) throw new Error('Not signed in')
-        return u.getIdToken()
-      },
+      getIdToken,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- linked forces a new value after linking
     [user, loading, failed, linked],

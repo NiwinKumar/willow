@@ -79,11 +79,29 @@ export function referenceFor(metricId: string, session: Session, baseline: Sessi
   return (id && sessions.find((s) => s.id === id)) || baseline
 }
 
-/** An upload or analysis this old has stopped (the tab closed mid-upload, or the server restarted). */
-const STALL_MS = 30 * 60_000
+/** An upload or analysis this old has stopped (the tab closed mid-upload, or the server restarted; the api gives up on a run after 6 min). */
+const STALL_MS = 10 * 60_000
 export const inFlight = (s: Pick<Session, 'status'>) => s.status === 'uploading' || s.status === 'processing'
 /** Still uploading or measuring after STALL_MS: nothing will change by waiting, so screens stop polling it. */
 export const stalled = (s: Pick<Session, 'status' | 'created_at'>) => inFlight(s) && Date.now() - Date.parse(s.created_at) > STALL_MS
+
+/**
+ * Sessions a screen already reads closely (the check-in's own 2 s reads while it measures): the DataProvider's
+ * poll of sessions still in flight skips them, so one session is never polled twice. Returns the release.
+ */
+const watched = new Map<string, number>()
+export function watchSession(id: string): () => void {
+  watched.set(id, (watched.get(id) ?? 0) + 1)
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    const n = (watched.get(id) ?? 1) - 1
+    if (n > 0) watched.set(id, n)
+    else watched.delete(id)
+  }
+}
+export const isWatched = (id: string) => watched.has(id)
 
 /** Live sessions the engine could not measure yet (the photos are kept, no numbers exist). */
 export function isUnmeasured(s: Session | null | undefined): boolean {

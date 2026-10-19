@@ -74,17 +74,8 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   const [asking, setAsking] = useState<Session | null>(null)
   const date = parseDate(day)
 
-  // Still measuring: read again every few seconds until the api answers (no made-up progress). A session
-  // stuck for 30 min will not move by waiting, so polling stops there.
-  const polling = shown.some((s) => sessionState(s) === 'pending' && !stalled(s))
-  const { refresh } = data
-  useEffect(() => {
-    if (!polling) return
-    const t = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh()
-    }, 6000)
-    return () => window.clearInterval(t)
-  }, [polling, refresh])
+  // Still measuring: the DataProvider reads each such session again (backing off) until the api answers; a
+  // session stuck for 10 min will not move by waiting, so it stops there (data/live.ts stalled).
 
   // Metric detail in the URL (?metric= and the place it was read at, ?place=); opening pushes, so Back closes it.
   const metricId = params.get('metric') as MetricId | null

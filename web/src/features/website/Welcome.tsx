@@ -10,7 +10,7 @@ import { CLOSE_UPS, GOALS, MAX_GOALS, METRIC_META, type GoalId } from '../../lib
 import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
-import { useData } from '../../data/useData'
+import { useActivateData, useData } from '../../data/useData'
 import { TrackChoices } from '../checkin/TrackChoices'
 import { placesOf } from '../../lib/profile'
 import { choicesOf, trackOf, type TrackChoice } from '../../lib/track'
@@ -39,6 +39,8 @@ export default function Welcome() {
   const { search } = useLocation()
   const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' || raw === 'wisp' ? raw : 'consent'
   const { user } = useAuth()
+  // Onboarding shows (and saves) the account's profile and consent.
+  useActivateData()
 
   useEffect(() => {
     window.scrollTo(0, 0)

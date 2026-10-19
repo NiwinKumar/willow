@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
-import { retailerProducts } from '../../../lib/api'
 import { useRetailData } from '../context'
 import { useRetailState } from '../state'
 import type { Insights, Products, ProductRow, Segments } from '../types'
 import { Bone, ErrorState, int, MIN_GROUP, PageHeader, pct, SkeletonPanel } from '../ui'
 import { topUnmet } from '../ui/insight'
+import { fetchProducts } from '../productData'
 import { useSegments, useView } from '../useView'
 import { Conflicts, Gaps, WhatPeopleWant } from './customers/Demand'
 import { MatrixPanel } from './customers/Matrix'
@@ -45,7 +45,8 @@ function Page({ d }: { d: Insights }) {
   const { param, setParam } = useRetailState()
   const { hash } = useLocation()
   const mine = workspace.kind === 'brand' ? workspace.brand : null
-  const catalog = useView<Products>(`products|${filters.cohort}|${filters.range}`, () => retailerProducts(filters))
+  // The same request (and cache) as the product screens (productData).
+  const catalog = useView<Products>(`products|${filters.cohort}|${filters.range}`, () => fetchProducts(filters))
   const products = new Map<string, ProductRow>((catalog.data?.products ?? []).map((p) => [p.product_id, p]))
 
   // Anchors land once the matrix is in (it sets the height above them); an old `view=demand` link lands on
