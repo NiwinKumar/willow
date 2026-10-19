@@ -121,8 +121,11 @@ _TOOL_NAMES = {d.name for d in TOOLS.function_declarations}
 def model_round(contents: list[types.Content], config: types.GenerateContentConfig):
     """One Gemini turn: ([(tool, args)], text, the model's content). The seam the tests replace."""
     started = time.monotonic()
-    res = gemini.client().models.generate_content(
-        model=get_settings().gemini_model, contents=contents, config=config
+    res = gemini.with_retry(
+        "shelf_agent",
+        lambda: gemini.client().models.generate_content(
+            model=get_settings().gemini_model, contents=contents, config=config
+        ),
     )
     usage = res.usage_metadata
     log.info(

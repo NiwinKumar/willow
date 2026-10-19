@@ -1,17 +1,19 @@
 """Gemini on Vertex AI (docs/GEMINI_SPEC.md).
 
 Every call: the global system rules, JSON output against a pydantic schema, low thinking, a
-generous token cap (thinking tokens count against it), one retry on a schema failure, then the
-caller's deterministic fallback. Logs prompt id, latency and token counts only (no images, no PII).
+generous token cap (thinking tokens count against it), one retry on a schema failure or a
+transient error (429, 503, 504), then the caller's deterministic fallback. Logs prompt id,
+latency and token counts only (no images, no PII).
 """
 
 import json
 import logging
 import threading
 import time
+from collections.abc import Callable
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from pydantic import BaseModel, ValidationError
 
 from app.settings import get_settings
@@ -29,6 +31,44 @@ SYSTEM_RULES = (
 
 class GeminiError(Exception):
     """Gemini failed twice or could not be reached; callers fall back."""
+
+
+# Worth one more try: a rate limit, an overloaded model, or Vertex's own deadline (Oct 19: Ask
+# answered 503 after one 504 DEADLINE_EXCEEDED; the same question worked minutes later).
+TRANSIENT_CODES = (429, 503, 504)
+# A try that failed after this long is not repeated, so a retry adds at most one call's worth of
+# waiting to a request (the 25 s per-call policy).
+RETRY_WITHIN_S = 25.0
+
+
+def transient(exc: BaseException) -> bool:
+    return isinstance(exc, errors.APIError) and exc.code in TRANSIENT_CODES
+
+
+def retry_pause(exc: BaseException) -> float:
+    """Seconds to wait before the retry: a rate limit needs a moment, an overload or a deadline
+    barely any."""
+    return 1.5 if isinstance(exc, errors.APIError) and exc.code == 429 else 0.5
+
+
+def with_retry[R](prompt_id: str, call: Callable[[], R]) -> R:
+    """`call()`, tried once more after a short pause when it fails with a transient error that
+    came back within RETRY_WITHIN_S. For the tool-calling turns, which call the client directly;
+    generate_json does the same inside its own attempts."""
+    started = time.monotonic()
+    try:
+        return call()
+    except Exception as exc:
+        if not transient(exc) or time.monotonic() - started > RETRY_WITHIN_S:
+            raise
+        log.warning(
+            "gemini %s attempt 1 failed, retrying: %s: %s",
+            prompt_id,
+            type(exc).__name__,
+            str(exc)[:300],
+        )
+        time.sleep(retry_pause(exc))
+    return call()
 
 
 _client: genai.Client | None = None
@@ -78,7 +118,10 @@ def generate_json[T: BaseModel](
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     last_error: Exception | None = None
-    for attempt in range(1, attempts + 1):
+    tries = attempts
+    attempt = 0
+    while attempt < tries:
+        attempt += 1
         started = time.monotonic()
         try:
             res = client().models.generate_content(
@@ -93,12 +136,12 @@ def generate_json[T: BaseModel](
                 type(exc).__name__,
                 str(exc)[:300],
             )
-            # Rate limit or overload: a short pause usually clears it (spot labels and the
-            # explanation start several calls at once).
-            if attempt < attempts and any(
-                c in str(exc) for c in ("429", "503", "RESOURCE_EXHAUSTED")
-            ):
-                time.sleep(1.5 * attempt)
+            if transient(exc) and time.monotonic() - started <= RETRY_WITHIN_S:
+                # A single-attempt call still gets one retry on a transient error (never more:
+                # a request waits at most one extra call).
+                tries = max(tries, 2)
+                if attempt < tries:
+                    time.sleep(retry_pause(exc))
             continue
         usage = res.usage_metadata
         log.info(

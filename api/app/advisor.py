@@ -343,26 +343,14 @@ def _retrieval_line(name: str, args: dict[str, Any], out: dict[str, Any]) -> str
 
 
 def _generate(contents: list[types.Content], config: types.GenerateContentConfig):
-    """One tool-calling turn; a slow or rate-limited Gemini gets one more try after a pause."""
-    for attempt in (1, 2):
-        try:
-            return gemini.client().models.generate_content(
-                model=get_settings().gemini_model, contents=contents, config=config
-            )
-        except Exception as exc:
-            log.warning(
-                "advisor tools attempt %d failed: %s: %s",
-                attempt,
-                type(exc).__name__,
-                str(exc)[:300],
-            )
-            # only a rate limit or an overloaded model is worth a second try; a timeout already
-            # used its 25 s, and the turn has a budget
-            busy = any(code in str(exc) for code in ("429", "503", "RESOURCE_EXHAUSTED"))
-            if attempt == 2 or not busy:
-                raise
-            time.sleep(1.5)
-    raise AssertionError("unreachable")
+    """One tool-calling turn; a rate-limited, overloaded or deadline-hit Gemini gets one more try
+    after a short pause (gemini.with_retry)."""
+    return gemini.with_retry(
+        "advisor_tools",
+        lambda: gemini.client().models.generate_content(
+            model=get_settings().gemini_model, contents=contents, config=config
+        ),
+    )
 
 
 def _no_stage(event: str, data: dict[str, Any]) -> None:
