@@ -12,12 +12,13 @@ import { Disclaimer } from '../../components/willow/Disclaimer'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner } from '../../data/hooks'
 import { SITE_ORDER, stalled } from '../../data/live'
-import type { MetricId, RoutineEntry, Session } from '../../data/types'
+import type { Metric, MetricId, RoutineEntry, Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
 import { clockOf, fmtDate, parseDate } from '../../lib/format'
 import { METRIC_META, SITE_LABEL } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
+import { readableWarnings } from '../../lib/warnings'
 import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
 import { InsightsCard, NextAction } from './ExplanationCard'
@@ -37,10 +38,19 @@ const NONE: Session[] = []
 const TOMORROW_KEY = 'willow.tomorrowShown'
 const isMeasured = (st: string) => st === 'compared' || st === 'baseline' || st === 'former'
 
+/** Why some readings of a place are missing: the engine's notes that name them ("Pores need a closer photo…"), else "Not read this time: Pores." */
+function unreadLine(s: Session, unread: Metric[]): string {
+  const labels = unread.map((m) => METRIC_META[m.id].label)
+  const notes = readableWarnings(s.result).filter((w) => labels.some((l) => w.toLowerCase().startsWith(l.toLowerCase())))
+  const left = labels.filter((l) => !notes.some((w) => w.toLowerCase().includes(l.toLowerCase())))
+  const lines = [...notes.map((w) => (/[.!?]$/.test(w) ? w : `${w}.`)), ...(left.length ? [`Not read this time: ${left.join(', ')}.`] : [])]
+  return lines.join(' ')
+}
+
 /**
  * A day's result (design "Day detail"), the one result page, for every place at once: one check-in per place
- * (?session= picks it for its place, else the place's latest analysed one), the insights, every reading in
- * one grid (tap one for its detail, ?metric= and ?place=), then each place's photo with its spots and areas.
+ * (?session= picks it for its place, else the place's latest analysed one), the insights, the readings grouped by
+ * place (tap one for its detail, ?metric= and ?place=), then each place's photo with its spots and areas.
  */
 export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<string, Session[]>; entries: RoutineEntry[] }) {
   const navigate = useNavigate()
@@ -243,7 +253,15 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
     if (!firstAt.has(i.m.id)) firstAt.set(i.m.id, k)
   })
   const ordered = [...byGoal].sort((a, b) => firstAt.get(a.m.id)! - firstAt.get(b.m.id)!)
-  const twice = new Set(ordered.filter((i, k) => ordered.findIndex((j) => j.m.id === i.m.id) !== k).map((i) => i.m.id))
+  // On screen the readings are grouped by place (a heading per place when there are several), so "Dark spots"
+  // on the face and on the cheek close-up never look like one reading twice. A metric with no reading has no
+  // tile: one quiet line under its place says why (the engine's note), or that it was not read.
+  const readings = states
+    .filter((x) => isMeasured(x.st))
+    .map((x) => {
+      const own = byGoal.filter((i) => i.s === x.s)
+      return { s: x.s, st: x.st, read: own.filter((i) => i.m.value !== null), unread: own.filter((i) => i.m.value === null).map((i) => i.m) }
+    })
   const open = ordered.find((i) => i.m.id === metricId && i.s.site === qPlace) ?? ordered.find((i) => i.m.id === metricId) ?? null
   const sheetSession = open?.s ?? primary
   const sheetBase = baseOf(sheetSession)
@@ -420,25 +438,37 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           return null
         })}
 
-        {ordered.length ? (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
-            {ordered.map(({ m, s, st }, i) => {
-              // counts of a check-in with (or without) cheek photos compare with one taken the same way
-              const ref = referenceFor(m.id, s, baseOf(s), seriesOf(s))
-              return (
-                <MetricTile
-                  key={`${s.id}:${m.id}`}
-                  metric={m}
-                  session={s}
-                  place={twice.has(m.id) ? placeOf(s) : undefined}
-                  onOpen={() => showMetric(s, m.id)}
-                  band={s.is_baseline || st === 'former' ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null}
-                  delay={i * 60}
-                />
-              )
-            })}
-          </div>
-        ) : null}
+        {readings.map(({ s, st, read, unread }, g) => (
+          <section key={s.id} aria-label={multi ? `${placeOf(s)} readings` : 'Readings'} data-place={s.site} className="flex flex-col gap-3">
+            {multi ? (
+              <h2 className={`m-0 flex items-baseline gap-2 self-start text-[17px] font-normal ${g ? 'pt-3' : ''}`}>
+                {placeOf(s)}
+                <span className="text-[13px] text-ink-2">
+                  {read.length} {read.length === 1 ? 'reading' : 'readings'}
+                </span>
+              </h2>
+            ) : null}
+            {read.length ? (
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
+                {read.map(({ m }, i) => {
+                  // counts of a check-in with (or without) cheek photos compare with one taken the same way
+                  const ref = referenceFor(m.id, s, baseOf(s), seriesOf(s))
+                  return (
+                    <MetricTile
+                      key={`${s.id}:${m.id}`}
+                      metric={m}
+                      session={s}
+                      onOpen={() => showMetric(s, m.id)}
+                      band={s.is_baseline || st === 'former' ? m.mdc95 : st === 'compared' ? bandOf(ref, m.id) : null}
+                      delay={(g * 6 + i) * 60}
+                    />
+                  )
+                })}
+              </div>
+            ) : null}
+            {unread.length ? <p className="m-0 text-[14px] leading-[1.45] text-ink-2">{unreadLine(s, unread)}</p> : null}
+          </section>
+        ))}
 
         {states.map(({ s, st }) => (
           <PlaceSection

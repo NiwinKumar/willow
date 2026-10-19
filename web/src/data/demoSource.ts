@@ -25,6 +25,42 @@ export function pickDemo(): Promise<DemoPick> {
   if (held && pick) return Promise.resolve(pick)
   const views = fresh()
   if (views) return Promise.resolve((pick = views.length ? { source: 'real', views } : { source: 'unavailable', views: null, reason: 'empty' }))
+  return request()
+}
+
+/**
+ * The journey's sessions for Mei's story (/journey): the answer the landing page already asked for when it is
+ * under 10 minutes old, else a new request. Never a held pick, whose photo links may be older than an hour.
+ */
+export function journeyViews(): Promise<SessionView[]> {
+  const views = fresh()
+  if (views) return Promise.resolve(views)
+  return request().then(() => {
+    const v = fresh()
+    if (!v) throw new Error('journey unavailable')
+    return v
+  })
+}
+
+const warmed: HTMLImageElement[] = []
+
+/**
+ * Mei's first face photo (the "Meet Mei" slide) starts loading now, at high priority, so the slide draws it from
+ * the browser's memory. Called when /journey opens and when a pointer or focus reaches a link to it.
+ */
+export function warmFirstPhoto(views: SessionView[] | null | undefined) {
+  const url = (views ?? [])
+    .filter((v) => v.session.site === 'face_full' && v.session.preview)
+    .sort((a, b) => a.session.created_at.localeCompare(b.session.created_at))[0]?.session.preview?.url
+  if (!url || warmed.some((img) => img.src === url)) return
+  const img = new Image()
+  img.fetchPriority = 'high'
+  img.decoding = 'async'
+  img.src = url
+  warmed.splice(0, warmed.length, img)
+}
+
+function request(): Promise<DemoPick> {
   inflight ??= api
     .demoJourney()
     .then((r) => {

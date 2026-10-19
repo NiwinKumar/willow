@@ -11,7 +11,8 @@ function preconnect(apiUrl: string | undefined): Plugin {
     transformIndexHtml: () => [
       ...(apiUrl ? [{ tag: 'link', attrs: { rel: 'preconnect', href: apiUrl, crossorigin: '' }, injectTo: 'head' as const }] : []),
       { tag: 'link', attrs: { rel: 'preconnect', href: 'https://identitytoolkit.googleapis.com', crossorigin: '' }, injectTo: 'head' as const },
-      { tag: 'link', attrs: { rel: 'dns-prefetch', href: 'https://storage.googleapis.com' }, injectTo: 'head' as const },
+      // photos (Mei's first one is the journey's opening image): a full connection, not only the name
+      { tag: 'link', attrs: { rel: 'preconnect', href: 'https://storage.googleapis.com' }, injectTo: 'head' as const },
     ],
   }
 }
