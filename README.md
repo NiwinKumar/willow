@@ -56,8 +56,8 @@ The landing page also runs [sample photos through the real pipeline](https://mee
 **About Mei.** Mei is 26, lives in Singapore and has acne along her cheeks, jaw and chin. Her photos are generated and show no real person, so there is no consent question and nobody's skin is on display. Every number in her story was measured from those photos by Willow's live engine and explained by Gemini, exactly as for anyone. Every surface that shows her says she is simulated.
 
 <p align="center">
-  <img src="docs/img/readme/journey.webp" alt="The last slide of Mei's journey, 'Eight weeks later': blemishes and tone evenness improved beyond her normal range; redness, dark spots and shine stayed within it. Her photos are blurred in this screenshot." width="88%" />
-  <br /><sub>Mei's journey, week 8: two readings clearly improved, three stayed within her normal range. (Photos blurred for this README.)</sub>
+  <img src="docs/img/readme/journey.webp" alt="The last slide of Mei's journey, 'Eight weeks later': blemishes and tone evenness improved beyond her normal range; redness, dark spots and shine stayed within it. Her baseline and latest photos sit side by side; Mei is simulated and her photos are generated." width="88%" />
+  <br /><sub>Mei's journey, week 8: two readings clearly improved, three stayed within her normal range. Mei is simulated: her photos are generated and show no real person.</sub>
 </p>
 
 ---
