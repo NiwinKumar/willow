@@ -9,9 +9,9 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 from scipy import ndimage
-from skimage.feature import blob_log
 
 from app import config
+from app.metrics.blobs import blob_log_fast
 
 
 @dataclass
@@ -76,7 +76,7 @@ def find_blemishes(
 
     # round-blob search at sizes from ~1 to ~5 mm across
     r_min, r_max = (d * px_per_mm / 2 for d in config.BLEMISH_DIAMETER_MM)
-    blobs = blob_log(
+    blobs = blob_log_fast(
         z / 10,
         min_sigma=r_min / 1.414,
         max_sigma=r_max / 1.414,

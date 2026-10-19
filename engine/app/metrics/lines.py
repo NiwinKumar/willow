@@ -165,11 +165,18 @@ def _direction_ok(theta: np.ndarray, direction: tuple, shape: tuple[int, int]) -
 
 
 def find_lines(
-    lab: np.ndarray, face: Face, skin: np.ndarray, px_per_mm: float, marks: list
+    lab: np.ndarray,
+    face: Face,
+    skin: np.ndarray,
+    px_per_mm: float,
+    marks: list,
+    with_masks: bool = True,
 ) -> tuple[dict[str, np.ndarray], dict[str, float | None], list[str]]:
     """Line pixels per zone, at the input's scale. `face` landmarks are in `lab`'s pixels,
     `marks` (blemishes, dark spots: x, y, radius) too. -> (zone -> line mask, zone -> mm of
-    line per cm2 of zone skin or None if too small, zones skipped for expression)."""
+    line per cm2 of zone skin or None if too small, zones skipped for expression).
+    with_masks=False leaves the line masks out (empty dict): the metric needs only the
+    densities, and each mask is a full-size resize."""
     h, w = skin.shape
     scale = min(config.LINES_WORK_PX_PER_MM / px_per_mm, 1.0)
     size = (max(round(w * scale), 1), max(round(h * scale), 1))
@@ -247,13 +254,14 @@ def find_lines(
             lengths += per_piece[long - 1].tolist()
             zone_line |= keep
             area += int(region.sum())
-        if area:
-            density[zone] = sum(lengths) / (area / px**2 / 100.0)
+        if not area:
+            density[zone] = None
+            continue
+        density[zone] = sum(lengths) / (area / px**2 / 100.0)
+        if with_masks:
             masks[zone] = cv2.resize(
                 zone_line.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST
             ).astype(bool)
-        else:
-            density[zone] = None
     return masks, density, skipped
 
 
@@ -265,7 +273,7 @@ def lines(
     extras per zone."""
     if px_per_mm < config.LINES_MIN_PX_PER_MM:
         return None, {}
-    _, density, skipped = find_lines(lab, face, skin, px_per_mm, marks)
+    _, density, skipped = find_lines(lab, face, skin, px_per_mm, marks, with_masks=False)
     measured = [v for v in density.values() if v is not None]
     extras = {
         f"{z}_mm_per_cm2": (round(v, 2) if v is not None else None) for z, v in density.items()

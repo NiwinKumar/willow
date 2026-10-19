@@ -14,20 +14,19 @@ Left and right are the person's own (left_cheek_macro: their left cheek), as in 
 """
 
 import dataclasses
-import json
+import logging
 import time
 from pathlib import Path
 from types import SimpleNamespace
 
 import cv2
 import numpy as np
-from jsonschema import validate
 from scipy.ndimage import binary_fill_holes
 
 from app import config
 from app.aggregate import summarize
 from app.color import linear_srgb_to_lab
-from app.decode import load_photo_srgb8
+from app.decode import read_photo_info
 from app.errors import EngineError
 from app.io import save_png, save_preview
 from app.landmarks import EYE_OUTER, Face, FaceNotFound, detect_face, polygon_mask, skin_colour
@@ -38,10 +37,11 @@ from app.metrics.redness import erythema_index
 from app.metrics.texture import texture
 from app.metrics.tone import ita_band, ita_degrees
 from app.overlay import redness_rgba, to_preview
-from app.pipeline import SCHEMA, _load, _mean_extras, capture_mode_for
+from app.pipeline import _load, _mean_extras, capture_mode_for, finite_frame, map_frames
 from app.pipeline_face import _candidates
 from app.quality import check_frame, laplacian_variance
 from app.roi import Box
+from app.schemas import validate
 
 REGIONS = {
     "cheek_macro": "cheek",  # either or both cheeks (older check-ins)
@@ -76,6 +76,8 @@ SITE_METRICS = {site: SKIN_METRICS for site in REGIONS if site != "nose_macro"} 
     "nose_macro": ("blemishes", "pores"),
 }
 SCALE_METRICS = {"pores", "texture"}  # need the mm scale; measured only once it is calibrated
+
+log = logging.getLogger("willow.macro")
 
 
 def _edges(shape: tuple[int, int]) -> np.ndarray:
@@ -126,12 +128,19 @@ def _region_skin(
     return np.isin(labels, big) & region
 
 
-def _find_face(srgb8: np.ndarray) -> Face | None:
+def _find_face(srgb8: np.ndarray, retry_px_per_mm: float | None = None) -> Face | None:
     """Face landmarks on a close-up. The landmarker needs most of a face in view, so a
     close-up is also tried shrunk onto a plain canvas (CLOSEUP_SHRINK), landmarks mapped
-    back (they may then run off the photo)."""
+    back (they may then run off the photo).
+
+    retry_px_per_mm: the retry of a close-up whose face was not found, given the scale of
+    the session's other close-ups: a less strict landmarker (CLOSEUP_RETRY_CONFIDENCE), one
+    more shrink, and a face kept only if its iris is in the photo and gives about that scale
+    (CLOSEUP_RETRY_SCALE_TOL): a less certain face is otherwise easily the wrong size."""
     h, w = srgb8.shape[:2]
-    for k in (1.0, *config.CLOSEUP_SHRINK):
+    retry = retry_px_per_mm is not None
+    shrinks = (1.0, *config.CLOSEUP_SHRINK, *((config.CLOSEUP_RETRY_SHRINK,) if retry else ()))
+    for k in shrinks:
         if k == 1.0:
             canvas, x0, y0 = srgb8, 0, 0
         else:
@@ -141,10 +150,15 @@ def _find_face(srgb8: np.ndarray) -> Face | None:
             y0, x0 = (h - small.shape[0]) // 2, (w - small.shape[1]) // 2
             canvas[y0 : y0 + small.shape[0], x0 : x0 + small.shape[1]] = small
         try:
-            face = detect_face(canvas)
+            face = detect_face(canvas, config.CLOSEUP_RETRY_CONFIDENCE if retry else None)
         except FaceNotFound:
             continue
-        return dataclasses.replace(face, points=(face.points - [x0, y0]) / k)
+        face = dataclasses.replace(face, points=(face.points - [x0, y0]) / k)
+        if not retry:
+            return face
+        iris = _iris_px_per_mm(face, (h, w))
+        if iris is not None and abs(iris / retry_px_per_mm - 1) <= config.CLOSEUP_RETRY_SCALE_TOL:
+            return face
     return None
 
 
@@ -267,7 +281,7 @@ def _front_camera(path: str) -> bool:
     the assumed macro scale (and then only if _not_macro finds nothing against it)."""
     if Path(path).suffix.lower() == ".dng":
         return False
-    info = load_photo_srgb8(path)[1]  # already decoded once
+    info = read_photo_info(path)  # EXIF only (the pixels are decoded once, in _load)
     return "front" in (info.lens or "").lower() or not (info.camera or info.lens)
 
 
@@ -278,7 +292,7 @@ def _not_macro(path: str) -> str | None:
     or a photo without these tags, is not judged (the scale stays assumed)."""
     if Path(path).suffix.lower() == ".dng":
         return None
-    info = load_photo_srgb8(path)[1]
+    info = read_photo_info(path)
     if info.focal_35mm is not None and info.focal_35mm > config.MACRO_MAX_FOCAL_35MM:
         return "face_not_found"
     if info.focus_position is not None and info.focus_position < config.MACRO_MIN_FOCUS_POSITION:
@@ -288,12 +302,18 @@ def _not_macro(path: str) -> str | None:
     return None
 
 
-def _frame(path: str, site: str, overlays: bool = False) -> dict:
+def _frame(
+    path: str, site: str, overlays: bool = False, retry_px_per_mm: float | None = None
+) -> dict:
     """Everything measured on one close-up. overlays: also keep its a* on the preview grid
-    for the redness overlay (not nose_macro: it has no redness metric)."""
+    for the redness overlay (not nose_macro: it has no redness metric). retry_px_per_mm: a
+    second try at a close-up whose face was not found (_find_face): only a face found this
+    time is measured, else it fails as face_not_found again."""
     linear, srgb8 = _load(path)
     h, w = srgb8.shape[:2]
-    face = _find_face(srgb8)
+    face = _find_face(srgb8, retry_px_per_mm)
+    if retry_px_per_mm is not None and face is None:
+        return _no_face(srgb8, site)
     iris = _iris_px_per_mm(face, (h, w)) if face is not None else None
     not_macro = None
     if iris is not None:
@@ -317,6 +337,8 @@ def _frame(path: str, site: str, overlays: bool = False) -> dict:
         region = _region(
             dataclasses.replace(face, points=face.points * scale), REGIONS[site], lab.shape[:2]
         )
+        if retry_px_per_mm is not None and not region.any():
+            return _no_face(srgb8, site)  # a less certain face: its region must be in view
         pieces = PIECES[REGIONS[site]]
         nose = REGIONS[site] == "nose"
         skin = _region_skin(lab, region, px, pieces, nose) if region.any() else region
@@ -437,9 +459,35 @@ def analyze_macro(
         raise EngineError("bad_request", str(exc)) from exc
     draw = compute_overlays and bool(output_prefix)  # overlays need somewhere to go
 
-    frames, per_frame = [], []
-    for i, path in enumerate(files):
-        f = _frame(path, site, overlays=draw)
+    def measure(item: tuple[int, str], retry: float | None = None) -> dict | None:
+        """One close-up's frame, or None when the measurements trip over it."""
+        i, path = item
+        try:
+            f = _frame(path, site, overlays=draw, retry_px_per_mm=retry)
+            return finite_frame(f, f"close-up {i + 1}")
+        except (IndexError, ValueError) as exc:  # as face photos: the photo fails, not the request
+            log.warning("close-up %d could not be measured: %s", i + 1, exc)
+            return None
+
+    items = list(enumerate(files))
+    results = map_frames(measure, items)  # photos in parallel
+    # close-ups whose face was not found: once more, less strictly, at the scale of the
+    # session's close-ups that had an eye in view (_find_face)
+    iris = [f["px_per_mm"] for f in results if f is not None and f["scale_from"] == "iris"]
+    lost = [i for i, f in enumerate(results) if f is not None and f["scale_from"] == "unknown"]
+    if iris and lost:
+        ref = float(np.median(iris))
+        again = map_frames(lambda i: measure(items[i], retry=ref), lost)
+        for i, f in zip(lost, again, strict=True):
+            if f is not None and f["face_found"]:
+                log.info("close-up %d: face found on the second try", i + 1)
+                results[i] = f
+    frames, per_frame, failed = [], [], []
+    for i, f in enumerate(results):
+        if f is None:
+            per_frame.append({"index": i, "passed": False, "reasons": []})
+            failed.append(f"photo {i + 1} could not be measured")
+            continue
         f["index"] = i
         frames.append(f)
         per_frame.append(
@@ -501,7 +549,8 @@ def analyze_macro(
     warnings = [
         "uncalibrated photo: results are a trend only, not a measurement"
         if mode == "uncalibrated"
-        else "no colour card: colours as captured by the camera"
+        else "no colour card: colours as captured by the camera",
+        *failed,
     ]
     if any(not _scale_known(f) for f in good):
         warnings.append(
@@ -570,7 +619,7 @@ def analyze_macro(
     for f in frames:
         f.pop("srgb8", None)
         f.pop("redness_map", None)
-    validate(result, json.loads(SCHEMA.read_text()))
+    validate(result)  # the contract's result schema (app.schemas, loaded once)
     return result
 
 

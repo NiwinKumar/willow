@@ -435,3 +435,57 @@ def test_moustache_over_the_lip_is_skipped_but_beard_skin_elsewhere_is_searched(
     assert guard[52, 50]  # moustache next to the lip: skipped
     assert not guard[90, 50]  # beard on the chin: still searched
     assert not guard[52, 22]  # ordinary skin beside the lips: only the narrow band applies
+
+
+def test_a_region_cut_off_by_the_photo_edge_leaves_only_its_metrics_out(
+    tmp_path, fake_landmarks, monkeypatch
+):
+    # a forehead above the top of the photo has no pixels: the photo still passes and only
+    # tone evenness (which reads the forehead) is not measured; it used to fail the photo
+    monkeypatch.setitem(SQUARES, "forehead", (440, -400))
+    _face_photo(tmp_path / "face.jpg")
+    r = analyze_face([str(tmp_path / "face.jpg")])
+    assert r["frames_used"] == 1 and r["quality"]["per_frame"][0]["passed"]
+    m = {x["id"]: x for x in r["metrics"]}
+    assert m["tone_evenness"]["value"] is None
+    assert m["tone_ita"]["value"] is not None and m["redness"]["value"] is not None
+
+
+def test_a_metric_that_is_not_a_number_is_not_measured(tmp_path, fake_landmarks, monkeypatch):
+    # a NaN (e.g. the median of an empty set) must not reach the JSON (which has no NaN)
+    import json
+
+    monkeypatch.setattr(
+        "app.pipeline_face.glow", lambda *a: (float("nan"), {"l_star": float("nan"), "c": 1.0})
+    )
+    _face_photo(tmp_path / "face.jpg")
+    r = analyze_face([str(tmp_path / "face.jpg")])
+    json.dumps(r, allow_nan=False)
+    glow = next(x for x in r["metrics"] if x["id"] == "glow")
+    assert glow["value"] is None and r["frames_used"] == 1
+
+
+def test_non_finite_numbers_become_none():
+    from app.pipeline import finite_frame
+
+    f = finite_frame(
+        {
+            "values": {"a": float("nan"), "b": 2.0, "c": None},
+            "extras": {"a": {"x": float("inf"), "y": [1.0, np.float32("nan")], "z": ["top"]}},
+        },
+        "test",
+    )
+    assert f["values"] == {"a": None, "b": 2.0, "c": None}
+    assert f["extras"] == {"a": {"x": None, "y": [1.0, None], "z": ["top"]}}
+
+
+def test_photos_measured_in_parallel_keep_their_order():
+    import time
+
+    from app.pipeline import map_frames
+
+    def slow_first(i):
+        time.sleep(0.05 if i == 0 else 0.0)
+        return i * 10
+
+    assert map_frames(slow_first, [0, 1, 2, 3], workers=2) == [0, 10, 20, 30]

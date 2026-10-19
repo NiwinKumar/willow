@@ -7,10 +7,11 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
-from skimage.feature import blob_log
+from scipy.spatial import cKDTree
 
 from app import config
 from app.metrics.blemish import _local_mean, robust_spread
+from app.metrics.blobs import blob_log_fast
 
 
 @dataclass
@@ -38,14 +39,54 @@ def _drop_chains(pores: list[Pore], px_per_mm: float) -> list[Pore]:
     xy = np.array([(p.x, p.y) for p in pores])
     reach = config.PORE_CHAIN_MM * px_per_mm
     drop = np.zeros(len(pores), bool)
-    for i in range(len(pores)):
-        near = np.hypot(*(xy - xy[i]).T) <= reach
-        if near.sum() < config.PORE_CHAIN_MIN + 1:
+    # neighbours from a k-d tree (a distance to every pore from every pore was thousands
+    # squared), then the exact test below on those few, in index order
+    tree = cKDTree(xy)
+    for i, cand in enumerate(tree.query_ball_point(xy, reach * (1 + 1e-9) + 1e-9)):
+        if len(cand) < config.PORE_CHAIN_MIN + 1:
             continue
-        ev = np.linalg.eigvalsh(np.cov(xy[near].T))
+        cand = np.sort(np.asarray(cand, dtype=np.intp))
+        idx = cand[np.hypot(*(xy[cand] - xy[i]).T) <= reach]
+        if len(idx) < config.PORE_CHAIN_MIN + 1:
+            continue
+        ev = np.linalg.eigvalsh(np.cov(xy[idx].T))
         if ev[1] > config.PORE_CHAIN_ELONGATION**2 * max(ev[0], 1e-9):
-            drop |= near
+            drop[idx] = True
     return [p for p, d in zip(pores, drop, strict=True) if not d]
+
+
+def _disk_means(
+    maps: list[np.ndarray], skin: np.ndarray, ys: np.ndarray, xs: np.ndarray, radii: list
+) -> tuple[list[np.ndarray], np.ndarray]:
+    """Per blob (centre ys, xs; radius radii): the mean of each map over the skin pixels of
+    its disk (pixel centres within the radius, as `(dy**2 + dx**2) <= r * r`), and how many
+    there are. Blobs come in a few radii (one per blob-search scale): each radius's disk
+    offsets are gathered for all its blobs at once."""
+    n = len(ys)
+    sums = [np.zeros(n) for _ in maps]
+    count = np.zeros(n)
+    if n == 0:
+        return sums, count
+    pad = int(np.ceil(max(radii)))
+    sk = np.pad(skin, pad).astype(np.float64)
+    vals = [np.pad(np.where(skin, m, 0), pad).astype(np.float64) for m in maps]
+    groups: dict[float, list[int]] = {}
+    for i, r in enumerate(radii):
+        groups.setdefault(float(r), []).append(i)
+    for idx in groups.values():
+        r = radii[idx[0]]  # the radius as the blob search gave it (r * r in its own type)
+        ri = int(np.ceil(r))
+        dy, dx = np.mgrid[-ri : ri + 1, -ri : ri + 1]
+        inside = dy**2 + dx**2 <= r * r
+        dy, dx = dy[inside], dx[inside]
+        sel = np.asarray(idx)
+        rows = ys[sel, None] + pad + dy
+        cols = xs[sel, None] + pad + dx
+        count[sel] = sk[rows, cols].sum(axis=1)
+        for v, total in zip(vals, sums, strict=True):
+            total[sel] = v[rows, cols].sum(axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return [t / count for t in sums], count
 
 
 def find_pores(
@@ -62,7 +103,7 @@ def find_pores(
     spread = robust_spread(darker[skin])
     z = np.clip(darker / spread, 0, None)
     r_min, r_max = (d * px / 2 for d in config.PORE_DIAMETER_MM)
-    blobs = blob_log(
+    blobs = blob_log_fast(
         z / 10,
         min_sigma=max(r_min / 1.414, 0.5),
         max_sigma=r_max / 1.414,
@@ -73,32 +114,29 @@ def find_pores(
     # away from the skin's edge: a nostril rim, lid or hairline edge is a row of dark dots
     edge = max(round(config.PORE_EDGE_MM * px), 2)
     inner = cv2.erode(skin.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=edge) > 0
-    h, w = L.shape
-    out = []
-    for y, x, s in blobs:
-        y, x = int(y), int(x)
-        if not inner[y, x]:
-            continue
-        r = max(s * 1.414, 1.0)
-        # the disk only within its own bounding box: a whole-image mask per blob made a
-        # pore-rich close-up take minutes (thousands of blobs x every pixel)
-        ri = int(np.ceil(r))
-        y0, y1, x0, x1 = max(y - ri, 0), min(y + ri + 1, h), max(x - ri, 0), min(x + ri + 1, w)
-        yy, xx = np.ogrid[y0:y1, x0:x1]
-        disk = ((yy - y) ** 2 + (xx - x) ** 2 <= r * r) & skin[y0:y1, x0:x1]
-        if not disk.any() or float(z[y0:y1, x0:x1][disk].mean()) < config.PORE_MIN_SCORE:
-            continue
-        out.append(
-            Pore(
-                x=float(x * back),
-                y=float(y * back),
-                diameter_mm=float(2 * r / px),
-                dark_l=float(darker[y0:y1, x0:x1][disk].mean()),
-            )
-        )
+    keep = [(int(y), int(x), max(s * 1.414, 1.0)) for y, x, s in blobs]
+    keep = [b for b in keep if inner[b[0], b[1]]]
+    ys = np.array([b[0] for b in keep], np.intp)
+    xs = np.array([b[1] for b in keep], np.intp)
+    radii = [b[2] for b in keep]
+    # mean darkness score over the skin of each blob's disk (pores are thousands: all at once)
+    (score, dark), n = _disk_means([z, darker], skin, ys, xs, radii)
+    ok = (n > 0) & (score >= config.PORE_MIN_SCORE)
+    # away from marks (a pimple's or mark's edge is not a pore)
+    px_x, px_y = xs * back, ys * back
     for m in marks or []:
         reach = m.radius + config.PORE_MARK_GAP_MM * px_per_mm
-        out = [p for p in out if np.hypot(p.x - m.x, p.y - m.y) > reach]
+        ok &= np.hypot(px_x - m.x, px_y - m.y) > reach
+    out = [
+        Pore(
+            x=float(x * back),
+            y=float(y * back),
+            diameter_mm=float(2 * r / px),
+            dark_l=float(d),
+        )
+        for y, x, r, d, good in zip(ys.tolist(), xs.tolist(), radii, dark, ok, strict=True)
+        if good
+    ]
     return _drop_chains(out, px_per_mm)
 
 

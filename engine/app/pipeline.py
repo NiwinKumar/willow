@@ -1,11 +1,14 @@
 """One analysis request end to end (forearm sites, M1)."""
 
-import json
+import logging
+import math
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from numbers import Real
 from pathlib import Path
 
 import numpy as np
-from jsonschema import validate
 
 from app import config
 from app.aggregate import summarize
@@ -18,8 +21,9 @@ from app.metrics.redness import redness
 from app.metrics.tone import ita_band, tone_ita
 from app.quality import FrameQuality, check_frame
 from app.roi import Box, skin_mask
+from app.schemas import RESULT, validate
 
-SCHEMA = Path(__file__).resolve().parents[2] / "schemas" / "analysis_result.schema.json"
+SCHEMA = RESULT  # the result schema's path (app.schemas loads it)
 FOREARM_SITES = {"forearm_treated", "forearm_control"}
 METRIC_INFO = {  # id -> (group, label, unit)
     "tone_ita": ("tone_pigment", "Skin tone (ITA)", "deg"),
@@ -37,6 +41,43 @@ def _mean_extras(per_frame: list[dict]) -> dict:
         if nums:  # photos without a value for this key (None) are left out of the mean
             out[key] = round(sum(nums) / len(nums), 2)
     return out
+
+
+log = logging.getLogger("willow.pipeline")
+
+
+def _finite(value, path: str, bad: list[str]):
+    """value with every NaN / infinite number (nested in dicts and lists) made None."""
+    if isinstance(value, dict):
+        return {k: _finite(v, f"{path}.{k}", bad) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_finite(v, f"{path}[{i}]", bad) for i, v in enumerate(value)]
+    number = isinstance(value, (Real, np.number)) and not isinstance(value, bool)
+    if number and not math.isfinite(float(value)):
+        bad.append(path)
+        return None
+    return value
+
+
+def finite_frame(frame: dict, name: str) -> dict:
+    """A photo's values and extras without NaN or infinite numbers (an empty region's median,
+    say): those become None, as not measured, and are logged. JSON has no NaN, so one would
+    otherwise fail the whole response."""
+    bad: list[str] = []
+    frame["values"] = _finite(frame["values"], "values", bad)
+    frame["extras"] = _finite(frame["extras"], "extras", bad)
+    if bad:
+        log.warning("%s: not finite, left out: %s", name, ", ".join(bad))
+    return frame
+
+
+def map_frames(fn: Callable, items: list, workers: int = config.FRAME_WORKERS) -> list:
+    """fn over a session's photos, `workers` at a time, results in the photos' order. Most of
+    a photo's work is OpenCV / NumPy / SciPy, which let another thread run meanwhile."""
+    if workers <= 1 or len(items) <= 1:
+        return [fn(it) for it in items]
+    with ThreadPoolExecutor(max_workers=min(workers, len(items))) as pool:
+        return list(pool.map(fn, items))
 
 
 def capture_mode_for(files: list[str]) -> str:
@@ -233,5 +274,5 @@ def analyze_forearm(
             pass  # an unreadable file is already reported per photo
     if shape is not None:
         result["image_size"] = {"width": int(shape[1]), "height": int(shape[0])}
-    validate(result, json.loads(SCHEMA.read_text()))
+    validate(result)  # the contract's result schema (app.schemas, loaded once)
     return result

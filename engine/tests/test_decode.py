@@ -4,7 +4,14 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from app.decode import decode_dng, decode_photo, srgb_to_linear
+from app.decode import (
+    _srgb_curve,
+    decode_dng,
+    decode_photo,
+    load_photo_srgb8,
+    read_photo_info,
+    srgb_to_linear,
+)
 
 GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden"
 DNGS = sorted(GOLDEN.glob("*.dng")) + sorted(GOLDEN.glob("*.DNG")) if GOLDEN.exists() else []
@@ -23,6 +30,29 @@ def test_srgb_to_linear_known_values():
     assert lin[0] == 0.0 and lin[3] == pytest.approx(1.0)
     assert lin[1] == pytest.approx(10 / 255 / 12.92)  # straight-line part of the curve
     assert lin[2] == pytest.approx(0.2158, abs=1e-4)  # mid-grey is ~22% of the light
+
+
+def test_srgb_to_linear_table_matches_the_curve_bit_for_bit():
+    # 8-bit photos use a 256-entry table: every value, at every position in a big array
+    # (vector and tail code paths), must equal the curve computed directly
+    rng = np.random.default_rng(0)
+    img = rng.integers(0, 256, (301, 403, 3), dtype=np.uint8)
+    img[0, :256, 0] = np.arange(256)
+    direct = _srgb_curve(img.astype(np.float32) / 255.0)
+    table = srgb_to_linear(img)
+    assert table.dtype == np.float32 and table.shape == img.shape
+    assert np.array_equal(table.view(np.uint32), direct.view(np.uint32))
+
+
+def test_photo_info_without_decoding_matches_the_full_decode(tmp_path):
+    img = Image.new("RGB", (40, 20), (200, 150, 120))
+    exif = Image.Exif()
+    exif[0x0112] = 6  # rotate 90
+    exif[0x0110] = "iPhone 17 Pro"
+    exif.get_ifd(0x8769).update({0xA434: "iPhone 17 Pro back camera 2.22mm f/2.2", 0xA405: 14})
+    path = tmp_path / "frame.jpg"
+    img.save(path, quality=95, exif=exif)
+    assert read_photo_info(path) == load_photo_srgb8(path)[1]
 
 
 def test_decode_photo_jpeg_applies_exif_rotation(tmp_path):
