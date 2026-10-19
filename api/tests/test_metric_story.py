@@ -241,3 +241,9 @@ def test_a_story_kept_meanwhile_for_another_metric_is_not_overwritten(monkeypatc
     _gemini(monkeypatch, GOOD_POINTS)
     metric_story.story(store, UID, sid, doc, "tone_evenness")
     assert set(store.session_get(UID, sid)["stories"]) == {"redness", "tone_evenness"}
+
+
+def test_a_date_may_be_written_with_or_without_a_leading_zero():
+    allowed = metric_story._allowed({"routine": [{"started": "2026-08-01"}], "value": 4.2})
+    assert {"01", "1", "4.2"} <= allowed
+    assert "2026" not in allowed and "08" not in allowed

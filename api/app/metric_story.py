@@ -315,11 +315,12 @@ def _dates(obj: Any) -> list[str]:
 
 def _allowed(f: dict[str, Any]) -> set[str]:
     """Numbers a sentence may quote: the measured ones, and a date only as its day of the month
-    ("12 Oct"), never a year or a month number that could pass for a measurement."""
+    ("12 Oct", "01 Aug" or "1 Aug"), never a year or a month number that could pass for a
+    measurement."""
     allowed = numbers.collect(_without_dates(f))
     for d in _dates(f):
         if len(d) >= 10 and d[8:10].isdigit():
-            allowed.add(str(int(d[8:10])))
+            allowed |= {d[8:10], str(int(d[8:10]))}
     return allowed
 
 
