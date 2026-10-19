@@ -66,8 +66,7 @@ def ask(
         return hit[1]
     limits.take(store, user.uid, "retailer_ask")
     try:
-        data = retailer.insights(body.cohort, body.range)
-        data = {**data, "perception": proof_ai.perception_rows(body.cohort, body.range)}
+        data = _ask_inputs(body.cohort, body.range)
     except Exception as exc:
         limits.refund(store, user.uid, "retailer_ask")
         raise HTTPException(
@@ -87,6 +86,25 @@ def ask(
     if not answer.get("refused"):
         _answers[key] = (time.time(), answer)
     return answer
+
+
+def _ask_inputs(cohort: str, range_: str) -> dict[str, Any]:
+    data = retailer.insights(cohort, range_)
+    return {**data, "perception": proof_ai.perception_rows(cohort, range_)}
+
+
+def warm_answer(question: str, cohort: str = "mixed", range_: str = "all") -> bool:
+    """Answer and keep a suggested question ahead of time (app/warm.py, on instance start), so
+    the first person to tap it is not the one who waits for Gemini. True when it is kept."""
+    key = _answer_key(AskRequest(question=question, cohort=cohort, range=range_))
+    hit = _answers.get(key)
+    if hit and time.time() - hit[0] < ANSWER_TTL_S:
+        return True
+    answer = retailer_ask.ask(question, _ask_inputs(cohort, range_))
+    if answer.get("refused"):
+        return False
+    _answers[key] = (time.time(), answer)
+    return True
 
 
 # ── Willow Proof views (docs/RETAILER_INSIGHTS.md "Willow Proof views") ─────────────────────
