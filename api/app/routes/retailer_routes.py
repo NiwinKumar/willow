@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -32,11 +33,27 @@ class AskRequest(BaseModel):
     range: retailer.Range = "all"
 
 
+# A checked answer is the same for everyone who asks the same question over the same filters
+# (aggregates only, no one's own data), so it is kept for an hour: a repeated question (the
+# suggestions, the brand journey) answers at once and costs no Gemini call or daily question.
+# Errors are never kept.
+ANSWER_TTL_S = 3600
+_answers: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
+
+
+def _answer_key(body: AskRequest) -> tuple[str, str, str]:
+    return (" ".join(body.question.lower().split()), body.cohort, body.range)
+
+
 @router.post("/ask")
 def ask(
     body: AskRequest, user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
     """Gemini answers from the same aggregates as /insights; every number is checked."""
+    key = _answer_key(body)
+    hit = _answers.get(key)
+    if hit and time.time() - hit[0] < ANSWER_TTL_S:
+        return hit[1]
     limits.take(store, user.uid, "retailer_ask")
     try:
         data = retailer.insights(body.cohort, body.range)
@@ -47,7 +64,7 @@ def ask(
             503, {"code": "insights_unavailable", "message": "Insights are unavailable right now."}
         ) from exc
     try:
-        return retailer_ask.ask(body.question, data)
+        answer = retailer_ask.ask(body.question, data)
     except retailer_ask.Unavailable as exc:
         limits.refund(store, user.uid, "retailer_ask")
         raise HTTPException(
@@ -57,6 +74,8 @@ def ask(
                 "message": "The assistant is unavailable right now. Try again in a minute.",
             },
         ) from exc
+    _answers[key] = (time.time(), answer)
+    return answer
 
 
 # ── Willow Proof views (docs/RETAILER_INSIGHTS.md "Willow Proof views") ─────────────────────
