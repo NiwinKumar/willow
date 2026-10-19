@@ -131,6 +131,24 @@ def delete_prefix(prefix: str) -> int:
     return len(blobs)
 
 
+def set_temporary_hold(prefix: str, held: bool) -> int:
+    """Put a temporary hold on (or take it off) every object under a prefix; returns how many
+    changed. The 30-day lifecycle skips held objects, and they cannot be overwritten or deleted
+    until released (the demo journey keeps its photos through judging this way)."""
+    client = gcp.storage_client()
+    blobs = [
+        b
+        for b in client.list_blobs(get_settings().bucket, prefix=prefix)
+        if bool(b.temporary_hold) != held
+    ]
+    for i in range(0, len(blobs), 100):
+        with client.batch():
+            for blob in blobs[i : i + 100]:
+                blob.temporary_hold = held
+                blob.patch()
+    return len(blobs)
+
+
 def copy_object(source_name: str, dest_name: str) -> None:
     """Server-side copy inside the captures bucket (sample photos into a person's session)."""
     bucket = gcp.storage_client().bucket(get_settings().bucket)

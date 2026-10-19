@@ -15,6 +15,14 @@ YYYYMMDD_HHMM_<site>[_quick] holding its frames, analysed oldest first into the 
 (so the first one per site becomes the baseline, exactly as for anyone):
 
     uv run python scripts/seed_demo.py journey path/to/journey [--reset]
+
+The demo account's photos and results carry a temporary hold, so the bucket's 30-day lifecycle
+leaves them for judging (everyone else's still go at 30 days). `journey` takes the hold off before
+--reset and puts it back on everything when done. Anything else that rewrites them (remeasure.py,
+backfill_previews.py) needs `hold --release` first and `hold` after. Release once judging ends;
+the lifecycle then deletes them within a day.
+
+    uv run python scripts/seed_demo.py hold [--release]
 """
 
 import argparse
@@ -130,10 +138,20 @@ def cmd_list(_a) -> None:
         print(f"{s['id']}: {s['title']} ({s['site']}, {s['capture_mode']}, {len(s['frames'])})")
 
 
+def _hold(uid: str, held: bool) -> None:
+    n = sum(storage.set_temporary_hold(f"{p}/{uid}/", held) for p in ("uploads", "results"))
+    print(f"{uid}: {n} objects {'held' if held else 'released'}")
+
+
+def cmd_hold(a) -> None:
+    _hold(get_settings().demo_user_id, not a.release)
+
+
 def cmd_journey(a) -> None:
     store = FirestoreStore()
     uid = get_settings().demo_user_id
     if a.reset:
+        _hold(uid, False)
         store.delete_user(uid)
         storage.delete_prefix(f"uploads/{uid}/")
         storage.delete_prefix(f"results/{uid}/")
@@ -170,6 +188,7 @@ def cmd_journey(a) -> None:
         done = analysis.run(store, get_settings().bucket, uid, sid, doc)
         state = "measured" if done.get("measured") else "not measured"
         print(f"{folder.name}: {state}{', baseline' if done.get('is_baseline') else ''}")
+    _hold(uid, True)
 
 
 def main() -> int:
@@ -196,6 +215,7 @@ def main() -> int:
     j = sub.add_parser("journey")
     j.add_argument("folder")
     j.add_argument("--reset", action="store_true")
+    sub.add_parser("hold").add_argument("--release", action="store_true")
     a = ap.parse_args()
     {
         "sample": cmd_sample,
@@ -203,6 +223,7 @@ def main() -> int:
         "remove-sample": cmd_remove,
         "list": cmd_list,
         "journey": cmd_journey,
+        "hold": cmd_hold,
     }[a.cmd](a)
     return 0
 
