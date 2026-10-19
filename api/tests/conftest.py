@@ -59,11 +59,13 @@ def no_real_gemini(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture(autouse=True)
 def fresh_ask_answers():
     """Kept Ask answers never leak from one test into the next."""
-    from app.routes import retailer_routes
+    from app.routes import autopilot_routes, retailer_routes
 
     retailer_routes._answers.clear()
+    autopilot_routes._parsed.clear()
     yield
     retailer_routes._answers.clear()
+    autopilot_routes._parsed.clear()
 
 
 @pytest.fixture(autouse=True)

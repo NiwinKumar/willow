@@ -346,3 +346,29 @@ def test_the_parse_schema_is_one_gemini_accepts():
     from app.routes.autopilot_routes import ParseOut
 
     assert _transformers.t_schema(None, ParseOut)  # raises on a schema Vertex can't take
+
+
+def test_gemini_reading_of_the_same_words_is_kept(client, fake, monkeypatch):
+    from app.routes import autopilot_routes as r
+
+    calls = []
+
+    def draft(prompt_id, contents, schema, **kw):
+        calls.append(1)
+        return schema(
+            rule=r.DraftRule(
+                name="Calm budget skin",
+                trigger=r.DraftTrigger(kind="unmet_need", goals=["redness"], unmet_min=0.6),
+            )
+        )
+
+    monkeypatch.setattr(gemini, "generate_json", draft)
+    words = "when most dry-skin people get no calm, push a cream"
+    body = {"text": words, "workspace": "CeraVe"}
+    first = client.post("/v1/retailer/autopilot/parse", json=body).json()
+    again = client.post(
+        "/v1/retailer/autopilot/parse", json=body | {"text": f"  {words.upper()} "}
+    ).json()
+    assert first["source"] == "gemini" and again == first and len(calls) == 1
+    other = client.post("/v1/retailer/autopilot/parse", json=body | {"workspace": "retailer"})
+    assert other.status_code == 200 and len(calls) == 2

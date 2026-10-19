@@ -2,6 +2,7 @@
 runs them. Sign-in on every route (guest accounts included), as campaigns; the scheduler's run is
 /v1/internal/autopilot (Cloud Scheduler's OIDC token only)."""
 
+import time
 from datetime import date
 from typing import Any, Literal
 
@@ -237,6 +238,13 @@ class ParseOut(BaseModel):
     missed: list[str] = Field(default_factory=list, max_length=6)
 
 
+# Gemini's reading of the same words for the same workspace is kept for an hour (only Gemini's;
+# the fixed patterns are instant), so a repeated rule (the brand journey) reads at once. Nothing in
+# it is personal: the words and the workspace only.
+PARSE_TTL_S = 3600
+_parsed: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+
+
 @router.post("/retailer/autopilot/parse")
 def parse_rule(
     body: ParseBody, user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
@@ -244,6 +252,10 @@ def parse_rule(
     """A rule typed in plain words, read into the form's fields by Gemini (nothing is saved):
     {rule, sentence, missed, source}. The draft must pass the form's own checks; without Gemini
     (or when its draft fails them) fixed word patterns read it (`source` "rules")."""
+    key = (" ".join(body.text.lower().split()), body.workspace)
+    hit = _parsed.get(key)
+    if hit and time.time() - hit[0] < PARSE_TTL_S:
+        return hit[1]
     fallback = autopilot.parse(body.text, body.workspace)
     try:
         limits.take(store, user.uid, "campaign_create")
@@ -260,12 +272,14 @@ def parse_rule(
         )
         doc = _body_doc(rule)
         missed = [m for m in out["missed"] if isinstance(m, str) and len(m) <= 120]
-        return {
+        read = {
             "rule": doc,
             "missed": missed,
             "source": "gemini",
             "sentence": autopilot.describe(doc),
         }
+        _parsed[key] = (time.time(), read)
+        return read
     except (gemini.GeminiError, ValueError, HTTPException):
         return fallback | {"source": "rules", "sentence": autopilot.describe(fallback["rule"])}
 
