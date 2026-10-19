@@ -1,7 +1,8 @@
 """SessionView (CONTRACT.md section 3): {session, result, labels, explanation}.
 
 `session` also carries what the Lens needs and the engine does not produce: a signed preview URL
-(the engine's `{output_prefix}preview.jpg`, when present), signed overlay URLs, the hours since
+(the api's small `preview.webp` of the engine's `{output_prefix}preview.jpg`, else the JPEG, when
+present; app/previews.py), signed overlay URLs, the hours since
 the baseline for the scrubber, the person's note and deviation flag, and whether the
 explanation came from Gemini or the template (`explanation_source`), and the live analysis
 `stage`. Detail views (one session) also sign the person's own photos (`frame_urls`) and the
@@ -12,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
 
-from app import storage
+from app import previews, storage
 from app.results import measured_result
 from app.store import iso
 
@@ -63,10 +64,13 @@ def reference_index(result: dict[str, Any] | None) -> int:
 
 
 def photo_name(uid: str, sid: str, doc: dict[str, Any], existing: set[str]) -> str | None:
-    """The image shown on the stage: the engine's preview.jpg, else the person's own JPEG of the
-    reference photo (a quick selfie is already viewable; a RAW frame is not)."""
-    if preview_name(uid, sid) in existing:
-        return preview_name(uid, sid)
+    """The image shown on the stage: the small WebP of the engine's preview.jpg, else the JPEG,
+    else the person's own JPEG of the reference photo (a quick selfie is already viewable; a RAW
+    frame is not)."""
+    jpeg = preview_name(uid, sid)
+    for name in (previews.webp_name(jpeg), jpeg):
+        if name in existing:
+            return name
     types, uris = doc.get("content_types") or [], doc.get("frame_uris") or []
     i = reference_index(measured_result(doc))
     if i < min(len(types), len(uris)) and types[i] == "image/jpeg":

@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
-from app import baselines, engine, explain, labeller, storage, views
+from app import baselines, engine, explain, labeller, previews, storage, views
 from app.store import Store
 
 log = logging.getLogger("willow.analysis")
@@ -89,9 +89,11 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     explanation, source, details = (None, None, {})
     if measured:
         _stage(store, uid, session_id, "explaining")
-        # The explanation and the spot labels are independent Gemini calls: run them together.
+        # The explanation and the spot labels are independent Gemini calls: run them together,
+        # and meanwhile the small WebP of the engine's preview the pages show.
         context = explain_context(store, uid, doc, current, session_id)
-        with ThreadPoolExecutor(max_workers=2) as pool:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            pool.submit(previews.publish, views.preview_name(uid, session_id))
             explained = pool.submit(explain.generate, result, context)
             labelled = pool.submit(labeller.label_candidates, result)
             explanation, source = explained.result()
