@@ -32,11 +32,15 @@ def _hours_between(later: Any, earlier: Any) -> float | None:
     return round((later - earlier).total_seconds() / 3600, 1)
 
 
+# Each signature is one IAM signBlob call (storage.signing shares one session across them).
+SIGN_WORKERS = 24
+
+
 def sign_all(names: list[str]) -> dict[str, str]:
     unique = list(dict.fromkeys(names))
     if not unique:
         return {}
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=min(SIGN_WORKERS, len(unique))) as pool:
         return dict(zip(unique, pool.map(storage.signed_get_url, unique), strict=True))
 
 

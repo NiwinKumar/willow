@@ -78,3 +78,25 @@ def test_http_mode_maps_engine_errors(monkeypatch):
     with pytest.raises(engine.EngineError) as err:
         engine.analyze(_request())
     assert err.value.code == "frame_unreadable"
+
+
+def test_the_engine_id_token_is_reused_until_it_nears_expiry(monkeypatch):
+    import threading
+
+    minted = []
+    monkeypatch.setattr(engine, "_id_tokens", {})
+    monkeypatch.setattr(
+        engine, "_mint_id_token", lambda aud: minted.append(aud) or f"t{len(minted)}"
+    )
+    threads = [
+        threading.Thread(target=engine._id_token, args=("https://engine",)) for _ in range(8)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert engine._id_token("https://engine") == "t1" and minted == ["https://engine"]
+    # past ID_TOKEN_REUSE_S a fresh one is minted
+    monkeypatch.setitem(engine._id_tokens, "https://engine", ("t1", 0.0))
+    assert engine._id_token("https://engine") == "t2"
+    assert engine.ID_TOKEN_REUSE_S < 3600  # Google ID tokens live an hour

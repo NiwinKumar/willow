@@ -375,13 +375,23 @@ def routine_check_route(
     user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
     """Rule table first (always), then Gemini additions marked source=model. Past the daily cap
-    the rule table still answers, without the AI additions."""
+    the rule table still answers, without the AI additions. A routine of fewer than two products
+    asks no Gemini and uses none of the cap; the same routine checked within the hour answers
+    from the kept check (no new call, no use); a Gemini failure gives the use back."""
     entries = [{"id": eid, **e} for eid, e in store.routine_list(user.uid)]
+    if not routine_check.needs_model(entries):
+        return routine_check.check(entries, use_model=False)
+    kept = routine_check.answered(entries)
+    if kept is not None:
+        return kept
     try:
         limits.take(store, user.uid, "routine_check")
     except HTTPException:
         return routine_check.check(entries, use_model=False)
-    return routine_check.check(entries)
+    result, complete = routine_check.run(entries)
+    if not complete:
+        limits.refund(store, user.uid, "routine_check")
+    return result
 
 
 class ChatMessage(BaseModel):

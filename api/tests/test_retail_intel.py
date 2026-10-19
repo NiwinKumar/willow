@@ -577,6 +577,23 @@ def test_facts_are_built_once_per_filter_and_eligibility_for_campaigns(monkeypat
         retail_intel.facts("everyone", "all")
 
 
+def test_eligibility_and_autopilot_signals_are_built_once_per_data_version(monkeypatch):
+    raw = retailer.raw_from_tables(_tables())
+    monkeypatch.setattr(retailer, "fetch", lambda: raw)
+    monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": None, "version": 0})
+    monkeypatch.setattr(retail_intel, "_facts", {})
+    built = []
+    real = retail_intel._eligibility_entry
+    monkeypatch.setattr(retail_intel, "_eligibility_entry", lambda *a: built.append(1) or real(*a))
+    assert retail_intel.eligibility_all() is retail_intel.eligibility_all()
+    sig = retail_intel.autopilot_signals()
+    assert retail_intel.autopilot_signals() is sig and sig["version"] == 1
+    assert len(built) == len(catalog.products())  # one pass, shared by both
+    assert retail_intel.segments()["cells"] and len(sig["unmet"]) <= len(
+        retail_intel.segments()["cells"]
+    )
+
+
 # ── generator: switching and skin effects ──────────────────────────────────────────────────
 
 # Digest of cohort.generate(2026-10-15) on origin/main before switching and skin effects

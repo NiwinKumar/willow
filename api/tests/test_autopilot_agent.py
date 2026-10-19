@@ -2,6 +2,7 @@
 no. The model is scripted (autopilot_agent.model_round); the evidence is the stub from
 test_autopilot."""
 
+import copy
 from datetime import timedelta
 
 import pytest
@@ -372,3 +373,125 @@ def test_gemini_reading_of_the_same_words_is_kept(client, fake, monkeypatch):
     assert first["source"] == "gemini" and again == first and len(calls) == 1
     other = client.post("/v1/retailer/autopilot/parse", json=body | {"workspace": "retailer"})
     assert other.status_code == 200 and len(calls) == 2
+
+
+def test_one_time_budget_for_the_whole_check_later_rules_use_the_fixed_logic(
+    client, fake, ev, monkeypatch
+):
+    """The budget covers every rule: once it is used up, the remaining rules run on the fixed
+    logic (no Gemini), so N rules never wait N x 45 s."""
+    import time
+
+    _rule(client, level="auto", name="First")
+    _rule(
+        client,
+        level="auto",
+        name="Second",
+        scope={"category": "moisturizer"},
+        trigger={"kind": "proven", "goals": ["redness"]},
+    )
+    clock = [0.0]
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    asked = []
+
+    def slow_round(contents, config):
+        asked.append(config.http_options.timeout)
+        clock[0] += autopilot_agent.BUDGET_S  # the first rule's agent uses the whole budget
+        return [("finish", {"summary": "Nothing to start."})], None, None
+
+    monkeypatch.setattr(autopilot_agent, "model_round", slow_round)
+    out = _run(client)
+    assert len(asked) == 1  # the second rule never asked Gemini...
+    assert out["result"]["source"] == "rules"  # ...it ran on the fixed logic
+    assert out["result"]["started"] == 1  # and still started its campaign
+
+
+def test_each_round_waits_at_most_the_time_left(fake, ev, monkeypatch):
+    from app import autopilot
+
+    seen = []
+
+    def round_(contents, config):
+        seen.append(config.http_options.timeout)
+        return [("finish", {"summary": "Nothing to change."})], None, None
+
+    monkeypatch.setattr(autopilot_agent, "model_round", round_)
+    monkeypatch.setattr(autopilot_agent.time, "monotonic", lambda: 1000.0)
+    rule = (
+        "r_000000000001",
+        autopilot.rule_doc(
+            "u_test",
+            {
+                "name": "x",
+                "workspace": "retailer",
+                "enabled": True,
+                "level": "auto",
+                "scope": {"category": "serum", "product_ids": []},
+                "trigger": {"kind": "proven", "goals": ["dark_spots"]},
+                "conditions": {},
+                "action": {"days": 14, "holdout_pct": 0.2, "max_running": 2},
+            },
+            campaigns.now(),
+        ),
+    )
+    totals: dict = {}
+    autopilot_agent.run_rule(fake.store, "u_test", rule, ev, campaigns.now(), totals, 1010.0)
+    assert seen == [10_000]  # 10 s left: not the 25 s default
+    with pytest.raises(gemini.GeminiError):  # no time left: the caller uses the fixed logic
+        autopilot_agent.run_rule(fake.store, "u_test", rule, ev, campaigns.now(), totals, 1001.0)
+
+
+def test_two_tabs_opening_a_stale_check_run_it_once(client, fake, ev, monkeypatch):
+    from app import autopilot
+
+    _rule(client, level="auto")
+    runs = []
+    real = autopilot.run
+    monkeypatch.setattr(autopilot, "run", lambda *a: runs.append(1) or real(*a))
+    first = client.post("/v1/retailer/autopilot/run?if_stale=true").json()
+    # a second tab that read the same stale state (before the first wrote last_run_at)
+    for rid, _ in fake.store.rules_of("u_test"):
+        fake.store.rule_update(rid, {"last_run_at": None})
+    second = client.post("/v1/retailer/autopilot/run?if_stale=true").json()
+    assert len(runs) == 1 and first["result"] and second["result"] is None
+    assert len(fake.store.campaigns) == 2  # started once, not twice
+    assert all(a["kind"] != "run_claim" for a in second["activity"])  # never in the feed
+
+
+def test_a_claim_that_could_not_read_the_evidence_is_given_back(client, fake, ev, monkeypatch):
+    from app import autopilot
+
+    _rule(client, level="auto")
+
+    def down():
+        raise campaigns.Unavailable("bq down")
+
+    monkeypatch.setattr(autopilot, "signals", down)
+    assert client.post("/v1/retailer/autopilot/run?if_stale=true").status_code == 503
+    monkeypatch.setattr(autopilot, "signals", lambda: copy.deepcopy(ev))
+    assert client.post("/v1/retailer/autopilot/run?if_stale=true").json()["result"] is not None
+
+
+def test_run_now_gives_the_use_back_when_the_evidence_is_unavailable(client, fake, ev, monkeypatch):
+    from app import autopilot
+
+    _rule(client, level="auto")
+    day = campaigns.now().date().isoformat()
+    used = fake.store.usage.get(("u_test", day, "campaign_create"), 0)
+
+    def down():
+        raise campaigns.Unavailable("bq down")
+
+    monkeypatch.setattr(autopilot, "signals", down)
+    assert client.post("/v1/retailer/autopilot/run").status_code == 503
+    assert fake.store.usage.get(("u_test", day, "campaign_create"), 0) == used
+
+
+def test_the_rule_list_reads_the_campaigns_once(client, fake, ev, monkeypatch):
+    for name in ("One", "Two", "Three"):
+        _rule(client, name=name)
+    reads = []
+    real = fake.store.campaigns_of
+    monkeypatch.setattr(fake.store, "campaigns_of", lambda uid: reads.append(uid) or real(uid))
+    assert len(client.get("/v1/retailer/autopilot").json()["rules"]) == 3
+    assert len(reads) == 1

@@ -217,3 +217,39 @@ def test_a_repeated_question_is_answered_from_the_kept_answer(client, fake, monk
         "/v1/retailer/ask", json={"question": "What works for dark spots?", "range": "30d"}
     )
     assert other.status_code == 200 and len(calls) == 2
+
+
+def test_refusals_are_not_kept(client, fake, monkeypatch):
+    calls = []
+
+    def bad(*a, **k):
+        calls.append(1)
+        return Answer(answer="It beats it by 41 points.")  # rejected twice: the refusal
+
+    monkeypatch.setattr(gemini, "generate_json", bad)
+    monkeypatch.setattr(retailer, "insights", lambda *a: INSIGHTS)
+    first = client.post("/v1/retailer/ask", json={"question": "What works for dark spots?"})
+    assert first.json()["refused"] is True
+    again = client.post("/v1/retailer/ask", json={"question": "What works for dark spots?"})
+    assert again.json()["refused"] is True
+    assert len(calls) == 4  # asked again, not served from the kept refusal
+
+
+def test_new_rows_start_the_kept_answers_over(client, fake, monkeypatch):
+    calls = []
+
+    def once(*a, **k):
+        calls.append(1)
+        return Answer(answer="Azelaic Gel: 61% still improved at week 8 (synthetic cohort).")
+
+    version = {"v": 1}
+    monkeypatch.setattr(gemini, "generate_json", once)
+    monkeypatch.setattr(retailer, "insights", lambda *a: INSIGHTS)
+    monkeypatch.setattr(retailer, "_rows", lambda: ({}, version["v"]))
+    ask = {"question": "What works for dark spots?"}
+    client.post("/v1/retailer/ask", json=ask)
+    client.post("/v1/retailer/ask", json=ask)
+    assert len(calls) == 1
+    version["v"] = 2  # BigQuery rows refreshed
+    client.post("/v1/retailer/ask", json=ask)
+    assert len(calls) == 2

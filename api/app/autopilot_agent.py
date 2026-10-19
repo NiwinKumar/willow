@@ -39,7 +39,11 @@ from app.store import Doc, Store
 log = logging.getLogger("willow.autopilot_agent")
 
 MAX_ROUNDS = 8
+# The whole check (every rule) gets this long: each round waits at most what is left (and never
+# more than PER_CALL_S), and rules reached after it run on autopilot.py's fixed logic.
 BUDGET_S = 45.0
+PER_CALL_S = 25.0
+MIN_ROUND_S = 3.0  # less than this left: no new round
 DAYS = (7, 14, 30)
 
 INSTRUCTIONS = """You are AutoCampaign, the campaign agent inside Willow Proof, a retail analytics
@@ -169,12 +173,26 @@ def model_round(contents: list[types.Content], config: types.GenerateContentConf
     """One Gemini turn: (function calls as [(name, args)], text, the model's content). The seam
     the tests replace."""
     started = time.monotonic()
-    res = gemini.with_retry(
-        "autopilot_agent",
-        lambda: gemini.client().models.generate_content(
-            model=get_settings().gemini_model, contents=contents, config=config
-        ),
-    )
+    http = config.http_options
+    budget_s = (http.timeout / 1000) if http and http.timeout else PER_CALL_S
+
+    def call(cfg: types.GenerateContentConfig):
+        return gemini.client().models.generate_content(
+            model=get_settings().gemini_model, contents=contents, config=cfg
+        )
+
+    try:
+        res = call(config)
+    except Exception as exc:
+        # one retry on a transient error, only within this round's time (never past the budget)
+        left = budget_s - (time.monotonic() - started) - gemini.retry_pause(exc)
+        if not gemini.transient(exc) or left < MIN_ROUND_S:
+            raise
+        log.warning("autopilot_agent attempt 1 failed, retrying: %s", str(exc)[:300])
+        time.sleep(gemini.retry_pause(exc))
+        res = call(
+            config.model_copy(update={"http_options": types.HttpOptions(timeout=int(left * 1000))})
+        )
     usage = res.usage_metadata
     log.info(
         json.dumps(
@@ -202,6 +220,7 @@ class Episode:
         sig: dict,
         at: datetime,
         totals: dict[str, int],
+        deadline: float | None = None,
     ):
         self.store, self.uid, self.rule, self.sig, self.at, self.totals = (
             store,
@@ -211,6 +230,8 @@ class Episode:
             at,
             totals,
         )
+        # time.monotonic() by which the run must stop (the whole check's, shared by every rule)
+        self.deadline = deadline if deadline is not None else time.monotonic() + BUDGET_S
         self.rid, self.rdoc = rule
         self.by_id = {p["product_id"]: p for p in sig["products"]}
         self.seen_outputs: list[Any] = [autopilot.describe(self.rdoc), self.rdoc["action"]]
@@ -629,10 +650,13 @@ class Episode:
             thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
-        started = time.monotonic()
         for i in range(MAX_ROUNDS):
-            if time.monotonic() - started > BUDGET_S:
+            left = self.deadline - time.monotonic()
+            if left < MIN_ROUND_S:
+                if i == 0:  # nothing done: the caller runs the fixed logic
+                    raise gemini.GeminiError("autopilot: no time left for the agent")
                 break
+            config.http_options = types.HttpOptions(timeout=int(min(PER_CALL_S, left) * 1000))
             try:
                 calls, text, content = model_round(contents, config)
             except Exception as exc:
@@ -668,11 +692,18 @@ _TOOL_NAMES = {d.name for d in TOOLS.function_declarations}
 
 
 def run_rule(
-    store: Store, uid: str, rule: tuple[str, Doc], sig: dict, at: datetime, totals: dict[str, int]
+    store: Store,
+    uid: str,
+    rule: tuple[str, Doc],
+    sig: dict,
+    at: datetime,
+    totals: dict[str, int],
+    deadline: float | None = None,
 ) -> None:
-    """One rule's check by the agent. Raises gemini.GeminiError (or anything the model call
-    raises) before acting when Gemini can't be reached; the caller then uses the fixed logic."""
-    Episode(store, uid, rule, sig, at, totals).run()
+    """One rule's check by the agent, stopping by `deadline` (time.monotonic(); default BUDGET_S
+    from now). Raises gemini.GeminiError (or anything the model call raises) before acting when
+    Gemini can't be reached or no time is left; the caller then uses the fixed logic."""
+    Episode(store, uid, rule, sig, at, totals, deadline).run()
 
 
 # -- typed rules ---------------------------------------------------------------------------

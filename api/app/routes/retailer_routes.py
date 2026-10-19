@@ -36,13 +36,23 @@ class AskRequest(BaseModel):
 # A checked answer is the same for everyone who asks the same question over the same filters
 # (aggregates only, no one's own data), so it is kept for an hour: a repeated question (the
 # suggestions, the brand journey) answers at once and costs no Gemini call or daily question.
-# Errors are never kept.
+# Errors and refusals (including "could not put together an answer") are never kept, and fresh
+# BigQuery rows (a new data version) start over.
 ANSWER_TTL_S = 3600
-_answers: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
+_answers: dict[tuple[str, str, str, int | None], tuple[float, dict[str, Any]]] = {}
 
 
-def _answer_key(body: AskRequest) -> tuple[str, str, str]:
-    return (" ".join(body.question.lower().split()), body.cohort, body.range)
+def _data_version() -> int | None:
+    """The version of the rows the answers are computed from (retailer._rows, cached for minutes;
+    None when they cannot be read)."""
+    try:
+        return retailer._rows()[1]
+    except Exception:
+        return None
+
+
+def _answer_key(body: AskRequest) -> tuple[str, str, str, int | None]:
+    return (" ".join(body.question.lower().split()), body.cohort, body.range, _data_version())
 
 
 @router.post("/ask")
@@ -74,7 +84,8 @@ def ask(
                 "message": "The assistant is unavailable right now. Try again in a minute.",
             },
         ) from exc
-    _answers[key] = (time.time(), answer)
+    if not answer.get("refused"):
+        _answers[key] = (time.time(), answer)
     return answer
 
 

@@ -19,7 +19,9 @@ import statistics
 import threading
 import time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
+from functools import lru_cache
 from typing import Any, Literal
 
 from app import catalog, cohort
@@ -99,16 +101,27 @@ QUERIES = {
 }
 
 
-def fetch() -> dict[str, list[dict[str, Any]]]:
+@lru_cache
+def bq_client():
+    """One BigQuery client for the process (insights and the judge status check share it)."""
     from google.cloud import bigquery
 
     s = get_settings()
-    client = bigquery.Client(project=s.project_id, location="us-central1")
+    return bigquery.Client(project=s.project_id, location="us-central1")
+
+
+def fetch() -> dict[str, list[dict[str, Any]]]:
+    """The five queries side by side (each waits on BigQuery, not on CPU)."""
+    s = get_settings()
+    client = bq_client()
     ds = f"{s.project_id}.{s.bq_dataset}"
-    return {
-        name: [dict(r) for r in client.query(sql.format(ds=ds, weeks=WEEKS)).result(timeout=30)]
-        for name, sql in QUERIES.items()
-    }
+
+    def run(sql: str) -> list[dict[str, Any]]:
+        return [dict(r) for r in client.query(sql.format(ds=ds, weeks=WEEKS)).result(timeout=30)]
+
+    with ThreadPoolExecutor(max_workers=len(QUERIES)) as pool:
+        futures = {name: pool.submit(run, sql) for name, sql in QUERIES.items()}
+        return {name: f.result() for name, f in futures.items()}
 
 
 def raw_from_tables(tables: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
@@ -716,27 +729,46 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
 
 _raw: dict[str, Any] = {"at": 0.0, "data": None, "version": 0}
 _views: dict[tuple[str, str], tuple[int, date, dict[str, Any]]] = {}
-_lock = threading.Lock()
+_lock = threading.Lock()  # the first load (nothing to serve yet): one query at a time
+_refreshing = threading.Lock()  # held by the one background refresh of stale rows
+
+
+def _refresh(raw: dict[str, Any], fetch_rows) -> None:
+    """Fetch new rows into `raw`; if BigQuery fails, the last good rows stay and are retried a
+    minute later."""
+    try:
+        data = fetch_rows()
+    except Exception as exc:
+        log.warning("retailer insights refresh failed; serving the cached rows: %s", exc)
+        raw["at"] = time.time() - CACHE_SECONDS + 60
+        return
+    raw["data"], raw["at"], raw["version"] = data, time.time(), raw["version"] + 1
+
+
+def _refresh_in_background(raw: dict[str, Any], fetch_rows) -> None:
+    try:
+        _refresh(raw, fetch_rows)
+    finally:
+        _refreshing.release()
 
 
 def _rows() -> tuple[dict[str, list[dict[str, Any]]], int]:
-    """BigQuery rows, cached for CACHE_SECONDS; one query at a time; if BigQuery fails after
-    expiry, the last good rows are served (and retried a minute later) instead of an error."""
-    if _raw["data"] is not None and time.time() - _raw["at"] <= CACHE_SECONDS:
-        return _raw["data"], _raw["version"]
+    """BigQuery rows, cached for CACHE_SECONDS. Stale-while-revalidate: once rows exist they are
+    always served at once; past expiry, one background refresh runs (never two at a time) and
+    later requests get the new rows. Only the very first load waits, one query at a time."""
+    raw = _raw
+    if raw["data"] is not None:
+        if time.time() - raw["at"] > CACHE_SECONDS and _refreshing.acquire(blocking=False):
+            # Cloud Run gives the thread CPU while any request is in flight; the stale rows are
+            # served meanwhile, so nobody waits on BigQuery.
+            threading.Thread(target=_refresh_in_background, args=(raw, fetch), daemon=True).start()
+        return raw["data"], raw["version"]
     with _lock:
-        if _raw["data"] is not None and time.time() - _raw["at"] <= CACHE_SECONDS:
-            return _raw["data"], _raw["version"]  # another request refreshed it meanwhile
-        try:
-            _raw["data"] = fetch()
-            _raw["at"] = time.time()
-            _raw["version"] += 1
-        except Exception:
-            if _raw["data"] is None:
-                raise
-            log.warning("retailer insights refresh failed; serving the cached rows")
-            _raw["at"] = time.time() - CACHE_SECONDS + 60
-        return _raw["data"], _raw["version"]
+        if raw["data"] is None:  # another request may have loaded it while this one waited
+            raw["data"] = fetch()
+            raw["at"] = time.time()
+            raw["version"] += 1
+        return raw["data"], raw["version"]
 
 
 def insights(cohort_: str = "mixed", range_: str = "all") -> dict[str, Any]:

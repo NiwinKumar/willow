@@ -30,6 +30,7 @@ see) through `signals()`, the seam the tests replace.
 import hashlib
 import re
 import secrets
+import time
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -151,12 +152,20 @@ def rule_doc(uid: str, body: dict[str, Any], at: datetime) -> Doc:
     }
 
 
-def rule_view(store: Store, rid: str, doc: Doc, feed: list[tuple[str, Doc]] | None = None) -> dict:
+def rule_view(
+    store: Store,
+    rid: str,
+    doc: Doc,
+    feed: list[tuple[str, Doc]] | None = None,
+    owned: list[tuple[str, Doc]] | None = None,
+) -> dict:
+    """`owned`: the owner's campaigns when the caller already read them (one read for a list of
+    rules instead of one per rule)."""
     mine = [(a, d) for a, d in (feed or []) if d.get("rule_id") == rid]
     mine.sort(key=lambda r: iso(r[1].get("at")) or "", reverse=True)
-    rule_campaigns = [
-        (cid, d) for cid, d in store.campaigns_of(doc["owner_uid"]) if d.get("rule_id") == rid
-    ]
+    if owned is None:
+        owned = store.campaigns_of(doc["owner_uid"])
+    rule_campaigns = [(cid, d) for cid, d in owned if d.get("rule_id") == rid]
     return {
         "id": rid,
         "name": doc["name"],
@@ -395,18 +404,24 @@ def run(store: Store, uid: str, at: datetime | None = None) -> dict[str, Any]:
     totals = dict.fromkeys(
         ("started", "proposed", "paused", "resumed", "ended", "extended", "narrowed", "held"), 0
     )
+    from app import autopilot_agent
+
     rules = sorted(store.rules_of(uid), key=lambda r: iso(r[1].get("created_at")) or "")
     source = "gemini"
+    # One time budget for the whole check, not per rule: each agent round waits at most what is
+    # left, and rules reached after it run on the fixed logic (fast, no Gemini).
+    deadline = time.monotonic() + autopilot_agent.BUDGET_S
     for rid, rdoc in rules:
         if not rdoc.get("enabled"):
             continue
         _guard(store, uid, (rid, rdoc), by_id, at, totals)
         try:
-            from app import autopilot_agent
-
-            autopilot_agent.run_rule(store, uid, (rid, rdoc), sig, at, totals)
+            if deadline - time.monotonic() < autopilot_agent.MIN_ROUND_S:
+                raise gemini.GeminiError("autopilot: the check's time budget is used up")
+            autopilot_agent.run_rule(store, uid, (rid, rdoc), sig, at, totals, deadline)
         except gemini.GeminiError:
-            # Gemini unreachable before acting: this rule runs on the fixed logic
+            # Gemini unreachable before acting (or no time left): this rule runs on the fixed
+            # logic
             source = "rules"
             _manage(store, uid, (rid, rdoc), by_id, at, totals)
             if _window_open(rdoc, at.date()):
@@ -761,8 +776,26 @@ def _summary(store: Store, uid: str, rule: tuple[str, Doc], at: datetime) -> Doc
     return {"last_summary_at": at}
 
 
+# Who runs a stale check: a create-once doc in the activity collection (Firestore create() fails
+# when it exists, so exactly one caller wins). Its owner is never a person's uid, so it never
+# shows in anyone's feed; it holds no personal data (the id is a hash).
+CLAIM_OWNER = "_run_claims"
+
+
+def _claim_run(store: Store, uid: str, last: datetime | None, at: datetime) -> str | None:
+    """Claim the stale check for this owner: the id is fixed by the last finished check (and the
+    STALE window, so a check that died without finishing is retried in the next window). Two
+    tabs that both see the same stale check get the same id, and only one creates it. Returns the
+    claim's id, or None when another caller has it."""
+    window = int(at.timestamp() // STALE.total_seconds())
+    aid = _aid(f"{uid}:run-claim:{iso(last)}:{window}")
+    doc = {"owner_uid": CLAIM_OWNER, "kind": "run_claim", "at": at, "status": "done"}
+    return aid if store.activity_add(aid, doc) else None
+
+
 def run_if_stale(store: Store, uid: str) -> dict[str, Any] | None:
-    """The Campaigns page's check: runs when the last one is over STALE old (None otherwise)."""
+    """The Campaigns page's check: runs when the last one is over STALE old (None otherwise, or
+    when another tab or instance is already running it)."""
     rules = store.rules_of(uid)
     if not any(d.get("enabled") for _, d in rules):
         return None
@@ -770,9 +803,17 @@ def run_if_stale(store: Store, uid: str) -> dict[str, Any] | None:
         (campaigns._aware(d.get("last_run_at")) for _, d in rules if d.get("last_run_at")),
         default=None,
     )
-    if last and campaigns.now() - last < STALE:
+    at = campaigns.now()
+    if last and at - last < STALE:
         return None
-    return run(store, uid)
+    claim = _claim_run(store, uid, last, at)
+    if claim is None:
+        return None
+    try:
+        return run(store, uid, at)
+    except campaigns.Unavailable:
+        store.activity_delete(claim)  # nothing ran: the next open may try again
+        raise
 
 
 def run_all(store: Store) -> dict[str, Any]:

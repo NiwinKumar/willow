@@ -6,7 +6,11 @@ those are validated (known products only, no invented numbers, never the niacina
 myth) and dropped if they fail. If Gemini is unavailable the rule findings stand alone.
 """
 
+import copy
+import hashlib
 import re
+import threading
+import time
 from itertools import combinations
 from typing import Any, Literal
 
@@ -242,19 +246,75 @@ def _valid(add: ModelConflict, ids: set[str], allowed: set[str], rules: list[dic
     return frozenset(add.products) not in same
 
 
-def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
-    result = rule_findings(entries)
-    active = [e for e in entries if not e.get("ended_at")]
-    if not use_model or len(active) < 2:
-        return result
-    listing = "\n".join(
+def _active(entries: list[Entry]) -> list[Entry]:
+    return [e for e in entries if not e.get("ended_at")]
+
+
+def needs_model(entries: list[Entry]) -> bool:
+    """Gemini is only asked about a routine of two or more products in use."""
+    return len(_active(entries)) >= 2
+
+
+def _listing(active: list[Entry]) -> str:
+    return "\n".join(
         f"- id {e['id']}: {_name(e)} ({', '.join(e.get('slots') or []) or 'no time set'}, "
         f"{schedule.words(e.get('schedule'))}); "
         f"actives: {', '.join(a['name'] for a in e.get('key_actives') or []) or 'not listed'}; "
         f"ingredients: {', '.join((e.get('inci') or [])[:INCI_DEPTH])}"
         for e in active
     )
-    prompt = f"Routine:\n{listing}\n\nRule-based findings (final):\n{result}"
+
+
+# A routine Gemini already checked answers again at once for an hour (no new call, no use of the
+# daily cap). Keyed by a hash of the exact prompt (the listing and the rule findings), so any
+# change to the routine is a new check. Only complete answers are kept, never the rules-only
+# fallback.
+ANSWER_TTL_S = 3600
+ANSWER_KEEP = 500
+_answers: dict[str, tuple[float, dict[str, Any]]] = {}
+_answers_lock = threading.Lock()
+
+
+def _prompt_of(entries: list[Entry]) -> tuple[str, str, dict[str, Any]]:
+    result = rule_findings(entries)
+    listing = _listing(_active(entries))
+    return f"Routine:\n{listing}\n\nRule-based findings (final):\n{result}", listing, result
+
+
+def _key(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode()).hexdigest()
+
+
+def answered(entries: list[Entry]) -> dict[str, Any] | None:
+    """The kept complete answer for this exact routine, or None."""
+    if not needs_model(entries):
+        return None
+    key = _key(_prompt_of(entries)[0])
+    with _answers_lock:
+        hit = _answers.get(key)
+        if hit and time.time() - hit[0] < ANSWER_TTL_S:
+            return copy.deepcopy(hit[1])
+    return None
+
+
+def clear_answers() -> None:
+    with _answers_lock:
+        _answers.clear()
+
+
+def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
+    return run(entries, use_model)[0]
+
+
+def run(entries: list[Entry], use_model: bool = True) -> tuple[dict[str, Any], bool]:
+    """(findings, complete). complete: Gemini answered, or the routine needs no Gemini; False
+    when Gemini was wanted and failed (or use_model is off), so the rules stand alone."""
+    active = _active(entries)
+    if len(active) < 2:
+        return rule_findings(entries), True
+    prompt, listing, result = _prompt_of(entries)
+    if not use_model:
+        return result, False
     try:
         extra = gemini.generate_json(
             "routine_check",
@@ -265,7 +325,7 @@ def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
             max_output_tokens=4096,
         )
     except gemini.GeminiError:
-        return result
+        return result, False
     ids = {e["id"] for e in active}
     names = {e["id"]: _name(e) for e in active}
     allowed = numbers.in_text(listing)
@@ -284,4 +344,9 @@ def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
             and not (MYTH.search(note) and re.search(r"vitamin c|ascorbic", note, re.I))
         ):
             result["notes"].append(note)
-    return result
+    with _answers_lock:
+        if len(_answers) >= ANSWER_KEEP:  # oldest first out
+            for k in sorted(_answers, key=lambda k: _answers[k][0])[: ANSWER_KEEP // 10]:
+                del _answers[k]
+        _answers[_key(prompt)] = (time.time(), copy.deepcopy(result))
+    return result, True

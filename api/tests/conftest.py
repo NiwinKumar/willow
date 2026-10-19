@@ -69,6 +69,16 @@ def fresh_ask_answers():
 
 
 @pytest.fixture(autouse=True)
+def fresh_routine_answers():
+    """A routine check kept by one test (app/routine_check.py) never answers the next one."""
+    from app import routine_check
+
+    routine_check.clear_answers()
+    yield
+    routine_check.clear_answers()
+
+
+@pytest.fixture(autouse=True)
 def no_real_bigquery(monkeypatch: pytest.MonkeyPatch):
     """Tests never query BigQuery; a test that needs insights replaces retailer.insights."""
     from app import retailer

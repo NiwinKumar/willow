@@ -1,12 +1,67 @@
 """Signed upload URLs and object metadata in the captures bucket."""
 
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from urllib.parse import urlencode
 
+import google.auth.credentials
+from google.auth import iam
+
 from app import gcp
 from app.settings import get_settings
+
+# Parallel signatures (views.sign_all): the shared signing session keeps this many connections.
+SIGN_POOL = 32
+
+
+class SharedSessionSigning(google.auth.credentials.Signing):
+    """Signs through IAM signBlob as `email` over one shared HTTP session.
+
+    google-auth's impersonated credentials open a new AuthorizedSession (a new TLS connection)
+    for every signature; a detail view signs about 40 URLs, so each paid a handshake. This
+    signs the same way (the source credentials call signBlob for the target account) but reuses
+    one pooled session across signatures and threads."""
+
+    def __init__(self, source: google.auth.credentials.Credentials, email: str) -> None:
+        import requests
+        from google.auth.transport.requests import Request
+
+        session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=SIGN_POOL)
+        session.mount("https://", adapter)
+        self._email = email
+        self._signer = iam.Signer(Request(session), source, email)
+
+    def sign_bytes(self, message: bytes) -> bytes:
+        return self._signer.sign(message)
+
+    @property
+    def signer_email(self) -> str:
+        return self._email
+
+    @property
+    def signer(self) -> iam.Signer:
+        return self._signer
+
+
+_signing: google.auth.credentials.Signing | None = None
+_signing_lock = threading.Lock()
+
+
+def signing() -> google.auth.credentials.Signing:
+    """What signs V4 URLs: gcp.signing_credentials() (sa-api via IAM), over a shared session
+    when they are impersonated credentials (Cloud Run and local runs), else as they are."""
+    global _signing
+    with _signing_lock:
+        if _signing is None:
+            creds = gcp.signing_credentials()
+            source = getattr(creds, "_source_credentials", None)
+            email = getattr(creds, "signer_email", None)
+            _signing = SharedSessionSigning(source, email) if source and email else creds
+        return _signing
 
 
 @dataclass(frozen=True)
@@ -37,7 +92,7 @@ def signed_put_url(object_name: str, content_type: str, ttl_seconds: int) -> str
         expiration=timedelta(seconds=ttl_seconds),
         method="PUT",
         content_type=content_type,
-        credentials=gcp.signing_credentials(),
+        credentials=signing(),
     )
 
 
@@ -83,7 +138,7 @@ def signed_get_url(object_name: str) -> str:
         version="v4",
         expiration=timedelta(seconds=_GET_TTL_SECONDS),
         method="GET",
-        credentials=gcp.signing_credentials(),
+        credentials=signing(),
     )
     _signed_get_cache[object_name] = (url, now + _GET_TTL_SECONDS)
     return url
@@ -94,12 +149,23 @@ DISPLAYABLE = ("**/preview.jpg", "**/preview.webp", "**/overlays/*", "**/views/*
 
 def list_names(prefix: str, globs: tuple[str, ...] = DISPLAYABLE) -> set[str]:
     """The results under a prefix matching `globs`: by default previews and overlays only. Spot
-    crops (dozens per session) are listed only where a page shows them (the spot diary)."""
+    crops (dozens per session) are listed only where a page shows them (the spot diary).
+
+    One listing per glob, all at once, names only: GCS filters each one, so a person's spot
+    crops (thousands across sessions) never travel when only previews are wanted."""
     client = gcp.storage_client()
     bucket = get_settings().bucket
-    return {
-        b.name for glob in globs for b in client.list_blobs(bucket, prefix=prefix, match_glob=glob)
-    }
+
+    def names(glob: str) -> set[str]:
+        blobs = client.list_blobs(
+            bucket, prefix=prefix, match_glob=glob, fields="items(name),nextPageToken"
+        )
+        return {b.name for b in blobs}
+
+    if len(globs) <= 1:
+        return set().union(*map(names, globs))
+    with ThreadPoolExecutor(max_workers=len(globs)) as pool:
+        return set().union(*pool.map(names, globs))
 
 
 def delete_object(object_name: str) -> None:

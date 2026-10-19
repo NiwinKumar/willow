@@ -564,3 +564,71 @@ def test_analyzing_a_finished_session_again_shows_it_and_runs_nothing(client, fa
     monkeypatch.setattr(analysis, "run", boom)
     again = client.post(f"/v1/sessions/{sid}/analyze")
     assert again.status_code == 200 and again.json()["session"]["id"] == sid
+
+
+def _analyze_with_slow_gemini(client, fake, monkeypatch, **run_kw):
+    import threading
+    import time
+
+    from app import explain, gemini, labeller
+
+    release = threading.Event()
+    calls = []
+
+    def slow(*a, **k):
+        calls.append(a[0])
+        release.wait(5)
+        raise gemini.GeminiError("too slow")
+
+    monkeypatch.setattr(gemini, "generate_json", slow)
+    monkeypatch.setattr(labeller, "label_candidates", lambda *a, **k: release.wait(5) or {})
+    monkeypatch.setattr(analysis, "GEMINI_BUDGET_S", 0.3)
+    monkeypatch.setattr(explain, "FIRST_TRY_MIN_S", 0.0)
+    created = _create(client)
+    _upload_all(fake, created)
+    sid = created["session_id"]
+    doc = fake.store.session_get("u_test", sid)
+    t = time.monotonic()
+    out = analysis.run(fake.store, "bucket", "u_test", sid, doc, **run_kw)
+    took = time.monotonic() - t
+    release.set()
+    return out, took, calls
+
+
+def test_gemini_past_its_deadline_falls_back_to_the_template(client, fake, monkeypatch):
+    doc, took, calls = _analyze_with_slow_gemini(client, fake, monkeypatch)
+    assert took < 2  # neither the explanation nor the labels are waited for past the budget
+    assert calls == ["explanation"]
+    assert doc["status"] == "done" and doc["explanation_source"] == "template"
+    assert doc["explanation"]["headline"] == "Your first reading"
+    assert doc["labels"] == {} and doc["label_details"] == {}
+
+
+def test_near_the_request_limit_gemini_is_skipped(client, fake, monkeypatch):
+    import time
+
+    started = time.monotonic() - (analysis.REQUEST_LIMIT_S - analysis.GEMINI_MIN_LEFT_S + 5)
+    doc, took, calls = _analyze_with_slow_gemini(client, fake, monkeypatch, started=started)
+    assert calls == []
+    assert doc["status"] == "done" and doc["explanation_source"] == "template"
+    assert doc["labels"] == {}
+    assert analysis.gemini_budget(time.monotonic()) == analysis.GEMINI_BUDGET_S
+
+
+def test_the_upload_check_reads_every_frame_at_once(client, fake, monkeypatch):
+    import threading
+
+    from app import storage
+
+    created = _create(client, n=4)
+    _upload_all(fake, created)
+    together = threading.Barrier(4, timeout=3)  # breaks unless the 4 reads run side by side
+    real = storage.object_info
+
+    def info(name):
+        together.wait()
+        return real(name)
+
+    monkeypatch.setattr(storage, "object_info", info)
+    res = client.post(f"/v1/sessions/{created['session_id']}/analyze")
+    assert res.status_code == 200, res.text

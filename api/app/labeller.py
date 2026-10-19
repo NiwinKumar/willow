@@ -6,12 +6,14 @@ diagnoses: the engine's numbers stay the engine's.
 
 Agreement rule: every batch is asked twice (temperature 0, candidates in reverse order the second
 time). A label is kept only when both runs give the same label and neither says "low" confidence;
-otherwise the candidate is "uncertain". Up to 5 candidates per request; batches run in parallel,
-within LABEL_BUDGET_S: a batch still unanswered then is left unlabelled, so a slow Gemini never
-holds up a check-in's result.
+otherwise the candidate is "uncertain". Up to 5 candidates per request; every call runs at once
+(a batch's two runs side by side), within LABEL_BUDGET_S: a batch still unanswered then is left
+unlabelled, so a slow Gemini never holds up a check-in's result.
 """
 
 import logging
+import re
+import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any, Literal
 
@@ -27,9 +29,13 @@ log = logging.getLogger("willow.labeller")
 # 5 per call answer in about 10 s.
 BATCH = 5
 MAX_CANDIDATES = 40
-WORKERS = 8
-# The check-in waits for the labels: past this, unanswered batches stay unlabelled.
-LABEL_BUDGET_S = 30.0
+# Every call at once: 40 candidates are 8 batches asked twice, 16 calls. With 8 workers the
+# second runs queued behind the first ones and agreement waited for a second wave (20-30 s).
+WORKERS = 16
+# The check-in waits for the labels: past this, unanswered batches stay unlabelled. Each call's
+# own deadline is the same, so a slow call is not left running long after nobody waits for it.
+LABEL_BUDGET_S = 15.0
+DIGIT = re.compile(r"\d")
 
 Label = Literal[
     "papule_pustule",
@@ -85,14 +91,16 @@ def _crops(candidate: dict[str, Any]) -> tuple[bytes, bytes] | None:
         return None
 
 
-def _ask_or_none(job: tuple[list, str]) -> dict[str, CandidateLabel] | None:
+def _ask_or_none(job: tuple[list, str, float]) -> dict[str, CandidateLabel] | None:
     try:
         return _ask(*job)
     except gemini.GeminiError:
         return None
 
 
-def _ask(batch: list[tuple[dict, tuple[bytes, bytes]]], site: str) -> dict[str, CandidateLabel]:
+def _ask(
+    batch: list[tuple[dict, tuple[bytes, bytes]]], site: str, timeout_s: float = LABEL_BUDGET_S
+) -> dict[str, CandidateLabel]:
     parts: list[types.Part | str] = []
     for cand, (crop, ctx) in batch:
         parts += [
@@ -109,9 +117,11 @@ def _ask(batch: list[tuple[dict, tuple[bytes, bytes]]], site: str) -> dict[str, 
         instructions=INSTRUCTIONS,
         temperature=0.0,
         max_output_tokens=4096,
-        attempts=2,  # one retry
-        # 20 small images per call: on a slow Gemini day 25 s was not enough (Oct 14).
-        timeout_ms=45_000,
+        # no second try: the budget has no room for one (a transient 429/503 that comes back
+        # quickly is still retried once by generate_json)
+        attempts=1,
+        # 10 small images per call answer in about 10 s; past the budget nobody waits for it
+        timeout_ms=max(1_000, round(timeout_s * 1000)),
     )
     ids = {c["id"] for c, _ in batch}
     return {lab.id: lab for lab in reply.labels if lab.id in ids}
@@ -120,29 +130,45 @@ def _ask(batch: list[tuple[dict, tuple[bytes, bytes]]], site: str) -> dict[str, 
 def _agree(a: CandidateLabel | None, b: CandidateLabel | None) -> dict[str, Any]:
     if a and b and a.label == b.label and "low" not in (a.confidence, b.confidence):
         confidence = "high" if a.confidence == b.confidence == "high" else "medium"
-        features = [f for f in a.visible_features if not BANNED.search(f) and f.strip()][:4]
+        # words only: a digit ("2 mm", "3 spots") would be Gemini measuring or counting
+        features = [
+            f
+            for f in a.visible_features
+            if f.strip() and not BANNED.search(f) and not DIGIT.search(f)
+        ][:4]
         return {"label": a.label, "confidence": confidence, "visible_features": features}
     return {"label": "uncertain", "confidence": "low", "visible_features": []}
 
 
-def label_candidates(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def label_candidates(
+    result: dict[str, Any], budget_s: float | None = None
+) -> dict[str, dict[str, Any]]:
     """{candidate_id: {label, confidence, visible_features}} for every candidate with crops.
 
     Returns {} when the engine produced no candidates or no crops; spots whose batch could not be
-    asked twice are left out (unlabelled), never guessed.
+    asked twice within the budget (LABEL_BUDGET_S, or `budget_s` when smaller) are left out
+    (unlabelled), never guessed.
     """
+    budget = LABEL_BUDGET_S if budget_s is None else min(LABEL_BUDGET_S, budget_s)
+    if budget <= 0:
+        return {}
+    deadline = time.monotonic() + budget
     candidates = (result.get("candidates") or [])[:MAX_CANDIDATES]
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    if not candidates:
+        return {}
+    with ThreadPoolExecutor(max_workers=min(WORKERS, len(candidates))) as pool:
         crops = list(pool.map(_crops, candidates))
     ready = [(c, cr) for c, cr in zip(candidates, crops, strict=True) if cr]
-    if not ready:
+    left = deadline - time.monotonic()
+    if not ready or left <= 0:
         return {}
     batches = [ready[i : i + BATCH] for i in range(0, len(ready), BATCH)]
     site = result.get("site", "")
-    jobs = [(b, site) for b in batches] + [(list(reversed(b)), site) for b in batches]
+    # Each batch's two runs next to each other, all at once: a pair finishes together.
+    jobs = [job for b in batches for job in ((b, site, left), (list(reversed(b)), site, left))]
     pool = ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs)))
     futures = [pool.submit(_ask_or_none, job) for job in jobs]
-    done, late = wait(futures, timeout=LABEL_BUDGET_S)
+    done, late = wait(futures, timeout=left)
     # Don't wait for the late ones: their spots stay unlabelled (the threads finish on their own).
     pool.shutdown(wait=False, cancel_futures=True)
     if late:
@@ -150,10 +176,10 @@ def label_candidates(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "candidate labels: %d of %d calls missed the %.0f s budget",
             len(late),
             len(jobs),
-            LABEL_BUDGET_S,
+            budget,
         )
     runs = [f.result() if f in done else None for f in futures]
-    first, second = runs[: len(batches)], runs[len(batches) :]
+    first, second = runs[0::2], runs[1::2]
     out: dict[str, dict[str, Any]] = {}
     for a_run, b_run, batch in zip(first, second, batches, strict=True):
         if a_run is None or b_run is None:

@@ -139,8 +139,40 @@ def test_a_sleeping_engine_reads_as_waking_and_is_asked_again_soon(client, monke
     assert len(calls) == 1  # kept briefly...
     monkeypatch.setattr(demo.time, "time", lambda: 10_000_000_000.0)
     monkeypatch.setattr(engine, "health", lambda timeout=0: {"engine_version": "0.3.1"})
-    assert client.get("/v1/demo/status").json()["engine"]["status"] == "ok"  # ...then asked again
+    # ...then asked again, in the background: this caller gets the last answer at once
+    assert client.get("/v1/demo/status").json()["engine"]["status"] == "waking"
+    with demo._status_lock:  # the background check has finished
+        pass
+    assert client.get("/v1/demo/status").json()["engine"]["status"] == "ok"
     assert engine.HEALTH_TIMEOUT_S > 35  # longer than a cold start
+
+
+def test_a_stale_status_never_waits_and_checks_once_at_a_time(monkeypatch):
+    import threading
+
+    from app import engine, retailer
+
+    demo.clear_cache()
+    old = {k: {"status": "ok", "old": True} for k in demo.LIVE_KEYS}
+    demo._cache["status"] = (0.0, old)
+    gate, calls = threading.Event(), []
+
+    def slow_engine(timeout=0):
+        calls.append(1)
+        gate.wait(5)  # a cold engine
+        return {"engine_version": "0.3.1"}
+
+    monkeypatch.setattr(engine, "health", slow_engine)
+    monkeypatch.setattr(demo, "live_check", lambda *a: {"status": "ok"})
+    monkeypatch.setattr(retailer, "insights", lambda: {"cohort": {"synthetic": 500, "real": 0}})
+    # two stale reads while the engine is slow: both answered from the cache at once
+    assert demo.status() is old and demo.status() is old
+    gate.set()
+    with demo._status_lock:  # the one background check has finished
+        pass
+    assert len(calls) == 1
+    assert demo.status()["engine"]["status"] == "ok" and "old" not in demo.status()["engine"]
+    demo.clear_cache()
 
 
 def test_an_engine_that_refuses_is_unreachable(client, monkeypatch):

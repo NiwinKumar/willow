@@ -26,6 +26,9 @@ from app.store import Store, get_store
 
 router = APIRouter(prefix="/v1/demo", tags=["demo"])
 
+ROUTINE_CHECK_KEEP_S = 3600  # a complete routine check (Gemini answered)
+ROUTINE_CHECK_RETRY_S = 60  # the rules-only fallback: Gemini is asked again after this
+
 
 @router.get("/samples")
 def list_samples() -> dict[str, Any]:
@@ -116,14 +119,22 @@ def journey_routine_log(
 @router.get("/routine/check")
 def journey_routine_check(store: Store = Depends(get_store)) -> dict[str, Any]:
     """The routine check on the demo journey's routine: one Gemini run an hour, shared by every
-    judge, so the public demo never spends anyone's daily cap."""
+    judge, so the public demo never spends anyone's daily cap. Judges arriving together wait for
+    the one run; a rules-only answer (Gemini failed) is kept only a minute, then Gemini is asked
+    again."""
     uid = get_settings().demo_user_id
 
-    def run() -> dict[str, Any]:
+    def run() -> tuple[dict[str, Any], bool]:
         entries = [{"id": eid, **e} for eid, e in store.routine_list(uid)]
-        return routine_check.check(entries)
+        return routine_check.run(entries)
 
-    return demo._cached(f"routine-check:{uid}", 3600, run)
+    result, _ = demo._cached(
+        f"routine-check:{uid}",
+        ROUTINE_CHECK_KEEP_S,
+        run,
+        keep_for=lambda v: ROUTINE_CHECK_KEEP_S if v[1] else ROUTINE_CHECK_RETRY_S,
+    )
+    return result
 
 
 @router.get("/advisor/history")

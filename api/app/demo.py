@@ -66,23 +66,47 @@ class Sample(BaseModel):
 
 
 _cache: dict[str, tuple[float, Any]] = {}
+_ttl: dict[str, float] = {}  # a key kept for other than its caller's `seconds` (keep_for)
+_key_locks: dict[str, threading.Lock] = {}
+_key_locks_guard = threading.Lock()
 
 
 STATUS_RETRY_S = 10.0  # a status with a failed check is asked again after this
 _status_lock = threading.Lock()
 
 
-def _cached(key: str, seconds: float, make):
+def _fresh(key: str, seconds: float) -> tuple[bool, Any]:
     hit = _cache.get(key)
-    if hit and time.time() - hit[0] < seconds:
-        return hit[1]
-    value = make()
-    _cache[key] = (time.time(), value)
-    return value
+    if hit and time.time() - hit[0] < _ttl.get(key, seconds):
+        return True, hit[1]
+    return False, None
+
+
+def _cached(key: str, seconds: float, make, keep_for=None):
+    """`make()` kept `seconds` (or `keep_for(value)` seconds when given). Single-flight per key:
+    while one caller makes it, the others with the same key wait for that answer instead of
+    making their own (a shared Gemini call is made once)."""
+    ok, value = _fresh(key, seconds)
+    if ok:
+        return value
+    with _key_locks_guard:
+        lock = _key_locks.setdefault(key, threading.Lock())
+    with lock:
+        ok, value = _fresh(key, seconds)  # made while this one waited
+        if ok:
+            return value
+        value = make()
+        _cache[key] = (time.time(), value)
+        if keep_for is not None:
+            _ttl[key] = keep_for(value)
+        else:
+            _ttl.pop(key, None)
+        return value
 
 
 def clear_cache() -> None:
     _cache.clear()
+    _ttl.clear()
 
 
 def samples() -> list[Sample]:
@@ -179,11 +203,12 @@ def probe_storage() -> None:
 
 def probe_bigquery() -> None:
     """Table metadata for the cohort table the insights read (free: no query, no bytes)."""
-    from google.cloud import bigquery
+    from app import retailer
 
     s = get_settings()
-    client = bigquery.Client(project=s.project_id, location="us-central1")
-    client.get_table(f"{s.project_id}.{s.bq_dataset}.sessions_flat", timeout=PROBE_TIMEOUT_S)
+    retailer.bq_client().get_table(
+        f"{s.project_id}.{s.bq_dataset}.sessions_flat", timeout=PROBE_TIMEOUT_S
+    )
 
 
 def live_check(name: str, probe) -> dict[str, Any]:
@@ -273,16 +298,26 @@ def status() -> dict[str, Any]:
         good = all(hit[1][k].get("status") == "ok" for k in LIVE_KEYS)
         if time.time() - hit[0] < (60 if good else STATUS_RETRY_S):
             return hit[1]
-    # One check at a time (it can wait 45 s on a cold engine): while one runs, others get the
-    # last answer if there is one, else wait for this one.
-    if not _status_lock.acquire(blocking=hit is None):
+        # Stale: answer with the last check at once and re-check in the background (it can take
+        # 45 s on a cold engine). One check at a time: a check already running is left alone.
+        if _status_lock.acquire(blocking=False):
+            threading.Thread(target=_check_in_background, args=(check,), daemon=True).start()
         return hit[1]
-    try:
+    # Nothing to show yet: the first caller runs the check, the others wait for its answer.
+    with _status_lock:
         again = _cache.get("status")
-        if again is not hit and again is not None:  # finished while this one waited
+        if again is not None:  # finished while this one waited
             return again[1]
         value = check()
         _cache["status"] = (time.time(), value)
         return value
+
+
+def _check_in_background(check) -> None:
+    """Run a status check into the cache; releases _status_lock, which the caller acquired."""
+    try:
+        _cache["status"] = (time.time(), check())
+    except Exception as exc:  # the last answer stays; the next request tries again
+        log.warning("status: background check failed: %s", exc)
     finally:
         _status_lock.release()
