@@ -5,6 +5,7 @@ import { BarChart3, Building2, PlayCircle, Smartphone, type LucideIcon } from 'l
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { WillowIntro } from '../../components/willow/WillowLoader'
+import { journeyViews, warmFirstPhoto } from '../../data/demoSource'
 import { leaveDemo } from '../../data/useData'
 import { identity } from '../../lib/identity'
 import { JUDGE_STOPS } from '../../lib/judge'
@@ -138,7 +139,7 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
         <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
-          <WayIn to={JOURNEY_PATH} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
+          <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
           <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
           <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
           <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
@@ -158,7 +159,7 @@ const WAY_TONE = {
 } as const
 
 /** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). The tag says which are played for judges and which are the live app. */
-function WayIn({ to, onClick, tone, icon: Icon, title, tag, sub }: { to?: string; onClick?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string }) {
+function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, tag, sub }: { to?: string; onClick?: () => void; onWarm?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string }) {
   const t = WAY_TONE[tone]
   const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] text-ink`
   const body = (
@@ -176,15 +177,22 @@ function WayIn({ to, onClick, tone, icon: Icon, title, tag, sub }: { to?: string
     </>
   )
   const style = { background: t.bg, boxShadow: t.shadow }
+  const warm = onWarm ? { onPointerEnter: onWarm, onFocus: onWarm, onTouchStart: onWarm } : {}
   return to ? (
-    <Link to={to} className={cls} style={style}>
+    <Link to={to} className={cls} style={style} {...warm}>
       {body}
     </Link>
   ) : (
-    <button type="button" onClick={onClick} className={cls} style={style}>
+    <button type="button" onClick={onClick} className={cls} style={style} {...warm}>
       {body}
     </button>
   )
+}
+
+/** On the way to Mei's journey (pointer over, focus, touch): its code and her first photo start loading. */
+function warmJourney() {
+  void import('../journey/Journey')
+  journeyViews().then(warmFirstPhoto, () => undefined)
 }
 
 const wayCard = 'w-lift relative flex h-[380px] flex-col justify-between overflow-hidden rounded-[34px] p-6 text-left no-underline disabled:cursor-default disabled:opacity-100'
@@ -250,6 +258,9 @@ function WaysIn({ returning }: { returning: boolean }) {
           type="button"
           disabled={journey.state !== 'ready'}
           onClick={() => navigate('/journey')}
+          onPointerEnter={warmJourney}
+          onFocus={warmJourney}
+          onTouchStart={warmJourney}
           className={`${wayCard} text-white`}
           style={{ background: 'radial-gradient(60% 40% at 30% 60%, #9FC2C9 0%, transparent 70%), linear-gradient(200deg, #2F4A2A 0%, #3E6A6E 45%, #15241C 100%)' }}
         >

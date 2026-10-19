@@ -192,3 +192,28 @@ def test_gemini_sees_months_in_words_and_no_page_plumbing():
     v = retailer_ask.view(data)
     assert "filters" not in v and "empty" not in v
     assert v["needs_by_month"]["months"] == ["August 2026", "October 2026"]
+
+
+def test_a_repeated_question_is_answered_from_the_kept_answer(client, fake, monkeypatch):
+    from datetime import UTC, datetime
+
+    calls = []
+
+    def once(*a, **k):
+        calls.append(1)
+        return Answer(answer="Azelaic Gel: 61% still improved at week 8 (synthetic cohort).")
+
+    monkeypatch.setattr(gemini, "generate_json", once)
+    monkeypatch.setattr(retailer, "insights", lambda *a: INSIGHTS)
+    first = client.post("/v1/retailer/ask", json={"question": "What works for dark spots?"})
+    again = client.post("/v1/retailer/ask", json={"question": "  what works for DARK spots? "})
+    assert first.status_code == again.status_code == 200
+    assert again.json() == first.json()
+    assert len(calls) == 1
+    day = datetime.now(UTC).date().isoformat()
+    assert fake.store.usage_incr("u_test", day, "retailer_ask", 0) == 1
+    # other filters are another question
+    other = client.post(
+        "/v1/retailer/ask", json={"question": "What works for dark spots?", "range": "30d"}
+    )
+    assert other.status_code == 200 and len(calls) == 2

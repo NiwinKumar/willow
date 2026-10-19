@@ -2,13 +2,14 @@ import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import { journeyViews, warmFirstPhoto } from '../../data/demoSource'
 import { toSession } from '../../data/live'
 import type { Metric, Session } from '../../data/types'
 import { enterDemo } from '../../data/useData'
-import { api } from '../../lib/api'
 import { fmtReading, METRIC_META, unitOf } from '../../lib/metrics'
 import { wordsFor, verdictKind } from '../../lib/verdict'
 import { setWalkthroughs, startSegment, walkthroughsOn } from '../tour/runner'
+import { useImageStatus } from '../progress/useImageStatus'
 import { MEI_WEEKS } from './meiSegments'
 
 /**
@@ -43,10 +44,11 @@ export default function Journey() {
   const iRef = useRef(0)
 
   useEffect(() => {
-    api
-      .demoJourney()
-      .then((r) => {
-        const done = r.sessions.map(toSession).filter((s) => s.status === 'done' && s.result)
+    // The landing page has usually asked for the journey already; her first photo starts loading with it.
+    journeyViews()
+      .then((views) => {
+        warmFirstPhoto(views)
+        const done = views.map(toSession).filter((s) => s.status === 'done' && s.result)
         const faces = done.filter((s) => s.site === 'face_full').sort((a, b) => a.created_at.localeCompare(b.created_at))
         const closes = done.filter((s) => s.site !== 'face_full')
         const start = faces[0] ? new Date(faces[0].created_at).getTime() : 0
@@ -103,6 +105,7 @@ export default function Journey() {
   const slide = slides[i]
   const first = weeks[0]
   const latest = weeks.at(-1)
+  const firstShown = useImageStatus(first?.face.preview?.url ?? null) !== 'loading'
 
   return (
     <main
@@ -150,7 +153,7 @@ export default function Journey() {
       </header>
 
       <section aria-live="polite" className="mx-auto flex w-full max-w-[1180px] flex-1 items-center px-[clamp(16px,3vw,32px)] py-5">
-        {state === 'loading' ? <p className="m-auto text-ink-2">Loading Mei’s journey…</p> : null}
+        {state === 'loading' ? <IntroSkeleton /> : null}
         {state === 'error' ? (
           <div className="m-auto flex flex-col items-center gap-3 text-center">
             <p className="m-0 text-[17px]">Mei’s journey can’t be read right now.</p>
@@ -183,8 +186,8 @@ export default function Journey() {
           )}
         </footer>
       ) : null}
-      {/* the next photos load while this slide plays */}
-      <div hidden>{slides[i + 1]?.kind === 'week' ? <Prefetch w={(slides[i + 1] as { w: Week }).w} /> : null}</div>
+      {/* the next photos load while this slide plays (after her first photo, so they never slow it down) */}
+      <div hidden>{slides[i + 1]?.kind === 'week' && (i > 0 || firstShown) ? <Prefetch w={(slides[i + 1] as { w: Week }).w} /> : null}</div>
     </main>
   )
 }
@@ -198,18 +201,64 @@ function Prefetch({ w }: { w: Week }) {
   )
 }
 
-function Photo({ s, label, className = '' }: { s: Session; label: string; className?: string }) {
-  return s.preview ? (
-    <img src={s.preview.url} alt={label} className={`aspect-[3/4] w-full rounded-[24px] object-cover squircle ${className}`} />
-  ) : (
-    <div className={`grid aspect-[3/4] w-full place-items-center rounded-[24px] bg-ink/5 text-ink-2 ${className}`}>No photo</div>
+/** A check-in photo (3:4). A shimmer holds its place until it has loaded, then the photo fades in. `first` is the
+ * "Meet Mei" photo, the slide's largest image: fetched at high priority. */
+function Photo({ s, label, className = '', first = false }: { s: Session; label: string; className?: string; first?: boolean }) {
+  const url = s.preview?.url ?? null
+  const status = useImageStatus(url)
+  if (!s.preview || status === 'failed')
+    return <div className={`grid aspect-[3/4] w-full place-items-center rounded-[24px] bg-ink/5 text-ink-2 ${className}`}>No photo</div>
+  const ready = status === 'ready'
+  return (
+    <div className={`relative aspect-[3/4] w-full overflow-hidden rounded-[24px] squircle ${className}`}>
+      {ready ? null : <span aria-hidden className="skeleton absolute inset-0 rounded-none" style={SHIMMER} />}
+      <img
+        src={s.preview.url}
+        alt={label}
+        width={s.preview.width ?? 1200}
+        height={s.preview.height ?? 1600}
+        decoding="async"
+        fetchPriority={first ? 'high' : 'auto'}
+        className="relative size-full object-cover transition-opacity duration-300"
+        style={{ opacity: ready ? 1 : 0 }}
+      />
+    </div>
   )
 }
+
+/** "Meet Mei" while her journey is read: the slide's own layout, its photo and lines as shimmers. */
+function IntroSkeleton() {
+  return (
+    <div role="status" aria-label="Loading Mei’s journey" className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]">
+      <span aria-hidden className={`skeleton aspect-[3/4] w-full rounded-[24px] squircle ${INTRO_PHOTO}`} style={SHIMMER} />
+      <div aria-hidden className="flex flex-col gap-4">
+        <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h1>
+        {/* the two paragraphs' lines, so the heading does not move when they arrive */}
+        <span className="flex max-w-[520px] flex-col gap-[clamp(10px,1vw,13px)] py-1">
+          {['100%', '96%', '100%', '58%'].map((w, k) => (
+            <span key={k} className="skeleton h-[clamp(14px,1.2vw,16px)]" style={{ ...SHIMMER, width: w }} />
+          ))}
+        </span>
+        <span className="flex max-w-[520px] flex-col gap-2 pt-1">
+          {['100%', '100%', '100%', '40%'].map((w, k) => (
+            <span key={k} className="skeleton h-3" style={{ ...SHIMMER, width: w }} />
+          ))}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// The shimmer a shade darker than the app's: the journey's page is the warm #F3F1EC, where the usual one barely shows.
+const SHIMMER = { background: 'linear-gradient(90deg, #E7E4DD 25%, #DAD6CE 50%, #E7E4DD 75%)', backgroundSize: '200% 100%' }
+
+// 3:4 and no taller than 68% of the screen
+const INTRO_PHOTO = 'max-w-[calc(68dvh*.75)] justify-self-center'
 
 function Intro({ face, count, closeUps }: { face: Session; count: number; closeUps: number }) {
   return (
     <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
-      <Photo s={face} label="Mei's first check-in selfie" className="max-h-[68dvh] w-auto max-w-full justify-self-center" />
+      <Photo s={face} label="Mei's first check-in selfie" className={INTRO_PHOTO} first />
       <div className="flex flex-col gap-4">
         <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h1>
         <p className="m-0 max-w-[520px] text-[clamp(16px,1.4vw,19px)] leading-[1.5] text-pretty">

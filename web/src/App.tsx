@@ -6,6 +6,7 @@ import { CheckInOverlay } from './components/shell/CheckInOverlay'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { buttonClass } from './components/ui/Button'
 import { WillowLoader } from './components/willow/WillowLoader'
+import { journeyViews, warmFirstPhoto } from './data/demoSource'
 import { DataProvider } from './data/store'
 import { TourOverlay } from './features/tour/TourOverlay'
 import { useAuth } from './lib/useAuth'
@@ -28,6 +29,9 @@ const Result = lazy(() => import('./features/progress/Result'))
 const ProductTest = lazy(() => import('./features/progress/ProductTest'))
 const Routine = lazy(() => import('./features/routine/Routine'))
 const You = lazy(() => import('./features/you/You'))
+
+// Opened straight at Mei's story: her journey and first photo load while the page's code does.
+if (window.location.pathname === '/journey') journeyViews().then(warmFirstPhoto, () => undefined)
 
 /**
  * Routes. The website (landing, sign in, welcome, judge tour) and Retail stand alone; the app lives in one

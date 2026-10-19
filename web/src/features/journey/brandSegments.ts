@@ -72,7 +72,7 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
       title: 'Proof by Willow · ask',
       steps: [
         { route: `/retail?${AS}`, target: 'text:Ask anything', action: 'click', caption: 'Ask anything: a question in plain words, about the same data on screen.', hold: 1200 },
-        { target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, caption: 'Gemini answers from the aggregates only. Any number it writes that isn’t in them is rejected, and no one person can be looked up.', hold: 1200 },
+        { target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, wait: 75_000, caption: 'Gemini answers from the aggregates only. Any number it writes that isn’t in them is rejected, and no one person can be looked up.', hold: 1200 },
         { target: 'css:dialog[open] [aria-busy="false"]', action: 'point', caption: 'The answer, its chart drawn from the same numbers, and follow-up questions.', hold: 3600 },
         { action: 'escape', caption: 'Back to the workspace.', hold: 800 },
       ],
@@ -82,7 +82,7 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
       title: 'Proof by Willow · claims',
       steps: [
         { route: product(ids.hero), target: 'css:#ev-h', action: 'point', caption: 'Claim-ready statements, each with its number of people, its window and its cohort.', hold: 2400 },
-        { target: 'css:section[aria-labelledby="claims-h"] button:not([role="radio"])', action: 'click', caption: 'Gemini drafts copy from those statements only. Every number is checked before it shows.', until: claimsDone, hold: 1500 },
+        { target: 'css:section[aria-labelledby="claims-h"] button:not([role="radio"])', action: 'click', caption: 'Gemini drafts copy from those statements only. Every number is checked before it shows.', until: claimsDone, wait: 60_000, hold: 1500 },
         { target: 'css:#claims-h', action: 'point', caption: 'Each draft names the statements it rests on.', hold: 2600 },
       ],
     },
@@ -97,7 +97,7 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
         { action: 'escape', caption: 'Or let Proof promote for you…', hold: 900 },
         { target: 'text:New rule', action: 'click', caption: 'AutoCampaign: rules that promote a product the moment its proof allows.', hold: 1200 },
         { target: 'css:dialog[open] textarea', action: 'type', text: RULE_WORDS, caption: 'A rule in plain words.', hold: 400 },
-        { target: 'text:Read it', action: 'click', until: ruleRead, caption: 'Gemini reads the words into the rule, and the form checks it against the guardrails.', hold: 1200 },
+        { target: 'text:Read it', action: 'click', until: ruleRead, wait: 60_000, caption: 'Gemini reads the words into the rule, and the form checks it against the guardrails.', hold: 1200 },
         { target: 'text:Reads as', action: 'point', caption: 'The rule it read: which proof triggers it, who sees the card, for how long. Nothing is saved here.', hold: 3400 },
         { action: 'escape', caption: 'Measured, proven, claimed, promoted: with AI at each step, and every number checked.', hold: 1400 },
       ],

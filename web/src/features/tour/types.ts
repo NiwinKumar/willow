@@ -21,8 +21,10 @@ export type TourStep = {
   caption: string
   /** How long the step stays after its action, in ms (default 2600). */
   hold?: number
-  /** Wait for this before moving on (checked every 250 ms, at most 30 s), e.g. Wisp's answer. */
+  /** Wait for this before moving on (checked every 250 ms, at most `wait`), e.g. Wisp's answer. */
   until?: () => boolean
+  /** The longest `until` waits, in ms (default 30 s): a live Gemini answer can take longer. */
+  wait?: number
   /** Runs before the step's action (e.g. set up demo state). */
   run?: () => void | Promise<void>
 }
