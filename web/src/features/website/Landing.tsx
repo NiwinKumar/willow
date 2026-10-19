@@ -141,7 +141,7 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
         <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
           <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
           <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
-          <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
+          <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
           <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
         </nav>
       </div>

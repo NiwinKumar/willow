@@ -96,7 +96,13 @@ export default function SignIn() {
   }
 
   const google = () => void run('google', signInWithGoogle, authErrorText)
-  const asGuest = () => void run('guest', continueAsGuest, () => 'Could not start a guest session. Check your connection and try again.')
+  // A new guest starts with the starter routine and sample check-ins (an account made with Google or email
+  // starts fresh). A miss leaves an empty guest account, not an error: the app works the same.
+  const startGuest = async () => {
+    await continueAsGuest()
+    await api.guestSetup(await getIdToken()).catch(() => undefined)
+  }
+  const asGuest = () => void run('guest', startGuest, () => 'Could not start a guest session. Check your connection and try again.')
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -184,6 +190,13 @@ export default function SignIn() {
             </span>
             {pending === 'google' ? 'Signing in…' : 'Continue with Google'}
           </button>
+
+          {guest ? null : (
+            <button type="button" onClick={asGuest} disabled={pending !== null} aria-busy={pending === 'guest' || undefined} className="flex min-h-[60px] flex-col items-center justify-center gap-0.5 rounded-[18px] border border-line bg-white px-4 py-2 text-[16px] text-ink transition-transform active:scale-[.98]">
+              <span>{pending === 'guest' ? 'Setting up your guest account…' : 'Continue as a guest'}</span>
+              <span className="text-[13px] leading-[1.35] text-ink-2">No sign-up. Starts with sample check-ins and a routine to explore.</span>
+            </button>
+          )}
 
           <div aria-hidden className="flex items-center gap-3 font-mono text-[12px] text-ink-3 [@media(max-height:700px)]:hidden">
             <span className="h-px flex-1 bg-line" />
@@ -282,13 +295,7 @@ export default function SignIn() {
           </form>
 
           <div className="flex flex-wrap justify-between gap-2.5 text-[14px]">
-            {guest ? (
-              <span className="flex min-h-10 items-center text-ink-2">You are using Willow as a guest.</span>
-            ) : (
-              <button type="button" onClick={asGuest} disabled={pending !== null} className="hit44 min-h-10 text-[14px] underline">
-                {pending === 'guest' ? 'Starting…' : 'Continue as guest'}
-              </button>
-            )}
+            {guest ? <span className="flex min-h-10 items-center text-ink-2">You are using Willow as a guest.</span> : null}
             <button type="button" onClick={() => setMode(up ? 'signin' : 'signup')} className="min-h-10 text-[14px]">
               {up ? 'Have an account? Sign in' : 'New here? Create an account'}
             </button>

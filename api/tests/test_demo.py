@@ -51,8 +51,10 @@ def test_a_sample_run_is_an_ordinary_session_of_the_judge(client, fake, samples)
     assert all(dst.startswith(f"uploads/u_test/{sid}/") for _, dst in samples)
     view = client.post(f"/v1/sessions/{sid}/analyze").json()
     assert view["session"]["status"] == "done"
-    assert view["session"]["is_baseline"] is True
     assert view["session"]["sample_id"] == "forearm_base"
+    # someone else's photos: read on their own, never this person's baseline
+    assert view["session"]["is_baseline"] is False
+    assert fake.store.baseline_get("u_test", "forearm_control__calibrated_raw") is None
 
 
 def test_unknown_sample_is_404(client, samples):
@@ -253,3 +255,41 @@ def test_journey_routine_is_public_and_read_only(client, fake):
     assert "conflicts" in check
     # nothing a caller sends reaches the demo account: there are no demo write routes
     assert anon.put(f"/v1/demo/routine/log/{today}/{entry['id']}/pm").status_code in (404, 405)
+
+
+def test_a_new_guest_starts_with_the_starter_check_ins_and_routine(client, fake, monkeypatch):
+    import json as _json
+
+    from app import storage
+
+    copied = []
+    monkeypatch.setattr(storage, "copy_prefix", lambda src, dst: copied.append((src, dst)) or 3)
+    source = "s_20260823_810e21e6"
+    fake.store.session_set(
+        "demo_willow",
+        source,
+        {
+            "site": "face_full",
+            "capture_mode": "uncalibrated",
+            "status": "done",
+            "measured": True,
+            "is_baseline": True,
+            "note": "Mei's own words",
+            "frame_uris": [f"gs://b/uploads/demo_willow/{source}/frame_1.jpg"],
+            "result_json": _json.dumps(
+                {"session_id": source, "preview": f"demo_willow/{source}/p"}
+            ),
+            "labels": {"c_001": "mole"},
+        },
+    )
+    first = client.post("/v1/demo/guest-setup").json()
+    assert first == {"routine_added": 4, "sessions_added": 1}
+    sid, doc = fake.store.sessions_list("u_test")[0]
+    assert doc["sample_id"] == "mei_face_week1" and doc["is_baseline"] is False
+    assert doc["note"] is None and doc["labels"] == {"c_001": "mole"}
+    assert doc["frame_uris"] == [f"gs://b/uploads/u_test/{sid}/frame_1.jpg"]
+    assert _json.loads(doc["result_json"]) == {"session_id": sid, "preview": f"u_test/{sid}/p"}
+    assert (f"uploads/demo_willow/{source}/", f"uploads/u_test/{sid}/") in copied
+    # once is enough: a second call (another tab) adds nothing
+    assert client.post("/v1/demo/guest-setup").json() == {"routine_added": 0, "sessions_added": 0}
+    assert len(fake.store.sessions_list("u_test")) == 1
