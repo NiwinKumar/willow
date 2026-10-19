@@ -52,7 +52,7 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 - `app/gemini.py`: `generate_json(prompt_id, contents, Schema, instructions=...)`. System rules on every call, JSON against a pydantic schema, `thinking_level=LOW` (the lowest Gemini 3.8 Flash accepts), one retry, then `GeminiError` for the caller's fallback. Logs prompt id, latency and token counts only.
 - Catalog: `seed/products.json`, built from the sheet by `scripts/import_catalog.py` (see `docs/CATALOG_SPEC.md`).
 
-Judge mode data (sample photos, the seeded journey): `uv run python scripts/seed_demo.py --help`. Samples live in `gs://<bucket>/demo/samples/` with a manifest; the api re-reads it within 5 minutes.
+Judge mode data (sample photos, the seeded journey): `uv run python scripts/seed_demo.py --help`. Samples live in `gs://<bucket>/demo/samples/` with a manifest; the api re-reads it within 5 minutes. The demo account's objects carry a temporary hold so the 30-day lifecycle keeps them (`seed_demo.py hold [--release]`).
 
 Check-in photos analysed before the api wrote `preview.webp`: `uv run python scripts/backfill_previews.py [--uid <uid>] --apply` writes it from their `preview.jpg` (the demo account by default; dry run without `--apply`).
 

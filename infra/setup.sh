@@ -46,6 +46,11 @@ cat > /tmp/lifecycle.json << 'JSON'
 {"rule": [{"action": {"type": "Delete"}, "condition": {"age": 30, "matchesPrefix": ["uploads/", "results/"]}}]}
 JSON
 gcloud storage buckets update "$BUCKET" --lifecycle-file=/tmp/lifecycle.json
+# The lifecycle cannot exclude a prefix, so the demo account (Mei's journey, judged into December)
+# is kept with a temporary hold per object, which the lifecycle skips. Set Oct 19; re-applied by
+# `api/scripts/seed_demo.py journey`. Release when judging ends (deleted within a day after):
+#   gcloud storage objects update "$BUCKET/uploads/demo_willow/**" "$BUCKET/results/demo_willow/**" --temporary-hold
+#   gcloud storage objects update "$BUCKET/uploads/demo_willow/**" "$BUCKET/results/demo_willow/**" --no-temporary-hold
 cat > /tmp/cors.json << 'JSON'
 [{"origin": ["*"], "method": ["PUT", "GET", "HEAD"], "responseHeader": ["Content-Type"], "maxAgeSeconds": 3600}]
 JSON
