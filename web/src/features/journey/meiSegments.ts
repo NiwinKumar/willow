@@ -31,7 +31,7 @@ export const MEI_WEEKS: TourSegment[] = [
   seg(0, [
     checkIn(0, 'Sunday evening: her first check-in. Three face photos by the window and a cheek close-up, uploaded and measured by the engine.'),
     { target: 'text:Later days compare with this one', action: 'point', caption: 'It becomes her baseline: every later week is compared with her own skin, never with anyone else’s.' },
-    { target: 'text:Pores', action: 'point', caption: 'The close-up adds pores and texture: they need a macro photo.' },
+    { target: 'css:[data-place="cheek_macro"] > h2', action: 'point', caption: 'The cheek close-up has its own readings, texture among them. Pores need an even closer photo, and Willow says so instead of guessing.' },
     { route: '/routine', target: 'text:Your routine', action: 'point', caption: 'She lists what she uses. A niacinamide serum and a centella cream start the next day.' },
   ]),
   seg(1, [
