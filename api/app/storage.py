@@ -41,8 +41,12 @@ def signed_put_url(object_name: str, content_type: str, ttl_seconds: int) -> str
     )
 
 
-def put_bytes(object_name: str, data: bytes, content_type: str) -> None:
+def put_bytes(
+    object_name: str, data: bytes, content_type: str, cache_control: str | None = None
+) -> None:
     blob = gcp.storage_client().bucket(get_settings().bucket).blob(object_name)
+    if cache_control:
+        blob.cache_control = cache_control  # sent with the upload as object metadata
     blob.upload_from_string(data, content_type=content_type)
 
 
@@ -85,7 +89,7 @@ def signed_get_url(object_name: str) -> str:
     return url
 
 
-DISPLAYABLE = ("**/preview.jpg", "**/overlays/*", "**/views/*")
+DISPLAYABLE = ("**/preview.jpg", "**/preview.webp", "**/overlays/*", "**/views/*")
 
 
 def list_names(prefix: str, globs: tuple[str, ...] = DISPLAYABLE) -> set[str]:

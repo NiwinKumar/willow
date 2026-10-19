@@ -40,7 +40,7 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 | POST | `/v1/advisor/chat` | `{messages:[{role, text}]}` -> `{message, products, follow_up_suggestions, retrieval, remaining_today}`; 20 a day |
 | PATCH/DELETE | `/v1/routine/{id}` | Stop (`ended_at`) or move AM/PM / remove a mistaken entry (its ticks go too) |
 
-`SessionView.session` also carries `measured` (false when the engine returned a placeholder; `result` is then null), `baseline` (`{session_id, frames, has_noise_band}` of the baseline this session is compared with, same site and capture mode), `preview` (signed URL of the engine's `{output_prefix}preview.jpg` when it exists, sized to `image_size`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
+`SessionView.session` also carries `measured` (false when the engine returned a placeholder; `result` is then null), `baseline` (`{session_id, frames, has_noise_band}` of the baseline this session is compared with, same site and capture mode), `preview` (signed URL of the api's small `preview.webp` of the engine's `{output_prefix}preview.jpg`, else the JPEG, when it exists, sized to `image_size`; `app/previews.py`), `overlay_urls`, `hours_since_baseline`, `note`, `deviation`, `error` and `explanation_source` (`template` until the Gemini explanation lands, then `gemini`).
 
 ## Engine modes
 - `ENGINE_MODE=fixture`: answers from `app/contract/analysis_result.sample.json`, filtered to the site's metrics, varied a little per session, with the baseline verdict rules applied. `engine_version` ends in `-fixture` and `warnings[]` says the numbers are a sample.
@@ -53,6 +53,8 @@ Signed upload URLs are signed with IAM signBlob as `sa-api` (locally your user i
 - Catalog: `seed/products.json`, built from the sheet by `scripts/import_catalog.py` (see `docs/CATALOG_SPEC.md`).
 
 Judge mode data (sample photos, the seeded journey): `uv run python scripts/seed_demo.py --help`. Samples live in `gs://<bucket>/demo/samples/` with a manifest; the api re-reads it within 5 minutes.
+
+Check-in photos analysed before the api wrote `preview.webp`: `uv run python scripts/backfill_previews.py [--uid <uid>] --apply` writes it from their `preview.jpg` (the demo account by default; dry run without `--apply`).
 
 After the engine starts measuring a new site (face, close-ups): `uv run python scripts/remeasure.py [--site face_full] --apply` measures the photos saved before, oldest first, so the earliest becomes each person's baseline (dry run without `--apply`).
 
