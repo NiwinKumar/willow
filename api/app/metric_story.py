@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -101,52 +102,50 @@ def _metric(result: dict[str, Any], metric_id: str) -> dict[str, Any] | None:
     return next((m for m in result.get("metrics", []) if m["id"] == metric_id), None)
 
 
-def _same_way(doc: dict[str, Any], other_result: dict[str, Any], metric_id: str) -> bool:
+def _same_way(this_result: dict[str, Any], other_result: dict[str, Any], metric_id: str) -> bool:
     """Blemish and dark-spot counts include the cheeks only when cheek photos were taken: such
     counts are only compared with a check-in taken the same way (app/baselines.match_counts)."""
     if metric_id not in baselines.CONFIRMED_COUNTS:
         return True
-    this = measured_result(doc) or {}
-    return baselines.with_cheeks(this) == baselines.with_cheeks(other_result)
+    return baselines.with_cheeks(this_result) == baselines.with_cheeks(other_result)
 
 
-def _previous(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str):
-    """The latest earlier measured session of the same site and capture mode with this metric."""
+def _earlier(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str):
+    """Every earlier measured session of the same site and capture mode with this metric, taken
+    the same way: [(session id, doc, its metric)]. One read of the sessions and one parse of each
+    result, shared by the previous check-in and the history."""
     this_at = doc.get("created_at")
-    best = None
+    if not this_at:
+        return []
+    this_result = measured_result(doc) or {}
+    out = []
     for other_id, other in store.sessions_list(uid):
         if other_id == sid or other.get("site") != doc.get("site"):
             continue
         if other.get("capture_mode") != doc.get("capture_mode"):
             continue
-        if not other.get("created_at") or not this_at or other["created_at"] >= this_at:
+        if not other.get("created_at") or other["created_at"] >= this_at:
             continue
         result = measured_result(other)
         m = _metric(result, metric_id) if result else None
-        if m is None or m.get("value") is None or not _same_way(doc, result, metric_id):
+        if m is None or m.get("value") is None or not _same_way(this_result, result, metric_id):
             continue
-        if best is None or other["created_at"] > best[1]["created_at"]:
-            best = (other_id, other, m)
-    return best
+        out.append((other_id, other, m))
+    return out
+
+
+def _previous(earlier: list[tuple[str, dict[str, Any], dict[str, Any]]]):
+    """The latest earlier measured session of the same site and capture mode with this metric."""
+    return max(earlier, key=lambda r: r[1]["created_at"], default=None)
 
 
 def _history(
-    store: Store, uid: str, doc: dict[str, Any], metric_id: str, m: dict[str, Any]
+    earlier: list[tuple[str, dict[str, Any], dict[str, Any]]], m: dict[str, Any]
 ) -> list[dict[str, Any]]:
     """Every earlier measured check-in of this site and capture mode with this metric, oldest
     first (at most HISTORY), rounded as the app shows them: what Gemini reads the trend from."""
     rows = []
-    for _, other in store.sessions_list(uid):
-        if other.get("site") != doc.get("site") or other.get("capture_mode") != doc.get(
-            "capture_mode"
-        ):
-            continue
-        if not other.get("created_at") or other["created_at"] >= doc["created_at"]:
-            continue
-        result = measured_result(other)
-        om = _metric(result, metric_id) if result else None
-        if om is None or om.get("value") is None or not _same_way(doc, result, metric_id):
-            continue
+    for _, other, om in earlier:
         value = explain.shown_numbers({**om, "mdc95": m.get("mdc95")})["value"]
         rows.append(
             {
@@ -199,8 +198,9 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
     if metric_id in explain.DIRECTION_WORDS:
         # the unwanted side is said gently ("moved the other way"), never "more redness"
         out["when_lower"], out["when_higher"] = explain.gentle_words({"id": metric_id})
-    out["history"] = _history(store, uid, doc, metric_id, m)
-    prev = _previous(store, uid, sid, doc, metric_id)
+    earlier = _earlier(store, uid, sid, doc, metric_id)
+    out["history"] = _history(earlier, m)
+    prev = _previous(earlier)
     lo = now_day - timedelta(days=13)
     if prev:
         _, prev_doc, pm = prev
@@ -214,8 +214,12 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
     concerns = CONCERNS_OF.get(metric_id, set())
     products = []
     if concerns:
-        logs = store.routine_logs(uid, lo.isoformat(), now_day.isoformat())
-        for entry_id, e in sorted(store.routine_list(uid), key=lambda r: r[0]):
+        # the two reads side by side (each is a Firestore round trip)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            logs_f = pool.submit(store.routine_logs, uid, lo.isoformat(), now_day.isoformat())
+            routine_f = pool.submit(store.routine_list, uid)
+            logs, routine = logs_f.result(), routine_f.result()
+        for entry_id, e in sorted(routine, key=lambda r: r[0]):
             if not concerns & set(e.get("concerns") or []):
                 continue
             started = e.get("started_at") and date.fromisoformat(str(e["started_at"])[:10])
@@ -370,6 +374,14 @@ def _within_cap(store: Store, uid: str) -> bool:
     return True
 
 
+def _keep(
+    store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str, entry: dict[str, Any]
+) -> None:
+    """Write one metric's story into the session's `stories` as a field-path update, so a story
+    another request kept for another metric meanwhile is not overwritten (metric_id is [a-z_])."""
+    store.session_update(uid, sid, {f"stories.{metric_id}": entry})
+
+
 def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str) -> dict | None:
     """Skin tone is always written from the facts (descriptive only, never judged by Gemini)."""
     f = facts(store, uid, sid, doc, metric_id)
@@ -379,12 +391,17 @@ def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
     cached = (doc.get("stories") or {}).get(metric_id)
     if cached and cached.get("key") == key and cached.get("points"):
         points, reasons, source = cached["points"], cached.get("reasons") or [], "gemini"
-    elif f["metric_id"] != "tone_ita" and _within_cap(store, uid) and (got := _gemini_story(f)):
-        points, reasons, source = got[0], got[1], "gemini"
-        stories = dict(doc.get("stories") or {})
-        stories[metric_id] = {"key": key, "points": points, "reasons": reasons}
-        store.session_update(uid, sid, {"stories": stories})
-    else:  # Gemini down or a point failed the checks: the same facts, written by code
+    elif f["metric_id"] != "tone_ita" and _within_cap(store, uid):
+        got = _gemini_story(f)
+        if got:
+            points, reasons, source = got[0], got[1], "gemini"
+            _keep(
+                store, uid, sid, doc, metric_id, {"key": key, "points": points, "reasons": reasons}
+            )
+        else:  # Gemini down or a point failed the checks: the use goes back
+            limits.refund(store, uid, "metric_story")
+            points, reasons, source = _points(f), [], "facts"
+    else:  # past the cap, or skin tone: the same facts, written by code
         points, reasons, source = _points(f), [], "facts"
     return {
         "metric_id": metric_id,

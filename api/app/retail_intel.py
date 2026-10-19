@@ -1792,12 +1792,17 @@ def facts(cohort_: str = "mixed", range_: str = "all") -> tuple[Facts, int, date
         return f, version, today
 
 
-def _cached(name: str, cohort_: str, range_: str, build, *extra: Any) -> Any:
-    f, _, _ = facts(cohort_, range_)
+def _memo(f: Facts, name: str, build, *extra: Any) -> Any:
+    """A view of these facts, built once (the facts are rebuilt on a new data version or day)."""
     key = ("view", name, *extra)
     if key not in f.memo:
         f.memo[key] = build(f, *extra)
     return f.memo[key]
+
+
+def _cached(name: str, cohort_: str, range_: str, build, *extra: Any) -> Any:
+    f, _, _ = facts(cohort_, range_)
+    return _memo(f, name, build, *extra)
 
 
 def products(cohort_: str = "mixed", range_: str = "all") -> dict[str, Any]:
@@ -1856,20 +1861,23 @@ def _eligibility_entry(f: Facts, pid: str) -> dict[str, Any]:
     }
 
 
+def _eligibility_view(f: Facts) -> list[dict[str, Any]]:
+    return [_eligibility_entry(f, pid) for pid in sorted(_catalog()[0])]
+
+
 def eligibility_all() -> list[dict[str, Any]]:
     """Every product's promotion eligibility on cohort=mixed, range=all (the evidence shoppers
     see): {product_id, product, brand, tier, eligible, reasons, goals, skin_types, evidence}.
-    Raises when the rows are unavailable."""
-    f, _, _ = facts("mixed", "all")
-    return [_eligibility_entry(f, pid) for pid in sorted(_catalog()[0])]
+    Built once per data version and day (the facts' memo), like every other view. Raises when
+    the rows are unavailable."""
+    return _cached("eligibility", "mixed", "all", _eligibility_view)
 
 
 def product_eligibility(product_id: str) -> dict[str, Any] | None:
     """One product's entry from eligibility_all(), or None for an unknown product."""
     if product_id not in _catalog()[0]:
         return None
-    f, _, _ = facts("mixed", "all")
-    return _eligibility_entry(f, product_id)
+    return next((e for e in eligibility_all() if e["product_id"] == product_id), None)
 
 
 # ── AutoCampaign signals (app/autopilot.py) ───────────────────────────────────────────────
@@ -1900,18 +1908,13 @@ def rising_goals(f: Facts) -> dict[str, dict[str, Any]]:
     return out
 
 
-def autopilot_signals() -> dict[str, Any]:
-    """What AutoCampaign rules watch, on cohort=mixed, range=all (the evidence shoppers see, as
-    campaign eligibility): per product its eligibility with tier, n and lift; the goals rising
-    month on month; and every skin type x goal group's unmet share. Raises when the rows are
-    unavailable."""
-    f, version, _ = facts("mixed", "all")
+def _signals_view(f: Facts, version: int) -> dict[str, Any]:
+    by_id = {e["product_id"]: e for e in _memo(f, "eligibility", _eligibility_view)}
     products = []
     for pid in sorted(_catalog()[0]):
         row = _stats(f, pid)["row"]
-        entry = _eligibility_entry(f, pid)
         products.append(
-            entry
+            by_id[pid]
             | {
                 "category": row["category"],
                 "n": row.get("n"),
@@ -1921,7 +1924,7 @@ def autopilot_signals() -> dict[str, Any]:
                 "base_rate": row.get("base_rate"),
             }
         )
-    cells = segments_view(f)["cells"]
+    cells = _memo(f, "segments", segments_view)["cells"]
     return {
         "version": version,
         "cohort": cohort_label(f.cohort),
@@ -1933,3 +1936,13 @@ def autopilot_signals() -> dict[str, Any]:
             if c["unmet"] is not None
         ],
     }
+
+
+def autopilot_signals() -> dict[str, Any]:
+    """What AutoCampaign rules watch, on cohort=mixed, range=all (the evidence shoppers see, as
+    campaign eligibility): per product its eligibility with tier, n and lift; the goals rising
+    month on month; and every skin type x goal group's unmet share. Built once per data version
+    and day (the facts' memo; the segments view is the cached one). Raises when the rows are
+    unavailable."""
+    f, version, _ = facts("mixed", "all")
+    return _memo(f, "autopilot_signals", _signals_view, version)

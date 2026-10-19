@@ -405,3 +405,29 @@ def test_harsh_words_and_false_improvements_are_rejected():
         update={"items": [explain._Item(metric_id="redness", summary="Your redness improved.")]}
     )
     assert any("improvement claimed" in p for p in explain.problems(flipped, data))
+
+
+def test_the_deadline_caps_each_call_and_skips_a_late_second_try(monkeypatch):
+    import time
+
+    result = _result_with_change()
+    invented = {"headline": "Redness down 40%", "items": [], "next_steps": [], "disclaimer": "x"}
+    timeouts = []
+
+    def fake(prompt_id, contents, schema, **kw):
+        timeouts.append(kw["timeout_ms"])
+        return schema.model_validate(invented)
+
+    monkeypatch.setattr(explain.gemini, "generate_json", fake)
+    # 8 s left: one try (capped at 8 s), no second (needs SECOND_TRY_MIN_S), then the template
+    exp, source = explain.generate(result, {}, deadline=time.monotonic() + 8)
+    assert source == "template" and exp == explain.template(result)
+    assert len(timeouts) == 1 and timeouts[0] <= 8000
+    # plenty of time: the second try is made
+    timeouts.clear()
+    explain.generate(result, {}, deadline=time.monotonic() + 60)
+    assert len(timeouts) == 2
+    # no time at all: no call
+    timeouts.clear()
+    assert explain.generate(result, {}, deadline=time.monotonic())[1] == "template"
+    assert timeouts == []

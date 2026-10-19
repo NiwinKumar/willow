@@ -207,3 +207,37 @@ def test_route(client, monkeypatch):
         assert client.get("/v1/sessions/s_20261030_cccccccc/story/Bad!").status_code == 404
     finally:
         app.dependency_overrides.pop(get_store, None)
+
+
+def _story_uses(store):
+    day = datetime.now(UTC).date().isoformat()
+    return store.usage.get((UID, day, "metric_story"), 0)
+
+
+def test_a_story_gemini_could_not_write_gives_the_use_back(monkeypatch):
+    store = _world()
+    assert _story(store)["source"] == "facts"  # Gemini offline in tests
+    assert _story_uses(store) == 0
+    _gemini(monkeypatch, ["It improved by 40 percent."])  # a point that fails the checks
+    assert _story(store)["source"] == "facts" and _story_uses(store) == 0
+    _gemini(monkeypatch, GOOD_POINTS)
+    assert _story(store)["source"] == "gemini" and _story_uses(store) == 1
+
+
+def test_the_sessions_are_read_once_per_story(monkeypatch):
+    store = _world()
+    reads = []
+    real = store.sessions_list
+    monkeypatch.setattr(store, "sessions_list", lambda uid: reads.append(uid) or real(uid))
+    s = _story(store)
+    assert s["points"][0] == "Last check-in (23 Oct): 7.95." and len(reads) == 1
+
+
+def test_a_story_kept_meanwhile_for_another_metric_is_not_overwritten(monkeypatch):
+    store = _world()
+    sid = "s_20261030_cccccccc"
+    doc = store.session_get(UID, sid)  # read before another request kept its story
+    store.session_update(UID, sid, {"stories": {"redness": {"key": "k", "points": ["x"]}}})
+    _gemini(monkeypatch, GOOD_POINTS)
+    metric_story.story(store, UID, sid, doc, "tone_evenness")
+    assert set(store.session_get(UID, sid)["stories"]) == {"redness", "tone_evenness"}

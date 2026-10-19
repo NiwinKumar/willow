@@ -19,14 +19,18 @@ def _result(n=3):
 
 def _model(monkeypatch, runs):
     """Each call returns the next run's labels for the ids it was asked about."""
+    import threading
+
     calls = []
+    lock = threading.Lock()  # the calls run at once: the n-th call gets the n-th run
 
     def fake(prompt_id, parts, schema, **kw):
         if prompt_id != "candidate_labels":  # the explanation falls back to its template
             raise gemini.GeminiError("offline in tests")
         asked = [p.split(" ")[1] for p in parts if isinstance(p, str) and p.startswith("Candidate")]
-        calls.append(asked)
-        table = runs[len(calls) - 1]
+        with lock:
+            calls.append(asked)
+            table = runs[len(calls) - 1]
         return BatchLabels(labels=[CandidateLabel(id=i, **table[i]) for i in asked if i in table])
 
     monkeypatch.setattr(gemini, "generate_json", fake)
@@ -128,3 +132,60 @@ def test_a_slow_batch_is_left_unlabelled_within_the_budget(monkeypatch):
     release.set()
     assert time.monotonic() - t < 2
     assert sorted(out) == ["c_0", "c_1", "c_2", "c_3", "c_4"]
+
+
+def test_features_with_digits_are_dropped(monkeypatch):
+    """Gemini never measures or counts: a visible feature with a digit is not shown."""
+    run = {
+        "c_0": {
+            "label": "freckle",
+            "confidence": "high",
+            "visible_features": ["flat", "about 2 mm wide", "3 spots nearby", "even brown"],
+        }
+    }
+    _model(monkeypatch, [run, run])
+    out = labeller.label_candidates(_result(1))
+    assert out["c_0"]["visible_features"] == ["flat", "even brown"]
+
+
+def test_every_call_runs_at_once_with_a_deadline_inside_the_budget(monkeypatch):
+    """40 candidates: 8 batches asked twice, all 16 calls side by side (with fewer workers the
+    second runs queued behind the first ones), each a batch's pair, one try, a deadline that
+    fits the budget."""
+    import threading
+
+    same = {"label": "pore", "confidence": "high", "visible_features": []}
+    all_in = threading.Barrier(16, timeout=3)  # breaks unless all 16 calls run together
+    seen = []
+    lock = threading.Lock()
+
+    def fake(prompt_id, parts, schema, **kw):
+        asked = [p.split(" ")[1] for p in parts if isinstance(p, str) and p.startswith("Candidate")]
+        with lock:
+            seen.append((asked, kw["attempts"], kw["timeout_ms"]))
+        all_in.wait()
+        return BatchLabels(labels=[CandidateLabel(id=i, **same) for i in asked])
+
+    monkeypatch.setattr(gemini, "generate_json", fake)
+    monkeypatch.setattr(storage, "read_bytes", lambda name: b"\xff\xd8jpeg")
+    out = labeller.label_candidates(_result(40))
+    assert len(out) == 40 and len(seen) == 16
+    assert {a for _, a, _ in seen} == {1}
+    assert all(0 < t <= labeller.LABEL_BUDGET_S * 1000 for _, _, t in seen)
+    assert labeller.LABEL_BUDGET_S <= 15
+
+
+def test_a_smaller_budget_wins_and_no_budget_means_no_labels(monkeypatch):
+    seen = []
+
+    def fake(prompt_id, parts, schema, **kw):
+        seen.append(kw["timeout_ms"])
+        raise gemini.GeminiError("offline")
+
+    monkeypatch.setattr(gemini, "generate_json", fake)
+    monkeypatch.setattr(storage, "read_bytes", lambda name: b"\xff\xd8jpeg")
+    assert labeller.label_candidates(_result(1), budget_s=4) == {}
+    assert seen and max(seen) <= 4000
+    seen.clear()
+    assert labeller.label_candidates(_result(1), budget_s=0) == {}
+    assert seen == []

@@ -1,5 +1,7 @@
 import logging
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -342,6 +344,7 @@ def analyze_session(
     store: Store = Depends(get_store),
     force: bool = Query(default=False),
 ) -> dict[str, Any]:
+    started = time.monotonic()  # Cloud Run's 300 s count from about here (analysis.run)
     uid = user.uid
     doc = _load(store, uid, session_id)
     # A forced re-run of a measured session that fails leaves it as it was (still measured, on
@@ -357,11 +360,10 @@ def analyze_session(
         # ?force=1 measures every frame again (a re-analyzed baseline rebuilds its baseline doc).
         return _detail_view(store, uid, session_id, doc)
 
-    missing = []
-    for i, uri in enumerate(doc["frame_uris"], start=1):
-        info = storage.object_info(storage.name_from_uri(uri))
-        if not info.exists or not info.size:
-            missing.append(i)
+    names = [storage.name_from_uri(uri) for uri in doc["frame_uris"]]
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(names)))) as pool:
+        infos = list(pool.map(storage.object_info, names))  # one metadata read per frame, at once
+    missing = [i for i, info in enumerate(infos, start=1) if not info.exists or not info.size]
     if missing:
         raise HTTPException(
             409,
@@ -381,7 +383,7 @@ def analyze_session(
         raise HTTPException(409, {"code": "conflict", "message": "analysis already running"})
 
     try:
-        doc = analysis.run(store, settings.bucket, uid, session_id, doc)
+        doc = analysis.run(store, settings.bucket, uid, session_id, doc, started=started)
     except engine.EngineError as exc:
         limits.refund(store, uid, "analyze")  # our failure: it does not use up a daily analysis
         if before:
@@ -417,21 +419,27 @@ def analyze_session(
 def _detail_view(store: Store, uid: str, session_id: str, doc: dict) -> dict[str, Any]:
     result = measured_result(doc)
     crops = any(c.get("crop_uri") for c in (result or {}).get("candidates", []))
-    existing = (
-        storage.list_names(
-            views.results_prefix(uid, session_id),
-            storage.DISPLAYABLE + (views.CROP_GLOBS if crops else ()),
-        )
-        if doc.get("result_json")
-        else set()
-    )
     # The person's own photos (frame_urls): only JPEG/HEIC, only those in the bucket.
     viewable = any(ct in views.VIEWABLE_FRAMES for ct in doc.get("content_types") or [])
-    uploaded = (
-        storage.list_names(views.uploads_prefix(uid, session_id), views.FRAME_GLOBS)
-        if viewable
-        else set()
-    )
+    with ThreadPoolExecutor(max_workers=2) as pool:  # the two listings at once
+        results_listed = (
+            pool.submit(
+                storage.list_names,
+                views.results_prefix(uid, session_id),
+                storage.DISPLAYABLE + (views.CROP_GLOBS if crops else ()),
+            )
+            if doc.get("result_json")
+            else None
+        )
+        uploads_listed = (
+            pool.submit(
+                storage.list_names, views.uploads_prefix(uid, session_id), views.FRAME_GLOBS
+            )
+            if viewable
+            else None
+        )
+        existing = results_listed.result() if results_listed else set()
+        uploaded = uploads_listed.result() if uploads_listed else set()
     media = views.media_names(doc, uploaded, existing)
     wanted = views.wanted_urls(uid, session_id, doc, existing, with_overlays=True)
     signed = views.sign_all(wanted + views.media_urls(media))

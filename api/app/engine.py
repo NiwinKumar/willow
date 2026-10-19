@@ -8,6 +8,8 @@ Cloud Run engine with an ID token.
 
 import copy
 import hashlib
+import threading
+import time
 from typing import Any
 
 import httpx
@@ -175,7 +177,25 @@ def health(timeout: float = HEALTH_TIMEOUT_S) -> dict[str, Any]:
     return res.json()
 
 
+# Google ID tokens live an hour: one is reused for ID_TOKEN_REUSE_S instead of minting one per
+# engine call and per status check (a metadata-server round trip each time).
+ID_TOKEN_REUSE_S = 50 * 60
+_id_tokens: dict[str, tuple[str, float]] = {}
+_id_token_lock = threading.Lock()
+
+
 def _id_token(audience: str) -> str:
+    """An ID token for the engine, cached per audience (thread-safe)."""
+    with _id_token_lock:
+        hit = _id_tokens.get(audience)
+        if hit and hit[1] > time.monotonic():
+            return hit[0]
+        token = _mint_id_token(audience)
+        _id_tokens[audience] = (token, time.monotonic() + ID_TOKEN_REUSE_S)
+        return token
+
+
+def _mint_id_token(audience: str) -> str:
     from google.auth.transport.requests import Request
     from google.oauth2 import id_token
 

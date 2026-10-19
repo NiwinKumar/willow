@@ -7,6 +7,7 @@ validator twice. Every number here is copied from the metrics, so it always pass
 import json
 import logging
 import re
+import time
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -487,17 +488,44 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
     return found
 
 
-def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str, Any], str]:
-    """(explanation, source): Gemini when it passes the validator, else the template."""
+# One call's own deadline when nobody gives a shorter one (scripts/reexplain.py).
+CALL_TIMEOUT_S = 35.0
+# The second try (after a rejected first answer) only when this much time is left: an
+# explanation takes about 5-10 s, and a try cut off by the deadline is wasted.
+SECOND_TRY_MIN_S = 12.0
+# Not worth a first try with less than this left.
+FIRST_TRY_MIN_S = 2.0
+
+
+def fallback(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """(template explanation, "template"): the deterministic text, numbers from the metrics."""
     context = dict(context)
     result = with_bands(result, context.pop("bands", None))
+    return template(result, context.get("is_baseline", True)), "template"
+
+
+def generate(
+    result: dict[str, Any], context: dict[str, Any], deadline: float | None = None
+) -> tuple[dict[str, Any], str]:
+    """(explanation, source): Gemini when it passes the validator, else the template.
+
+    `deadline` (time.monotonic()) caps every Gemini call; the second try is made only when
+    SECOND_TRY_MIN_S are left, else the template answers."""
     if not result["metrics"] or not result["quality"]["passed"]:
         # Nothing was measured: the fixed text says why and how to retake (Gemini would be told
         # this is a first reading, which a session that failed quality never is).
-        return template(result, context.get("is_baseline", True)), "template"
-    data = gemini_input(result, context)
+        return fallback(result, context)
+    context = dict(context)
+    banded = with_bands(result, context.pop("bands", None))
+    data = gemini_input(banded, context)
     prompt = f"Session data (JSON):\n{json.dumps(data)}"
-    for _ in range(2):  # at most two Gemini calls, then the template: analysis must stay quick
+    for attempt in range(2):  # at most two Gemini calls, then the template: analysis stays quick
+        timeout_s = CALL_TIMEOUT_S
+        if deadline is not None:
+            left = deadline - time.monotonic()
+            if left < (SECOND_TRY_MIN_S if attempt else FIRST_TRY_MIN_S):
+                break
+            timeout_s = min(timeout_s, left)
         try:
             exp = gemini.generate_json(
                 "explanation",
@@ -509,7 +537,7 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
                 # the loop is the retry (GEMINI_SPEC: retry once): two calls at most, so with
                 # the engine the analysis stays well inside Cloud Run's 300 s
                 attempts=1,
-                timeout_ms=35_000,
+                timeout_ms=max(1_000, round(timeout_s * 1000)),
             )
         except gemini.GeminiError:
             break
@@ -523,4 +551,4 @@ def generate(result: dict[str, Any], context: dict[str, Any]) -> tuple[dict[str,
             issues[:3],
             [i.summary[:160] for i in exp.items if f"for {i.metric_id} " in " ".join(issues)],
         )
-    return template(result, context.get("is_baseline", True)), "template"
+    return template(banded, context.get("is_baseline", True)), "template"

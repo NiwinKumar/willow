@@ -6,7 +6,9 @@ sessions again once their site is measured, so photos taken early still become t
 
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
+import time
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,6 +16,15 @@ from app import baselines, engine, explain, labeller, previews, storage, views
 from app.store import Store
 
 log = logging.getLogger("willow.analysis")
+
+# The Gemini work after the engine (explanation, spot labels, the preview WebP alongside) shares
+# one deadline: past it the template explanation and no labels are saved instead of waiting.
+GEMINI_BUDGET_S = 20.0
+# Cloud Run cuts a request off at 300 s. With less than GEMINI_MIN_LEFT_S of it left after the
+# engine, Gemini is skipped (template, no labels): the result is saved and the request answers,
+# instead of being cut off with the session left "processing" and the daily analysis spent.
+REQUEST_LIMIT_S = 300.0
+GEMINI_MIN_LEFT_S = 40.0
 
 
 class SessionGone(Exception):
@@ -29,10 +40,38 @@ def _stage(store: Store, uid: str, session_id: str, stage: str) -> None:
         log.warning("could not write stage %s for %s/%s", stage, uid, session_id)
 
 
-def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any]) -> dict:
+def _within[T](future: Future, deadline: float, fallback: Callable[[], T], what: str) -> T:
+    """The future's result if it is ready by the deadline, else (or if it failed) the fallback."""
+    try:
+        return future.result(timeout=max(0.0, deadline - time.monotonic()))
+    except TimeoutError:
+        log.warning("%s was not ready in time; using the fallback", what)
+    except Exception:
+        log.exception("%s failed; using the fallback", what)
+    return fallback()
+
+
+def gemini_budget(started: float | None) -> float:
+    """Seconds the Gemini work may take now: GEMINI_BUDGET_S, or 0 when the request (started at
+    time.monotonic() `started`) is too close to Cloud Run's limit."""
+    if started is None:
+        return GEMINI_BUDGET_S
+    left = REQUEST_LIMIT_S - (time.monotonic() - started)
+    return GEMINI_BUDGET_S if left >= GEMINI_MIN_LEFT_S else 0.0
+
+
+def run(
+    store: Store,
+    bucket: str,
+    uid: str,
+    session_id: str,
+    doc: dict[str, Any],
+    started: float | None = None,
+) -> dict:
     """Analyze one session whose frames are uploaded and return its updated doc.
 
-    Raises engine.EngineError after marking the session failed.
+    `started` (time.monotonic() when the request began) lets a slow engine run skip Gemini
+    rather than outlive the request. Raises engine.EngineError after marking the session failed.
     """
     store.session_update(
         uid,
@@ -90,14 +129,28 @@ def run(store: Store, bucket: str, uid: str, session_id: str, doc: dict[str, Any
     if measured:
         _stage(store, uid, session_id, "explaining")
         # The explanation and the spot labels are independent Gemini calls: run them together,
-        # and meanwhile the small WebP of the engine's preview the pages show.
+        # and meanwhile the small WebP of the engine's preview the pages show. All within one
+        # deadline; the pool is not waited for past it (late calls finish on their own).
         context = explain_context(store, uid, doc, current, session_id)
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            pool.submit(previews.publish, views.preview_name(uid, session_id))
-            explained = pool.submit(explain.generate, result, context)
-            labelled = pool.submit(labeller.label_candidates, result)
-            explanation, source = explained.result()
-            details = labelled.result()
+        budget = gemini_budget(started)
+        deadline = time.monotonic() + budget
+        pool = ThreadPoolExecutor(max_workers=3)
+        try:
+            published = pool.submit(previews.publish, views.preview_name(uid, session_id))
+            if budget > 0:
+                explained = pool.submit(explain.generate, result, context, deadline)
+                labelled = pool.submit(labeller.label_candidates, result, budget)
+                explanation, source = _within(
+                    explained, deadline, lambda: explain.fallback(result, context), "explanation"
+                )
+                details = _within(labelled, deadline, dict, "spot labels")
+            else:
+                log.warning("%s/%s: too close to the request limit, no Gemini", uid, session_id)
+                explanation, source = explain.fallback(result, context)
+            # best effort (the page falls back to the JPEG), but usually done by now
+            _within(published, max(deadline, time.monotonic() + 5), lambda: None, "preview")
+        finally:
+            pool.shutdown(wait=False)
     if store.session_get(uid, session_id) is None:
         # "Delete my data" ran while the engine worked: remove what it wrote since, keep nothing.
         storage.delete_prefix(views.results_prefix(uid, session_id))

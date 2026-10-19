@@ -4,8 +4,12 @@ from functools import lru_cache
 import pytest
 from fastapi.testclient import TestClient
 
-from app import catalog, cohort, retailer
+from app import catalog, cohort, demo, retailer
 from app.main import app
+
+# captured before conftest's offline stubs replace them
+REAL_FETCH = retailer.fetch
+REAL_PROBE = demo.probe_bigquery
 
 TODAY = date(2026, 10, 15)
 CICA = "dot-and-key-cica-calming-night-gel"  # moisturiser for redness (and blemishes, oil)
@@ -385,6 +389,53 @@ def test_bigquery_failure_after_expiry_serves_the_last_rows(monkeypatch):
 
     monkeypatch.setattr(retailer, "fetch", down)
     assert retailer.insights()["cohort"]["synthetic"] > 0
+
+
+def test_stale_rows_are_served_at_once_while_one_refresh_runs(monkeypatch):
+    import threading
+
+    old, new = _raw(), _raw()
+    monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": old, "version": 3})
+    monkeypatch.setattr(retailer, "_views", {})
+    gate, calls = threading.Event(), []
+
+    def slow():
+        calls.append(1)
+        gate.wait(5)  # BigQuery taking its time
+        return new
+
+    monkeypatch.setattr(retailer, "fetch", slow)
+    assert retailer._rows() == (old, 3)  # stale: served at once...
+    assert retailer._rows() == (old, 3)  # ...and the refresh is not started twice
+    gate.set()
+    with retailer._refreshing:  # the background refresh has finished
+        pass
+    assert len(calls) == 1 and retailer._rows() == (new, 4)
+
+
+def test_the_five_queries_run_side_by_side_on_one_client(monkeypatch):
+    import threading
+
+    started, both = [], threading.Barrier(len(retailer.QUERIES), timeout=5)
+
+    class Job:
+        def result(self, timeout=None):
+            both.wait()  # every query is in flight at once, or this times out
+            return [{"x": 1}]
+
+    class Client:
+        def query(self, sql):
+            started.append(sql)
+            return Job()
+
+        def get_table(self, name, timeout=None):
+            started.append(name)
+
+    monkeypatch.setattr(retailer, "bq_client", lambda: Client())
+    out = REAL_FETCH()  # conftest replaces retailer.fetch with an offline stub
+    assert set(out) == set(retailer.QUERIES) and len(started) == len(retailer.QUERIES)
+    REAL_PROBE()  # the judge status probe uses the same shared client
+    assert started[-1].endswith(".sessions_flat")
 
 
 def test_goal_labels_match_the_app():

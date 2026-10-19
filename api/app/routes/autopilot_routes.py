@@ -124,7 +124,8 @@ def _owned(store: Store, uid: str, rid: str) -> dict[str, Any]:
 def _views(store: Store, uid: str) -> list[dict[str, Any]]:
     feed = store.activities_of(uid)
     rows = sorted(store.rules_of(uid), key=lambda r: str(r[1].get("created_at") or ""))
-    return [autopilot.rule_view(store, rid, d, feed) for rid, d in rows]
+    owned = store.campaigns_of(uid) if rows else []  # read once for every rule
+    return [autopilot.rule_view(store, rid, d, feed, owned) for rid, d in rows]
 
 
 @router.get("/retailer/autopilot")
@@ -303,7 +304,12 @@ def run_now(
         result = _run(autopilot.run_if_stale, store, user.uid)
     else:
         limits.take(store, user.uid, "campaign_create")
-        result = _run(autopilot.run, store, user.uid)
+        try:
+            result = _run(autopilot.run, store, user.uid)
+        except HTTPException:
+            # the evidence could not be read: nothing ran, so the use goes back
+            limits.refund(store, user.uid, "campaign_create")
+            raise
     return {"result": result} | overview(user, store)
 
 

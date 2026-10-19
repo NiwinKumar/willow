@@ -238,9 +238,9 @@ def test_stage_follows_the_analysis(client, fake, monkeypatch):
         seen["engine"] = client.get(f"/v1/sessions/{sid}").json()["session"]["stage"]
         return real_analyze(request)
 
-    def watch_explain(result, context):
+    def watch_explain(result, context, *rest):
         seen["explaining"] = _doc(fake, sid)["stage"]
-        return real_explain(result, context)
+        return real_explain(result, context, *rest)
 
     monkeypatch.setattr(engine, "analyze", watch_engine)
     monkeypatch.setattr(explain, "generate", watch_explain)

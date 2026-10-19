@@ -484,7 +484,13 @@ class MemoryStore:
         self.sessions[(uid, sid)] = copy.deepcopy(doc)
 
     def session_update(self, uid: str, sid: str, fields: Doc) -> None:
-        self.sessions[(uid, sid)].update(copy.deepcopy(fields))
+        doc = self.sessions[(uid, sid)]
+        for key, value in copy.deepcopy(fields).items():
+            *parents, leaf = key.split(".")  # a dotted key is a field path, as in Firestore
+            node = doc
+            for part in parents:
+                node = node.setdefault(part, {})
+            node[leaf] = value
 
     def session_claim(self, uid: str, sid: str, stale: timedelta) -> bool:
         doc = self.sessions.get((uid, sid)) or {}
