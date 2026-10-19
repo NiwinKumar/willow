@@ -138,10 +138,10 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
         <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
-          <WayIn to={JOURNEY_PATH} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
-          <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" sub="How a skincare brand uses Proof, played for you" />
-          <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
-          <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" sub="For brands: which products measurably work, for whom" />
+          <WayIn to={JOURNEY_PATH} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
+          <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
+          <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : 'Opens Mei’s account: tick her routine, ask Wisp'} />
+          <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
         </nav>
       </div>
     </section>
@@ -157,15 +157,17 @@ const WAY_TONE = {
   sky: { bg: 'radial-gradient(90% 90% at 0% 0%, #9CD3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #3D7BFF 0%, transparent 62%), radial-gradient(60% 60% at 85% 10%, #E6F3FF 0%, transparent 70%), #7FA6FF', shadow: glow('rgba(61,123,255,.55)') },
 } as const
 
-/** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). */
-function WayIn({ to, onClick, tone, icon: Icon, title, sub }: { to?: string; onClick?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; sub: string }) {
+/** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). The tag says which are played for judges and which are the live app. */
+function WayIn({ to, onClick, tone, icon: Icon, title, tag, sub }: { to?: string; onClick?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string }) {
   const t = WAY_TONE[tone]
   const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] text-ink`
   const body = (
     <>
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-1 h-[45%] rounded-[24px] bg-gradient-to-b from-white/35 to-transparent" />
       <span className="relative flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[clamp(19px,1.7vw,23px)] leading-[1.15] font-medium tracking-[-0.01em]">{title}</span>
+        <span className="text-[clamp(19px,1.7vw,23px)] leading-[1.15] font-medium tracking-[-0.01em]">
+          {title} <span className="text-[.8em] font-normal whitespace-nowrap opacity-70">({tag})</span>
+        </span>
         <span className="text-[13.5px] leading-[1.35] opacity-80">{sub}</span>
       </span>
       <span aria-hidden className={`relative grid size-12 flex-none place-items-center rounded-full transition-transform duration-200 group-hover:translate-x-0.5 bg-ink text-inverse`}>
