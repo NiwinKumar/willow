@@ -26,6 +26,9 @@ settings = get_settings()
 
 app = FastAPI(title="Willow api", version=__version__)
 log = logging.getLogger("willow.api")
+if not logging.getLogger().handlers:
+    # Uvicorn configures only its own loggers; without this the app's info lines are dropped.
+    logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
 
 
 @app.on_event("startup")
@@ -36,6 +39,15 @@ def _dev_seed() -> None:
         from app.store import get_store
 
         dev_seed.seed_demo_campaigns(get_store())
+
+
+@app.on_event("startup")
+def _warm() -> None:
+    """Production: load the rows, status and kept Gemini answers before serving (app/warm.py)."""
+    if settings.auth_mode != "dev":
+        from app import warm
+
+        warm.run()
 
 
 # Registered before CORS, so it sits inside it: an unexpected error still reaches the browser as

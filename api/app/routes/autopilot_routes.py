@@ -260,29 +260,39 @@ def parse_rule(
     fallback = autopilot.parse(body.text, body.workspace)
     try:
         limits.take(store, user.uid, "campaign_create")
-        out = autopilot_agent.parse(body.text, body.workspace, fallback["rule"], ParseOut)
-        d = out["rule"]
-        rule = RuleBody(
-            name=(d["name"] or fallback["rule"]["name"])[:60],
-            workspace=body.workspace,
-            level=d["level"],
-            scope=Scope(category=d["category"]),
-            trigger=Trigger(**d["trigger"]),
-            conditions=Conditions(**d["conditions"]),
-            action=Action(**d["action"]),
-        )
-        doc = _body_doc(rule)
-        missed = [m for m in out["missed"] if isinstance(m, str) and len(m) <= 120]
-        read = {
-            "rule": doc,
-            "missed": missed,
-            "source": "gemini",
-            "sentence": autopilot.describe(doc),
-        }
+        read = _gemini_read(body.text, body.workspace, fallback)
         _parsed[key] = (time.time(), read)
         return read
     except (gemini.GeminiError, ValueError, HTTPException):
         return fallback | {"source": "rules", "sentence": autopilot.describe(fallback["rule"])}
+
+
+def _gemini_read(text: str, workspace: str, fallback: dict[str, Any]) -> dict[str, Any]:
+    """Gemini's reading of a rule, checked by the form's own model (raises when it fails)."""
+    out = autopilot_agent.parse(text, workspace, fallback["rule"], ParseOut)
+    d = out["rule"]
+    rule = RuleBody(
+        name=(d["name"] or fallback["rule"]["name"])[:60],
+        workspace=workspace,
+        level=d["level"],
+        scope=Scope(category=d["category"]),
+        trigger=Trigger(**d["trigger"]),
+        conditions=Conditions(**d["conditions"]),
+        action=Action(**d["action"]),
+    )
+    doc = _body_doc(rule)
+    missed = [m for m in out["missed"] if isinstance(m, str) and len(m) <= 120]
+    return {"rule": doc, "missed": missed, "source": "gemini", "sentence": autopilot.describe(doc)}
+
+
+def warm_reading(text: str, workspace: str) -> bool:
+    """Read and keep a rule ahead of time (app/warm.py: the brand journey's typed rule)."""
+    key = (" ".join(text.lower().split()), workspace)
+    hit = _parsed.get(key)
+    if hit and time.time() - hit[0] < PARSE_TTL_S:
+        return True
+    _parsed[key] = (time.time(), _gemini_read(text, workspace, autopilot.parse(text, workspace)))
+    return True
 
 
 def _run(fn, *args) -> dict[str, Any]:
