@@ -408,6 +408,8 @@ export const api = {
   startSample: (token: string, sampleId: string) =>
     request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }, LONG_TIMEOUT_MS),
   judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }, LONG_TIMEOUT_MS),
+  /** A new guest's starter routine and Mei's first-week check-ins as samples (guest accounts only, empty accounts only). */
+  guestSetup: (token: string) => request<{ routine_added: number; sessions_added: number }>(token, '/v1/demo/guest-setup', { method: 'POST' }, LONG_TIMEOUT_MS),
   advisorChat: (token: string, messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) =>
     request<AdvisorReply>(token, '/v1/advisor/chat', { method: 'POST', ...json(images.length ? { messages, images } : { messages }) }, LONG_TIMEOUT_MS),
   /** Product tests (forearm): the running one first. */

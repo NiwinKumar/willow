@@ -87,7 +87,10 @@ def run(
             "stage": "received",
         },
     )
-    current = baselines.get(store, uid, doc["site"], doc["capture_mode"])
+    # Sample photos (a judge's "Run it", a guest's starter check-ins) are someone else's skin:
+    # read on their own, never compared with this person's baseline and never made one.
+    sample = bool(doc.get("sample_id"))
+    current = None if sample else baselines.get(store, uid, doc["site"], doc["capture_mode"])
     baseline_map = None
     if current and current["session_id"] != session_id:
         baseline_map = baselines.for_request(current)
@@ -179,6 +182,8 @@ def run(
         },
     )
     doc = store.session_get(uid, session_id) or doc
+    if sample:
+        return doc
     if measured:
         try:
             baselines.remember_counts(store, uid, session_id, doc, result)

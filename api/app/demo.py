@@ -7,11 +7,13 @@ copies the frames server-side into the person's own session; from there it is an
 (the same analyze call, engine, baseline rule and Gemini explanation as anyone's photos).
 """
 
+import hashlib
 import json
 import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -155,6 +157,70 @@ def create_sample_session(store: Store, uid: str, s: Sample) -> str:
         storage.copy_object(preview, views.preview_name(uid, session_id))
     store.session_set(uid, session_id, doc)
     return session_id
+
+
+# A new guest's starter check-ins: Mei's first week (face, then the cheek close-up), already
+# measured, copied with their photos and results so the app is not empty on day one. They are
+# sample sessions (sample_id): read on their own, never a baseline, hidden from Home once the
+# guest's own check-ins exist.
+STARTER_SESSIONS = {
+    "s_20260823_810e21e6": "mei_face_week1",
+    "s_20260823_d31f4642": "mei_cheek_week1",
+}
+# What a starter copies from the source session; everything else starts fresh.
+STARTER_FIELDS = (
+    "site",
+    "capture_mode",
+    "content_types",
+    "n_frames",
+    "measured",
+    "status",
+    "explanation",
+    "explanation_source",
+    "labels",
+    "label_details",
+    "deviation",
+)
+
+
+def starter_session_id(uid: str, source_id: str, now: datetime) -> str:
+    """The same id for the same guest and source, so two tabs cannot add a starter twice."""
+    return f"s_{now:%Y%m%d}_{hashlib.sha1(f'{uid}:{source_id}'.encode()).hexdigest()[:8]}"
+
+
+def add_starter_sessions(store: Store, uid: str) -> int:
+    """Copy the starter check-ins into a guest's account; returns how many were added."""
+    demo_uid = get_settings().demo_user_id
+    now = datetime.now(UTC)
+    added = 0
+    for i, (source_id, sample_id) in enumerate(STARTER_SESSIONS.items()):
+        src = store.session_get(demo_uid, source_id)
+        if not src or src.get("status") != "done" or not src.get("result_json"):
+            continue
+        sid = starter_session_id(uid, source_id, now)
+        if store.session_get(uid, sid):
+            continue
+        for prefix in (views.uploads_prefix, views.results_prefix):
+            storage.copy_prefix(prefix(demo_uid, source_id), prefix(uid, sid))
+        old_path, new_path = f"{demo_uid}/{source_id}", f"{uid}/{sid}"
+        doc = {k: src[k] for k in STARTER_FIELDS if k in src}
+        doc.update(
+            frame_uris=[u.replace(old_path, new_path) for u in src.get("frame_uris") or []],
+            result_json=src["result_json"].replace(old_path, new_path).replace(source_id, sid),
+            # a few minutes ago, face first: the newest check-in on Home is the close-up's pair
+            created_at=now - timedelta(minutes=10 - i),
+            analyzed_at=now,
+            stage=None,
+            error=None,
+            note=None,
+            is_baseline=False,
+            compared_with=None,
+            counts_compared_with=None,
+            sample_id=sample_id,
+        )
+        store.session_set(uid, sid, doc)
+        added += 1
+    return added
 
 
 def judge_routine_entries() -> list[tuple[dict[str, Any], list[str]]]:

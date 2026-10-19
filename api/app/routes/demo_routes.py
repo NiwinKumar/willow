@@ -2,6 +2,7 @@
 journey and live status. Sample runs and the routine need a sign-in (a guest is enough) so every
 judge works in an account of their own; the journey and status are public."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -23,6 +24,8 @@ from app.routes.products_routes import (
 from app.routes.sessions_routes import list_views
 from app.settings import get_settings
 from app.store import Store, get_store
+
+log = logging.getLogger("willow.demo")
 
 router = APIRouter(prefix="/v1/demo", tags=["demo"])
 
@@ -70,21 +73,48 @@ def judge_setup(
     fixed entry ids, so two tabs at once cannot add it twice."""
     if not user.is_anonymous and get_settings().auth_mode != "dev":
         return {"routine_added": 0}
-    added = 0
-    if not store.routine_list(user.uid):
-        for i, (product, slots) in enumerate(demo.judge_routine_entries(), start=1):
-            # started yesterday (UTC): a judge west of UTC can tick their own "today" in the
-            # evening, which is already tomorrow in UTC
-            body = RoutineEntryIn(
-                product_id=product["product_id"],
-                slots=slots,
-                source="catalog",
-                started_at=datetime.now(UTC).date() - timedelta(days=1),
-            )
-            add_routine_entry(store, user.uid, body, entry_id=f"r_judge{i}")
-            added += 1
+    added = _starter_routine(store, user.uid)
     store.user_merge(user.uid, {"judge": True})
     return {"routine_added": added}
+
+
+@router.post("/guest-setup")
+def guest_setup(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """A new guest (Continue as a guest) starts with something to look at: the starter routine
+    and Mei's first-week check-ins as samples. Guest accounts only, only into an empty account;
+    an account made with Google or email starts fresh."""
+    if not user.is_anonymous and get_settings().auth_mode != "dev":
+        return {"routine_added": 0, "sessions_added": 0}
+    routine_added = _starter_routine(store, user.uid)
+    sessions_added = 0
+    if not store.sessions_list(user.uid):
+        try:
+            sessions_added = demo.add_starter_sessions(store, user.uid)
+        except Exception:
+            log.exception("could not add the starter check-ins for %s", user.uid)
+    return {"routine_added": routine_added, "sessions_added": sessions_added}
+
+
+def _starter_routine(store: Store, uid: str) -> int:
+    """The judge routine, into an empty routine only; fixed entry ids, so two tabs at once
+    cannot add it twice."""
+    if store.routine_list(uid):
+        return 0
+    added = 0
+    for i, (product, slots) in enumerate(demo.judge_routine_entries(), start=1):
+        # started yesterday (UTC): someone west of UTC can tick their own "today" in the
+        # evening, which is already tomorrow in UTC
+        body = RoutineEntryIn(
+            product_id=product["product_id"],
+            slots=slots,
+            source="catalog",
+            started_at=datetime.now(UTC).date() - timedelta(days=1),
+        )
+        add_routine_entry(store, uid, body, entry_id=f"r_judge{i}")
+        added += 1
+    return added
 
 
 @router.get("/journey")
