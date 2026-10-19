@@ -277,7 +277,11 @@ def test_a_new_guest_starts_with_the_starter_check_ins_and_routine(client, fake,
             "note": "Mei's own words",
             "frame_uris": [f"gs://b/uploads/demo_willow/{source}/frame_1.jpg"],
             "result_json": _json.dumps(
-                {"session_id": source, "preview": f"demo_willow/{source}/p"}
+                {
+                    "session_id": source,
+                    "user_id": "demo_willow",
+                    "preview": f"demo_willow/{source}/p",
+                }
             ),
             "labels": {"c_001": "mole"},
         },
@@ -288,7 +292,11 @@ def test_a_new_guest_starts_with_the_starter_check_ins_and_routine(client, fake,
     assert doc["sample_id"] == "mei_face_week1" and doc["is_baseline"] is False
     assert doc["note"] is None and doc["labels"] == {"c_001": "mole"}
     assert doc["frame_uris"] == [f"gs://b/uploads/u_test/{sid}/frame_1.jpg"]
-    assert _json.loads(doc["result_json"]) == {"session_id": sid, "preview": f"u_test/{sid}/p"}
+    assert _json.loads(doc["result_json"]) == {
+        "session_id": sid,
+        "user_id": "u_test",
+        "preview": f"u_test/{sid}/p",
+    }
     assert (f"uploads/demo_willow/{source}/", f"uploads/u_test/{sid}/") in copied
     # once is enough: a second call (another tab) adds nothing
     assert client.post("/v1/demo/guest-setup").json() == {"routine_added": 0, "sessions_added": 0}
