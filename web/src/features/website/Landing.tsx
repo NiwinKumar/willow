@@ -1,6 +1,6 @@
 import './website.css'
 
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { BarChart3, Building2, PlayCircle, Smartphone, type LucideIcon } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
@@ -12,7 +12,8 @@ import { JUDGE_STOPS } from '../../lib/judge'
 import { useAuth } from '../../lib/useAuth'
 import { useSamples } from '../../lib/useSamples'
 import { ProofLockup } from '../retail/brand'
-import { HeroBloom, Lockup } from './Decor'
+import { Lockup } from './Decor'
+import { HeroGarden } from './HeroGarden'
 import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH, useOpenApp } from './destinations'
 import { FIRST_CHECKIN, isReturning } from './entry'
 import { journeyLine, journeyUnavailableLine, useEntryActions, useJourney } from './hooks'
@@ -49,7 +50,6 @@ export default function Landing() {
   const { user, loading } = useAuth()
   const { pathname, hash } = useLocation()
   const [introDone, setIntroDone] = useState(false)
-  const bloom = useRef<HTMLDivElement>(null)
   const returning = !loading && isReturning(user)
 
   // /science and #section links open at their section (under the intro, so the reveal lands there).
@@ -69,30 +69,13 @@ export default function Landing() {
     }
   }, [introDone])
 
-  // The hero flowers drift down a little slower than the page (parallax).
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let raf = 0
-    const on = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        if (bloom.current) bloom.current.style.translate = `0 ${(Math.min(window.scrollY, window.innerHeight) * 0.18).toFixed(1)}px`
-      })
-    }
-    window.addEventListener('scroll', on, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', on)
-      cancelAnimationFrame(raf)
-    }
-  }, [])
-
   return (
     <div className="min-h-dvh overflow-x-clip bg-canvas text-ink">
       <WillowIntro onDone={() => setIntroDone(true)} />
       <SectionRail ready={introDone} />
       {/* One main landmark for the page; the privacy footer stays outside it (contentinfo). */}
       <main>
-        <Hero bloomRef={bloom} />
+        <Hero grow={introDone} />
         <WaysIn returning={returning} />
         <How />
         <ScienceSection className={`${pad} ${railRoom}`} />
@@ -104,14 +87,14 @@ export default function Landing() {
   )
 }
 
-function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
+function Hero({ grow }: { grow: boolean }) {
   const { user, loading } = useAuth()
   const app = useOpenApp()
   const me = identity(user)
   return (
     <section id="top" className="w-sky relative min-h-[min(94vh,860px)] overflow-hidden rounded-b-[clamp(36px,5vw,64px)] text-ink">
-      <div ref={bloomRef} aria-hidden className="absolute inset-y-0 right-0 w-[min(68%,1100px)]">
-        <HeroBloom className="absolute inset-0" />
+      <div className="absolute inset-0">
+        <HeroGarden start={grow} />
       </div>
       <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(249,227,204,.55) 0%, rgba(249,227,204,.25) 32%, rgba(249,227,204,0) 52%)' }} />
 
@@ -128,7 +111,7 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
       </header>
 
       <div className={`relative z-[2] grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-center gap-[clamp(28px,5vw,72px)] pb-[clamp(32px,6vh,64px)] pt-[clamp(28px,6vh,72px)] ${pad}`}>
-        <div className="flex animate-[wRiseLg_.9s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-7">
+        <div data-garden-copy className="flex animate-[wRiseLg_.9s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-7">
           <h1 className="m-0 text-[clamp(44px,5.4vw,84px)] font-light leading-[.96] tracking-[-0.035em]">
             See whether your skin <span className="font-serif font-normal italic tracking-[-0.01em]">really</span> changed.
           </h1>
@@ -138,7 +121,8 @@ function Hero({ bloomRef }: { bloomRef: Ref<HTMLDivElement> }) {
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ COSMETIC TRACKING · NOT A MEDICAL DEVICE</span>
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
-        <nav aria-label="Ways in" className="flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
+        <nav data-garden-calm aria-label="Ways in" className="relative flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
+          <span aria-hidden className="pointer-events-none absolute -inset-6 -z-10 rounded-[52px] bg-[rgba(255,248,242,.34)] shadow-[0_30px_80px_-30px_rgba(60,40,90,.35)] blur-[18px]" />
           <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
           <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
           <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
