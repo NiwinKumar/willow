@@ -1,9 +1,9 @@
 """Copy survey responses into a Google Sheet (docs/SURVEY.md).
 
 Firestore is the record; the sheet is a readable copy for the founders. Rows are appended with
-the Sheets API as the api service account (the same impersonation as URL signing, so it works on
-Cloud Run and on a laptop), with RAW input so an answer starting with "=" stays text. The sheet
-must be shared with that account as an editor, and needs two tabs: "Responses" and "Contacts".
+the Sheets API as the api service account (the same impersonation as URL signing), with RAW
+input so an answer starting with "=" stays text. The sheet must be shared with that account as
+an editor; the "Responses" and "Contacts" tabs and their headers are made on first use.
 A failed append never fails the response; scripts/survey_sync.py copies anything left behind.
 """
 
@@ -102,11 +102,31 @@ def _call(method: str, url: str, **kw: Any) -> dict[str, Any]:
 _headed: set[str] = set()
 
 
+def _ensure_tab(tab: str) -> int:
+    """The tab's sheet id, making the tab if the sheet lacks it. A new spreadsheet's lone empty
+    "Sheet1" becomes Responses, so a fresh sheet needs no setup beyond sharing it."""
+    sid = get_settings().survey_sheet_id
+    meta = _call("GET", f"{_API}/{sid}", params={"fields": "sheets.properties"})
+    tabs = {s["properties"]["title"]: s["properties"]["sheetId"] for s in meta.get("sheets", [])}
+    if tab in tabs:
+        return tabs[tab]
+    frozen = {"frozenRowCount": 1}
+    if tab == RESPONSES and list(tabs) == ["Sheet1"]:
+        props = {"sheetId": tabs["Sheet1"], "title": tab, "gridProperties": frozen}
+        req = {"updateSheetProperties": {"properties": props, "fields": "title,gridProperties"}}
+        _call("POST", f"{_API}/{sid}:batchUpdate", json={"requests": [req]})
+        return tabs["Sheet1"]
+    req = {"addSheet": {"properties": {"title": tab, "gridProperties": frozen}}}
+    reply = _call("POST", f"{_API}/{sid}:batchUpdate", json={"requests": [req]})
+    return reply["replies"][0]["addSheet"]["properties"]["sheetId"]
+
+
 def _ensure_header(tab: str, header: list[str]) -> None:
-    """Write the header row once into an empty tab (checked once per process)."""
+    """Make the tab if needed and give it a bold header row (checked once per process)."""
     if tab in _headed:
         return
     sid = get_settings().survey_sheet_id
+    sheet_id = _ensure_tab(tab)
     got = _call("GET", f"{_API}/{sid}/values/{quote(tab)}!1:1")
     if not got.get("values"):
         _call(
@@ -115,6 +135,15 @@ def _ensure_header(tab: str, header: list[str]) -> None:
             params={"valueInputOption": "RAW"},
             json={"values": [header]},
         )
+        row = {"sheetId": sheet_id, "startRowIndex": 0, "endRowIndex": 1}
+        bold = {
+            "repeatCell": {
+                "range": row,
+                "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}},
+                "fields": "userEnteredFormat.textFormat.bold",
+            }
+        }
+        _call("POST", f"{_API}/{sid}:batchUpdate", json={"requests": [bold]})
     _headed.add(tab)
 
 

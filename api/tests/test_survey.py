@@ -137,3 +137,42 @@ def test_every_question_has_unique_ids_and_known_kinds():
         assert q["part"] in parts
         ids = [o["id"] for o in q.get("options", [])]
         assert len(set(ids)) == len(ids)
+
+
+def test_a_fresh_sheet_gets_its_tabs_and_bold_headers(monkeypatch):
+    """A new spreadsheet has one empty "Sheet1": it becomes Responses, Contacts is added."""
+    calls: list[tuple[str, str, dict]] = []
+    tabs = {"Sheet1": 0}
+
+    def fake(method, url, **kw):
+        calls.append((method, url, kw))
+        if method == "GET" and url.endswith("/sid"):
+            return {"sheets": [{"properties": {"title": t, "sheetId": i}} for t, i in tabs.items()]}
+        if method == "GET":
+            return {}
+        reqs = kw.get("json", {}).get("requests", [])
+        for r in reqs:
+            if "updateSheetProperties" in r:
+                tabs[r["updateSheetProperties"]["properties"]["title"]] = tabs.pop("Sheet1")
+            if "addSheet" in r:
+                tabs[r["addSheet"]["properties"]["title"]] = 7
+                return {"replies": [{"addSheet": {"properties": {"sheetId": 7}}}]}
+        return {}
+
+    monkeypatch.setattr(
+        survey_sheet, "get_settings", lambda: type("S", (), {"survey_sheet_id": "sid"})()
+    )
+    monkeypatch.setattr(survey_sheet, "_call", fake)
+    survey_sheet._headed.clear()
+    survey_sheet._ensure_header("Responses", ["a"])
+    survey_sheet._ensure_header("Contacts", ["b"])
+    assert tabs == {"Responses": 0, "Contacts": 7}
+    headers = [kw["json"]["values"] for m, _, kw in calls if m == "PUT"]
+    assert headers == [[["a"]], [["b"]]]
+    bolded = [
+        kw["json"]["requests"][0]["repeatCell"]["range"]["sheetId"]
+        for m, _, kw in calls
+        if m == "POST" and "repeatCell" in kw["json"]["requests"][0]
+    ]
+    assert bolded == [0, 7]
+    survey_sheet._headed.clear()
