@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     autopilot_audience: str | None = None
     # A reminder goes out on the first run at or after the scheduled time, up to this long after it.
     reminder_window_minutes: int = 30
+    # The validation survey's Google Sheet (app/survey_sheet.py), shared with the signing service
+    # account as an editor. Unset: responses are kept in Firestore only.
+    survey_sheet_id: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

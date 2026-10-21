@@ -10,6 +10,10 @@
       ],
       "rewrites": [
         {
+          "source": "/survey{,/**}",
+          "destination": "/survey/index.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }
@@ -71,6 +75,10 @@
         "**/node_modules/**"
       ],
       "rewrites": [
+        {
+          "source": "/survey{,/**}",
+          "destination": "/survey/index.html"
+        },
         {
           "source": "**",
           "destination": "/index.html"

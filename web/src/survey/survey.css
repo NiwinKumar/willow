@@ -1,0 +1,105 @@
+/*
+ * Motion for the survey page (docs/SURVEY.md). The survey is seen once per person, so it gets a small delight
+ * budget, spent where it explains or confirms: screens slide in the direction you're going, choices settle in
+ * one after another, a tick draws itself, the noise band draws the way the app's charts do, and the thank-you
+ * blooms. Curves and durations are the design system's (tokens.css: --ease-standard, --ease-spring, --dur-*).
+ * Only transform, opacity and stroke offsets move. Reduced motion keeps the fades and drops the movement.
+ */
+
+/* Screens: forward slides in from the right, back from the left. */
+@keyframes svInFwd {
+  from { opacity: 0; translate: 18px 0 }
+  to { opacity: 1; translate: 0 0 }
+}
+@keyframes svInBack {
+  from { opacity: 0; translate: -18px 0 }
+  to { opacity: 1; translate: 0 0 }
+}
+@keyframes svRise {
+  from { opacity: 0; translate: 0 12px }
+  to { opacity: 1; translate: 0 0 }
+}
+.sv-screen { animation: svInFwd var(--dur-medium) var(--ease-standard) both }
+.sv-screen[data-dir='back'] { animation-name: svInBack }
+.sv-rise { animation: svRise 0.5s var(--ease-standard) both }
+
+/* Choices settle in one after another (the delay is set per option). */
+.sv-opt { animation: svRise var(--dur-medium) var(--ease-standard) both }
+
+/* A picked choice: the box springs a little, the tick draws, a soft ring spreads once. */
+@keyframes svCheck {
+  from { scale: 0.7 }
+  to { scale: 1 }
+}
+@keyframes svTick {
+  from { stroke-dashoffset: 1 }
+  to { stroke-dashoffset: 0 }
+}
+@keyframes svRing {
+  from { opacity: 0.35; scale: 0.9 }
+  to { opacity: 0; scale: 2.1 }
+}
+.sv-check { animation: svCheck var(--dur-base) var(--ease-spring) both }
+.sv-tick { stroke-dasharray: 1; animation: svTick var(--dur-base) var(--ease-standard) 60ms both }
+.sv-ring { animation: svRing 0.55s var(--ease-standard) both }
+
+/* The "2 of 3" count rolls up when it changes. */
+@keyframes svCount {
+  from { opacity: 0; translate: 0 6px }
+  to { opacity: 1; translate: 0 0 }
+}
+.sv-count { display: inline-block; animation: svCount var(--dur-base) var(--ease-standard) both }
+
+/* The part indicator fills from the left as you move into a part. */
+.sv-seg { transform-origin: left center; transition: transform var(--dur-slow) var(--ease-standard) }
+
+/* Buttons: the arrow leans forward on hover (pointer devices only, so a tap never leaves it nudged). */
+.sv-arrow { display: inline-block; transition: translate var(--dur-base) var(--ease-standard) }
+@media (hover: hover) and (pointer: fine) {
+  button:hover > .sv-arrow,
+  button:hover .sv-arrow { translate: 3px 0 }
+}
+
+/* The idea's noise band: the readings draw left to right, the dots land, the real change glows twice. */
+@keyframes svDraw {
+  from { stroke-dashoffset: 1 }
+  to { stroke-dashoffset: 0 }
+}
+@keyframes svDot {
+  from { opacity: 0; scale: 0.6 }
+  to { opacity: 1; scale: 1 }
+}
+@keyframes svGlow {
+  0%, 100% { opacity: 0.35; scale: 1 }
+  50% { opacity: 0.12; scale: 1.5 }
+}
+.sv-draw { stroke-dasharray: 1; animation: svDraw var(--dur-draw) var(--ease-standard) 200ms both }
+.sv-dot { transform-box: fill-box; transform-origin: center; animation: svDot var(--dur-base) var(--ease-spring) both }
+.sv-glow { transform-box: fill-box; transform-origin: center; animation: svGlow 1.6s ease-in-out 1.5s 2 both }
+
+/* Thank you: the mark blooms, then a few petals drift up and fade (once). */
+@keyframes svBloom {
+  from { opacity: 0; scale: 0.8; filter: blur(6px) }
+  to { opacity: 1; scale: 1; filter: blur(0) }
+}
+@keyframes svPetal {
+  0% { opacity: 0; translate: 0 0; rotate: 0deg }
+  15% { opacity: 0.85 }
+  100% { opacity: 0; translate: var(--drift-x) -180px; rotate: var(--spin) }
+}
+.sv-bloom { display: inline-block; animation: svBloom 0.8s var(--ease-spring) both }
+.sv-petal { position: absolute; border-radius: 60% 40% 60% 40%; filter: blur(0.6px); animation: svPetal 3.2s var(--ease-standard) both }
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-screen, .sv-screen[data-dir='back'], .sv-rise, .sv-opt, .sv-count { animation: svFade var(--dur-base) ease both }
+  .sv-check, .sv-ring, .sv-glow, .sv-petal { animation: none }
+  .sv-ring, .sv-petal { display: none }
+  .sv-tick, .sv-draw { animation: none; stroke-dasharray: none }
+  .sv-dot { animation: svFade var(--dur-base) ease both }
+  .sv-bloom { animation: svFade 0.4s ease both }
+  .sv-seg, .sv-arrow { transition: none }
+}
+@keyframes svFade {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}

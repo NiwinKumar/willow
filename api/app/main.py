@@ -20,6 +20,7 @@ from app.routes.reminders_routes import router as reminders_router
 from app.routes.retailer_routes import router as retailer_router
 from app.routes.sessions_routes import router as sessions_router
 from app.routes.shelf_routes import router as shelf_router
+from app.routes.survey_routes import router as survey_router
 from app.settings import get_settings
 
 settings = get_settings()
@@ -105,6 +106,7 @@ app.include_router(campaign_router)
 app.include_router(shelf_router)
 app.include_router(autopilot_router)
 app.include_router(product_requests_router)
+app.include_router(survey_router)
 if storage.dev_uploads_enabled():
     from app.routes.dev_routes import router as dev_router
 

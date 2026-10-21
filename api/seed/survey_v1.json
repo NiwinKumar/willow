@@ -1,0 +1,304 @@
+{
+  "version": "v1",
+  "pilot_date": "2026-11-07",
+  "parts": [
+    { "id": "routine", "label": "Your routine" },
+    { "id": "worked", "label": "Did it work?" },
+    { "id": "idea", "label": "An idea" },
+    { "id": "touch", "label": "Stay in touch" }
+  ],
+  "questions": [
+    {
+      "id": "age",
+      "part": "routine",
+      "kind": "single",
+      "required": true,
+      "title": "How old are you?",
+      "options": [
+        { "id": "under_18", "label": "Under 18" },
+        { "id": "18_24", "label": "18–24" },
+        { "id": "25_34", "label": "25–34" },
+        { "id": "35_44", "label": "35–44" },
+        { "id": "45_54", "label": "45–54" },
+        { "id": "55_plus", "label": "55 or older" }
+      ],
+      "end_if": { "in": ["under_18"], "screen": "minor" }
+    },
+    {
+      "id": "products_yesterday",
+      "part": "routine",
+      "kind": "single",
+      "required": true,
+      "title": "Yesterday, how many skincare products did you use, morning and night together?",
+      "help": "Cleanser, moisturizer and sunscreen all count.",
+      "options": [
+        { "id": "0", "label": "None" },
+        { "id": "1_2", "label": "1–2" },
+        { "id": "3_4", "label": "3–4" },
+        { "id": "5_7", "label": "5–7" },
+        { "id": "8_plus", "label": "8 or more" }
+      ],
+      "end_if": { "in": ["0"], "screen": "no_routine" }
+    },
+    {
+      "id": "goals",
+      "part": "routine",
+      "kind": "multi",
+      "max": 3,
+      "shuffle": true,
+      "required": true,
+      "title": "What would you most like your skincare to help with?",
+      "help": "Choose up to 3.",
+      "options": [
+        { "id": "breakouts", "label": "Breakouts" },
+        { "id": "dark_spots", "label": "Dark spots or uneven-looking tone" },
+        { "id": "redness", "label": "Redness" },
+        { "id": "texture", "label": "Texture or visible pores" },
+        { "id": "lines", "label": "Fine lines" },
+        { "id": "oil", "label": "Oiliness or shine" },
+        { "id": "dryness", "label": "Dryness or flakiness" },
+        { "id": "dullness", "label": "Skin looking tired or dull" },
+        { "id": "under_eye", "label": "Under-eye area" },
+        { "id": "none", "label": "Nothing in particular, just looking after it", "fixed": true, "exclusive": true }
+      ]
+    },
+    {
+      "id": "bought_3m",
+      "part": "routine",
+      "kind": "single",
+      "required": true,
+      "title": "How many new skincare products have you bought in the last 3 months?",
+      "options": [
+        { "id": "0", "label": "None" },
+        { "id": "1", "label": "1" },
+        { "id": "2_3", "label": "2–3" },
+        { "id": "4_6", "label": "4–6" },
+        { "id": "7_plus", "label": "7 or more" }
+      ]
+    },
+    {
+      "id": "where_buy",
+      "part": "routine",
+      "kind": "multi",
+      "shuffle": true,
+      "title": "Where did you buy them?",
+      "help": "Choose all that apply.",
+      "show_if": { "q": "bought_3m", "not_in": ["0"] },
+      "options": [
+        { "id": "multi_brand", "label": "Beauty apps or sites with many brands (Nykaa, Sephora, Purplle…)" },
+        { "id": "marketplace", "label": "Amazon, Flipkart or a similar marketplace" },
+        { "id": "quick", "label": "Quick delivery apps (Blinkit, Zepto, Instamart…)" },
+        { "id": "brand_site", "label": "A brand’s own website" },
+        { "id": "pharmacy", "label": "Pharmacy or supermarket" },
+        { "id": "store", "label": "Beauty store or counter" },
+        { "id": "clinic", "label": "Dermatologist or clinic" },
+        { "id": "other", "label": "Somewhere else", "fixed": true }
+      ]
+    },
+    {
+      "id": "last_sure",
+      "part": "worked",
+      "kind": "scale",
+      "required": true,
+      "title": "Think of the last product you started for something specific. How sure are you that it made a visible difference?",
+      "options": [
+        { "id": "not_at_all", "label": "Not at all sure" },
+        { "id": "slightly", "label": "Slightly sure" },
+        { "id": "moderately", "label": "Moderately sure" },
+        { "id": "very", "label": "Very sure" },
+        { "id": "completely", "label": "Completely sure" },
+        { "id": "too_soon", "label": "Too soon to tell", "fixed": true },
+        { "id": "none_recent", "label": "I haven’t started one in the last 6 months", "fixed": true }
+      ]
+    },
+    {
+      "id": "how_judged",
+      "part": "worked",
+      "kind": "multi",
+      "shuffle": true,
+      "title": "How did you decide whether it was working?",
+      "help": "Choose all that apply.",
+      "show_if": { "q": "last_sure", "not_in": ["none_recent"] },
+      "options": [
+        { "id": "mirror", "label": "Looked in the mirror" },
+        { "id": "photos", "label": "Compared photos I took" },
+        { "id": "scanner", "label": "A skin-scanning app or in-store scanner" },
+        { "id": "feel", "label": "How my skin felt" },
+        { "id": "comments", "label": "Someone commented on my skin" },
+        { "id": "reviews", "label": "Reviews or influencers" },
+        { "id": "didnt", "label": "I didn’t really check", "fixed": true, "exclusive": true }
+      ]
+    },
+    {
+      "id": "weeks_to_tell",
+      "part": "worked",
+      "kind": "single",
+      "title": "After about how many weeks can you usually tell whether a product works for you?",
+      "options": [
+        { "id": "under_2", "label": "Less than 2 weeks" },
+        { "id": "2_4", "label": "2–4 weeks" },
+        { "id": "5_8", "label": "5–8 weeks" },
+        { "id": "over_8", "label": "More than 8 weeks" },
+        { "id": "cant", "label": "I usually can’t tell", "fixed": true }
+      ]
+    },
+    {
+      "id": "shelf",
+      "part": "worked",
+      "kind": "single",
+      "title": "How many skincare products are sitting half-used on your shelf right now?",
+      "options": [
+        { "id": "0", "label": "None" },
+        { "id": "1_2", "label": "1–2" },
+        { "id": "3_5", "label": "3–5" },
+        { "id": "6_plus", "label": "6 or more" }
+      ]
+    },
+    {
+      "id": "story",
+      "part": "worked",
+      "kind": "text",
+      "max_length": 1000,
+      "title": "Tell us about the last time a skincare product disappointed you.",
+      "help": "Optional. A sentence or two is plenty. This is the answer we read most closely.",
+      "placeholder": "What happened?"
+    },
+    {
+      "id": "idea",
+      "part": "idea",
+      "kind": "info",
+      "title": "Here’s what we’re building",
+      "body": [
+        "Willow is a phone app for checking whether your skincare is doing anything.",
+        "Once a week you take a guided photo, about a minute. Willow measures things like redness, dark spots and texture, and compares your skin with itself, never with other people.",
+        "After a few weeks it tells you plainly: a real change, or no clear change beyond your normal day-to-day variation. It also points out products in your routine that overlap or clash.",
+        "It’s for cosmetic tracking, not medical advice."
+      ]
+    },
+    {
+      "id": "useful",
+      "part": "idea",
+      "kind": "scale",
+      "required": true,
+      "title": "How useful would this be for you?",
+      "options": [
+        { "id": "not_at_all", "label": "Not at all useful" },
+        { "id": "slightly", "label": "Slightly useful" },
+        { "id": "moderately", "label": "Moderately useful" },
+        { "id": "very", "label": "Very useful" },
+        { "id": "extremely", "label": "Extremely useful" }
+      ]
+    },
+    {
+      "id": "first_try",
+      "part": "idea",
+      "kind": "single",
+      "shuffle": true,
+      "title": "Which part would you try first?",
+      "options": [
+        { "id": "proof", "label": "Finding out whether a product really works for me" },
+        { "id": "timeline", "label": "Seeing how my skin changes over time" },
+        { "id": "clash", "label": "Checking whether my products overlap or clash" },
+        { "id": "next", "label": "Help deciding what to keep, stop or try next" },
+        { "id": "similar", "label": "What worked for people with similar skin" },
+        { "id": "none", "label": "None of these", "fixed": true }
+      ]
+    },
+    {
+      "id": "no_change",
+      "part": "idea",
+      "kind": "single",
+      "title": "Say you used a product for 4 weeks and Willow showed no clear change. What would you most likely do?",
+      "options": [
+        { "id": "stop", "label": "Stop using it and save the money" },
+        { "id": "longer", "label": "Give it a few more weeks, then check again" },
+        { "id": "keep", "label": "Keep using it anyway" },
+        { "id": "ask", "label": "Ask someone else, like a dermatologist or a friend" },
+        { "id": "unsure", "label": "Not sure", "fixed": true }
+      ]
+    },
+    {
+      "id": "hesitate",
+      "part": "idea",
+      "kind": "multi",
+      "shuffle": true,
+      "title": "What would make you hesitate to use it?",
+      "help": "Choose all that apply.",
+      "options": [
+        { "id": "privacy", "label": "Privacy of photos of my face" },
+        { "id": "tone", "label": "Whether it works as well for my skin tone" },
+        { "id": "effort", "label": "A weekly photo sounds like effort" },
+        { "id": "forget", "label": "I’d forget to do it" },
+        { "id": "accuracy", "label": "I doubt a phone can measure skin well" },
+        { "id": "ads", "label": "Product suggestions might feel like ads" },
+        { "id": "derm", "label": "I’d rather ask a dermatologist" },
+        { "id": "nothing", "label": "Nothing, I’d try it", "fixed": true, "exclusive": true }
+      ]
+    },
+    {
+      "id": "paid_before",
+      "part": "idea",
+      "kind": "single",
+      "title": "In the past 12 months, have you paid for a skincare app, a skin analysis or a skin consultation?",
+      "options": [
+        { "id": "app", "label": "Yes, an app or skin analysis" },
+        { "id": "consult", "label": "Yes, a dermatologist or clinic" },
+        { "id": "both", "label": "Yes, both" },
+        { "id": "no", "label": "No" }
+      ]
+    },
+    {
+      "id": "share_store",
+      "part": "idea",
+      "kind": "single",
+      "title": "Would you share your results with a store you shop at, in return for better product suggestions?",
+      "help": "Only results like “redness: no clear change”. Never photos or your name.",
+      "options": [
+        { "id": "yes", "label": "Yes" },
+        { "id": "depends", "label": "Maybe, it depends on the store" },
+        { "id": "no", "label": "No" }
+      ]
+    },
+    {
+      "id": "pilot",
+      "part": "touch",
+      "kind": "single",
+      "required": true,
+      "title": "We’re starting a free 4-week pilot on 7 November. Want to join?",
+      "help": "One guided photo a week, about a minute. At the end we show you what changed, and what didn’t.",
+      "options": [
+        { "id": "yes", "label": "Yes, count me in" },
+        { "id": "maybe", "label": "Maybe, tell me more" },
+        { "id": "no", "label": "Not this time" }
+      ]
+    },
+    {
+      "id": "chat",
+      "part": "touch",
+      "kind": "single",
+      "title": "Would you do a 15-minute call with us? We’d love to learn from you.",
+      "options": [
+        { "id": "yes", "label": "Yes, happy to" },
+        { "id": "no", "label": "No, thanks" }
+      ]
+    },
+    {
+      "id": "email",
+      "part": "touch",
+      "kind": "email",
+      "title": "Where should we reach you?",
+      "help": "Only for the pilot and the call. Kept in a separate list, never shared or sold. To have it deleted, reply to any email we send.",
+      "show_if_any": [
+        { "q": "pilot", "in": ["yes", "maybe"] },
+        { "q": "chat", "in": ["yes"] }
+      ],
+      "consent": "Email me about the Willow pilot and the call, and nothing else."
+    },
+    {
+      "id": "country",
+      "part": "touch",
+      "kind": "country",
+      "title": "Last one: which country do you live in?"
+    }
+  ]
+}
