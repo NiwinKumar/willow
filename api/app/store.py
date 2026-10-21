@@ -97,6 +97,9 @@ class Store(Protocol):
     def survey_responses(self) -> list[tuple[str, Doc]]: ...
     def survey_contact_set(self, rid: str, doc: Doc) -> None: ...
     def survey_contact_get(self, rid: str) -> Doc | None: ...
+    # The early-access waitlist (routes/waitlist_routes.py): waitlist/{sha256(email)[:32]}.
+    def waitlist_get(self, key: str) -> Doc | None: ...
+    def waitlist_set(self, key: str, doc: Doc) -> None: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -476,6 +479,13 @@ class FirestoreStore:
         snap = self._db().document(f"survey_contacts/{rid}").get()
         return snap.to_dict() if snap.exists else None
 
+    def waitlist_get(self, key: str) -> Doc | None:
+        snap = self._db().document(f"waitlist/{key}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def waitlist_set(self, key: str, doc: Doc) -> None:
+        self._db().document(f"waitlist/{key}").set(doc)
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -500,6 +510,7 @@ class MemoryStore:
         self.wishes: dict[str, Doc] = {}
         self.survey: dict[str, Doc] = {}
         self.survey_contacts: dict[str, Doc] = {}
+        self.waitlist: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -775,6 +786,12 @@ class MemoryStore:
 
     def survey_contact_get(self, rid: str) -> Doc | None:
         return copy.deepcopy(self.survey_contacts.get(rid))
+
+    def waitlist_get(self, key: str) -> Doc | None:
+        return copy.deepcopy(self.waitlist.get(key))
+
+    def waitlist_set(self, key: str, doc: Doc) -> None:
+        self.waitlist[key] = copy.deepcopy(doc)
 
 
 @lru_cache

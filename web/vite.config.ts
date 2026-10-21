@@ -17,11 +17,12 @@ function preconnect(apiUrl: string | undefined): Plugin {
   }
 }
 
-/** /survey is its own page (survey/index.html): serve it locally the way firebase.json's rewrite does in production. */
+/** /survey and /waitlist are their own pages (survey/index.html, waitlist/index.html): serve them locally the way
+ * firebase.json's rewrites do in production. */
 function surveyPage(): Plugin {
   const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
-    const m = req.url?.match(/^\/survey(\/[^?]*)?(\?.*)?$/)
-    if (m) req.url = `/survey/index.html${m[2] ?? ''}`
+    const m = req.url?.match(/^\/(survey|waitlist)(\/[^?]*)?(\?.*)?$/)
+    if (m) req.url = `/${m[1]}/index.html${m[3] ?? ''}`
     next()
   }
   return { name: 'willow-survey-page', configureServer: (s) => void s.middlewares.use(rewrite), configurePreviewServer: (s) => void s.middlewares.use(rewrite) }
@@ -32,6 +33,6 @@ export default defineConfig(({ mode }) => ({
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // The catalog lives in api/seed/products.json (one source for the api and the demo).
   server: { port: 5173, host: true, fs: { allow: ['..'] } },
-  // Two pages: the app, and the survey (its own small bundle and its own link-preview tags, docs/SURVEY.md).
-  build: { rollupOptions: { input: { main: 'index.html', survey: 'survey/index.html' } } },
+  // Three pages: the app, the survey (its own small bundle and link-preview tags, docs/SURVEY.md) and the waitlist.
+  build: { rollupOptions: { input: { main: 'index.html', survey: 'survey/index.html', waitlist: 'waitlist/index.html' } } },
 }))
