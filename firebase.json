@@ -14,6 +14,10 @@
           "destination": "/survey/index.html"
         },
         {
+          "source": "/waitlist{,/**}",
+          "destination": "/waitlist/index.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }
@@ -78,6 +82,10 @@
         {
           "source": "/survey{,/**}",
           "destination": "/survey/index.html"
+        },
+        {
+          "source": "/waitlist{,/**}",
+          "destination": "/waitlist/index.html"
         },
         {
           "source": "**",

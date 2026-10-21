@@ -209,6 +209,7 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 | POST | `/v1/product-requests` (Oct 18) | `{brand ≤80, name ≤120, photo?: {mime_type: image/jpeg\|png\|webp, data_base64 ≤8 MB}}`: a photo, or both brand and name (else 422) -> 201 the request. 409 `in_catalog` (`detail.product`) when the catalog already has it; 422 `bad_image`; daily cap `product_request` 10 / 2000. The photo is stored at `requests/{uid}/{id}.{ext}` until the request is answered |
 | PATCH | `/v1/product-requests/{id}` (Oct 18) | `{seen: bool}` -> 204 (the in-app note was seen); 404 unknown |
 | POST | `/v1/survey` (Oct 21, public, no sign-in) | The validation survey (docs/SURVEY.md). `{version: "v1", answers: {question_id: option_id \| [option_id] \| text \| country code}, screened_out?: "no_routine", email? ≤254, email_consent, source ≤32 ([a-z0-9_-]), duration_s, website (honeypot, must be empty)}` -> 201 `{ok, id}`. Answers are checked against `api/seed/survey_v1.json` (422 `bad_answer`); `age: under_18` is never kept (422 `under_18`); an email needs `email_consent` (422 `bad_email`); a filled honeypot answers 201 and keeps nothing; 6 per network address per day per instance (429 `daily_limit`). Copied to the Google Sheet `SURVEY_SHEET_ID` when set |
+| POST | `/v1/waitlist` (Oct 21, public, no sign-in) | Early access from the `/waitlist` page. `{email ≤254, source ≤32 ([a-z0-9_-]), website (honeypot, must be empty)}` -> 201 `{ok, already}` (`already: true` when that address had joined, nothing changes). 422 `bad_email`; a filled honeypot answers 201 and keeps nothing; shares the survey's 6 per network address per day per instance (429 `daily_limit`) |
 | GET | `/v1/retailer/insights` | aggregate JSON for the in-app retailer view (BigQuery) |
 | GET | `/v1/me` | `{uid, consent, profile}`; `consent` and `profile` are null until saved |
 | PUT | `/v1/me/profile` | partial update of `users/{uid}.profile` (fields left out keep their value, `null` clears one) -> `{profile}`; 422 on an unknown field or value |
@@ -299,6 +300,8 @@ survey_responses/{id}                      (Oct 21; YYYYMMDDHHMMSS-8 hex; the va
   answers {question_id: option ids / text / country}, has_contact, sheet_synced
 survey_contacts/{id}                       (Oct 21; same id; only when someone leaves an email)
   response_id, email, consent (the exact wording), consented_at, pilot, chat, version
+waitlist/{key}                             (Oct 21; key = sha256(email)[:32]; one per address)
+  email (lowercased), source, created_at
 users/{uid}/product_tests/{test_id}
   entry_id | null, product_id | null, name, site_pair: forearm, started_at (YYYY-MM-DD),
   length_days (7-56), ended_at | null, created_at, updated_at
