@@ -73,4 +73,5 @@
 | Oct 12 | No Vertex AI Search, no native app, no MedGemma/Derm Foundation in MVP | earlier options |
 | Oct 12 | Hero demo: DHA self-tanner split forearm + tan line + 5-frame repeatability | blush/irritation tests |
 | Oct 20 | Landing hero background is an interactive ASCII tulip field (WebGL2, golden hour, mountains, birds; the cursor is a small sun), calmed behind the copy and buttons; CSS flowers stay as the no-WebGL fallback | blurred CSS flowers (Keto-style imagery) |
+| Oct 21 | Validation survey is our own page at `/survey` (Willow design system, its own small bundle and link-preview card), answers through `POST /v1/survey` into Firestore, copied to a Google Sheet; questions in `api/seed/survey_v1.json`, wording from docs/SURVEY.md research. Free 4-week pilot offered for 7 Nov | Google Forms (plain look, no control over wording, layout or data) |
 | Open | Organizer answers (video length, cutoff time, credits): later | -- |

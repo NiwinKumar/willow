@@ -39,6 +39,7 @@ Env vars:
 | DEMO_USER_ID | demo_willow | read-only seeded account |
 | VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY | (Secret Manager `willow-vapid-public` / `willow-vapid-private`) | Web Push keys (base64url, raw P-256). Unset = push off and the app offers calendar reminders only; tests and fixture mode need neither. Generate a local pair with the one-liner in `infra/setup.sh` ("Check-in reminders"); never commit them |
 | VAPID_SUBJECT | https://willow-511508.web.app | contact for the push services (`mailto:` or https); push needs all three VAPID values |
+| SURVEY_SHEET_ID | (unset) | the validation survey's Google Sheet id (docs/SURVEY.md); unset keeps responses in Firestore only. The sheet is shared with `sa-api` as an editor and has tabs `Responses` and `Contacts` |
 | APP_URL | https://willow-511508.web.app | the web app, for the calendar event's link |
 | REMINDERS_AUDIENCE | https://willow-api-hrlt7lqdwa-uc.a.run.app/v1/internal/reminders | OIDC audience Cloud Scheduler's token must carry; unset = `/v1/internal/reminders` answers 503 (`AUTH_MODE=dev` skips the check) |
 | SCHEDULER_SERVICE_ACCOUNT | sa-scheduler@willow-511508.iam.gserviceaccount.com | the only identity allowed to run reminders |

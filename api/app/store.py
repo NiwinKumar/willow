@@ -90,6 +90,13 @@ class Store(Protocol):
     def product_wish_get(self, key: str) -> Doc | None: ...
     def product_wish_update(self, key: str, fields: Doc) -> None: ...
     def product_wishes(self) -> list[tuple[str, Doc]]: ...
+    # The validation survey (app/survey.py): survey_responses/{id}, and survey_contacts/{id} for
+    # the few who leave an email (kept apart from the answers).
+    def survey_response_set(self, rid: str, doc: Doc) -> None: ...
+    def survey_response_update(self, rid: str, fields: Doc) -> None: ...
+    def survey_responses(self) -> list[tuple[str, Doc]]: ...
+    def survey_contact_set(self, rid: str, doc: Doc) -> None: ...
+    def survey_contact_get(self, rid: str) -> Doc | None: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -453,6 +460,22 @@ class FirestoreStore:
     def product_wishes(self) -> list[tuple[str, Doc]]:
         return [(s.id, s.to_dict()) for s in self._db().collection("product_requests").stream()]
 
+    def survey_response_set(self, rid: str, doc: Doc) -> None:
+        self._db().document(f"survey_responses/{rid}").set(doc)
+
+    def survey_response_update(self, rid: str, fields: Doc) -> None:
+        self._db().document(f"survey_responses/{rid}").update(fields)
+
+    def survey_responses(self) -> list[tuple[str, Doc]]:
+        return [(s.id, s.to_dict()) for s in self._db().collection("survey_responses").stream()]
+
+    def survey_contact_set(self, rid: str, doc: Doc) -> None:
+        self._db().document(f"survey_contacts/{rid}").set(doc)
+
+    def survey_contact_get(self, rid: str) -> Doc | None:
+        snap = self._db().document(f"survey_contacts/{rid}").get()
+        return snap.to_dict() if snap.exists else None
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -475,6 +498,8 @@ class MemoryStore:
         self.activity: dict[str, Doc] = {}
         self.product_requests: dict[tuple[str, str], Doc] = {}
         self.wishes: dict[str, Doc] = {}
+        self.survey: dict[str, Doc] = {}
+        self.survey_contacts: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -735,6 +760,21 @@ class MemoryStore:
 
     def product_wishes(self) -> list[tuple[str, Doc]]:
         return [(k, copy.deepcopy(d)) for k, d in self.wishes.items()]
+
+    def survey_response_set(self, rid: str, doc: Doc) -> None:
+        self.survey[rid] = copy.deepcopy(doc)
+
+    def survey_response_update(self, rid: str, fields: Doc) -> None:
+        self.survey[rid].update(copy.deepcopy(fields))
+
+    def survey_responses(self) -> list[tuple[str, Doc]]:
+        return [(k, copy.deepcopy(d)) for k, d in self.survey.items()]
+
+    def survey_contact_set(self, rid: str, doc: Doc) -> None:
+        self.survey_contacts[rid] = copy.deepcopy(doc)
+
+    def survey_contact_get(self, rid: str) -> Doc | None:
+        return copy.deepcopy(self.survey_contacts.get(rid))
 
 
 @lru_cache

@@ -8,6 +8,7 @@
 *.jpeg
 *.png
 !web/public/**/*.png
+!web/public/og/*.jpg
 !docs/img/**/*.png
 data/*
 !data/README.md
