@@ -17,7 +17,7 @@ A short survey to check, with real skincare users, that the problem Willow solve
 ## The flow
 
 1. **Intro:** who is asking (Niwin and Harshini), why, about 4 minutes, no photos or account, anonymous unless you leave an email, we'll share the results. 18+.
-2. **Part 1, Your routine:** age (under 18 ends politely and nothing is kept), products used yesterday (none ends politely, kept as `screened_out: no_routine`), goals (up to 3), products bought in 3 months, where (skipped if none).
+2. **Part 1, Your routine:** age (under 18 ends politely and nothing is kept), products used yesterday (none ends politely, kept as `screened_out: no_routine`), goals (any number; "nothing in particular" goes alone), products bought in 3 months, where (skipped if none).
 3. **Part 2, Did it work?** how sure the last product made a visible difference (every point labelled, plus "too soon" and "none recently"), how they judged it, weeks until they can tell, half-used products on the shelf, one optional story.
 4. **Part 3, An idea:** a plain description of Willow (with the noise band drawn as the app draws it), then usefulness, what they'd try first, what they'd do if Willow said "no clear change", hesitations, whether they've paid for skin help before, sharing results with a store.
 5. **Part 4, Stay in touch:** join the free 4-week pilot on **7 November**, a 15-minute call, an email (only if either is yes, with its own unticked consent box), country.
