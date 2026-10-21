@@ -35,11 +35,11 @@ test('changing an earlier answer drops answers to screens that no longer show', 
   assert.deepEqual(kept, { bought_3m: '0', goals: ['redness'] })
 })
 
-test('up to three goals, and "nothing in particular" goes alone', () => {
+test('any number of goals, and "nothing in particular" goes alone', () => {
   const goals = q('goals')
   let r = toggle(goals, ['redness', 'lines', 'oil'], 'texture')
-  assert.equal(r.full, true)
-  assert.deepEqual(r.next, ['redness', 'lines', 'oil'])
+  assert.equal(r.full, false)
+  assert.deepEqual(r.next, ['redness', 'lines', 'oil', 'texture'])
   r = toggle(goals, ['redness', 'lines'], 'none')
   assert.deepEqual(r.next, ['none'])
   r = toggle(goals, ['none'], 'redness')

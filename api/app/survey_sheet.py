@@ -93,6 +93,8 @@ def _call(method: str, url: str, **kw: Any) -> dict[str, Any]:
         if res.status_code == 429 or res.status_code >= 500:
             time.sleep(0.6 * (attempt + 1))
             continue
+        if res.status_code >= 400:
+            log.warning("sheets %s %s: %s", method, res.status_code, res.text[:500])
         res.raise_for_status()
         return res.json()
     res.raise_for_status()
@@ -113,7 +115,8 @@ def _ensure_tab(tab: str) -> int:
     frozen = {"frozenRowCount": 1}
     if tab == RESPONSES and list(tabs) == ["Sheet1"]:
         props = {"sheetId": tabs["Sheet1"], "title": tab, "gridProperties": frozen}
-        req = {"updateSheetProperties": {"properties": props, "fields": "title,gridProperties"}}
+        fields = "title,gridProperties.frozenRowCount"  # "gridProperties" alone would zero the size
+        req = {"updateSheetProperties": {"properties": props, "fields": fields}}
         _call("POST", f"{_API}/{sid}:batchUpdate", json={"requests": [req]})
         return tabs["Sheet1"]
     req = {"addSheet": {"properties": {"title": tab, "gridProperties": frozen}}}

@@ -62,7 +62,6 @@ def test_an_email_goes_to_its_own_list_only_with_consent(client, store):
     [
         {"made_up": "x"},
         {"age": "17"},
-        {"goals": ["redness", "lines", "oil", "texture"]},  # more than 3
         {"goals": ["none", "redness"]},  # "nothing in particular" goes alone
         {"country": "India"},
         {"idea": "seen"},  # the info screen holds no answer

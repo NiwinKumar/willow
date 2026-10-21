@@ -44,11 +44,10 @@
       "id": "goals",
       "part": "routine",
       "kind": "multi",
-      "max": 3,
       "shuffle": true,
       "required": true,
-      "title": "What would you most like your skincare to help with?",
-      "help": "Choose up to 3.",
+      "title": "What would you like your skincare to help with?",
+      "help": "Choose all that apply.",
       "options": [
         { "id": "breakouts", "label": "Breakouts" },
         { "id": "dark_spots", "label": "Dark spots or uneven-looking tone" },
