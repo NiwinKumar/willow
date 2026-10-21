@@ -69,7 +69,7 @@ The top hesitation says what to fix first (for example privacy, or skin-tone acc
 
 ## Setting up the Google Sheet
 
-1. Create a sheet with two tabs named `Responses` and `Contacts`. Header rows are written on the first response.
+1. Create a blank Google Sheet. The api makes the `Responses` and `Contacts` tabs (the empty `Sheet1` becomes `Responses`) and their bold, frozen header rows on the first response.
 2. Share it with `sa-api@willow-511508.iam.gserviceaccount.com` as an editor.
 3. Enable the Sheets API in `willow-511508`: `gcloud services enable sheets.googleapis.com --project willow-511508`.
 4. Set `SURVEY_SHEET_ID` on the api (`gcloud run services update willow-api --region us-central1 --update-env-vars SURVEY_SHEET_ID=<id>`).
