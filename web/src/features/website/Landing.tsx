@@ -2,28 +2,22 @@ import './website.css'
 
 import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { BarChart3, Building2, PlayCircle, Smartphone, type LucideIcon } from 'lucide-react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 import { WillowIntro } from '../../components/willow/WillowLoader'
 import { journeyViews, warmFirstPhoto } from '../../data/demoSource'
-import { leaveDemo } from '../../data/useData'
 import { identity } from '../../lib/identity'
-import { JUDGE_STOPS } from '../../lib/judge'
 import { useAuth } from '../../lib/useAuth'
-import { useSamples } from '../../lib/useSamples'
 import { ProofLockup } from '../retail/brand'
 import { Lockup } from './Decor'
 import { HeroGarden } from './HeroGarden'
 import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH, useOpenApp } from './destinations'
-import { FIRST_CHECKIN, isReturning } from './entry'
-import { journeyLine, journeyUnavailableLine, useEntryActions, useJourney } from './hooks'
-import { Figures, LiveStatus, MethodCards, ScienceSection } from './ScienceSection'
+import { LiveStatus } from './Method'
 import { SectionRail } from './SectionRail'
+import { Culture, Gains, How, Problem, SectionHead, storySection, Unique } from './Story'
 import { glide, SECTIONS, setupReveal } from './scroll'
 
 const pad = 'px-[clamp(18px,4vw,52px)]'
-/** Sections after the hero leave room for the rail on wide screens. */
-const railRoom = 'min-[760px]:pr-[max(64px,4vw)]'
 
 /** In-page anchor that glides instead of jumping. */
 function Anchor({ to, className = '', style, children }: { to: string; className?: string; style?: CSSProperties; children: ReactNode }) {
@@ -43,14 +37,13 @@ function Anchor({ to, className = '', style, children }: { to: string; className
 }
 
 /**
- * The website (Willow.dc.html): intro loader each time the site opens, hero, four ways in, how it works, science,
- * limits, fairness and the privacy footer, with the section rail. `/science` opens at the science section.
+ * The website (Willow.dc.html): intro loader each time the site opens, the hero with its ways in, then the story
+ * (Story.tsx: the problem, how Willow fixes it on Google Cloud, what makes it different, who gains, the culture it
+ * builds), the ways in again and the privacy footer, with the section rail. `/science` opens at the science section.
  */
 export default function Landing() {
-  const { user, loading } = useAuth()
   const { pathname, hash } = useLocation()
   const [introDone, setIntroDone] = useState(false)
-  const returning = !loading && isReturning(user)
 
   // /science and #section links open at their section (under the intro, so the reveal lands there).
   useEffect(() => {
@@ -76,11 +69,12 @@ export default function Landing() {
       {/* One main landmark for the page; the privacy footer stays outside it (contentinfo). */}
       <main>
         <Hero grow={introDone} />
-        <WaysIn returning={returning} />
+        <Problem />
         <How />
-        <ScienceSection className={`${pad} ${railRoom}`} />
-        <Limits />
-        <Fairness />
+        <Unique />
+        <Gains />
+        <Culture />
+        <Try />
       </main>
       <Footer />
     </div>
@@ -179,225 +173,30 @@ function warmJourney() {
   journeyViews().then(warmFirstPhoto, () => undefined)
 }
 
-const wayCard = 'w-lift relative flex h-[380px] flex-col justify-between overflow-hidden rounded-[34px] p-6 text-left no-underline disabled:cursor-default disabled:opacity-100'
-
-function WayText({ tag, title, body }: { tag: string; title: string; body: ReactNode }) {
+/** The story ends where it starts: the ways in, for anyone who scrolled first. */
+function Try() {
+  const app = useOpenApp()
   return (
-    <>
-      <span className="font-mono text-[12px] tracking-[.1em]">■ {tag}</span>
-      <span className="flex flex-col gap-2">
-        <span className="font-serif text-[30px] leading-[1.05]">{title}</span>
-        <span className="text-[14px] leading-[1.4]">{body}</span>
-      </span>
-    </>
-  )
-}
-
-function WaysIn({ returning }: { returning: boolean }) {
-  const navigate = useNavigate()
-  const { continueAsGuest } = useAuth()
-  const own = useEntryActions(FIRST_CHECKIN)
-  const journey = useJourney()
-  const samples = useSamples()
-  const sample = samples.state === 'ready' ? samples.samples[0] : undefined
-  const [sampleState, setSampleState] = useState<'idle' | 'starting' | 'failed'>('idle')
-
-  const runSample = async () => {
-    if (!sample || sampleState === 'starting') return
-    setSampleState('starting')
-    try {
-      // Sample photos are copied into an account of your own, so a guest one is made when needed.
-      await continueAsGuest()
-    } catch {
-      return setSampleState('failed')
-    }
-    leaveDemo()
-    navigate(`/check-in?${new URLSearchParams({ site: sample.site, mode: sample.capture_mode, sample: sample.id })}`)
-  }
-
-  return (
-    <section id="ways" className={`pt-[clamp(56px,8vw,110px)] ${pad} ${railRoom}`}>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
-        <h2 className="m-0 font-serif text-[clamp(36px,4.4vw,60px)] font-normal leading-none tracking-[-0.01em]">Four ways in</h2>
-        <p className="m-0 max-w-[420px] text-[16px] leading-normal text-ink-2">
-          The demo journey follows Mei, a simulated person: generated photos of someone who does not exist, measured by the live engine, read-only. Sample runs go through the real pipeline in a guest account of your own. Only your own capture creates personal results.
-        </p>
-      </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-4">
-        <button
-          type="button"
-          onClick={own.guest}
-          disabled={own.pending !== null}
-          className={`${wayCard} text-white`}
-          style={{ background: 'radial-gradient(70% 50% at 70% 30%, #E7864A 0%, transparent 70%), linear-gradient(160deg, #B5A6A0 0%, #C2622F 45%, #4E1D0E 100%)' }}
-        >
-          <WayText
-            tag="PERSONAL"
-            title={returning ? 'Check in with your own photos' : 'Start my own baseline'}
-            body={own.pending ? 'Starting…' : own.error ? <span role="alert">{own.error}</span> : returning ? 'A face check-in, compared with your own baseline.' : 'Consent, goals, then five photos of one site.'}
-          />
-        </button>
-
-        <button
-          type="button"
-          disabled={journey.state !== 'ready'}
-          onClick={() => navigate('/journey')}
-          onPointerEnter={warmJourney}
-          onFocus={warmJourney}
-          onTouchStart={warmJourney}
-          className={`${wayCard} text-white`}
-          style={{ background: 'radial-gradient(60% 40% at 30% 60%, #9FC2C9 0%, transparent 70%), linear-gradient(200deg, #2F4A2A 0%, #3E6A6E 45%, #15241C 100%)' }}
-        >
-          <WayText
-            tag={journey.state === 'unavailable' ? 'SIMULATED JOURNEY · UNAVAILABLE' : 'SIMULATED JOURNEY · READ-ONLY'}
-            title="Follow Mei’s eight weeks"
-            body={
-              journey.state === 'ready'
-                ? `A simulated person with acne: generated photos, measured by the same engine as yours. ${journeyLine(journey)}.`
-                : journey.state === 'loading'
-                  ? 'Checking the journey…'
-                  : journeyUnavailableLine(journey)
-            }
-          />
-        </button>
-
-        <button
-          type="button"
-          disabled={!sample || sampleState === 'starting'}
-          onClick={() => void runSample()}
-          className={`${wayCard} text-[#2A2410]`}
-          style={{ background: 'radial-gradient(70% 60% at 60% 40%, #FFF3B8 0%, transparent 70%), linear-gradient(150deg, #F3E7A6 0%, #D9B94A 50%, #6E5A12 100%)' }}
-        >
-          <span className="font-mono text-[12px] tracking-[.1em]">■ ACTUAL SAMPLE RUN</span>
-          <span className="flex flex-col gap-2 text-white">
-            <span className="font-serif text-[30px] leading-[1.05]">Run sample photos through the real pipeline</span>
-            <span className="text-[14px] leading-[1.4]">
-              {sampleState === 'starting'
-                ? 'Starting…'
-                : sampleState === 'failed'
-                  ? <span role="alert">Could not start a guest session. Try again.</span>
-                  : sample
-                    ? `Live processing in a guest account of your own. ${sample.title}.`
-                    : samples.state === 'loading'
-                      ? 'Live processing, sample subject.'
-                      : 'Sample photos are not available right now.'}
-            </span>
-          </span>
-        </button>
-
-        <Link
-          to="/judge"
-          className={`${wayCard} text-white hover:text-white`}
-          style={{ background: 'radial-gradient(60% 50% at 50% 20%, #B8B4FF 0%, transparent 70%), linear-gradient(180deg, #5E64D6 0%, #2B2E8C 55%, #0E0F33 100%)' }}
-        >
-          <WayText tag={`JUDGE TOUR · ${JUDGE_STOPS.length} STOPS`} title="Guided tour, guest access" body="Sample run, proof journey, Wisp the assistant, routine scan, retailer insights." />
-        </Link>
-      </div>
-    </section>
-  )
-}
-
-function How() {
-  return (
-    <section id="how" className={`pt-[clamp(72px,10vw,140px)] ${pad} ${railRoom}`}>
-      {/* The design draws no title here; screen readers still get one so the h3 cards sit under a section. */}
-      <h2 className="sr-only">How it works</h2>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-4">
-        <div className="flex flex-col gap-14 rounded-[36px] bg-surface p-8 shadow-[0_30px_60px_-40px_rgba(0,0,0,.25)]">
-          <span className="font-dot text-[64px] font-extrabold leading-none text-ink">01</span>
-          <div>
-            <h3 className="m-0 mb-2.5 text-[26px] font-normal tracking-[-0.02em]">Five photos, one baseline</h3>
-            <p className="m-0 leading-normal text-ink-2">On day one you take five photos, repositioning between each. The spread between them is your personal noise band.</p>
-          </div>
-        </div>
-        <div
-          className="flex flex-col gap-14 rounded-[36px] p-8"
-          style={{ background: 'radial-gradient(80% 70% at 50% 100%, #FFB27A 0%, #FF6B4A 30%, rgba(242,95,168,.55) 60%, #FAFAF8 92%)', boxShadow: 'inset 0 0 40px 8px rgba(255,255,255,.55), 0 30px 60px -40px rgba(255,107,74,.6)' }}
-        >
-          <span className="font-dot text-[64px] font-extrabold leading-none">02</span>
-          <div>
-            <h3 className="m-0 mb-2.5 text-[26px] font-normal tracking-[-0.02em]">Three photos each time after</h3>
-            <p className="m-0 leading-normal">Same light, pose and distance. Later readings are compared with your baseline, not with anyone else.</p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-14 rounded-[36px] bg-selected p-8 text-inverse shadow-[0_30px_60px_-30px_rgba(0,0,0,.5)]">
-          <span className="font-dot text-[64px] font-extrabold leading-none text-lime">03</span>
-          <div>
-            <h3 className="m-0 mb-2.5 text-[26px] font-normal tracking-[-0.02em]">Real change, or normal variation</h3>
-            <p className="m-0 leading-normal text-[#C9C6C0]">A change counts only when it is larger than your noise band in the same capture mode.</p>
-          </div>
-        </div>
-      </div>
-      <MethodCards className="mt-4" />
-    </section>
-  )
-}
-
-const LIMITS = [
-  {
-    tag: 'MEASURED',
-    title: 'Close-up pores and texture, forearm tone and redness',
-    body: 'Marked measured when the photo carries its own reference: the iris sets the scale in a close-up, a white sheet corrects the light beside a RAW forearm photo.',
-  },
-  {
-    tag: 'INDICATIVE',
-    title: 'Face readings, blemish counts, lines, shine and glow',
-    body: 'Faces carry no colour reference, so these are labelled indicative. A change outside your noise band is still reported; the label says how firm it is.',
-  },
-  { tag: 'NOT MEASURED', title: 'Hydration, firmness, UV damage', body: 'A phone photo cannot measure these honestly, so Willow does not try.' },
-  { tag: 'NEVER SHOWN', title: 'Skin age, beauty scores, diagnoses', body: 'Tone is a description, never a score. No condition is ever named.' },
-]
-
-function Limits() {
-  return (
-    <section id="limits" className={`pt-[clamp(72px,10vw,140px)] ${pad} ${railRoom}`}>
-      <h2 className="sr-only">What is measured, and what is not</h2>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-px overflow-hidden rounded-[32px] bg-line">
-        {LIMITS.map((l) => (
-          <div key={l.tag} className="flex min-h-[200px] flex-col gap-3.5 bg-canvas p-7">
-            <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ {l.tag}</span>
-            <span className="text-[22px] font-normal tracking-[-0.01em]">{l.title}</span>
-            <span className="text-[15px] leading-normal text-ink-2">{l.body}</span>
-          </div>
-        ))}
-      </div>
-      <Figures className="mt-4" />
-    </section>
-  )
-}
-
-const EVIDENCE = [
-  { tag: 'IN PLACE', tone: 'bg-lime text-ink', title: 'Tone-relative detection', body: 'Spots, blemishes and redness are found against your own median and spread. No detector uses a fixed lightness cut-off; tone bands only describe tone.' },
-  { tag: 'IN PLACE', tone: 'bg-lime text-ink', title: 'Change only against yourself', body: 'No cross-person ranking. Retail aggregates count change against each person’s own baseline and never rank tone bands.' },
-  { tag: 'NOT CLAIMED', tone: 'bg-selected text-inverse', title: 'Clinical validation', body: 'Willow has not been validated against clinical instruments. What it checks is repeatability, through your own noise band. Readings describe cosmetic appearance only.' },
-]
-
-function Fairness() {
-  return (
-    <section id="fairness" className={`pt-[clamp(72px,10vw,140px)] ${pad} ${railRoom}`}>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-stretch gap-4">
-        <div
-          className="relative flex min-h-[420px] flex-col justify-between gap-10 overflow-hidden rounded-[44px] p-[clamp(26px,4vw,44px)] text-inverse"
-          style={{ background: 'radial-gradient(60% 60% at 30% 20%, #6E5BFF 0%, transparent 70%), radial-gradient(60% 60% at 80% 90%, #F25FA8 0%, transparent 70%), #120C2E' }}
-        >
-          <span className="font-mono text-[12px] tracking-[.08em]">■ SKIN-TONE FAIRNESS</span>
-          <h2 className="m-0 font-serif text-[clamp(36px,4.4vw,58px)] font-normal leading-none">Every threshold is relative to your own skin.</h2>
-          <p className="m-0 max-w-[520px] leading-[1.55] text-[#E7E2FF]">
-            Spot and redness detection compare each region with your own median and spread, never a fixed lightness cut-off. Tone is a description, not a score. Redness is reported as change from you, because it shows differently on deeper skin.
-          </p>
-        </div>
-        <div className="flex flex-col gap-3">
-          {EVIDENCE.map((e) => (
-            <div key={e.title} className="flex flex-1 items-start gap-4 rounded-[30px] bg-surface px-[22px] py-5">
-              <span className={`flex-none whitespace-nowrap rounded-pill px-2.5 py-1.5 font-mono text-[11px] ${e.tone}`}>{e.tag}</span>
-              <span className="flex flex-col gap-1">
-                <span className="text-[17px]">{e.title}</span>
-                <span className="text-[14px] leading-[1.45] text-ink-2">{e.body}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+    <section id="try" className={storySection}>
+      <SectionHead
+        tag="SEE IT FOR YOURSELF"
+        title="Watch it work, then use it."
+        lead={
+          <>
+            Mei is simulated: her photos are generated by Gemini 3 Pro Image and show no real person, and every number is measured from them by the live engine. Both journeys are narrated with Gemini text-to-speech.{' '}
+            <Link to="/judge" className="text-ink">
+              Or take the guided judge tour
+            </Link>
+            .
+          </>
+        }
+      />
+      <nav aria-label="Ways in, again" className="grid gap-3 md:grid-cols-2">
+        <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Her eight weeks, narrated, with the app in between" />
+        <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
+        <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
+        <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
+      </nav>
     </section>
   )
 }
@@ -407,6 +206,7 @@ const FOOTER: { title: string; links: FooterLink[] }[] = [
   {
     title: 'PRODUCT',
     links: [
+      { label: 'The problem', to: 'problem', anchor: true },
       { label: 'How it works', to: 'how', anchor: true },
       { label: 'Science and limits', to: 'science', anchor: true },
       { label: 'Judge tour', to: '/judge' },
@@ -424,14 +224,15 @@ const FOOTER: { title: string; links: FooterLink[] }[] = [
   {
     title: 'FOR BUSINESS',
     links: [
-      { label: 'Fairness approach', to: 'fairness', anchor: true },
+      { label: 'What retailers gain', to: 'gains', anchor: true },
+      { label: 'Fairness approach', to: 'culture', anchor: true },
     ],
   },
 ]
 
 function Footer() {
   return (
-    <footer id="privacy" className={`relative overflow-hidden pt-[clamp(72px,10vw,140px)] ${pad} ${railRoom}`}>
+    <footer id="privacy" className={`relative overflow-hidden ${storySection}`}>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-start gap-8">
         <p className="col-span-full m-0 max-w-[560px] font-serif text-[clamp(28px,3vw,40px)] leading-[1.1] min-[400px]:col-span-2">
           Original photos are deleted 30 days after upload. You can delete everything, any time.

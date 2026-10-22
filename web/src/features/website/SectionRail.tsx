@@ -5,10 +5,10 @@ import { glide, SECTIONS } from './scroll'
 
 /** The four rail groups that cover the landing's sections. */
 const GROUPS: [string, string[]][] = [
-  ['Intro', ['top', 'ways']],
-  ['How it works', ['how']],
-  ['Science', ['science', 'limits']],
-  ['Fairness & privacy', ['fairness', 'privacy']],
+  ['The problem', ['top', 'problem']],
+  ['How it works', ['how', 'science']],
+  ['Who gains', ['gains', 'culture']],
+  ['Try it', ['try', 'privacy']],
 ]
 const LABEL_BG = [
   'radial-gradient(120% 140% at 15% 0%, #FFB27A 0%, transparent 60%), radial-gradient(120% 140% at 100% 100%, #FF8A70 0%, transparent 65%), #FFD9C2',

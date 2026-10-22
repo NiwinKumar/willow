@@ -14,6 +14,7 @@ import { MEI_CHAPTERS, MEI_WEEKS } from './meiSegments'
 import { lineMs, lineShow, useSlideNarration } from './narration'
 import { VoiceToggle } from './VoiceToggle'
 import { BriefPoints, Point } from './value'
+import { PROBLEM_STATS } from './problem'
 
 /**
  * /journey: Mei's eight weeks as a story a judge can sit back and watch, framed by the problem it answers. Mei is
@@ -470,28 +471,6 @@ function SlideHead({ kicker, title, lead }: { kicker: string; title: string; lea
 }
 
 /** Public survey figures behind the problem, each with its source. Drawn to scale: the bar is the share. */
-const PROBLEM_STATS: { group: string; rows: { pct: number; label: string; value?: string; source: string; good?: boolean }[] }[] = [
-  {
-    group: 'Shoppers can’t tell what works',
-    rows: [
-      { pct: 90, label: 'are frustrated finding skincare products that work', source: 'Drive Research, 1,004 women' },
-      { pct: 62, label: 'worry about ineffective results', source: 'Drive Research, 1,004 women' },
-      { pct: 15, label: 'think their wrinkle products work very well', source: 'Drive Research, 1,004 women' },
-    ],
-  },
-  {
-    group: 'So money is wasted',
-    rows: [
-      { pct: 52, label: 'of Gen Z regret overspending on beauty', source: 'LendingTree, US' },
-      { pct: 50, value: '~50%', label: 'have kept unused skincare for over a year', source: 'Consumer Council, Hong Kong' },
-    ],
-  },
-  {
-    group: 'And proof is worth paying for',
-    rows: [{ pct: 85, label: 'would pay more for products with proven efficacy', source: 'Euromonitor, Top Global Consumer Trends 2024', good: true }],
-  },
-]
-
 /** The problem Willow answers, before anyone meets Mei: shoppers can't tell what works; retailers can't see it. */
 function Problem() {
   return (
