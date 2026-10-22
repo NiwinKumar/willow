@@ -11,6 +11,7 @@ import { DEFAULT_FILTERS } from '../retail/state'
 import { int, MIN_GROUP, pct, pts } from '../retail/ui/format'
 import { setWalkthroughs, startSegment, walkthroughsOn } from '../tour/runner'
 import { BRAND, BRAND_SLUG, brandSegments, type BrandChapter } from './brandSegments'
+import { BriefPoints, Worth } from './value'
 
 /**
  * /journey/brand: how a skincare brand uses Proof by Willow, as a story that plays itself (the companion of Mei's
@@ -22,6 +23,8 @@ import { BRAND, BRAND_SLUG, brandSegments, type BrandChapter } from './brandSegm
  */
 
 const SLIDE_MS = 6500
+// The value slide carries more words: longer on screen.
+const READ_MS = 10000
 const FILTERS = DEFAULT_FILTERS
 const PLAYED_KEY = 'willow.brandJourney.played'
 
@@ -32,7 +35,7 @@ type Data = {
   cmp: RetailerProductDetail | null
   segs: RetailerSegments | null
 }
-type Kind = 'intro' | BrandChapter | 'end'
+type Kind = 'intro' | BrandChapter | 'value' | 'end'
 
 /** The product Proof's Overview puts in its spotlight: the Proven one with the highest lower lift bound. */
 function spotlightOf(rows: RetailerProductRow[]): RetailerProductRow | null {
@@ -106,7 +109,9 @@ export default function BrandJourney() {
     }
   }, [])
 
-  const slides: Kind[] = useMemo(() => ['intro', 'proof', ...(data?.cmp ? (['compare'] as const) : []), 'customers', 'ask', 'claims', 'campaign', 'end'], [data])
+  const slides: Kind[] = useMemo(() => ['intro', 'proof', ...(data?.cmp ? (['compare'] as const) : []), 'customers', 'ask', 'sell', 'value', 'end'], [data])
+  const chapters = slides.filter((k): k is BrandChapter => k !== 'intro' && k !== 'value' && k !== 'end')
+  const kicker = (k: BrandChapter, name: string) => `${chapters.indexOf(k) + 1} of ${chapters.length} · ${name}`
   const segments = useMemo(() => (data ? brandSegments({ hero: data.hero.product.product_id, compare: data.cmp?.product.product_id ?? null }) : null), [data])
   const last = slides.length - 1
   const at = Math.min(i, last)
@@ -116,7 +121,7 @@ export default function BrandJourney() {
   const next = useCallback(() => {
     if (at >= last) return
     const kind = slides[at]
-    const seg = kind !== 'intro' && kind !== 'end' ? segments?.[kind] : null
+    const seg = kind !== 'intro' && kind !== 'value' && kind !== 'end' ? segments?.[kind] : null
     if (walk && seg && !readPlayed().includes(seg.id)) {
       writePlayed([...readPlayed(), seg.id])
       startSegment(seg, `/journey/brand?at=${at + 1}`)
@@ -127,9 +132,9 @@ export default function BrandJourney() {
 
   useEffect(() => {
     if (state !== 'ready' || paused || at >= last) return
-    const t = window.setTimeout(next, SLIDE_MS)
+    const t = window.setTimeout(next, slides[at] === 'value' ? READ_MS : SLIDE_MS)
     return () => window.clearTimeout(t)
-  }, [at, paused, state, last, next])
+  }, [at, paused, state, last, next, slides])
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -159,7 +164,7 @@ export default function BrandJourney() {
   }
 
   const kind = slides[at]
-  const hasWalk = walk && kind !== 'intro' && kind !== 'end' && Boolean(segments?.[kind])
+  const hasWalk = walk && kind !== 'intro' && kind !== 'value' && kind !== 'end' && Boolean(segments?.[kind])
 
   return (
     <main
@@ -200,7 +205,7 @@ export default function BrandJourney() {
                 <span
                   key={`${k}-${at}`}
                   className="block h-full origin-left rounded-full bg-ink"
-                  style={k < at ? undefined : k === at && at < last ? { animation: `wFill ${SLIDE_MS}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === at ? undefined : 'scaleX(0)' }}
+                  style={k < at ? undefined : k === at && at < last ? { animation: `wFill ${slides[k] === 'value' ? READ_MS : SLIDE_MS}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === at ? undefined : 'scaleX(0)' }}
                 />
               </button>
             ))}
@@ -221,12 +226,12 @@ export default function BrandJourney() {
         {state === 'ready' && data ? (
           <div key={kind} className="flex w-full flex-col gap-5" style={{ animation: 'wRise .45s both' }}>
             {kind === 'intro' ? <Intro d={data} /> : null}
-            {kind === 'proof' ? <ProofSlide d={data} /> : null}
-            {kind === 'compare' && data.cmp ? <CompareSlide x={data.cmp} d={data} /> : null}
-            {kind === 'customers' ? <CustomersSlide d={data} /> : null}
-            {kind === 'ask' ? <AskSlide /> : null}
-            {kind === 'claims' ? <ClaimsSlide d={data} /> : null}
-            {kind === 'campaign' ? <CampaignSlide d={data} /> : null}
+            {kind === 'proof' ? <ProofSlide d={data} kicker={kicker('proof', 'Overview and product page')} /> : null}
+            {kind === 'compare' && data.cmp ? <CompareSlide x={data.cmp} d={data} kicker={kicker('compare', 'Compare')} /> : null}
+            {kind === 'customers' ? <CustomersSlide d={data} kicker={kicker('customers', 'Customers')} /> : null}
+            {kind === 'ask' ? <AskSlide kicker={kicker('ask', 'Gemini in Proof')} /> : null}
+            {kind === 'sell' ? <SellSlide d={data} kicker={kicker('sell', 'Claims and campaigns')} /> : null}
+            {kind === 'value' ? <ValueSlide /> : null}
             {kind === 'end' ? <End onProof={() => navigate(`/retail?as=brand:${BRAND_SLUG}`)} onMei={() => navigate('/journey')} onApp={openApp} /> : null}
             {hasWalk ? <p className="m-0 text-[13px] text-ink-2">Up next: this step, played live in Proof by Willow.</p> : null}
           </div>
@@ -373,7 +378,7 @@ function Intro({ d }: { d: Data }) {
       <div className="flex flex-col gap-4">
         <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">{BRAND}, with proof</h1>
         <Lead>
-          A skincare brand can say what a product is for. It can’t easily show how often it visibly works, for whom, or how it compares on the shelf. Claims without evidence are hard to trust, and a product bought for the wrong skin often comes back.
+          Retailers and brands see what was bought, never whether it worked. A brand can say what a product is for, but not how often it visibly works, for whom, or how it compares on the shelf. Claims without evidence are hard to trust, and a product bought for the wrong skin often comes back.
         </Lead>
         <Lead>Proof by Willow reads the check-ins people take in the Willow app, each against their own baseline, and shows the brand what changed.</Lead>
         <p className="m-0 max-w-[540px] text-[14px] leading-[1.5] text-ink-2">
@@ -384,13 +389,13 @@ function Intro({ d }: { d: Data }) {
   )
 }
 
-function ProofSlide({ d }: { d: Data }) {
+function ProofSlide({ d, kicker }: { d: Data; kicker: string }) {
   const p = d.hero.product
   const wk = d.brand.cohort.weeks
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="1 · Overview and product page">See what it does</Title>
+        <Title kicker={kicker}>See what it does</Title>
         <div className="flex items-center gap-4">
           <Packshot p={p} size={88} />
           <div className="flex min-w-0 flex-col gap-1">
@@ -403,6 +408,7 @@ function ProofSlide({ d }: { d: Data }) {
         <Lead>
           Proof measures the people who use it against people with the same goals who don’t. The difference is what Proof calls lift; a product is Proven when that lift stays above zero across its interval.
         </Lead>
+        <Worth>Evidence from real routines of what the product does: something to sell on, not a lab claim or a star rating.</Worth>
         <CohortNote d={d} />
       </div>
       <div className="flex flex-col gap-3">
@@ -418,19 +424,20 @@ function ProofSlide({ d }: { d: Data }) {
   )
 }
 
-function CompareSlide({ x, d }: { x: RetailerProductDetail; d: Data }) {
+function CompareSlide({ x, d, kicker }: { x: RetailerProductDetail; d: Data; kicker: string }) {
   const self = x.competitors.rows.find((r) => r.is_self) ?? x.product
   const rival = x.competitors.rows.find((r) => !r.is_self)
   const rows = rival ? [self, rival] : [self]
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="2 · Compare">Compare it fairly</Title>
+        <Title kicker={kicker}>Compare it fairly</Title>
         <Lead>
           {x.competitors.rank ? `${x.product.product} is #${x.competitors.rank} of ${x.competitors.of} ${x.product.category_label.toLowerCase()} on visible change. ` : ''}
           Lift sets each product apart from people who would have changed anyway, so a brand sees where it stands on the same method as everyone else.
         </Lead>
         {x.competitors.note ? <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">{x.competitors.note}</p> : null}
+        <Worth>Where it stands on the shelf, measured the same way as every rival. A retailer sees which products earn their space.</Worth>
         <CohortNote d={d} />
       </div>
       <ul className="m-0 grid list-none gap-2 p-0">
@@ -464,7 +471,7 @@ function CompareSlide({ x, d }: { x: RetailerProductDetail; d: Data }) {
   )
 }
 
-function CustomersSlide({ d }: { d: Data }) {
+function CustomersSlide({ d, kicker }: { d: Data; kicker: string }) {
   const p = d.hero.product
   const skin = d.hero.segments.skin
   const s = d.segs
@@ -477,10 +484,11 @@ function CustomersSlide({ d }: { d: Data }) {
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="3 · Customers">Who it works for</Title>
+        <Title kicker={kicker}>Who it works for</Title>
         <Lead>
           The same product doesn’t work the same for everyone. Proof splits the outcome by skin type and goal, so {BRAND} knows whose routine each product belongs in.
         </Lead>
+        <Worth>Recommend each product where it works, and stop selling it to skin it doesn’t suit: those are the purchases that come back.</Worth>
         {leads.length ? (
           <div className="flex flex-col gap-2">
             <span className="text-[13px] text-ink-2">Groups where a product from {BRAND} is the best pick</span>
@@ -525,14 +533,15 @@ const AI_JOBS: [string, string][] = [
   ['Shelf vs results', 'Flags, for retailers, what to stock up on or rethink'],
 ]
 
-function AskSlide() {
+function AskSlide({ kicker }: { kicker: string }) {
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="4 · Gemini in Proof">An analyst that can’t make things up</Title>
+        <Title kicker={kicker}>An analyst that can’t make things up</Title>
         <Lead>
           Gemini works across Proof: it summarises, recommends, answers questions, drafts claims and sets up campaigns. It never measures anything. It only reads the aggregates Proof already computed, and any number it writes that isn’t in them is rejected before it shows.
         </Lead>
+        <Worth>Answers in seconds without waiting on an analyst, and never a made-up number.</Worth>
         <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">No one person can be looked up: groups under 10 people are hidden, and every answer says which data it used.</p>
       </div>
       <ul className="m-0 grid list-none gap-2 p-0">
@@ -547,59 +556,52 @@ function AskSlide() {
   )
 }
 
-function ClaimsSlide({ d }: { d: Data }) {
+/** Claims and campaigns in one chapter: say what the evidence supports, then promote it only where it works. */
+function SellSlide({ d, kicker }: { d: Data; kicker: string }) {
   const ev = d.hero.evidence
-  const pick = [ev.find((e) => e.id === 'efficacy'), ev.find((e) => e.kind === 'segment'), ev.find((e) => e.kind === 'speed')].filter((e): e is NonNullable<typeof e> => Boolean(e))
-  const shown = (pick.length ? pick : ev).slice(0, 3)
-  const caveat = ev[0]?.caveat ?? d.hero.evidence_caveat ?? null
+  const pick = [ev.find((e) => e.id === 'efficacy'), ev.find((e) => e.kind === 'segment')].filter((e): e is NonNullable<typeof e> => Boolean(e))
+  const shown = (pick.length ? pick : ev).slice(0, 2)
+  const e = d.hero.eligibility
   return (
     <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="5 · Claim drafts">Claims it can stand behind</Title>
-        <Lead>Proof turns the measurements into claim-ready statements, each with its number of people, window and cohort. Gemini drafts copy for a pack, a product page or social only from those statements, and every number is checked before it shows.</Lead>
-        {caveat ? <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">{caveat}</p> : null}
+        <Title kicker={kicker}>Sell it on proof</Title>
+        <Lead>
+          Proof turns the measurements into claim-ready statements, and Gemini drafts pack, product-page and social copy from those statements only, every number checked. Only a Proven product can then be promoted, only to the skin types and goals its evidence covers, with a random holdout so the lift is measured.
+        </Lead>
+        <Worth>Claims it can defend, and promotion spent only where the product works, with the result measured instead of assumed.</Worth>
+        <CohortNote d={d} />
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <span className="text-[13px] text-ink-2">Claim-ready statements for {d.hero.product.product}</span>
         <ul className="m-0 grid list-none gap-2 p-0">
-          {shown.map((e) => (
-            <li key={e.id} className="rounded-[18px] bg-white/80 px-4 py-3 text-[14.5px] leading-[1.45]">
-              {e.text}
+          {shown.map((x) => (
+            <li key={x.id} className="rounded-[18px] bg-white/80 px-4 py-3 text-[14.5px] leading-[1.45]">
+              {x.text}
             </li>
           ))}
         </ul>
-        <CohortNote d={d} />
+        <div className="flex flex-col gap-2 rounded-[20px] bg-white/70 p-4">
+          <span className="text-[13px] text-ink-2">Promoted only to</span>
+          <Chips items={[...e.goals.map(goalLabel), ...e.skin_types.map(skinLabel)]} />
+        </div>
       </div>
     </div>
   )
 }
 
-function CampaignSlide({ d }: { d: Data }) {
-  const e = d.hero.eligibility
+/** What a retailer gains from Proof, against the Retail & Commerce brief. */
+function ValueSlide() {
   return (
-    <div className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
+    <div className="grid w-full items-center gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
-        <Title kicker="6 · Campaigns">Promote it where it’s proven</Title>
+        <Title kicker="What the retailer gains">Outcomes, not just purchases</Title>
         <Lead>
-          Only a Proven product can be promoted in the Willow app, and only to people whose goals and skin type its evidence covers. A randomised holdout never sees the card, so the lift the campaign causes is measured, not assumed.
+          A multi-brand retailer sells every product in a shopper’s routine, so it is the one place that can see what actually works, for whom. Proof gives it that view, from consented check-ins, in aggregate.
         </Lead>
-        {e.reasons[0] ? <p className="m-0 max-w-[540px] text-[13.5px] leading-[1.5] text-ink-2">{e.reasons[0]}</p> : null}
-        <CohortNote d={d} />
+        <Worth label="And for the shopper" shopper>She finds what works for her skin sooner, and stops paying for what doesn’t.</Worth>
       </div>
-      <div className="flex flex-col gap-4 rounded-[20px] bg-white/70 p-4">
-        <div className="flex items-center gap-3">
-          <ProductImage product={{ image_url: d.hero.product.image_url, category: d.hero.product.category, name: d.hero.product.product }} size={44} />
-          <span className="text-[14.5px] leading-[1.3]">{d.hero.product.product}</span>
-        </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] text-ink-2">Goals its evidence covers</span>
-          <Chips items={e.goals.map(goalLabel)} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] text-ink-2">Skin types its evidence covers</span>
-          <Chips items={e.skin_types.map(skinLabel)} />
-        </div>
-      </div>
+      <BriefPoints />
     </div>
   )
 }

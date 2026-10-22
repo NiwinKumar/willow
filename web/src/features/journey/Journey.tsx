@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { journeyViews, warmFirstPhoto } from '../../data/demoSource'
@@ -10,24 +10,78 @@ import { fmtReading, METRIC_META, unitOf } from '../../lib/metrics'
 import { wordsFor, verdictKind } from '../../lib/verdict'
 import { setWalkthroughs, startSegment, walkthroughsOn } from '../tour/runner'
 import { useImageStatus } from '../progress/useImageStatus'
-import { MEI_WEEKS } from './meiSegments'
+import { MEI_CHAPTERS, MEI_WEEKS } from './meiSegments'
+import { BriefPoints, Point } from './value'
 
 /**
- * /journey: Mei's eight weeks as a story a judge can sit back and watch. Mei is simulated (generated photos of no
- * real person); every number on a slide is her real measurement from the live engine, every headline is Gemini's
- * explanation of it and every note is hers, all read from /v1/demo/journey. One slide per face check-in (with the
- * cheek close-up taken the same evening), then where she ended up, then the way into her full app. Between weeks a
- * short walkthrough plays her real demo account (meiSegments.ts, features/tour) and comes back to the next slide
- * (?at=); judges can turn the walkthroughs off.
+ * /journey: Mei's eight weeks as a story a judge can sit back and watch, framed by the problem it answers. Mei is
+ * simulated (generated photos of no real person); every number on a slide is her real measurement from the live
+ * engine, every headline is Gemini's explanation of it and every note is hers, all read from /v1/demo/journey.
+ * The problem first (shoppers can't tell what works, retailers see purchases and not outcomes), then Mei, then five
+ * chapters (weeks 1, 2-3, 4-5, 6-7, 8; MEI_CHAPTERS) that each say what she gains and what her retailer gains,
+ * then the two gains side by side against the brief, then where she ended up. Between chapters a short walkthrough
+ * plays her real demo account (meiSegments.ts, features/tour) and comes back to the next slide (?at=); judges can
+ * turn the walkthroughs off.
  */
 
 const SLIDE_MS = 7000
+// The problem and the two gains carry more words: longer on screen.
+const READ_MS = 12000
 const FACE_IDS: Metric['id'][] = ['blemishes', 'redness', 'pigment_spots', 'shine', 'tone_evenness']
 const CLOSE_IDS: Metric['id'][] = ['pores', 'texture']
 const DAY_MS = 86_400_000
 
 type Week = { face: Session; close: Session | null; week: number }
-type Slide = { kind: 'intro' } | { kind: 'week'; w: Week; i: number } | { kind: 'end' }
+type Chapter = { weeks: Week[]; i: number }
+type Slide = { kind: 'problem' } | { kind: 'intro' } | { kind: 'chapter'; c: Chapter } | { kind: 'mei' } | { kind: 'retail' } | { kind: 'end' }
+
+/** Each chapter: the features Mei used and what each gave her, and what it is worth to the retailer that sold her the products. */
+const CHAPTERS: { title: string; used: [string, string][]; retail: string }[] = [
+  {
+    title: 'Her baseline',
+    used: [
+      ['Guided check-in', 'Three photos by the window and a cheek close-up, each checked for light and framing before it counts.'],
+      ['Personal baseline', 'Every later week is read against her own skin and normal range, never anyone else’s.'],
+      ['Routine list', 'What she uses, from any brand, lined up with her readings from day one.'],
+    ],
+    retail: 'Her goal and her whole routine, across brands. Not just a basket.',
+  },
+  {
+    title: 'Weeks 2–3: a flare, caught',
+    used: [
+      ['Weekly reading', 'Each Sunday’s check-in against her normal range, explained by Gemini from the measured numbers.'],
+      ['Wisp, the adviser', 'Answers “should I stop one?” from her own data, without inventing a number.'],
+      ['Routine check', 'Names the retinol and BHA clash, with a one-tap fix.'],
+    ],
+    retail: 'A clash caught in a week, before she gives up on both products or sends them back.',
+  },
+  {
+    title: 'Weeks 4–5: only fair comparisons',
+    used: [
+      ['Side-by-side compare', 'Her baseline next to this week, same light, same distance.'],
+      ['Routine history', 'The BHA she stopped keeps its dates, so its effect can still be read.'],
+      ['Photo checks', 'A photo that can’t be compared fairly isn’t counted, and Willow says so.'],
+    ],
+    retail: 'Outcome data it can trust: a reading that can’t be compared fairly never counts.',
+  },
+  {
+    title: 'Weeks 6–7: what’s working',
+    used: [
+      ['Is it working?', 'Each product next to the reading it targets, since the day she started it.'],
+      ['Duplicate check', 'Spots three products with niacinamide in one routine.'],
+    ],
+    retail: 'Which product in a mixed-brand routine goes with a visible change: what no single brand can see.',
+  },
+  {
+    title: 'Week 8: keep, stop, save',
+    used: [
+      ['Hold to compare', 'Week 8 against week 1 in one gesture: what clearly changed, and what hasn’t yet.'],
+      ['Wisp, the adviser', 'Tells her whether she needs both niacinamide serums.'],
+      ['Stop a product', 'One less product to rebuy; its history stays for the record.'],
+    ],
+    retail: 'A customer who rebuys what worked for her, and one more measured outcome for Proof.',
+  },
+]
 
 const dayOf = (iso: string) => iso.slice(0, 10)
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -63,13 +117,16 @@ export default function Journey() {
     }
   }, [])
 
-  const slides: Slide[] = useMemo(() => [{ kind: 'intro' }, ...weeks.map((w, k) => ({ kind: 'week' as const, w, i: k })), { kind: 'end' }], [weeks])
+  const slides: Slide[] = useMemo(() => {
+    const chapters = MEI_CHAPTERS.map((c, k) => ({ weeks: c.weeks.map((n) => weeks[n]).filter((w): w is Week => Boolean(w)), i: k })).filter((c) => c.weeks.length)
+    return [{ kind: 'problem' }, { kind: 'intro' }, ...chapters.map((c) => ({ kind: 'chapter' as const, c })), { kind: 'mei' }, { kind: 'retail' }, { kind: 'end' }]
+  }, [weeks])
   const last = slides.length - 1
   const go = (n: number) => setI(Math.max(0, Math.min(last, n)))
-  // Forward from a week slide: that week in the app first (when walkthroughs are on), then the next slide.
+  // Forward from a chapter slide: that chapter in the app first (when walkthroughs are on), then the next slide.
   const forward = (from: number) => {
     const s = slides[from]
-    const seg = s?.kind === 'week' ? MEI_WEEKS[s.i] : undefined
+    const seg = s?.kind === 'chapter' ? MEI_WEEKS[s.c.i] : undefined
     if (walk && seg) startSegment(seg, `/journey?at=${from + 1}`)
     else go(from + 1)
   }
@@ -85,9 +142,9 @@ export default function Journey() {
 
   useEffect(() => {
     if (state !== 'ready' || paused || i >= last) return
-    const t = window.setTimeout(() => forwardRef.current(i), SLIDE_MS)
+    const t = window.setTimeout(() => forwardRef.current(i), msOf(slides[i]))
     return () => window.clearTimeout(t)
-  }, [i, paused, state, last])
+  }, [i, paused, state, last, slides])
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -108,6 +165,7 @@ export default function Journey() {
   }
 
   const slide = slides[i]
+  const nextSlide = slides[i + 1]
   const first = weeks[0]
   const latest = weeks.at(-1)
   const firstShown = useImageStatus(first?.face.preview?.url ?? null) !== 'loading'
@@ -136,7 +194,7 @@ export default function Journey() {
             <span className={`relative h-5 w-9 rounded-full transition-colors ${walk ? 'bg-ink' : 'bg-ink/20'}`} aria-hidden>
               <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] ${walk ? 'left-[18px]' : 'left-0.5'}`} />
             </span>
-            Show her in the app between weeks
+            Show her in the app between chapters
           </button>
           <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 place-items-center rounded-full hover:bg-ink/5">
             <X size={20} strokeWidth={1.6} />
@@ -149,7 +207,7 @@ export default function Journey() {
                 <span
                   key={`${k}-${i}`}
                   className="block h-full origin-left rounded-full bg-ink"
-                  style={k < i ? undefined : k === i && i < last ? { animation: `wFill ${SLIDE_MS}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === i ? undefined : 'scaleX(0)' }}
+                  style={k < i ? undefined : k === i && i < last ? { animation: `wFill ${msOf(slides[k])}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === i ? undefined : 'scaleX(0)' }}
                 />
               </button>
             ))}
@@ -158,7 +216,8 @@ export default function Journey() {
       </header>
 
       <section aria-live="polite" className="mx-auto flex w-full max-w-[1180px] flex-1 items-center px-[clamp(16px,3vw,32px)] py-5">
-        {state === 'loading' ? <IntroSkeleton /> : null}
+        {/* the problem needs no data: it shows at once while her journey loads */}
+        {state === 'loading' ? i === 0 ? <Problem /> : <IntroSkeleton /> : null}
         {state === 'error' ? (
           <div className="m-auto flex flex-col items-center gap-3 text-center">
             <p className="m-0 text-[17px]">Mei’s journey can’t be read right now.</p>
@@ -167,8 +226,11 @@ export default function Journey() {
             </button>
           </div>
         ) : null}
+        {state === 'ready' && slide.kind === 'problem' ? <Problem /> : null}
         {state === 'ready' && slide.kind === 'intro' && first ? <Intro face={first.face} count={weeks.length} closeUps={weeks.filter((w) => w.close).length} /> : null}
-        {state === 'ready' && slide.kind === 'week' ? <WeekSlide w={slide.w} n={slide.i} total={weeks.length} /> : null}
+        {state === 'ready' && slide.kind === 'chapter' ? <ChapterSlide c={slide.c} total={MEI_CHAPTERS.length} /> : null}
+        {state === 'ready' && slide.kind === 'mei' ? <MeiGains count={weeks.length} /> : null}
+        {state === 'ready' && slide.kind === 'retail' ? <RetailGains onBrand={() => navigate('/journey/brand')} /> : null}
         {state === 'ready' && slide.kind === 'end' && first && latest ? <End first={first} latest={latest} onApp={openApp} onBrand={() => navigate('/journey/brand')} onProof={() => navigate('/retail')} onOwn={() => navigate('/welcome')} /> : null}
       </section>
 
@@ -182,7 +244,7 @@ export default function Journey() {
           </button>
           {i < last ? (
             <button type="button" onClick={() => forward(i)} className="flex min-h-11 items-center gap-1 rounded-pill bg-selected px-5 text-inverse">
-              {walk && slide?.kind === 'week' ? `Week ${slide.i + 1} in the app` : 'Next'} <ChevronRight size={18} />
+              {walk && slide?.kind === 'chapter' ? MEI_WEEKS[slide.c.i]?.title ?? 'Next' : 'Next'} <ChevronRight size={18} />
             </button>
           ) : (
             <button type="button" onClick={openApp} className="min-h-11 rounded-pill bg-selected px-5 text-inverse">
@@ -192,10 +254,12 @@ export default function Journey() {
         </footer>
       ) : null}
       {/* the next photos load while this slide plays (after her first photo, so they never slow it down) */}
-      <div hidden>{slides[i + 1]?.kind === 'week' && (i > 0 || firstShown) ? <Prefetch w={(slides[i + 1] as { w: Week }).w} /> : null}</div>
+      <div hidden>{nextSlide?.kind === 'chapter' && (i > 0 || firstShown) ? <Prefetch w={nextSlide.c.weeks.at(-1) as Week} /> : null}</div>
     </main>
   )
 }
+
+const msOf = (s: Slide | undefined) => (s?.kind === 'problem' || s?.kind === 'mei' || s?.kind === 'retail' ? READ_MS : SLIDE_MS)
 
 function Prefetch({ w }: { w: Week }) {
   return (
@@ -270,7 +334,7 @@ function Intro({ face, count, closeUps }: { face: Session; count: number; closeU
           Mei is 26, lives in Singapore and has acne along her cheeks, jaw and chin. She checks in with Willow every Sunday evening: {count} face check-ins and {closeUps} cheek close-ups over eight weeks, while she changes her routine.
         </p>
         <p className="m-0 max-w-[520px] text-[14px] leading-[1.5] text-ink-2">
-          Mei is simulated: her photos are generated and show no real person. Every number in this story was measured from them by Willow’s live engine and explained by Gemini, exactly as for anyone. It plays by itself, about a minute; tap or use the arrow keys to move faster.
+          Mei is simulated: her photos are generated and show no real person. Every number in this story was measured from them by Willow’s live engine and explained by Gemini, exactly as for anyone. Her eight weeks play in five chapters, by themselves; tap or use the arrow keys to move faster.
         </p>
       </div>
     </div>
@@ -303,45 +367,188 @@ function pick(s: Session, ids: Metric['id'][]) {
   return ids.map((id) => s.result?.metrics.find((m) => m.id === id)).filter((m): m is Metric => Boolean(m))
 }
 
-function WeekSlide({ w, n, total }: { w: Week; n: number; total: number }) {
-  const { face, close } = w
-  const sideOn = (face.result?.warnings ?? []).some((x) => x.startsWith('side view'))
+/** What a chapter is worth: each feature Mei used and what it gave her, then what the retailer gains. */
+function Gains({ used, retail }: { used: [string, string][]; retail: string }) {
   return (
-    <div key={face.id} className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
-      <div className="relative">
-        <Photo s={face} label={`Mei's face check-in, ${when(face.created_at)}`} className="max-h-[70dvh]" />
-        {close ? (
-          <div className="absolute right-3 bottom-3 w-[34%] max-w-[180px] rounded-[18px] bg-white p-1 shadow-[0_18px_40px_-20px_rgba(0,0,0,.5)]">
-            <Photo s={close} label={`Mei's cheek close-up, ${when(close.created_at)}`} className="rounded-[14px]" />
-            <span className="block px-1.5 py-1 text-[11px] text-ink-2">Cheek close-up</span>
-          </div>
-        ) : null}
+    <div className="flex flex-col gap-2">
+      <div className="rounded-[18px] bg-[#EEF7E6] px-4 py-3">
+        <span className="text-[12.5px] text-ink-2">What she used, and what it gave her</span>
+        <ul className="m-0 mt-1.5 grid list-none gap-1.5 p-0">
+          {used.map(([f, g]) => (
+            <li key={f} className="grid grid-cols-[minmax(0,9.5em)_minmax(0,1fr)] gap-3 text-[13.5px] leading-[1.4]">
+              <span className="font-medium">{f}</span>
+              <span>{g}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-[13px] text-ink-2">
-            {n + 1} of {total} · {when(face.created_at)}
-          </span>
-          <h2 className="m-0 font-serif text-[clamp(32px,3.6vw,52px)] leading-none font-normal">{face.is_baseline ? 'Her baseline' : `Week ${w.week}`}</h2>
+      <p className="m-0 flex flex-col gap-0.5 rounded-[18px] bg-[#ECEFFB] px-4 py-2.5 text-[13.5px] leading-[1.4]">
+        <span className="text-[12.5px] text-ink-2">For the retailer</span>
+        {retail}
+      </p>
+    </div>
+  )
+}
+
+function ChapterSlide({ c, total }: { c: Chapter; total: number }) {
+  const w = c.weeks.at(-1) as Week
+  const { face, close } = w
+  const copy = CHAPTERS[c.i]
+  const firstDay = c.weeks[0].face.created_at
+  const sideOn = c.weeks.some((x) => (x.face.result?.warnings ?? []).some((m) => m.startsWith('side view')))
+  const note = face.note ?? c.weeks.find((x) => x.face.note)?.face.note
+  return (
+    <div key={face.id} className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.75fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+      <div className="flex flex-col">
+        <div className="relative">
+          <Photo s={face} label={`Mei's face check-in, ${when(face.created_at)}`} className="max-h-[60dvh]" />
+          {close ? (
+            <div className="absolute right-3 bottom-3 w-[34%] max-w-[160px] rounded-[18px] bg-white p-1 shadow-[0_18px_40px_-20px_rgba(0,0,0,.5)]">
+              <Photo s={close} label={`Mei's cheek close-up, ${when(close.created_at)}`} className="rounded-[14px]" />
+              <span className="block px-1.5 py-1 text-[11px] text-ink-2">Cheek close-up</span>
+            </div>
+          ) : null}
         </div>
-        {face.note ? (
-          <blockquote className="m-0 border-l-2 border-ink/20 pl-3.5 text-[clamp(15px,1.3vw,18px)] leading-[1.45] text-pretty">
-            “{face.note}”<span className="mt-1 block text-[12.5px] text-ink-2">Mei’s note</span>
+        {note ? (
+          <blockquote className="m-0 mt-3 border-l-2 border-ink/20 pl-3.5 text-[14px] leading-[1.45] text-pretty">
+            “{note}”<span className="mt-0.5 block text-[12px] text-ink-2">Mei’s note</span>
           </blockquote>
         ) : null}
+      </div>
+      <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-1">
+          <span className="text-[13px] text-ink-2">
+            Chapter {c.i + 1} of {total} · {c.weeks.length > 1 ? `${when(firstDay)} to ${when(face.created_at)}` : when(face.created_at)}
+          </span>
+          <h2 className="m-0 font-serif text-[clamp(30px,3.4vw,48px)] leading-none font-normal text-balance">{copy?.title ?? (face.is_baseline ? 'Her baseline' : `Week ${w.week}`)}</h2>
+        </div>
+        {copy ? <Gains used={copy.used} retail={copy.retail} /> : null}
         {face.explanation?.headline ? (
-          <p className="m-0 rounded-[18px] bg-white/70 px-4 py-3 text-[14.5px] leading-[1.45]">
+          <p className="m-0 rounded-[18px] bg-white/70 px-4 py-3 text-[14px] leading-[1.45]">
             <span className="mb-0.5 block text-[12px] text-ink-2">What Willow read (Gemini, from the measured numbers)</span>
             {face.explanation.headline}
           </p>
         ) : null}
-        {sideOn ? <p className="m-0 text-[13.5px] text-ink-2">Her head was turned this week, so Willow did not compare these readings with her front-on baseline. It says so instead of guessing.</p> : null}
-        <ul className="m-0 grid list-none gap-1.5 p-0 sm:grid-cols-2">
+        {sideOn ? <p className="m-0 text-[13px] text-ink-2">One week her head was turned, so Willow did not compare it with her front-on baseline. It says so instead of guessing.</p> : null}
+        <ul className="m-0 grid list-none gap-1.5 p-0 sm:grid-cols-2 xl:grid-cols-3">
           {[...pick(face, FACE_IDS).map((m) => ({ m, s: face })), ...(close ? pick(close, CLOSE_IDS).map((m) => ({ m, s: close })) : [])].map(({ m, s }) => (
             <Reading key={`${s.id}-${m.id}`} m={m} s={s} />
           ))}
         </ul>
       </div>
+    </div>
+  )
+}
+
+function SlideHead({ kicker, title, lead }: { kicker: string; title: string; lead: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-[13px] text-ink-2">{kicker}</span>
+      <h2 className="m-0 font-serif text-[clamp(34px,4.2vw,60px)] leading-[.98] font-normal text-balance">{title}</h2>
+      <p className="m-0 max-w-[540px] text-[clamp(15px,1.3vw,18px)] leading-[1.5] text-pretty">{lead}</p>
+    </div>
+  )
+}
+
+/** Public survey figures behind the problem, each with its source. Drawn to scale: the bar is the share. */
+const PROBLEM_STATS: { group: string; rows: { pct: number; label: string; value?: string; source: string; good?: boolean }[] }[] = [
+  {
+    group: 'Shoppers can’t tell what works',
+    rows: [
+      { pct: 90, label: 'are frustrated finding skincare products that work', source: 'Drive Research, 1,004 women' },
+      { pct: 62, label: 'worry about ineffective results', source: 'Drive Research, 1,004 women' },
+      { pct: 15, label: 'think their wrinkle products work very well', source: 'Drive Research, 1,004 women' },
+    ],
+  },
+  {
+    group: 'So money is wasted',
+    rows: [
+      { pct: 52, label: 'of Gen Z regret overspending on beauty', source: 'LendingTree, US' },
+      { pct: 50, value: '~50%', label: 'have kept unused skincare for over a year', source: 'Consumer Council, Hong Kong' },
+    ],
+  },
+  {
+    group: 'And proof is worth paying for',
+    rows: [{ pct: 85, label: 'would pay more for products with proven efficacy', source: 'Euromonitor, Top Global Consumer Trends 2024', good: true }],
+  },
+]
+
+/** The problem Willow answers, before anyone meets Mei: shoppers can't tell what works; retailers can't see it. */
+function Problem() {
+  return (
+    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.9fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
+      <div className="flex flex-col gap-5">
+        <SlideHead
+          kicker="The problem"
+          title="Skincare is sold on claims. Nobody sees whether it worked."
+          lead="Willow measures the outcome from ordinary phone photos, then gives it to the shopper and to the retailer that sold the product."
+        />
+        <div className="grid max-w-[540px] grid-cols-2 gap-2">
+          <p className="m-0 flex flex-col gap-0.5 rounded-[18px] bg-white/75 px-4 py-3">
+            <span className="text-[clamp(24px,2.4vw,32px)] leading-none tracking-[-0.02em] tnum">£1 billion+</span>
+            <span className="text-[13px] leading-[1.35] text-ink-2">of unused skincare sits in UK homes (The Body Shop, 2,000 adults)</span>
+          </p>
+          <p className="m-0 flex flex-col gap-0.5 rounded-[18px] bg-[#ECEFFB] px-4 py-3">
+            <span className="text-[15px] leading-[1.3]">Retailers see purchases, never outcomes</span>
+            <span className="text-[13px] leading-[1.35] text-ink-2">Routines mix brands, so no single brand sees what changed. A multi-brand retailer could.</span>
+          </p>
+        </div>
+      </div>
+      <figure className="m-0 flex flex-col gap-4 rounded-[24px] bg-white/70 p-[clamp(16px,2vw,24px)]">
+        {PROBLEM_STATS.map((g) => (
+          <div key={g.group} className="flex flex-col gap-2">
+            <span className="text-[13px] text-ink-2">{g.group}</span>
+            <ul className="m-0 grid list-none gap-2.5 p-0">
+              {g.rows.map((r) => (
+                <li key={r.label} className="grid grid-cols-[3.4em_minmax(0,1fr)] items-baseline gap-x-3">
+                  <span className={`text-[clamp(20px,2vw,26px)] leading-none tracking-[-0.02em] tnum ${r.good ? 'text-[#1F7F45]' : ''}`}>{r.value ?? `${r.pct}%`}</span>
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="text-[14px] leading-[1.35]">{r.label}</span>
+                    <span aria-hidden className="h-1.5 overflow-hidden rounded-full bg-ink/[.07]">
+                      <span className={`block h-full origin-left rounded-full ${r.good ? 'bg-[#1F7F45]' : 'bg-[#C8603A]'}`} style={{ width: `${r.pct}%`, animation: 'wFill .9s cubic-bezier(.2,.7,.2,1) .2s both' }} />
+                    </span>
+                    <span className="text-[11.5px] text-ink-2">{r.source}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </figure>
+    </div>
+  )
+}
+
+/** What eight Sundays gave Mei, from her own data. */
+function MeiGains({ count }: { count: number }) {
+  return (
+    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+      <SlideHead kicker="What the shopper gains" title="Mei knows what works for her skin" lead={`${count} Sunday check-ins with her phone. Instead of guessing, she has answers.`} />
+      <ul className="m-0 grid list-none gap-2 p-0">
+        <Point title="Proof, not a feeling">Each reading against her own baseline and normal range: what clearly changed, and what hasn’t moved yet.</Point>
+        <Point title="Problems caught in a week">A retinol and BHA clash, then a duplicate serum, each with a one-tap fix.</Point>
+        <Point title="Less money wasted">She stopped a product she didn’t need and keeps the ones that go with her change.</Point>
+        <Point title="Advice in her own words">Wisp answers from her measurements and routine, and never invents a number.</Point>
+      </ul>
+    </div>
+  )
+}
+
+/** What the retailer gains, against the four parts of the Retail & Commerce brief. */
+function RetailGains({ onBrand }: { onBrand: () => void }) {
+  return (
+    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+      <div className="flex flex-col gap-4">
+        <SlideHead
+          kicker="What the retailer gains"
+          title="Outcomes, not just purchases"
+          lead="With consent and only in aggregate, check-ins like Mei’s become Proof by Willow: the retailer’s view of what actually works, and for whom."
+        />
+        <button type="button" onClick={onBrand} className="min-h-11 self-start rounded-pill bg-white px-5 text-[14.5px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]">
+          See how a brand uses Proof
+        </button>
+      </div>
+      <BriefPoints />
     </div>
   )
 }
