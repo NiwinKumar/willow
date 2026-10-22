@@ -792,21 +792,21 @@ export function WaitlistField({ fx }: { fx: EventTarget }) {
         glass.splice(0, 4, (box.left - r.left) * dpr, (r.bottom - box.bottom) * dpr, (box.right - r.left) * dpr, (r.bottom - box.top) * dpr)
       }
       // (In the mark's own units the bud's half-width is .47, its middle .36 and its tip .94.)
-      // Where the card sits at the left (a wide screen), the mark fills the height in the space to its right.
-      // Otherwise the bud is bigger than the card: on a mid-width screen its dome rises above the card and its
-      // sides show either side; on a phone it fills the width behind it.
+      // Where the card sits at the left (a wide screen), the mark stands in the space to its right, its tip a little
+      // below the top and its stem running off the bottom. Otherwise the bud is a little bigger than the card: on a
+      // mid-width screen its dome rises above the card and its sides show either side; on a phone it sits behind it.
       shift = 0
       if (calm[0] + calm[2] < -0.15) {
-        scale = Math.min(1.4, 1.62 / 1.16)
-        lift = 0.86 - 0.94 * scale
+        scale = 0.95
+        lift = 0.72 - 0.94 * scale
         shift = Math.min((calm[2] + asp) / 2 + 0.04, asp - 0.1 - 0.47 * scale)
       } else if (asp >= 0.9) {
         const half = calm[2] > 0 && calm[2] < 5 ? calm[2] : 0.5
-        scale = Math.max(0.9, Math.min(1.5, (half * 1.26) / 0.47))
-        lift = 0.86 - 0.94 * scale
+        scale = Math.max(0.72, Math.min(1.1, (half * 0.94) / 0.47))
+        lift = 0.76 - 0.94 * scale
       } else {
-        scale = Math.min(1, (asp * 1.02) / 0.47)
-        lift = 0.12 - 0.36 * scale
+        scale = Math.min(0.8, (asp * 0.82) / 0.47)
+        lift = 0.28 - 0.36 * scale
       }
     }
 
