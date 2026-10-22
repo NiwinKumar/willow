@@ -1,0 +1,453 @@
+{
+ "lines": [
+  {
+   "id": "mei-problem",
+   "take": "mei-slides",
+   "text": "Skincare is sold on claims, and almost nobody can tell whether it worked. Ninety percent of women say finding products that work is frustrating, and only fifteen percent think their wrinkle products work very well. So money is wasted on products that sit unused, and retailers only ever see the purchase, never the outcome. Willow measures that outcome, from ordinary phone photos, for the shopper and for the retailer that sold the product.",
+   "ms": 24785
+  },
+  {
+   "id": "mei-intro",
+   "take": "mei-slides",
+   "text": "Meet Mei. She's twenty-six, lives in Singapore, and has acne along her cheeks, jaw and chin. Mei is simulated: her photos are generated, but every number you'll see was measured from them by Willow's live engine, exactly as it would be for you. Here are her eight Sundays, in five chapters.",
+   "ms": 18523
+  },
+  {
+   "id": "mei-c1",
+   "take": "mei-slides",
+   "text": "Sunday evening, Mei takes three face photos by her window and a cheek close-up. Willow's engine on Cloud Run measures each one with classical computer vision, never with a language model, and this first check-in becomes her baseline. From now on, every reading is compared with her own skin and her own normal range, never with anyone else's. She also lists the products she uses. For her retailer, that's something it never had before: her goal and her whole routine, across brands.",
+   "show": "Sunday evening, Mei takes three face photos by her window and a cheek close-up. Willow's engine on Cloud Run measures each one with classical computer vision, never with a language model, and this first check-in becomes her baseline. From now on, every reading is compared with her own skin and her own normal range, never with anyone else's. She also lists the products she uses.",
+   "ms": 27541
+  },
+  {
+   "id": "mei-c2",
+   "take": "mei-slides",
+   "text": "Week two: she starts a niacinamide serum and a centella cream. Her head was turned in that photo, so Willow doesn't compare it with her front-on baseline, and says so instead of guessing. Week three: she adds a retinol and a BHA, and her chin turns dry and flaky. She asks Wisp, Willow's Gemini adviser, and the routine check flags a retinoid and an acid on the same night. For the retailer, that's a clash caught early, before she gives up on both products or sends them back.",
+   "show": "Week two: she starts a niacinamide serum and a centella cream. Her head was turned in that photo, so Willow doesn't compare it with her front-on baseline, and says so instead of guessing. Week three: she adds a retinol and a BHA, and her chin turns dry and flaky. She asks Wisp, Willow's Gemini adviser, and the routine check flags a retinoid and an acid on the same night.",
+   "ms": 27396
+  },
+  {
+   "id": "mei-c3",
+   "take": "mei-slides",
+   "text": "Week four is her worst in ages: her period, a deadline at work, and little sleep. Her blemish count rises, but it stays inside her own normal range, so Willow doesn't call it a change. On Monday she stops the BHA, after Wisp flagged the clash, and by week five her skin feels calmer. A reading that can't be told apart from everyday noise never counts as a change. That honesty is what makes the outcome data worth trusting.",
+   "show": "Week four is her worst in ages: her period, a deadline at work, and little sleep. Her blemish count rises, but it stays inside her own normal range, so Willow doesn't call it a change. On Monday she stops the BHA, after Wisp flagged the clash, and by week five her skin feels calmer.",
+   "ms": 25144
+  },
+  {
+   "id": "mei-c4",
+   "take": "mei-slides",
+   "text": "Week six brings her first clear change: her blemishes are down, beyond her normal range. The marks from old spots are still there, so in week seven she adds a second niacinamide serum for them. The routine check notices she now has three products with niacinamide, and Is it working lines each product up with the reading it targets. For the retailer, that's the answer no single brand can see: which product in a mixed routine goes with a visible change.",
+   "show": "Week six brings her first clear change: her blemishes are down, beyond her normal range. The marks from old spots are still there, so in week seven she adds a second niacinamide serum for them. The routine check notices she now has three products with niacinamide, and Is it working lines each product up with the reading it targets.",
+   "ms": 26118
+  },
+  {
+   "id": "mei-c5",
+   "take": "mei-slides",
+   "text": "Week eight. Against her baseline, her blemishes are clearly down and her tone is more even, while redness, shine and dark spots are still within her normal range. Her cheek close-up couldn't be measured this time, and Willow says so. She asks Wisp whether she needs both niacinamide serums, and stops one. That's one less product to rebuy, and one more measured outcome for the retailer.",
+   "show": "Week eight. Against her baseline, her blemishes are clearly down and her tone is more even, while redness, shine and dark spots are still within her normal range. Her cheek close-up couldn't be measured this time, and Willow says so. She asks Wisp whether she needs both niacinamide serums, and stops one.",
+   "ms": 22180
+  },
+  {
+   "id": "mei-gains",
+   "take": "mei-slides",
+   "text": "So what did Mei gain? Proof instead of a feeling, with every reading measured against her own baseline. Problems caught in a week, not after a wasted month. Less money spent on products she didn't need. And advice in her own words, from an adviser that never invents a number.",
+   "ms": 16119
+  },
+  {
+   "id": "mei-retail",
+   "take": "mei-slides",
+   "text": "And what does the retailer gain? Outcomes, not just purchases. With consent, and only in aggregate, check-ins like Mei's show what visibly works for each skin type and goal, across every brand on the shelf. That's how a retailer understands its customers, engages them, serves them better, and runs more efficiently, by stocking and promoting what's proven. That view is Proof by Willow.",
+   "ms": 23857
+  },
+  {
+   "id": "mei-end",
+   "take": "mei-slides",
+   "text": "Eight weeks later, here's Mei, measured against her own baseline. Open her account to explore the app yourself, open Proof by Willow for the retailer's side, or start your own baseline.",
+   "ms": 10335
+  },
+  {
+   "id": "mei-c1-checkin",
+   "take": "mei-steps",
+   "text": "Sunday evening, her first check-in: three face photos by the window and a cheek close-up. Each is checked on her phone, then measured by the engine on Cloud Run.",
+   "ms": 11322
+  },
+  {
+   "id": "mei-c1-baseline",
+   "take": "mei-steps",
+   "text": "It becomes her baseline. Every later week is compared with her own skin, never with anyone else's.",
+   "ms": 7846
+  },
+  {
+   "id": "mei-c1-routine",
+   "take": "mei-steps",
+   "text": "She lists what she uses, from any brand. Willow now knows what she's trying, not only what she bought.",
+   "ms": 6759
+  },
+  {
+   "id": "mei-c2-checkin",
+   "take": "mei-steps",
+   "text": "Week three. She started a retinol and a BHA on Tuesday, and her chin feels dry and flaky.",
+   "ms": 7095
+  },
+  {
+   "id": "mei-c2-blemishes",
+   "take": "mei-steps",
+   "text": "Her blemishes are still within her normal range, but she wants advice before it gets worse.",
+   "ms": 6314
+  },
+  {
+   "id": "wisp-open",
+   "take": "mei-steps",
+   "text": "She opens Wisp, Willow's adviser.",
+   "ms": 3595
+  },
+  {
+   "id": "wisp-type",
+   "take": "mei-steps",
+   "text": "She asks in her own words.",
+   "ms": 2682
+  },
+  {
+   "id": "mei-c2-answer",
+   "take": "mei-steps",
+   "text": "Wisp is Gemini on Vertex AI. It calls tools to read her measurements, her routine and the product catalog, and it may only quote numbers already in her data.",
+   "ms": 11294
+  },
+  {
+   "id": "wisp-close",
+   "take": "mei-steps",
+   "text": "She acts on the answer.",
+   "ms": 2180
+  },
+  {
+   "id": "mei-c2-clash",
+   "take": "mei-steps",
+   "text": "The routine check agrees: a retinoid and an acid on the same night, with a one-tap fix to alternate them.",
+   "ms": 7710
+  },
+  {
+   "id": "mei-c3-checkin",
+   "take": "mei-steps",
+   "text": "Week five. She stopped the BHA on Monday, and her skin feels calmer.",
+   "ms": 5589
+  },
+  {
+   "id": "mei-c3-compare",
+   "take": "mei-steps",
+   "text": "Compare puts her baseline next to this week, side by side.",
+   "ms": 4305
+  },
+  {
+   "id": "mei-c3-fair",
+   "take": "mei-steps",
+   "text": "Same window, same light, same distance: that's what makes the comparison fair.",
+   "ms": 5760
+  },
+  {
+   "id": "mei-c3-history",
+   "take": "mei-steps",
+   "text": "History keeps the BHA she stopped, with its dates, so its effect can still be read.",
+   "ms": 6003
+  },
+  {
+   "id": "mei-c3-back",
+   "take": "mei-steps",
+   "text": "Back to her routine.",
+   "ms": 1746
+  },
+  {
+   "id": "mei-c4-checkin",
+   "take": "mei-steps",
+   "text": "Week seven. She added a second niacinamide serum on Monday, for the marks.",
+   "ms": 5505
+  },
+  {
+   "id": "mei-c4-duplicate",
+   "take": "mei-steps",
+   "text": "The routine check notices three products with niacinamide in one routine.",
+   "ms": 5750
+  },
+  {
+   "id": "mei-c4-working",
+   "take": "mei-steps",
+   "text": "Is it working? Each product sits next to the reading it targets, since the day she started it. An association, never proof of cause.",
+   "ms": 10208
+  },
+  {
+   "id": "mei-c5-checkin",
+   "take": "mei-steps",
+   "text": "Week eight, her latest check-in.",
+   "ms": 2962
+  },
+  {
+   "id": "mei-c5-compare",
+   "take": "mei-steps",
+   "text": "Eight weeks on, she compares with week one.",
+   "ms": 3207
+  },
+  {
+   "id": "mei-c5-hold",
+   "take": "mei-steps",
+   "text": "She holds the photo, and her baseline flickers over this week's, in the same framing. The quickest way to see a change.",
+   "ms": 8508
+  },
+  {
+   "id": "mei-c5-letgo",
+   "take": "mei-steps",
+   "text": "She lets go: back to this week.",
+   "ms": 2926
+  },
+  {
+   "id": "mei-c5-answer",
+   "take": "mei-steps",
+   "text": "Wisp answers from her routine and the catalog, checked against her data.",
+   "ms": 5364
+  },
+  {
+   "id": "mei-c5-serum",
+   "take": "mei-steps",
+   "text": "She opens the serum she doubles up on…",
+   "ms": 3051
+  },
+  {
+   "id": "mei-c5-stop",
+   "take": "mei-steps",
+   "text": "…and stops it. One less product to rebuy, and it keeps its dates under Stopped.",
+   "ms": 6193
+  },
+  {
+   "id": "brand-intro",
+   "take": "brand-slides",
+   "text": "This is the other side of Willow: Proof, for brands and retailers. Today, a brand can say what a product is for, but not how often it visibly works, for whom, or how it compares on the shelf. Proof reads the check-ins people take in Willow, each against their own baseline, and shows what changed. The brand here is real, The Derma Co. The people are Willow's synthetic cohort, clearly labelled as simulated.",
+   "ms": 26883
+  },
+  {
+   "id": "brand-proof",
+   "take": "brand-slides",
+   "text": "Chapter one: see what it does. Proof compares people who use a product with people who share their goals but don't use it. The difference is lift, and a product is Proven only when that lift stays above zero across its whole interval. That's evidence from real routines, not a lab claim or a star rating.",
+   "ms": 19791
+  },
+  {
+   "id": "brand-compare",
+   "take": "brand-slides",
+   "text": "Chapter two: compare it fairly. Each product is ranked against others in its category that share a goal, all measured the same way. A brand sees exactly where it stands, and a retailer sees which products earn their place on the shelf.",
+   "ms": 15496
+  },
+  {
+   "id": "brand-customers",
+   "take": "brand-slides",
+   "text": "Chapter three: who it works for. The same product doesn't work the same for everyone, so Proof splits every outcome by skin type and goal. A retailer can recommend each product where it works, and stop selling it to skin it doesn't suit, which is where returns come from.",
+   "ms": 15803
+  },
+  {
+   "id": "brand-ask",
+   "take": "brand-slides",
+   "text": "Chapter four: an analyst that can't make things up. Gemini on Vertex AI works across Proof: it summarises, recommends, answers questions, drafts claims and sets up campaigns. It never measures. It only reads the aggregates Proof has already computed in BigQuery, and any number it writes that isn't in them is rejected before anyone sees it.",
+   "ms": 23197
+  },
+  {
+   "id": "brand-sell",
+   "take": "brand-slides",
+   "text": "Chapter five: sell it on proof. Proof turns the measurements into claim-ready statements, and Gemini drafts copy from those statements only. Then only a Proven product can be promoted, only to the skin types and goals its evidence covers, and a random holdout never sees the card, so the lift a campaign causes is measured, not assumed.",
+   "ms": 20937
+  },
+  {
+   "id": "brand-value",
+   "take": "brand-slides",
+   "text": "So what does a retailer gain? It sells every product in a shopper's routine, so it's the one place that can see what actually works. Proof turns that into understanding customers, engaging them, serving them better, and running more efficiently, by stocking and promoting what's proven. And the shopper finds what works for her skin sooner.",
+   "ms": 20700
+  },
+  {
+   "id": "brand-end",
+   "take": "brand-slides",
+   "text": "Measured in people's routines, proven against people who don't use it, claimed in words the evidence supports, and promoted only where it works. Open Proof by Willow to explore it yourself.",
+   "ms": 11779
+  },
+  {
+   "id": "b-proof-open",
+   "take": "brand-steps",
+   "text": "Proof opens on The Derma Co's workspace, with its strongest proof first.",
+   "ms": 5730
+  },
+  {
+   "id": "b-proof-brief",
+   "take": "brand-steps",
+   "text": "This week's brief: what moved in its data, summarised by Gemini. Every number is checked against the cards.",
+   "ms": 7763
+  },
+  {
+   "id": "b-proof-view",
+   "take": "brand-steps",
+   "text": "View proof opens what was measured for this product.",
+   "ms": 3638
+  },
+  {
+   "id": "b-proof-facts",
+   "take": "brand-steps",
+   "text": "Visible change in its users, beside people with the same goals who don't use it.",
+   "ms": 5268
+  },
+  {
+   "id": "b-proof-journey",
+   "take": "brand-steps",
+   "text": "Every user, from trying it to week eight, read from their own check-ins.",
+   "ms": 4397
+  },
+  {
+   "id": "b-proof-next",
+   "take": "brand-steps",
+   "text": "Next steps: Gemini picks what to do next from what the data supports. Each one opens where it's done.",
+   "ms": 8786
+  },
+  {
+   "id": "b-cmp-rank",
+   "take": "brand-steps",
+   "text": "Each product is ranked against others in its category that share a goal.",
+   "ms": 4127
+  },
+  {
+   "id": "b-cmp-open",
+   "take": "brand-steps",
+   "text": "Compare puts it side by side with the highest-ranked other product.",
+   "ms": 4539
+  },
+  {
+   "id": "b-cmp-same",
+   "take": "brand-steps",
+   "text": "The same figures for both, measured the same way.",
+   "ms": 4849
+  },
+  {
+   "id": "b-cmp-curve",
+   "take": "brand-steps",
+   "text": "And when the lasting change began, week by week.",
+   "ms": 3313
+  },
+  {
+   "id": "b-cust-map",
+   "take": "brand-steps",
+   "text": "Customers maps every skin type against the goal people chose.",
+   "ms": 4935
+  },
+  {
+   "id": "b-cust-best",
+   "take": "brand-steps",
+   "text": "Switch to the best product for each group.",
+   "ms": 3749
+  },
+  {
+   "id": "b-cust-open",
+   "take": "brand-steps",
+   "text": "Open a group where The Derma Co leads.",
+   "ms": 2694
+  },
+  {
+   "id": "b-cust-detail",
+   "take": "brand-steps",
+   "text": "The leader, the runner-up, and the brand's other products for this goal.",
+   "ms": 4439
+  },
+  {
+   "id": "b-ask-open",
+   "take": "brand-steps",
+   "text": "Ask anything: a question in plain words, about the same data on screen.",
+   "ms": 6446
+  },
+  {
+   "id": "b-ask-answer",
+   "take": "brand-steps",
+   "text": "Gemini answers from the aggregates only. Any number it writes that isn't in them is rejected, and no one person can ever be looked up.",
+   "ms": 9570
+  },
+  {
+   "id": "b-ask-chart",
+   "take": "brand-steps",
+   "text": "The answer, a chart drawn from the same numbers, and follow-up questions.",
+   "ms": 5378
+  },
+  {
+   "id": "b-ask-back",
+   "take": "brand-steps",
+   "text": "Back to the workspace.",
+   "ms": 2021
+  },
+  {
+   "id": "b-claims-list",
+   "take": "brand-steps",
+   "text": "Claim-ready statements, each with its number of people, its time window and its cohort.",
+   "ms": 6176
+  },
+  {
+   "id": "b-claims-draft",
+   "take": "brand-steps",
+   "text": "Gemini drafts pack, product-page and social copy from those statements only. Every number is checked before it shows.",
+   "ms": 9399
+  },
+  {
+   "id": "b-claims-cite",
+   "take": "brand-steps",
+   "text": "Each draft names the statements it rests on.",
+   "ms": 3528
+  },
+  {
+   "id": "b-camp-start",
+   "take": "brand-steps",
+   "text": "Only a Proven product can be promoted, so a campaign starts from its proof.",
+   "ms": 4961
+  },
+  {
+   "id": "b-camp-audience",
+   "take": "brand-steps",
+   "text": "The audience is only the goals and skin types its evidence covers.",
+   "ms": 5073
+  },
+  {
+   "id": "b-camp-holdout",
+   "take": "brand-steps",
+   "text": "A random holdout never sees the card, so the lift can be measured.",
+   "ms": 3908
+  },
+  {
+   "id": "b-camp-card",
+   "take": "brand-steps",
+   "text": "This is the card a matching shopper sees in the Willow app. Nothing is launched here.",
+   "ms": 5879
+  },
+  {
+   "id": "b-camp-or",
+   "take": "brand-steps",
+   "text": "Or let Proof promote for you.",
+   "ms": 2326
+  },
+  {
+   "id": "b-auto-new",
+   "take": "brand-steps",
+   "text": "AutoCampaign: rules that promote a product the moment its proof allows.",
+   "ms": 5231
+  },
+  {
+   "id": "b-auto-type",
+   "take": "brand-steps",
+   "text": "A rule, written in plain words.",
+   "ms": 2571
+  },
+  {
+   "id": "b-auto-read",
+   "take": "brand-steps",
+   "text": "Gemini reads the words into a rule, and the form checks it against the guardrails.",
+   "ms": 4762
+  },
+  {
+   "id": "b-auto-reads",
+   "take": "brand-steps",
+   "text": "The rule it read: which proof triggers it, who sees the card, and for how long. Nothing is saved here.",
+   "ms": 7517
+  },
+  {
+   "id": "b-auto-end",
+   "take": "brand-steps",
+   "text": "Measured, proven, claimed and promoted: with AI at each step, and every number checked.",
+   "ms": 7271
+  }
+ ]
+}
