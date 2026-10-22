@@ -5,8 +5,8 @@ import { glide, SECTIONS } from './scroll'
 
 /** The four rail groups that cover the landing's sections. */
 const GROUPS: [string, string[]][] = [
-  ['Who gains', ['top', 'gains']],
-  ['The problem', ['problem']],
+  ['The problem', ['top', 'problem']],
+  ['Who gains', ['gains']],
   ['How it works', ['how', 'science']],
   ['Culture & try it', ['culture', 'try', 'privacy']],
 ]

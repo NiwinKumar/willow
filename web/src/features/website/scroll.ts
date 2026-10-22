@@ -1,7 +1,7 @@
 /** Landing scroll behaviour from the design: a quintic glide to a section, and sections that rise into view. */
 
 /** Landing sections in page order (the rail, the reveal and #links use these ids). */
-export const SECTIONS = ['top', 'gains', 'problem', 'how', 'science', 'culture', 'try', 'privacy'] as const
+export const SECTIONS = ['top', 'problem', 'gains', 'how', 'science', 'culture', 'try', 'privacy'] as const
 
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
