@@ -16,7 +16,7 @@ export const BRAND = 'The Derma Co'
 export const BRAND_SLUG = slugOf(BRAND)
 const AS = `as=brand:${BRAND_SLUG}`
 
-export type BrandChapter = 'proof' | 'compare' | 'customers' | 'ask' | 'claims' | 'campaign'
+export type BrandChapter = 'proof' | 'compare' | 'customers' | 'ask' | 'sell'
 
 /** The product the story is about (the Overview spotlight) and the one with a category rival to compare. */
 export type BrandIds = { hero: string; compare: string | null }
@@ -84,19 +84,14 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
         { action: 'escape', caption: 'Back to the workspace.', hold: 800 },
       ],
     },
-    claims: {
-      id: 'brand-claims',
-      title: 'Proof by Willow · claims',
+    sell: {
+      id: 'brand-sell',
+      title: 'Proof by Willow · claims and campaigns',
       steps: [
         { route: product(ids.hero), target: 'css:#ev-h', action: 'point', caption: 'Claim-ready statements, each with its number of people, its window and its cohort.', hold: 2400 },
         { target: 'css:section[aria-labelledby="claims-h"] button:not([role="radio"])', action: 'click', caption: 'Gemini drafts copy from those statements only. Every number is checked before it shows.', until: claimsDone, wait: 60_000, hold: 1500 },
         { target: 'css:#claims-h', action: 'point', caption: 'Each draft names the statements it rests on.', hold: 2600 },
-      ],
-    },
-    campaign: {
-      id: 'brand-campaign',
-      title: 'Proof by Willow · campaign',
-      steps: [
+
         { route: `/retail/campaigns?${AS}&new=${encodeURIComponent(ids.hero)}`, target: 'css:#proof-new-campaign', action: 'point', caption: 'Only a Proven product can be promoted, so the campaign starts from its proof.', hold: 2000 },
         { target: 'text:Matching profiles', action: 'point', caption: 'The audience is only the goals and skin types its evidence covers.', hold: 2400 },
         { target: 'text:Randomised holdout', action: 'point', caption: 'A random holdout never sees the card, so the lift can be measured.', hold: 2400 },
