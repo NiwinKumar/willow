@@ -7,7 +7,7 @@ import { MEASURES } from './measures'
 import { MethodCards } from './Method'
 
 /**
- * The landing's story below the hero: who gains, the problem (with public figures), how Willow fixes it step by step
+ * The landing's story below the hero: the problem (with public figures), who gains, how Willow fixes it step by step
  * and the Google Cloud service behind each step, what makes it different, and the culture it builds.
  */
 
