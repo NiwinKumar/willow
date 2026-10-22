@@ -9,8 +9,8 @@ import { useEffect, useRef, useState } from 'react'
  *   2. per pixel, draw that cell's glyph from an atlas, with a small RGB split, a CRT halo from the cell
  *      texture's mipmaps, scanlines and a vignette.
  * It moves on its own (spin, scrolling words, orbits, scan). The pointer is a light and a soft lens, the bud leans
- * toward it, and moving it leaves a comet tail and, every so often, a word that types itself on, floats up and
- * fades. A click drops a stone in water: a splash, then a ring of words (the next line of a small week-1-to-week-8
+ * toward it, and moving it uncovers what lies under the night: a page of Willow lines, still and aligned to the
+ * grid, shows along the pointer's path and closes again behind it. A click drops a stone in water: a splash, then a ring of words (the next line of a small week-1-to-week-8
  * story) with softer crests following it, bending the field as they pass. The waves take turns: a circle, a star,
  * a heart.
  * A click on the bud also makes it open its petals for a breath. A drag spins the mark. The form talks to it
@@ -56,11 +56,10 @@ const RIPPLE_FIRST = 16
 const RIPPLES = 6
 const HEART = RIPPLE_FIRST + RIPPLES
 const STAR = HEART + 1
-// the words the pointer leaves behind as it moves, one every WORD_EVERY css px of travel
-const WORDS = ['willow', 'baseline', 'same light', 'glow', 'week 1', 'barrier', 'calm', 'real change', 'texture', 'your skin', 'hydration', 'week 8', 'measured', 'even']
-const WORD_EVERY = 110
-const MAX_TRAIL = 64
-const MAX_TAIL = 28
+// the pointer's path, a point every TAIL_EVERY css px, each uncovering the page under the night for TAIL_LIFE s
+const TAIL_EVERY = 18
+const TAIL_LIFE = 0.9
+const MAX_TAIL = 48
 const MAX_RIPPLE = 4
 const TEXT_W = 256
 
@@ -83,8 +82,7 @@ uniform float uShift;     // the mark's centre, sideways (q units)
 uniform vec3 uLight;
 uniform vec3 uPtr;       // q.x, q.y, on (0..1)
 uniform vec3 uShatter;   // q.x, q.y, amount (the opening assembly)
-uniform vec4 uTrail[${MAX_TRAIL}];  // letters of the words the pointer left: q.x, q.y, age, glyph (age < 0 = none)
-uniform vec4 uTail[${MAX_TAIL}];    // the comet tail behind the pointer: q.x, q.y, age
+uniform vec4 uTail[${MAX_TAIL}];    // the pointer's path, oldest first: q.x, q.y, age (< 0 = none), 1 = a stroke starts here
 uniform vec4 uRipple[${MAX_RIPPLE}]; // click rings: q.x, q.y, age, text line
 uniform vec3 uBurst;     // joining: where the light bursts from (q), and its age (< 0 = not yet)
 uniform float uPulse[6]; // age of each keystroke pulse (s), <0 = none
@@ -347,6 +345,8 @@ void main(){
     }
   }
 
+  float solid = g;          // the mark or a ring is here (the path brightens it rather than uncovering)
+
   // --- the night behind
   if (g < .5){
     // stars on two layers that drift against the pointer
@@ -370,6 +370,32 @@ void main(){
         float c = glyphAt(mod(row, 12.), floor(x));
         if (c > .5){ g = c; col = SKY * .55 * smoothstep(.78, .95, win); }
       }
+    }
+  }
+
+  // the pointer's path uncovers a page of Willow lines lying still under the night, one line per row, and it closes
+  // again behind: white where the pointer is, cooling to gold, pink and lilac as it fades. Over the mark the path
+  // only brightens what is there.
+  float rv = 0., ra = 0.;
+  for (int i = 0; i < ${MAX_TAIL}; i++){
+    vec4 a = uTail[i];
+    if (a.z < 0. || a.z > ${TAIL_LIFE.toFixed(2)}) continue;
+    vec4 b = i > 0 ? uTail[i - 1] : a;           // the point before it on the path
+    if (b.z < 0. || a.w > .5) b = a;
+    vec2 pa = q - a.xy, ba = b.xy - a.xy;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0., 1.);
+    float age = mix(a.z, b.z, h);
+    float r = cellU.y * (.8 - .35 * age / ${TAIL_LIFE.toFixed(2)});
+    float k = smoothstep(r, r * .3, length(pa - ba * h)) * (1. - smoothstep(${(TAIL_LIFE * 0.4).toFixed(2)}, ${TAIL_LIFE.toFixed(2)}, age));
+    if (k > rv){ rv = k; ra = age / ${TAIL_LIFE.toFixed(2)}; }
+  }
+  if (rv > .02){
+    vec3 warm = mix(vec3(1.), mix(GOLD, mix(PINK, LILAC, smoothstep(.45, .9, ra)), smoothstep(.15, .45, ra)), smoothstep(0., .2, ra));
+    if (solid > .5) col = mix(col, warm * 1.3, rv * .55);
+    else {
+      float c = glyphAt(mod(row * 5., 12.), cell.x + floor(h21(vec2(row, 3.)) * 200.));
+      if (c > .5){ g = c; col = warm * rv * 1.25; }
+      else if (g > .5) col *= 1. - rv;            // a star in a gap between words steps aside
     }
   }
 
@@ -439,25 +465,6 @@ void main(){
     }
     g = c > .5 ? c : float(${gi('~')});
     col = mix(vec3(1.), tint, smoothstep(.3, 1.6, rp.z)) * fade * (c > .5 ? 1.6 : shaped ? 1.3 : .9);
-  }
-  // the comet tail: sparks along the pointer's path, white at the head, cooling to pink and lilac
-  for (int i = 0; i < ${MAX_TAIL}; i++){
-    vec4 tp = uTail[i];
-    if (tp.z < 0. || tp.z > .7) continue;
-    if (floor((tp.xy * uView.y * .5 + uView * .5) / uCell) != cell) continue;
-    float a = tp.z / .7;
-    g = a < .15 ? float(${gi('*')}) : a < .4 ? float(${gi('+')}) : a < .7 ? float(${gi('·')}) : float(${gi('.')});
-    col = mix(vec3(1.), mix(PINK, LILAC, a), smoothstep(0., .3, a)) * (1. - a * a) * 1.2;
-  }
-  // words the pointer left: each types itself on, floats up, cools from white to its hue and fades
-  for (int i = 0; i < ${MAX_TRAIL}; i++){
-    vec4 tp = uTrail[i];
-    if (tp.z < 0.) continue;
-    vec2 p = tp.xy + vec2(0., tp.z * .045);
-    if (floor((p * uView.y * .5 + uView * .5) / uCell) != cell) continue;
-    float f = 1. - smoothstep(1., 2.4, tp.z);
-    g = tp.z < .06 ? float(${gi('#')}) : tp.w;
-    col = mix(vec3(1.), mix(GOLD, PINK, h21(floor(tp.xy * 9.))), smoothstep(.05, .6, tp.z)) * f * 1.25;
   }
   // joining: sparks burst from the button, fast then drifting down as they fade
   if (uBurst.z >= 0. && uBurst.z < 1.8){
@@ -733,16 +740,12 @@ export function WaitlistField({ fx }: { fx: EventTarget }) {
       burst: [0, 0] as number[],
       breathAt: -9,
       lean: 0,
-      trail: [] as { x: number; y: number; t: number; g: number }[],
-      tail: [] as { x: number; y: number; t: number }[],
-      travel: 0,
+      tail: [] as { x: number; y: number; t: number; start: boolean }[],
       ripples: [] as { x: number; y: number; t: number; line: number }[],
       told: 0,
       clicks: 0,
-      wrote: 0,
       pen: null as null | { x: number; y: number },
     }
-    const trailA = new Float32Array(MAX_TRAIL * 4)
     const tailA = new Float32Array(MAX_TAIL * 4)
     const rippleA = new Float32Array(MAX_RIPPLE * 4)
     const pulses = new Float32Array(6)
@@ -820,8 +823,7 @@ export function WaitlistField({ fx }: { fx: EventTarget }) {
       if (!ptr.down) st.spin += (0.32 - st.spin) * Math.min(1, dt * 1.4)
       st.yaw += st.spin * dt
       st.lean += ((ptr.down ? st.lean : ptr.on * toQ(ptr.x, ptr.y)[0] * 0.35) - st.lean) * Math.min(1, dt * 2)
-      while (st.trail.length && t - st.trail[0].t > 2.6) st.trail.shift()
-      while (st.tail.length && t - st.tail[0].t > 0.7) st.tail.shift()
+      while (st.tail.length && t - st.tail[0].t > TAIL_LIFE) st.tail.shift()
       while (st.ripples.length && t - st.ripples[0].t > 3.4) st.ripples.shift()
       const [qx, qy] = toQ(ptr.x, ptr.y)
       st.pitch += ((ptr.on * -qy * 0.3) - st.pitch) * Math.min(1, dt * 2)
@@ -858,11 +860,8 @@ export function WaitlistField({ fx }: { fx: EventTarget }) {
       gl!.uniform1f(u('uGlitch'), Math.max(0, 1 - (t - st.glitchAt) / 0.7) ** 1.5)
       const breath = t - st.breathAt < 1.8 ? Math.sin(((t - st.breathAt) / 1.8) * Math.PI) * 0.42 : 0
       gl!.uniform1f(u('uBloom'), Math.min(1, st.bloom + breath))
-      trailA.fill(-1)
-      st.trail.forEach((p, i) => trailA.set([p.x, p.y, t - p.t, p.g], i * 4))
-      gl!.uniform4fv(u('uTrail'), trailA)
       tailA.fill(-1)
-      st.tail.forEach((p, i) => tailA.set([p.x, p.y, t - p.t, 0], i * 4))
+      st.tail.forEach((p, i) => tailA.set([p.x, p.y, t - p.t, p.start ? 1 : 0], i * 4))
       gl!.uniform4fv(u('uTail'), tailA)
       rippleA.fill(-1)
       st.ripples.forEach((r, i) => rippleA.set([r.x, r.y, t - r.t, r.line], i * 4))
@@ -941,37 +940,14 @@ export function WaitlistField({ fx }: { fx: EventTarget }) {
       }
     }
 
-    // the pen: a spark every cell along the pointer's path, and a word every WORD_EVERY px of travel, written
-    // level and centred just above the pointer, its letters a beat apart so it types itself on
+    // the pen: a point every TAIL_EVERY px along the pointer's path; a jump starts a new stroke
     const write = (x: number, y: number) => {
-      const cw = cellD[0] / dpr
-      if (!st.pen || Math.hypot(x - st.pen.x, y - st.pen.y) > 220) {
+      const fresh = !st.pen || Math.hypot(x - st.pen.x, y - st.pen.y) > 220
+      if (fresh || Math.hypot(x - st.pen!.x, y - st.pen!.y) >= TAIL_EVERY) {
         st.pen = { x, y }
-        return
-      }
-      let dx = x - st.pen.x
-      let dy = y - st.pen.y
-      let dist = Math.hypot(dx, dy)
-      while (dist >= cw) {
-        st.pen.x += (dx / dist) * cw
-        st.pen.y += (dy / dist) * cw
-        const [qx, qy] = toQ(st.pen.x, st.pen.y)
-        st.tail.push({ x: qx, y: qy, t: st.t })
+        const [qx, qy] = toQ(x, y)
+        st.tail.push({ x: qx, y: qy, t: st.t, start: fresh })
         if (st.tail.length > MAX_TAIL) st.tail.shift()
-        st.travel += cw
-        if (st.travel >= WORD_EVERY) {
-          st.travel = 0
-          const word = WORDS[st.wrote++ % WORDS.length]
-          const ch = cellD[1] / dpr
-          for (let i = 0; i < word.length; i++) {
-            const [wx, wy] = toQ(st.pen.x + (i - (word.length - 1) / 2) * cw, st.pen.y - ch * 1.6)
-            if (word[i] !== ' ') st.trail.push({ x: wx, y: wy, t: st.t + i * 0.035, g: gi(word[i]) })
-          }
-          while (st.trail.length > MAX_TRAIL) st.trail.shift()
-        }
-        dx = x - st.pen.x
-        dy = y - st.pen.y
-        dist = Math.hypot(dx, dy)
       }
     }
 
