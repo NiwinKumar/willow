@@ -7,8 +7,8 @@ import { MEASURES } from './measures'
 import { MethodCards } from './Method'
 
 /**
- * The landing's story below the hero: the problem (with public figures), how Willow fixes it step by step and the
- * Google Cloud service behind each step, what makes it different, who gains, and the culture it builds.
+ * The landing's story below the hero: who gains, the problem (with public figures), how Willow fixes it step by step
+ * and the Google Cloud service behind each step, what makes it different, and the culture it builds.
  */
 
 const pad = 'px-[clamp(18px,4vw,52px)]'

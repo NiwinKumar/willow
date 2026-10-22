@@ -38,7 +38,7 @@ function Anchor({ to, className = '', style, children }: { to: string; className
 
 /**
  * The website (Willow.dc.html): intro loader each time the site opens, the hero with its ways in, then the story
- * (Story.tsx: the problem, how Willow fixes it on Google Cloud, what makes it different, who gains, the culture it
+ * (Story.tsx: who gains, the problem, how Willow fixes it on Google Cloud, what makes it different, the culture it
  * builds), the ways in again and the privacy footer, with the section rail. `/science` opens at the science section.
  */
 export default function Landing() {
@@ -69,10 +69,10 @@ export default function Landing() {
       {/* One main landmark for the page; the privacy footer stays outside it (contentinfo). */}
       <main>
         <Hero grow={introDone} />
+        <Gains />
         <Problem />
         <How />
         <Unique />
-        <Gains />
         <Culture />
         <Try />
       </main>
