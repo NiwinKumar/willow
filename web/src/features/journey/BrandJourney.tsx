@@ -11,7 +11,9 @@ import { DEFAULT_FILTERS } from '../retail/state'
 import { int, MIN_GROUP, pct, pts } from '../retail/ui/format'
 import { setWalkthroughs, startSegment, walkthroughsOn } from '../tour/runner'
 import { BRAND, BRAND_SLUG, brandSegments, type BrandChapter } from './brandSegments'
+import { lineMs, useSlideNarration } from './narration'
 import { BriefPoints, Worth } from './value'
+import { VoiceToggle } from './VoiceToggle'
 
 /**
  * /journey/brand: how a skincare brand uses Proof by Willow, as a story that plays itself (the companion of Mei's
@@ -25,6 +27,8 @@ import { BriefPoints, Worth } from './value'
 const SLIDE_MS = 6500
 // The value slide carries more words: longer on screen.
 const READ_MS = 10000
+// After a slide's line has been said, a short breath before the next slide.
+const GAP_MS = 1100
 const FILTERS = DEFAULT_FILTERS
 const PLAYED_KEY = 'willow.brandJourney.played'
 
@@ -130,11 +134,16 @@ export default function BrandJourney() {
     setI(at + 1)
   }, [at, last, slides, segments, walk])
 
+  // every slide is read aloud (voice.json `brand-<slide>`); it waits for its line before moving on
+  const { narrated, finished } = useSlideNarration(at, slides[at] ? `brand-${slides[at]}` : undefined, slides[at + 1] ? `brand-${slides[at + 1]}` : undefined, state === 'ready', paused)
+  const ownMs = (k: number) => (slides[k] === 'value' ? READ_MS : SLIDE_MS)
+  const slideMs = (k: number) => (narrated && k === at ? lineMs(`brand-${slides[k]}`) + GAP_MS : ownMs(k))
   useEffect(() => {
     if (state !== 'ready' || paused || at >= last) return
-    const t = window.setTimeout(next, slides[at] === 'value' ? READ_MS : SLIDE_MS)
+    if (narrated && !finished) return
+    const t = window.setTimeout(next, narrated ? GAP_MS : slides[at] === 'value' ? READ_MS : SLIDE_MS)
     return () => window.clearTimeout(t)
-  }, [at, paused, state, last, next, slides])
+  }, [at, paused, state, last, next, slides, narrated, finished])
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -187,6 +196,7 @@ export default function BrandJourney() {
             <span className="hidden rounded-pill bg-ink/[.06] px-3 py-1 text-[12.5px] text-ink-2 sm:inline">Proof by Willow · a real brand, a synthetic cohort</span>
           </span>
           <span className="flex items-center gap-1.5">
+            <VoiceToggle />
             <button type="button" role="switch" aria-checked={!walk} onClick={toggleWalk} className="flex min-h-11 items-center gap-2 rounded-pill px-3 text-[13px] text-ink-2 hover:bg-ink/5">
               <span aria-hidden className={`relative h-5 w-8 rounded-full transition-colors ${walk ? 'bg-ink/15' : 'bg-ink'}`}>
                 <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-[left] ${walk ? 'left-0.5' : 'left-3.5'}`} />
@@ -205,7 +215,7 @@ export default function BrandJourney() {
                 <span
                   key={`${k}-${at}`}
                   className="block h-full origin-left rounded-full bg-ink"
-                  style={k < at ? undefined : k === at && at < last ? { animation: `wFill ${slides[k] === 'value' ? READ_MS : SLIDE_MS}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === at ? undefined : 'scaleX(0)' }}
+                  style={k < at ? undefined : k === at && at < last ? { animation: `wFill ${slideMs(k)}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === at ? undefined : 'scaleX(0)' }}
                 />
               </button>
             ))}

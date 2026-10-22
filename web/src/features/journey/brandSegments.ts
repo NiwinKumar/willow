@@ -1,6 +1,10 @@
 import { slugOf } from '../retail/ui/format'
 import { findTarget } from '../tour/find'
 import type { TourSegment } from '../tour/types'
+import { lineText } from './narration'
+
+// A step's caption is its narration line (voice.json): spoken and shown together.
+const v = (id: string) => ({ voice: id, caption: lineText(id) })
 
 /**
  * The live walkthroughs of Proof by Willow that play between the brand journey's slides (/journey/brand). Each
@@ -44,12 +48,12 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
       id: 'brand-proof',
       title: 'Proof by Willow · the proof',
       steps: [
-        { route: `/retail?${AS}`, target: 'css:#spot-h', action: 'point', caption: `Proof opens on ${BRAND}’s workspace, with its strongest proof first.`, hold: 2200 },
-        { target: 'css:#brief-h', action: 'point', caption: 'This week’s brief: what moved in its data, summarised by Gemini. Every number is checked against the cards.', hold: 3000 },
-        { target: 'text:View proof', action: 'click', caption: 'View proof opens what was measured for this product.', hold: 1200 },
-        { target: 'css:section[aria-label="Key facts"]', action: 'point', caption: 'Visible change in its users, beside people with the same goals who don’t use it.', hold: 2600 },
-        { target: 'css:#journey', action: 'point', caption: 'Every user from trying it to week 8, read from their own check-ins.', hold: 2400 },
-        { target: 'css:#next-h', action: 'point', caption: 'Next steps: Gemini picks what to do next from what the data supports. Each one opens where it’s done.', hold: 3000 },
+        { route: `/retail?${AS}`, target: 'css:#spot-h', action: 'point', ...v('b-proof-open'), hold: 2200 },
+        { target: 'css:#brief-h', action: 'point', ...v('b-proof-brief'), hold: 3000 },
+        { target: 'text:View proof', action: 'click', ...v('b-proof-view'), hold: 1200 },
+        { target: 'css:section[aria-label="Key facts"]', action: 'point', ...v('b-proof-facts'), hold: 2600 },
+        { target: 'css:#journey', action: 'point', ...v('b-proof-journey'), hold: 2400 },
+        { target: 'css:#next-h', action: 'point', ...v('b-proof-next'), hold: 3000 },
       ],
     },
     compare: ids.compare
@@ -57,10 +61,10 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
           id: 'brand-compare',
           title: 'Proof by Willow · compare',
           steps: [
-            { route: product(ids.compare), target: 'css:#comp-h', action: 'point', caption: 'Each product is ranked against others in its category that share a goal.', hold: 2200 },
-            { target: 'label:Compare with', action: 'click', caption: 'Compare puts it side by side with the highest-ranked other product.', hold: 1200 },
-            { target: 'css:section[aria-label="Products side by side"]', action: 'point', caption: 'The same figures for both, measured the same way.', hold: 2600 },
-            { target: 'css:#cmp-curve', action: 'point', caption: 'When the lasting change began, week by week.', hold: 2200 },
+            { route: product(ids.compare), target: 'css:#comp-h', action: 'point', ...v('b-cmp-rank'), hold: 2200 },
+            { target: 'label:Compare with', action: 'click', ...v('b-cmp-open'), hold: 1200 },
+            { target: 'css:section[aria-label="Products side by side"]', action: 'point', ...v('b-cmp-same'), hold: 2600 },
+            { target: 'css:#cmp-curve', action: 'point', ...v('b-cmp-curve'), hold: 2200 },
           ],
         }
       : null,
@@ -68,40 +72,40 @@ export function brandSegments(ids: BrandIds): Record<BrandChapter, TourSegment |
       id: 'brand-customers',
       title: 'Proof by Willow · customers',
       steps: [
-        { route: `/retail/customers?${AS}`, target: 'text:Skin type × goal', action: 'point', caption: 'Customers maps every skin type against the goal people chose.', hold: 2000 },
-        { target: 'text:Best product', action: 'click', caption: 'Switch to the best product for each group.', hold: 1800 },
-        { target: 'label:, yours. Open details', action: 'click', caption: `Open a group where ${BRAND} leads.`, hold: 1200 },
-        { target: 'text:Best product for this group', action: 'point', caption: 'The leader, the runner-up and your other products for this goal.', hold: 2600 },
+        { route: `/retail/customers?${AS}`, target: 'text:Skin type × goal', action: 'point', ...v('b-cust-map'), hold: 2000 },
+        { target: 'text:Best product', action: 'click', ...v('b-cust-best'), hold: 1800 },
+        { target: 'label:, yours. Open details', action: 'click', ...v('b-cust-open'), hold: 1200 },
+        { target: 'text:Best product for this group', action: 'point', ...v('b-cust-detail'), hold: 2600 },
       ],
     },
     ask: {
       id: 'brand-ask',
       title: 'Proof by Willow · ask',
       steps: [
-        { route: `/retail?${AS}&ask=1`, target: 'text:Ask anything', action: 'point', caption: 'Ask anything: a question in plain words, about the same data on screen.', hold: 1600 },
-        { run: ensureAsk, target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, wait: 75_000, caption: 'Gemini answers from the aggregates only. Any number it writes that isn’t in them is rejected, and no one person can be looked up.', hold: 1200 },
-        { target: 'css:dialog[open] [aria-busy="false"]', action: 'point', caption: 'The answer, its chart drawn from the same numbers, and follow-up questions.', hold: 3600 },
-        { action: 'escape', caption: 'Back to the workspace.', hold: 800 },
+        { route: `/retail?${AS}&ask=1`, target: 'text:Ask anything', action: 'point', ...v('b-ask-open'), hold: 1600 },
+        { run: ensureAsk, target: 'text:How do outcomes compare with non-users?', action: 'click', until: askDone, wait: 75_000, ...v('b-ask-answer'), hold: 1200 },
+        { target: 'css:dialog[open] [aria-busy="false"]', action: 'point', ...v('b-ask-chart'), hold: 3600 },
+        { action: 'escape', ...v('b-ask-back'), hold: 800 },
       ],
     },
     sell: {
       id: 'brand-sell',
       title: 'Proof by Willow · claims and campaigns',
       steps: [
-        { route: product(ids.hero), target: 'css:#ev-h', action: 'point', caption: 'Claim-ready statements, each with its number of people, its window and its cohort.', hold: 2400 },
-        { target: 'css:section[aria-labelledby="claims-h"] button:not([role="radio"])', action: 'click', caption: 'Gemini drafts copy from those statements only. Every number is checked before it shows.', until: claimsDone, wait: 60_000, hold: 1500 },
-        { target: 'css:#claims-h', action: 'point', caption: 'Each draft names the statements it rests on.', hold: 2600 },
+        { route: product(ids.hero), target: 'css:#ev-h', action: 'point', ...v('b-claims-list'), hold: 2400 },
+        { target: 'css:section[aria-labelledby="claims-h"] button:not([role="radio"])', action: 'click', ...v('b-claims-draft'), until: claimsDone, wait: 60_000, hold: 1500 },
+        { target: 'css:#claims-h', action: 'point', ...v('b-claims-cite'), hold: 2600 },
 
-        { route: `/retail/campaigns?${AS}&new=${encodeURIComponent(ids.hero)}`, target: 'css:#proof-new-campaign', action: 'point', caption: 'Only a Proven product can be promoted, so the campaign starts from its proof.', hold: 2000 },
-        { target: 'text:Matching profiles', action: 'point', caption: 'The audience is only the goals and skin types its evidence covers.', hold: 2400 },
-        { target: 'text:Randomised holdout', action: 'point', caption: 'A random holdout never sees the card, so the lift can be measured.', hold: 2400 },
-        { target: 'text:The card exactly as a matching shopper sees it', action: 'point', caption: 'The card a matching shopper sees in the Willow app. Nothing is launched here.', hold: 2400 },
-        { action: 'escape', caption: 'Or let Proof promote for you…', hold: 900 },
-        { target: 'text:New rule', action: 'click', caption: 'AutoCampaign: rules that promote a product the moment its proof allows.', hold: 1200 },
-        { target: 'css:dialog[open] textarea', action: 'type', text: RULE_WORDS, caption: 'A rule in plain words.', hold: 400 },
-        { target: 'text:Read it', action: 'click', until: ruleRead, wait: 60_000, caption: 'Gemini reads the words into the rule, and the form checks it against the guardrails.', hold: 1200 },
-        { target: 'text:Reads as', action: 'point', caption: 'The rule it read: which proof triggers it, who sees the card, for how long. Nothing is saved here.', hold: 3400 },
-        { action: 'escape', caption: 'Measured, proven, claimed, promoted: with AI at each step, and every number checked.', hold: 1400 },
+        { route: `/retail/campaigns?${AS}&new=${encodeURIComponent(ids.hero)}`, target: 'css:#proof-new-campaign', action: 'point', ...v('b-camp-start'), hold: 2000 },
+        { target: 'text:Matching profiles', action: 'point', ...v('b-camp-audience'), hold: 2400 },
+        { target: 'text:Randomised holdout', action: 'point', ...v('b-camp-holdout'), hold: 2400 },
+        { target: 'text:The card exactly as a matching shopper sees it', action: 'point', ...v('b-camp-card'), hold: 2400 },
+        { action: 'escape', ...v('b-camp-or'), hold: 900 },
+        { target: 'text:New rule', action: 'click', ...v('b-auto-new'), hold: 1200 },
+        { target: 'css:dialog[open] textarea', action: 'type', text: RULE_WORDS, ...v('b-auto-type'), hold: 400 },
+        { target: 'text:Read it', action: 'click', until: ruleRead, wait: 60_000, ...v('b-auto-read'), hold: 1200 },
+        { target: 'text:Reads as', action: 'point', ...v('b-auto-reads'), hold: 3400 },
+        { action: 'escape', ...v('b-auto-end'), hold: 1400 },
       ],
     },
   }

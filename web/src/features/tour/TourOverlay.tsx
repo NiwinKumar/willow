@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { enterDemo } from '../../data/useData'
+import { pauseVoice, preloadVoice, resumeVoice, say, speaking, stopVoice } from '../journey/narration'
 import { endSegment, goStep, setPaused, useTourRun } from './runner'
 import { findTarget } from './find'
 import type { TourTarget } from './types'
@@ -24,7 +25,14 @@ export function TourOverlay() {
   const paused = useRef(false)
   useEffect(() => {
     paused.current = run?.paused ?? false
+    if (run?.paused) pauseVoice()
+    else resumeVoice()
   }, [run?.paused])
+  // the narration stops with the walkthrough
+  const playing = Boolean(run)
+  useEffect(() => {
+    if (!playing) stopVoice()
+  }, [playing])
 
   useEffect(() => {
     if (!run) {
@@ -42,8 +50,9 @@ export function TourOverlay() {
       let left = ms
       while (left > 0) {
         if (!alive) throw STOP
-        await new Promise((r) => window.setTimeout(r, 100))
-        if (!paused.current) left -= 100
+        const tick = Math.min(100, left)
+        await new Promise((r) => window.setTimeout(r, tick))
+        if (!paused.current) left -= tick
       }
       if (!alive) throw STOP
     }
@@ -55,6 +64,10 @@ export function TourOverlay() {
       }
       return null
     }
+    // the step's line starts with it; the step lasts until the line has been said
+    if (step.voice) void say(step.voice)
+    else stopVoice()
+    preloadVoice(run.seg.steps[run.i + 1]?.voice)
     void (async () => {
       if (run.i === 0 && run.seg.demo) enterDemo()
       if (step.route && step.route !== window.location.pathname + window.location.search) {
@@ -93,6 +106,10 @@ export function TourOverlay() {
       }
       if (step.until) for (let waited = 0; waited < (step.wait ?? 30_000) && !step.until(); waited += 250) await sleep(250)
       await sleep(step.hold ?? 2600)
+      if (step.voice) {
+        for (let waited = 0; waited < 40_000 && speaking(); waited += 100) await sleep(100)
+        await sleep(250)
+      }
       goStep(run.i + 1)
     })().catch((e) => {
       // A step that failed moves on, unless a newer step (or a stop) already replaced it.
@@ -108,7 +125,6 @@ export function TourOverlay() {
   // The walkthrough sits in the top layer (a manual popover), so app sheets (native modal dialogs, also top layer)
   // never cover or blur it: whenever a dialog opens it is raised again, above that dialog.
   const layer = useRef<HTMLDivElement>(null)
-  const playing = Boolean(run)
   useEffect(() => {
     const el = layer.current
     if (!playing || !el) return

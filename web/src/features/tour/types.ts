@@ -19,6 +19,8 @@ export type TourStep = {
   text?: string
   /** One or two plain sentences: what she is doing and what Willow does with it. Numbers only if on screen. */
   caption: string
+  /** The narration line that speaks the caption (journey/voice.json). The step lasts at least as long as it. */
+  voice?: string
   /** How long the step stays after its action, in ms (default 2600). */
   hold?: number
   /** Wait for this before moving on (checked every 250 ms, at most `wait`), e.g. Wisp's answer. */

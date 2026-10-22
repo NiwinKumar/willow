@@ -11,6 +11,8 @@ import { wordsFor, verdictKind } from '../../lib/verdict'
 import { setWalkthroughs, startSegment, walkthroughsOn } from '../tour/runner'
 import { useImageStatus } from '../progress/useImageStatus'
 import { MEI_CHAPTERS, MEI_WEEKS } from './meiSegments'
+import { lineMs, lineShow, useSlideNarration } from './narration'
+import { VoiceToggle } from './VoiceToggle'
 import { BriefPoints, Point } from './value'
 
 /**
@@ -35,7 +37,10 @@ type Week = { face: Session; close: Session | null; week: number }
 type Chapter = { weeks: Week[]; i: number }
 type Slide = { kind: 'problem' } | { kind: 'intro' } | { kind: 'chapter'; c: Chapter } | { kind: 'mei' } | { kind: 'retail' } | { kind: 'end' }
 
-/** Each chapter: the features Mei used and what each gave her, and what it is worth to the retailer that sold her the products. */
+/**
+ * Each chapter: its title, then (under the paragraph that says what happened, voice.json `mei-c<n>`, and her data)
+ * the features Mei used and what each gave her, and what it is worth to the retailer that sold her the products.
+ */
 const CHAPTERS: { title: string; used: [string, string][]; retail: string }[] = [
   {
     title: 'Her baseline',
@@ -47,22 +52,22 @@ const CHAPTERS: { title: string; used: [string, string][]; retail: string }[] = 
     retail: 'Her goal and her whole routine, across brands. Not just a basket.',
   },
   {
-    title: 'Weeks 2–3: a flare, caught',
+    title: 'Weeks 2–3: a new routine',
     used: [
-      ['Weekly reading', 'Each Sunday’s check-in against her normal range, explained by Gemini from the measured numbers.'],
+      ['Photo checks', 'A turned head isn’t compared with her front-on baseline, and Willow says so.'],
       ['Wisp, the adviser', 'Answers “should I stop one?” from her own data, without inventing a number.'],
       ['Routine check', 'Names the retinol and BHA clash, with a one-tap fix.'],
     ],
-    retail: 'A clash caught in a week, before she gives up on both products or sends them back.',
+    retail: 'A clash caught early, before she gives up on both products or sends them back.',
   },
   {
-    title: 'Weeks 4–5: only fair comparisons',
+    title: 'Weeks 4–5: a rough week, read honestly',
     used: [
+      ['Normal range', 'A rise inside her own everyday variation isn’t called a change.'],
       ['Side-by-side compare', 'Her baseline next to this week, same light, same distance.'],
       ['Routine history', 'The BHA she stopped keeps its dates, so its effect can still be read.'],
-      ['Photo checks', 'A photo that can’t be compared fairly isn’t counted, and Willow says so.'],
     ],
-    retail: 'Outcome data it can trust: a reading that can’t be compared fairly never counts.',
+    retail: 'Outcome data it can trust: everyday noise never counts as a change.',
   },
   {
     title: 'Weeks 6–7: what’s working',
@@ -82,6 +87,12 @@ const CHAPTERS: { title: string; used: [string, string][]; retail: string }[] = 
     retail: 'A customer who rebuys what worked for her, and one more measured outcome for Proof.',
   },
 ]
+
+/** The narration line each slide speaks (voice.json). */
+const voiceOf = (s: Slide | undefined) =>
+  !s ? undefined : s.kind === 'chapter' ? `mei-c${s.c.i + 1}` : ({ problem: 'mei-problem', intro: 'mei-intro', mei: 'mei-gains', retail: 'mei-retail', end: 'mei-end' } as const)[s.kind]
+// After a slide's line has been said, a short breath before the next slide.
+const GAP_MS = 1100
 
 const dayOf = (iso: string) => iso.slice(0, 10)
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -130,6 +141,9 @@ export default function Journey() {
     if (walk && seg) startSegment(seg, `/journey?at=${from + 1}`)
     else go(from + 1)
   }
+  const { narrated, finished } = useSlideNarration(i, voiceOf(slides[i]), voiceOf(slides[i + 1]), state === 'ready', paused)
+  // how long this slide stays: its line and a breath when narrated, else its own time
+  const slideMs = (k: number) => (narrated && k === i ? lineMs(voiceOf(slides[k]) ?? '') + GAP_MS : msOf(slides[k]))
   const forwardRef = useRef(forward)
   useEffect(() => {
     forwardRef.current = forward
@@ -142,9 +156,10 @@ export default function Journey() {
 
   useEffect(() => {
     if (state !== 'ready' || paused || i >= last) return
-    const t = window.setTimeout(() => forwardRef.current(i), msOf(slides[i]))
+    if (narrated && !finished) return // the slide waits for its line
+    const t = window.setTimeout(() => forwardRef.current(i), narrated ? GAP_MS : msOf(slides[i]))
     return () => window.clearTimeout(t)
-  }, [i, paused, state, last, slides])
+  }, [i, paused, state, last, slides, narrated, finished])
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -186,15 +201,20 @@ export default function Journey() {
     >
       <header className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-[clamp(16px,3vw,32px)] pt-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2.5">
+          <span className="mr-auto flex items-center gap-2.5">
             <span className="font-serif text-[22px]">willow</span>
-            <span className="rounded-pill bg-ink/[.06] px-3 py-1 text-[12.5px] text-ink-2">Mei is simulated · generated photos, real measurements</span>
+            <span className="rounded-pill bg-ink/[.06] px-3 py-1 text-[12.5px] text-ink-2">
+              <span className="hidden md:inline">Mei is simulated · generated photos, real measurements</span>
+              <span className="md:hidden">Simulated</span>
+            </span>
           </span>
-          <button type="button" role="switch" aria-checked={walk} onClick={toggleWalk} className="ml-auto flex min-h-11 items-center gap-2 rounded-pill px-3 text-[13px] text-ink-2 hover:bg-ink/5">
+          <VoiceToggle />
+          <button type="button" role="switch" aria-checked={walk} onClick={toggleWalk} className="flex min-h-11 items-center gap-2 rounded-pill px-3 text-[13px] text-ink-2 hover:bg-ink/5">
             <span className={`relative h-5 w-9 rounded-full transition-colors ${walk ? 'bg-ink' : 'bg-ink/20'}`} aria-hidden>
               <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] ${walk ? 'left-[18px]' : 'left-0.5'}`} />
             </span>
-            Show her in the app between chapters
+            <span className="hidden md:inline">Show her in the app between chapters</span>
+            <span className="whitespace-nowrap md:hidden">In the app</span>
           </button>
           <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 place-items-center rounded-full hover:bg-ink/5">
             <X size={20} strokeWidth={1.6} />
@@ -207,7 +227,7 @@ export default function Journey() {
                 <span
                   key={`${k}-${i}`}
                   className="block h-full origin-left rounded-full bg-ink"
-                  style={k < i ? undefined : k === i && i < last ? { animation: `wFill ${msOf(slides[k])}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === i ? undefined : 'scaleX(0)' }}
+                  style={k < i ? undefined : k === i && i < last ? { animation: `wFill ${slideMs(k)}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === i ? undefined : 'scaleX(0)' }}
                 />
               </button>
             ))}
@@ -341,13 +361,13 @@ function Intro({ face, count, closeUps }: { face: Session; count: number; closeU
   )
 }
 
-function Reading({ m, s }: { m: Metric; s: Session }) {
+function Reading({ m, s, compact = false }: { m: Metric; s: Session; compact?: boolean }) {
   const unit = m.value === null ? '' : unitOf(m).trim()
   const words = wordsFor(m, s)
   const kind = verdictKind(m, s)
   const tone = kind === 'changed' ? (words.label === 'Improved' ? 'bg-[#DDF3C9]' : words.label === 'Moved the other way' ? 'bg-[#FFE3CF]' : 'bg-[#E9E2FF]') : 'bg-white/70'
   return (
-    <li className={`flex items-center justify-between gap-3 rounded-[16px] px-3.5 py-2.5 ${tone}`}>
+    <li className={`flex items-center justify-between gap-3 rounded-[16px] px-3.5 ${compact ? 'py-2' : 'py-2.5'} ${tone}`}>
       <span className="flex min-w-0 flex-col">
         <span className="text-[14.5px]">{METRIC_META[m.id].label}</span>
         <span className="text-[12.5px] text-ink-2">
@@ -356,7 +376,7 @@ function Reading({ m, s }: { m: Metric; s: Session }) {
         </span>
       </span>
       <span className="flex flex-none items-baseline gap-1">
-        <span className="font-dot text-[22px] tnum">{fmtReading(m.value, m)}</span>
+        <span className={`font-dot tnum ${compact ? 'text-[19px]' : 'text-[22px]'}`}>{fmtReading(m.value, m)}</span>
         {unit ? <span className="text-[11px] text-ink-2">{unit}</span> : null}
       </span>
     </li>
@@ -367,22 +387,21 @@ function pick(s: Session, ids: Metric['id'][]) {
   return ids.map((id) => s.result?.metrics.find((m) => m.id === id)).filter((m): m is Metric => Boolean(m))
 }
 
-/** What a chapter is worth: each feature Mei used and what it gave her, then what the retailer gains. */
+/** What a chapter was worth, last on its slide: each feature Mei used and what it gave her, then what the retailer gains. */
 function Gains({ used, retail }: { used: [string, string][]; retail: string }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="grid gap-2 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
       <div className="rounded-[18px] bg-[#EEF7E6] px-4 py-3">
         <span className="text-[12.5px] text-ink-2">What she used, and what it gave her</span>
         <ul className="m-0 mt-1.5 grid list-none gap-1.5 p-0">
           {used.map(([f, g]) => (
-            <li key={f} className="grid grid-cols-[minmax(0,9.5em)_minmax(0,1fr)] gap-3 text-[13.5px] leading-[1.4]">
-              <span className="font-medium">{f}</span>
-              <span>{g}</span>
+            <li key={f} className="text-[13px] leading-[1.4]">
+              <span className="font-medium">{f}:</span> {g}
             </li>
           ))}
         </ul>
       </div>
-      <p className="m-0 flex flex-col gap-0.5 rounded-[18px] bg-[#ECEFFB] px-4 py-2.5 text-[13.5px] leading-[1.4]">
+      <p className="m-0 flex flex-col gap-0.5 rounded-[18px] bg-[#ECEFFB] px-4 py-3 text-[13px] leading-[1.4]">
         <span className="text-[12.5px] text-ink-2">For the retailer</span>
         {retail}
       </p>
@@ -390,15 +409,16 @@ function Gains({ used, retail }: { used: [string, string][]; retail: string }) {
   )
 }
 
+/** A chapter: what happened (the paragraph the narration reads), then her measured data, then what it was worth. */
 function ChapterSlide({ c, total }: { c: Chapter; total: number }) {
   const w = c.weeks.at(-1) as Week
   const { face, close } = w
   const copy = CHAPTERS[c.i]
   const firstDay = c.weeks[0].face.created_at
-  const sideOn = c.weeks.some((x) => (x.face.result?.warnings ?? []).some((m) => m.startsWith('side view')))
   const note = face.note ?? c.weeks.find((x) => x.face.note)?.face.note
+  const story = lineShow(`mei-c${c.i + 1}`)
   return (
-    <div key={face.id} className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.75fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+    <div key={face.id} className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.72fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
       <div className="flex flex-col">
         <div className="relative">
           <Photo s={face} label={`Mei's face check-in, ${when(face.created_at)}`} className="max-h-[60dvh]" />
@@ -411,30 +431,29 @@ function ChapterSlide({ c, total }: { c: Chapter; total: number }) {
         </div>
         {note ? (
           <blockquote className="m-0 mt-3 border-l-2 border-ink/20 pl-3.5 text-[14px] leading-[1.45] text-pretty">
-            “{note}”<span className="mt-0.5 block text-[12px] text-ink-2">Mei’s note</span>
+            “{note}”<span className="mt-0.5 block text-[12px] text-ink-2">Mei’s note, {when(face.created_at)}</span>
           </blockquote>
         ) : null}
       </div>
-      <div className="flex flex-col gap-3.5">
+      <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-[13px] text-ink-2">
             Chapter {c.i + 1} of {total} · {c.weeks.length > 1 ? `${when(firstDay)} to ${when(face.created_at)}` : when(face.created_at)}
           </span>
-          <h2 className="m-0 font-serif text-[clamp(30px,3.4vw,48px)] leading-none font-normal text-balance">{copy?.title ?? (face.is_baseline ? 'Her baseline' : `Week ${w.week}`)}</h2>
+          <h2 className="m-0 font-serif text-[clamp(30px,3.4vw,46px)] leading-none font-normal text-balance">{copy?.title ?? (face.is_baseline ? 'Her baseline' : `Week ${w.week}`)}</h2>
+        </div>
+        {story ? <p className="m-0 max-w-[620px] text-[clamp(15px,1.2vw,17px)] leading-[1.5] text-pretty">{story}</p> : null}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[12.5px] text-ink-2">
+            Her readings on {when(face.created_at)}, against her baseline{face.explanation?.headline ? ` · Gemini: “${face.explanation.headline}”` : ''}
+          </span>
+          <ul className="m-0 grid list-none gap-1.5 p-0 sm:grid-cols-2 xl:grid-cols-3">
+            {[...pick(face, FACE_IDS).map((m) => ({ m, s: face })), ...(close ? pick(close, CLOSE_IDS).map((m) => ({ m, s: close })) : [])].map(({ m, s }) => (
+              <Reading key={`${s.id}-${m.id}`} m={m} s={s} compact />
+            ))}
+          </ul>
         </div>
         {copy ? <Gains used={copy.used} retail={copy.retail} /> : null}
-        {face.explanation?.headline ? (
-          <p className="m-0 rounded-[18px] bg-white/70 px-4 py-3 text-[14px] leading-[1.45]">
-            <span className="mb-0.5 block text-[12px] text-ink-2">What Willow read (Gemini, from the measured numbers)</span>
-            {face.explanation.headline}
-          </p>
-        ) : null}
-        {sideOn ? <p className="m-0 text-[13px] text-ink-2">One week her head was turned, so Willow did not compare it with her front-on baseline. It says so instead of guessing.</p> : null}
-        <ul className="m-0 grid list-none gap-1.5 p-0 sm:grid-cols-2 xl:grid-cols-3">
-          {[...pick(face, FACE_IDS).map((m) => ({ m, s: face })), ...(close ? pick(close, CLOSE_IDS).map((m) => ({ m, s: close })) : [])].map(({ m, s }) => (
-            <Reading key={`${s.id}-${m.id}`} m={m} s={s} />
-          ))}
-        </ul>
       </div>
     </div>
   )
