@@ -77,6 +77,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
     {
       id: 'audience',
       header: 'Audience',
+      width: '160px',
       optional: true,
       cell: (c) => {
         const text = audienceText(c.goals, c.skin_types)
@@ -207,7 +208,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
       rowKey={(c) => c.id}
       onRowClick={(c) => onOpen(c.id)}
       rowLabel={(c) => `Open campaign for ${c.product ?? c.product_id}`}
-      minWidth={980}
+      minWidth={1120}
       rowClassName={(c) => `cmp-row-${c.id} ${highlight === c.id ? '!bg-proof-leaf-soft' : ''} [transition:background-color_.8s_ease]`}
     />
   )

@@ -261,12 +261,12 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
         : `${int(d.cohort.synthetic)} simulated people, generated from measured photo noise. Not real customers.`
   return (
     <div ref={box} className="relative">
-      <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)} className="hit44 inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-ctl border border-line bg-surface px-3 text-proof-small text-ink hover:border-line-strong hover:bg-pf-hover">
+      <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)} className="hit44 inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-ctl border border-line bg-surface px-2.5 text-proof-small sm:px-3 text-ink hover:border-line-strong hover:bg-pf-hover">
         <span aria-hidden className={`size-1.5 rounded-full ${kind === 'real' ? 'bg-proof-leaf' : 'bg-pf-amber'}`} />
         <span className="hidden sm:inline">{data}</span>
         <span aria-hidden className="hidden text-ink-3 sm:inline">/</span>
         {range}
-        <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="text-ink-2" />
+        <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="hidden text-ink-2 sm:block" />
       </button>
       {open ? (
         <div role="dialog" aria-label="Data scope" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-[320px] max-w-[calc(100vw-32px)] flex-col gap-4 rounded-card border border-line bg-surface p-4 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[wFadeIn_.12s_ease_both]">
@@ -300,7 +300,7 @@ function ThemeButton({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
 function TopBar({ d, loading, theme, onTheme, onAsk }: { d: Insights | null; loading: boolean; theme: ThemePref; onTheme: (t: ThemePref) => void; onAsk: () => void }) {
   const { carry } = useRetailState()
   return (
-    <header className="flex h-[var(--proof-topbar)] items-center gap-2 px-4 sm:px-6">
+    <header className="flex h-[var(--proof-topbar)] items-center gap-1.5 px-4 sm:gap-2 sm:px-6">
       <Link to={`/retail${carry}`} aria-label="Proof by Willow, Overview" className="flex shrink-0 items-center gap-2 rounded-ctl text-ink no-underline">
         <ProofMark size={26} />
         <span className="hidden items-baseline gap-1.5 text-[15px] tracking-[-0.01em] md:inline-flex">
@@ -308,15 +308,15 @@ function TopBar({ d, loading, theme, onTheme, onAsk }: { d: Insights | null; loa
           <span className="text-ink-2">by Willow</span>
         </span>
       </Link>
-      <span aria-hidden className="mx-1 text-[20px] font-light text-line-strong">
+      <span aria-hidden className="mx-1 hidden text-[20px] font-light text-line-strong sm:inline">
         /
       </span>
       <div className="min-w-0">
         <Workspace />
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
         <DataScope d={d} loading={loading} />
-        <button type="button" onClick={onAsk} className="hit44 inline-flex h-9 items-center gap-2 rounded-ctl border border-line bg-surface px-3 text-proof-small text-ink-2 hover:border-line-strong hover:text-ink">
+        <button type="button" onClick={onAsk} aria-label="Ask anything" className="hit44 inline-flex h-9 items-center gap-2 rounded-ctl border border-line bg-surface px-3 text-proof-small text-ink-2 hover:border-line-strong hover:text-ink">
           <Search size={15} strokeWidth={1.7} aria-hidden />
           <span className="hidden md:inline">Ask anything</span>
           <kbd className="hidden rounded-[4px] border border-line bg-pf-bg2 px-1.5 font-geist text-[11px] text-ink-2 lg:inline">⌘K</kbd>

@@ -200,7 +200,7 @@ function GoalsRows({ demo }: { demo: boolean }) {
       .catch(() => toast.error(offline))
   return (
     <>
-      <Row stack label={`Goals · ${goals.length} of ${MAX_GOALS}`} hint={`Up to three. Their readings come first in your results${demo ? ', the demo journey included' : ''}.`}>
+      <Row stack label={`Goals · ${goals.length} of ${MAX_GOALS}`} hint={`Up to ${MAX_GOALS}. Their readings come first in your results${demo ? ', the demo journey included' : ''}.`}>
         <div className="flex flex-wrap gap-1.5">
           {GOALS.map((g) => {
             const on = goals.includes(g.id)

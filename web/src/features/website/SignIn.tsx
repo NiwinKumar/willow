@@ -140,9 +140,11 @@ export default function SignIn() {
 
   return (
     <div className="w-sky relative grid min-h-dvh grid-cols-1 content-start min-[900px]:grid-cols-2 min-[900px]:content-stretch">
-      {/* Laptop: the bloom and the line on the left. Phone: only the back link above the card, so the form fits. */}
-      <div className="relative flex flex-col justify-between overflow-hidden px-[clamp(12px,3vw,40px)] pt-[clamp(10px,2vh,40px)] min-[900px]:pb-[clamp(20px,3vw,40px)]">
-        <HeroBloom className="absolute inset-0" mask="radial-gradient(70% 70% at 50% 50%, #000 40%, transparent 85%)" />
+      {/* Laptop: the bloom and the line on the left, held to the window so a tall card never pushes the line
+          below the fold. Phone: only the back link above the card, so the form fits. The flowers are sized for
+          the full-width hero, so the mask fades to nothing inside the column instead of meeting its edge. */}
+      <div className="relative flex flex-col justify-between overflow-hidden px-[clamp(12px,3vw,40px)] pt-[clamp(10px,2vh,40px)] min-[900px]:sticky min-[900px]:top-0 min-[900px]:h-dvh min-[900px]:pb-[clamp(20px,3vw,40px)]">
+        <HeroBloom className="absolute inset-0" mask="radial-gradient(closest-side, #000 45%, transparent)" />
         <Link to="/" className="glass-pill relative flex items-center gap-2.5 self-start rounded-pill py-1.5 pl-1.5 pr-4 text-[14px] text-ink no-underline">
           <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white">
             ←

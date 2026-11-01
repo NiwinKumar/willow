@@ -201,23 +201,23 @@ export default function Journey() {
       }}
     >
       <header className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-[clamp(16px,3vw,32px)] pt-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-1 sm:gap-3">
           <span className="mr-auto flex items-center gap-2.5">
             <span className="font-serif text-[22px]">willow</span>
-            <span className="rounded-pill bg-ink/[.06] px-3 py-1 text-[12.5px] text-ink-2">
+            <span className="rounded-pill bg-ink/[.06] px-2.5 py-1 text-[12.5px] text-ink-2 sm:px-3">
               <span className="hidden md:inline">Mei is simulated · generated photos, real measurements</span>
               <span className="md:hidden">Simulated</span>
             </span>
           </span>
           <VoiceToggle />
-          <button type="button" role="switch" aria-checked={walk} onClick={toggleWalk} className="flex min-h-11 items-center gap-2 rounded-pill px-3 text-[13px] text-ink-2 hover:bg-ink/5">
+          <button type="button" role="switch" aria-checked={walk} onClick={toggleWalk} className="flex min-h-11 items-center gap-1.5 rounded-pill px-2 text-[13px] sm:gap-2 sm:px-3 text-ink-2 hover:bg-ink/5">
             <span className={`relative h-5 w-9 rounded-full transition-colors ${walk ? 'bg-ink' : 'bg-ink/20'}`} aria-hidden>
               <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] ${walk ? 'left-[18px]' : 'left-0.5'}`} />
             </span>
             <span className="hidden md:inline">Show her in the app between chapters</span>
             <span className="whitespace-nowrap md:hidden">In the app</span>
           </button>
-          <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 place-items-center rounded-full hover:bg-ink/5">
+          <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-ink/5">
             <X size={20} strokeWidth={1.6} />
           </button>
         </div>

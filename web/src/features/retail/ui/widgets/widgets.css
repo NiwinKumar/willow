@@ -668,6 +668,14 @@ a.wg-bars-row:hover {
 .wg-cols-lab[data-on] {
   font-weight: 600;
 }
+/* Narrow cards (phones): eight columns leave ~30px each, so labels use the gap beside them and a size down. */
+@container (max-width: 400px) {
+  .wg-cols-lab {
+    margin-inline: -4px;
+    font-size: 10px;
+    letter-spacing: -.02em;
+  }
+}
 .wg-cols-tip {
   position: absolute;
   bottom: calc(100% + 6px);

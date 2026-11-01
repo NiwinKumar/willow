@@ -86,7 +86,7 @@ export const SITE_LABEL: Record<Site, string> = {
   forearm_control: 'Arm without product',
 }
 
-/** The goals a person can pick (up to three), each matched 1:1 to catalog concerns and to the metrics it
+/** The goals a person can pick (up to MAX_GOALS), each matched 1:1 to catalog concerns and to the metrics it
  * pulls to the top of results. Ids are stored on the account (users/{uid}.profile.goals). */
 export type GoalId = 'dark_spots' | 'even_tone' | 'redness' | 'blemishes' | 'pores_texture' | 'lines' | 'under_eye' | 'oil_glow'
 export const GOALS: { id: GoalId; label: string; metrics: MetricId[] }[] = [
