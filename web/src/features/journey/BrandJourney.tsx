@@ -203,7 +203,7 @@ export default function BrandJourney() {
               </span>
               Skip the app walkthroughs
             </button>
-            <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 place-items-center rounded-full hover:bg-ink/5">
+            <button type="button" onClick={() => navigate('/')} aria-label="Close the journey" className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-ink/5">
               <X size={20} strokeWidth={1.6} />
             </button>
           </span>

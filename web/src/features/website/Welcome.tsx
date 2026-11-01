@@ -1,6 +1,6 @@
 import './website.css'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import type { MetricId, Site } from '../../data/types'
@@ -83,8 +83,15 @@ function BackButton({ step, search }: { step: Step; search: string }) {
 }
 
 function Stepper({ current }: { current: number }) {
+  // Phones: the steps scroll sideways, so the current one is kept centred and the far edge fades to say there is more.
+  const list = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    const ol = list.current
+    const li = ol?.children[current] as HTMLElement | undefined
+    if (ol && li && ol.scrollWidth > ol.clientWidth) ol.scrollLeft = li.offsetLeft - (ol.clientWidth - li.offsetWidth) / 2
+  }, [current])
   return (
-    <ol aria-label="Setup progress" className="no-scrollbar m-0 flex max-w-full list-none items-start overflow-x-auto px-0.5 py-1">
+    <ol ref={list} aria-label="Setup progress" className="no-scrollbar m-0 flex max-w-full list-none items-start overflow-x-auto px-0.5 py-1 [mask-image:linear-gradient(90deg,#000_80%,transparent)] sm:[mask-image:none]">
       {STEPS.map((label, i) => {
         const st = i < current ? 'done' : i === current ? 'on' : 'up'
         return (

@@ -26,12 +26,15 @@ export function SkinTypes({ s, d, selected, onOpen, mine }: { s: Segments; d: In
         return (
           <span className="grid grid-cols-3 gap-4 pr-2">
             {r.top_goals.slice(0, 3).map((g) => (
+              // The share sits by its bar, so the goal's name gets the cell's whole width.
               <span key={g.goal_id} className="flex min-w-0 flex-col gap-1">
-                <span className="flex min-w-0 items-baseline justify-between gap-2 text-proof-label">
-                  <span className="truncate text-ink">{g.label}</span>
-                  <span className="shrink-0 text-ink-2 tnum">{pct(g.share)}</span>
+                <span className="truncate text-proof-label text-ink">{g.label}</span>
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <ShareBar value={g.share} max={max} />
+                  </span>
+                  <span className="shrink-0 text-proof-label text-ink-2 tnum">{pct(g.share)}</span>
                 </span>
-                <ShareBar value={g.share} max={max} />
               </span>
             ))}
           </span>
@@ -71,7 +74,7 @@ export function SkinTypes({ s, d, selected, onOpen, mine }: { s: Segments; d: In
         rowLabel={(r) => `${r.label} skin: open goals and top products`}
         defaultSort={{ id: 'people', dir: 'desc' }}
         csv={{ name: csvName('customers-skin-types', d), meta: csvMeta(s) }}
-        minWidth={820}
+        minWidth={940}
       />
     </Panel>
   )
