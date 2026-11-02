@@ -93,7 +93,7 @@ def _crops(candidate: dict[str, Any]) -> tuple[bytes, bytes] | None:
         return None
 
 
-def _ask_or_none(job: tuple[list, str, float]) -> dict[str, CandidateLabel] | None:
+def _ask_or_none(job: tuple[list, str, float, bool]) -> dict[str, CandidateLabel] | None:
     try:
         return _ask(*job)
     except gemini.GeminiError:
@@ -101,7 +101,10 @@ def _ask_or_none(job: tuple[list, str, float]) -> dict[str, CandidateLabel] | No
 
 
 def _ask(
-    batch: list[tuple[dict, tuple[bytes, bytes]]], site: str, timeout_s: float = LABEL_BUDGET_S
+    batch: list[tuple[dict, tuple[bytes, bytes]]],
+    site: str,
+    timeout_s: float = LABEL_BUDGET_S,
+    keep: bool = False,
 ) -> dict[str, CandidateLabel]:
     parts: list[types.Part | str] = []
     for cand, (crop, ctx) in batch:
@@ -124,6 +127,7 @@ def _ask(
         attempts=1,
         # 10 small images per call answer in about 10 s; past the budget nobody waits for it
         timeout_ms=max(1_000, round(timeout_s * 1000)),
+        keep=keep,
     )
     ids = {c["id"] for c, _ in batch}
     return {lab.id: lab for lab in reply.labels if lab.id in ids}
@@ -143,13 +147,13 @@ def _agree(a: CandidateLabel | None, b: CandidateLabel | None) -> dict[str, Any]
 
 
 def label_candidates(
-    result: dict[str, Any], budget_s: float | None = None
+    result: dict[str, Any], budget_s: float | None = None, keep: bool = False
 ) -> dict[str, dict[str, Any]]:
     """{candidate_id: {label, confidence, visible_features}} for every candidate with crops.
 
     Returns {} when the engine produced no candidates or no crops; spots whose batch could not be
     asked twice within the budget (LABEL_BUDGET_S, or `budget_s` when smaller) are left out
-    (unlabelled), never guessed.
+    (unlabelled), never guessed. `keep`: sample photos only (app/kept.py).
     """
     budget = LABEL_BUDGET_S if budget_s is None else min(LABEL_BUDGET_S, budget_s)
     if budget <= 0:
@@ -167,7 +171,11 @@ def label_candidates(
     batches = [ready[i : i + BATCH] for i in range(0, len(ready), BATCH)]
     site = result.get("site", "")
     # Each batch's two runs next to each other, all at once: a pair finishes together.
-    jobs = [job for b in batches for job in ((b, site, left), (list(reversed(b)), site, left))]
+    jobs = [
+        job
+        for b in batches
+        for job in ((b, site, left, keep), (list(reversed(b)), site, left, keep))
+    ]
     pool = ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs)))
     futures = [pool.submit(_ask_or_none, job) for job in jobs]
     done, late = wait(futures, timeout=left)

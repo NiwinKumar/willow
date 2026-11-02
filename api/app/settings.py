@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     engine_mode: Literal["fixture", "http"] = "fixture"
     engine_url: str | None = None
     gemini_model: str = "gemini-3.8-flash"
+    # Answers when the main model is slow or failing (app/gemini.py): about 1.3 s a call against
+    # about 4 s, checked by the same schemas and validators. Empty: no second model.
+    gemini_fallback_model: str = "gemini-3.5-flash-lite"
+    # Keep Gemini answers in Firestore across instances (app/kept.py). On in production only.
+    keep_gemini_answers: bool = False
     vertex_location: str = "global"
     bq_dataset: str = "willow_insights"
     allowed_origins: str = "http://localhost:5173"

@@ -1703,6 +1703,7 @@ def summarise(
                 max_output_tokens=2048,
                 attempts=1,
                 timeout_ms=20_000,
+                keep=lambda r: not summary_problems(r.text, cards),
             )
         except Exception as exc:  # Gemini down, timeout, bad JSON: the brief still loads
             log.warning(

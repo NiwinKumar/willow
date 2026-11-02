@@ -323,6 +323,8 @@ def run(entries: list[Entry], use_model: bool = True) -> tuple[dict[str, Any], b
             instructions=INSTRUCTIONS,
             temperature=0.0,
             max_output_tokens=4096,
+            # products only, nothing about the person
+            keep=True,
         )
     except gemini.GeminiError:
         return result, False

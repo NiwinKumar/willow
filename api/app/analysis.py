@@ -144,8 +144,9 @@ def run(
         try:
             published = pool.submit(previews.publish, views.preview_name(uid, session_id))
             if budget > 0:
-                explained = pool.submit(explain.generate, result, context, deadline)
-                labelled = pool.submit(labeller.label_candidates, result, budget)
+                # sample photos (the team's own): kept, so the next judge's analysis is quicker
+                explained = pool.submit(explain.generate, result, context, deadline, sample)
+                labelled = pool.submit(labeller.label_candidates, result, budget, sample)
                 explanation, source = _within(
                     explained, deadline, lambda: explain.fallback(result, context), "explanation"
                 )

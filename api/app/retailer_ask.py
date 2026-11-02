@@ -215,6 +215,7 @@ def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
                 temperature=0.2,
                 max_output_tokens=2048,
                 attempts=1,
+                keep=lambda r: not problems(r, data, question),
                 # INSIGHTS is about 25 KB: 25 s was not always enough (Oct 14, deadline exceeded).
                 timeout_ms=50_000,
             )
