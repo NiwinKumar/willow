@@ -33,6 +33,8 @@ Env vars:
 | ENGINE_MODE | fixture / http | fixture returns `fixtures/analysis_result.sample.json` |
 | ENGINE_URL | https://willow-engine-hrlt7lqdwa-uc.a.run.app | private; api adds an ID token |
 | GEMINI_MODEL | gemini-3.8-flash | latest GA Flash (GA Sep 2, 2026) |
+| GEMINI_FALLBACK_MODEL | gemini-3.5-flash-lite | second tries and the 7 s hedge (empty: none) |
+| KEEP_GEMINI_ANSWERS | false | `true` in production: keep validated answers in Firestore `gemini_kept` |
 | VERTEX_LOCATION | global | Gemini 3.x GA models are served only from the global endpoint; everything else stays in us-central1 |
 | BQ_DATASET | willow_insights | |
 | ALLOWED_ORIGINS | http://localhost:5173,https://willow-511508.web.app,https://meetwillow.web.app,https://willow-511508.firebaseapp.com | CORS |

@@ -7,6 +7,10 @@
 - Never send more than needed: crops, not full faces, for labelling; metrics JSON, not images, for explanations.
 - Log prompt id, latency, token counts (no images, no PII) to Cloud Logging.
 - Retry once on schema-validation failure; then deterministic fallback.
+- Speed and reliability (Nov 2, for judging and the finale; `api/app/gemini.py`, `api/app/kept.py`). The main model takes about 4 s for even a tiny prompt and sometimes hangs until a 504 or a 429 (the logs Oct 15 - Nov 2: about 120 spot-label failures, 25 Ask timeouts, a 65 s advisor reply). So:
+  - **Fallback model** `GEMINI_FALLBACK_MODEL` = `gemini-3.5-flash-lite` (about 1.3 s; it runs without a thinking level, since LOW makes it about 6 s). The second try after a transient error (429, 503, 504, timeout) or a schema failure goes to it, without a pause. Its answers pass the same schemas and validators.
+  - **Hedge**: when the main model has not answered in 7 s (`HEDGE_AFTER_S`), the fallback is asked too and the first valid answer wins. Applies to every `generate_json` call and to the tool-calling turns (`with_retry`: advisor, shelf agent; AutoCampaign's retry). At most two model calls per request either way.
+  - **Kept answers**: a call with `keep=` is answered from Firestore `gemini_kept/{sha256}` when the same model, prompt, instructions, schema, temperature and inputs (images by their bytes) were answered before; a new answer is kept for 21 days once the caller's own validators accept it. Only for inputs that are aggregates, products or the team's sample photos: Ask, the brief, Proof claims and actions, AutoCampaign rule reading, the routine check, and the explanation and spot labels of sample check-ins. Never a person's own check-in, chat or story, so "Delete my data" still deletes everything. `KEEP_GEMINI_ANSWERS=true` in production only; the collection is closed to clients like every other (`infra/firestore.rules`).
 - Function calling and `response_schema` cannot be combined in one request: the advisor runs the tool loop with plain text, then one final call with `response_schema` to produce the structured message.
 
 ## Global system rules (prepend to every call)

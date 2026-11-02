@@ -23,7 +23,6 @@ from google.genai import types
 from app import gemini, numbers, retail_intel, shelf
 from app.explain import BANNED
 from app.proof_ai import OVERCLAIM
-from app.settings import get_settings
 
 log = logging.getLogger("willow.shelf_agent")
 
@@ -123,8 +122,8 @@ def model_round(contents: list[types.Content], config: types.GenerateContentConf
     started = time.monotonic()
     res = gemini.with_retry(
         "shelf_agent",
-        lambda: gemini.client().models.generate_content(
-            model=get_settings().gemini_model, contents=contents, config=config
+        lambda model: gemini.client().models.generate_content(
+            model=model, contents=contents, config=gemini.config_for(model, config)
         ),
     )
     usage = res.usage_metadata

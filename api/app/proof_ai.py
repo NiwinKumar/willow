@@ -177,6 +177,7 @@ def claims(view: dict[str, Any], channel: str) -> dict[str, Any]:
                 instructions=CLAIMS_INSTRUCTIONS,
                 temperature=0.4,
                 max_output_tokens=1500,
+                keep=lambda o: any(not _draft_problem(d, by_id, limit) for d in o.drafts),
             )
         except gemini.GeminiError:
             break
@@ -408,6 +409,7 @@ def actions(view: dict[str, Any], key: tuple) -> dict[str, Any]:
                 instructions=ACTIONS_INSTRUCTIONS,
                 temperature=0.2,
                 max_output_tokens=1200,
+                keep=lambda o: any(not _pick_problem(p, by_id) for p in o.picks),
             )
             seen = set()
             for p in out.picks:

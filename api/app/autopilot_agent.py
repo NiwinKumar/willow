@@ -33,7 +33,6 @@ from app import autopilot, campaigns, catalog, gemini, numbers
 from app.explain import BANNED
 from app.proof_ai import OVERCLAIM
 from app.retailer import GOAL_LABEL, SKIN_LABEL
-from app.settings import get_settings
 from app.store import Doc, Store
 
 log = logging.getLogger("willow.autopilot_agent")
@@ -176,9 +175,10 @@ def model_round(contents: list[types.Content], config: types.GenerateContentConf
     http = config.http_options
     budget_s = (http.timeout / 1000) if http and http.timeout else PER_CALL_S
 
-    def call(cfg: types.GenerateContentConfig):
+    def call(cfg: types.GenerateContentConfig, model: str | None = None):
+        model = model or gemini.models()[0]
         return gemini.client().models.generate_content(
-            model=get_settings().gemini_model, contents=contents, config=cfg
+            model=model, contents=contents, config=gemini.config_for(model, cfg)
         )
 
     try:
@@ -188,10 +188,13 @@ def model_round(contents: list[types.Content], config: types.GenerateContentConf
         left = budget_s - (time.monotonic() - started) - gemini.retry_pause(exc)
         if not gemini.transient(exc) or left < MIN_ROUND_S:
             raise
-        log.warning("autopilot_agent attempt 1 failed, retrying: %s", str(exc)[:300])
-        time.sleep(gemini.retry_pause(exc))
+        model, pause = gemini.second_try(exc)
+        log.warning("autopilot_agent attempt 1 failed, retrying on %s: %s", model, str(exc)[:300])
+        if pause:
+            time.sleep(pause)
         res = call(
-            config.model_copy(update={"http_options": types.HttpOptions(timeout=int(left * 1000))})
+            config.model_copy(update={"http_options": types.HttpOptions(timeout=int(left * 1000))}),
+            model,
         )
     usage = res.usage_metadata
     log.info(
@@ -725,5 +728,6 @@ def parse(text: str, workspace: str, defaults: dict[str, Any], schema) -> dict[s
         instructions=PARSE_INSTRUCTIONS,
         temperature=0.0,
         max_output_tokens=1500,
+        keep=True,
     )
     return out.model_dump()

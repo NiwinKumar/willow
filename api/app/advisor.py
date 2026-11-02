@@ -344,11 +344,11 @@ def _retrieval_line(name: str, args: dict[str, Any], out: dict[str, Any]) -> str
 
 def _generate(contents: list[types.Content], config: types.GenerateContentConfig):
     """One tool-calling turn; a rate-limited, overloaded or deadline-hit Gemini gets one more try
-    after a short pause (gemini.with_retry)."""
+    on the fallback model (gemini.with_retry)."""
     return gemini.with_retry(
         "advisor_tools",
-        lambda: gemini.client().models.generate_content(
-            model=get_settings().gemini_model, contents=contents, config=config
+        lambda model: gemini.client().models.generate_content(
+            model=model, contents=contents, config=gemini.config_for(model, config)
         ),
     )
 

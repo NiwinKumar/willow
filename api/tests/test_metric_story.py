@@ -247,3 +247,14 @@ def test_a_date_may_be_written_with_or_without_a_leading_zero():
     allowed = metric_story._allowed({"routine": [{"started": "2026-08-01"}], "value": 4.2})
     assert {"01", "1", "4.2"} <= allowed
     assert "2026" not in allowed and "08" not in allowed
+
+
+def test_a_story_is_shown_when_its_session_went_away_meanwhile(monkeypatch):
+    store = _world()
+    _gemini(monkeypatch, GOOD_POINTS)
+
+    def gone(*a, **kw):
+        raise RuntimeError("404 No document to update")
+
+    monkeypatch.setattr(store, "session_update", gone)
+    assert _story(store)["points"] == GOOD_POINTS

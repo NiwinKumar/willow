@@ -379,8 +379,13 @@ def _keep(
     store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str, entry: dict[str, Any]
 ) -> None:
     """Write one metric's story into the session's `stories` as a field-path update, so a story
-    another request kept for another metric meanwhile is not overwritten (metric_id is [a-z_])."""
-    store.session_update(uid, sid, {f"stories.{metric_id}": entry})
+    another request kept for another metric meanwhile is not overwritten (metric_id is [a-z_]).
+    Best effort: the story is shown either way (Oct 20: the session was deleted while its story
+    was written, and the failed update answered 500)."""
+    try:
+        store.session_update(uid, sid, {f"stories.{metric_id}": entry})
+    except Exception as exc:
+        log.warning("could not keep the %s story for %s: %s", metric_id, sid, exc)
 
 
 def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str) -> dict | None:

@@ -39,6 +39,8 @@ gcloud artifacts repositories create willow --repository-format=docker --locatio
 
 echo ">> Firestore (default database, native mode)"
 gcloud firestore databases create --location="$REGION" || true
+# Kept Gemini answers (api/app/kept.py) are removed by Firestore once expires_at passes (Nov 2).
+gcloud firestore fields ttls update expires_at --collection-group=gemini_kept --enable-ttl --async || true
 
 echo ">> Bucket + lifecycle + CORS"
 gcloud storage buckets create "$BUCKET" --location="$REGION" --uniform-bucket-level-access || true
