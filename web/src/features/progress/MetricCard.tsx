@@ -1,5 +1,6 @@
 import { BandBar } from '../../components/charts'
 import { InfoTip } from '../../components/willow/InfoTip'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtReading, fmtSigned, unitOf } from '../../lib/metrics'
@@ -55,13 +56,19 @@ export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 
         <Pill metric={m} session={session} size="sm" />
       </div>
       <div className="pointer-events-none relative flex items-baseline gap-1.5">
-        <span className="font-dot text-[clamp(31px,2.99vw,39px)] leading-[.9] font-extrabold tnum">{none ? '—' : fmtReading(m.value, m)}</span>
+        <span className="font-dot text-[clamp(31px,2.99vw,39px)] leading-[.9] font-extrabold tnum">
+          {none ? '—' : <RollingNumber value={m.value!} from={compared ? m.value! - m.delta! : 0} format={(v) => fmtReading(v, m)} duration={1000} delay={delay + 200} />}
+        </span>
         {!none && unit ? <span className="text-[15px]">{unit}</span> : null}
         {/* The change since the reading compared with, beside the value: "+12.2" up, "−2.1" down. */}
-        {change ? <span className="ml-1.5 text-[16px] tnum opacity-80">{change}</span> : null}
+        {change ? (
+          <span className="ml-1.5 text-[16px] tnum opacity-80">
+            <RollingNumber value={m.delta!} format={(v) => `${fmtSigned(v, m)}${unit === '°' ? '°' : ''}`} duration={1000} delay={delay + 200} />
+          </span>
+        ) : null}
       </div>
       <div className="pointer-events-none relative flex flex-col gap-2">
-        <BandBar variant="tile" ratio={compared && band && m.delta !== null ? m.delta / band : null} hasBand={band !== null && compared} hasValue={!none} />
+        <BandBar variant="tile" ratio={compared && band && m.delta !== null ? m.delta / band : null} hasBand={band !== null && compared} hasValue={!none} delay={delay + 200} />
         {said ? <span className="text-[15px] leading-[1.3]">{said.headline}</span> : plain ? <span className="text-[14px] leading-[1.35]">{plain}</span> : null}
       </div>
     </div>

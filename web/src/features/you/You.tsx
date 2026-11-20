@@ -1,3 +1,4 @@
+import { Words } from '../../components/willow/Words'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -36,7 +37,7 @@ export default function You() {
   const demo = data.mode === 'demo'
   return (
     <main className="relative mx-auto flex w-full max-w-[760px] flex-col gap-6" style={{ padding: '8px clamp(16px,4vw,40px) 32px' }}>
-      <h1 className="m-0 font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">You</h1>
+      <h1 className="m-0 font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal"><Words text="You" /></h1>
       <Group id="account" title="Account">{demo ? <DemoRow /> : <AccountRows />}</Group>
       <Group id="tracking" title="What Willow tracks">
         <GoalsRows demo={demo} />

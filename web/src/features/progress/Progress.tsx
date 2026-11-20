@@ -1,3 +1,4 @@
+import { Words } from '../../components/willow/Words'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
@@ -159,7 +160,7 @@ export default function Progress() {
     <Page label="Progress">
       <div className="flex animate-[wInL_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-4 pt-[clamp(8px,2vw,24px)] pb-2">
-          <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Your skin, over time</h1>
+          <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal"><Words text="Your skin, over time" /></h1>
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4">
@@ -272,7 +273,7 @@ function BaselinesCard({ places, onCheckIn }: { places: { site: Site; mode: Capt
   return (
     <section
       aria-label="Your baselines"
-      className="relative flex flex-col gap-[18px] overflow-hidden rounded-[44px] p-[clamp(22px,3vw,32px)] text-ink squircle"
+      className="relative flex flex-col gap-[18px] self-start overflow-hidden rounded-[44px] p-[clamp(22px,3vw,32px)] text-ink squircle"
       style={{ background: 'radial-gradient(70% 90% at 92% 100%, #C8E62E 0%, var(--signal-baseline) 30%, rgba(220,242,75,.25) 60%, transparent 80%), #F3F5E6', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.6), inset 0 0 70px rgba(255,255,255,.4), 0 30px 70px -50px rgba(140,170,20,.6)' }}
     >
       <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {rows.length > 1 ? 'YOUR BASELINES' : 'YOUR BASELINE'}</span>
@@ -331,7 +332,7 @@ function NotesCard({ notes }: { notes: Note[] }) {
       {list.length ? (
         <ul className="m-0 list-none p-0">
           {list.map((n, i) => (
-            <li key={`${n.day}${i}`} className="flex items-start gap-3.5 border-b border-ink/7 py-2.5">
+            <li key={`${n.day}${i}`} className="flex animate-[wRise_.45s_var(--ease-standard)_both] items-start gap-3.5 border-b border-ink/7 py-2.5" style={{ animationDelay: `${Math.min(i, 8) * 55 + 150}ms` }}>
               <span aria-hidden className="mt-1 size-3 shrink-0 rounded-full" style={{ background: n.dot }} />
               <span className="w-16 shrink-0 font-mono text-[13px]">{fmtDate(n.day)}</span>
               <span className="text-[15px] leading-[1.4]">{n.text}</span>

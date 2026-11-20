@@ -126,7 +126,7 @@ export function InsightsCard({ session, measured, actions, place }: { session: S
 
 /** One next step: a small outline button (or the ink one for the main step) with an arrow. */
 export function NextAction({ children, onClick, to, primary }: { children: ReactNode; onClick?: () => void; to?: string; primary?: boolean }) {
-  const cls = `inline-flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] leading-[1.2] no-underline transition-colors ${primary ? 'bg-selected text-inverse hover:bg-[#2a2a2a]' : 'text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5'}`
+  const cls = `inline-flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] leading-[1.2] no-underline transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] ${primary ? 'bg-selected text-inverse hover:bg-[#2a2a2a]' : 'text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5'}`
   if (to)
     return (
       <Link to={to} className={cls}>

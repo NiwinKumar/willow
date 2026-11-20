@@ -12,7 +12,7 @@ export function Pill({ tone = 'ink', className = '', children, ...rest }: { tone
         ? 'bg-white/60 text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.7)] backdrop-blur-[16px] hover:bg-white/85'
         : 'text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.14)] hover:bg-ink/5'
   return (
-    <button type="button" className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-pill px-4 text-[13px] transition-[background,translate] duration-300 ${t} ${className}`} {...rest}>
+    <button type="button" className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-pill px-4 text-[13px] transition-[background,translate,scale] duration-300 ease-standard active:scale-[.97] active:duration-100 ${t} ${className}`} {...rest}>
       {children}
     </button>
   )
@@ -42,10 +42,15 @@ export function VerdictLine({ kind, way, short, className = '' }: { kind: Verdic
 }
 
 /** Text glyph for sentences (◆ ○ ◌ → ◐ ·); decorative, the words carry the meaning. */
-export function Glyph({ g, className = '' }: { g: string; className?: string }) {
+export function Glyph({ g, className = '', delay = 0 }: { g: string; className?: string; delay?: number }) {
+  const ember = g === '◆'
   return (
-    <span aria-hidden className={`inline-block w-3.5 flex-none text-[12px] ${g === '◆' ? 'text-signal' : 'text-[#3E3C38]'} ${className}`}>
-      {g}
+    <span aria-hidden className={`relative inline-block w-3.5 flex-none text-[12px] ${ember ? 'text-signal' : 'text-[#3E3C38]'} ${className}`}>
+      {/* A real change lands with one spark: the ◆ settles and a ring leaves it. */}
+      <span className={`inline-block ${ember ? 'animate-[wIgnite_.7s_var(--ease-standard)_both]' : ''}`} style={ember ? { animationDelay: `${delay + 200}ms` } : undefined}>
+        {g}
+      </span>
+      {ember ? <span className="pointer-events-none absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 animate-[wRingOut_.9s_ease-out_both] rounded-full border border-signal motion-reduce:hidden" style={{ animationDelay: `${delay + 320}ms` }} /> : null}
     </span>
   )
 }
@@ -53,8 +58,9 @@ export function Glyph({ g, className = '' }: { g: string; className?: string }) 
 /** The arrow circle that ends the design's pills: black on glass pills, yellow on ink CTAs. */
 export function ArrowCircle({ tone = 'ink', size = 28 }: { tone?: 'ink' | 'yellow'; size?: number }) {
   return (
-    <span aria-hidden className={`grid shrink-0 place-items-center rounded-full ${tone === 'ink' ? 'bg-selected text-inverse' : 'bg-cta text-ink'}`} style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size * 0.45} height={size * 0.45} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    // Inside a `group` control the arrow leans the way it points on hover and the circle sinks on press.
+    <span aria-hidden className={`grid shrink-0 place-items-center overflow-hidden rounded-full transition-[scale] duration-200 group-active:scale-90 ${tone === 'ink' ? 'bg-selected text-inverse' : 'bg-cta text-ink'}`} style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" width={size * 0.45} height={size * 0.45} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-[translate] duration-300 ease-standard group-hover:translate-x-[2px] motion-reduce:transition-none">
         <path d="M5 12h14M13 6l6 6-6 6" />
       </svg>
     </span>

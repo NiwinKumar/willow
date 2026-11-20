@@ -23,6 +23,7 @@ import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, changeLines, type ChangeWay,
 import { BaselineDialog } from './BaselineDialog'
 import { InsightsCard, NextAction } from './ExplanationCard'
 import { frameFor, photoSize } from './frame'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { MetricTile } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
 import { DAY_HERO, DAY_RANK, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, metricQuestion, optionLabel, orderMetrics, photoExpired, retryable, sessionState, usableLine, usedFrames } from './model'
@@ -345,8 +346,8 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                   </span>
                 </h1>
                 <div className="flex flex-col items-start gap-1.5">
-                  {chips.map((ch) => (
-                    <span key={ch.t} className="flex min-h-[30px] items-center gap-[7px] rounded-pill bg-white/60 px-3 text-[12.5px]">
+                  {chips.map((ch, i) => (
+                    <span key={ch.t} className="flex min-h-[30px] animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-[7px] rounded-pill bg-white/60 px-3 text-[12.5px]" style={{ animationDelay: `${300 + i * 90}ms` }}>
                       {ch.g ? <VerdictGlyph kind={ch.g} way={ch.way} /> : <span aria-hidden>○</span>}
                       {ch.t}
                     </span>
@@ -354,7 +355,9 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 </div>
               </div>
               <div className="ml-auto flex flex-col items-end gap-1.5 text-right">
-                <span className="font-dot text-[clamp(52px,5vw,72px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
+                <span className="font-dot text-[clamp(52px,5vw,72px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">
+                  {/^\d+$/.test(big) ? <RollingNumber value={Number(big)} format={(v) => String(Math.round(v)).padStart(2, '0')} duration={900} delay={250} /> : big}
+                </span>
                 <span className="max-w-[190px] text-[13.5px] leading-[1.3]">{bigLabel}</span>
               </div>
             </div>

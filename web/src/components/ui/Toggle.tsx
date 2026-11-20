@@ -12,9 +12,9 @@ export function Toggle({ label, checked, onChange, description, disabled }: { la
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-[26px] w-11 shrink-0 rounded-pill transition-colors ${checked ? 'bg-selected' : 'bg-ink/20'}`}
+        className={`relative h-[26px] w-11 shrink-0 rounded-pill transition-[background-color,scale] duration-200 active:scale-95 ${checked ? 'bg-selected' : 'bg-ink/20'}`}
       >
-        <span aria-hidden className={`absolute top-[3px] size-5 rounded-full bg-white shadow-raised transition-[left] duration-200 ${checked ? 'left-[21px]' : 'left-[3px]'}`} />
+        <span aria-hidden className="absolute top-[3px] left-[3px] size-5 rounded-full bg-white shadow-raised transition-[translate,scale] duration-[260ms] ease-spring motion-reduce:transition-none" style={{ translate: checked ? '18px 0' : '0 0' }} />
       </button>
     </label>
   )

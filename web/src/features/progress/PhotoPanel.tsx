@@ -1,3 +1,4 @@
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { forwardRef, useMemo, useState, type KeyboardEvent } from 'react'
 
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
@@ -102,7 +103,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const baseBox = useMemo(() => (baseline ? frameFor(baseline.site, baseline.result, photoSize(baseline)) : null), [baseline])
   const baseDate = baseline ? fmtDate(baseline.created_at) : ''
 
-  const ring = (it: SpotItem) => {
+  const ring = (it: SpotItem, idx: number) => {
     const [x, y, w, h] = it.c.bbox
     const p = toPct(box, x + w / 2, y + h / 2)
     if (p.left < 0 || p.left > 100 || p.top < 0 || p.top > 100) return null
@@ -117,9 +118,10 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
         className="group absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
         style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: on ? 3 : 1 }}
       >
+        {/* Markers land on the photo one after another (the whole set within a second); the selected one pulses three times, then rests. */}
         <span
-          className={`grid size-[26px] place-items-center rounded-full border-2 bg-white/30 text-[12px] font-semibold text-ink backdrop-blur-[2px] transition-transform duration-200 group-hover:scale-115 ${on ? 'animate-[wPulse_1.6s_ease-out_infinite]' : ''}`}
-          style={{ borderColor: it.ring }}
+          className={`grid size-[26px] animate-[wDotIn_.4s_var(--ease-bounce)_both] place-items-center rounded-full border-2 bg-white/30 text-[12px] font-semibold text-ink backdrop-blur-[2px] transition-transform duration-200 group-hover:scale-115 ${on ? '[animation:wDotIn_.4s_var(--ease-bounce)_both,wPulse_1.6s_ease-out_.5s_3]' : ''}`}
+          style={{ borderColor: it.ring, animationDelay: on ? undefined : `${200 + Math.min(idx, 40) * 22}ms` }}
         >
           {it.n}
         </span>
@@ -130,12 +132,12 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   return (
     // Two columns for every site: a forearm photo on its own across a desktop page is taller than the screen.
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4 pt-6">
-      <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+      <section ref={ref} aria-label="Reference photo" className="flex scroll-mt-24 flex-col gap-3 self-start rounded-[44px] bg-surface p-3.5 shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle min-[900px]:sticky min-[900px]:top-6">
         <div className={`relative ${canCompare ? 'touch-pan-y select-none [-webkit-touch-callout:none]' : ''}`} {...(canCompare ? hold.bind : {})}>
           <PhotoFrame session={shown} box={box} alt={`Your ${multi ? `${VIEW_LABEL[active].toLowerCase()} ` : ''}photo from ${fmtDate(session.created_at, { day: 'numeric', month: 'long' })}`} missing={missing}>
             {overlay === 'redness' && rednessUrl ? <RednessLayer url={rednessUrl} box={box} session={shown} /> : null}
             {overlay === 'areas' ? <RegionLayer regions={regions} box={box} open={openRegion?.key ?? null} onPick={(key) => setRegion(openRegion?.key === key ? null : { sid: session.id, key })} /> : null}
-            {overlay === 'spots' ? visible.map(ring) : null}
+            {overlay === 'spots' ? visible.map((it, i) => ring(it, i)) : null}
           </PhotoFrame>
           {multi ? (
             <div className="absolute top-3.5 left-1/2 z-[6] w-max max-w-[calc(100%-24px)] -translate-x-1/2">
@@ -165,7 +167,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
               type="button"
               aria-pressed={hold.pinned}
               onClick={hold.toggle}
-              className={`flex min-h-11 items-center gap-2 rounded-pill px-4 text-[14px] transition-colors ${hold.pinned ? 'bg-selected text-inverse' : 'bg-sunken text-ink hover:bg-muted'}`}
+              className={`flex min-h-11 items-center gap-2 rounded-pill px-4 text-[14px] transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] ${hold.pinned ? 'bg-selected text-inverse' : 'bg-sunken text-ink hover:bg-muted'}`}
             >
               <span aria-hidden className={`size-2.5 rounded-full ${hold.pinned ? 'bg-lime' : 'border-[1.5px] border-ink/40'}`} />
               Show baseline · {baseDate}
@@ -184,7 +186,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             <div className="flex flex-wrap items-baseline justify-between gap-2.5">
               <h3 className="m-0 text-[24px] font-normal">Detected spots</h3>
               <span className="font-dot text-[30px] font-extrabold text-lime" aria-label={`${skin.length} skin ${skin.length === 1 ? 'finding' : 'findings'}`}>
-                {String(skin.length).padStart(2, '0')}
+                <RollingNumber value={skin.length} format={(v) => String(Math.round(v)).padStart(2, '0')} duration={900} delay={300} />
               </span>
             </div>
             <p className="m-0 text-[14px] leading-[1.45] text-white/75">
@@ -226,13 +228,14 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                       </span>
                     ) : null}
                     {multi && !g.items.length ? <span className="px-3 pb-1 text-[13px] text-white/60">No spots found on this photo.</span> : null}
-                {(all ? g.items : g.items.slice(0, LIST_LIMIT)).map((it) => (
+                {(all ? g.items : g.items.slice(0, LIST_LIMIT)).map((it, i) => (
                   <button
                     key={it.n}
                     type="button"
                     aria-pressed={it.n === selN}
                     onClick={() => pick(it)}
-                    className={`flex min-h-11 w-full items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-colors ${it.n === selN ? 'bg-white/14' : 'hover:bg-white/6'}`}
+                    className={`flex min-h-11 w-full animate-[wRise_.4s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-[background-color,scale] duration-200 active:scale-[.985] ${it.n === selN ? 'bg-white/14' : 'hover:bg-white/6'}`}
+                    style={{ animationDelay: `${Math.min(i, 10) * 45 + 250}ms` }}
                   >
                     <span className="grid size-[30px] shrink-0 place-items-center rounded-full border-2 text-[12px]" style={{ borderColor: it.ring }}>
                       {it.n}
@@ -288,7 +291,7 @@ function OverlayPicker({ options, value, onChange }: { options: Overlay[]; value
           aria-checked={value === o}
           tabIndex={value === o ? 0 : -1}
           onClick={() => onChange(o)}
-          className={`min-h-10 rounded-pill px-3.5 text-[13px] whitespace-nowrap transition-colors max-[360px]:px-2.5 ${value === o ? 'bg-selected text-inverse' : 'text-ink'}`}
+          className={`min-h-10 rounded-pill px-3.5 text-[13px] whitespace-nowrap transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] max-[360px]:px-2.5 ${value === o ? 'bg-selected text-inverse' : 'text-ink'}`}
         >
           {OVERLAY_LABEL[o]}
         </button>

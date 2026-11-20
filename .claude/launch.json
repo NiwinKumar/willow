@@ -2,33 +2,67 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "web",
-      "runtimeExecutable": "npm",
+      "name": "film-api",
+      "runtimeExecutable": "sh",
       "runtimeArgs": [
-        "--prefix",
-        "web",
-        "run",
-        "dev"
+        "-c",
+        "cd api && uv run python /private/tmp/claude-501/-Users-happyfox--claude-spares-spare-4xKLfS/5fb5da84-c0d2-4c89-a733-af555c6f2093/scratchpad/film/seed_api.py"
+      ],
+      "port": 8091
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd api && AUTH_MODE=dev DEV_STORE=memory ENGINE_MODE=fixture ALLOWED_ORIGINS=http://localhost:5173 uv run uvicorn app.main:app --port 8080"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd web && VITE_AUTH_MODE=dev VITE_API_URL=http://localhost:8080 npx vite --port 5173 --strictPort"
       ],
       "port": 5173
     },
     {
-      "name": "web-e2e",
+      "name": "api-widgets",
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd web && VITE_AUTH_MODE=dev VITE_DEV_UID=e2e_browser VITE_API_URL=http://localhost:8080 npx vite --port 5174 --strictPort"
+        "cd /Users/happyfox/projects/personal/willow/.claude/worktrees/widget-names/api && AUTH_MODE=dev DEV_STORE=memory ENGINE_MODE=fixture ALLOWED_ORIGINS=http://localhost:5174 uv run uvicorn app.main:app --port 8081"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "web-wisp",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/happyfox/projects/personal/willow/.claude/worktrees/hero-buttons/web && VITE_AUTH_MODE=dev VITE_API_URL=http://localhost:8081 npx vite --port 5174 --strictPort"
       ],
       "port": 5174
     },
     {
-      "name": "api-e2e",
+      "name": "web-prod",
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd api && AUTH_MODE=dev DEV_UPLOADS=true ENGINE_MODE=http ENGINE_URL=https://willow-engine-hrlt7lqdwa-uc.a.run.app ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174 uv run uvicorn app.main:app --port 8080"
+        "cd web && VITE_API_URL=https://willow-api-hrlt7lqdwa-uc.a.run.app npx vite --port 5173 --strictPort"
       ],
-      "port": 8080
+      "port": 5173
+    },
+    {
+      "name": "web-demo",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd web && VITE_AUTH_MODE=dev VITE_API_URL=https://willow-api-hrlt7lqdwa-uc.a.run.app npx vite --port 5173 --strictPort"
+      ],
+      "port": 5173
     }
   ]
 }

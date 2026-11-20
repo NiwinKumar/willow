@@ -52,7 +52,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
             </span>
           ) : null}
         </div>
-        <button type="button" onClick={onAdd} aria-label={`Add a product to your ${t.name.toLowerCase()} routine`} title="Add a product" className="hit44 grid size-9 place-items-center rounded-full transition-colors hover:bg-[rgba(128,128,128,.18)]" style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }}>
+        <button type="button" onClick={onAdd} aria-label={`Add a product to your ${t.name.toLowerCase()} routine`} title="Add a product" className="hit44 grid size-9 place-items-center rounded-full transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-[rgba(128,128,128,.18)]" style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }}>
           <Plus size={15} strokeWidth={1.8} aria-hidden />
         </button>
       </div>
@@ -61,7 +61,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
           Nothing here yet · add a product
         </button>
       ) : null}
-      {entries.map((e) => {
+      {entries.map((e, i) => {
         const on = ticked(e.id)
         const starts = e.started_at.slice(0, 10) > today
         const o = outcomeFor(e, sessions)
@@ -70,7 +70,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
         const rest = restsOn(e, today)
         const note = starts ? `FROM ${fmtDate(e.started_at).toUpperCase()}` : dayNote(e, slot, today)
         return (
-          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: 'wRise .4s both' }}>
+          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .4s ${i * 60}ms both` }}>
             <button
               type="button"
               aria-pressed={on}

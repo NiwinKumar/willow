@@ -78,12 +78,12 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
         {count > 0 ? (
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {done && findings.length ? (
-              <button type="button" aria-expanded={showHow} aria-controls={howId} onClick={() => setShowHow((v) => !v)} className="hit44 inline-flex h-9 items-center gap-1.5 rounded-pill bg-white/[.14] px-3.5 text-[12.5px] text-inverse transition-colors hover:bg-white/[.26]">
+              <button type="button" aria-expanded={showHow} aria-controls={howId} onClick={() => setShowHow((v) => !v)} className="hit44 inline-flex h-9 items-center gap-1.5 rounded-pill bg-white/[.14] px-3.5 text-[12.5px] text-inverse transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-white/[.26]">
                 <Info size={14} strokeWidth={1.8} aria-hidden />
                 How this was checked
               </button>
             ) : null}
-            <button type="button" onClick={() => void runAgain()} disabled={running} aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'} title={failed ? 'Try again' : 'Run again'} className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-colors hover:bg-white/[.26] disabled:opacity-60">
+            <button type="button" onClick={() => void runAgain()} disabled={running} aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'} title={failed ? 'Try again' : 'Run again'} className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-white/[.26] disabled:opacity-60">
               <RefreshCw size={15} strokeWidth={1.8} aria-hidden className={running ? 'motion-safe:animate-spin' : ''} />
             </button>
           </div>
@@ -137,7 +137,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                       {alternating === f.key ? 'Saving…' : 'Alternate these'}
                     </button>
                   ) : null}
-                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-8 rounded-pill bg-white/[.16] px-3.5 text-[12.5px] whitespace-nowrap transition-colors hover:bg-white/[.26]">
+                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-8 rounded-pill bg-white/[.16] px-3.5 text-[12.5px] whitespace-nowrap transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-white/[.26]">
                     Ask Wisp why →
                   </button>
                 </span>
@@ -195,7 +195,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
             })}
           </div>
           {sorted.length > SHOWN ? (
-            <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className="min-h-9 self-end rounded-pill bg-white/[.14] px-3.5 text-[13px] transition-colors hover:bg-white/[.26]">
+            <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className="min-h-9 self-end rounded-pill bg-white/[.14] px-3.5 text-[13px] transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-white/[.26]">
               {all ? 'Show fewer' : `Show ${sorted.length - SHOWN} more`}
             </button>
           ) : null}

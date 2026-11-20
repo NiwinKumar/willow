@@ -41,7 +41,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
   return (
     <div ref={ref} role="radiogroup" aria-label={label} onKeyDown={move} className={`relative flex gap-[3px] rounded-pill ${glass ? 'glass-pill p-0.5 shadow-glass' : frosted ? 'glass-pill p-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)]' : 'bg-canvas p-1'} ${className}`}>
       {pill ? (
-        <span aria-hidden className={`absolute rounded-pill ${glass ? 'top-0.5 bottom-0.5' : 'top-1 bottom-1'} bg-white shadow-[0_2px_8px_rgba(0,0,0,.08)] ${glide ? 'transition-[left,width] duration-[600ms] ease-standard' : ''}`} style={{ left: pill.x, width: pill.w }} />
+        <span aria-hidden className={`absolute rounded-pill ${glass ? 'top-0.5 bottom-0.5' : 'top-1 bottom-1'} left-0 bg-white shadow-[0_2px_8px_rgba(0,0,0,.08)] ${glide ? 'transition-[translate,width] duration-[280ms] ease-standard motion-reduce:transition-none' : ''}`} style={{ translate: `${pill.x}px 0`, width: pill.w }} />
       ) : null}
       {options.map((o) => (
         <button

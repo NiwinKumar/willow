@@ -23,6 +23,9 @@ export function ProductImage({ product, size, muted = false, rest = false, breat
 }) {
   const src = product.image_url || null
   const [failed, setFailed] = useState<string | null>(null)
+  // Packshots come from brand CDNs at their own pace: each fades in once decoded instead of popping in
+  // (an image already in the cache counts as loaded at once, so it never flickers).
+  const [loaded, setLoaded] = useState<string | null>(null)
   if (!src || failed === src) return <>{fallback ?? <CategoryOrb category={product.category} size={size} muted={muted} rest={rest} breathe={breathe} />}</>
   return (
     <span
@@ -43,8 +46,12 @@ export function ProductImage({ product, size, muted = false, rest = false, breat
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
+        ref={(el) => {
+          if (el?.complete && el.naturalWidth > 0 && loaded !== src) setLoaded(src)
+        }}
+        onLoad={() => setLoaded(src)}
         onError={() => setFailed(src)}
-        className="size-full object-cover"
+        className={`size-full object-cover transition-opacity duration-300 ease-standard motion-reduce:transition-none ${loaded === src ? 'opacity-100' : 'opacity-0'}`}
       />
     </span>
   )

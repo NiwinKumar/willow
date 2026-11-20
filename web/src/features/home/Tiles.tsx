@@ -1,3 +1,4 @@
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { useState } from 'react'
 
 import type { QualityReason, Session } from '../../data/types'
@@ -28,7 +29,7 @@ export function ProductTestTile({ read, onOpen, className = '' }: { read: Forear
       type="button"
       onClick={onOpen}
       aria-label={`Product test${name ? `: ${name} on your forearm` : ''}, day ${day}${of ? ` of ${of}` : ''}. ${standing.t}. Open the product test.`}
-      className={`flex min-w-0 animate-[wRise_.55s_.2s_both] flex-col justify-between gap-3 rounded-lg squircle p-4 text-left text-willow-900 transition-transform duration-[400ms] ease-standard hover:-translate-y-1 ${className}`}
+      className={`flex min-w-0 animate-[wRise_.55s_.2s_both] flex-col justify-between gap-3 rounded-lg squircle p-4 text-left text-willow-900 transition-[translate,scale] duration-[400ms] ease-standard hover:-translate-y-1 active:translate-y-0 active:scale-[.985] active:duration-100 ${className}`}
       style={{ background: 'radial-gradient(100% 90% at 0% 0%, #B8E986 0%, transparent 60%), radial-gradient(100% 100% at 100% 100%, #4FB866 0%, transparent 62%), #CDEFB5', boxShadow: 'inset 0 0 44px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(15,59,58,.55)' }}
     >
       <span className="flex items-start justify-between gap-3">
@@ -67,7 +68,7 @@ export function BaselineTile({ baseline, onOpen, className = '' }: { baseline: S
       type="button"
       onClick={onOpen}
       aria-label={`Your baseline: ${fmtDate(baseline.created_at, { day: 'numeric', month: 'long' })}, ${ago}. ${photos} photos, a normal range for ${ranged} readings. Open your progress.`}
-      className={`card flex min-w-0 animate-[wRise_.55s_.24s_both] flex-col justify-between gap-3 p-4 text-left transition-transform duration-[400ms] ease-standard hover:-translate-y-1 ${className}`}
+      className={`card flex min-w-0 animate-[wRise_.55s_.24s_both] flex-col justify-between gap-3 p-4 text-left transition-[translate,scale] duration-[400ms] ease-standard hover:-translate-y-1 active:translate-y-0 active:scale-[.985] active:duration-100 ${className}`}
     >
       <span className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 flex-col gap-1">
@@ -111,7 +112,7 @@ export function PhotosTile({ session, onOpen, className = '' }: { session: Sessi
       type="button"
       onClick={onOpen}
       aria-label={`Last photos, ${place.toLowerCase()} on ${fmtDate(session.created_at)}: ${used} of ${total} used. ${checks.map((c) => `${c.label} ${c.ok ? 'passed' : 'needs a look'}`).join(', ')}. ${tip} Open the result.`}
-      className={`card flex min-w-0 animate-[wRise_.55s_.16s_both] flex-col gap-3 p-4 text-left transition-transform duration-[400ms] ease-standard hover:-translate-y-1 ${className}`}
+      className={`card flex min-w-0 animate-[wRise_.55s_.16s_both] flex-col gap-3 p-4 text-left transition-[translate,scale] duration-[400ms] ease-standard hover:-translate-y-1 active:translate-y-0 active:scale-[.985] active:duration-100 ${className}`}
     >
       <span className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 flex-col gap-1">
@@ -121,13 +122,15 @@ export function PhotosTile({ session, onOpen, className = '' }: { session: Sessi
           </span>
         </span>
         <span className="flex flex-none items-baseline gap-1">
-          <span className="font-dot text-[34px] leading-none tnum">{used}</span>
+          <span className="font-dot text-[34px] leading-none tnum">
+            <RollingNumber value={used} format={String} duration={700} delay={300} />
+          </span>
           <span className="text-[12px] text-ink-2">of {total} used</span>
         </span>
       </span>
       <span className="grid grid-cols-2 gap-1.5 text-[12.5px]">
-        {checks.map((c) => (
-          <span key={c.label} className={`flex items-center gap-1.5 rounded-pill px-2.5 py-1 ${c.ok ? 'bg-ink/5' : 'bg-[#FFE3CF]'}`}>
+        {checks.map((c, i) => (
+          <span key={c.label} className={`flex animate-[wRise_.4s_both] items-center gap-1.5 rounded-pill px-2.5 py-1 ${c.ok ? 'bg-ink/5' : 'bg-[#FFE3CF]'}`} style={{ animationDelay: `${360 + i * 70}ms` }}>
             <span aria-hidden>{c.ok ? '✓' : '△'}</span>
             {c.label}
           </span>

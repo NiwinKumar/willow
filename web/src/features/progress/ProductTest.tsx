@@ -1,3 +1,4 @@
+import { Words } from '../../components/willow/Words'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -202,6 +203,14 @@ export default function ProductTest() {
             <EmptyState
               title="No product test yet"
               body="A product test compares a treated square of skin on one forearm with an untreated square on the other, photographed together. Start with a baseline of each square, before you apply the product."
+              action={
+                data.mode === 'live' && tests.status === 'ready' ? undefined : (
+                  // The one action belongs inside the card that explains it, not floating under it.
+                  <Button variant="ink" size="lg" className="mt-1" onClick={photograph}>
+                    Photograph both arms
+                  </Button>
+                )
+              }
             />
             {data.mode === 'live' && tests.status === 'ready' ? (
               <section aria-label="Start a product test" className="card flex max-w-[640px] flex-col gap-3 bg-surface p-[clamp(20px,3vw,28px)]">
@@ -209,11 +218,7 @@ export default function ProductTest() {
                 <StartTest preset={{ name: params.get('start') === 'self-tanner' ? 'Self-tanner' : '' }} />
                 <span className="text-[13px] text-ink-2">To test a routine product, open it on the Routine page and choose “Start a forearm test”.</span>
               </section>
-            ) : (
-              <Button variant="ink" size="lg" className="self-start" onClick={photograph}>
-                Photograph both arms
-              </Button>
-            )}
+            ) : null}
           </>
         )}
         <Disclaimer />
@@ -296,7 +301,7 @@ export default function ProductTest() {
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">
             ■ {test ? test.name.toUpperCase() : 'TREATED VS CONTROL'} · {td ? `DAY ${td.day} OF ${td.of}` : `DAY ${dayN}`} · {look.short}
           </span>
-          <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Treated arm vs control arm</h1>
+          <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal"><Words text="Treated arm vs control arm" /></h1>
         </div>
         <div className="flex flex-wrap justify-end gap-1.5">
           {hasRedness ? (

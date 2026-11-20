@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
  */
 export function Group({ id, title, children, tone = 'plain' }: { id: string; title: string; children: ReactNode; tone?: 'plain' | 'danger' }) {
   return (
-    <section id={id} aria-labelledby={`${id}-h`} className="flex scroll-mt-24 flex-col gap-2">
+    <section id={id} aria-labelledby={`${id}-h`} className="flex scroll-mt-24 animate-[wRise_.5s_var(--ease-standard)_both] flex-col gap-2 [animation-delay:calc(var(--i,0)*80ms+80ms)] [&:nth-child(2)]:[--i:1] [&:nth-child(3)]:[--i:2] [&:nth-child(4)]:[--i:3] [&:nth-child(5)]:[--i:4] [&:nth-child(6)]:[--i:5] [&:nth-child(7)]:[--i:6]">
       <h2 id={`${id}-h`} className="m-0 px-1 text-[13px] font-normal text-ink-2">
         {title}
       </h2>

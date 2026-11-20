@@ -386,6 +386,15 @@
 @keyframes wShimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
 @keyframes wNudge { 0%, 50%, 100% { translate: 0 0 } 14% { translate: 0 -10px } 26% { translate: 0 0 } 36% { translate: 0 -5px } 46% { translate: 0 0 } }
 @keyframes wDotIn { from { scale: 0; opacity: 0 } to { scale: 1; opacity: 1 } }
+/* A real change arrives with one spark: the ◆ lands and a ring leaves it (never loops). */
+@keyframes wIgnite { from { scale: .4; opacity: 0 } 60% { scale: 1.18 } to { scale: 1; opacity: 1 } }
+@keyframes wRingOut { from { scale: .5; opacity: .9 } to { scale: 2.6; opacity: 0 } }
+/* A word of the greeting comes into focus a beat after the one before it. */
+@keyframes wLetter { from { opacity: 0; translate: 0 .35em; filter: blur(6px) } to { opacity: 1; translate: 0 0; filter: blur(0) } }
+/* A line that connects things is drawn from its start. */
+@keyframes wLine { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+/* A value's marker slides out from the baseline to where the reading landed. */
+@keyframes wFromCentre { from { left: 50% } }
 @keyframes wRingPulse { 0% { box-shadow: 0 0 0 0 rgba(18, 18, 18, .4) } 100% { box-shadow: 0 0 0 18px rgba(18, 18, 18, 0) } }
 @keyframes wPageIn { from { opacity: 0; filter: blur(8px); translate: 0 14px } to { opacity: 1; filter: blur(0); translate: 0 0 } }
 /* The measuring card (home/LeadCard.tsx): an indeterminate bar sweep, the active step turning, and a light band

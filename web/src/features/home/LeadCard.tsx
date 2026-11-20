@@ -1,3 +1,4 @@
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { ArrowCircle } from './parts'
 
 /** The design's lead-card auras (Willow App.dc.html appVals AURA), plus a quiet grey for checks that didn't finish. */
@@ -87,8 +88,8 @@ export function LeadCard({ lead }: { lead: Lead }) {
         <span className="font-mono text-[11px] tracking-[.08em]">{lead.eyebrow ? `■ ${lead.eyebrow}` : ''}</span>
         {lead.chips?.length ? (
           <span className="flex flex-wrap gap-[5px]">
-            {lead.chips.map((c) => (
-              <span key={c} className="rounded-pill bg-white/60 px-2.5 py-[5px] text-[12px] text-ink backdrop-blur-[10px]">
+            {lead.chips.map((c, i) => (
+              <span key={c} className="animate-[wRise_.45s_both] rounded-pill bg-white/60 px-2.5 py-[5px] text-[12px] text-ink backdrop-blur-[10px]" style={{ animationDelay: `${220 + i * 80}ms` }}>
                 {c}
               </span>
             ))}
@@ -99,8 +100,10 @@ export function LeadCard({ lead }: { lead: Lead }) {
         {lead.steps ? <ScanField /> : null}
         {lead.big ? (
           <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-            <span className="font-dot text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">{lead.big}</span>
-            {lead.bigLabel ? <span className="max-w-[140px] pb-1 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
+            <span className="font-dot text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">
+              <BigNumber text={lead.big} />
+            </span>
+            {lead.bigLabel ? <span className="max-w-[140px] animate-[wWord_.6s_.9s_both] pb-1 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
           </div>
         ) : null}
       </div>
@@ -130,8 +133,8 @@ export function LeadCard({ lead }: { lead: Lead }) {
       ) : null}
       <div className="relative flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-2">
-          <h2 className="m-0 text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
-          <p className="m-0 max-w-[46ch] text-[14px] leading-[1.45]">{lead.sub}</p>
+          <h2 className="m-0 animate-[wLetter_.6s_.25s_var(--ease-standard)_both] text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
+          <p className="m-0 max-w-[46ch] animate-[wWord_.7s_.45s_both] text-[14px] leading-[1.45]">{lead.sub}</p>
         </div>
         {lead.cta || lead.note || lead.secondary ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -139,21 +142,39 @@ export function LeadCard({ lead }: { lead: Lead }) {
               <button
                 type="button"
                 onClick={lead.cta.onClick}
-                className="flex min-h-[46px] items-center gap-3 rounded-pill bg-selected pr-[5px] pl-5 text-[14.5px] text-inverse shadow-[0_14px_26px_-14px_rgba(0,0,0,.6)] transition-transform duration-[250ms] hover:-translate-y-0.5"
+                className="group flex min-h-[46px] animate-[wRise_.5s_.6s_both] items-center gap-3 rounded-pill bg-selected pr-[5px] pl-5 text-[14.5px] text-inverse shadow-[0_14px_26px_-14px_rgba(0,0,0,.6)] transition-[translate,scale,box-shadow] duration-[250ms] ease-standard hover:-translate-y-0.5 active:translate-y-0 active:scale-[.97] active:duration-100"
               >
                 {lead.cta.label}
                 <ArrowCircle tone="yellow" size={36} />
               </button>
             ) : null}
             {lead.secondary ? (
-              <button type="button" onClick={lead.secondary.onClick} className="order-first min-h-11 rounded-pill bg-white/60 px-4 text-[13px] text-ink backdrop-blur-[10px] hover:bg-white/80">
+              <button type="button" onClick={lead.secondary.onClick} className="order-first min-h-11 rounded-pill bg-white/60 px-4 text-[13px] text-ink backdrop-blur-[10px] transition-[background,scale] duration-200 hover:bg-white/80 active:scale-[.97]">
                 {lead.secondary.label}
               </button>
             ) : null}
-            {lead.note ? <span className="rounded-pill bg-white/60 px-3.5 py-2.5 text-[13px] backdrop-blur-[10px]">{lead.note}</span> : null}
+            {lead.note ? <span className="max-w-[30ch] text-[12.5px] leading-[1.35] text-ink/75">{lead.note}</span> : null}
           </div>
         ) : null}
       </div>
     </section>
   )
+}
+
+/**
+ * The card's big figure counts into place: "3/5" counts the 3, "12" counts up, "−1.7" counts from 0 with its sign
+ * and decimals kept. Anything else (none of these shapes) is shown as it is.
+ */
+function BigNumber({ text }: { text: string }) {
+  const m = /^([−+-]?)(\d+)(?:\.(\d+))?(\/\d+)?$/.exec(text)
+  if (!m) return <>{text}</>
+  const [, sign, whole, frac = '', rest = ''] = m
+  const decimals = frac.length
+  const value = Number(`${whole}${frac ? `.${frac}` : ''}`) * (sign === '−' || sign === '-' ? -1 : 1)
+  const format = (v: number) => {
+    const abs = Math.abs(v).toFixed(decimals)
+    const s = v < 0 && Number(abs) !== 0 ? '−' : sign === '+' ? '+' : ''
+    return `${s}${abs}${rest}`
+  }
+  return <RollingNumber value={value} format={format} duration={1100} delay={180} />
 }

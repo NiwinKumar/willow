@@ -85,7 +85,9 @@ export function Calendar({
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-baseline gap-3">
           <h2 aria-live="polite" className="m-0 font-serif text-[clamp(36px,4vw,52px)] leading-none font-normal">
-            {monthName}
+            <span key={month} className="inline-block animate-[wLetter_.5s_var(--ease-standard)_both]">
+              {monthName}
+            </span>
           </h2>
           <span className="font-dot text-[22px] font-extrabold text-ink-2">{y}</span>
         </div>
@@ -111,10 +113,10 @@ export function Calendar({
               ) : null}
             </div>
           ) : null}
-          <button type="button" onClick={onPrev} disabled={!canPrev} aria-label="Previous month" className="grid size-11 place-items-center rounded-full bg-sunken transition-colors hover:bg-muted disabled:opacity-40">
+          <button type="button" onClick={onPrev} disabled={!canPrev} aria-label="Previous month" className="grid size-11 place-items-center rounded-full bg-sunken transition-[background,scale] duration-150 hover:bg-muted active:scale-[.92] disabled:opacity-40 disabled:active:scale-100">
             <ChevronLeft size={18} aria-hidden />
           </button>
-          <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next month" className="grid size-11 place-items-center rounded-full bg-sunken transition-colors hover:bg-muted disabled:opacity-40">
+          <button type="button" onClick={onNext} disabled={!canNext} aria-label="Next month" className="grid size-11 place-items-center rounded-full bg-sunken transition-[background,scale] duration-150 hover:bg-muted active:scale-[.92] disabled:opacity-40 disabled:active:scale-100">
             <ChevronRight size={18} aria-hidden />
           </button>
         </div>
@@ -150,13 +152,17 @@ export function Calendar({
                 onClick={day.onPick}
                 aria-label={day.label}
                 aria-current={iso === current ? 'date' : undefined}
-                className={`${cell} ${tap} text-ink`}
+                className={`${cell} ${tap} group relative text-ink hover:z-[11]`}
                 onPointerEnter={iso === nudge ? () => setReached(true) : undefined}
                 onFocus={iso === nudge ? () => setReached(true) : undefined}
                 style={{ ...delay, ...(iso === nudge && !reached && !reduce ? { animation: 'wDotIn .45s cubic-bezier(.2,.8,.2,1) backwards, wNudge 2.8s ease-in-out 1.6s infinite' } : {}), background: day.bg, boxShadow: iso === current ? '0 0 0 2px var(--bg-surface), 0 0 0 3.5px var(--text-primary)' : 'inset 0 0 0 1px rgba(255,255,255,.5), 0 10px 22px -16px rgba(0,0,0,.45)' }}
               >
                 <span className={`text-[clamp(12px,1.3vw,15px)] ${isToday ? 'font-semibold' : ''}`}>{d}</span>
                 {dotRow(day.dots)}
+                {/* On a mouse, what the day holds appears over it after a beat (the button's label says the same). */}
+                <span aria-hidden className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-[12] hidden w-max max-w-[220px] -translate-x-1/2 translate-y-1 rounded-[14px] bg-selected px-3 py-2 text-left text-[12px] leading-[1.35] text-inverse opacity-0 shadow-[0_16px_32px_-16px_rgba(0,0,0,.5)] transition-[opacity,translate] duration-200 ease-standard group-hover:translate-y-0 group-hover:opacity-100 group-hover:delay-300 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [@media(hover:hover)]:block">
+                  {day.label.replace(/\. Open details$/, '').split(', ').slice(1).join(' · ')}
+                </span>
               </button>
             )
           if (isToday && onToday)

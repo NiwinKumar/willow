@@ -33,16 +33,18 @@ export function HeroRuler({ ratio, label }: { ratio: number | null; label: strin
  * reading. `card` = dotted rule and a tall bar marker (metric cards); `tile` = a track with a round marker
  * (day detail). Decorative: the delta and range are always written beside it.
  */
-export function BandBar({ ratio, hasBand, hasValue, variant = 'card' }: { ratio: number | null; hasBand: boolean; hasValue: boolean; variant?: 'card' | 'tile' }) {
+export function BandBar({ ratio, hasBand, hasValue, variant = 'card', delay = 0 }: { ratio: number | null; hasBand: boolean; hasValue: boolean; variant?: 'card' | 'tile'; delay?: number }) {
   const pos = bandPosition(hasBand ? ratio : null)
+  // The marker starts on the baseline (the centre) and slides to where the reading landed: the change, drawn.
+  const slide = { left: `${pos}%`, opacity: hasValue ? 1 : 0, animation: pos === 50 ? undefined : `wFromCentre 1s ${delay}ms var(--ease-standard) both` }
   if (variant === 'tile')
     return (
       <span aria-hidden className="relative block h-1.5 rounded-[6px] bg-ink/12">
         <span className="absolute inset-y-0 left-[35%] w-[30%] rounded-[6px] bg-white/75" style={{ opacity: hasBand ? 1 : 0 }} />
         <span className="absolute -top-[3px] left-1/2 h-3 w-[1.5px] bg-ink/40" />
         <span
-          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-selected shadow-[0_0_0_3px_rgba(255,255,255,.8)] transition-[left] duration-[600ms] ease-standard"
-          style={{ left: `${pos}%`, opacity: hasValue ? 1 : 0 }}
+          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-selected shadow-[0_0_0_3px_rgba(255,255,255,.8)] transition-[left] duration-[600ms] ease-standard motion-reduce:animate-none"
+          style={slide}
         />
       </span>
     )
@@ -50,7 +52,7 @@ export function BandBar({ ratio, hasBand, hasValue, variant = 'card' }: { ratio:
     <span aria-hidden className="relative block h-[22px]">
       <span className="absolute inset-x-[6%] top-[10px] h-0.5 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.4px)', backgroundSize: '7px 2px' }} />
       <span className="absolute top-[3px] left-[35%] h-4 w-[30%] rounded-pill bg-white/60" style={{ opacity: hasBand ? 1 : 0.25 }} />
-      <span className="absolute top-0 h-[22px] w-[3px] -translate-x-1/2 rounded-[3px] bg-current transition-[left] duration-[600ms]" style={{ left: `${pos}%`, opacity: hasValue ? 1 : 0 }} />
+      <span className="absolute top-0 h-[22px] w-[3px] -translate-x-1/2 rounded-[3px] bg-current transition-[left] duration-[600ms] motion-reduce:animate-none" style={slide} />
     </span>
   )
 }

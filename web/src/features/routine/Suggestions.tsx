@@ -38,8 +38,8 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
   }
   const row = 'flex items-center gap-3 border-t border-line py-2.5 first:border-t-0 first:pt-0'
   const tag = 'truncate font-mono text-[10px] tracking-[.08em] text-ink-2'
-  const title = 'line-clamp-2 text-[14px] leading-[1.3] text-pretty'
-  const act = 'hit44 min-h-9 shrink-0 rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-colors'
+  const title = 'line-clamp-3 text-[14px] leading-[1.3] text-pretty'
+  const act = 'hit44 min-h-9 shrink-0 rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97]'
   return (
     <section aria-labelledby="suggested-h" className="card flex flex-col gap-1 p-4">
       <h2 id="suggested-h" className="pb-2 text-[18px] font-normal tracking-[-0.01em]">

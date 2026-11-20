@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
+
 import { ProductImage } from '../../components/willow/ProductImage'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import type { RoutineEntry } from '../../data/types'
 import { imageOf } from '../routine/routineModel'
 import { dayNote, restsOn } from '../routine/schedule'
@@ -35,7 +38,7 @@ const PANEL: Record<Slot, { name: string; bg: string; fg: string; line: string; 
 function fit(n: number): { rows: number; cols: number; px: number } {
   const rows = n <= 4 ? 1 : n <= 10 ? 2 : 3
   const cols = Math.max(1, Math.ceil(n / rows))
-  const px = rows === 3 ? 32 : cols <= 3 ? 48 : cols === 4 ? 42 : 36
+  const px = rows === 3 ? 32 : cols <= 3 ? 60 : cols === 4 ? 54 : 40
   return { rows, cols, px }
 }
 
@@ -83,7 +86,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
               <div className="flex items-baseline justify-between">
                 <span className="font-mono text-[10.5px] tracking-[.08em]">■ {p.name}</span>
                 <span className="font-dot text-[17px]" aria-label={`${ticked} of ${due} used today`}>
-                  {ticked}/{due}
+                  <RollingNumber value={ticked} format={(v) => `${Math.round(v)}/${due}`} duration={500} />
                 </span>
               </div>
               {list.length === 0 && !(slot === 'am' && missingSunscreen) ? (
@@ -92,9 +95,9 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                 </button>
               ) : (
                 <div className="relative my-auto grid justify-items-center gap-x-1 gap-y-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-                  {rows === 1 ? <span aria-hidden className="absolute h-[1.5px]" style={{ background: p.line, top: px / 2 - 1, left: `${50 / cols}%`, right: `${50 / cols}%` }} /> : null}
-                  {list.map((e) => (
-                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
+                  {rows === 1 ? <span aria-hidden className="absolute h-[1.5px] origin-left animate-[wLine_.9s_.5s_var(--ease-standard)_both]" style={{ background: p.line, top: px / 2 - 1, left: `${50 / cols}%`, right: `${50 / cols}%` }} /> : null}
+                  {list.map((e, i) => (
+                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} delay={(slot === 'am' ? 300 : 420) + i * 90} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
                     <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
@@ -115,8 +118,15 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   )
 }
 
-function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry: RoutineEntry; slot: Slot; on: boolean; px: number; named: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
+function Orb({ entry, slot, on, px, named, ring, badgeRing, delay, onToggle }: { entry: RoutineEntry; slot: Slot; on: boolean; px: number; named: boolean; ring: string; badgeRing: string; delay: number; onToggle: (on: boolean) => void }) {
   const [c0, c1, c2] = orbColours(entry)
+  // A tick the person just made sends one ring out from the product (not on load, not when unticking).
+  const [ripple, setRipple] = useState(0)
+  const wasOn = useRef(on)
+  useEffect(() => {
+    if (on && !wasOn.current) setRipple((n) => n + 1)
+    wasOn.current = on
+  }, [on])
   const full = [entry.custom_name, entry.brand].filter(Boolean).join(' · ')
   const rest = restsOn(entry)
   const note = dayNote(entry, slot)
@@ -127,13 +137,15 @@ function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry:
       aria-pressed={on}
       aria-label={`${on ? 'Used today' : 'Mark used today'}: ${full}${rest && !on ? ' (rests today)' : ''}`}
       title={full}
-      className="group relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit"
+      className="group relative flex w-full min-w-0 animate-[wRise_.5s_var(--ease-standard)_both] flex-col items-center gap-1.5 p-0 text-inherit"
+      style={{ animationDelay: `${delay}ms` }}
     >
       <span
         aria-hidden
-        className="relative rounded-full transition-[box-shadow,scale] duration-[350ms] ease-bounce group-hover:scale-[1.08] group-active:scale-[.92]"
+        className="relative rounded-full transition-[outline-color,scale] duration-[350ms] ease-bounce group-hover:scale-[1.08] group-active:scale-[.92]"
         style={{ width: px, height: px, outline: `1.5px solid ${on ? ring : 'transparent'}`, outlineOffset: 3 }}
       >
+        {ripple ? <span key={ripple} className="pointer-events-none absolute inset-0 animate-[wRingOut_.7s_ease-out_both] rounded-full border-[1.5px] motion-reduce:hidden" style={{ borderColor: ring }} /> : null}
         <ProductImage
           product={imageOf(entry)}
           size={px}
@@ -160,7 +172,7 @@ function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry:
           ✓
         </span>
       </span>
-      {named ? <span className={`line-clamp-2 text-center leading-[1.2] ${px >= 42 ? 'text-[11.5px]' : 'text-[10.5px]'}`}>{shortName(entry)}</span> : null}
+      {named ? <span className={`line-clamp-2 text-center leading-[1.2] ${px >= 42 ? 'text-[12px]' : 'text-[10.5px]'}`}>{shortName(entry)}</span> : null}
       {note && named ? <span className="min-h-[11px] font-mono text-[9.5px] tracking-[.05em] opacity-75">{note}</span> : null}
     </button>
   )

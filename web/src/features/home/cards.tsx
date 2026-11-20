@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react'
 
+import { RollingNumber } from '../../components/willow/RollingNumber'
+import { useInViewOnce } from '../../lib/useInView'
+import { useReducedMotion } from '../../lib/useReducedMotion'
+
 import { TrendChart } from '../../components/charts'
 import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
@@ -13,8 +17,11 @@ import { CardHead, Pill, VerdictLine } from './parts'
 
 /** Standard Home card shell: surface, radius 30, rise in. */
 export function HomeCard({ label, className = '', delay = 0, children }: { label: string; className?: string; delay?: number; children: ReactNode }) {
+  // A card below the fold waits (paused on its first frame) until it scrolls into view, then rises.
+  const [ref, seen] = useInViewOnce<HTMLElement>()
+  const reduce = useReducedMotion()
   return (
-    <section aria-label={label} className={`card flex min-w-0 animate-[wRise_.55s_both] flex-col gap-2.5 p-5 ${className}`} style={{ animationDelay: `${delay}ms` }}>
+    <section ref={ref} aria-label={label} className={`card flex min-w-0 animate-[wRise_.55s_both] flex-col gap-2.5 p-5 ${className}`} style={{ animationDelay: `${delay}ms`, animationPlayState: seen || reduce ? 'running' : 'paused' }}>
       {children}
     </section>
   )
@@ -29,7 +36,7 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
   const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
   const rows = sorted.slice(0, count)
   const rest = sorted.slice(count)
-  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background,scale] duration-300 active:scale-[.97] active:duration-100'
   return (
     <HomeCard label="Since your baseline" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
@@ -54,13 +61,14 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
       <div className="flex flex-1 flex-col gap-1.5">
         {rows.map(({ m, kind }, i) => {
           const unit = m.value === null ? '' : unitOf(m).trim()
+          const was = baseline?.result?.metrics.find((b) => b.id === m.id)?.value ?? null
           return (
             <button
               key={m.id}
               type="button"
               onClick={() => onOpen(m.id)}
               aria-label={`${METRIC_META[m.id].label}: ${fmtReading(m.value, m)}${unit ? ` ${unit}` : ''}. Open in the result.`}
-              className="flex min-h-14 max-h-24 flex-1 animate-[wRise_.5s_both] items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-14 max-h-24 flex-1 animate-[wRise_.5s_both] items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate,scale] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07] active:scale-[.985] active:duration-100"
               style={{ animationDelay: `${i * 70 + 120}ms` }}
             >
               <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(m.id) }} />
@@ -70,10 +78,14 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
               </span>
               <span className="flex flex-none flex-col items-end gap-0.5">
                 <span className="flex items-baseline gap-[3px]">
-                  <span className="font-dot text-[18px]">{fmtReading(m.value, m)}</span>
+                  <span className="font-dot text-[18px]">{m.value === null ? fmtReading(m.value, m) : <RollingNumber value={m.value} from={was ?? m.value} format={(v) => fmtReading(v, m)} duration={1000} delay={i * 70 + 320} />}</span>
                   {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
                 </span>
-                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[11px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}
+                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? (
+                  <span className="text-[11px] text-ink-2">
+                    <RollingNumber value={m.delta} format={(v) => fmtSigned(v, m)} duration={1000} delay={i * 70 + 320} />
+                  </span>
+                ) : null}
               </span>
             </button>
           )
@@ -182,11 +194,11 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
             {r.flag ? (
               // Every row looks the same; a flag is a small note under the name (lined up with it), its button compact.
               <div className="ml-[42px] flex items-center gap-2 rounded-[12px] bg-[#FFE3CF]/80 py-1.5 pr-1.5 pl-2.5">
-                <span className="line-clamp-2 min-w-0 flex-1 text-[11.5px] leading-[1.35]" title={r.flag.text}>
+                <span className="min-w-0 flex-1 text-[11.5px] leading-[1.35]">
                   <span aria-hidden>△ </span>
                   {r.flag.text}
                 </span>
-                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-colors hover:bg-white">
+                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-[background,scale] duration-200 hover:bg-white active:scale-[.96]">
                   Ask Wisp
                 </button>
               </div>
@@ -201,7 +213,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
 
 /** Your goals: each measure the person chose, as a trend since the baseline against their own normal range. */
 export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, className }: { trends: GoalTrend[]; baseline: Session | null; onOpen: (metricId: string) => void; onProgress: () => void; onAsk?: () => void; className?: string }) {
-  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background,scale] duration-300 active:scale-[.97] active:duration-100'
   return (
     <HomeCard label="Your goals" className={`@container gap-2 p-4 ${className ?? ''}`} delay={320}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
@@ -230,7 +242,7 @@ export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, classNa
               onClick={() => onOpen(t.id)}
               aria-label={`${t.label}: ${t.line}. Open in the result.`}
               title={t.reading ?? undefined}
-              className="flex min-h-14 max-h-24 flex-1 items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
+              className="flex min-h-14 max-h-24 flex-1 items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate,scale] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07] active:scale-[.985] active:duration-100"
             >
               <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
