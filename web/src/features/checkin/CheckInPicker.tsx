@@ -62,7 +62,7 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
       onClick={(e) => {
         if (e.target === ref.current) onClose()
       }}
-      className="squircle mt-3 mr-3 mb-3 ml-auto h-auto max-h-[calc(100dvh-24px)] w-[min(400px,calc(100vw-24px))] max-w-none animate-[wCapIn_.45s_var(--ease-standard)_both] overflow-hidden rounded-lg bg-surface p-0 text-ink shadow-[0_40px_90px_-30px_rgba(0,0,0,.45)] backdrop:bg-[rgba(18,18,18,.26)] backdrop:backdrop-blur-[4px]"
+      className="squircle mt-3 mr-3 mb-3 ml-auto h-fit max-h-[calc(100dvh-24px)] w-[min(400px,calc(100vw-24px))] max-w-none animate-[wCapIn_.45s_var(--ease-standard)_both] overflow-hidden rounded-lg bg-surface p-0 text-ink shadow-[0_40px_90px_-30px_rgba(0,0,0,.45)] backdrop:bg-[rgba(18,18,18,.26)] backdrop:backdrop-blur-[4px]"
     >
       {open ? (
         <div className="flex max-h-[calc(100dvh-24px)] flex-col">
