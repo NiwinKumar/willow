@@ -162,11 +162,11 @@ export default function Progress() {
       <div className="flex animate-[wInL_.5s_cubic-bezier(.2,.8,.2,1)_both] flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-4 pt-[clamp(8px,2vw,24px)] pb-2">
           <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal"><Words text="Your skin, over time" /></h1>
+          <MonthStrip months={months} current={month} counts={Object.fromEntries(months.map((m) => [m, [...byDay.keys()].filter((d) => d.startsWith(m)).length]))} onPick={setMonthPick} />
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4">
           <section aria-label="Calendar" className="flex flex-col gap-3.5 rounded-[44px] bg-surface p-[clamp(16px,2.6vw,28px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
-            <MonthStrip months={months} current={month} counts={Object.fromEntries(months.map((m) => [m, [...byDay.keys()].filter((d) => d.startsWith(m)).length]))} onPick={setMonthPick} />
             <Calendar
               month={month}
               days={days}

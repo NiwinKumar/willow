@@ -20,9 +20,9 @@ export type RulerItem = {
  * of the app already uses.
  */
 
-const H = 150
+const H = 124
 const MID = H / 2
-const LIMIT = 2.6
+const LIMIT = 1.8
 
 /**
  * The signal ruler: every metric of a check-in as one dot on a single line. The centre is the baseline, the
@@ -34,12 +34,12 @@ const LIMIT = 2.6
 export function SignalRuler({ items, delay = 400, className = '' }: { items: RulerItem[]; delay?: number; className?: string }) {
   const [hot, setHot] = useState<string | null>(null)
   // From ratio to a percent across the track: ±1 (the band) is 16% either side of the centre.
-  const xTrue = (r: number) => 50 + (clamp(r, -LIMIT, LIMIT) / LIMIT) * 42
+  const xTrue = (r: number) => 50 + (clamp(r, -LIMIT, LIMIT) / LIMIT) * 46
   const sorted = [...items].sort((a, b) => a.ratio - b.ratio)
   // Dots are spread to a minimum spacing, in order, within their own zone (left of the band, inside it, right of
   // it), so two readings that fell on the same spot both show; a dot never crosses the band's edge.
   const dotX = new Map<string, number>()
-  const GAP = 5.2
+  const GAP = 6
   const pack = (group: RulerItem[], lo: number, hi: number) => {
     let pos = group.map((it) => xTrue(it.ratio))
     for (let i = 1; i < pos.length; i++) pos[i] = Math.max(pos[i], pos[i - 1] + GAP)
@@ -50,29 +50,28 @@ export function SignalRuler({ items, delay = 400, className = '' }: { items: Rul
     group.forEach((it, i) => dotX.set(it.id, pos[i]))
   }
   pack(sorted.filter((it) => it.ratio < -1), 2, xTrue(-1) - 3.5)
-  pack(sorted.filter((it) => Math.abs(it.ratio) <= 1), xTrue(-1) + 2.5, xTrue(1) - 2.5)
+  pack(sorted.filter((it) => Math.abs(it.ratio) <= 1), xTrue(-1) + 3, xTrue(1) - 3)
   pack(sorted.filter((it) => it.ratio > 1), xTrue(1) + 3.5, 98)
   const x = (r: number, id?: string) => (id && dotX.has(id) ? dotX.get(id)! : xTrue(r))
-  const rows = [-2, 2, -1, 1]
+  const rows = [-1, 1]
   const place = new Map<string, { tx: number; row: number }>()
+  const byX = [...items].sort((a, b) => x(a.ratio, a.id) - x(b.ratio, b.id))
   rows.forEach((row, k) => {
     let last = -Infinity
-    sorted.forEach((it, i) => {
-      if (i % 4 !== k) return
-      const tx = Math.min(100, Math.max(x(it.ratio, it.id), last + 14))
+    byX.forEach((it, i) => {
+      if (i % 2 !== k) return
+      const tx = Math.min(98, Math.max(x(it.ratio, it.id), last + 12))
       place.set(it.id, { tx, row })
       last = tx
     })
   })
-  const yOf = (row: number) => MID + row * 30 + (row < 0 ? -4 : 12)
+  const yOf = (row: number) => MID + row * 28 + (row < 0 ? -2 : 12)
   const summary = items.map((it) => `${it.label}: ${it.detail}`).join('; ')
   return (
     <div role="img" aria-label={`Every reading against your normal range. ${summary}`} className={`relative select-none ${className}`} style={{ height: H }}>
       {/* the line, the normal range named on itself, and the baseline tick */}
       <span aria-hidden className="absolute top-1/2 right-0 left-0 h-[2px] -translate-y-1/2 rounded-full bg-ink/15" />
-      <span aria-hidden className="absolute top-1/2 flex h-[22px] -translate-y-1/2 items-center justify-center rounded-[11px] bg-white/75 font-mono text-[9.5px] tracking-[.1em] text-ink/60 uppercase shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)]" style={{ left: `${xTrue(-1)}%`, width: `${xTrue(1) - xTrue(-1)}%` }}>
-        normal range
-      </span>
+      <span aria-hidden className="absolute top-1/2 h-[22px] -translate-y-1/2 rounded-[11px] bg-white/80 shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)]" style={{ left: `${xTrue(-1)}%`, width: `${xTrue(1) - xTrue(-1)}%` }} />
       <span aria-hidden className="absolute top-1/2 left-1/2 h-[30px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink/60" />
       <span aria-hidden className="absolute left-1/2 -translate-x-1/2 font-mono text-[9.5px] tracking-[.1em] text-ink/70 uppercase" style={{ top: MID + 18 }}>
         baseline
@@ -81,7 +80,8 @@ export function SignalRuler({ items, delay = 400, className = '' }: { items: Rul
       <svg aria-hidden viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full overflow-visible">
         {items.map((it) => {
           const p = place.get(it.id)!
-          return <line key={it.id} x1={x(it.ratio, it.id)} y1={MID + (p.row < 0 ? -12 : 12)} x2={p.tx} y2={p.row < 0 ? yOf(p.row) - 10 : yOf(p.row)} stroke="currentColor" strokeOpacity={hot === it.id ? 0.8 : 0.3} strokeWidth="1" vectorEffect="non-scaling-stroke" className="animate-[wFadeIn_.5s_both]" style={{ animationDelay: `${delay + 700}ms` }} />
+          if (Math.abs(p.tx - x(it.ratio, it.id)) < 0.5) return null
+          return <line key={it.id} x1={x(it.ratio, it.id)} y1={MID + (p.row < 0 ? -12 : 12)} x2={p.tx} y2={p.row < 0 ? yOf(p.row) - 10 : yOf(p.row)} stroke="currentColor" strokeOpacity={hot === it.id ? 0.8 : 0.25} strokeWidth="1" vectorEffect="non-scaling-stroke" className="animate-[wFadeIn_.5s_both]" style={{ animationDelay: `${delay + 700}ms` }} />
         })}
       </svg>
       {items.map((it, i) => {
@@ -104,7 +104,7 @@ export function SignalRuler({ items, delay = 400, className = '' }: { items: Rul
             </span>
             {/* the name in its row; on hover the detail joins it */}
             <span
-              className={`absolute w-max max-w-[160px] -translate-x-1/2 animate-[wWord_.5s_both] text-center text-[11px] leading-[1.2] whitespace-nowrap transition-[color] duration-200 ${p.row < 0 ? '-translate-y-full' : ''} ${on ? 'font-medium text-ink' : out ? 'text-ink' : 'text-ink/70'}`}
+              className={`absolute w-max max-w-[160px] -translate-x-1/2 animate-[wWord_.5s_both] text-center text-[12px] leading-[1.2] whitespace-nowrap transition-[color] duration-200 ${p.row < 0 ? '-translate-y-full' : ''} ${on ? 'font-medium text-ink' : out ? 'text-ink' : 'text-ink-2'}`}
               style={{ left: `${p.tx}%`, top: yOf(p.row), animationDelay: `${delay + 600 + i * 40}ms`, zIndex: on ? 6 : 4 }}
             >
               {it.label}

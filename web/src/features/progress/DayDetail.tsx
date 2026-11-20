@@ -376,11 +376,6 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 <span className="max-w-[190px] text-[13.5px] leading-[1.3]">{bigLabel}</span>
               </div>
             </div>
-            {ruler.length >= 3 ? (
-              <div className="mt-1 border-t border-ink/10 pt-1">
-                <SignalRuler items={ruler} />
-              </div>
-            ) : null}
           </section>
           {told.length ? (
             <div className="grid content-stretch gap-3">
@@ -390,6 +385,17 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             </div>
           ) : null}
         </div>
+
+        {/* Every reading of the day on one line against the normal range: the day's verdict as one picture, under the hero. */}
+        {ruler.length >= 3 ? (
+          <section aria-label="Every reading against your normal range" className="card flex animate-[wRise_.5s_.2s_both] flex-col gap-1 px-[clamp(20px,3vw,32px)] pt-5 pb-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 className="m-0 text-[18px] font-normal">Where each reading sits</h2>
+              <span className="text-[12.5px] text-ink-2">Centre: your baseline · white block: your normal range · <span className="text-signal-ink">◆</span> a real change</span>
+            </div>
+            <SignalRuler items={ruler} delay={500} />
+          </section>
+        ) : null}
 
         {states.map(({ s, st }) => {
           const where = multi ? ` · ${placeOf(s).toUpperCase()}` : ''

@@ -20,9 +20,11 @@ export function MonthStrip({ months, current, counts, onPick }: { months: string
   }, [current, months.length])
   if (months.length < 2) return null
   const label = (m: string) => parseDate(`${m}-01`).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()
-  const year = (m: string, i: number) => (i === 0 || months[i - 1].slice(0, 4) !== m.slice(0, 4) ? m.slice(0, 4) : null)
+  // The year is written only where it changes, and only when the journey spans two.
+  const spansYears = new Set(months.map((m) => m.slice(0, 4))).size > 1
+  const year = (m: string, i: number) => (spansYears && (i === 0 || months[i - 1].slice(0, 4) !== m.slice(0, 4)) ? m.slice(0, 4) : null)
   return (
-    <div ref={row} role="tablist" aria-label="Month" className="no-scrollbar relative -mx-1 flex gap-0.5 overflow-x-auto rounded-pill bg-canvas p-1">
+    <div ref={row} role="tablist" aria-label="Month" className="no-scrollbar glass-pill relative flex max-w-full gap-0.5 overflow-x-auto rounded-pill p-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)]">
       {pill ? <span aria-hidden className={`pointer-events-none absolute top-1 bottom-1 left-0 rounded-pill bg-selected shadow-[0_8px_18px_-10px_rgba(0,0,0,.5)] ${pill.glide ? 'transition-[translate,width] duration-[360ms] ease-[cubic-bezier(.34,1.2,.5,1)] motion-reduce:transition-none' : ''}`} style={{ translate: `${pill.x}px 0`, width: pill.w }} /> : null}
       {months.map((m, i) => {
         const on = m === current
@@ -39,8 +41,8 @@ export function MonthStrip({ months, current, counts, onPick }: { months: string
             className={`relative z-[1] flex min-h-9 shrink-0 flex-col items-center justify-center gap-[3px] rounded-pill px-3 font-mono text-[10.5px] tracking-[.08em] transition-[color,scale] duration-300 active:scale-95 ${on ? 'text-inverse' : 'text-ink-2 hover:text-ink'}`}
           >
             <span className="flex items-baseline gap-1">
-              {year(m, i) ? <span className="opacity-60">{year(m, i)!.slice(2)}·</span> : null}
               {label(m)}
+              {year(m, i) ? <span className="opacity-60">{year(m, i)!.slice(2)}</span> : null}
             </span>
             <span aria-hidden className="flex h-[5px] gap-[3px]">
               {Array.from({ length: Math.min(n, 6) }, (_, k) => (

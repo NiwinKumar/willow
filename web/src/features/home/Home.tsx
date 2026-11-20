@@ -29,7 +29,6 @@ import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
-import { JourneyStrip } from './JourneyStrip'
 import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
@@ -218,7 +217,7 @@ function HomeBody() {
   const last: Slot[] = []
   if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} onOpen={() => openResult(lastPhotos)} /> })
   if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
-  const daily: Slot[] = [{ key: 'routine', node: null, grow: true }]
+  const daily: Slot[] = [{ key: 'routine', node: null }]
   if (forearm) daily.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
   if (read.baseline && !demo) daily.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })
 
@@ -230,7 +229,7 @@ function HomeBody() {
   const missingSunscreen = Boolean(check.data?.gaps.some((g) => /sunscreen/i.test(g.need)))
 
   let routineCard: ReactNode
-  const routineCls = 'flex-1'
+  const routineCls = 'w-full self-start'
   if (routine.status === 'loading' || (routine.status === 'idle' && !entries)) routineCard = <CardSkeleton className={routineCls} label="Routine today" />
   else if (routine.status === 'error') {
     routineCard = (
@@ -288,15 +287,10 @@ function HomeBody() {
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <LeadCard lead={lead} />
         </div>
-        {read.baseline && own.length > 1 ? (
-          <div className="col-span-12 flex min-w-0 [&>section]:flex-1">
-            <JourneyStrip sessions={own} baseline={read.baseline} entries={entries ?? []} goals={goals} />
-          </div>
-        ) : null}
         {columns.map((col, i) => (
           <div key={col[0].key} className={`flex min-w-0 flex-col gap-3.5 ${spans[i]}`}>
             {col.map((c, k) => (
-              <div key={c.key} className={`flex min-w-0 ${(col.some((x) => x.grow) ? c.grow : k === col.length - 1) ? 'flex-1' : ''}`}>
+              <div key={c.key} className={`flex min-w-0 ${c.key === 'routine' ? '' : (col.some((x) => x.grow) ? c.grow : k === col.length - 1) ? 'flex-1' : ''}`}>
                 {c.node}
               </div>
             ))}
