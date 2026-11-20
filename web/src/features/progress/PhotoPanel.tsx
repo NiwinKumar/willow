@@ -76,6 +76,8 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const labelsMissing = allItems.length > 0 && !Object.keys(session.label_details ?? {}).length
   const selN = picked?.sid === session.id ? picked.n : (visible[0]?.n ?? listed[0]?.n ?? null)
   const sel = listed.find((it) => it.n === selN) ?? null
+  // Hovering a row in the list lights its marker on the photo (and the other way round).
+  const [hot, setHot] = useState<number | null>(null)
   // Picking a spot in the list shows the photo it is on.
   const pick = (it: SpotItem) => {
     setPicked({ sid: session.id, n: it.n })
@@ -115,12 +117,14 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
         onClick={() => pick(it)}
         aria-label={`Spot ${it.n}: ${it.kind}`}
         aria-pressed={on}
+        onPointerEnter={() => setHot(it.n)}
+        onPointerLeave={() => setHot((h) => (h === it.n ? null : h))}
         className="group absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
-        style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: on ? 3 : 1 }}
+        style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: on || hot === it.n ? 3 : 1 }}
       >
         {/* Markers land on the photo one after another (the whole set within a second); the selected one pulses three times, then rests. */}
         <span
-          className={`grid size-[26px] animate-[wDotIn_.4s_var(--ease-bounce)_both] place-items-center rounded-full border-2 bg-white/30 text-[12px] font-semibold text-ink backdrop-blur-[2px] transition-transform duration-200 group-hover:scale-115 ${on ? '[animation:wDotIn_.4s_var(--ease-bounce)_both,wPulse_1.6s_ease-out_.5s_3]' : ''}`}
+          className={`grid size-[26px] animate-[wDotIn_.4s_var(--ease-bounce)_both] place-items-center rounded-full border-2 text-[12px] font-semibold text-ink backdrop-blur-[2px] transition-[transform,background-color] duration-200 group-hover:scale-115 ${hot === it.n ? 'scale-125 bg-white/80' : 'bg-white/30'} ${on ? '[animation:wDotIn_.4s_var(--ease-bounce)_both,wPulse_1.6s_ease-out_.5s_3]' : ''}`}
           style={{ borderColor: it.ring, animationDelay: on ? undefined : `${200 + Math.min(idx, 40) * 22}ms` }}
         >
           {it.n}
@@ -234,7 +238,9 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                     type="button"
                     aria-pressed={it.n === selN}
                     onClick={() => pick(it)}
-                    className={`flex min-h-11 w-full animate-[wRise_.4s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-[background-color,scale] duration-200 active:scale-[.985] ${it.n === selN ? 'bg-white/14' : 'hover:bg-white/6'}`}
+                    onPointerEnter={() => setHot(it.n)}
+                    onPointerLeave={() => setHot((h) => (h === it.n ? null : h))}
+                    className={`flex min-h-11 w-full animate-[wRise_.4s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-[background-color,scale] duration-200 active:scale-[.985] ${it.n === selN ? 'bg-white/14' : hot === it.n ? 'bg-white/10' : 'hover:bg-white/6'}`}
                     style={{ animationDelay: `${Math.min(i, 10) * 45 + 250}ms` }}
                   >
                     <span className="grid size-[30px] shrink-0 place-items-center rounded-full border-2 text-[12px]" style={{ borderColor: it.ring }}>

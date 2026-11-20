@@ -1,4 +1,5 @@
 import { Words } from '../../components/willow/Words'
+import { MonthStrip } from './MonthStrip'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
@@ -165,6 +166,7 @@ export default function Progress() {
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4">
           <section aria-label="Calendar" className="flex flex-col gap-3.5 rounded-[44px] bg-surface p-[clamp(16px,2.6vw,28px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+            <MonthStrip months={months} current={month} counts={Object.fromEntries(months.map((m) => [m, [...byDay.keys()].filter((d) => d.startsWith(m)).length]))} onPick={setMonthPick} />
             <Calendar
               month={month}
               days={days}

@@ -31,14 +31,19 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
 const ROWS = 3
 
 /** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
-export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className, rows: count = ROWS }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string; rows?: number }) {
+export function ChangedCard({ session, baseline, goals, series = [], onOpen, onFull, onAsk, className, rows: count = ROWS }: { session: Session; baseline: Session | null; goals: string[]; /** The face check-ins, for each row's trend. */ series?: Session[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string; rows?: number }) {
+  const trendOf = (id: string) =>
+    series
+      .filter((o) => o.status === 'done' && o.result?.metrics.some((x) => x.id === id && x.value !== null))
+      .map((o) => ({ t: new Date(o.created_at).getTime(), v: o.result!.metrics.find((x) => x.id === id)!.value! }))
+      .sort((a, b) => a.t - b.t)
   const metrics = byGoals(session.result?.metrics ?? [], goals).map((m) => ({ m, kind: verdictKind(m, session) }))
   const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]
   const rows = sorted.slice(0, count)
   const rest = sorted.slice(count)
   const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background,scale] duration-300 active:scale-[.97] active:duration-100'
   return (
-    <HomeCard label="Since your baseline" className={`gap-2 p-4 ${className ?? ''}`} delay={120}>
+    <HomeCard label="Since your baseline" className={`@container gap-2 p-4 ${className ?? ''}`} delay={120}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <div className="flex min-w-0 flex-col">
           <h2 className="m-0 text-h3 font-normal">Since your baseline</h2>
@@ -76,6 +81,11 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
                 <span className="truncate text-[14px]">{METRIC_META[m.id].label}</span>
                 <VerdictLine kind={kind} way={changeWay(m)} className="text-[12px] text-ink-2" />
               </span>
+              {trendOf(m.id).length > 1 ? (
+                <span className="hidden flex-none text-ink-2 @min-[300px]:block">
+                  <TrendChart points={trendOf(m.id)} baseline={was} band={baseline?.result?.metrics.find((b) => b.id === m.id)?.mdc95 ?? null} width={88} height={30} stroke={kind === 'changed' && changeWay(m) !== 'otherWay' ? 'var(--signal-change)' : 'currentColor'} label={`${METRIC_META[m.id].label} across your check-ins, with your baseline and normal range`} />
+                </span>
+              ) : null}
               <span className="flex flex-none flex-col items-end gap-0.5">
                 <span className="flex items-baseline gap-[3px]">
                   <span className="font-dot text-[18px]">{m.value === null ? fmtReading(m.value, m) : <RollingNumber value={m.value} from={was ?? m.value} format={(v) => fmtReading(v, m)} duration={1000} delay={i * 70 + 320} />}</span>

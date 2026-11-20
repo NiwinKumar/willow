@@ -222,15 +222,16 @@ function Consent() {
                 <span className="text-[15.5px]">{c.title}</span>
                 <span className={`text-[13px] leading-[1.35] text-ink-2 ${open === i ? '' : 'line-clamp-1 [@media(max-height:700px)]:hidden'}`}>{c.summary}</span>
               </span>
-              <span aria-hidden className="text-[20px] text-ink-2">
-                {open === i ? '−' : '+'}
+              <span aria-hidden className="grid size-7 place-items-center text-[20px] text-ink-2 transition-[rotate,color] duration-300 ease-standard" style={{ rotate: open === i ? '45deg' : '0deg', color: open === i ? 'var(--text-primary)' : undefined }}>
+                +
               </span>
             </button>
-            {open === i ? (
-              <p id={`consent-${i}`} className="m-0 px-4 pb-3.5 text-[14px] leading-[1.5] text-[#3E3C38] sm:pr-5 sm:pl-[66px]">
+            {/* The detail unfolds (grid rows 0fr → 1fr, so the text never jumps) and comes into focus. */}
+            <div id={`consent-${i}`} aria-hidden={open !== i} className="grid transition-[grid-template-rows] duration-[320ms] ease-standard motion-reduce:transition-none" style={{ gridTemplateRows: open === i ? '1fr' : '0fr' }}>
+              <p className={`m-0 min-h-0 overflow-hidden px-4 text-[14px] leading-[1.5] text-[#3E3C38] transition-[opacity,translate,filter,padding] duration-300 ease-standard sm:pr-5 sm:pl-[66px] ${open === i ? 'pb-3.5 opacity-100' : 'translate-y-[-4px] opacity-0 blur-[3px]'}`}>
                 {c.detail}
               </p>
-            ) : null}
+            </div>
           </div>
         ))}
         <p className="m-0 border-t border-ink/[.07] px-4 py-2.5 text-[12.5px] [@media(max-height:700px)]:py-2 leading-[1.4] text-ink-2 sm:px-5">

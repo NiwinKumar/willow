@@ -1,3 +1,4 @@
+import { metricAura } from '../home/derive'
 import { Words } from '../../components/willow/Words'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -206,8 +207,11 @@ function GoalsRows({ demo }: { demo: boolean }) {
           {GOALS.map((g) => {
             const on = goals.includes(g.id)
             return (
-              <button key={g.id} type="button" aria-pressed={on} onClick={() => (on ? save(goals.filter((x) => x !== g.id)) : goals.length >= MAX_GOALS ? setHint(true) : save([...goals, g.id]))} className={chip(on)}>
-                {on ? '✓ ' : ''}
+              <button key={g.id} type="button" aria-pressed={on} onClick={() => (on ? save(goals.filter((x) => x !== g.id)) : goals.length >= MAX_GOALS ? setHint(true) : save([...goals, g.id]))} className={`${chip(on)} flex items-center gap-2 pl-1.5`}>
+                {/* the goal's own hue (the one its rows on Home carry); a tick lands on it when chosen */}
+                <span aria-hidden className="relative grid size-6 place-items-center rounded-[8px] squircle shadow-[inset_0_0_8px_1px_rgba(255,255,255,.5)] transition-[scale] duration-300 ease-bounce" style={{ background: metricAura(g.metrics[0]), scale: on ? '1.08' : '1' }}>
+                  <span className={`text-[11px] font-semibold text-ink transition-[opacity,scale] duration-300 ease-bounce ${on ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}>✓</span>
+                </span>
                 {g.label}
               </button>
             )

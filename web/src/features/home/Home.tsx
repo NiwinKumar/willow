@@ -29,6 +29,7 @@ import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
+import { JourneyStrip } from './JourneyStrip'
 import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
@@ -195,6 +196,7 @@ function HomeBody() {
       <ChangedCard
         className={cls}
         session={measured}
+        series={face}
         baseline={read.baseline}
         goals={goals}
         rows={4}
@@ -286,6 +288,11 @@ function HomeBody() {
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <LeadCard lead={lead} />
         </div>
+        {read.baseline && own.length > 1 ? (
+          <div className="col-span-12 flex min-w-0 [&>section]:flex-1">
+            <JourneyStrip sessions={own} baseline={read.baseline} entries={entries ?? []} goals={goals} />
+          </div>
+        ) : null}
         {columns.map((col, i) => (
           <div key={col[0].key} className={`flex min-w-0 flex-col gap-3.5 ${spans[i]}`}>
             {col.map((c, k) => (

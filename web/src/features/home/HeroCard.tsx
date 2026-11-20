@@ -49,7 +49,7 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
       aria-label="Today"
       onPointerMove={lean}
       onPointerLeave={rest}
-      className="relative isolate flex min-h-[clamp(240px,20vw,260px)] min-w-0 animate-[wRise_.6s_both] flex-col justify-between gap-7 overflow-hidden rounded-[36px] squircle text-ink"
+      className="spot relative isolate flex min-h-[clamp(240px,20vw,260px)] min-w-0 animate-[wRise_.6s_both] flex-col justify-between gap-7 overflow-hidden rounded-[36px] squircle text-ink"
       style={{
         padding: 'clamp(20px,2.4vw,30px)',
         background: 'linear-gradient(180deg, #F8E2CB 0%, #F4C6B6 38%, #DDBBDD 62%, #9DB4E8 84%, #84A3E0 100%)',
@@ -110,8 +110,9 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
 
 /** A soft blurred bloom on its stem, masked into the right of the card (the design's hero flower, in CSS). */
 function Bloom() {
+  let n = 0
   const petal = (left: string, top: string, w: string, h: string, rotate: number, colour: string, blur = 8) => (
-    <span className="absolute rounded-[50%]" style={{ left, top, width: w, height: h, rotate: `${rotate}deg`, background: `radial-gradient(closest-side, ${colour} 0%, ${colour} 45%, transparent 100%)`, filter: `blur(${blur}px)` }} />
+    <span className="absolute animate-[wBreathe_9s_ease-in-out_infinite] rounded-[50%] motion-reduce:animate-none" style={{ left, top, width: w, height: h, rotate: `${rotate}deg`, background: `radial-gradient(closest-side, ${colour} 0%, ${colour} 45%, transparent 100%)`, filter: `blur(${blur}px)`, animationDelay: `${-(n++ * 1.3)}s` }} />
   )
   return (
     // The outer span leans with the pointer (HeroCard sets --lean-x/--lean-y); the inner one breathes.

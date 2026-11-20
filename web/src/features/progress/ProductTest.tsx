@@ -7,6 +7,7 @@ import { ForearmChart } from '../../components/charts'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { ForearmArt } from '../../components/willow/ForearmArt'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { WillowLoader } from '../../components/willow/WillowLoader'
@@ -203,6 +204,7 @@ export default function ProductTest() {
             <EmptyState
               title="No product test yet"
               body="A product test compares a treated square of skin on one forearm with an untreated square on the other, photographed together. Start with a baseline of each square, before you apply the product."
+              art={<ForearmArt width={260} />}
               action={
                 data.mode === 'live' && tests.status === 'ready' ? undefined : (
                   // The one action belongs inside the card that explains it, not floating under it.

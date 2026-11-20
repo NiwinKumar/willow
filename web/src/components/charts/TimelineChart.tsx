@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useRef, useState, type PointerEvent } from 'react'
 
 import { labelIndices, timelineGeometry } from './chartMath'
 
@@ -59,6 +59,18 @@ export function TimelineChart({
   caption: string
 }) {
   const id = useId().replace(/:/g, '')
+  // Hover (or a finger on the chart) reads the nearest check-in: a crosshair and a pill with its date and value.
+  const svg = useRef<SVGSVGElement>(null)
+  const [near, setNear] = useState<number | null>(null)
+  const seek = (e: PointerEvent<SVGSVGElement>) => {
+    const el = svg.current
+    if (!el || !points.length) return
+    const r = el.getBoundingClientRect()
+    const x = ((e.clientX - r.left) / r.width) * 600
+    let best = 0
+    for (let i = 1; i < points.length; i++) if (Math.abs(g.X(i) - x) < Math.abs(g.X(best) - x)) best = i
+    setNear(best)
+  }
   const values = points.map((p) => p.value)
   const g = timelineGeometry(values, baseIndex, band)
   const base = g.base
@@ -70,7 +82,7 @@ export function TimelineChart({
   const pill = (i: number) => !many || i === baseIndex || i === highlight || i === points.length - 1
   return (
     <figure className="m-0">
-      <svg viewBox="0 0 600 300" aria-hidden className="block h-auto w-full overflow-visible">
+      <svg ref={svg} viewBox="0 0 600 300" aria-hidden onPointerMove={seek} onPointerDown={seek} onPointerLeave={() => setNear(null)} className="block h-auto w-full touch-pan-y overflow-visible">
         <defs>
           <filter id={`${id}b`} x="-10%" y="-60%" width="120%" height="220%">
             <feGaussianBlur stdDeviation={9} />
@@ -152,6 +164,18 @@ export function TimelineChart({
             </g>
           ) : null,
         )}
+        {near !== null ? (
+          <g className="pointer-events-none animate-[wFadeIn_.15s_both]">
+            <line x1={g.X(near)} x2={g.X(near)} y1={24} y2={262} stroke="#fff" strokeOpacity={0.45} strokeDasharray="3 4" />
+            {points[near].value !== null ? <circle cx={g.X(near)} cy={g.Y(points[near].value!)} r={11} fill="none" stroke="#fff" strokeWidth={1.5} /> : null}
+            <g transform={`translate(${Math.min(Math.max(g.X(near), 70), 530)}, ${points[near].value !== null ? Math.max(g.Y(points[near].value!) - 54, 20) : baseY - 54})`}>
+              <rect x={-60} y={-14} width={120} height={28} rx={14} fill="#fff" />
+              <text y={5} textAnchor="middle" fontSize={11.5} fontFamily={MONO} fill="var(--text-primary)">
+                {points[near].label} · {points[near].value === null ? 'no reading' : (points[near].text ?? format(points[near].value!))}
+              </text>
+            </g>
+          </g>
+        ) : null}
         {points.map((p, i) =>
           shownLabels.has(i) ? (
             <text key={`x${i}`} x={g.X(i)} y={282} textAnchor="middle" fontSize={11} fontFamily={MONO} fill={i === baseIndex ? LIME : MUTED}>

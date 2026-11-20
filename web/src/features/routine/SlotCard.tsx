@@ -8,6 +8,7 @@ import { fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
 import { outcomeFor } from '../../lib/outcome'
 import { CHANGE_WORDS } from '../../lib/verdict'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { ProductImage } from './productUi'
 import { compactName, entryName, imageOf, metaLine } from './routineModel'
 import { dayNote, restsOn, scheduleWords } from './schedule'
@@ -48,7 +49,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
           <h2 className="text-[22px] font-light tracking-[-0.02em]">{t.name}</h2>
           {due.length ? (
             <span className="font-mono text-[12px] tracking-[.06em] opacity-75" aria-label={`${done} of ${due.length} used today`}>
-              {done}/{due.length} TODAY
+              <RollingNumber value={done} format={(v) => `${Math.round(v)}/${due.length}`} duration={450} /> TODAY
             </span>
           ) : null}
         </div>
@@ -81,6 +82,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
               className="group relative grid size-[46px] shrink-0 place-items-center rounded-[16px] transition-transform hover:scale-[1.04] active:scale-95"
               style={{ background: t.track }}
             >
+              <StartRing days={daysSince(e.started_at, today)} dark={t.dark} />
               <ProductImage product={imageOf(e)} size={34} muted={!on} rest={rest} />
               <span
                 aria-hidden
@@ -123,5 +125,30 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
         )
       })}
     </section>
+  )
+}
+
+/** Days since a product started, as a thin ring filling over its first eight weeks (when its effect can first be read). */
+const FIRST_READ_DAYS = 56
+function daysSince(iso: string, today: string): number {
+  return Math.max(0, Math.round((new Date(today).getTime() - new Date(iso.slice(0, 10)).getTime()) / 86_400_000))
+}
+function StartRing({ days, dark }: { days: number; dark: boolean }) {
+  const part = Math.min(1, days / FIRST_READ_DAYS)
+  const colour = part >= 1 ? 'var(--willow-500)' : dark ? 'rgba(255,255,255,.85)' : 'var(--text-primary)'
+  return (
+    <span
+      aria-hidden
+      title={part >= 1 ? `Day ${days}: long enough to read its effect` : `Day ${days} of ${FIRST_READ_DAYS} before its effect can be read`}
+      className="pointer-events-none absolute inset-[2px] rounded-[14px] opacity-0 transition-opacity duration-500 [animation:wFadeIn_.6s_.4s_both]"
+      style={{
+        background: `conic-gradient(${colour} calc(var(--p) * 1turn), transparent 0)`,
+        ['--p' as string]: part,
+        mask: 'linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)',
+        WebkitMask: 'linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)',
+        padding: 2,
+        opacity: 1,
+      }}
+    />
   )
 }

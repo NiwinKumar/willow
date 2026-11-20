@@ -350,6 +350,26 @@
     height: max(100%, 44px);
     translate: -50% -50%;
   }
+  /* A soft light that follows the pointer across a card (AppShell writes --mx/--my on the card under it).
+     Decoration at the edge of attention: 0 → .9 opacity on hover only, white only, never under the text. */
+  .spot {
+    position: relative;
+  }
+  .spot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.42), transparent 62%);
+    opacity: 0;
+    transition: opacity 400ms var(--ease-standard);
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .spot:hover::after {
+      opacity: 0.9;
+    }
+  }
   .no-scrollbar {
     scrollbar-width: none;
   }
@@ -395,6 +415,11 @@
 @keyframes wLine { from { transform: scaleX(0) } to { transform: scaleX(1) } }
 /* A value's marker slides out from the baseline to where the reading landed. */
 @keyframes wFromCentre { from { left: 50% } }
+/* A line drawing draws itself (paths carry pathLength=1). */
+@keyframes wDrawPath { to { stroke-dashoffset: 0 } }
+@keyframes wFillIn { to { fill-opacity: .9 } }
+/* Route changes: the old page sinks and blurs away while the new one rises into focus (view transitions). */
+@keyframes wPageOut { to { opacity: 0; filter: blur(6px); translate: 0 -10px } }
 @keyframes wRingPulse { 0% { box-shadow: 0 0 0 0 rgba(18, 18, 18, .4) } 100% { box-shadow: 0 0 0 18px rgba(18, 18, 18, 0) } }
 @keyframes wPageIn { from { opacity: 0; filter: blur(8px); translate: 0 14px } to { opacity: 1; filter: blur(0); translate: 0 0 } }
 /* The measuring card (home/LeadCard.tsx): an indeterminate bar sweep, the active step turning, and a light band
@@ -425,4 +450,13 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
 @layer base {
   html[data-touring] dialog[open]:not(:modal) { position: fixed; inset: 0; max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em); overflow: auto; }
   html[data-touring] dialog[open]:not(:modal)::backdrop { background: rgba(18, 18, 18, .3); }
+}
+
+/* Route transitions (browsers with the View Transitions API; others switch at once and the page's own
+   entrance plays). The shell stays put: the sidebar, dock and background are their own groups. */
+::view-transition-old(page) { animation: wPageOut 140ms var(--ease-exit) both; }
+::view-transition-new(page) { animation: wPageIn 360ms var(--ease-standard) both; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(page), ::view-transition-new(page) { animation: none; }
 }

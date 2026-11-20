@@ -51,7 +51,7 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, name, in
           {NAV.map((n) => {
             const on = current === n.id
             return (
-              <Link key={n.id} to={n.to} aria-current={on ? 'page' : undefined} aria-label={n.label} title={n.label} className={`${row} ${on ? 'text-inverse' : 'text-ink hover:bg-ink/6'}`}>
+              <Link key={n.id} to={n.to} viewTransition aria-current={on ? 'page' : undefined} aria-label={n.label} title={n.label} className={`${row} ${on ? 'text-inverse' : 'text-ink hover:bg-ink/6'}`}>
                 <NavIcon name={n.icon} active={on} />
                 <span className={`relative ${label}`}>{n.label}</span>
               </Link>
@@ -67,7 +67,7 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, name, in
         </svg>
         <span className={label}>{collapsed ? 'Expand' : 'Collapse'}</span>
       </button>
-      <Link to="/you" aria-current={current === 'you' ? 'page' : undefined} aria-label="You" title="You · goals, privacy" className={`flex shrink-0 items-center gap-[11px] rounded-[25px] squircle py-0.5 pr-3 pl-[4.5px] no-underline transition-colors ${current === 'you' ? 'bg-white' : ''}`}>
+      <Link to="/you" viewTransition aria-current={current === 'you' ? 'page' : undefined} aria-label="You" title="You · goals, privacy" className={`flex shrink-0 items-center gap-[11px] rounded-[25px] squircle py-0.5 pr-3 pl-[4.5px] no-underline transition-colors ${current === 'you' ? 'bg-white' : ''}`}>
         <span className="rounded-full shadow-[0_0_0_2px_rgba(255,255,255,.8)]">
           <Avatar initials={initials} size={36} />
         </span>

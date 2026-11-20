@@ -157,6 +157,19 @@ export function AppShell() {
   // The design pads the page around the sidebar (12px gutter + sidebar + 24px) and, when the advisor panel
   // fits beside the content (≥1280px), around the panel too.
   const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
+  // The spotlight on .spot cards: the pointer's place is written straight onto the card under it (no renders).
+  useEffect(() => {
+    if (!matchMedia('(hover: hover)').matches) return
+    const move = (e: PointerEvent) => {
+      const el = (e.target as Element | null)?.closest<HTMLElement>('.spot')
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      el.style.setProperty('--mx', `${e.clientX - r.left}px`)
+      el.style.setProperty('--my', `${e.clientY - r.top}px`)
+    }
+    document.addEventListener('pointermove', move, { passive: true })
+    return () => document.removeEventListener('pointermove', move)
+  }, [])
   return (
     <ShellContext.Provider value={api}>
       <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
@@ -179,7 +192,7 @@ export function AppShell() {
         ) : (
           <Header current={current} name={me.short} initials={me.initials} />
         )}
-        <div className="relative z-[1]">
+        <div className="relative z-[1]" style={{ viewTransitionName: 'page' }}>
           <Outlet />
         </div>
         {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} />}

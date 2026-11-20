@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { CompareSplit } from '../../components/charts'
+import { SignalRuler, type RulerItem } from '../../components/charts/SignalRuler'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -16,10 +17,10 @@ import type { Metric, MetricId, RoutineEntry, Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { ApiError, api } from '../../lib/api'
 import { clockOf, fmtDate, parseDate } from '../../lib/format'
-import { METRIC_META, SITE_LABEL } from '../../lib/metrics'
+import { METRIC_META, SITE_LABEL, fmtReading, fmtSigned, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { readableWarnings } from '../../lib/warnings'
-import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
+import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, changeLines, changeWay, verdictKind, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
 import { InsightsCard, NextAction } from './ExplanationCard'
 import { frameFor, photoSize } from './frame'
@@ -254,6 +255,20 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
       const own = byGoal.filter((i) => i.s === x.s)
       return { s: x.s, st: x.st, read: own.filter((i) => i.m.value !== null), unread: own.filter((i) => i.m.value === null).map((i) => i.m) }
     })
+  // The signal ruler: every compared reading of the day as change ÷ its normal range, on one line.
+  const ruler: RulerItem[] = readings
+    .filter((r) => r.st === 'compared')
+    .flatMap((r) =>
+      r.read.flatMap(({ m, s }) => {
+        const band = bandOf(referenceFor(m.id, s, baseOf(s), seriesOf(s)), m.id)
+        if (m.delta === null || m.value === null || !band) return []
+        const kind = verdictKind(m, s)
+        const way = changeWay(m)
+        const unit = unitOf(m).trim()
+        const twice = readings.filter((o) => o.st === 'compared' && o.read.some((i) => i.m.id === m.id)).length > 1
+        return [{ id: `${s.site}.${m.id}`, label: twice ? `${METRIC_META[m.id].label} · ${placeOf(s)}` : METRIC_META[m.id].label, ratio: m.delta / band, detail: `${fmtReading(m.value, m)}${unit ? ` ${unit}` : ''} · ${fmtSigned(m.delta, m)} since baseline`, tone: kind === 'changed' ? (way === 'otherWay' ? 'otherWay' : 'improved') : 'noise' }]
+      }),
+    )
   const open = ordered.find((i) => i.m.id === metricId && i.s.site === qPlace) ?? ordered.find((i) => i.m.id === metricId) ?? null
   const sheetSession = open?.s ?? primary
   const sheetBase = baseOf(sheetSession)
@@ -361,6 +376,11 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 <span className="max-w-[190px] text-[13.5px] leading-[1.3]">{bigLabel}</span>
               </div>
             </div>
+            {ruler.length >= 3 ? (
+              <div className="mt-1 border-t border-ink/10 pt-1">
+                <SignalRuler items={ruler} />
+              </div>
+            ) : null}
           </section>
           {told.length ? (
             <div className="grid content-stretch gap-3">
@@ -447,8 +467,16 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 {read.map(({ m }, i) => {
                   // counts of a check-in with (or without) cheek photos compare with one taken the same way
                   const ref = referenceFor(m.id, s, baseOf(s), seriesOf(s))
+                  const trend = {
+                    points: seriesOf(s)
+                      .filter((o) => o.status === 'done' && o.result?.metrics.some((x) => x.id === m.id && x.value !== null))
+                      .map((o) => ({ t: new Date(o.created_at).getTime(), v: o.result!.metrics.find((x) => x.id === m.id)!.value! }))
+                      .sort((a, b) => a.t - b.t),
+                    baseline: ref?.result?.metrics.find((x) => x.id === m.id)?.value ?? null,
+                  }
                   return (
                     <MetricTile
+                      trend={trend}
                       key={`${s.id}:${m.id}`}
                       metric={m}
                       session={s}

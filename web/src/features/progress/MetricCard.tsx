@@ -1,4 +1,4 @@
-import { BandBar } from '../../components/charts'
+import { BandBar, TrendChart } from '../../components/charts'
 import { InfoTip } from '../../components/willow/InfoTip'
 import { RollingNumber } from '../../components/willow/RollingNumber'
 import { VerdictGlyph } from '../../components/willow/Verdict'
@@ -23,7 +23,7 @@ function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Sessi
 }
 
 /** Day-detail tile: the reading with its change beside it, a track with a round marker, the change in words, and an info button (what it measures). With `onOpen` it is a button that opens the metric's detail. */
-export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; place?: string; onOpen?: () => void; delay?: number }) {
+export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0, trend }: { metric: Metric; session: Session; band: number | null; place?: string; onOpen?: () => void; delay?: number; trend?: { points: { t: number; v: number }[]; baseline: number | null } }) {
   const look = METRIC_LOOK[m.id]
   const none = m.value === null
   const unit = unitOf(m).trim()
@@ -36,7 +36,7 @@ export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 
   // The whole tile opens the detail (a button under the content); the info button sits on top, top right.
   return (
     <div
-      className={`group relative flex min-h-[230px] animate-[wRise_.5s_both] flex-col justify-between gap-3.5 rounded-[36px] p-[22px] text-left shadow-[inset_0_0_40px_rgba(255,255,255,.3),0_30px_60px_-46px_rgba(0,0,0,.5)] squircle has-[[data-tip-open]]:z-30 ${onOpen ? 'transition-transform duration-300 ease-standard hover:-translate-y-0.5 has-[>button:active]:scale-[.98]' : ''}`}
+      className={`spot group relative flex min-h-[250px] animate-[wRise_.5s_both] flex-col justify-between gap-3.5 rounded-[36px] p-[22px] text-left shadow-[inset_0_0_40px_rgba(255,255,255,.3),0_30px_60px_-46px_rgba(0,0,0,.5)] squircle has-[[data-tip-open]]:z-30 ${onOpen ? 'transition-transform duration-300 ease-standard hover:-translate-y-0.5 has-[>button:active]:scale-[.98]' : ''}`}
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >
       {onOpen ? (
@@ -70,6 +70,12 @@ export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 
       <div className="pointer-events-none relative flex flex-col gap-2">
         <BandBar variant="tile" ratio={compared && band && m.delta !== null ? m.delta / band : null} hasBand={band !== null && compared} hasValue={!none} delay={delay + 200} />
         {said ? <span className="text-[15px] leading-[1.3]">{said.headline}</span> : plain ? <span className="text-[14px] leading-[1.35]">{plain}</span> : null}
+        {/* The metric's own trend across every check-in (dashed: baseline, shaded: normal range), drawn in after the tile lands. */}
+        {trend && trend.points.length > 1 ? (
+          <span className="mt-1 block animate-[wWord_.6s_both] opacity-80" style={{ animationDelay: `${delay + 500}ms` }}>
+            <TrendChart points={trend.points} baseline={trend.baseline} band={band} width={220} height={34} stroke="currentColor" label={`${label} across your check-ins, with your baseline and normal range`} />
+          </span>
+        ) : null}
       </div>
     </div>
   )

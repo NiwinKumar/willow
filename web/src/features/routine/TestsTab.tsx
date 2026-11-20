@@ -2,6 +2,8 @@ import { FlaskConical, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { ForearmArt } from '../../components/willow/ForearmArt'
+
 import type { ProductTest, RoutineEntry, Session } from '../../data/types'
 import { fmtDate, plural } from '../../lib/format'
 import { readForearm, type ForearmRead } from '../home/forearm'
@@ -64,6 +66,7 @@ export function TestStrip({ read, onStart }: { read: ForearmRead | null; onStart
             <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">PRODUCT TEST · FOREARM</span>
             <span className="text-[17px] leading-[1.25] tracking-[-0.01em] text-pretty">Try a product on your forearm first</span>
             <span className="text-[13.5px] leading-[1.4] text-ink-2">One square treated, one left untouched on the other arm, photographed together.</span>
+            <ForearmArt width={200} className="mt-2 text-ink/75" />
           </div>
           <OpenTest onClick={onStart} className="ml-auto self-end">
             Start a test
