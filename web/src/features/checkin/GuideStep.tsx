@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { Toggle } from '../../components/ui/Toggle'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { fmtDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
@@ -146,18 +147,20 @@ export function GuideStep(props: {
                 <p className="m-0 mt-1 text-[13px] text-[#BDBAB4]">Lock it once and never change it. If you do, start a new baseline.</p>
               </>
             ) : null}
+          </div>
+        ) : null}
 
         <div className="rounded-[36px] bg-surface/[.88] p-[clamp(20px,3vw,30px)] shadow-[0_30px_60px_-44px_rgba(0,0,0,.3)] backdrop-blur-[20px] squircle">
           <div className="flex items-baseline justify-between gap-2.5">
             <h2 className="m-0 mb-1.5 text-[22px] font-normal">{kind === 'arm' ? 'Forearm checklist' : kind === 'close' ? 'Close-up checklist' : first ? 'First-session checklist' : 'Session checklist'}</h2>
             <span className="font-dot text-[22px]" aria-label={`${on} of ${items.length} ready`}>
-              {on}/{items.length}
+              <RollingNumber value={on} format={(v) => `${Math.round(v)}/${items.length}`} duration={400} />
             </span>
           </div>
           <p className="m-0 mb-3.5 text-[14px] leading-[1.45] text-ink-2">Same light, pose and distance every session. Camera checks help you frame; they don’t measure.</p>
           <div className="flex flex-col gap-0.5">
             {items.map((c, i) => (
-              <label key={c.title} className="flex min-h-[54px] cursor-pointer items-center gap-3.5 rounded-[18px] px-2.5 py-1.5 transition-[background] hover:bg-ink/[.04]">
+              <label key={c.title} className="flex min-h-[54px] cursor-pointer animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-2.5 py-1.5 transition-[background,scale] duration-200 hover:bg-ink/[.04] active:scale-[.99]" style={{ animationDelay: `${250 + i * 60}ms` }}>
                 <input type="checkbox" checked={ticks[i]} onChange={() => setTicks((t) => t.map((x, j) => (j === i ? !x : x)))} className="m-0 size-[22px] flex-none accent-[var(--text-primary)]" />
                 <span className="flex flex-col gap-0.5">
                   <span className="text-[16px]">{c.title}</span>
@@ -177,9 +180,6 @@ export function GuideStep(props: {
               description={cheeks ? `Photos ${total - 1} and ${total}: turn your head about 45° to show your ${POSE_NAME.left.toLowerCase()}, then your ${POSE_NAME.right.toLowerCase()}. Spots on the cheeks and jaw are counted on them.` : 'Every photo faces the camera. Cheek photos show the spots a front photo misses.'}
             />
             {otherWay ? <span className="pb-1 text-[13px] leading-[1.4] text-ink-2">Blemish and dark-spot counts are compared with your earlier check-ins taken {cheeks ? 'with' : 'without'} cheek photos. Everything else is compared with your baseline.</span> : null}
-          </div>
-        ) : null}
-
           </div>
         ) : null}
 
@@ -222,10 +222,10 @@ export function GuideStep(props: {
         )}
 
         <div className="grid grid-cols-2 gap-2.5">
-          <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>
+          <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.98] disabled:active:scale-100 ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>
             Use camera
           </button>
-          <button type="button" onClick={props.onFiles} className={`min-h-16 rounded-[24px] border border-ink/15 text-[16px] ${raw ? 'bg-selected text-inverse' : 'bg-white text-ink'}`}>
+          <button type="button" onClick={props.onFiles} className={`min-h-16 rounded-[24px] border border-ink/15 text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.98] ${raw ? 'bg-selected text-inverse' : 'bg-white text-ink'}`}>
             Upload files
           </button>
         </div>

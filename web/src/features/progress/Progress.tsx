@@ -226,8 +226,9 @@ export default function Progress() {
                 summary={`${label} across ${series.points.length} check-ins${series.band !== null && sample ? `, normal range ${bandText(sample, series.band)} around the baseline` : ', no normal range yet'}.`}
               />
             ) : (
-              <p className="m-0 py-16 text-center text-[15px] text-white/70">No check-ins with readings yet.</p>
+              <EmptyChart onCheckIn={() => shell.openCheckIn()} />
             )}
+            {series && series.points.some((p) => p.value !== null) ? (
             <div className="flex flex-wrap gap-4 text-[13px] text-white/70">
               <span className="flex items-center gap-2">
                 <span aria-hidden className="h-2 w-[18px] rounded-[8px]" style={{ background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink))' }} />
@@ -246,6 +247,7 @@ export default function Progress() {
                 No reading
               </span>
             </div>
+            ) : null}
           </section>
         </div>
 
@@ -345,5 +347,40 @@ function NotesCard({ notes }: { notes: Note[] }) {
         <span className="text-[15px] text-ink-2">Nothing yet. Products you add to your routine and notes on check-ins show here.</span>
       )}
     </section>
+  )
+}
+
+/**
+ * The chart before any reading: a faint sketch of what will be here (a baseline dot, the normal range around
+ * it, later readings) and the one thing to do about it. Decorative; the words carry the meaning.
+ */
+function EmptyChart({ onCheckIn }: { onCheckIn: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-5 py-6 text-center">
+      <svg viewBox="0 0 320 110" width="320" height="110" aria-hidden className="block max-w-full overflow-visible">
+        <rect x="20" y="36" width="280" height="38" rx="19" fill="url(#emptyBand)" opacity=".35" />
+        <defs>
+          <linearGradient id="emptyBand" x1="0" x2="1">
+            <stop offset="0" stopColor="var(--aura-violet)" />
+            <stop offset="1" stopColor="var(--aura-pink)" />
+          </linearGradient>
+        </defs>
+        <line x1="20" x2="300" y1="55" y2="55" stroke="#fff" strokeOpacity=".4" strokeDasharray="2 6" />
+        <circle cx="44" cy="55" r="7" fill="var(--signal-baseline)" stroke="#121212" strokeWidth="3" className="animate-[wDotIn_.5s_.3s_var(--ease-bounce)_both]" style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
+        {[110, 176, 242].map((x, i) => (
+          <circle key={x} cx={x} cy="55" r="6" fill="none" stroke="#fff" strokeOpacity=".5" strokeDasharray="2 3" className="animate-[wDotIn_.5s_var(--ease-bounce)_both]" style={{ animationDelay: `${600 + i * 150}ms`, transformBox: 'fill-box', transformOrigin: 'center' }} />
+        ))}
+        <text x="44" y="90" textAnchor="middle" fontSize="10" fontFamily="var(--font-mono)" fill="var(--signal-baseline)" letterSpacing=".06em">
+          BASELINE
+        </text>
+        <text x="176" y="90" textAnchor="middle" fontSize="10" fontFamily="var(--font-mono)" fill="#fff" fillOpacity=".5" letterSpacing=".06em">
+          LATER CHECK-INS
+        </text>
+      </svg>
+      <p className="m-0 max-w-[34ch] text-[15px] leading-[1.45] text-white/80">Your first check-in sets the baseline. Each one after it lands here, against your own normal range.</p>
+      <button type="button" onClick={onCheckIn} className="min-h-11 rounded-pill bg-white px-5 text-[14px] text-ink transition-[scale] duration-200 ease-standard active:scale-[.97]">
+        Take your baseline
+      </button>
+    </div>
   )
 }

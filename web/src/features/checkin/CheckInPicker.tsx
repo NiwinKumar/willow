@@ -62,10 +62,10 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
       onClick={(e) => {
         if (e.target === ref.current) onClose()
       }}
-      className="squircle mt-3 mr-3 mb-3 ml-auto h-[calc(100dvh-24px)] max-h-none w-[min(400px,calc(100vw-24px))] max-w-none animate-[wCapIn_.45s_var(--ease-standard)_both] overflow-hidden rounded-lg bg-surface p-0 text-ink shadow-[0_40px_90px_-30px_rgba(0,0,0,.45)] backdrop:bg-[rgba(18,18,18,.26)] backdrop:backdrop-blur-[4px]"
+      className="squircle mt-3 mr-3 mb-3 ml-auto h-auto max-h-[calc(100dvh-24px)] w-[min(400px,calc(100vw-24px))] max-w-none animate-[wCapIn_.45s_var(--ease-standard)_both] overflow-hidden rounded-lg bg-surface p-0 text-ink shadow-[0_40px_90px_-30px_rgba(0,0,0,.45)] backdrop:bg-[rgba(18,18,18,.26)] backdrop:backdrop-blur-[4px]"
     >
       {open ? (
-        <div className="flex h-full flex-col">
+        <div className="flex max-h-[calc(100dvh-24px)] flex-col">
           <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
             <div className="flex flex-col gap-1">
               <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">■ {whenCaps()}</span>
@@ -116,7 +116,7 @@ function Today({ live, known, places, line, onStart, onUpload, onChange }: { liv
         </div>
         <ol aria-label="Places in this check-in" className="m-0 flex list-none flex-col gap-1.5 p-0">
           {places.map((p, i) => (
-            <li key={p} className="flex min-h-14 items-center gap-3 rounded-[20px] bg-white py-2 pr-3 pl-2 shadow-[0_10px_24px_-18px_rgba(0,0,0,.3)]">
+            <li key={p} className="flex min-h-14 animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-3 rounded-[20px] bg-white py-2 pr-3 pl-2 shadow-[0_10px_24px_-18px_rgba(0,0,0,.3)]" style={{ animationDelay: `${200 + i * 70}ms` }}>
               <span aria-hidden className="relative size-10 flex-none rounded-[14px] shadow-[inset_0_0_12px_rgba(255,255,255,.5)]" style={{ background: SITE_SWATCH[p] }}>
                 <span className="absolute -top-1 -left-1 grid size-5 place-items-center rounded-full bg-selected font-dot text-[9.5px] text-inverse">{i + 1}</span>
               </span>
@@ -134,8 +134,8 @@ function Today({ live, known, places, line, onStart, onUpload, onChange }: { liv
         </div>
       </div>
       <div className="flex flex-col gap-2 border-t border-ink/[.06] px-5 pt-3.5 pb-5">
-        <button type="button" onClick={onStart} className="flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background] hover:bg-[#2a2a2a]">
-          Start check-in <span aria-hidden>→</span>
+        <button type="button" onClick={onStart} className="group flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background,scale] duration-200 ease-standard hover:bg-[#2a2a2a] active:scale-[.98]">
+          Start check-in <span aria-hidden className="inline-block transition-[translate] duration-300 ease-standard group-hover:translate-x-1">→</span>
         </button>
         <button type="button" onClick={onUpload} className="min-h-11 text-[14px] text-ink underline decoration-ink/30 underline-offset-4">
           Upload photos instead

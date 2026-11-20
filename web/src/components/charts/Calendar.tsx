@@ -89,7 +89,7 @@ export function Calendar({
               {monthName}
             </span>
           </h2>
-          <span className="font-dot text-[22px] font-extrabold text-ink-2">{y}</span>
+          <span className="hidden font-dot text-[22px] font-extrabold text-ink-2 sm:inline">{y}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {legend ? (
