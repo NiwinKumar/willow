@@ -93,7 +93,7 @@ export function JourneyStrip({ sessions, baseline, entries, goals, className = '
         {starts.map((s, i) => (
           <span key={`${s.day}${s.name}`} className="group absolute top-[38px] flex -translate-x-1/2 animate-[wRise_.4s_both] flex-col items-center" style={{ left: `${s.at * 100}%`, animationDelay: `${500 + s.at * 1100}ms`, zIndex: 4 }} title={`Started ${s.name}, ${fmt(s.day)}`}>
             <span aria-hidden className="w-[1.5px] rounded-full bg-willow-500" style={{ height: 10 + startRow[i] * 26 }} />
-            <span className="block rounded-full shadow-[0_0_0_2px_var(--bg-surface),0_0_0_3px_var(--willow-500)] transition-[scale] duration-200 group-hover:scale-125">
+            <span className="block scale-90 rounded-full shadow-[0_0_0_2px_var(--bg-surface),0_0_0_3px_var(--willow-500)] transition-[scale] duration-200 group-hover:scale-125 sm:scale-100">
               <ProductImage product={imageOf(s.entry)} size={20} decorative />
             </span>
             <span className="sr-only">Started {s.name}, {fmt(s.day)}</span>

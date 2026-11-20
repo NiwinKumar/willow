@@ -21,7 +21,15 @@ export function useInViewOnce<T extends HTMLElement>(margin = '0px 0px -10% 0px'
       { rootMargin: margin, threshold: 0.12 },
     )
     io.observe(el)
-    return () => io.disconnect()
+    // A card the observer never reports (a hidden tab, a print, an odd layout) still shows after a moment.
+    const fallback = window.setTimeout(() => {
+      setSeen(true)
+      io.disconnect()
+    }, 1600)
+    return () => {
+      io.disconnect()
+      window.clearTimeout(fallback)
+    }
   }, [seen, margin])
   return [ref, seen]
 }

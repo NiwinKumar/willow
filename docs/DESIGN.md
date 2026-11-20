@@ -688,3 +688,22 @@ The retail dashboard is branded **Proof by Willow** (earlier “Willow Proof”;
 
 ### App icon
 - One icon for every page the app serves (the Willow app and Willow Proof under /retail, they share one index.html): the frosted flower tile, `web/public/favicon-32.png`, `favicon-64.png`, `apple-touch-icon.png` (180) and the manifest's `icon-192.png` / `icon-512.png`, all cut from the tile in `willow-favicon-new.png` (Oct 18, replaced the first tile; the source is not committed). The touch icon has no transparency: the tile sits full bleed on its own cream edge colour, since iOS rounds the corners itself. The old SVG icons are gone.
+
+## Polish pass (Nov 20), additions
+
+Branch `web/polish-pass`. Everything below keeps the v3 tokens; new motion lives in `web/src/index.css` (`wIgnite`, `wRingOut`, `wLetter`, `wLine`, `wFromCentre`, `wDrawPath`, `wPageOut`) and the shared pieces in `web/src/components/willow` (`RollingNumber`, `Words`, `ForearmArt`) and `web/src/lib` (`useInView`, `useReducedMotion`).
+
+- **Numbers arrive by counting** (`RollingNumber`): once, on arrival, from the value they are compared with (a reading counts from its baseline value). Never in a loop. Reduced motion: the final value at once.
+- **Titles write themselves** (`Words`): the serif page titles and the greeting come into focus a word at a time.
+- **Real change sparks**: the ember ◆ lands with one ring leaving it.
+- **Signal ruler** (`components/charts/SignalRuler`): every reading of a check-in on one line against the normal range; dots slide out from the baseline. On the Result hero.
+- **Journey strip** (`features/home/JourneyStrip`): baseline to today, check-ins as dots, product starts as photos. On Home.
+- **Month strip** (`features/progress/MonthStrip`): the months of the journey above the calendar, dots for check-ins, the black pill glides.
+- **Chart scrub**: hovering (or a finger on) the Progress chart reads the nearest check-in.
+- **Trend sparklines** on every metric tile (Result) and baseline row (Home).
+- **Start rings** on routine rows: days since a product started, over its first eight weeks.
+- **Forearm line drawing** for the product test, drawn in.
+- **Route transitions** (View Transitions API): the old page sinks and blurs, the new one rises; the shell stays put.
+- **Spotlight** (`.spot`): a soft light that follows the pointer across the hero cards and tiles. Hover only, white only.
+- **Cards below the fold** wait until they are seen (`useInViewOnce`), with a 1.6 s fallback.
+- Press feedback on every control (scale .97, ~100 ms), the dock and month pills glide, the toggle knob springs, the consent rows unfold.
