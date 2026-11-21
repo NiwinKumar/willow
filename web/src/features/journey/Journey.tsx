@@ -419,7 +419,7 @@ function ChapterSlide({ c, total }: { c: Chapter; total: number }) {
   const note = face.note ?? c.weeks.find((x) => x.face.note)?.face.note
   const story = lineShow(`mei-c${c.i + 1}`)
   return (
-    <div key={face.id} className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.72fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+    <div key={face.id} className="grid w-full items-start gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,.72fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
       <div className="flex flex-col">
         <div className="relative">
           <Photo s={face} label={`Mei's face check-in, ${when(face.created_at)}`} className="max-h-[60dvh]" />
@@ -520,7 +520,7 @@ function Problem() {
 /** What eight Sundays gave Mei, from her own data. */
 function MeiGains({ count }: { count: number }) {
   return (
-    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
       <SlideHead kicker="What the shopper gains" title="Mei knows what works for her skin" lead={`${count} Sunday check-ins with her phone. Instead of guessing, she has answers.`} />
       <ul className="m-0 grid list-none gap-2 p-0">
         <Point title="Proof, not a feeling">Each reading against her own baseline and normal range: what clearly changed, and what hasn’t moved yet.</Point>
@@ -535,7 +535,7 @@ function MeiGains({ count }: { count: number }) {
 /** What the retailer gains, against the four parts of the Retail & Commerce brief. */
 function RetailGains({ onBrand }: { onBrand: () => void }) {
   return (
-    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+    <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
       <div className="flex flex-col gap-4">
         <SlideHead
           kicker="What the retailer gains"
@@ -554,7 +554,7 @@ function RetailGains({ onBrand }: { onBrand: () => void }) {
 function End({ first, latest, onApp, onBrand, onProof, onOwn }: { first: Week; latest: Week; onApp: () => void; onBrand: () => void; onProof: () => void; onOwn: () => void }) {
   const ms = pick(latest.face, FACE_IDS)
   return (
-    <div className="grid w-full items-center gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ animation: 'wRise .45s both' }}>
+    <div className="grid w-full items-center gap-[clamp(20px,3.4vw,48px)] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
       <div className="grid grid-cols-2 gap-2.5">
         <figure className="m-0 flex flex-col gap-1.5">
           <Photo s={first.face} label="Mei at her baseline" />

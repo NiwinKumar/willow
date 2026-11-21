@@ -97,7 +97,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                 <div className="relative my-auto grid justify-items-center gap-x-1 gap-y-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
                   {rows === 1 ? <span aria-hidden className="absolute h-[1.5px] origin-left animate-[wLine_.9s_.5s_var(--ease-standard)_both]" style={{ background: p.line, top: px / 2 - 1, left: `${50 / cols}%`, right: `${50 / cols}%` }} /> : null}
                   {list.map((e, i) => (
-                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} delay={(slot === 'am' ? 300 : 420) + i * 90} onToggle={(on) => onToggle(e, slot, on)} />
+                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} delay={(slot === 'am' ? 300 : 420) + i * 70} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
                     <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">

@@ -336,7 +336,7 @@ function NotesCard({ notes }: { notes: Note[] }) {
       {list.length ? (
         <ul className="m-0 list-none p-0">
           {list.map((n, i) => (
-            <li key={`${n.day}${i}`} className="flex animate-[wRise_.45s_var(--ease-standard)_both] items-start gap-3.5 border-b border-ink/7 py-2.5" style={{ animationDelay: `${Math.min(i, 8) * 55 + 150}ms` }}>
+            <li key={`${n.day}${i}`} className="flex animate-[wRise_.5s_var(--ease-standard)_both] items-start gap-3.5 border-b border-ink/7 py-2.5" style={{ animationDelay: `${Math.min(i, 8) * 55 + 150}ms` }}>
               <span aria-hidden className="mt-1 size-3 shrink-0 rounded-full" style={{ background: n.dot }} />
               <span className="w-16 shrink-0 font-mono text-[13px]">{fmtDate(n.day)}</span>
               <span className="text-[15px] leading-[1.4]">{n.text}</span>

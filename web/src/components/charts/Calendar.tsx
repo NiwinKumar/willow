@@ -72,7 +72,7 @@ export function Calendar({
   // entrance holds only `backwards` so its end state does not pin `scale` and the press can still play.
   // Reduced motion keeps the press as a dim instead of movement. Plain days stay flat, hairline-outlined spans.
   const tap =
-    'cursor-pointer animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_backwards] transition-[translate,scale,opacity] duration-150 ease-standard hover:-translate-y-0.5 active:scale-[.96] motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 motion-reduce:active:opacity-80'
+    'cursor-pointer animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_backwards] transition-[translate,scale,opacity] duration-150 ease-standard hover:-translate-y-0.5 active:scale-[.97] motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 motion-reduce:active:opacity-80'
   const dotRow = (list: string[] | undefined) => (
     <span aria-hidden className="flex min-h-1.5 gap-[3px]">
       {(list ?? []).map((c, i) => (

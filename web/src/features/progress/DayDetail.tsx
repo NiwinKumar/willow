@@ -362,7 +362,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 </h1>
                 <div className="flex flex-col items-start gap-1.5">
                   {chips.map((ch, i) => (
-                    <span key={ch.t} className="flex min-h-[30px] animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-[7px] rounded-pill bg-white/60 px-3 text-[12.5px]" style={{ animationDelay: `${300 + i * 90}ms` }}>
+                    <span key={ch.t} className="flex min-h-[30px] animate-[wRise_.5s_var(--ease-standard)_both] items-center gap-[7px] rounded-pill bg-white/60 px-3 text-[12.5px]" style={{ animationDelay: `${300 + i * 70}ms` }}>
                       {ch.g ? <VerdictGlyph kind={ch.g} way={ch.way} /> : <span aria-hidden>○</span>}
                       {ch.t}
                     </span>

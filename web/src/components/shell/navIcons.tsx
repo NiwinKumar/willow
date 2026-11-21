@@ -10,7 +10,7 @@ export type NavIconName = keyof typeof NAV_ICON
 export function NavIcon({ name, active, size = 18 }: { name: NavIconName; active: boolean; size?: number }) {
   const [duo, line] = NAV_ICON[name]
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden className="relative shrink-0 overflow-visible transition-[scale,rotate,translate] duration-[400ms] ease-bounce group-hover:-translate-y-px group-hover:scale-[1.14] group-hover:-rotate-[8deg] group-active:scale-90">
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden className="relative shrink-0 overflow-visible transition-[scale,rotate,translate] duration-[400ms] ease-bounce group-hover:-translate-y-px group-hover:scale-[1.14] group-hover:-rotate-[8deg] group-active:scale-[.92]">
       <path d={duo} fill={active ? 'rgba(220,242,75,.9)' : 'rgba(18,18,18,.07)'} className="transition-[fill] duration-300" />
       <path d={line} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>

@@ -59,7 +59,7 @@ export function Glyph({ g, className = '', delay = 0 }: { g: string; className?:
 export function ArrowCircle({ tone = 'ink', size = 28 }: { tone?: 'ink' | 'yellow'; size?: number }) {
   return (
     // Inside a `group` control the arrow leans the way it points on hover and the circle sinks on press.
-    <span aria-hidden className={`grid shrink-0 place-items-center overflow-hidden rounded-full transition-[scale] duration-200 group-active:scale-90 ${tone === 'ink' ? 'bg-selected text-inverse' : 'bg-cta text-ink'}`} style={{ width: size, height: size }}>
+    <span aria-hidden className={`grid shrink-0 place-items-center overflow-hidden rounded-full transition-[scale] duration-200 group-active:scale-[.92] ${tone === 'ink' ? 'bg-selected text-inverse' : 'bg-cta text-ink'}`} style={{ width: size, height: size }}>
       <svg viewBox="0 0 24 24" width={size * 0.45} height={size * 0.45} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-[translate] duration-300 ease-standard group-hover:translate-x-[2px] motion-reduce:transition-none">
         <path d="M5 12h14M13 6l6 6-6 6" />
       </svg>

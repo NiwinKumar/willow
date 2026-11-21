@@ -71,7 +71,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
         const rest = restsOn(e, today)
         const note = starts ? `FROM ${fmtDate(e.started_at).toUpperCase()}` : dayNote(e, slot, today)
         return (
-          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .4s ${i * 60}ms both` }}>
+          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .5s ${i * 70}ms both` }}>
             <button
               type="button"
               aria-pressed={on}
@@ -79,7 +79,7 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
               onClick={() => void toggle(e, on)}
               aria-label={starts ? `${name} starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}: ${name}` : `Mark as used ${t.when}: ${name}${rest ? ' (it rests today)' : ''}`}
               title={starts ? `Starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}` : rest ? 'Rests today on its schedule' : `Mark as used ${t.when}`}
-              className="group relative grid size-[46px] shrink-0 place-items-center rounded-[16px] transition-transform hover:scale-[1.04] active:scale-95"
+              className="group relative grid size-[46px] shrink-0 place-items-center rounded-[16px] transition-transform hover:scale-[1.04] active:scale-[.97]"
               style={{ background: t.track }}
             >
               <ProductImage product={imageOf(e)} size={34} muted={!on} rest={rest} />

@@ -38,7 +38,7 @@ export function MonthStrip({ months, current, counts, onPick }: { months: string
             aria-current={on ? 'true' : undefined}
             aria-label={`${parseDate(`${m}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}, ${n} check-in${n === 1 ? '' : 's'}`}
             onClick={() => onPick(m)}
-            className={`relative z-[1] flex min-h-9 shrink-0 flex-col items-center justify-center gap-[3px] rounded-pill px-3 font-mono text-[10.5px] tracking-[.08em] transition-[color,scale] duration-300 active:scale-95 ${on ? 'text-inverse' : 'text-ink-2 hover:text-ink'}`}
+            className={`relative z-[1] flex min-h-9 shrink-0 flex-col items-center justify-center gap-[3px] rounded-pill px-3 font-mono text-[10.5px] tracking-[.08em] transition-[color,scale] duration-300 active:scale-[.97] ${on ? 'text-inverse' : 'text-ink-2 hover:text-ink'}`}
           >
             <span className="flex items-baseline gap-1">
               {label(m)}

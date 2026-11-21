@@ -103,7 +103,7 @@ export function TomorrowSheet({ open, onClose }: { open: boolean; onClose: () =>
         <p className="relative m-0 text-[16px] leading-[1.55] text-ink-2">Each check-in is compared with your baseline, so tomorrow’s photo works best taken the same way:</p>
         <ol className="relative m-0 flex list-none flex-col gap-2 p-0">
           {['Same room and light, facing the window', 'Clean face, nothing applied', 'Hair back, face the camera straight on'].map((t, i) => (
-            <li key={t} className="flex animate-[wRise_.45s_both] items-center gap-3.5 rounded-[20px] bg-sunken px-4 py-3 text-[15px]" style={{ animationDelay: `${200 + i * 80}ms` }}>
+            <li key={t} className="flex animate-[wRise_.5s_both] items-center gap-3.5 rounded-[20px] bg-sunken px-4 py-3 text-[15px]" style={{ animationDelay: `${200 + i * 70}ms` }}>
               <span aria-hidden className="font-dot text-[20px] font-extrabold">
                 0{i + 1}
               </span>

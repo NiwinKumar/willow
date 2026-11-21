@@ -706,4 +706,6 @@ Branch `web/polish-pass`. Everything below keeps the v3 tokens; new motion lives
 - **Route transitions** (View Transitions API): the old page sinks and blurs, the new one rises; the shell stays put.
 - **Spotlight** (`.spot`): a soft light that follows the pointer across the hero cards and tiles. Hover only, white only.
 - **Cards below the fold** wait until they are seen (`useInViewOnce`), with a 1.6 s fallback.
-- Press feedback on every control (scale .97, ~100 ms), the dock and month pills glide, the toggle knob springs, the consent rows unfold.
+- **Press feedback**, three values only: controls (pills, buttons, chips) sink to `.97`; cards and rows to `.985`; round icon buttons and marks to `.92`. 100 ms on the way down, 200–300 ms back up. Disabled controls do not sink.
+- **Entrance**, one vocabulary: a card or row rises 14 px in 500 ms (`wRise .5s`), rows 70 ms apart (long lists cap the delay so they finish inside half a second); words and small marks come into focus in 350 ms; tooltips in 250 ms. The hero cards alone take 600 ms.
+- The dock and month pills glide, the toggle knob springs, the consent rows unfold.

@@ -63,7 +63,7 @@ export function RoutineSheet({ open, onClose, kind, title, onBack, fixedHeight =
     else d.style.transform = ''
   }
 
-  const round = 'grid shrink-0 place-items-center rounded-full transition-[background,scale] active:scale-95'
+  const round = 'grid shrink-0 place-items-center rounded-full transition-[background,scale] active:scale-[.97]'
   const shape =
     kind === 'bottom'
       ? `mx-auto mt-auto mb-0 w-full max-w-[760px] max-h-[92dvh] ${fixedHeight ? 'h-[92dvh]' : ''} overflow-y-auto rounded-t-[44px] bg-surface p-[clamp(20px,3vw,32px)] motion-safe:animate-[rtSheet_.45s_cubic-bezier(.2,.7,.2,1)_both]`

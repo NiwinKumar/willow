@@ -153,7 +153,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                 </ul>
               ) : null
               return (
-                <article key={f.key} className={rows ? 'flex flex-col gap-2.5 rounded-[16px] bg-white/[.07] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-5' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
+                <article key={f.key} className={rows ? 'flex flex-col gap-2.5 rounded-[16px] bg-white/[.07] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-5' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .5s ${i * 70}ms both` }}>
                   <div className={`flex min-w-0 flex-1 flex-col ${rows ? 'gap-1.5' : 'gap-3'}`}>
                     <div className="flex items-start gap-2.5">
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">

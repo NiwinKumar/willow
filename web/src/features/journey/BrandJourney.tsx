@@ -234,7 +234,7 @@ export default function BrandJourney() {
           </div>
         ) : null}
         {state === 'ready' && data ? (
-          <div key={kind} className="flex w-full flex-col gap-5" style={{ animation: 'wRise .45s both' }}>
+          <div key={kind} className="flex w-full flex-col gap-5" style={{ animation: 'wRise .5s both' }}>
             {kind === 'intro' ? <Intro d={data} /> : null}
             {kind === 'proof' ? <ProofSlide d={data} kicker={kicker('proof', 'Overview and product page')} /> : null}
             {kind === 'compare' && data.cmp ? <CompareSlide x={data.cmp} d={data} kicker={kicker('compare', 'Compare')} /> : null}

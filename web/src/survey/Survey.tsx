@@ -427,7 +427,7 @@ function Choices({ q, seed, type, picked, onPick, full }: { q: Question; seed: n
           <label
             key={o.id}
             style={{ animationDelay: `${80 + i * 35}ms` }}
-            className={`sv-opt group relative flex min-h-[56px] cursor-pointer items-center gap-3.5 rounded-[20px] px-4 py-3 text-[16px] leading-[1.35] transition-[background-color,box-shadow,opacity,scale] duration-200 active:scale-[.99] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)] ${
+            className={`sv-opt group relative flex min-h-[56px] cursor-pointer items-center gap-3.5 rounded-[20px] px-4 py-3 text-[16px] leading-[1.35] transition-[background-color,box-shadow,opacity,scale] duration-200 active:scale-[.97] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)] ${
               on ? 'bg-white shadow-[inset_0_0_0_2px_#121212,0_14px_30px_-22px_rgba(0,0,0,.45)]' : 'bg-white/60 shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] hover:bg-white/85'
             } ${dim ? 'opacity-55' : ''} ${o.fixed && scale && (i === 0 || !opts[i - 1].fixed) ? 'mt-2.5' : ''}`}
           >

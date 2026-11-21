@@ -347,7 +347,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
         {!started && !capped ? (
           <div className="flex flex-wrap justify-center gap-2">
             {starters.map((t, i) => (
-              <button key={t} type="button" onClick={() => ask(t)} className="min-h-11 rounded-pill border border-ink/[.08] bg-surface/90 px-[18px] text-[13px] backdrop-blur-[12px] transition-transform hover:-translate-y-0.5" style={{ animation: `wRise .45s ${i * 70}ms both` }}>
+              <button key={t} type="button" onClick={() => ask(t)} className="min-h-11 rounded-pill border border-ink/[.08] bg-surface/90 px-[18px] text-[13px] backdrop-blur-[12px] transition-transform hover:-translate-y-0.5" style={{ animation: `wRise .5s ${i * 70}ms both` }}>
                 {t}
               </button>
             ))}

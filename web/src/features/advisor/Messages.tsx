@@ -157,7 +157,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
   }
   const widgetLinks: WidgetLinks = { go: actions.go, onProduct: actions.onProduct, onAdd: actions.onAdd, product: (id) => byId.get(id) ?? null }
   return (
-    <div className="group flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }} aria-busy={revealing}>
+    <div className="group flex w-full items-start gap-3" style={{ animation: 'wRise .5s both' }} aria-busy={revealing}>
       <span className="-mt-0.5 -ml-1">
         <WispMark size={34} state={revealing ? 'speaking' : 'idle'} still={!revealing} />
       </span>
@@ -205,7 +205,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
         {!revealing && last && r.follow_up_suggestions.length ? (
           <span className="flex flex-wrap gap-1.5 pt-1.5">
             {r.follow_up_suggestions.map((f, i) => (
-              <button key={f} type="button" disabled={busy || capped} onClick={() => actions.onAsk(f)} className="min-h-10 rounded-pill border border-ink/12 bg-white/90 px-3.5 text-left text-[13px] transition-[background-color,scale] duration-200 ease-standard hover:bg-sunken active:scale-[.97]" style={{ animation: `wRise .4s ${i * 80}ms both` }}>
+              <button key={f} type="button" disabled={busy || capped} onClick={() => actions.onAsk(f)} className="min-h-10 rounded-pill border border-ink/12 bg-white/90 px-3.5 text-left text-[13px] transition-[background-color,scale] duration-200 ease-standard hover:bg-sunken active:scale-[.97]" style={{ animation: `wRise .5s ${i * 70}ms both` }}>
                 {f}
               </button>
             ))}
@@ -220,7 +220,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
 /** A product the advisor named (from reply.products: real catalog listings). Stores are links, with the price read off each store's page when the catalog has one. */
 function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3" style={{ animation: 'wRise .45s both' }}>
+    <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3" style={{ animation: 'wRise .5s both' }}>
       <button type="button" onClick={onOpen} aria-label={`Product details: ${p.name}`} className="shrink-0 rounded-full transition-transform hover:scale-105">
         <ProductImage product={p} size={44} />
       </button>
@@ -262,7 +262,7 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
 export function StandardCard({ m, busy }: { m: Extract<ChatMessage, { role: 'standard' }>; busy: boolean }) {
   const s = m.standard
   return (
-    <div className="flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }}>
+    <div className="flex w-full items-start gap-3" style={{ animation: 'wRise .5s both' }}>
       <span className="-mt-0.5 -ml-1">
         <WispMark size={34} still />
       </span>
@@ -302,7 +302,7 @@ export function StandardCard({ m, busy }: { m: Extract<ChatMessage, { role: 'sta
 
 export function ErrorBubble({ m, busy }: { m: Extract<ChatMessage, { role: 'error' }>; busy: boolean }) {
   return (
-    <div role="alert" className="flex items-start gap-3" style={{ animation: 'wRise .4s both' }}>
+    <div role="alert" className="flex items-start gap-3" style={{ animation: 'wRise .5s both' }}>
       <span aria-hidden className="mt-1.5 grid size-[26px] shrink-0 place-items-center rounded-full bg-coral text-[13.5px] text-inverse">
         !
       </span>

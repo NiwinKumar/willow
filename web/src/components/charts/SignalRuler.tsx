@@ -94,7 +94,7 @@ export function SignalRuler({ items, delay = 400, className = '' }: { items: Rul
             {/* the dot: ◆ for a real change the wanted way, ◇ the other way, ○ within noise; slides out from the centre */}
             <span
               className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 animate-[wFromCentre_1.1s_var(--ease-standard)_both] motion-reduce:animate-none"
-              style={{ left: `${x(it.ratio, it.id)}%`, animationDelay: `${delay + i * 60}ms`, zIndex: on ? 5 : out ? 3 : 2 }}
+              style={{ left: `${x(it.ratio, it.id)}%`, animationDelay: `${delay + i * 70}ms`, zIndex: on ? 5 : out ? 3 : 2 }}
             >
               <span className={`grid size-[22px] place-items-center rounded-full transition-[scale,box-shadow] duration-200 ease-standard ${on ? 'scale-125' : ''} ${ember ? 'bg-signal text-white shadow-[0_6px_16px_-6px_var(--signal-change-glow)]' : it.tone === 'otherWay' ? 'bg-white text-ink shadow-[inset_0_0_0_1.5px_var(--text-primary)]' : 'bg-white/90 text-ink/70 shadow-[inset_0_0_0_1.5px_rgba(18,18,18,.3)]'}`}>
                 <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>

@@ -208,7 +208,7 @@ export default function Waitlist() {
                     className="wl-input h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] font-light text-white caret-[var(--action-primary)] placeholder:text-white/40 outline-none"
                   />
                 </label>
-                <button ref={button} type="submit" disabled={state.kind === 'sending'} className="cta-yellow inline-flex h-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border-0 px-6 text-[15px] font-normal transition-transform active:scale-[.96] disabled:cursor-wait sm:h-11">
+                <button ref={button} type="submit" disabled={state.kind === 'sending'} className="cta-yellow inline-flex h-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border-0 px-6 text-[15px] font-normal transition-transform active:scale-[.97] disabled:cursor-wait sm:h-11">
                   {state.kind === 'sending' ? (
                     <>
                       <span aria-hidden className="wl-spin size-4 rounded-full border-2 border-black/20 border-t-black/70" />

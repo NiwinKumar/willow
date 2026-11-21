@@ -240,7 +240,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                     onClick={() => pick(it)}
                     onPointerEnter={() => setHot(it.n)}
                     onPointerLeave={() => setHot((h) => (h === it.n ? null : h))}
-                    className={`flex min-h-11 w-full animate-[wRise_.4s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-[background-color,scale] duration-200 active:scale-[.985] ${it.n === selN ? 'bg-white/14' : hot === it.n ? 'bg-white/10' : 'hover:bg-white/6'}`}
+                    className={`flex min-h-11 w-full animate-[wRise_.5s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-3 py-2.5 text-left transition-[background-color,scale] duration-200 active:scale-[.985] ${it.n === selN ? 'bg-white/14' : hot === it.n ? 'bg-white/10' : 'hover:bg-white/6'}`}
                     style={{ animationDelay: `${Math.min(i, 10) * 45 + 250}ms` }}
                   >
                     <span className="grid size-[30px] shrink-0 place-items-center rounded-full border-2 text-[12px]" style={{ borderColor: it.ring }}>

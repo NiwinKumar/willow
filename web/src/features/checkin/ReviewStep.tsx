@@ -15,7 +15,7 @@ export function ReviewStep({ shots, n, soft, onRetake, onUpload }: { shots: { ur
       <p className="m-0 leading-normal text-[#3E3C38]">Retake any that look blurry, too bright or covered by hair. Willow checks quality again after upload and leaves out any photo it can’t use.</p>
       <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,160px),1fr))] gap-3 p-0">
         {shots.map((s, i) => (
-          <li key={s.url} className="flex animate-rise flex-col gap-2 rounded-[28px] bg-surface p-2.5" style={{ animationDelay: `${i * 60}ms` }}>
+          <li key={s.url} className="flex animate-rise flex-col gap-2 rounded-[28px] bg-surface p-2.5" style={{ animationDelay: `${i * 70}ms` }}>
             <div className="relative aspect-[3/4] overflow-hidden rounded-[20px] bg-muted">
               <img src={s.url} alt={`Photo ${i + 1}${soft.has(s.url) ? ', looks soft' : ''}`} className="size-full object-cover" />
               <span className="absolute top-2.5 left-2.5 font-dot text-[16px] text-white [text-shadow:0_1px_6px_rgba(0,0,0,.5)]">{pad2(i + 1)}</span>

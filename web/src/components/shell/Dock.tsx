@@ -27,7 +27,7 @@ export function Dock({ current, onCheckIn, due }: { current: Destination; onChec
     setPill((p) => (a ? { x: a.offsetLeft, w: a.offsetWidth, on: true, glide: p.on } : { ...p, on: false }))
   }, [current, pathname])
   const item = (d: { id: string; label: string; to: string }) => (
-    <Link key={d.id} to={d.to} viewTransition aria-current={current === d.id ? 'page' : undefined} className={`relative z-[1] flex min-h-12 items-center rounded-pill px-[15px] text-[14px] no-underline transition-[color,scale] duration-300 active:scale-95 ${current === d.id ? 'text-inverse' : 'text-ink'}`}>
+    <Link key={d.id} to={d.to} viewTransition aria-current={current === d.id ? 'page' : undefined} className={`relative z-[1] flex min-h-12 items-center rounded-pill px-[15px] text-[14px] no-underline transition-[color,scale] duration-300 active:scale-[.97] ${current === d.id ? 'text-inverse' : 'text-ink'}`}>
       {d.label}
     </Link>
   )

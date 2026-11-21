@@ -194,7 +194,7 @@ export default function SignIn() {
           </button>
 
           {guest ? null : (
-            <button type="button" onClick={asGuest} disabled={pending !== null} aria-busy={pending === 'guest' || undefined} className="flex min-h-[60px] flex-col items-center justify-center gap-0.5 rounded-[18px] border border-line bg-white px-4 py-2 text-[16px] text-ink transition-transform active:scale-[.98]">
+            <button type="button" onClick={asGuest} disabled={pending !== null} aria-busy={pending === 'guest' || undefined} className="flex min-h-[60px] flex-col items-center justify-center gap-0.5 rounded-[18px] border border-line bg-white px-4 py-2 text-[16px] text-ink transition-transform active:scale-[.97]">
               <span>{pending === 'guest' ? 'Setting up your guest account…' : 'Continue as a guest'}</span>
               <span className="text-[13px] leading-[1.35] text-ink-2">No sign-up. Starts with sample check-ins and a routine to explore.</span>
             </button>
@@ -290,7 +290,7 @@ export default function SignIn() {
                 {error}
               </p>
             ) : null}
-            <button type="submit" disabled={pending !== null} className="cta-yellow flex min-h-12 items-center justify-center gap-2.5 rounded-[18px] text-[16px] transition-transform active:scale-[.98]">
+            <button type="submit" disabled={pending !== null} className="cta-yellow flex min-h-12 items-center justify-center gap-2.5 rounded-[18px] text-[16px] transition-transform active:scale-[.97]">
               {pending === 'email' ? <span aria-hidden className="size-4 animate-spin rounded-full border-2 border-ink/25 border-t-ink" /> : null}
               {pending === 'email' ? (up ? 'Creating account…' : 'Signing in…') : up ? 'Create account' : 'Sign in'}
             </button>

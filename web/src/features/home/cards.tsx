@@ -21,7 +21,7 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
   const [ref, seen] = useInViewOnce<HTMLElement>()
   const reduce = useReducedMotion()
   return (
-    <section ref={ref} aria-label={label} className={`card flex min-w-0 animate-[wRise_.55s_both] flex-col gap-2.5 p-5 ${className}`} style={{ animationDelay: `${delay}ms`, animationPlayState: seen || reduce ? 'running' : 'paused' }}>
+    <section ref={ref} aria-label={label} className={`card flex min-w-0 animate-[wRise_.5s_both] flex-col gap-2.5 p-5 ${className}`} style={{ animationDelay: `${delay}ms`, animationPlayState: seen || reduce ? 'running' : 'paused' }}>
       {children}
     </section>
   )
@@ -118,9 +118,9 @@ export function SetupCard({ rows, className }: { rows: SetupRow[]; className?: s
         <span className="block h-full rounded-[5px] transition-[width] duration-[800ms] ease-standard" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #FFB27A, #F25FA8)' }} />
       </div>
       <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-        {rows.map((r) => (
-          <li key={r.t} className="flex items-center gap-1.5">
-            <button type="button" onClick={r.onClick} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-[14px] squircle px-1.5 py-[7px] text-left text-ink transition-[background] duration-[250ms] hover:bg-ink/5">
+        {rows.map((r, i) => (
+          <li key={r.t} className="flex animate-[wRise_.5s_var(--ease-standard)_both] items-center gap-1.5" style={{ animationDelay: `${250 + i * 70}ms` }}>
+            <button type="button" onClick={r.onClick} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-[14px] squircle px-1.5 py-[7px] text-left text-ink transition-[background,scale] duration-[250ms] ease-standard hover:bg-ink/5 active:scale-[.985] active:duration-100">
               <span
                 aria-hidden
                 className={`grid size-[22px] flex-none place-items-center rounded-full border-[1.5px] text-[11px] ${r.state === 'done' ? 'border-ink bg-selected text-inverse' : 'border-ink/25 text-ink'}`}
@@ -172,7 +172,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
   return (
     <section
       aria-label="Routine effect"
-      className={`@container relative isolate flex min-w-0 animate-[wRise_.55s_.28s_both] flex-col gap-2 overflow-hidden rounded-lg squircle p-4 text-ink ${className ?? ''}`}
+      className={`@container relative isolate flex min-w-0 animate-[wRise_.5s_.28s_both] flex-col gap-2 overflow-hidden rounded-lg squircle p-4 text-ink ${className ?? ''}`}
       style={{ background: 'radial-gradient(100% 90% at 0% 0%, #E6F3FF 0%, transparent 60%), radial-gradient(90% 100% at 100% 100%, #D8B8FF 0%, transparent 62%), #EAF2FF', boxShadow: 'inset 0 0 44px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(61,123,255,.55)' }}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -208,7 +208,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
                   <span aria-hidden>△ </span>
                   {r.flag.text}
                 </span>
-                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-[background,scale] duration-200 hover:bg-white active:scale-[.96]">
+                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-[background,scale] duration-200 hover:bg-white active:scale-[.97]">
                   Ask Wisp
                 </button>
               </div>

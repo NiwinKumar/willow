@@ -140,7 +140,7 @@ const WAY_TONE = {
 /** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). The tag says which are played for judges and which are the live app. */
 function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, tag, sub, delay = 0 }: { to?: string; onClick?: () => void; onWarm?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string; delay?: number }) {
   const t = WAY_TONE[tone]
-  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] text-ink ${delay ? 'animate-[wRiseLg_.8s_cubic-bezier(.2,.7,.2,1)_both]' : ''}`
+  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.97] text-ink ${delay ? 'animate-[wRiseLg_.8s_cubic-bezier(.2,.7,.2,1)_both]' : ''}`
   const body = (
     <>
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-1 h-[45%] rounded-[24px] bg-gradient-to-b from-white/35 to-transparent" />

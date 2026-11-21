@@ -160,7 +160,7 @@ export function GuideStep(props: {
           <p className="m-0 mb-3.5 text-[14px] leading-[1.45] text-ink-2">Same light, pose and distance every session. Camera checks help you frame; they don’t measure.</p>
           <div className="flex flex-col gap-0.5">
             {items.map((c, i) => (
-              <label key={c.title} className="flex min-h-[54px] cursor-pointer animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-2.5 py-1.5 transition-[background,scale] duration-200 hover:bg-ink/[.04] active:scale-[.99]" style={{ animationDelay: `${250 + i * 60}ms` }}>
+              <label key={c.title} className="flex min-h-[54px] cursor-pointer animate-[wRise_.5s_var(--ease-standard)_both] items-center gap-3.5 rounded-[18px] px-2.5 py-1.5 transition-[background,scale] duration-200 hover:bg-ink/[.04] active:scale-[.97]" style={{ animationDelay: `${250 + i * 70}ms` }}>
                 <input type="checkbox" checked={ticks[i]} onChange={() => setTicks((t) => t.map((x, j) => (j === i ? !x : x)))} className="m-0 size-[22px] flex-none accent-[var(--text-primary)]" />
                 <span className="flex flex-col gap-0.5">
                   <span className="text-[16px]">{c.title}</span>
@@ -222,10 +222,10 @@ export function GuideStep(props: {
         )}
 
         <div className="grid grid-cols-2 gap-2.5">
-          <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.98] disabled:active:scale-100 ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>
+          <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.97] disabled:active:scale-100 ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>
             Use camera
           </button>
-          <button type="button" onClick={props.onFiles} className={`min-h-16 rounded-[24px] border border-ink/15 text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.98] ${raw ? 'bg-selected text-inverse' : 'bg-white text-ink'}`}>
+          <button type="button" onClick={props.onFiles} className={`min-h-16 rounded-[24px] border border-ink/15 text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.97] ${raw ? 'bg-selected text-inverse' : 'bg-white text-ink'}`}>
             Upload files
           </button>
         </div>

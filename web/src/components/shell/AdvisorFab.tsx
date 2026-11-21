@@ -129,7 +129,7 @@ export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; o
         aria-expanded={open}
         title="Ask Wisp"
         tabIndex={hidden ? -1 : undefined}
-        className="grid size-full place-items-center rounded-full transition-[scale] duration-300 ease-spring hover:scale-[1.05] active:scale-[.94] active:duration-100 motion-reduce:hover:scale-100"
+        className="grid size-full place-items-center rounded-full transition-[scale] duration-300 ease-spring hover:scale-[1.05] active:scale-[.92] active:duration-100 motion-reduce:hover:scale-100"
         // a soft shadow under the button, tinted like the cat's rim light
         style={{ boxShadow: '0 18px 34px -16px rgba(72,56,150,.5), 0 4px 10px -6px rgba(0,0,0,.25)' }}
       >

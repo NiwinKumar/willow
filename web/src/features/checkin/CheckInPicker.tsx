@@ -73,7 +73,7 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
                 Check in
               </h2>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="grid size-11 place-items-center rounded-full bg-sunken text-ink transition-[scale] active:scale-95">
+            <button type="button" onClick={onClose} aria-label="Close" className="grid size-11 place-items-center rounded-full bg-sunken text-ink transition-[scale] active:scale-[.97]">
               <X size={16} strokeWidth={1.8} aria-hidden />
             </button>
           </div>
@@ -116,7 +116,7 @@ function Today({ live, known, places, line, onStart, onUpload, onChange }: { liv
         </div>
         <ol aria-label="Places in this check-in" className="m-0 flex list-none flex-col gap-1.5 p-0">
           {places.map((p, i) => (
-            <li key={p} className="flex min-h-14 animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-3 rounded-[20px] bg-white py-2 pr-3 pl-2 shadow-[0_10px_24px_-18px_rgba(0,0,0,.3)]" style={{ animationDelay: `${200 + i * 70}ms` }}>
+            <li key={p} className="flex min-h-14 animate-[wRise_.5s_var(--ease-standard)_both] items-center gap-3 rounded-[20px] bg-white py-2 pr-3 pl-2 shadow-[0_10px_24px_-18px_rgba(0,0,0,.3)]" style={{ animationDelay: `${200 + i * 70}ms` }}>
               <span aria-hidden className="relative size-10 flex-none rounded-[14px] shadow-[inset_0_0_12px_rgba(255,255,255,.5)]" style={{ background: SITE_SWATCH[p] }}>
                 <span className="absolute -top-1 -left-1 grid size-5 place-items-center rounded-full bg-selected font-dot text-[9.5px] text-inverse">{i + 1}</span>
               </span>
@@ -134,7 +134,7 @@ function Today({ live, known, places, line, onStart, onUpload, onChange }: { liv
         </div>
       </div>
       <div className="flex flex-col gap-2 border-t border-ink/[.06] px-5 pt-3.5 pb-5">
-        <button type="button" onClick={onStart} className="group flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background,scale] duration-200 ease-standard hover:bg-[#2a2a2a] active:scale-[.98]">
+        <button type="button" onClick={onStart} className="group flex min-h-[50px] items-center justify-center gap-2.5 rounded-pill bg-selected text-[15px] text-inverse transition-[background,scale] duration-200 ease-standard hover:bg-[#2a2a2a] active:scale-[.97]">
           Start check-in <span aria-hidden className="inline-block transition-[translate] duration-300 ease-standard group-hover:translate-x-1">→</span>
         </button>
         <button type="button" onClick={onUpload} className="min-h-11 text-[14px] text-ink underline decoration-ink/30 underline-offset-4">

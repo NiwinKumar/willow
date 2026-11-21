@@ -38,7 +38,7 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, due, name, in
         <span className={`text-[21px] font-light tracking-[-0.03em] ${label}`}>willow</span>
       </Link>
       <button type="button" onClick={onCheckIn} aria-label={due ? `Check in, ${due}` : 'Check in'} title={due ? `Check in · ${due} · N` : 'Check in · N'} className="cta-yellow group relative flex h-10 w-full shrink-0 items-center gap-[11px] overflow-hidden rounded-[25px] squircle pr-2.5 pl-[13.5px] text-[14px] whitespace-nowrap hover:brightness-[1.04]">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="shrink-0 transition-[scale,translate] duration-300 ease-bounce group-hover:-translate-y-px group-hover:scale-[1.16] group-active:scale-[.85]">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="shrink-0 transition-[scale,translate] duration-300 ease-bounce group-hover:-translate-y-px group-hover:scale-[1.16] group-active:scale-[.92]">
           <path d="M12 5v14M5 12h14" />
         </svg>
         <span className={label}>Check in</span>

@@ -29,7 +29,7 @@ const usable = (s: Session) => s.status === 'done' && s.measured !== false && Bo
 
 function Frame({ title, link, onLink, children }: { title: string; link: string; onLink: () => void; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2.5 rounded-[22px] bg-sunken/80 p-3.5" style={{ animation: 'wRise .45s both' }}>
+    <div className="flex flex-col gap-2.5 rounded-[22px] bg-sunken/80 p-3.5" style={{ animation: 'wRise .5s both' }}>
       <span className="flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {title.toUpperCase()}</span>
         <button type="button" onClick={onLink} className="hit44 inline-flex items-center gap-1 rounded-pill bg-white px-2.5 py-1 text-[12px] transition-colors hover:bg-ink/5">

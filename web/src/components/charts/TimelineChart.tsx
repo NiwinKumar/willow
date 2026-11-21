@@ -142,7 +142,7 @@ export function TimelineChart({
               {p.i === highlight ? <circle cx={p.x} cy={p.y} r={13} fill="none" stroke="#fff" strokeWidth={1.5} className="animate-[wDotIn_.4s_var(--ease-standard)_both]" style={pop(at + 200)} /> : null}
               <circle cx={p.x} cy={p.y} r={isBase ? 8 : 6.5} fill={isBase ? LIME : '#E6E6E6'} stroke="var(--action-selected)" strokeWidth={3} className="animate-[wDotIn_.45s_var(--ease-bounce)_both]" style={pop(at)} />
               {pill(p.i) ? (
-                <g className="animate-[wRise_.4s_var(--ease-standard)_both]" style={{ animationDelay: `${at + 260}ms` }}>
+                <g className="animate-[wRise_.5s_var(--ease-standard)_both]" style={{ animationDelay: `${at + 260}ms` }}>
                   <rect x={p.x - 30} y={p.y - 42} width={60} height={26} rx={13} fill="#fff" />
                   <text x={p.x} y={p.y - 24} textAnchor="middle" fontSize={12} fontFamily={MONO} fill="var(--text-primary)">
                     {points[p.i].text ?? format(p.v)}
