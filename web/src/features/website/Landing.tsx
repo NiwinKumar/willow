@@ -98,7 +98,7 @@ function Hero({ grow }: { grow: boolean }) {
         {loading ? null : app.signedIn ? (
           <span className="max-w-[60vw] truncate text-[14px] text-ink-2">Signed in as {me.email ?? me.name}</span>
         ) : (
-          <Link to="/signin" className="cta-yellow flex min-h-11 items-center rounded-pill px-6 text-[15px] font-medium no-underline transition-[filter] hover:brightness-105">
+          <Link to="/signin" className="cta-yellow flex min-h-11 items-center rounded-pill px-6 text-[15px] font-medium no-underline transition-[filter,scale] duration-200 ease-standard hover:brightness-105 active:scale-[.97]">
             Sign in
           </Link>
         )}
@@ -115,12 +115,13 @@ function Hero({ grow }: { grow: boolean }) {
           <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ COSMETIC TRACKING · NOT A MEDICAL DEVICE</span>
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
-        <nav data-garden-calm aria-label="Ways in" className="relative flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
-          <span aria-hidden className="pointer-events-none absolute -inset-6 -z-10 rounded-[52px] bg-[rgba(255,248,242,.34)] shadow-[0_30px_80px_-30px_rgba(60,40,90,.35)] blur-[18px]" />
-          <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
-          <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
-          <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
-          <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
+        <nav data-garden-calm aria-label="Ways in" className="relative flex w-full max-w-[500px] flex-col gap-3.5 justify-self-center md:justify-self-end">
+          <span aria-hidden className="pointer-events-none absolute -inset-6 -z-10 animate-[wFadeIn_.9s_.3s_both] rounded-[52px] bg-[rgba(255,248,242,.34)] shadow-[0_30px_80px_-30px_rgba(60,40,90,.35)] blur-[18px]" />
+          {/* The ways in arrive in the order recommended: the judge path first. */}
+          <WayIn delay={150} to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
+          <WayIn delay={260} to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
+          <WayIn delay={370} onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
+          <WayIn delay={480} to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
         </nav>
       </div>
     </section>
@@ -137,9 +138,9 @@ const WAY_TONE = {
 } as const
 
 /** One of the hero's ways in: a big glossy button (a link, or an action for "Open the Willow app"). The tag says which are played for judges and which are the live app. */
-function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, tag, sub }: { to?: string; onClick?: () => void; onWarm?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string }) {
+function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, tag, sub, delay = 0 }: { to?: string; onClick?: () => void; onWarm?: () => void; tone: keyof typeof WAY_TONE; icon: LucideIcon; title: string; tag: string; sub: string; delay?: number }) {
   const t = WAY_TONE[tone]
-  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] text-ink`
+  const cls = `group relative flex min-h-[92px] w-full items-center gap-4 overflow-hidden rounded-[30px] py-4 pr-4 pl-6 text-left no-underline backdrop-blur-[14px] transition-[transform,filter] duration-200 hover:-translate-y-1 hover:brightness-[1.04] active:translate-y-0 active:scale-[.99] text-ink ${delay ? 'animate-[wRiseLg_.8s_cubic-bezier(.2,.7,.2,1)_both]' : ''}`
   const body = (
     <>
       <span aria-hidden className="pointer-events-none absolute inset-x-3 top-1 h-[45%] rounded-[24px] bg-gradient-to-b from-white/35 to-transparent" />
@@ -154,7 +155,7 @@ function WayIn({ to, onClick, onWarm, tone, icon: Icon, title, tag, sub }: { to?
       </span>
     </>
   )
-  const style = { background: t.bg, boxShadow: t.shadow }
+  const style = { background: t.bg, boxShadow: t.shadow, animationDelay: delay ? `${delay}ms` : undefined }
   const warm = onWarm ? { onPointerEnter: onWarm, onFocus: onWarm, onTouchStart: onWarm } : {}
   return to ? (
     <Link to={to} className={cls} style={style} {...warm}>

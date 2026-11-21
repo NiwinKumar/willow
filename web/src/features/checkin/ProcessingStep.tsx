@@ -268,18 +268,23 @@ export function ProcessingStep(props: {
 
       <div className="flex flex-col gap-1 rounded-[36px] bg-surface/90 p-[clamp(20px,3vw,30px)] shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)] backdrop-blur-[20px] squircle">
         <ol aria-label="Stages" className="m-0 list-none p-0">
-          {stages.map((st) => (
-            <li key={st.name} className="flex items-start gap-3.5 border-b border-ink/[.06] px-1.5 py-3">
+          {stages.map((st, i) => (
+            <li key={st.name} className="flex animate-[wRise_.45s_var(--ease-standard)_both] items-start gap-3.5 border-b border-ink/[.06] px-1.5 py-3" style={{ animationDelay: `${150 + i * 70}ms` }}>
               <span
                 aria-hidden
-                className="grid size-[30px] flex-none place-items-center rounded-full text-[14px] transition-[background] duration-[400ms]"
+                className={`grid size-[30px] flex-none place-items-center rounded-full text-[14px] transition-[background] duration-[400ms] ${st.tone === 'run' ? 'motion-safe:animate-[wBreathe_2.4s_ease-in-out_infinite]' : ''}`}
                 style={{ background: st.tone === 'fail' ? 'var(--aura-coral)' : st.tone === 'done' ? 'var(--text-primary)' : st.tone === 'run' ? 'var(--aura-lilac)' : '#E4E3DE', color: st.tone === 'done' || st.tone === 'fail' ? '#fff' : 'var(--text-primary)' }}
               >
-                {st.glyph}
+                {/* the mark pops into its new state (keyed by state, so only a change animates) */}
+                <span key={st.tone} className="inline-block animate-[wDotIn_.4s_var(--ease-bounce)_both]">
+                  {st.glyph}
+                </span>
               </span>
               <span className="flex flex-col gap-[3px]">
                 <span className="text-[17px]">{st.name}</span>
-                <span className="text-[14px] leading-[1.4] text-ink-2">{st.detail}</span>
+                <span key={st.detail} className="animate-[wWord_.4s_both] text-[14px] leading-[1.4] text-ink-2">
+                  {st.detail}
+                </span>
               </span>
             </li>
           ))}
@@ -313,19 +318,19 @@ export function ProcessingStep(props: {
             {sample ? (
               // Sample photos can't be retaken: offer the person's own check-in instead.
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={props.onFaceCheckIn} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse">
+                <button type="button" onClick={props.onFaceCheckIn} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   Take your own photo
                 </button>
-                <button type="button" onClick={props.onClose} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px]">
+                <button type="button" onClick={props.onClose} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   Done
                 </button>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={props.onRetake} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse">
+                <button type="button" onClick={props.onRetake} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   Retake photos
                 </button>
-                <button type="button" onClick={props.onUploadAgain} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px]">
+                <button type="button" onClick={props.onUploadAgain} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   Upload different files
                 </button>
               </div>
@@ -337,10 +342,10 @@ export function ProcessingStep(props: {
           <div className="mt-3 flex flex-col gap-2.5">
             <p className="m-0 leading-normal">These photos were not measured this time, so this check-in has no numbers. Your photos are kept and can be measured later.</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={props.onFaceCheckIn} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse">
+              <button type="button" onClick={props.onFaceCheckIn} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
                 Take a face photo
               </button>
-              <button type="button" onClick={props.onClose} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px]">
+              <button type="button" onClick={props.onClose} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] transition-[scale] duration-200 ease-standard active:scale-[.97]">
                 Done
               </button>
             </div>
@@ -353,15 +358,15 @@ export function ProcessingStep(props: {
             <div className="flex flex-wrap gap-2">
               {outcome === 'missing' ? (
                 // A new attempt: the camera for quick photos, the file picker for RAW.
-                <button type="button" onClick={props.onRetake} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse">
+                <button type="button" onClick={props.onRetake} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   {received ? 'Take the photos again' : 'Start a new check-in'}
                 </button>
               ) : outcome === 'limit' || outcome === 'gone' ? null : (
-                <button type="button" onClick={props.onRetry} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse">
+                <button type="button" onClick={props.onRetry} className="min-h-[52px] rounded-pill bg-selected px-[22px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   {outcome === 'timeout' ? 'Retry analysis' : 'Try again'}
                 </button>
               )}
-              <button type="button" onClick={props.onClose} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px]">
+              <button type="button" onClick={props.onClose} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px] transition-[scale] duration-200 ease-standard active:scale-[.97]">
                 {outcome === 'limit' || outcome === 'gone' ? 'Done' : 'Come back later'}
               </button>
             </div>
@@ -369,8 +374,8 @@ export function ProcessingStep(props: {
         ) : null}
 
         {outcome === 'success' && shown >= 4 ? (
-          <button type="button" onClick={props.onSeeResult} className="mt-3 flex min-h-[60px] animate-rise items-center justify-center rounded-[24px] bg-selected text-[17px] text-inverse">
-            {view?.session.is_baseline ? 'See your baseline' : 'See your results'} →
+          <button type="button" onClick={props.onSeeResult} className="group mt-3 flex min-h-[60px] animate-rise items-center justify-center gap-2 rounded-[24px] bg-selected text-[17px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.98]">
+            {view?.session.is_baseline ? 'See your baseline' : 'See your results'} <span aria-hidden className="inline-block transition-[translate] duration-300 ease-standard group-hover:translate-x-1">→</span>
           </button>
         ) : null}
       </div>
