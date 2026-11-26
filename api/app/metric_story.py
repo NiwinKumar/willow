@@ -23,7 +23,17 @@ from typing import Any
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from app import baselines, cohort, explain, gemini, limits, numbers, schedule
+from app import (
+    baselines,
+    cohort,
+    explain,
+    gemini,
+    limits,
+    numbers,
+    schedule,
+    story_insights,
+    tracks,
+)
 from app.results import measured_result
 from app.store import Store
 
@@ -51,7 +61,7 @@ for _concern, _metrics in cohort.CONCERN_METRICS.items():
 
 
 class StoryGemini(BaseModel):
-    points: list[str] = Field(default_factory=list, max_length=5)
+    points: list[str] = Field(default_factory=list, max_length=7)
     reasons: list[str] = Field(default_factory=list, max_length=2)
 
 
@@ -62,7 +72,7 @@ against their baseline (real_change = changed by more than their photos usually 
 = about the same as at their start; no_baseline = their first reading or a baseline with too few
 photos), and the routine products aimed at this measurement with how often they were used since
 the previous check-in.
-Write "points": 3 to 5 short bullet sentences, in this order:
+Write "points": 3 to 7 short bullet sentences, in this order:
 - how it looked last time, then this time, and the direction in everyday words (when_lower /
   when_higher, e.g. "a more even tone than last week"); a change smaller than normal_range is
   "about the same".
@@ -72,7 +82,17 @@ Write "points": 3 to 5 short bullet sentences, in this order:
   (lower redness, spots, pores, texture, lines, shine, blemishes, evenness; higher under-eye
   brightness and glow) is an improvement, said warmly; the other way is said gently ("moved the
   other way"), never "worse", "worsened" or "declined".
-- each routine product, by name: when it started or stopped and how often it was used.
+- by area (when FACTS has "areas"): name the areas whose verdict_vs_baseline is real_change and
+  which way each went (way improved = an improvement, other_way = moved the other way); say the
+  other areas stayed within their normal range. Never call an area changed unless its own
+  verdict_vs_baseline is real_change; no_band means it cannot be judged yet.
+- spots (when FACTS has "spots"): which areas have new ones this time, which still have them,
+  which are fading or not seen this time, using only those counts and area labels.
+- each routine product, by name: when it started or stopped, how often it was used, and its
+  since_start: helping = moved beyond the normal range the way people usually want since it
+  started; moving_other_way = moved beyond it the other way; no_change_yet = within the normal
+  range so far (most changes take 4 to 8 weeks); too_early = fewer than 2 weeks or 2 check-ins
+  since it started. Always say timing lines up, never that the product did it.
 Write "reasons": at most 2 sentences on what MAY explain the change, or the lack of one.
 Rules:
 - Everyday words, short sentences. Never write delta, noise band, mdc, threshold, variance, a*,
@@ -82,7 +102,11 @@ Rules:
 - Never claim a product caused a change: "lines up with", "may", "could". If use was low or a
   product started only days ago, say it is too early to tell. Light, distance and angle can also
   move a reading.
-- Never call it a real change unless verdict_vs_baseline is real_change.
+- Never call it a real change unless verdict_vs_baseline is real_change (or, for an area, that
+  area's own verdict_vs_baseline; for a product, its since_start status helping or
+  moving_other_way).
+- Area names only as the "label" in FACTS (left and right are the person's own). Never name a
+  condition, a cause, a treatment or a product the person does not already use.
 - Cosmetic language only; never diagnose. Skin tone (tone_ita) is descriptive: never better or
   worse, never lighter or darker as a goal.
 - British spelling."""
@@ -110,16 +134,16 @@ def _same_way(this_result: dict[str, Any], other_result: dict[str, Any], metric_
     return baselines.with_cheeks(this_result) == baselines.with_cheeks(other_result)
 
 
-def _earlier(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str):
+def _earlier(rows: list[tuple[str, dict[str, Any]]], sid: str, doc: dict[str, Any], metric_id: str):
     """Every earlier measured session of the same site and capture mode with this metric, taken
-    the same way: [(session id, doc, its metric)]. One read of the sessions and one parse of each
-    result, shared by the previous check-in and the history."""
+    the same way: [(session id, doc, its metric)]. One read of the sessions (`rows`) and one parse
+    of each result, shared by the previous check-in, the history, the areas and the products."""
     this_at = doc.get("created_at")
     if not this_at:
         return []
     this_result = measured_result(doc) or {}
     out = []
-    for other_id, other in store.sessions_list(uid):
+    for other_id, other in rows:
         if other_id == sid or other.get("site") != doc.get("site"):
             continue
         if other.get("capture_mode") != doc.get("capture_mode"):
@@ -177,6 +201,40 @@ def _usage(entry_id: str, entry: dict[str, Any], logs: list[dict[str, Any]], lo:
     return {"days_used": len(used), "of_days": planned} if planned else None
 
 
+def _baseline_metric(doc: dict[str, Any], earlier: list[tuple[str, dict, dict]]) -> dict | None:
+    """The metric of the baseline session this check-in was compared with (its areas and band)."""
+    want = ((doc.get("compared_with") or {}).get("session_id")) or None
+    for other_id, other, om in earlier:
+        if (want and other_id == want) or (not want and other.get("is_baseline")):
+            return om
+    return None
+
+
+def _diary(rows: list[tuple[str, dict[str, Any]]], sid: str, doc: dict[str, Any]) -> list[dict]:
+    """The spot diary's sessions up to and including this check-in (face only), oldest first."""
+    if doc.get("site") != "face_full" or not doc.get("created_at"):
+        return []
+    used = []
+    for other_id, other in rows:
+        if other.get("site") != "face_full" or not other.get("created_at"):
+            continue
+        if other["created_at"] > doc["created_at"] or (
+            other_id != sid and other.get("status") != "done"
+        ):
+            continue
+        result = measured_result(other)
+        if tracks.usable(result):
+            used.append(
+                {
+                    "id": other_id,
+                    "created_at": other["created_at"],
+                    "marks": tracks.observations(result, other.get("labels") or {}),
+                }
+            )
+    used.sort(key=lambda r: r["created_at"])
+    return used if used and used[-1]["id"] == sid else []
+
+
 def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str) -> dict | None:
     result = measured_result(doc)
     m = _metric(result, metric_id) if result else None
@@ -198,7 +256,8 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
     if metric_id in explain.DIRECTION_WORDS:
         # the unwanted side is said gently ("moved the other way"), never "more redness"
         out["when_lower"], out["when_higher"] = explain.gentle_words({"id": metric_id})
-    earlier = _earlier(store, uid, sid, doc, metric_id)
+    rows = store.sessions_list(uid)
+    earlier = _earlier(rows, sid, doc, metric_id)
     out["history"] = _history(earlier, m)
     prev = _previous(earlier)
     lo = now_day - timedelta(days=13)
@@ -211,6 +270,17 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
             places = explain.decimals(m)
             out["change_vs_previous"] = round(shown["value"] - prev_value, places)
         lo = prev_day + timedelta(days=1)
+    base_m = _baseline_metric(doc, earlier)
+    if metric_id != "tone_ita":  # skin tone is never split by area
+        out["areas"] = story_insights.areas(m, prev[2] if prev else None, base_m)
+    spot_facts = story_insights.spots(metric_id, _diary(rows, sid, doc))
+    if spot_facts:
+        out["spots"] = spot_facts
+    places = explain.decimals(m)
+    band = explain.shown_numbers({**base_m, "id": metric_id})["mdc95"] if base_m else shown["mdc95"]
+    series = [
+        (_day(o["created_at"]), om["value"]) for _, o, om in earlier if om.get("value") is not None
+    ]
     concerns = CONCERNS_OF.get(metric_id, set())
     products = []
     if concerns:
@@ -234,6 +304,15 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
                     "started_since_last_check_in": bool(started and started >= lo),
                     "stopped": ended.isoformat() if ended and ended <= now_day else None,
                     "use": _usage(entry_id, e, logs, lo, now_day),
+                    "since_start": story_insights.since_start(
+                        started.isoformat() if started else None,
+                        metric_id,
+                        now_day,
+                        m["value"],
+                        series,
+                        band,
+                        places,
+                    ),
                 }
             )
     out["routine"] = products
@@ -272,6 +351,7 @@ def _points(f: dict[str, Any]) -> list[str]:
         pts.append(f"Since your baseline: {said}, more than your photos usually vary.")
     elif verdict == "within_noise":
         pts.append("Since your baseline: no real change, within your normal photo variation.")
+    pts += _area_points(f) + _spot_points(f)
     for p in f.get("routine", []):
         bits = []
         if p["started_since_last_check_in"] and p["started"]:
@@ -282,16 +362,84 @@ def _points(f: dict[str, Any]) -> list[str]:
             bits.append(f"used {p['use']['days_used']} of {p['use']['of_days']} planned days")
         name = f"{p['brand']} {p['name']}".strip()
         pts.append(
-            f"In your routine for this: {name}" + (f" ({', '.join(bits)})." if bits else ".")
+            f"In your routine for this: {name}"
+            + (f" ({', '.join(bits)})." if bits else ".")
+            + _since_words(p.get("since_start"), f)
+        )
+    if any(
+        (p.get("since_start") or {}).get("status") not in (None, "too_early")
+        for p in f.get("routine", [])
+    ):
+        pts.append(
+            "Timing is an association, not proof: light, angle and other products also play a part."
         )
     return pts
+
+
+def _names(labels: list[str]) -> str:
+    return labels[0] if len(labels) == 1 else f"{', '.join(labels[:-1])} and {labels[-1]}"
+
+
+def _area_points(f: dict[str, Any]) -> list[str]:
+    """One line on the areas: those that changed beyond their own normal range, by way."""
+    rows = [a for a in f.get("areas") or [] if a.get("verdict_vs_baseline")]
+    if len(rows) < 2:
+        return []
+    better = [a["label"] for a in rows if a.get("way") == "improved"]
+    other = [a["label"] for a in rows if a.get("way") == "other_way"]
+    shifted = [a["label"] for a in rows if a.get("way") == "shifted"]
+    steady = [a for a in rows if a["verdict_vs_baseline"] == "within_noise"]
+    bits = []
+    if better:
+        bits.append(f"improved on the {_names(better)}")
+    if other:
+        bits.append(f"{explain.OTHER_WAY} on the {_names(other)}")
+    if shifted:
+        bits.append(f"shifted on the {_names(shifted)}")
+    if not bits:
+        return ["By area: every area is within its own normal range since your baseline."]
+    rest = " The other areas are within their normal range." if steady else ""
+    return [f"By area since your baseline: {'; '.join(bits)}.{rest}"]
+
+
+def _spot_points(f: dict[str, Any]) -> list[str]:
+    """Where spots are new this time, and where they are fading or not seen."""
+    rows = (f.get("spots") or {}).get("areas") or []
+    new = [f"{r['new_this_time']} on the {r['label']}" for r in rows if r["new_this_time"]]
+    gone = [r["label"] for r in rows if r["fading"] or r["not_seen_this_time"]]
+    out = []
+    if new:
+        out.append(f"New since last check-in: {_names(new)}.")
+    if gone:
+        out.append(f"Fading or not seen this time on the {_names(gone)}.")
+    return out
+
+
+def _since_words(s: dict[str, Any] | None, f: dict[str, Any]) -> str:
+    if not s:
+        return ""
+    if s["status"] == "too_early":
+        return " Too early to tell: it needs at least 2 weeks and 2 check-ins since it started."
+    label = f["label"].lower()
+    weeks = f"{s['weeks']} weeks"
+    if s["status"] == "no_change_yet":
+        return f" Since it started ({weeks}): {label} within your normal range so far."
+    if s["status"] == "helping":
+        return f" Since it started ({weeks}): {label} improved beyond your normal range."
+    if s["status"] == "moving_other_way":
+        return (
+            f" Since it started ({weeks}): {label} {explain.OTHER_WAY}, beyond your normal range."
+        )
+    if s["status"] == "changed":
+        return f" Since it started ({weeks}): {label} shifted beyond your normal range."
+    return ""
 
 
 def _fingerprint(f: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(f, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
-DATE_KEYS = {"this_day", "previous_day", "day", "started", "stopped"}
+DATE_KEYS = {"this_day", "previous_day", "day", "started", "stopped", "from_day"}
 CAUSE = re.compile(r"\b(caus\w*|due to|thanks to|because of|result of|made your)\b", re.I)
 
 
@@ -324,15 +472,40 @@ def _allowed(f: dict[str, Any]) -> set[str]:
     return allowed
 
 
+def _mentions(text: str, f: dict[str, Any]) -> tuple[list[dict], list[dict]]:
+    """The areas (by label) and routine products (by name) a sentence talks about."""
+    low = text.lower()
+    rows = [*(f.get("areas") or []), *((f.get("spots") or {}).get("areas") or [])]
+    areas = [a for a in rows if a["label"] in low]
+    products = [p for p in f.get("routine") or [] if p["name"] and p["name"].lower() in low]
+    return areas, products
+
+
+def _change_ok(text: str, f: dict[str, Any]) -> bool:
+    """A sentence may claim a change only when what it is about really changed: the areas it
+    names (their own verdict), else the products it names (since_start), else the whole face."""
+    areas, products = _mentions(text, f)
+    if areas:
+        return all(a.get("verdict_vs_baseline") == "real_change" for a in areas)
+    if products:
+        return any(
+            (p.get("since_start") or {}).get("status") in ("helping", "moving_other_way", "changed")
+            for p in products
+        )
+    return f.get("verdict_vs_baseline") == "real_change"
+
+
 def _problem(text: str, f: dict[str, Any], allowed: set[str]) -> str | None:
     if not numbers.only_known(text, allowed):
         return "unknown number"
     if explain.BANNED.search(text) or explain.JARGON.search(text):
         return "banned or jargon word"
-    if f.get("verdict_vs_baseline") != "real_change" and explain._claims_change(text):
+    if explain._claims_change(text) and not _change_ok(text, f):
         return "change claimed without a real change"
     if CAUSE.search(text):
         return "claims a cause"
+    if _mentions(text, f)[0]:
+        return None  # an area may move the other way from the whole face
     d = f.get("change_vs_previous")
     words = WORDS.get(f["metric_id"])
     if d and words:
@@ -415,7 +588,15 @@ def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
         "reasons": reasons,
         "source": source,
         "products": [
-            {"name": p["name"], "brand": p["brand"], "use": p["use"]} for p in f["routine"]
+            {
+                "name": p["name"],
+                "brand": p["brand"],
+                "use": p["use"],
+                "since_start": p.get("since_start"),
+            }
+            for p in f["routine"]
         ],
+        "areas": f.get("areas") or [],
+        "spots": f.get("spots"),
         "has_previous": "previous_day" in f,
     }

@@ -90,8 +90,10 @@ def test_points_compare_with_last_week_and_name_the_routine():
     assert s["points"][2] == "Since your baseline: improved, more than your photos usually vary."
     assert s["points"][3] == (
         "In your routine for this: Minimalist Alpha Arbutin 2% Serum "
-        "(started 24 Oct, used 5 of 7 planned days)."
+        "(started 24 Oct, used 5 of 7 planned days). Too early to tell: it needs at least "
+        "2 weeks and 2 check-ins since it started."
     )
+    assert s["products"][0]["since_start"]["status"] == "too_early"  # 6 days, 1 check-in
     assert [p["name"] for p in s["products"]] == ["Alpha Arbutin 2% Serum"]
     assert s["reasons"] == [] and s["source"] == "facts"  # Gemini offline in tests
 
