@@ -108,3 +108,11 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Change: the api waits up to 280 s for `/v1/analyze` (was 120 s); the engine's Cloud Run request timeout is 300 s (was 120 s). No request or response change.
 - Impact: engine code none; schemas none; api and infra only.
 - Approved by: n/a (api and infra, both Niwin's)
+
+## 2026-11-27: Readings by area (proposed by Harshini; engine, then api/web)
+- Why: a face reading is one number for the whole face, so a check-in could not say where it moved (the left cheek calmer, the chin with more blemishes). The metric detail needs that to be useful.
+- What: on `face_full` results, `metrics[].extras.by_zone` for `redness`, `tone_evenness`, `blemishes`, `pigment_spots` and `dark_circles`: `{zone: {value, within_session_sd, mdc95, n}}`. Zones are the face map's (`forehead`, `nose`, `right_cheek`, `left_cheek`, `around_mouth`, `chin`, `right_jaw`, `left_jaw`; `right_under_eye` / `left_under_eye` for dark circles), each measured on the photos that show at least `ZONE_MIN_MM2` of its skin, with its own photo-to-photo SD (the metric's `MIN_SD` floor) and noise band. Blemishes and dark spots per zone come from the same confirmed marks as the totals (cheek photos own the cheeks and jaws). Skin tone, shine, glow and lines are not split (lines already report zones in its extras). Definitions in `docs/METRICS.md` "Readings by area".
+- Schema: none (`extras` is a free object). Whole-face values, bands and verdicts are unchanged.
+- Version: engine 0.4.1 (additive). A result without `by_zone` (older engine) simply has no areas; re-measuring a session adds them.
+- Impact: engine; api reads `by_zone` to compare each zone with the same zone of the baseline session (metric story); web shows it.
+- Approved by: [x] Harshini [ ] Niwin

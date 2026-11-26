@@ -63,6 +63,7 @@ MIN_SD = {
     "texture": 0.05,  # index
 }
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
+ZONE_MIN_MM2 = 50.0  # a face-map zone needs this much skin in a photo for a by-zone reading
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
