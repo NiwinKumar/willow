@@ -69,13 +69,57 @@ export type SessionView = {
 /** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
  * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
  * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
+/** One face area of a metric against the same area of the baseline, judged on that area's own normal range
+ * (engine extras.by_zone, api story_insights.areas). Older engines send none. */
+export type StoryArea = {
+  area: string
+  label: string
+  value: number
+  previous_value?: number
+  change_vs_previous?: number
+  baseline_value?: number
+  change_vs_baseline?: number
+  normal_range?: number | null
+  verdict_vs_baseline?: 'real_change' | 'within_noise' | 'no_band'
+  way?: 'improved' | 'other_way' | 'shifted' | null
+}
+/** Blemishes or dark spots in one area, from the spot diary up to this check-in. */
+export type StorySpotArea = {
+  area: string
+  label: string
+  new_this_time: number
+  still_there: number
+  fading: number
+  not_seen_this_time: number
+  faded_so_far: number
+  typical_days_visible: { at_least: number; at_most: number; from: number } | null
+}
+/** A routine product aimed at the metric: use since the last check-in, and how the metric moved since it started. */
+export type StoryProduct = {
+  name: string
+  brand: string
+  use: { days_used: number; of_days: number } | null
+  since_start?: {
+    started: string
+    weeks: number
+    check_ins: number
+    status: 'too_early' | 'helping' | 'moving_other_way' | 'changed' | 'no_change_yet' | 'no_band'
+    from_day?: string
+    from_value?: number
+    value?: number
+    change?: number
+    normal_range?: number | null
+  } | null
+}
 export type MetricStory = {
   metric_id: string
   points: string[]
   reasons: string[]
   source: 'gemini' | 'facts'
-  products: { name: string; brand: string; use: { days_used: number; of_days: number } | null }[]
+  products: StoryProduct[]
   has_previous: boolean
+  areas?: StoryArea[]
+  spots?: { check_ins: number; days_covered: number; areas: StorySpotArea[] } | null
 }
 
 /** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */

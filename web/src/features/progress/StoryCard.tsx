@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import type { Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { api, type MetricStory } from '../../lib/api'
+import { unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
+import { areaStatus, productLine, productStatus, sentence, spotLine, typicalLine, type Status } from './storyParts'
 
 /**
  * "What changed" for one metric, in points (api GET /v1/sessions/{id}/story/{metric}): Gemini reads the metric's
@@ -31,6 +33,8 @@ export function StoryCard({ session, metricId }: { session: Session; metricId: s
   }, [mode, getIdToken, session.id, metricId, key])
 
   const story = got?.key === key ? got.story : null
+  const m = session.result?.metrics.find((x) => x.id === metricId)
+  const unit = m ? unitOf(m) : ''
   const state: 'loading' | 'ready' | 'none' = mode !== 'live' ? 'none' : got?.key !== key ? 'loading' : story ? 'ready' : 'none'
   if (state === 'none') return null
   return (
@@ -48,6 +52,7 @@ export function StoryCard({ session, metricId }: { session: Session; metricId: s
               <li key={p}>{p}</li>
             ))}
           </ul>
+          <StoryDetails story={story} unit={unit} />
           {story.reasons.length ? (
             <div className="flex flex-col gap-1.5 border-t border-ink/10 pt-3">
               <span className="text-[13px] text-ink-2">Possible reasons · not a diagnosis</span>
@@ -61,5 +66,91 @@ export function StoryCard({ session, metricId }: { session: Session; metricId: s
         </>
       ) : null}
     </section>
+  )
+}
+
+const TONE: Record<Status['tone'], string> = { good: 'text-ink', away: 'text-ink', quiet: 'text-ink-2' }
+
+function StatusText({ s }: { s: Status }) {
+  return (
+    <span className={`flex shrink-0 items-center gap-1.5 text-[13px] ${TONE[s.tone]}`}>
+      <span aria-hidden className={s.tone === 'good' ? 'text-[#FF6A1A]' : ''}>
+        {s.glyph}
+      </span>
+      {s.text}
+    </span>
+  )
+}
+
+/**
+ * The story's facts as rows: each area against the same area of your baseline (its own normal range), spots by
+ * area since the last check-in, and each routine product since it started. Shown only when the api has them.
+ */
+function StoryDetails({ story, unit }: { story: MetricStory; unit: string }) {
+  const areas = story.areas ?? []
+  const spots = story.spots?.areas ?? []
+  const products = story.products.filter((p) => p.since_start || p.use)
+  const block = 'flex flex-col gap-2 border-t border-ink/10 pt-3'
+  const head = 'text-[13px] text-ink-2'
+  const row = 'flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 text-[15px]'
+  const num = (v: number | undefined) => (v === undefined ? '' : `${v}${unit && unit !== '°' ? (unit === '%' ? '%' : ` ${unit}`) : unit}`)
+  return (
+    <>
+      {areas.length > 1 ? (
+        <div className={block}>
+          <span className={head}>By area · each against the same area at your start</span>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {areas.map((a) => (
+              <li key={a.area} className={row}>
+                <span>
+                  <span>{sentence(a.label)}</span>
+                  <span className="text-ink-2">
+                    {' '}
+                    {num(a.value)}
+                    {a.baseline_value !== undefined ? ` (start ${num(a.baseline_value)})` : ''}
+                  </span>
+                </span>
+                <StatusText s={areaStatus(a)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {spots.length ? (
+        <div className={block}>
+          <span className={head}>Spots by area · since your last check-in</span>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {spots.map((r) => (
+              <li key={r.area} className="flex flex-col text-[15px]">
+                <span className={row}>
+                  <span>{sentence(r.label)}</span>
+                  <span className="text-[13px] text-ink-2">{spotLine(r)}</span>
+                </span>
+                {typicalLine(r) ? <span className="text-[13px] text-ink-2">{typicalLine(r)}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {products.length ? (
+        <div className={block}>
+          <span className={head}>Your routine for this · timing is an association, not proof</span>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {products.map((p) => {
+              const st = productStatus(p)
+              return (
+                <li key={`${p.brand} ${p.name}`} className="flex flex-col gap-0.5">
+                  <span className={row}>
+                    <span>{`${p.brand} ${p.name}`.trim()}</span>
+                    {st ? <StatusText s={st} /> : null}
+                  </span>
+                  <span className="text-[13px] text-ink-2">{productLine(p)}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </>
   )
 }

@@ -88,7 +88,8 @@ Write "points": 3 to 7 short bullet sentences, in this order:
   verdict_vs_baseline is real_change; no_band means it cannot be judged yet.
 - spots (when FACTS has "spots"): which areas have new ones this time, which still have them,
   which are fading or not seen this time, using only those counts and area labels.
-- each routine product, by name: when it started or stopped, how often it was used, and its
+- each routine product, by name: when it started or stopped, how often it was used since the
+  last check-in (use_since_last_check_in, never "since it started"), and its
   since_start: helping = moved beyond the normal range the way people usually want since it
   started; moving_other_way = moved beyond it the other way; no_change_yet = within the normal
   range so far (most changes take 4 to 8 weeks); too_early = fewer than 2 weeks or 2 check-ins
@@ -303,7 +304,8 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
                     "started": started.isoformat() if started else None,
                     "started_since_last_check_in": bool(started and started >= lo),
                     "stopped": ended.isoformat() if ended and ended <= now_day else None,
-                    "use": _usage(entry_id, e, logs, lo, now_day),
+                    # days ticked since the previous check-in (not since the start)
+                    "use_since_last_check_in": _usage(entry_id, e, logs, lo, now_day),
                     "since_start": story_insights.since_start(
                         started.isoformat() if started else None,
                         metric_id,
@@ -358,8 +360,9 @@ def _points(f: dict[str, Any]) -> list[str]:
             bits.append(f"started {_fmt_day(date.fromisoformat(p['started']))}")
         if p["stopped"]:
             bits.append(f"stopped {_fmt_day(date.fromisoformat(p['stopped']))}")
-        if p["use"]:
-            bits.append(f"used {p['use']['days_used']} of {p['use']['of_days']} planned days")
+        if p["use_since_last_check_in"]:
+            u = p["use_since_last_check_in"]
+            bits.append(f"used {u['days_used']} of {u['of_days']} planned days since last check-in")
         name = f"{p['brand']} {p['name']}".strip()
         pts.append(
             f"In your routine for this: {name}"
@@ -380,6 +383,14 @@ def _names(labels: list[str]) -> str:
     return labels[0] if len(labels) == 1 else f"{', '.join(labels[:-1])} and {labels[-1]}"
 
 
+def _on(labels: list[str]) -> str:
+    """'on the nose and chin', 'around the mouth', 'on the nose and around the mouth'."""
+    on = [x for x in labels if not x.startswith("around")]
+    around = [x for x in labels if x.startswith("around")]
+    parts = [f"on the {_names(on)}"] if on else []
+    return " and ".join(parts + around)
+
+
 def _area_points(f: dict[str, Any]) -> list[str]:
     """One line on the areas: those that changed beyond their own normal range, by way."""
     rows = [a for a in f.get("areas") or [] if a.get("verdict_vs_baseline")]
@@ -389,13 +400,19 @@ def _area_points(f: dict[str, Any]) -> list[str]:
     other = [a["label"] for a in rows if a.get("way") == "other_way"]
     shifted = [a["label"] for a in rows if a.get("way") == "shifted"]
     steady = [a for a in rows if a["verdict_vs_baseline"] == "within_noise"]
+    if len(better) == len(rows):
+        return [
+            "By area since your baseline: improved in every area, each beyond its own normal range."
+        ]
+    if len(other) == len(rows):
+        return [f"By area since your baseline: {explain.OTHER_WAY} in every area."]
     bits = []
     if better:
-        bits.append(f"improved on the {_names(better)}")
+        bits.append(f"improved {_on(better)}")
     if other:
-        bits.append(f"{explain.OTHER_WAY} on the {_names(other)}")
+        bits.append(f"{explain.OTHER_WAY} {_on(other)}")
     if shifted:
-        bits.append(f"shifted on the {_names(shifted)}")
+        bits.append(f"shifted {_on(shifted)}")
     if not bits:
         return ["By area: every area is within its own normal range since your baseline."]
     rest = " The other areas are within their normal range." if steady else ""
@@ -405,13 +422,13 @@ def _area_points(f: dict[str, Any]) -> list[str]:
 def _spot_points(f: dict[str, Any]) -> list[str]:
     """Where spots are new this time, and where they are fading or not seen."""
     rows = (f.get("spots") or {}).get("areas") or []
-    new = [f"{r['new_this_time']} on the {r['label']}" for r in rows if r["new_this_time"]]
+    new = [f"{r['new_this_time']} {_on([r['label']])}" for r in rows if r["new_this_time"]]
     gone = [r["label"] for r in rows if r["fading"] or r["not_seen_this_time"]]
     out = []
     if new:
         out.append(f"New since last check-in: {_names(new)}.")
     if gone:
-        out.append(f"Fading or not seen this time on the {_names(gone)}.")
+        out.append(f"Fading or not seen this time {_on(gone)}.")
     return out
 
 
@@ -591,7 +608,7 @@ def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
             {
                 "name": p["name"],
                 "brand": p["brand"],
-                "use": p["use"],
+                "use": p["use_since_last_check_in"],
                 "since_start": p.get("since_start"),
             }
             for p in f["routine"]

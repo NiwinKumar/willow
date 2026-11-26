@@ -108,3 +108,8 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Change: the api waits up to 280 s for `/v1/analyze` (was 120 s); the engine's Cloud Run request timeout is 300 s (was 120 s). No request or response change.
 - Impact: engine code none; schemas none; api and infra only.
 - Approved by: n/a (api and infra, both Niwin's)
+
+## 2026-11-27: Metric story by area, spots and product timing (proposed by Harshini; api/web)
+- What: `GET /v1/sessions/{id}/story/{metric_id}` adds `areas` (per face area: value, baseline value, change, its own normal range, verdict, way), `spots` (per area: new this time, still there, fading, not seen this time, faded so far, typical days visible) and `products[].since_start` (weeks, check-ins, status). Existing fields unchanged. Needs engine 0.4.1 `extras.by_zone` for areas; older results simply have none. Details in `docs/GEMINI_SPEC.md` section 7.
+- Impact: engine none beyond 0.4.1; schemas none; api and web.
+- Approved by: [x] Harshini [ ] Niwin
