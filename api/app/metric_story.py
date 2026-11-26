@@ -39,6 +39,7 @@ from app.store import Store
 
 log = logging.getLogger("willow.story")
 HISTORY = 12  # earlier check-ins Gemini reads
+MAX_WORDS = 45  # the intro: two short sentences (the rows below hold the details)
 
 # words for a change in each direction (web/src/lib/metrics.ts METRIC_META)
 WORDS = {
@@ -61,51 +62,34 @@ for _concern, _metrics in cohort.CONCERN_METRICS.items():
 
 
 class StoryGemini(BaseModel):
-    points: list[str] = Field(default_factory=list, max_length=7)
-    reasons: list[str] = Field(default_factory=list, max_length=2)
+    points: list[str] = Field(default_factory=list, max_length=2)
+    reasons: list[str] = Field(default_factory=list, max_length=2)  # asked for none; ignored
 
 
-INSTRUCTIONS = """You explain one skin measurement to the person: how it looked at their earlier
-check-ins and what changed this time. FACTS hold this check-in (value, this_day), the previous one
-(previous_value, previous_day), every earlier check-in in history (oldest first), the verdict
-against their baseline (real_change = changed by more than their photos usually vary; within_noise
-= about the same as at their start; no_baseline = their first reading or a baseline with too few
-photos), and the routine products aimed at this measurement with how often they were used since
-the previous check-in.
-Write "points": 3 to 7 short bullet sentences, in this order:
-- how it looked last time, then this time, and the direction in everyday words (when_lower /
-  when_higher, e.g. "a more even tone than last week"); a change smaller than normal_range is
-  "about the same".
-- the overall trend across history when there are 3 or more check-ins (steady, improving, back
-  and forth).
-- the verdict against the start, in plain words: a real_change toward what people usually want
-  (lower redness, spots, pores, texture, lines, shine, blemishes, evenness; higher under-eye
-  brightness and glow) is an improvement, said warmly; the other way is said gently ("moved the
-  other way"), never "worse", "worsened" or "declined".
-- by area (when FACTS has "areas"): name the areas whose verdict_vs_baseline is real_change and
-  which way each went (way improved = an improvement, other_way = moved the other way); say the
-  other areas stayed within their normal range. Never call an area changed unless its own
-  verdict_vs_baseline is real_change; no_band means it cannot be judged yet.
-- spots (when FACTS has "spots"): which areas have new ones this time, which still have them,
-  which are fading or not seen this time, using only those counts and area labels.
-- each routine product, by name: when it started or stopped, how often it was used since the
-  last check-in (use_since_last_check_in, never "since it started"), and its
-  since_start: helping = moved beyond the normal range the way people usually want since it
-  started; moving_other_way = moved beyond it the other way; no_change_yet = within the normal
-  range so far (most changes take 4 to 8 weeks); too_early = fewer than 2 weeks or 2 check-ins
-  since it started. Always say timing lines up, never that the product did it.
-Write "reasons": at most 2 sentences on what MAY explain the change, or the lack of one.
+INSTRUCTIONS = """You write the short intro to one skin measurement's details. The app shows the
+details right below it as rows (each face area, spots by area, each routine product), so do not
+repeat them: no lists of areas, products, days used or spot counts.
+FACTS hold this check-in (value, this_day), the previous one (previous_value, previous_day), the
+verdict against their baseline (real_change = changed by more than their photos usually vary;
+within_noise = about the same as at their start; no_baseline = their first reading), "areas"
+(each with its own verdict_vs_baseline and way) and the routine products with since_start.
+Write "points": 1 or 2 sentences, at most 40 words in all:
+1. How it compares with their start, in everyday words, and where if it helps: "every area",
+   or at most two area labels where it changed most. A real_change toward what people usually
+   want (lower redness, spots, pores, texture, lines, shine, blemishes, evenness; higher
+   under-eye brightness and glow) is an improvement, said warmly; the other way is said gently
+   ("moved the other way"), never "worse", "worsened" or "declined".
+2. The one other thing most worth knowing, only if there is one: how it moved since the last
+   check-in when that differs from the trend, or that it is too early to judge their routine.
+Write "reasons": an empty list.
 Rules:
 - Everyday words, short sentences. Never write delta, noise band, mdc, threshold, variance, a*,
   ΔL* or index.
-- Quote numbers only as they appear in FACTS (values, days used, of_days, days of the month); no
-  new numbers, percentages or estimates. Write dates as "23 Oct".
-- Never claim a product caused a change: "lines up with", "may", "could". If use was low or a
-  product started only days ago, say it is too early to tell. Light, distance and angle can also
-  move a reading.
+- Quote numbers only as they appear in FACTS; no new numbers, percentages or estimates. Write
+  dates as "23 Oct". Prefer no numbers at all.
+- Never claim a product caused a change.
 - Never call it a real change unless verdict_vs_baseline is real_change (or, for an area, that
-  area's own verdict_vs_baseline; for a product, its since_start status helping or
-  moving_other_way).
+  area's own verdict_vs_baseline).
 - Area names only as the "label" in FACTS (left and right are the person's own). Never name a
   condition, a cause, a treatment or a product the person does not already use.
 - Cosmetic language only; never diagnose. Skin tone (tone_ita) is descriptive: never better or
@@ -322,61 +306,57 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
 
 
 def _points(f: dict[str, Any]) -> list[str]:
-    """The story in points, from the facts only (no Gemini)."""
-    unit = {"pct_area": "%", "deg": "°"}.get(f.get("unit") or "", "")
-    v = lambda x: f"{x}{unit}"  # noqa: E731
-    down, up = WORDS.get(f["metric_id"], ("lower", "higher"))
-    pts = []
-    if f.get("previous_day"):
-        pts.append(
-            f"Last check-in ({_fmt_day(date.fromisoformat(f['previous_day']))}): "
-            f"{v(f['previous_value'])}."
-        )
-    now = f"This check-in ({_fmt_day(date.fromisoformat(f['this_day']))}): {v(f['value'])}"
-    d, band = f.get("change_vs_previous"), f.get("normal_range")
-    if d is None:
-        pts.append(f"{now}.")
-    elif band is not None and abs(d) <= band:
-        pts.append(f"{now}, about the same as last time.")
-    elif f["metric_id"] == "tone_ita":
-        pts.append(f"{now}, a shift from last time (skin tone is descriptive only).")
-    elif explain.way_of({"id": f["metric_id"]}, d) == "other_way":
-        pts.append(f"{now}, {explain.OTHER_WAY} since last time.")
-    else:
-        pts.append(f"{now}, {down if d < 0 else up} than last time.")
-    verdict = f.get("verdict_vs_baseline")
+    """The intro from the facts only (no Gemini): how it compares with the start (and where), then
+    how it moved since the last check-in. The rows below the intro hold the rest."""
+    first = _vs_start(f)
+    last = _vs_last(f)
+    return [x for x in (first, last) if x]
+
+
+def _vs_start(f: dict[str, Any]) -> str:
     if f.get("is_baseline"):
-        pts.append("This is your baseline: later check-ins are compared with it.")
-    elif verdict == "real_change":
+        return "This is your baseline: later check-ins are compared with it."
+    verdict = f.get("verdict_vs_baseline")
+    areas = [a for a in f.get("areas") or [] if a.get("verdict_vs_baseline")]
+    moved = [a for a in areas if a["verdict_vs_baseline"] == "real_change"]
+    if verdict == "real_change":
         way = explain.way_of({"id": f["metric_id"]}, f.get("change_vs_baseline"))
-        said = {"improved": "improved", "other_way": explain.OTHER_WAY}.get(way or "", "shifted")
-        pts.append(f"Since your baseline: {said}, more than your photos usually vary.")
-    elif verdict == "within_noise":
-        pts.append("Since your baseline: no real change, within your normal photo variation.")
-    pts += _area_points(f) + _spot_points(f)
-    for p in f.get("routine", []):
-        bits = []
-        if p["started_since_last_check_in"] and p["started"]:
-            bits.append(f"started {_fmt_day(date.fromisoformat(p['started']))}")
-        if p["stopped"]:
-            bits.append(f"stopped {_fmt_day(date.fromisoformat(p['stopped']))}")
-        if p["use_since_last_check_in"]:
-            u = p["use_since_last_check_in"]
-            bits.append(f"used {u['days_used']} of {u['of_days']} planned days since last check-in")
-        name = f"{p['brand']} {p['name']}".strip()
-        pts.append(
-            f"In your routine for this: {name}"
-            + (f" ({', '.join(bits)})." if bits else ".")
-            + _since_words(p.get("since_start"), f)
+        said = {"improved": "Improved", "other_way": "Moved the other way"}.get(
+            way or "", "Shifted"
         )
-    if any(
-        (p.get("since_start") or {}).get("status") not in (None, "too_early")
-        for p in f.get("routine", [])
-    ):
-        pts.append(
-            "Timing is an association, not proof: light, angle and other products also play a part."
+        same = [a for a in moved if a.get("way") == way]
+        if areas and len(same) == len(areas):
+            where = ", in every area"
+        elif same:
+            where = f", most {_on([a['label'] for a in same[:2]])}"
+        else:
+            where = ""
+        return f"{said} since your start, beyond your normal range{where}."
+    if verdict == "within_noise":
+        if moved:
+            a = moved[0]
+            how = "improved" if a.get("way") == "improved" else explain.OTHER_WAY
+            return f"About the same as at your start overall, though it {how} {_on([a['label']])}."
+        return "About the same as at your start: within your normal range."
+    return "Your first reading of this: later check-ins are compared with it."
+
+
+def _vs_last(f: dict[str, Any]) -> str:
+    d, band = f.get("change_vs_previous"), f.get("normal_range")
+    if d is None or not f.get("previous_day"):
+        return ""
+    day = _fmt_day(date.fromisoformat(f["previous_day"]))
+    if band is not None and abs(d) <= band:
+        return f"About the same as your last check-in on {day}."
+    if f["metric_id"] == "tone_ita":
+        return f"It shifted since your last check-in on {day}."
+    if explain.way_of({"id": f["metric_id"]}, d) == "other_way":
+        return (
+            f"It {explain.OTHER_WAY} since your last check-in on {day}, so it moves week to week."
         )
-    return pts
+    down, up = WORDS.get(f["metric_id"], ("lower", "higher"))
+    words = down if d < 0 else up
+    return f"{words[0].upper()}{words[1:]} than at your last check-in on {day}."
 
 
 def _names(labels: list[str]) -> str:
@@ -391,69 +371,12 @@ def _on(labels: list[str]) -> str:
     return " and ".join(parts + around)
 
 
-def _area_points(f: dict[str, Any]) -> list[str]:
-    """One line on the areas: those that changed beyond their own normal range, by way."""
-    rows = [a for a in f.get("areas") or [] if a.get("verdict_vs_baseline")]
-    if len(rows) < 2:
-        return []
-    better = [a["label"] for a in rows if a.get("way") == "improved"]
-    other = [a["label"] for a in rows if a.get("way") == "other_way"]
-    shifted = [a["label"] for a in rows if a.get("way") == "shifted"]
-    steady = [a for a in rows if a["verdict_vs_baseline"] == "within_noise"]
-    if len(better) == len(rows):
-        return [
-            "By area since your baseline: improved in every area, each beyond its own normal range."
-        ]
-    if len(other) == len(rows):
-        return [f"By area since your baseline: {explain.OTHER_WAY} in every area."]
-    bits = []
-    if better:
-        bits.append(f"improved {_on(better)}")
-    if other:
-        bits.append(f"{explain.OTHER_WAY} {_on(other)}")
-    if shifted:
-        bits.append(f"shifted {_on(shifted)}")
-    if not bits:
-        return ["By area: every area is within its own normal range since your baseline."]
-    rest = " The other areas are within their normal range." if steady else ""
-    return [f"By area since your baseline: {'; '.join(bits)}.{rest}"]
-
-
-def _spot_points(f: dict[str, Any]) -> list[str]:
-    """Where spots are new this time, and where they are fading or not seen."""
-    rows = (f.get("spots") or {}).get("areas") or []
-    new = [f"{r['new_this_time']} {_on([r['label']])}" for r in rows if r["new_this_time"]]
-    gone = [r["label"] for r in rows if r["fading"] or r["not_seen_this_time"]]
-    out = []
-    if new:
-        out.append(f"New since last check-in: {_names(new)}.")
-    if gone:
-        out.append(f"Fading or not seen this time {_on(gone)}.")
-    return out
-
-
-def _since_words(s: dict[str, Any] | None, f: dict[str, Any]) -> str:
-    if not s:
-        return ""
-    if s["status"] == "too_early":
-        return " Too early to tell: it needs at least 2 weeks and 2 check-ins since it started."
-    label = f["label"].lower()
-    weeks = f"{s['weeks']} weeks"
-    if s["status"] == "no_change_yet":
-        return f" Since it started ({weeks}): {label} within your normal range so far."
-    if s["status"] == "helping":
-        return f" Since it started ({weeks}): {label} improved beyond your normal range."
-    if s["status"] == "moving_other_way":
-        return (
-            f" Since it started ({weeks}): {label} {explain.OTHER_WAY}, beyond your normal range."
-        )
-    if s["status"] == "changed":
-        return f" Since it started ({weeks}): {label} shifted beyond your normal range."
-    return ""
+STORY_VERSION = 2  # 2: the short intro (Nov 27); a new version rewrites kept stories
 
 
 def _fingerprint(f: dict[str, Any]) -> str:
-    return hashlib.sha256(json.dumps(f, sort_keys=True, default=str).encode()).hexdigest()[:16]
+    body = json.dumps({"v": STORY_VERSION, "facts": f}, sort_keys=True, default=str)
+    return hashlib.sha256(body.encode()).hexdigest()[:16]
 
 
 DATE_KEYS = {"this_day", "previous_day", "day", "started", "stopped", "from_day"}
@@ -552,8 +475,10 @@ def _gemini_story(f: dict[str, Any]) -> tuple[list[str], list[str]] | None:
     if not points or bad:
         log.warning("metric_story: points rejected %s", bad[:2])
         return None
-    reasons = [r.strip() for r in out.reasons if r.strip() and not _problem(r.strip(), f, allowed)]
-    return points, reasons[:2]
+    if sum(len(p.split()) for p in points) > MAX_WORDS:
+        log.warning("metric_story: intro too long (%d points)", len(points))
+        return None
+    return points, []
 
 
 def _within_cap(store: Store, uid: str) -> bool:
