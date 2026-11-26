@@ -306,7 +306,12 @@ def _frame(path: str, overlays: bool = False) -> dict:
         [*blemishes, *big],
     )
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
-    zone_values = _zone_colour(lab, red, roi_skin, px_per_mm)
+    # the face split into the app's "Areas": each zone is the face skin inside its drawn outline,
+    # so what an area counts is exactly what the photo shows (_drawn_zones)
+    zone_label = _zone_labels(face, box, face_skin)
+    areas = _area_outlines(face, box, zone_label, polys)
+    zone_label = _drawn_zones(zone_label, areas, box)
+    zone_values = _zone_colour(lab, red, zone_label, px_per_mm)
     zone_values["dark_circles"] = {
         f"{side}_under_eye": med(0, f"{side}_under_eye") - med(0, f"{side}_cheek")
         for side in ("right", "left")
@@ -339,7 +344,6 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "glow": glow_extras,
         "lines": lines_extras,
     }
-    zone_label = _zone_labels(face, box, face_skin)
     return {
         "values": values,
         "extras": extras,
@@ -349,7 +353,8 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "face": face,
         "view": face.view,
         "polygons": polys,
-        # the "Areas" outlines are drawn for the reference photos only: worked out on demand (_areas)
+        # the "Areas" outlines drawn on the photo, and the zone of every face-skin pixel inside them
+        "areas": areas,
         "zone_label": zone_label,
         # which zone each mark sits in, and each zone's skin (px): a session with side photos
         # takes each zone from the photo that faces it (_combine_views)
@@ -539,15 +544,36 @@ def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
         }
 
 
+def _drawn_zones(
+    label: np.ndarray | None, areas: dict[str, np.ndarray], box: Box
+) -> np.ndarray | None:
+    """The zone map cut to the drawn "Areas" outlines: a face-skin pixel keeps its zone only if
+    it lies inside that zone's outline (photo pixels; under-eye patches are not zones). Skin the
+    outlines leave out (the eyelids under the brows, a stray piece of a zone) is in no area, so
+    every area count, size and colour reading covers exactly what the photo shows."""
+    if label is None:
+        return None
+    out = np.zeros_like(label)
+    for code, name in enumerate(facemap.ZONES, start=1):
+        if name not in areas:
+            continue
+        inside = polygon_mask(label.shape, np.asarray(areas[name]) - [box.x, box.y])
+        out[inside & (label == code)] = code
+    return out
+
+
 def _zone_colour(
-    lab: np.ndarray, red: np.ndarray, roi_skin: dict[str, np.ndarray], px_per_mm: float
+    lab: np.ndarray, red: np.ndarray, zone_label: np.ndarray | None, px_per_mm: float
 ) -> dict[str, dict[str, float]]:
-    """One photo's colour readings per face-map zone (docs/METRICS.md "Readings by area"):
-    redness = the zone's median a*, tone_evenness = the within-zone part of the evenness
-    metric (SD of the ~1 mm smoothed melanin proxy over the zone's skin). Zones with less than
-    ZONE_MIN_MM2 of skin in this photo are left out. Skin tone is never split by zone."""
+    """One photo's colour readings per area (docs/METRICS.md "Readings by area"), on the face
+    skin inside each drawn area (_drawn_zones): redness = the area's median a*, tone_evenness =
+    the within-area part of the evenness metric (SD of the ~1 mm smoothed melanin proxy). Areas
+    with less than ZONE_MIN_MM2 of skin in this photo are left out. Skin tone is never split."""
+    if zone_label is None:
+        return {"redness": {}, "tone_evenness": {}}
     least = config.ZONE_MIN_MM2 * px_per_mm**2
-    here = {z: roi_skin[z] for z in facemap.ZONES if z in roi_skin and roi_skin[z].sum() >= least}
+    masks = {z: zone_label == c for c, z in enumerate(facemap.ZONES, start=1)}
+    here = {z: m for z, m in masks.items() if m.sum() >= least}
     if not here:
         return {"redness": {}, "tone_evenness": {}}
     mi = ndimage.gaussian_filter(
@@ -897,7 +923,7 @@ def _area_outlines(
 
 def _areas(f: dict) -> dict[str, np.ndarray]:
     """A photo's area outlines (_area_outlines), worked out once, only for the photos drawn."""
-    if "areas" not in f:
+    if "areas" not in f:  # frames from before _frame drew them
         f["areas"] = _area_outlines(f["face"], f["box"], f["zone_label"], f["polygons"])
     return f["areas"]
 

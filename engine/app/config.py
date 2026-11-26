@@ -437,6 +437,7 @@ FACE_ZONES = (
     "left_jaw",
 )
 FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as forehead
+NOSE_BRIDGE_WIDTH_FRAC = 0.8  # the nose zone's bridge: this share of the inner eye corners' spread
 MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
 FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
 FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)

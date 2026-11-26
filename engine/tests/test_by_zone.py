@@ -1,12 +1,14 @@
 """Readings by area (extras.by_zone): each face-map zone's own value, spread and noise band,
 from the same marks and pixels the whole-face metric uses."""
 
+from types import SimpleNamespace as M
+
 import numpy as np
 import pytest
 from test_three_view import _frame
 
-from app import config
-from app.pipeline_face import _by_zone, _combine_views, _zone_colour, _zone_marks
+from app import config, facemap
+from app.pipeline_face import _by_zone, _combine_views, _drawn_zones, _zone_colour, _zone_marks
 
 
 def _three_view():
@@ -70,19 +72,39 @@ def test_identical_photos_get_the_metric_floor_not_zero():
     assert chin["mdc95"] > 0
 
 
-def test_zone_colour_reads_each_zone_on_its_own_skin():
+def test_zone_colour_reads_each_area_on_its_own_skin():
     px = 10.0
     lab = np.zeros((100, 200, 3))
     lab[..., 1] = 10.0
     lab[:, 100:, 1] = 20.0  # the right half is redder
     red = np.full((100, 200), 0.4)
-    left = np.zeros((100, 200), bool)
-    left[:, :100] = True  # 100 mm2 at 10 px/mm
-    right = ~left
-    speck = np.zeros((100, 200), bool)
-    speck[0, 0] = True  # far below ZONE_MIN_MM2
-    out = _zone_colour(lab, red, {"forehead": left, "chin": right, "nose": speck}, px)
+    label = np.zeros((100, 200), np.uint8)
+    label[:, :100] = facemap.ZONES.index("forehead") + 1  # 100 mm2 at 10 px/mm
+    label[:, 100:] = facemap.ZONES.index("chin") + 1
+    label[0, 0] = facemap.ZONES.index("nose") + 1  # far below ZONE_MIN_MM2
+    out = _zone_colour(lab, red, label, px)
     assert out["redness"] == {"forehead": 10.0, "chin": 20.0}
-    # uniform melanin proxy: no blotchiness inside either zone
+    # uniform melanin proxy: no blotchiness inside either area
     assert out["tone_evenness"]["forehead"] == pytest.approx(0.0, abs=1e-9)
     assert "nose" not in out["tone_evenness"]
+    assert _zone_colour(lab, red, None, px) == {"redness": {}, "tone_evenness": {}}
+
+
+def test_only_skin_inside_a_drawn_area_counts():
+    label = np.zeros((40, 40), np.uint8)
+    forehead = facemap.ZONES.index("forehead") + 1
+    label[:, :] = forehead
+    outline = np.array([[10.0, 10.0], [30.0, 10.0], [30.0, 30.0], [10.0, 30.0]])
+    box = M(x=5, y=5)  # the outline is in photo pixels, the label in the crop's
+    out = _drawn_zones(label, {"forehead": outline}, box)
+    assert out[10, 10] == forehead and out[2, 2] == 0  # outside the drawn outline: no area
+    assert _drawn_zones(None, {}, box) is None
+
+
+def test_the_nose_runs_up_its_bridge_to_the_forehead():
+    if facemap.canonical() is None:
+        pytest.skip("face model not downloaded")
+    v = facemap.canonical()[0]
+    mid_bridge = (0.0, (float(v[6, 1]) + float(v[168, 1])) / 2)  # between the eyes
+    assert facemap.zone_of(*mid_bridge) == "nose"
+    assert facemap.zone_of(float(v[133, 0]) * 1.6, float(v[133, 1]) - 15) == "right_cheek"

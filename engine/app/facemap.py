@@ -70,9 +70,17 @@ def _zone_bounds() -> dict:
     mesh = canonical()
     assert mesh is not None
     v = mesh[0]
-    nose = cv2.convexHull(v[[i for i in NOSE_ALL if i < len(v)], :2].astype(np.float32))
+    brow_y = float(v[[105, 334], 1].mean()) - config.FOREHEAD_ZONE_BELOW_BROW_MM
+    # the nose runs up its bridge to the forehead's lower edge, between the inner eye corners
+    # (133, 362): that strip was split between the cheeks, outside both cheeks' drawn areas
+    bridge = [
+        (v[i, 0] * config.NOSE_BRIDGE_WIDTH_FRAC, y) for i in (133, 362) for y in (v[i, 1], brow_y)
+    ]
+    nose = cv2.convexHull(
+        np.vstack([v[[i for i in NOSE_ALL if i < len(v)], :2], bridge]).astype(np.float32)
+    )
     return {
-        "brow_y": float(v[[105, 334], 1].mean()) - config.FOREHEAD_ZONE_BELOW_BROW_MM,
+        "brow_y": brow_y,
         "nose": nose,
         "mouth_x": float(abs(v[61, 0])) + config.MOUTH_ZONE_MARGIN_MM,
         "subnasal_y": float(v[2, 1]),
