@@ -6,7 +6,7 @@ import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse } from '../../data/hooks'
+import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
 import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
 import type { RoutineEntry, Session } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
@@ -33,6 +33,7 @@ import { goalTrends } from './goals'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
+import { SpotDiaryTile } from './SpotDiaryTile'
 import { BaselineTile, PhotosTile, ProductTestTile } from './Tiles'
 
 const EMPTY: Session[] = []
@@ -111,6 +112,7 @@ function HomeBody() {
   const setUse = useSetRoutineUse()
   const check = useRoutineCheck(entries)
   const tests = useProductTests()
+  const spots = useSpots()
   const byId = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e])), [entries])
 
   const day = today()
@@ -216,6 +218,8 @@ function HomeBody() {
   const last: Slot[] = []
   if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} onOpen={() => openResult(lastPhotos)} /> })
   if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
+  const diary = !demo && spots.data?.enough_data ? spots.data : null
+  if (diary) last.push({ key: 'spots', node: <SpotDiaryTile className="flex-1" diary={diary} onOpen={() => navigate('/spots')} /> })
   const daily: Slot[] = [{ key: 'routine', node: null, grow: true }]
   if (forearm) daily.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
   if (read.baseline && !demo) daily.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })
