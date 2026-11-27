@@ -186,6 +186,14 @@ def _usage(entry_id: str, entry: dict[str, Any], logs: list[dict[str, Any]], lo:
     return {"days_used": len(used), "of_days": planned} if planned else None
 
 
+def _same_engine(doc: dict[str, Any], other: dict[str, Any]) -> bool:
+    """Two check-ins measured by the same engine major.minor: only those may be compared by area
+    or since a product started (the whole-face rule, baselines.guard_engine_version)."""
+    this_v = (measured_result(doc) or {}).get("engine_version")
+    other_v = (measured_result(other) or {}).get("engine_version")
+    return baselines._minor(this_v) == baselines._minor(other_v)
+
+
 def _baseline_metric(doc: dict[str, Any], earlier: list[tuple[str, dict, dict]]) -> dict | None:
     """The metric of the baseline session this check-in was compared with (its areas and band)."""
     want = ((doc.get("compared_with") or {}).get("session_id")) or None
@@ -255,16 +263,21 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
             places = explain.decimals(m)
             out["change_vs_previous"] = round(shown["value"] - prev_value, places)
         lo = prev_day + timedelta(days=1)
-    base_m = _baseline_metric(doc, earlier)
+    # areas and "since it started" compare numbers, so only with the same engine major.minor
+    comparable = [r for r in earlier if _same_engine(doc, r[1])]
+    base_m = _baseline_metric(doc, comparable)
+    prev_m = prev[2] if prev and _same_engine(doc, prev[1]) else None
     if metric_id != "tone_ita":  # skin tone is never split by area
-        out["areas"] = story_insights.areas(m, prev[2] if prev else None, base_m)
+        out["areas"] = story_insights.areas(m, prev_m, base_m)
     spot_facts = story_insights.spots(metric_id, _diary(rows, sid, doc))
     if spot_facts:
         out["spots"] = spot_facts
     places = explain.decimals(m)
     band = explain.shown_numbers({**base_m, "id": metric_id})["mdc95"] if base_m else shown["mdc95"]
     series = [
-        (_day(o["created_at"]), om["value"]) for _, o, om in earlier if om.get("value") is not None
+        (_day(o["created_at"]), om["value"])
+        for _, o, om in comparable
+        if om.get("value") is not None
     ]
     concerns = CONCERNS_OF.get(metric_id, set())
     products = []
@@ -444,15 +457,28 @@ def _problem(text: str, f: dict[str, Any], allowed: set[str]) -> str | None:
         return "change claimed without a real change"
     if CAUSE.search(text):
         return "claims a cause"
-    if _mentions(text, f)[0]:
-        return None  # an area may move the other way from the whole face
-    d = f.get("change_vs_previous")
     words = WORDS.get(f["metric_id"])
-    if d and words:
-        wrong = words[1] if d < 0 else words[0]  # the phrase for the other direction
-        if wrong.split(" / ")[0].lower() in text.lower():
+    if not words:
+        return None
+    named = _mentions(text, f)[0]
+    # an area may move the other way from the whole face: a sentence naming areas is checked
+    # against those areas' own changes (vs the baseline or the previous check-in; a phrase is
+    # wrong only when it contradicts both), else against the whole face since last time
+    if named:
+        deltas = [[a.get(k) for k in ("change_vs_baseline", "change_vs_previous")] for a in named]
+    else:
+        deltas = [[f.get("change_vs_previous")]]
+    low = text.lower()
+    for ds in deltas:
+        ds = [d for d in ds if d]
+        if ds and all(_wrong(words, d) in low for d in ds):
             return "wrong direction"
     return None
+
+
+def _wrong(words: tuple[str, str], d: float) -> str:
+    """The phrase for the other direction of a change `d` (lower case, first variant)."""
+    return (words[1] if d < 0 else words[0]).split(" / ")[0].lower()
 
 
 def _gemini_story(f: dict[str, Any]) -> tuple[list[str], list[str]] | None:

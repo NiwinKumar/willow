@@ -66,9 +66,6 @@ export type SessionView = {
   explanation: Explanation | null
 }
 
-/** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
- * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
- * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
 /** One face area of a metric against the same area of the baseline, judged on that area's own normal range
  * (engine extras.by_zone, api story_insights.areas). Older engines send none. */
 export type StoryArea = {
@@ -111,6 +108,9 @@ export type StoryProduct = {
     normal_range?: number | null
   } | null
 }
+/** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
+ * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
+ * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
 export type MetricStory = {
   metric_id: string
   points: string[]

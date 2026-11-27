@@ -127,3 +127,25 @@ def test_a_change_is_only_claimed_where_it_happened():
     )
     assert ok("Retinol 0.3% improved your skin.", f, allowed) is not None
     assert ok("Blemishes improved overall since your start.", f, allowed) is None
+
+
+def test_a_named_area_is_held_to_its_own_direction():
+    f = {
+        "metric_id": "blemishes",
+        "verdict_vs_baseline": "real_change",
+        "change_vs_previous": -3,  # the whole face has fewer
+        "areas": [
+            {
+                "area": "chin",
+                "label": "chin",
+                "verdict_vs_baseline": "real_change",
+                "way": "other_way",
+                "change_vs_baseline": 4.0,
+                "change_vs_previous": 3.0,
+            }
+        ],
+        "routine": [],
+    }
+    allowed = metric_story._allowed(f)
+    assert metric_story._problem("Fewer blemishes on the chin.", f, allowed) == "wrong direction"
+    assert metric_story._problem("More blemishes on the chin.", f, allowed) is None

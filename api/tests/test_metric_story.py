@@ -261,3 +261,25 @@ def test_a_story_is_shown_when_its_session_went_away_meanwhile(monkeypatch):
 
     monkeypatch.setattr(store, "session_update", gone)
     assert _story(store)["points"] == GOOD_POINTS
+
+
+def test_areas_and_product_timing_only_compare_the_same_engine():
+    store = MemoryStore()
+
+    def zoned(value, version):
+        m = _metric(value) | {"extras": {"by_zone": {"chin": {"value": value, "mdc95": 0.2}}}}
+        return m, version
+
+    for sid, day, (m, version), base in (
+        ("s_20261016_aaaaaaaa", "2026-10-16", zoned(8.0, "0.3.4"), True),
+        ("s_20261030_cccccccc", "2026-10-30", zoned(7.0, "0.4.2"), False),
+    ):
+        _session(store, sid, day, m, baseline=base)
+        doc = store.session_get(UID, sid)
+        result = json.loads(doc["result_json"]) | {"engine_version": version}
+        store.session_set(UID, sid, doc | {"result_json": json.dumps(result)})
+    sid = "s_20261030_cccccccc"
+    f = metric_story.facts(store, UID, sid, store.session_get(UID, sid), "tone_evenness")
+    chin = f["areas"][0]
+    assert chin["area"] == "chin" and "baseline_value" not in chin  # 0.3 vs 0.4: not compared
+    assert "previous_value" not in chin
