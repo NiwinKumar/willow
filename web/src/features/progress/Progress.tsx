@@ -45,6 +45,7 @@ export default function Progress() {
   const shell = useShell()
   const routine = useRoutine()
   const today = localDay()
+  // A check-in left while measuring says so here when its result lands.
 
   // Every check-in of every place, oldest first.
   const all = useMemo(() => SITE_ORDER.flatMap((p) => data.series(p)?.sessions ?? []).sort((a, b) => a.created_at.localeCompare(b.created_at)), [data])

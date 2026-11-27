@@ -49,7 +49,7 @@ export const MEI_WEEKS: TourSegment[] = [
   seg(1, 'Weeks 2 and 3 in the app', [
     checkIn(2, 'mei-c2-checkin'),
     { target: 'text:Blemishes', action: 'point', ...v('mei-c2-blemishes') },
-    ...askWisp('I started a retinol and a BHA this week and my chin is dry and flaky. Should I stop one?', 'mei-c2-answer'),
+    ...askWisp('I started a retinol and a BHA this week and my chin feels dry and flaky. Do they clash?', 'mei-c2-answer'),
     { route: '/routine', target: 'text:Alternate these', action: 'point', ...v('mei-c2-clash') },
   ]),
   seg(2, 'Weeks 4 and 5 in the app', [

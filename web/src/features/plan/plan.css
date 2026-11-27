@@ -1,0 +1,21 @@
+/* The routine builder's own motion (features/plan). Shared keyframes live in src/index.css. */
+@keyframes wPlanScan {
+  from { top: -20%; opacity: 0 }
+  20% { opacity: 1 }
+  to { top: 100%; opacity: 0 }
+}
+/* The skin profile card arrives like a card laid on a table: a little tilt, then flat. */
+@keyframes wPlanCard {
+  from { opacity: 0; transform: perspective(900px) rotateX(14deg) translateY(28px) scale(.96); filter: blur(6px) }
+  to { opacity: 1; transform: none; filter: blur(0) }
+}
+/* One light sweep across the card once it lands. */
+@keyframes wPlanSheen {
+  from { translate: -120% 0 }
+  to { translate: 220% 0 }
+}
+/* A timeline's line grows down from its first step. */
+@keyframes wPlanGrow {
+  from { transform: scaleY(0) }
+  to { transform: scaleY(1) }
+}

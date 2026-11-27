@@ -233,7 +233,7 @@ function TopProducts({ cat, d, mine }: { cat: Category; d: Insights; mine: strin
         rowClassName={(r) => (mine === r.brand ? '[&>*:first-child]:shadow-[inset_2px_0_0_var(--proof-leaf)]' : '')}
         minWidth={640}
         csv={{ name: csvName(`category-${cat.category}-products`, d), meta: csvMeta(d, cat.label) }}
-        empty={`No ${cat.label.toLowerCase()} in the catalogue.`}
+        empty={`No ${cat.label.toLowerCase()} in the catalog.`}
       />
     </Panel>
   )

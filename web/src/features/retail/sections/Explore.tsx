@@ -5,9 +5,11 @@ import { toast } from 'sonner'
 
 import { GOALS } from '../../../lib/metrics'
 import { useRetailData } from '../context'
+import { useCompetitorNames } from '../orgData'
+import { NamesHidden } from './NamesHidden'
 import { csvMeta, csvName, TIER_LABEL } from '../data'
 import { fetchProducts } from '../productData'
-import { sectionPath, useRetailState } from '../state'
+import { purposeOf, sectionPath, useRetailState } from '../state'
 import type { Products, ProofTier } from '../types'
 import { Bone, Button, DataTable, downloadCsv, EmptyState, ErrorState, int, interval, PageHeader, Panel, pct, pts, SkeletonHeader, SkeletonPanel, TIERS, weeks, type Column, type CsvValue } from '../ui'
 import { useView } from '../useView'
@@ -42,6 +44,9 @@ const FORMATS: Record<MeasureKind, BarFormat> = {
 const csvValue = (kind: MeasureKind, v: number | null): CsvValue => (v === null ? '' : kind === 'rate' || kind === 'points' ? Math.round(v * 100) : kind === 'weeks' ? Math.round(v * 10) / 10 : v)
 
 export default function Explore() {
+  // A brand organisation whose retailer keeps competitor names off can't cut the whole catalog by brand.
+  const names = useCompetitorNames()
+  if (names.anonymise) return <NamesHidden what="Explore across every brand" />
   // The same "not enough data" answer as every other section when the filter has too few people.
   return <InsightsGate skeleton={<ExploreSkeleton />}>{() => <Loaded />}</InsightsGate>
 }
@@ -153,6 +158,7 @@ function Body({ d }: { d: Products }) {
       <PageHeader
         title="Explore"
         description="Pick a measure, group it and filter it. Every view is a link you can share."
+        purpose={purposeOf('explore')}
         actions={
           <>
             <Button onClick={copyLink}>

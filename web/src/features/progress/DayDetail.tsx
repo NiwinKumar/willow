@@ -33,6 +33,8 @@ import { RejectedPhotos, UnmeasuredPhotos } from './photos'
 import { useAnyPhotoLoads } from './useImageStatus'
 import { NOTE_DOT, productName, rejectNote, sessionNotes } from './timeline'
 import { useSessionView } from './useSessionView'
+import { ShareButton } from './ShareButton'
+import { resultShare } from '../../lib/share'
 
 const NONE: Session[] = []
 const TOMORROW_KEY = 'willow.tomorrowShown'
@@ -328,6 +330,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
               <span className="font-mono text-[11px] tracking-[.08em]">■ {(multi ? shown.map(placeOf).join(' · ') : `${placeOf(primary)} · ${usableLine(primary)}`).toUpperCase()}</span>
               <div className="ml-auto flex flex-wrap justify-end gap-2">
+                <ShareButton card={resultShare(primary, baseOf(primary), data.goals)} />
                 <NotesButton session={primary} notes={notes} />
               </div>
             </div>

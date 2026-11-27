@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
  */
 
 /** Page opener: title (24 px semibold), an optional one-line description, actions on the right. */
-export function PageHeader({ title, description, actions, id, leading }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; id?: string; leading?: ReactNode }) {
+export function PageHeader({ title, description, actions, id, leading, purpose }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; id?: string; leading?: ReactNode; purpose?: string }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="flex min-w-0 items-start gap-4">
@@ -18,6 +18,7 @@ export function PageHeader({ title, description, actions, id, leading }: { title
             {title}
           </h1>
           {description ? <p className="m-0 text-proof-body text-ink-2 [&_strong]:font-medium [&_strong]:text-ink">{description}</p> : null}
+          {purpose ? <p className="m-0 pt-0.5 text-proof-small text-ink-2">{purpose}</p> : null}
         </div>
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

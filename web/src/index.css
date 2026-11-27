@@ -230,9 +230,17 @@
   a {
     color: inherit;
   }
-  /* No focus rings anywhere (owner decision, Oct 18): focus is not outlined on any element. */
-  :focus,
+  /* Focus rings for the keyboard only (the Oct 18 "no rings" decision is reversed for WCAG 2.4.7): a mouse or a
+     tap never draws one (:focus-visible), so the look under a pointer is unchanged. Text fields keep their own
+     look: browsers treat a clicked field as focus-visible, and the caret and field style already show focus. */
+  :focus {
+    outline: none;
+  }
   :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit']), textarea, select, [contenteditable]):focus-visible {
     outline: none;
   }
   h1,

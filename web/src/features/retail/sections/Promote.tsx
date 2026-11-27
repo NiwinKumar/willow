@@ -1,6 +1,6 @@
 import { Plus, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { api, type Campaign } from '../../../lib/api'
@@ -9,9 +9,11 @@ import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
 import { fetchProducts } from '../productData'
 import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, runningCount, workspaceId } from '../promote'
-import { sectionPath, useRetailState } from '../state'
+import { useOrg } from '../org'
+import { purposeOf, sectionPath, useRetailState } from '../state'
+import { ShelfResults } from './market/ShelfResults'
 import type { ProductRow, Products } from '../types'
-import { Bone, Button, EmptyState, ErrorState, int, PageHeader, pts, SkeletonTable, ToolButton } from '../ui'
+import { Bone, Button, EmptyState, ErrorState, int, PageHeader, pts, SkeletonTable, Tabs, ToolButton } from '../ui'
 import { AutoCampaigns } from './promote/AutoCampaigns'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
@@ -68,7 +70,7 @@ export default function Campaigns() {
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Campaigns" description="Promote a Proven product to the people its evidence covers." />
+      <PageHeader title="Campaigns" description="Promote a Proven product to the people its evidence covers." purpose={purposeOf('campaigns')} />
       {children}
     </div>
   )
@@ -103,6 +105,12 @@ function Rules() {
 function Body({ uid }: { uid: string }) {
   const { workspace } = useRetailData()
   const { param, setParam, carry } = useRetailState()
+  const { lockedBrand } = useOrg()
+  const { hash } = useLocation()
+  // Sub-views: the campaigns, AutoCampaign (standing rules) and the Shelf check (the retailer's own shelf).
+  const shelfOk = !lockedBrand && workspace.kind === 'retailer'
+  const tabParam = param('tab') ?? (hash === '#autocampaign' ? 'auto' : null)
+  const tab: 'campaigns' | 'auto' | 'shelf' = tabParam === 'auto' ? 'auto' : tabParam === 'shelf' && shelfOk ? 'shelf' : 'campaigns'
   const wsId = workspaceId(workspace)
   const brand = workspace.kind === 'brand' ? workspace.brand : null
   const wsLabel = workspace.kind === 'brand' ? `${workspace.brand ?? workspace.slug} workspace` : 'Retailer · all brands'
@@ -169,9 +177,10 @@ function Body({ uid }: { uid: string }) {
 
   const running = runningCount(campaigns)
   const mine = campaigns.filter((c) => c.workspace === wsId)
-  const showAll = param('all') === '1'
+  // Another workspace's campaigns are never shown to a brand organisation (a competitor's live marketing).
+  const showAll = param('all') === '1' && !lockedBrand
   const listed = showAll ? campaigns : mine
-  const elsewhere = campaigns.length - mine.length
+  const elsewhere = lockedBrand ? 0 : campaigns.length - mine.length
   const runningFor = new Map<string, number>()
   for (const c of mine) if (c.status === 'active') runningFor.set(c.product_id, (runningFor.get(c.product_id) ?? 0) + 1)
   const workspaceOf = (c: Campaign) => (c.workspace === wsId ? null : c.workspace === 'retailer' ? 'retailer workspace' : `${c.workspace} workspace`)
@@ -240,6 +249,7 @@ function Body({ uid }: { uid: string }) {
       <PageHeader
         title="Campaigns"
         description={description}
+        purpose={purposeOf('campaigns')}
         actions={
           <Button kind="primary" onClick={() => openCreate()} disabled={!eligible.length} title={eligible.length ? undefined : 'No product here is Proven yet'}>
             <Plus size={15} strokeWidth={1.8} aria-hidden />
@@ -248,6 +258,25 @@ function Body({ uid }: { uid: string }) {
         }
       />
 
+      <Tabs
+        label="Campaign views"
+        panelId="campaign-view"
+        value={tab}
+        onChange={(t) => setParam({ tab: t === 'campaigns' && hash !== '#autocampaign' ? null : t })}
+        tabs={[
+          { id: 'campaigns' as const, label: 'Campaigns', count: listed.length || null },
+          { id: 'auto' as const, label: 'AutoCampaign' },
+          ...(shelfOk ? [{ id: 'shelf' as const, label: 'Shelf check' }] : []),
+        ]}
+      />
+
+      <div id="campaign-view" role="tabpanel" key={tab} className="flex flex-col gap-8 animate-[proofPage_.2s_var(--ease-standard)_both]">
+      {tab === 'auto' ? (
+        <AutoCampaigns uid={uid} workspace={{ id: wsId ?? 'retailer', label: wsLabel }} onCampaignsChanged={() => void refetch()} />
+      ) : tab === 'shelf' ? (
+        <ShelfResults category="" standalone />
+      ) : (
+      <>
       {camps.status === 'error' && !camps.data ? (
         <section className="rounded-card border border-line bg-surface">
           <ErrorState compact title="Campaigns couldn’t load" body="No stats are shown rather than old ones." onRetry={() => void camps.refetch()} />
@@ -294,8 +323,6 @@ function Body({ uid }: { uid: string }) {
         <HowItWorks />
       )}
 
-      <AutoCampaigns uid={uid} workspace={{ id: wsId ?? 'retailer', label: wsLabel }} onCampaignsChanged={() => void refetch()} />
-
       <EligibleList
         title={brand ? 'Your products ready to promote' : 'Ready to promote'}
         eligible={eligible}
@@ -313,6 +340,9 @@ function Body({ uid }: { uid: string }) {
           />
         }
       />
+      </>
+      )}
+      </div>
 
       <CreateCampaign
         open={target.open}

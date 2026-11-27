@@ -1,4 +1,4 @@
-import { History } from 'lucide-react'
+import { History, ListChecks } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -27,6 +27,18 @@ import { suggestionsOf } from './suggestedToday'
 import { FeelNudge } from './FeelCard'
 import { RequestNotice } from './RequestNotice'
 import { failureText, useRoutineWrites } from './writes'
+import { useChecks, useEvidenceClock, useSafety } from '../../lib/safety'
+import type { ClickSurface } from '../../lib/clicks'
+import { isSample } from './actives'
+import { CheckForMe } from './checked'
+import { EntryActions } from './EntryActions'
+import { ReactionSheet, type ReactionTarget } from './ReactionSheet'
+import { ShelfVerdict } from './ShelfVerdict'
+import { SwapSheet, type SwapTarget } from './SwapSheet'
+import { TestSheet, type TestTarget } from './TestSheet'
+
+type Tab = 'routine' | 'verdict' | 'tests'
+const TITLES: Record<Tab, string> = { routine: 'Your routine', verdict: 'Is it working?', tests: 'Test a product' }
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
 // Unknown categories (label scans) sort just before sunscreen, never above the cleanser.
@@ -56,11 +68,19 @@ export default function Routine() {
   const writes = useRoutineWrites()
 
   const [params, setParams] = useSearchParams()
-  const tab: 'routine' | 'tests' = params.get('tab') === 'tests' ? 'tests' : 'routine'
-  const setTab = (t: 'routine' | 'tests') => setParams(t === 'tests' ? { tab: 'tests' } : {}, { replace: true })
+  const tabParam = params.get('tab')
+  const tab: Tab = tabParam === 'tests' || tabParam === 'verdict' ? tabParam : 'routine'
+  const setTab = (t: Tab) => setParams(t === 'routine' ? {} : { tab: t }, { replace: true })
   const [history, setHistory] = useState(false)
   const [add, setAdd] = useState<AddPreset | null>(null)
   const [info, setInfo] = useState<ProductTarget | null>(null)
+  const [infoSurface, setInfoSurface] = useState<ClickSurface>('product_sheet')
+  const [more, setMore] = useState<RoutineEntry | null>(null)
+  const [testing, setTesting] = useState<TestTarget | null>(null)
+  const [reaction, setReaction] = useState<ReactionTarget | null>(null)
+  const [swap, setSwap] = useState<SwapTarget | null>(null)
+  const clock = useEvidenceClock()
+  const safety = useSafety()
   // A product the advisor offered ("Add to routine" in its product sheet) arrives as router state.
   const incoming = (location.state as { addProduct?: Product } | null)?.addProduct
   const sheetPreset: AddPreset | null = incoming ? { product: incoming } : add
@@ -69,6 +89,15 @@ export default function Routine() {
     if (incoming) navigate(location.pathname, { replace: true, state: null })
   }
 
+  const productIds = useMemo(() => current.map((e) => e.product_id).filter((x): x is string => Boolean(x)), [current])
+  const checks = useChecks(productIds)
+  const sample = current.some(isSample)
+  const onPick = (id: 'details' | 'test' | 'reaction' | 'swap', e: RoutineEntry) => {
+    if (id === 'details') setInfo({ entry: e })
+    else if (id === 'test') setTesting({ entry_id: e.id, product_id: e.product_id ?? undefined, name: entryName(e) })
+    else if (id === 'reaction') setReaction({ product_id: e.product_id, entry_id: e.id, name: entryName(e) })
+    else if (e.product_id) setSwap({ product_id: e.product_id, name: entryName(e) })
+  }
   const am = current.filter((e) => e.slots.includes('am')).sort(byStep)
   const pm = current.filter((e) => e.slots.includes('pm')).sort(byStep)
   const loading = routine.status === 'loading' || routine.status === 'idle'
@@ -99,14 +128,19 @@ export default function Routine() {
   const testRead = readForearm(treated, controls, tests.running)
   const suggested = suggestionsOf(findings, current, sessions, usedLastNight)
   const showTests = tab === 'tests' && !loading && !failed
+  const showVerdict = tab === 'verdict' && !loading && !failed
   const attention = !loading && !failed
+  const testCount = tests.data?.length ?? 0
 
   return (
     <main className="relative mx-auto flex max-w-[1320px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-2">
       <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{tab === 'tests' ? 'Test a product' : 'Your routine'}</h1>
-          <span className="text-[14px] text-ink-2">{tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : meta}</span>
+          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{tab === 'tests' ? 'Test a product' : tab === 'verdict' ? 'Is it working?' : 'Your routine'}</h1>
+          <span className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+            {tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : tab === 'verdict' ? 'Each product against your own readings and its usual trial length.' : meta}
+            {sample && tab === 'routine' ? <span className="rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.04em] text-[var(--synthetic-fg)]">SAMPLE ROUTINE</span> : null}
+          </span>
         </div>
         <button type="button" onClick={() => setAdd({ mode: 'search' })} className="order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
           Add product
@@ -114,7 +148,7 @@ export default function Routine() {
             +
           </span>
         </button>
-        <div className="order-3 flex basis-full flex-wrap items-center gap-2 sm:order-2 sm:basis-auto">
+        <div className="order-3 flex basis-full flex-wrap items-center gap-2 xl:order-2 xl:basis-auto">
           <SegmentedControl
             frosted
             label="Routine or product tests"
@@ -123,9 +157,14 @@ export default function Routine() {
             onChange={setTab}
             options={[
               { value: 'routine', label: 'Routine' },
-              { value: 'tests', label: tests.running ? 'Product test · running' : 'Product tests' },
+              { value: 'verdict', label: 'Is it working?' },
+              { value: 'tests', label: tests.running ? 'Tests · running' : testCount ? `Tests · ${testCount}` : 'Tests' },
             ]}
           />
+          <button type="button" onClick={() => navigate('/plan')} className="hit44 glass-pill flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-colors hover:bg-white/80">
+            <ListChecks size={15} strokeWidth={1.7} aria-hidden />
+            Build me a routine
+          </button>
           <button type="button" onClick={() => setHistory(true)} className="hit44 glass-pill flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-colors hover:bg-white/80">
             <History size={15} strokeWidth={1.7} aria-hidden />
             History{stopped.length ? <span className="font-mono text-[11px] text-ink-2">{stopped.length}</span> : null}
@@ -134,14 +173,31 @@ export default function Routine() {
       </div>
 
       {/* Asks that need an answer come first, above the check. */}
-      {attention && !showTests ? (
+      {attention && sample && tab === 'routine' ? (
+        <section aria-label="Sample routine" className="card flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5" style={{ animation: 'wRise .5s both' }}>
+          <span className="flex min-w-0 flex-[1_1_280px] flex-col gap-0.5">
+            <span className="text-[16px]">This is a sample routine</span>
+            <span className="text-[13px] leading-[1.45] text-ink-2">It was set up to show how the routine check works, not picked for your skin. Replace it with what you use, or let Willow build one around your skin, budget and answers.</span>
+          </span>
+          <span className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => navigate('/plan')} className="min-h-10 rounded-pill bg-selected px-4 text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
+              Build me a routine
+            </button>
+            <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-10 rounded-pill bg-white px-4 text-[14px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color,scale] duration-200 ease-standard hover:bg-sunken active:scale-[.97]">
+              Replace with my own
+            </button>
+          </span>
+        </section>
+      ) : null}
+
+      {attention && !showTests && !showVerdict ? (
         <>
           <RequestNotice onAdd={(p) => setAdd({ product: p })} />
           <FeelNudge entries={entries} onOpen={(e) => setInfo({ entry: e, focus: 'feel' })} />
         </>
       ) : null}
 
-      {attention && !showTests && current.length ? (
+      {attention && !showTests && !showVerdict && current.length ? (
         <div className="@container">
           <div className="grid items-stretch gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_360px]">
             <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} />
@@ -154,6 +210,18 @@ export default function Routine() {
 
       {showTests ? (
         <ProductTests current={current} tests={tests} treated={treated} controls={controls} />
+      ) : showVerdict ? (
+        current.length ? (
+          <ShelfVerdict entries={current} sessions={sessions} check={check.data} clock={clock.data ?? null} checks={checks.checks} onOpen={(e) => setInfo({ entry: e })} onStop={(e) => void writes.stop(e)} onSwap={(e) => onPick('swap', e)} />
+        ) : (
+          <section className="card flex flex-col items-start gap-2 p-5" style={{ animation: 'wRise .5s both' }}>
+            <span className="text-[17px]">No products to judge yet</span>
+            <span className="text-[13.5px] leading-[1.5] text-ink-2">Add what you use, or build a routine. Each product gets a verdict here once its usual trial length has passed.</span>
+            <button type="button" onClick={() => navigate('/plan')} className="mt-1 min-h-10 rounded-pill bg-selected px-4 text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
+              Build me a routine
+            </button>
+          </section>
+        )
       ) : loading ? (
         <div className="@container"><div role="status" aria-label="Loading routine" className="grid gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_340px]">
           <div className="grid gap-3 @min-[600px]:grid-cols-2">
@@ -196,8 +264,11 @@ export default function Routine() {
             <div className="flex flex-col gap-3">
               <span className="font-dot text-[48px] leading-none font-extrabold">00</span>
               <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.02em]">No products yet</span>
-              <span className="max-w-[440px] leading-[1.55] text-[#3E3C38]">Add what you use and when you started. Willow lines start dates up with your readings and checks the ingredients against each other.</span>
+              <span className="max-w-[440px] leading-[1.55] text-[#3E3C38]">Add what you use and when you started. Willow lines start dates up with your readings and checks the ingredients against each other. Starting from nothing? Willow can build a three-step routine around your skin, budget and answers, every product checked for you.</span>
               <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => navigate('/plan')} className="min-h-11 rounded-pill bg-cta px-5 text-[15px] text-ink">
+                  Build me a routine
+                </button>
                 <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-11 rounded-pill bg-selected px-5 text-[15px] text-inverse">
                   Search catalog
                 </button>
@@ -228,20 +299,30 @@ export default function Routine() {
                 entries={slot === 'am' ? am : pm}
                 ticked={(id) => (ticks[id] ?? []).includes(slot)}
                 sessions={sessions}
+                clock={clock.data ?? null}
+                checks={checks.checks}
                 onOpen={(e) => setInfo({ entry: e })}
                 onStop={(e) => void writes.stop(e)}
+                onMore={setMore}
                 onAdd={() => setAdd({ mode: 'search', slot })}
               />
             ))}
             <div className="side flex min-w-0 flex-col gap-3 empty:hidden @min-[620px]:col-span-2 @min-[1020px]:col-span-1">
               {suggested.any ? <TestStrip read={testRead} onStart={() => setTab('tests')} /> : null}
-              <SponsoredCard inRoutine={everAdded} onView={(productId) => setInfo({ productId })} />
+              <SponsoredCard
+                inRoutine={everAdded}
+                onView={(productId) => {
+                  setInfoSurface('sponsored')
+                  setInfo({ productId })
+                }}
+              />
             </div>
           </div>
         </div>
       )}
 
       <div className="mx-1 mt-1 flex flex-col gap-2">
+        {!loading && !failed && !showTests && !showVerdict && current.length ? <CheckForMe /> : null}
         {!loading && !failed && !showTests && current.length ? (
           <p className="max-w-[820px] text-[12.5px] leading-[1.5] text-ink-2">
             {faceMeasured ? '◆ marks a change in your readings after you started a product. ' : 'Take a face check-in to see, over the weeks, whether each product lines up with a change in your readings. '}
@@ -263,11 +344,28 @@ export default function Routine() {
         }}
       />
       <AddProductSheet open={sheetPreset !== null} preset={sheetPreset} inRoutine={inRoutine} onClose={closeAdd} />
+      <EntryActions entry={more} onClose={() => setMore(null)} onPick={onPick} />
+      <TestSheet target={testing} onClose={() => setTesting(null)} />
+      <ReactionSheet target={reaction} onClose={() => setReaction(null)} />
+      <SwapSheet
+        target={swap}
+        market={safety.data?.market}
+        onClose={() => setSwap(null)}
+        onView={(p) => {
+          setSwap(null)
+          setInfo({ product: p })
+        }}
+      />
       <ProductSheet
         target={info}
-        onClose={() => setInfo(null)}
+        surface={infoSurface}
+        onClose={() => {
+          setInfo(null)
+          setInfoSurface('product_sheet')
+        }}
         onAdd={(p) => {
           setInfo(null)
+          setInfoSurface('product_sheet')
           setAdd({ product: p })
         }}
       />

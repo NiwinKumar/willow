@@ -147,7 +147,7 @@ const STEPS: Step[] = [
   {
     title: 'Prove it to the business',
     line: 'Outcomes, not just sales.',
-    body: 'Measured change is pooled by product, skin type and goal, across every brand on the shelf. Willow Proof shows what works for whom, drafts claims only from measured results, and measures each campaign against a holdout. In the demo, Proof runs on a labelled synthetic cohort.',
+    body: 'Measured change is pooled by product, skin type and goal, across every brand on the shelf. Proof by Willow shows what works for whom, drafts claims only from measured results, and measures each campaign against a holdout. In the demo, Proof runs on a labelled synthetic cohort.',
     fixes: ['blind'],
     cloud: [
       ['BigQuery', 'the outcome tables behind every Proof chart'],

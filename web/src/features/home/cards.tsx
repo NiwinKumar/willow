@@ -23,7 +23,7 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
 /** Rows What changed lists before folding the rest into one line. */
 const ROWS = 3
 
-/** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
+/** What changed: the latest measured check-in (of the place Home reads) against the baseline, changed measures first, with how far each moved. */
 export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, className, rows: count = ROWS }: { session: Session; baseline: Session | null; goals: string[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string; rows?: number }) {
   const metrics = byGoals(session.result?.metrics ?? [], goals).map((m) => ({ m, kind: verdictKind(m, session) }))
   const sorted = [...metrics.filter((x) => x.kind === 'changed'), ...metrics.filter((x) => x.kind !== 'changed')]

@@ -16,6 +16,12 @@ const MAX_Q = 300
 
 type Turn = { id: number; q: string; reply?: RetailerAnswer; error?: { title: string; message: string } }
 
+/**
+ * The thread survives closing the panel (the side panel unmounts its content): it is kept here per scope (the
+ * organisation and workspace), so reopening Ask shows the conversation so far; another scope starts afresh.
+ */
+const kept: { scope: string; turns: Turn[]; next: number } = { scope: '', turns: [], next: 0 }
+
 const UNIT: Record<NonNullable<RetailerAnswer['chart']>['unit'], (v: number) => string> = {
   percent: (v) => `${v < 0 ? '−' : ''}${Math.abs(v)}%`,
   count: (v) => String(v),
@@ -36,15 +42,21 @@ function errorOf(e: unknown): Turn['error'] {
  * "Ask the aggregates", inside the Ask side panel: Gemini answers from the same aggregates and filters as the
  * screen, and the api checks every number against them (GEMINI_SPEC section 6). Guest sign-in on first ask.
  */
-export function AskAggregates({ d, filters }: { d: Insights | null; filters: Filters }) {
+export function AskAggregates({ d, filters, scope = '' }: { d: Insights | null; filters: Filters; scope?: string }) {
   const { user, continueAsGuest, getIdToken } = useAuth()
-  const [thread, setThread] = useState<Turn[]>([])
+  const [thread, setThreadState] = useState<Turn[]>(() => (kept.scope === scope ? kept.turns : []))
+  const setThread = (f: (t: Turn[]) => Turn[]) =>
+    setThreadState((t) => {
+      const next = f(t)
+      Object.assign(kept, { scope, turns: next })
+      return next
+    })
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [slow, setSlow] = useState(false)
   // Only the newest answer reveals word by word; it finishes before follow-ups appear.
   const [revealing, setRevealing] = useState<number | null>(null)
-  const nextId = useRef(0)
+  const nextId = useRef(kept.scope === scope ? kept.next : 0)
   const end = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,6 +76,7 @@ export function AskAggregates({ d, filters }: { d: Insights | null; filters: Fil
     const q = text.trim()
     if (q.length < MIN_Q || busy || revealing !== null || !d) return
     const id = nextId.current++
+    kept.next = nextId.current
     setThread((t) => [...t, { id, q }])
     setDraft('')
     setBusy(true)
