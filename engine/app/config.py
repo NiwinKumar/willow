@@ -440,6 +440,14 @@ FACE_ZONES = (
 FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as forehead
 NOSE_BRIDGE_WIDTH_FRAC = 0.8  # the nose zone's bridge: this share of the inner eye corners' spread
 MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
+# A session with side photos (pipeline_face._assign_views): a side photo also measures the chin
+# and around-mouth skin on its half of the face wherever it sees that skin more squarely than the
+# front photo (facemap.facing, about the cosine of the angle to the camera) by this margin. On
+# the Nov 27 check-in (cheek photos turned ~50 degrees) that is 12 of the 22 chin triangles on
+# each side and about 25 of the 99 around the mouth: the side of the chin, which the front sees
+# at a slant and where a mark was in no photo's area.
+SIDE_REACH_ZONES = ("chin", "around_mouth")
+SIDE_FACING_MARGIN = 0.1
 FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
 FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)
 AREA_OUTLINE_MM = 1.0  # result.rois zone outlines simplified to this (fewer points, same shape)

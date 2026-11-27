@@ -1,4 +1,4 @@
-__version__ = "0.4.1"  # bump on every change that can move a number: baselines record it
+__version__ = "0.4.2"  # bump on every change that can move a number: baselines record it
 # 0.4.1: extras.by_zone (readings by area); no whole-face number moved, 0.4.x baselines compare
 # 0.4.0: side views (#67) keep shiny/marked skin, light hair stays hair, lip and nose-fold shadows
 # are not marks: side-view numbers moved, so 0.3.x baselines are not compared (measure them again)
