@@ -5,6 +5,7 @@ import { useOwner, useSpots } from '../../data/hooks'
 import { useData } from '../../data/useData'
 import type { Session } from '../../data/types'
 import type { SpotTrack } from '../../lib/api'
+import { MOLE_NOTE } from '../../lib/spotLabels'
 import { Crumb, Page, StatusCard } from './parts'
 import { SpotDiary } from './SpotDiary'
 import { useSessionView } from './useSessionView'
@@ -42,7 +43,6 @@ export default function SpotsPage() {
       <Page label="Spot diary">
         {crumb}
         <StatusCard
-          eyebrow="■ Spot diary"
           title="The spot diary follows your own spots."
           body="It needs your own face check-ins, so it isn't part of the demo. Sign in and check in a few times to see it fill in."
         />
@@ -63,6 +63,7 @@ export default function SpotsPage() {
         photo={photo}
         photoViews={photoView?.session.views ?? []}
       />
+      <p className="max-w-[560px] text-[13px] leading-normal text-ink-2">Moles are not followed. {MOLE_NOTE}</p>
     </Page>
   )
 }

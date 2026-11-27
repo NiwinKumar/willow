@@ -1,6 +1,7 @@
 /** Spot diary words and shapes (design SH/STG/ZN), shared by the diary and the photo stage. */
 import type { SpotDiary as Diary, SpotStatus, SpotTrack, SpotZone } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
+import { SPOT_NAME } from '../../lib/spotLabels'
 
 export const ZONE_NAME: Record<SpotZone, string> = {
   forehead: 'Forehead',
@@ -12,7 +13,8 @@ export const ZONE_NAME: Record<SpotZone, string> = {
   right_jaw: 'Right jawline',
   left_jaw: 'Left jawline',
 }
-const STAGE_NAME: Record<string, string> = { bump: 'Raised spot', clogged_pore: 'Blackhead or whitehead', mark: 'Mark left behind', red_spot: 'Red spot', dark_spot: 'Dark spot' }
+// The same words as the photo panel's labels (lib/spotLabels.ts SPOT_NAME)
+const STAGE_NAME: Record<string, string> = { bump: SPOT_NAME.papule_pustule[0], clogged_pore: 'Clogged pore', mark: SPOT_NAME.post_blemish_mark[0], red_spot: 'Red spot', dark_spot: 'Dark spot' }
 export const STAGE_COLOUR: Record<string, [string, string]> = { bump: ['#F25FA8', '#FBC6E1'], clogged_pore: ['#5E5B56', '#CFCCC6'], mark: ['#C98A5E', '#F1D3BC'], red_spot: ['#FF6B4A', '#FFC7B8'], dark_spot: ['#7A5240', '#D9C2B4'] }
 
 /** Status = shape + words, never colour alone (design SH). */
@@ -32,8 +34,8 @@ export const fmtDays = (n: number) => (n < 0.95 ? 'under a day' : nd(Math.round(
 export const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString()
 
 export function stageName(o: { stage: string; label: string | null }): string {
-  if (o.stage === 'clogged_pore' && /blackhead|open_comedone/i.test(o.label ?? '')) return 'Blackhead'
-  if (o.stage === 'clogged_pore' && /whitehead|closed_comedone/i.test(o.label ?? '')) return 'Whitehead'
+  if (o.stage === 'clogged_pore' && /blackhead|open_comedone/i.test(o.label ?? '')) return SPOT_NAME.open_comedone[0]
+  if (o.stage === 'clogged_pore' && /whitehead|closed_comedone/i.test(o.label ?? '')) return SPOT_NAME.closed_comedone[0]
   return STAGE_NAME[o.stage] ?? 'Spot'
 }
 
