@@ -14,6 +14,7 @@ from app import (
     limits,
     plan,
     reactions,
+    regions,
     regulatory,
     routine_check,
     safety,
@@ -58,6 +59,24 @@ def safety_check(
         "checks": checks,
         "unknown": unknown,
         "note": safety.LABELS_NOTE,
+    }
+
+
+@router.get("/markets")
+def markets() -> dict[str, Any]:
+    """Every market: its catalog region, its own currency and the currency its plan is priced in
+    (public, from the catalog)."""
+    priced = plan.priced_currencies()
+    return {
+        "markets": [
+            {
+                "market": m,
+                "region": regions.MARKET_REGION[m],
+                "currency": regions.MARKET_CURRENCY[m],
+                "priced_currency": priced.get(m, regions.MARKET_CURRENCY[m]),
+            }
+            for m in regions.MARKETS
+        ]
     }
 
 

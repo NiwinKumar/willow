@@ -80,6 +80,20 @@ export const BUDGET_RANGE: Record<string, { min: number; max: number; step: numb
   SGD: { min: 8, max: 120, step: 1, start: 35 },
   GBP: { min: 5, max: 80, step: 1, start: 20 },
   EUR: { min: 5, max: 90, step: 1, start: 25 },
+  // the APAC and Gulf markets (lib/market.ts): about the same span as USD, in round local steps
+  MYR: { min: 20, max: 400, step: 5, start: 100 },
+  THB: { min: 150, max: 3000, step: 50, start: 800 },
+  IDR: { min: 50000, max: 1500000, step: 10000, start: 400000 },
+  PHP: { min: 250, max: 5000, step: 50, start: 1400 },
+  VND: { min: 100000, max: 2500000, step: 10000, start: 650000 },
+  KRW: { min: 5000, max: 120000, step: 1000, start: 35000 },
+  JPY: { min: 700, max: 13000, step: 100, start: 3500 },
+  CNY: { min: 30, max: 650, step: 5, start: 180 },
+  HKD: { min: 40, max: 700, step: 5, start: 200 },
+  TWD: { min: 150, max: 2800, step: 50, start: 800 },
+  AUD: { min: 8, max: 140, step: 1, start: 40 },
+  NZD: { min: 8, max: 150, step: 1, start: 42 },
+  AED: { min: 20, max: 330, step: 5, start: 90 },
 }
 
 export const SLOT_WORDS: Record<PlanSlot, string> = { cleanser: 'Cleanser', moisturizer: 'Moisturiser', sunscreen: 'Sunscreen', active: 'Active' }

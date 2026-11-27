@@ -19,6 +19,7 @@ from app import (
     gemini,
     label_scan,
     limits,
+    regulatory,
     routine_check,
     routine_log,
     safety,
@@ -52,17 +53,26 @@ def catalog_search(
     max_price: float | None = Query(default=None, ge=0),
     currency: str | None = Query(default=None, max_length=3),
     limit: int = Query(default=8, ge=1, le=200),
+    market: regulatory.Market | None = None,
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
     """`concern` may repeat: products made for every one given. `total` counts every match.
-    With a safety profile, each product carries `check` (app/safety.py)."""
-    every = catalog.search_all(q, concern, category, max_price, currency)
-    found, total = every[:limit], len(every)
+    With a safety profile, each product carries `check` (app/safety.py). Nearest products first
+    (app/regions.py) for the person's saved market, else `market` (the web's guess from the
+    browser); `market` in the answer is the one used."""
     profile = safety.profile_of(store.user_get(user.uid))
+    market = (profile or {}).get("market") or market
+    every = catalog.search_all(q, concern, category, max_price, currency, market=market)
+    found, total = every[:limit], len(every)
     if profile:
         found = [{**p, "check": safety.check(p, profile)} for p in found]
-    return {"products": found, "total": total, "catalog_size": len(catalog.products())}
+    return {
+        "products": found,
+        "total": total,
+        "catalog_size": len(catalog.products()),
+        "market": market,
+    }
 
 
 @router.get("/catalog/{product_id}")

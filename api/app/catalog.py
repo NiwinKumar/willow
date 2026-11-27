@@ -16,6 +16,8 @@ from typing import Any, NamedTuple
 
 from pydantic import BaseModel, Field, field_validator
 
+from app import regions
+
 CATALOG_PATH = Path(__file__).resolve().parent.parent / "seed" / "products.json"
 
 CATEGORIES = (
@@ -207,8 +209,11 @@ def search(
     currency: str | None = None,
     exclude_ingredients: list[str] | None = None,
     limit: int = 8,
+    market: str | None = None,
 ) -> list[dict[str, Any]]:
-    return search_all(q, concern, category, max_price, currency, exclude_ingredients)[:limit]
+    return search_all(q, concern, category, max_price, currency, exclude_ingredients, market)[
+        :limit
+    ]
 
 
 def search_all(
@@ -218,9 +223,13 @@ def search_all(
     max_price: float | None = None,
     currency: str | None = None,
     exclude_ingredients: list[str] | None = None,
+    market: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Every match, best first. Several concerns: products made for all of them. Full and index
-    products both come back; for the same match a full product comes first. A price filter
+    """Every match, best first. Several concerns: products made for all of them. `market` (where
+    the person shops, app/regions.py): browsing (no query) lists the nearest products first; a
+    query keeps the best matches first and puts the nearest first among equally good ones; no
+    product is left out for its region. Then, for the same match, a full product before an
+    index one. A price filter
     leaves out products with no price, and an ingredient filter leaves out products whose
     ingredient list Willow does not have (it cannot tell they are free of it)."""
     excluded = [fold(x) for x in exclude_ingredients or [] if x.strip()]
@@ -245,11 +254,14 @@ def search_all(
             hits, quality = _quality(e, terms)
             if hits == 0:
                 continue
-            scored.append(((-hits, -quality, e.index, e.price, e.sort_name), p))
+            near = regions.distance(p, market)
+            scored.append(((-hits, -quality, near, e.index, e.price, e.sort_name), p))
         else:
-            # Browsing (no query): full products first, then by brand and name; raw prices in
-            # different currencies do not compare (sorting by them hid most INR products).
-            scored.append(((0, 0, e.index, 0.0, e.sort_name), p))
+            # Browsing (no query): nearest first, then full products, then by brand and name; raw
+            # prices in different currencies do not compare (sorting by them hid most INR
+            # products).
+            near = regions.distance(p, market)
+            scored.append(((0, 0, near, e.index, 0.0, e.sort_name), p))
     scored.sort(key=lambda s: s[0])
     if terms and scored:
         # Only the products matching the most words ("vitamin c" is not every product with a "c").

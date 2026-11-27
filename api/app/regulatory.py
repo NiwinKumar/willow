@@ -9,8 +9,8 @@ cosmetics and sunscreens (plan, Wisp, swaps); everything else can be checked, ne
 import re
 from typing import Any, Literal
 
-Market = Literal["US", "IN", "SG", "UK", "EU"]
-MARKETS: tuple[str, ...] = ("US", "IN", "SG", "UK", "EU")
+from app.regions import MARKETS, Market  # noqa: F401  (Market: re-exported for the routes)
+
 RegClass = Literal["cosmetic", "otc_drug", "pharmacy", "rx"]
 # strictest last: the class reported when the market is unknown
 ORDER = {"cosmetic": 0, "otc_drug": 1, "pharmacy": 2, "rx": 3}

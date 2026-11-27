@@ -24,7 +24,7 @@ from typing import Any, Literal
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import catalog, regulatory, routine_check, safety
+from app import catalog, regions, regulatory, routine_check, safety
 from app.safety import SafetyProfile
 
 log = logging.getLogger("willow.plan")
@@ -61,9 +61,9 @@ GOAL_LABEL = {
     "under_eye": "Under-eye",
     "oil_glow": "Shine and glow",
 }
-MARKET_REGION = {"US": "US", "IN": "IN", "SG": "SEA", "UK": "UK", "EU": "EU"}
-MARKET_WORDS = {"US": "the US", "IN": "India", "SG": "Singapore", "UK": "the UK", "EU": "the EU"}
-DEFAULT_CURRENCY = {"US": "USD", "IN": "INR", "SG": "SGD", "UK": "GBP", "EU": "EUR"}
+# market -> region, currency and words: one table, app/regions.py
+DEFAULT_CURRENCY = regions.MARKET_CURRENCY
+MARKET_WORDS = regions.MARKET_WORDS
 SIGN = {"USD": "$", "INR": "₹", "SGD": "S$", "GBP": "£", "EUR": "€", "AUD": "A$"}
 TIER_RANK = {"proven": 0, "promising": 1}
 MIN_PRICED = 10  # fewer products priced in the market's currency: fall back to USD prices
@@ -192,11 +192,8 @@ def _active_word(clock: dict[str, Any] | None, product: dict[str, Any]) -> str:
 
 
 def sold_in(product: dict[str, Any], market: str | None) -> bool:
-    if market is None:
-        return True
-    region = MARKET_REGION[market]
-    regions = set(product.get("region") or []) | {s.get("region") for s in product["stores"]}
-    return bool(regions & {region, "GLOBAL"})
+    """Sold in the market's region or GLOBAL (app/regions.py)."""
+    return regions.sold_in(product, market)
 
 
 def price_in(product: dict[str, Any], currency: str) -> float | None:
@@ -306,6 +303,25 @@ def _money(amount: float, currency: str) -> str:
     text = f"{amount:,.2f}".removesuffix(".00")
     sign = SIGN.get(currency)
     return f"{sign}{text}" if sign else f"{text} {currency}"
+
+
+def priced_currencies() -> dict[str, str]:
+    """The currency each market's plan is priced in: its own when at least MIN_PRICED full
+    products sold there have a checked price in it, else USD (prices are never converted). The
+    web sets the budget slider in this currency, so a budget is always compared like for like."""
+    products = catalog.products()
+    key = id(products)
+    if _PRICED.get("key") != key:
+        full = [p for p in products if catalog.is_full(p)]
+        out = {}
+        for market, cur in DEFAULT_CURRENCY.items():
+            n = sum(1 for p in full if sold_in(p, market) and price_in(p, cur) is not None)
+            out[market] = cur if cur == FALLBACK_CURRENCY or n >= MIN_PRICED else FALLBACK_CURRENCY
+        _PRICED.update(key=key, value=out)
+    return _PRICED["value"]
+
+
+_PRICED: dict[str, Any] = {}
 
 
 class _Ctx:
@@ -640,7 +656,7 @@ def _build(ctx: _Ctx) -> dict[str, Any]:
                 "verdict_week": start + clock["verdict_weeks"] if clock else None,
                 "evidence": clock,
                 "proof": tier,
-                "alternatives": ranked[1:3],
+                "alternatives": _alternatives(ctx, ranked[1:]),
                 "goal": goal,
             }
         )
@@ -701,6 +717,14 @@ def _build(ctx: _Ctx) -> dict[str, Any]:
         "market": ctx.market,
         "currency_note": ctx.currency_note,
     }
+
+
+def _alternatives(ctx: _Ctx, rest: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Two more for the slot, sold in the person's own region before GLOBAL ones (a product
+    with no flag still before one to check); the plan's own order within each."""
+    return sorted(
+        rest, key=lambda p: (ctx.check(p)["status"] != "clear", regions.distance(p, ctx.market))
+    )[:2]
 
 
 def _is_vitamin_c(p: dict[str, Any]) -> bool:
@@ -796,9 +820,9 @@ def swaps(
     """Products like this one for less or more: same category, the same main key active at a
     similar stated strength, a cosmetic where the person is. Prices are compared only in one
     currency (the market's, else this product's own), each side's lowest checked price in it,
-    never converted; with no price on both sides the why says nothing about price. Cheapest
-    first. Each item: product, why, price {currency, amount, base} or null, and `check` when the
-    person has a profile."""
+    never converted; with no price on both sides the why says nothing about price. Sold in the
+    person's own region first (app/regions.py), then cheapest. Each item: product, why, price
+    {currency, amount, base} or null, and `check` when the person has a profile."""
     actives = product.get("key_actives") or []
     if not actives:
         return []
@@ -842,9 +866,16 @@ def swaps(
         item = {"product": p, "why": why, "price": compared}
         if check:
             item["check"] = check
-        found.append((amount if amount is not None else math.inf, p["product_id"], item))
-    found.sort(key=lambda f: (f[0], f[1]))
-    return [f[2] for f in found[:limit]]
+        found.append(
+            (
+                regions.distance(p, market),
+                amount if amount is not None else math.inf,
+                p["product_id"],
+                item,
+            )
+        )
+    found.sort(key=lambda f: f[:3])
+    return [f[3] for f in found[:limit]]
 
 
 def _pct_words(pct: Any) -> str:
