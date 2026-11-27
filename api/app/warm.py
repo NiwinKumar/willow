@@ -42,10 +42,16 @@ def _rows() -> str:
 def _proof_lists() -> str:
     """Proof's product and brand lists (every catalog product and brand: 3,000+ rows since the
     catalog grew), so the first judge to open Products or the brand picker doesn't wait."""
+    from app import retail_intel
     from app.routes import retailer_routes
 
     retailer_routes.proof_products("mixed", "all")
     retailer_routes.proof_brands("mixed", "all")
+    # Campaigns, Customers and the brief are as heavy at 35,000 people: eligibility took ~22 s
+    # on a fresh instance (Nov 28), so it is built here too, before a judge opens Campaigns.
+    retail_intel.eligibility_all()
+    retail_intel.segments("mixed", "all")
+    retail_intel.brief("mixed", "all")
     return "proof lists"
 
 
