@@ -38,7 +38,7 @@ import { SwapSheet, type SwapTarget } from './SwapSheet'
 import { TestSheet, type TestTarget } from './TestSheet'
 
 type Tab = 'routine' | 'verdict' | 'tests'
-const TITLES: Record<Tab, string> = { routine: 'Your routine', verdict: 'Is it working?', tests: 'Test a product' }
+const TITLE: Record<Tab, string> = { routine: 'Your routine', verdict: 'Is it working?', tests: 'Test a product' }
 
 const ORDER = ['cleanser', 'toner', 'serum', 'treatment', 'exfoliant', 'moisturizer', 'eye_care', 'mask', 'sunscreen']
 // Unknown categories (label scans) sort just before sunscreen, never above the cleanser.
@@ -136,7 +136,7 @@ export default function Routine() {
     <main className="relative mx-auto flex max-w-[1320px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-2">
       <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{tab === 'tests' ? 'Test a product' : tab === 'verdict' ? 'Is it working?' : 'Your routine'}</h1>
+          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{TITLE[tab]}</h1>
           <span className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
             {tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : tab === 'verdict' ? 'Each product against your own readings and its usual trial length.' : meta}
             {sample && tab === 'routine' ? <span className="rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.04em] text-[var(--synthetic-fg)]">SAMPLE ROUTINE</span> : null}
