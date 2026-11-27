@@ -64,7 +64,7 @@ export default function Plan() {
     const s = safety.data
     if (s) {
       const market = s.market ?? draft.market
-      setDraft({ ...draft, reactive: s.reactive ?? draft.reactive, life_stage: s.life_stage ?? draft.life_stage, avoid: s.avoid.length ? s.avoid : draft.avoid, rx_treatment: s.rx_treatment ?? draft.rx_treatment, market, budget: market === draft.market ? draft.budget : (BUDGET_RANGE[marketOf(market).currency]?.start ?? draft.budget) })
+      setDraft({ ...draft, reactive: s.reactive ?? draft.reactive, life_stage: s.life_stage ?? draft.life_stage, avoid: s.avoid.length ? s.avoid : draft.avoid, avoid_ingredients: s.avoid_ingredients.length ? s.avoid_ingredients : draft.avoid_ingredients, note: s.note ?? draft.note, rx_treatment: s.rx_treatment ?? draft.rx_treatment, market, budget: market === draft.market ? draft.budget : (BUDGET_RANGE[marketOf(market).currency]?.start ?? draft.budget) })
     }
   }
 

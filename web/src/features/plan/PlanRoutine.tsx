@@ -259,7 +259,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
             {pick.evidence?.source ? (
               <p className="m-0 text-[12px] text-ink-2">
                 Verdict timing:{' '}
-                <a href={pick.evidence.source.url} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-2">
+                <a href={pick.evidence.source.url ?? undefined} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-2">
                   {pick.evidence.source.label}
                 </a>
                 {pick.evidence.grade ? ` · evidence grade ${pick.evidence.grade}` : ''}

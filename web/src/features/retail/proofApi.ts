@@ -1,4 +1,4 @@
-import { ApiError, request, retailerGet } from '../../lib/api'
+import { ApiError, request, retailerGet, type RetailerAnswer } from '../../lib/api'
 
 /*
  * Proof by Willow organisations (api proof_routes.py, prefix /v1/proof; research/finals/build-spec.md "Proof
@@ -104,6 +104,26 @@ export type ClicksView = {
   products: { product_id: string; product?: string | null; brand?: string | null; clicks: ClickCount }[]
 }
 
+/** The connected range as the api keeps it (proof_routes.py RangeRow): the item file's rows with their match. */
+export type RangeRowApi = { line: number; gtin: string; product_id: string; brand: string; name: string; category: string; price: string; facings: string; match: string | null; status: 'measured' | 'collecting' | 'no_users' | 'not_measured' | 'unrecognised' }
+export type RangeApi = { filename: string; source: 'file' | 'catalog'; rows: RangeRowApi[]; uploaded_at: string | null; by_role?: Role | null }
+/** `from`: whose item file a brand's range comes from (the retailer's, filtered to the brand). */
+export type RangeView = { range: RangeApi | null; from: { org_id: string; name: string } | null }
+
+/** POST /v1/proof/orgs/{org}/ask: the checked Ask, told whose question it is (`scope`). */
+export type OrgAnswer = RetailerAnswer & { scope?: { brand: string | null; names_hidden: boolean } }
+
+/** GET /v1/proof/orgs/{org}/fit: what opted-in shoppers avoid and react to; counts of people, ≥ min_group. */
+export type FitView = {
+  min_group: number
+  profiled: number | null
+  reacting: number | null
+  avoid: { id: string; label: string; people: number }[]
+  products: { product_id: string; product: string; brand: string; avoided: number | null; reacted: number | null; stopped: number | null }[]
+  hidden: number
+  basis: string
+}
+
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
 const enc = encodeURIComponent
 const P = '/v1/proof'
@@ -129,6 +149,11 @@ export const proofApi = {
     request<SavedClaim>(t, `${P}/orgs/${enc(org)}/claims`, { method: 'POST', ...json(body) }),
   setClaim: (t: string, org: string, id: string, status: 'draft' | 'approved') => request<SavedClaim>(t, `${P}/orgs/${enc(org)}/claims/${enc(id)}`, { method: 'PATCH', ...json({ status }) }),
   exportClaim: (t: string, org: string, id: string) => request<{ claim: SavedClaim; exported_at: string }>(t, `${P}/orgs/${enc(org)}/claims/${enc(id)}/export`),
+  range: (t: string, org: string) => request<RangeView>(t, `${P}/orgs/${enc(org)}/range`),
+  putRange: (t: string, org: string, body: { filename: string; source: 'file' | 'catalog'; rows: RangeRowApi[] }) => request<RangeView>(t, `${P}/orgs/${enc(org)}/range`, { method: 'PUT', ...json(body) }),
+  deleteRange: (t: string, org: string) => request<void>(t, `${P}/orgs/${enc(org)}/range`, { method: 'DELETE' }),
+  ask: (t: string, org: string, body: { question: string; cohort: string; range: string; brand?: string | null }) => request<OrgAnswer>(t, `${P}/orgs/${enc(org)}/ask`, { method: 'POST', ...json(body) }),
+  fit: (t: string, org: string) => request<FitView>(t, `${P}/orgs/${enc(org)}/fit`),
   research: () => retailerGet<ResearchView>(`${P}/research`),
   clicks: (days = 30) => retailerGet<ClicksView>(`/v1/retailer/clicks?days=${days}`),
 }
@@ -150,6 +175,9 @@ export function proofError(e: unknown, what: string): string {
   }
   return `Couldn’t ${what}. Check the connection and try again.`
 }
+
+/** The api's 403 for AutoCampaign writes by someone with no analyst or admin membership (autopilot_routes). */
+export const isNotMember = (e: unknown) => e instanceof ApiError && e.status === 403 && e.code === 'not_a_member'
 
 /** Roles that may decide, draft and send (the contract's "analyst+"). */
 export const canAct = (role: Role | null | undefined) => role === 'admin' || role === 'analyst'

@@ -1,14 +1,16 @@
 """Warm a new api instance before it serves (main.py startup, production only).
 
 In-memory state starts empty on every deploy and scale-out: the BigQuery rows, the live status,
-and the kept Gemini answers. Without this the first judge to open Proof, tap a suggested
-question or watch the brand journey pays for all of it (5-30 s). Everything runs at once and
-startup waits at most WARM_BUDGET_S; anything slower finishes in the background, and a failure
-only means that piece is computed on first use as before."""
+the kept Gemini answers and Mei's demo journey (her check-ins with signed photos, routine, ticks,
+routine check and Wisp history). Without this the first judge to open Proof, tap a suggested
+question, watch the brand journey or open the demo journey pays for all of it (4-30 s).
+Everything runs at once and startup waits at most WARM_BUDGET_S; anything slower finishes in the
+background, and a failure only means that piece is computed on first use as before."""
 
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
+from datetime import UTC, datetime, timedelta
 
 log = logging.getLogger("willow.warm")
 
@@ -56,11 +58,45 @@ def _rule() -> str:
     return f"rule kept={autopilot_routes.warm_reading(*JOURNEY_RULE)}"
 
 
+def _demo_days(now: datetime | None = None) -> list[str]:
+    """The web asks for Mei's routine with the judge's own local day (and her ticks for that day
+    and the day before). Every time zone's "today" is UTC yesterday, today or tomorrow."""
+    today = (now or datetime.now(UTC)).date()
+    return [(today + timedelta(days=d)).isoformat() for d in (-2, -1, 0, 1)]
+
+
+def _demo() -> str:
+    """Mei's journey views the judge flow opens (app/routes/demo_routes.py), into demo._cached:
+    her check-ins (every photo URL signed), routine, ticks and Wisp history."""
+    from app.routes import demo_routes
+    from app.store import get_store
+
+    store = get_store()
+    days = _demo_days()
+    demo_routes.journey(store=store)
+    for day in days[1:]:
+        demo_routes.journey_routine(today=day, store=store)
+    for day in days:
+        demo_routes.journey_routine_log(first=day, last=day, store=store)
+    demo_routes.journey_advisor_history(store=store)
+    return "demo journey"
+
+
+def _demo_check() -> str:
+    """Mei's routine check: one Gemini run an hour shared by every judge, made here once."""
+    from app.routes import demo_routes
+    from app.store import get_store
+
+    demo_routes.journey_routine_check(store=get_store())
+    return "demo routine check"
+
+
 def run(budget_s: float = WARM_BUDGET_S) -> None:
     started = time.monotonic()
     pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="warm")
     rows = pool.submit(_rows)
     jobs = [rows, pool.submit(_status), pool.submit(_rule)]
+    jobs += [pool.submit(_demo), pool.submit(_demo_check)]
     # Answers read the rows, so they start once the rows are in (or failed).
     jobs += [pool.submit(lambda q=q: (rows.exception(), _ask(q))[1]) for q in ASK_SUGGESTIONS]
     done, pending = wait(jobs, timeout=budget_s)

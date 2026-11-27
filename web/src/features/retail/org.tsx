@@ -31,7 +31,7 @@ export type OrgState = {
   memberships: Membership[]
   /** The brand an organisation is limited to (brand orgs); null for the retailer or legacy mode. */
   lockedBrand: string | null
-  switchOrg: (orgId: string) => Promise<void>
+  switchOrg: (orgId: string, opts?: { rejoin?: boolean }) => Promise<void>
   signOut: () => Promise<void>
   orgName: (id: string) => string
 }
@@ -120,10 +120,11 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const role = memberships.find((m) => m.org_id === currentId)?.role ?? null
 
   const switchOrg = useCallback(
-    async (orgId: string) => {
+    async (orgId: string, opts: { rejoin?: boolean } = {}) => {
       if (!instanceId) return
       const have = memberships.find((m) => m.org_id === orgId)
-      if (!have) {
+      // Joining again (from "Choose how to explore") gives the demo role that can act: analyst or admin.
+      if (!have || (opts.rejoin && have.role === 'viewer')) {
         const target = orgs.find((o) => o.id === orgId)
         const t = await auth.getIdToken()
         const joined = await proofApi.join(t, { instance: instanceId, org_id: orgId, role: target?.kind === 'brand' ? 'analyst' : 'admin' })
@@ -137,8 +138,11 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
   // A demo deep link into a brand's view (?as=brand:<slug>, e.g. the brand journey): sign in as a guest and join
   // the matching organisation (else the retailer's), so the link opens where it points instead of on a gate.
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const asParam = params.get('as')
+  // `?choose=1` (AutoCampaign's "Choose how to explore"): the demo gate again, to join with a role that can act.
+  const choosing = params.get('choose') === '1'
+  const doneChoosing = useCallback(() => setParams((p) => { const n = new URLSearchParams(p); n.delete('choose'); return n }, { replace: true }), [setParams])
   const [guestTried, setGuestTried] = useState(false)
   const [joinTried, setJoinTried] = useState(false)
   const demo = inst.status === 'ready' && inst.v.instance.demo
@@ -191,6 +195,18 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     )
   }
   if (!me.data) return <GateLoading />
+  if (choosing && inst.v.instance.demo)
+    return (
+      <ChooseOrg
+        view={inst.v}
+        onPick={async (id) => {
+          await switchOrg(id, { rejoin: true })
+          doneChoosing()
+        }}
+        onSignOut={signOut}
+        onCancel={org ? doneChoosing : undefined}
+      />
+    )
   if (!org) {
     if (inst.v.instance.demo) return <ChooseOrg view={inst.v} onPick={switchOrg} onSignOut={signOut} />
     return (
@@ -297,7 +313,7 @@ function SignIn({ instance }: { instance: ProofInstance | null }) {
   )
 }
 
-function ChooseOrg({ view, onPick, onSignOut }: { view: InstanceView; onPick: (id: string) => Promise<void>; onSignOut: () => Promise<void> }) {
+function ChooseOrg({ view, onPick, onSignOut, onCancel }: { view: InstanceView; onPick: (id: string) => Promise<void>; onSignOut: () => Promise<void>; onCancel?: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const pick = async (id: string) => {
     setBusy(id)
@@ -318,8 +334,11 @@ function ChooseOrg({ view, onPick, onSignOut }: { view: InstanceView; onPick: (i
           <h1 className="m-0 text-proof-title text-ink">Choose how to explore</h1>
           <Badge tone="amber">Demo</Badge>
         </div>
-        <p className="m-0 max-w-[62ch] text-proof-body text-ink-2">
-          {view.instance.name} is a demo instance: pick an organisation to join it with a demo role. In a real deployment the retailer’s admin invites you, and a brand is verified from the retailer’s supplier list. You can switch later from the account menu (“Try as”).
+        <p className="m-0 max-w-[62ch] text-proof-body text-ink">
+          Proof shows which skincare products are linked to a measured, held change in people’s own photos, against people with the same goals who don’t use them. A retailer uses it to run its range; a brand uses it to prove and promote its products.
+        </p>
+        <p className="m-0 max-w-[62ch] text-proof-small text-ink-2">
+          {view.instance.name} is a demo: pick a seat to join with a demo role. You land on Home, where each card is one decision with its evidence and one action. In a real deployment the retailer’s admin invites you and brands are verified from its supplier list. Switch any time from the account menu (“Try as”).
         </p>
       </div>
       <ul className={`m-0 grid list-none grid-cols-1 gap-3 p-0 ${brands.length > 5 ? '' : 'sm:grid-cols-2'}`}>
@@ -340,6 +359,11 @@ function ChooseOrg({ view, onPick, onSignOut }: { view: InstanceView; onPick: (i
       ) : null}
       <div className="flex items-center justify-between gap-3 text-proof-small text-ink-2">
         <span>Memberships made here are marked demo; campaigns they launch are shown to guest accounts only.</span>
+        {onCancel ? (
+          <button type="button" onClick={onCancel} className="hit44 shrink-0 border-0 bg-transparent text-proof-small text-ink-2 underline-offset-2 hover:text-ink hover:underline">
+            Back
+          </button>
+        ) : null}
         <button type="button" onClick={() => void onSignOut()} className="hit44 shrink-0 border-0 bg-transparent text-proof-small text-ink-2 underline-offset-2 hover:text-ink hover:underline">
           Sign out
         </button>
@@ -370,7 +394,24 @@ function OrgChoice({ org, busy, disabled, onPick }: { org: ProofOrg; busy: boole
           <span className="text-proof-small text-ink-2">{org.kind === 'brand' ? `Brand · ${org.brands.join(', ')}` : 'Retailer · every brand in the range'}</span>
         </span>
       </span>
-      <span className="text-proof-small text-ink-2">{org.kind === 'brand' ? 'See your own products’ evidence, answer the retailer’s requests, draft claims and promote what is Proven.' : 'Decide what to stock, question and promote across every brand; ask brands for evidence.'}</span>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0 text-proof-small text-ink-2">
+        {(org.kind === 'brand'
+          ? [
+              ['Prove', 'which of your products show a measured change, for whom'],
+              ['Claim', 'listing lines that quote only measured statements'],
+              ['Promote', 'Proven products, with a holdout that measures the lift'],
+            ]
+          : [
+              ['Stock', 'what earns its shelf, from outcomes across your range'],
+              ['Question', 'ask a brand for evidence before a range review'],
+              ['Promote', 'Proven products to the people they work for'],
+            ]
+        ).map(([k, v]) => (
+          <li key={k}>
+            <span className="font-medium text-ink">{k}:</span> {v}
+          </li>
+        ))}
+      </ul>
       <span className="mt-auto flex flex-wrap items-center gap-2 text-proof-label text-ink-2">
         {basis ? (
           <span className="inline-flex items-center gap-1 text-proof-leaf">

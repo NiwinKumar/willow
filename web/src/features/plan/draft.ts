@@ -14,6 +14,9 @@ export type Draft = {
   goals: GoalId[]
   life_stage: LifeStage
   avoid: AvoidId[]
+  /** Ingredient names the person reacted to before, and their note (features/you/PastReactions). */
+  avoid_ingredients: string[]
+  note: string | null
   rx_treatment: boolean
   market: Market
   budget: number
@@ -41,6 +44,8 @@ export function defaultDraft(seed: { skin_type?: string | null; goals?: string[]
     goals: cleanGoals(seed.goals ?? []).slice(0, PLAN_MAX_GOALS),
     life_stage: seed.safety?.life_stage ?? 'none',
     avoid: seed.safety?.avoid ?? [],
+    avoid_ingredients: seed.safety?.avoid_ingredients ?? [],
+    note: seed.safety?.note ?? null,
     rx_treatment: seed.safety?.rx_treatment ?? false,
     market,
     budget: BUDGET_RANGE[marketOf(market).currency]?.start ?? 25,
@@ -52,7 +57,8 @@ export function defaultDraft(seed: { skin_type?: string | null; goals?: string[]
 export function readDraft(): Draft | null {
   try {
     const raw = sessionStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as Draft) : null
+    // a draft from before the reacted-to questions has neither field
+    return raw ? ({ avoid_ingredients: [], note: null, ...JSON.parse(raw) } as Draft) : null
   } catch {
     return null
   }
@@ -86,7 +92,7 @@ export function writeResult(r: StoredResult | null) {
 /** The request these answers make (safety from the answers, keeping what only the account knows). */
 export function requestOf(d: Draft, base: SafetyProfile, adult: boolean | null): PlanRequest | null {
   if (!d.skin_type) return null
-  const safety: SafetyProfile = { ...base, adult: adult ?? base.adult, life_stage: d.life_stage, reactive: d.reactive, avoid: d.avoid, rx_treatment: d.rx_treatment, market: d.market }
+  const safety: SafetyProfile = { ...base, adult: adult ?? base.adult, life_stage: d.life_stage, reactive: d.reactive, avoid: d.avoid, avoid_ingredients: d.avoid_ingredients, note: d.note?.trim() || null, rx_treatment: d.rx_treatment, market: d.market }
   return {
     skin_type: d.skin_type,
     reactive: d.reactive,
@@ -102,8 +108,8 @@ export function requestOf(d: Draft, base: SafetyProfile, adult: boolean | null):
 /** Same answers, same plan: the key a stored result is kept under (only what the questions set, so the
  * account's own fields arriving after a reload never make the plan stale). */
 export const keyOf = (r: PlanRequest) => {
-  const { life_stage, reactive, avoid, rx_treatment, market } = r.safety
-  return JSON.stringify({ ...r, safety: { life_stage, reactive, avoid, rx_treatment, market } })
+  const { life_stage, reactive, avoid, avoid_ingredients, rx_treatment, market } = r.safety
+  return JSON.stringify({ ...r, safety: { life_stage, reactive, avoid, avoid_ingredients, rx_treatment, market } })
 }
 
 export type PlanState = {

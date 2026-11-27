@@ -8,7 +8,7 @@ import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
 import { useOrg } from '../org'
 import { useProducts } from '../productData'
-import { canAct } from '../proofApi'
+import { canAct, proofError } from '../proofApi'
 import { coverage, coverageSentence, ItemFileError, itemTemplate, matchRows, readItemFile, STATUS_HINT, STATUS_LABEL, STATUS_ORDER, statusOf, stockCsv, type MatchedRow, type RangeStatus } from '../range'
 import { useRange, type StoredRange } from '../rangeStore'
 import { purposeOf, sectionPath, useRetailState } from '../state'
@@ -34,10 +34,10 @@ export default function Range() {
   const { org, lockedBrand } = useOrg()
   const { state, retry } = useProducts(filters)
   const catalog = useMemo(() => (state.status === 'ready' ? state.d.products : []), [state])
-  const { range } = useRange()
+  const { range, loading } = useRange()
   const brand = lockedBrand ?? (workspace.kind === 'brand' ? workspace.brand : null)
 
-  if (state.status === 'loading')
+  if (state.status === 'loading' || loading)
     return (
       <div className="flex flex-col gap-6">
         <Bone className="h-8 w-48" />
@@ -47,11 +47,15 @@ export default function Range() {
     )
   if (state.status !== 'ready') return <ErrorState title="The catalog couldn’t load" body="Matching needs the measured catalog. No partial counts are shown." onRetry={retry} />
 
-  // A brand's range is its own catalog products (from the retailer's item file, filtered to the brand).
-  const brandRange: StoredRange | null = brand
-    ? { filename: `${org?.name ?? brand} in the retailer’s item file`, at: '', source: 'catalog', rows: catalog.filter((p) => p.brand === brand).map((p, i) => ({ line: i + 2, gtin: '', productId: p.product_id, brand: p.brand, name: p.product, category: p.category_label, price: '', facings: '', match: p.product_id, status: statusOf(p) })) }
+  // A brand organisation reads the retailer's item file filtered to its products (from the api). Until the
+  // retailer connects one, its range is its own catalog products, said as such. A retailer viewing a brand's
+  // lens sees its own range filtered to that brand.
+  const catalogRange: StoredRange | null = brand
+    ? { filename: `${org?.name ?? brand} products in the Willow catalog`, at: '', source: 'catalog', from: null, rows: catalog.filter((p) => p.brand === brand).map((p, i) => ({ line: i + 2, gtin: '', productId: p.product_id, brand: p.brand, name: p.product, category: p.category_label, price: '', facings: '', match: p.product_id, status: statusOf(p) })) }
     : null
-  const current = brandRange ?? range
+  const byId = new Map(catalog.map((p) => [p.product_id, p]))
+  const lens = brand && range && !lockedBrand ? { ...range, rows: range.rows.filter((r) => (r.match ? byId.get(r.match)?.brand : r.brand) === brand) } : null
+  const current = lockedBrand ? (range ?? catalogRange) : (lens ?? (brand ? catalogRange : range))
   return <Body catalog={catalog} current={current} brand={brand} canUpload={!brand} />
 }
 
@@ -86,9 +90,9 @@ function Body({ catalog, current, brand, canUpload }: { catalog: ProductRow[]; c
     try {
       const items = readItemFile(await f.text())
       const matched = matchRows(items, catalog)
-      save({ filename: f.name, at: new Date().toISOString(), source: 'file', rows: matched })
+      const where = await save({ filename: f.name, at: new Date().toISOString(), source: 'file', rows: matched })
       const c = coverage(matched)
-      toast(`Range connected · ${c.matched} matched${c.unrecognised ? `, ${c.unrecognised} not recognised` : ''}`)
+      toast(`Range connected · ${c.matched} matched${c.unrecognised ? `, ${c.unrecognised} not recognised` : ''}`, { description: where === 'server' ? `Saved to ${org?.name ?? 'your organisation'}: your team sees the same range.` : 'Saved in this browser only: the range service didn’t answer. Upload again to share it.' })
       // Facings in the file feed the Shelf check (the existing stock upload).
       const stock = stockCsv(matched)
       if (stock) {
@@ -108,9 +112,18 @@ function Body({ catalog, current, brand, canUpload }: { catalog: ProductRow[]; c
     }
   }
 
-  const useCatalog = () => {
-    save({ filename: 'The whole Willow catalog', at: new Date().toISOString(), source: 'catalog', rows: catalog.map((p, i) => ({ line: i + 2, gtin: '', productId: p.product_id, brand: p.brand, name: p.product, category: p.category_label, price: '', facings: '', match: p.product_id, status: statusOf(p) })) })
+  const connectWholeCatalog = async () => {
+    await save({ filename: 'The whole Willow catalog', at: new Date().toISOString(), source: 'catalog', rows: catalog.map((p, i) => ({ line: i + 2, gtin: '', productId: p.product_id, brand: p.brand, name: p.product, category: p.category_label, price: '', facings: '', match: p.product_id, status: statusOf(p) })) })
     toast(`Range set to the whole catalog · ${catalog.length} products`)
+  }
+
+  const clearRange = async () => {
+    try {
+      await clear()
+      toast('Range disconnected')
+    } catch (e) {
+      toast.error(proofError(e, 'disconnect the range'))
+    }
   }
 
   const unrec = rows.filter((r) => r.status === 'unrecognised' && r.brand && r.name)
@@ -196,11 +209,11 @@ function Body({ catalog, current, brand, canUpload }: { catalog: ProductRow[]; c
           <Button onClick={download}>
             <Download size={15} strokeWidth={1.7} aria-hidden /> Download template
           </Button>
-          <Button kind="ghost" onClick={useCatalog} disabled={!allowed}>
+          <Button kind="ghost" onClick={() => void connectWholeCatalog()} disabled={!allowed}>
             Use the whole catalog
           </Button>
         </div>
-        <p className="m-0 text-proof-small text-ink-2">In production the range arrives by feed (GS1, Shopify or a nightly file drop); the upload is the same step by hand. The file stays in this browser until the range api lands.</p>
+        <p className="m-0 text-proof-small text-ink-2">In production the range arrives by feed (GS1, Shopify or a nightly file drop); the upload is the same step by hand. The matched rows are saved to your organisation, so the team and your brands see the same range; brands see only their own rows.</p>
         <input ref={file} type="file" accept=".csv,text/csv" className="sr-only" aria-label="Upload an item file (CSV)" onChange={(e) => void onFile(e.target.files?.[0])} />
       </div>
     )
@@ -236,9 +249,10 @@ function Body({ catalog, current, brand, canUpload }: { catalog: ProductRow[]; c
           <span className="flex items-center gap-1.5 text-ink">
             <FileSpreadsheet size={14} strokeWidth={1.7} aria-hidden className="text-ink-2" /> <span className="truncate">{current.filename}</span>
           </span>
-          <span>{current.at ? `Connected ${new Date(current.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · ${int(rows.length)} rows` : `${int(rows.length)} products, confirmed by the brand`}</span>
-          {canUpload && current.source === 'file' ? (
-            <button type="button" onClick={clear} className="hit44 inline-flex items-center gap-1 self-start border-0 bg-transparent p-0 text-proof-small text-ink-2 hover:text-ink">
+          <span>{current.at ? `Connected ${new Date(current.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · ${int(rows.length)} rows` : `${int(rows.length)} products`}</span>
+          <span>{current.from ? `From ${current.from}’s item file, your rows only` : current.where === 'browser' ? 'In this browser only: the range service didn’t answer' : current.where === 'server' ? `Shared with ${org?.name ?? 'your organisation'}` : brand ? 'The retailer hasn’t connected an item file yet' : null}</span>
+          {canUpload && current.source === 'file' && allowed ? (
+            <button type="button" onClick={() => void clearRange()} className="hit44 inline-flex items-center gap-1 self-start border-0 bg-transparent p-0 text-proof-small text-ink-2 hover:text-ink">
               <Trash2 size={13} strokeWidth={1.7} aria-hidden /> Disconnect
             </button>
           ) : null}

@@ -1,16 +1,29 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
+import { setQueryData, useQuery } from '../../lib/query'
+import { useAuth } from '../../lib/useAuth'
 import { useOrgMaybe } from './org'
+import { proofApi, type RangeRowApi, type RangeView } from './proofApi'
 import type { MatchedRow } from './range'
 
 /*
- * The connected range of the organisation you are in. The Proof contracts have no range endpoint yet, so the
- * matched item file is kept in this browser per instance and organisation (research/finals/build-notes/D.md
- * "Gaps"). A brand organisation's range is its own catalog products (it arrives from the retailer's item file,
- * filtered to the brand), so it needs no upload.
+ * The connected range of the organisation you are in, kept on the api per organisation
+ * (GET/PUT/DELETE /v1/proof/orgs/{org}/range): a colleague on another laptop sees the same range. A brand
+ * organisation reads the retailer's item file filtered to its own products (`from` names the retailer); it
+ * cannot upload one. This browser keeps a copy only as a fallback: when the range endpoint fails (or in the
+ * legacy mode with no organisations), the last range saved here is used and labelled as such.
  */
 
-export type StoredRange = { filename: string; at: string; source: 'file' | 'catalog'; rows: MatchedRow[] }
+export type StoredRange = {
+  filename: string
+  at: string
+  source: 'file' | 'catalog'
+  rows: MatchedRow[]
+  /** Whose item file it is, when it is another organisation's (a brand reading the retailer's). */
+  from?: string | null
+  /** Where this copy lives: on the organisation (server) or only in this browser. */
+  where?: 'server' | 'browser'
+}
 
 const listeners = new Set<() => void>()
 const cache = new Map<string, StoredRange | null>()
@@ -39,15 +52,78 @@ function write(key: string, v: StoredRange | null) {
   listeners.forEach((l) => l())
 }
 
-export function useRange(): { range: StoredRange | null; save: (r: StoredRange) => void; clear: () => void; key: string } {
+export const toApiRows = (rows: MatchedRow[]): RangeRowApi[] =>
+  rows.map((r) => ({ line: r.line, gtin: r.gtin, product_id: r.productId, brand: r.brand, name: r.name, category: r.category, price: r.price, facings: r.facings, match: r.match, status: r.status }))
+
+/** The api's range as the screens read it (null when the organisation has none). */
+export function fromApi(v: RangeView | undefined): StoredRange | null {
+  if (!v?.range) return null
+  const r = v.range
+  return {
+    filename: r.filename,
+    at: r.uploaded_at ?? '',
+    source: r.source,
+    from: v.from?.name ?? null,
+    where: 'server',
+    rows: r.rows.map((x) => ({ line: x.line, gtin: x.gtin, productId: x.product_id, brand: x.brand, name: x.name, category: x.category, price: x.price, facings: x.facings, match: x.match, status: x.status })),
+  }
+}
+
+export type RangeHandle = {
+  range: StoredRange | null
+  /** The organisation's range is still loading (screens wait rather than flash "no range"). */
+  loading: boolean
+  /** Save to the organisation; 'browser' when the api refused or failed and only this browser has it. */
+  save: (r: StoredRange) => Promise<'server' | 'browser'>
+  clear: () => Promise<void>
+  key: string
+}
+
+export function useRange(): RangeHandle {
   const org = useOrgMaybe()
-  const key = `willow.proof.range.${org?.instance?.id ?? 'local'}.${org?.org?.id ?? 'retailer'}`
+  const orgId = org?.org?.id ?? null
+  const { getIdToken } = useAuth()
+  const key = `willow.proof.range.${org?.instance?.id ?? 'local'}.${orgId ?? 'retailer'}`
   const subscribe = useCallback((l: () => void) => {
     listeners.add(l)
     return () => listeners.delete(l)
   }, [])
-  const range = useSyncExternalStore(subscribe, () => read(key))
-  return useMemo(() => ({ range, save: (r: StoredRange) => write(key, r), clear: () => write(key, null), key }), [range, key])
+  const local = useSyncExternalStore(subscribe, () => read(key))
+  const q = useQuery<RangeView>(['proof-range', orgId], (t) => proofApi.range(t, orgId!), { enabled: Boolean(orgId), staleMs: 60_000 })
+  const failed = q.status === 'error' && q.data === undefined
+  const server = useMemo(() => fromApi(q.data), [q.data])
+  const browser = useMemo(() => (local ? { ...local, where: 'browser' as const } : null), [local])
+  const range = !orgId || failed ? browser : server
+  const loading = Boolean(orgId) && !failed && q.data === undefined
+  return useMemo(
+    () => ({
+      range,
+      loading,
+      key,
+      save: async (r: StoredRange) => {
+        if (!orgId) {
+          write(key, r)
+          return 'browser' as const
+        }
+        try {
+          const v = await proofApi.putRange(await getIdToken(), orgId, { filename: r.filename, source: r.source, rows: toApiRows(r.rows) })
+          setQueryData<RangeView>(['proof-range', orgId], v)
+          write(key, null)
+          return 'server' as const
+        } catch {
+          write(key, r)
+          return 'browser' as const
+        }
+      },
+      clear: async () => {
+        write(key, null)
+        if (!orgId) return
+        await proofApi.deleteRange(await getIdToken(), orgId)
+        setQueryData<RangeView>(['proof-range', orgId], { range: null, from: null })
+      },
+    }),
+    [range, loading, key, orgId, getIdToken],
+  )
 }
 
 /** The product ids in the connected range (matched rows only); null when no range is connected. */

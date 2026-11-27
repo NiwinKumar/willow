@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
 
 import { CHECK_WORDS, LABELS_NOTE, REGULATORY_WORDS, type CheckStatus, type ProductCheck } from '../../lib/safety'
+import { Link } from 'react-router-dom'
 
 /** Status colours from the routine-check state tokens; the meaning is always in the glyph and the words too. */
 const LOOK: Record<CheckStatus, { fg: string; bg: string }> = {
@@ -169,10 +170,14 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
                       <p className="m-0 mt-1 text-[12.5px] text-ink-2">{f.detail}</p>
                       {f.source ? (
                         <p className="m-0 mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-2">
-                          <a href={f.source.url} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-2">
-                            {f.source.label}
-                            <span aria-hidden> ↗</span>
-                          </a>
+                          {f.source.url ? (
+                            <a href={f.source.url} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-2">
+                              {f.source.label}
+                              <span aria-hidden> ↗</span>
+                            </a>
+                          ) : (
+                            <span className="text-ink">{f.source.label}</span>
+                          )}
                           {f.grade ? <span className="rounded-pill bg-white px-1.5 py-0.5 font-mono text-[10px]">Evidence grade {f.grade}</span> : null}
                         </p>
                       ) : null}
@@ -191,7 +196,12 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
                 </p>
               ) : null}
               {profileComplete === false ? <p className="m-0 mt-1.5 text-[12px] text-ink-2">Checked against part of your profile. Answer the questions in Build a routine for a full check.</p> : null}
-              <p className="m-0 mt-2.5 border-t border-line pt-2 text-[11.5px] text-ink-2">{LABELS_NOTE} Checked by fixed rules from published sources, not by AI.</p>
+              <p className="m-0 mt-2.5 border-t border-line pt-2 text-[11.5px] text-ink-2">
+                {LABELS_NOTE} Checked by fixed rules from published sources, not by AI.{' '}
+                <Link to="/checks" className="text-ink underline underline-offset-2">
+                  How we check
+                </Link>
+              </p>
             </div>
       ) : null}
     </>

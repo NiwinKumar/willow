@@ -12,10 +12,14 @@ import { useAuth } from '../../lib/useAuth'
 import { fetchInsights, RetailDataProvider, useRetailData } from './context'
 import { totalUsers } from './data'
 import { useDataTo } from './freshness'
+import { buildMask, maskText } from './masking'
 import { InstanceName, OrgProvider, useOrg } from './org'
+import { useCompetitorNames } from './orgData'
+import { useProducts } from './productData'
 import { ROLE_LABEL, verifiedText } from './proofApi'
 import { ADVANCED, COHORTS, LEGACY_PATHS, RANGES, SECTIONS, sectionPath, useRetailState } from './state'
 import type { Insights, Range } from './types'
+import { setExportFilter } from './ui/format'
 import { cohortKind, Combobox, int, Menu, MenuDivider, MenuItem, MenuLabel, Segmented, SidePanel, SkeletonHeader, SkeletonKpis, SkeletonTable, useTooltip } from './ui'
 
 /*
@@ -28,6 +32,7 @@ import { cohortKind, Combobox, int, Menu, MenuDivider, MenuItem, MenuLabel, Segm
 const Home = lazy(() => import('./sections/Home'))
 const Overview = lazy(() => import('./sections/Overview'))
 const Range = lazy(() => import('./sections/Range'))
+const Digest = lazy(() => import('./sections/Digest'))
 const Research = lazy(() => import('./sections/Research'))
 const Settings = lazy(() => import('./sections/Settings'))
 const Products = lazy(() => import('./sections/Products'))
@@ -103,13 +108,36 @@ type Section = (typeof SECTIONS)[number]
 function sectionOf(pathname: string): { nav: Section; page: Section } {
   const seg = pathname.replace(/^\/retail\/?/, '').split('/')[0]
   const adv = ADVANCED.find((a) => a.path === seg)
-  const navId = seg === 'compare' || seg === 'range' ? 'products' : LEGACY_PATHS[seg as keyof typeof LEGACY_PATHS]?.section
+  const navId = seg === 'compare' || seg === 'range' ? 'products' : seg === 'digest' ? 'home' : LEGACY_PATHS[seg as keyof typeof LEGACY_PATHS]?.section
   const nav = SECTIONS.find((s) => (navId ? s.id === navId : s.path === seg)) ?? SECTIONS[0]
+  if (seg === 'digest') return { nav, page: { ...nav, id: 'digest', label: 'Weekly digest', decision: '' } }
   if (seg === 'range') return { nav, page: { ...nav, id: 'range', label: 'Range', decision: 'Connect your range once: Proof matches your item file to the measured catalog and says what is measured, collecting or new.' } }
   return { nav, page: adv && seg !== 'compare' ? adv : seg === 'compare' ? (ADVANCED.find((a) => a.id === 'compare') ?? nav) : nav }
 }
 
+/**
+ * While a brand organisation sees competitors anonymised, every file that leaves Proof (CSV, evidence pack,
+ * brief, copied text) is filtered through the same names the screens use (masking.ts), so no export path can
+ * carry another brand's name. Built from the brand list at once and from the catalog once it loads.
+ */
+function useExportMask() {
+  const names = useCompetitorNames()
+  const { filters, brands } = useRetailData()
+  const { state } = useProducts(filters)
+  const rows = state.status === 'ready' ? state.d.products : null
+  const brandNames = brands.map((b) => b.brand).join('|')
+  useEffect(() => {
+    if (!names.anonymise) return setExportFilter(null)
+    const brandList = brandNames ? brandNames.split('|') : []
+    const list = rows ? rows.map((r) => ({ brand: r.brand, product: r.product })) : brandList.map((b) => ({ brand: b, product: '' }))
+    const m = buildMask(list, names.own, brandList)
+    setExportFilter((t) => maskText(t, m))
+    return () => setExportFilter(null)
+  }, [names.anonymise, names.own, rows, brandNames])
+}
+
 function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
+  useExportMask()
   const { pathname } = useLocation()
   const { page } = sectionOf(pathname)
   const { param, setParam } = useRetailState()
@@ -174,6 +202,7 @@ function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) =
                   <Route index element={<Home />} />
                   <Route path="board" element={<Overview />} />
                   <Route path="range" element={<Range />} />
+                  <Route path="digest" element={<Digest />} />
                   <Route path="research" element={<Research />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="products" element={<Products />} />
@@ -193,7 +222,7 @@ function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) =
       </main>
 
       <SidePanel open={askOpen} onClose={() => setParam({ ask: null })} title="Ask" subtitle={`Answers from the same data as the screen · ${RANGES.find((r) => r.value === filters.range)?.label} · ${COHORTS.find((c) => c.value === filters.cohort)?.label}`} width={480} labelledBy="proof-ask-title">
-        <AskAggregates d={d} filters={filters} scope={`${org?.id ?? ''}|${workspace.kind === 'brand' ? workspace.slug : 'retailer'}`} />
+        <AskAggregates d={d} filters={filters} scope={`${org?.id ?? ''}|${workspace.kind === 'brand' ? workspace.slug : 'retailer'}`} focusBrand={workspace.kind === 'brand' ? (workspace.brand ?? null) : null} />
       </SidePanel>
     </>
   )

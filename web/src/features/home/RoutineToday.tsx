@@ -182,25 +182,21 @@ function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry:
   )
 }
 
-/** No products yet (or demo): the design's "Add your routine" card. */
-export function RoutineEmpty({ demo, onRoutine, className }: { demo?: boolean; onRoutine: () => void; className?: string }) {
+/** No products yet: the design's "Add your routine" card. */
+export function RoutineEmpty({ onRoutine, className }: { onRoutine: () => void; className?: string }) {
   const navigate = useNavigate()
   return (
     <HomeCard label="Routine" className={`flex-row flex-wrap items-center justify-between gap-3 ${className ?? ''}`} delay={160}>
       <div className="flex max-w-[380px] flex-col gap-1">
-        <h2 className="m-0 text-h3 font-normal">{demo ? 'Routine' : 'Add your routine'}</h2>
-        <span className="text-[13px] leading-[1.45] text-ink-2">
-          {demo ? 'The demo journey has no routine to tick. Routines, ticks and the routine check are available in your own account.' : 'Add what you use, or let Willow build a three-step routine around your skin and budget, every product checked for you.'}
-        </span>
+        <h2 className="m-0 text-h3 font-normal">Add your routine</h2>
+        <span className="text-[13px] leading-[1.45] text-ink-2">Add what you use, or let Willow build a three-step routine around your skin and budget, every product checked for you.</span>
       </div>
-      {demo ? null : (
-        <span className="flex flex-wrap gap-2">
-          <Pill onClick={() => navigate('/plan')}>Build me a routine</Pill>
-          <button type="button" onClick={onRoutine} className="min-h-11 rounded-pill px-3 text-[14px] text-ink-2 underline underline-offset-4 transition-colors hover:text-ink">
-            Add a product
-          </button>
-        </span>
-      )}
+      <span className="flex flex-wrap gap-2">
+        <Pill onClick={() => navigate('/plan')}>Build me a routine</Pill>
+        <button type="button" onClick={onRoutine} className="min-h-11 rounded-pill px-3 text-[14px] text-ink-2 underline underline-offset-4 transition-colors hover:text-ink">
+          Add a product
+        </button>
+      </span>
     </HomeCard>
   )
 }

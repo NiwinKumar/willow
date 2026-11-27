@@ -119,6 +119,7 @@ export function useRetailState() {
 export function sectionPath(id: SectionId | keyof typeof LEGACY_PATHS | 'overview', sub?: string): string {
   if (id === 'overview') id = 'home'
   if (id === 'range') return `/retail/range${sub ? `/${encodeURIComponent(sub)}` : ''}`
+  if (id === 'digest') return '/retail/digest'
   const s = [...SECTIONS, ...ADVANCED].find((x) => x.id === id)
   const path = s ? s.path : id
   return `/retail${path ? `/${path}` : ''}${sub ? `/${encodeURIComponent(sub)}` : ''}`
@@ -127,5 +128,6 @@ export function sectionPath(id: SectionId | keyof typeof LEGACY_PATHS | 'overvie
 /** The one line a section's header carries: the decision the page supports and what the viewer gains. */
 export function purposeOf(id: SectionId): string {
   if (id === 'range') return 'Connect your range once: your item file is matched to the measured catalog, so every view knows what you sell and what is measured.'
+  if (id === 'digest') return 'Reach the team outside Proof: one email a week with what needs a decision and what came back.'
   return [...SECTIONS, ...ADVANCED].find((s) => s.id === id)?.decision ?? ''
 }

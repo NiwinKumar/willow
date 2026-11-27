@@ -1,30 +1,25 @@
-import { ArrowRight, BellOff, Check, CheckCircle2, CircleDashed, Clock, Download, History, Inbox, Megaphone, MoreHorizontal, Send, Sparkles, TrendingUp, TriangleAlert, Users, X, type LucideIcon } from 'lucide-react'
+import { ArrowRight, ArrowRightLeft, BellOff, Check, CheckCircle2, CircleDashed, Clock, Download, History, Inbox, Layers, Mail, Megaphone, MoreHorizontal, Send, Sparkles, TrendingUp, TriangleAlert, Users, X, type LucideIcon } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { api, retailerShelf, type Campaign } from '../../../lib/api'
-import { setQueryData, useQuery } from '../../../lib/query'
+import { api, type Campaign } from '../../../lib/api'
+import { setQueryData } from '../../../lib/query'
 import { useAuth } from '../../../lib/useAuth'
-import { openProposals } from '../autopilot'
-import { useRetailData } from '../context'
-import { composeCards, DISMISS_REASONS, kindOfKey, laneOf, STATUS_WORD, TYPE_LABEL, type CardAction, type CardKind, type DecisionCard } from '../decisions'
+import { DISMISS_REASONS, kindOfKey, laneOf, STATUS_WORD, TYPE_LABEL, type CardAction, type CardKind, type DecisionCard } from '../decisions'
+import { useHomeCards } from '../homeData'
 import { useOrg } from '../org'
-import { useDecide, useDecisions, useRequests, useSavedClaims, setRequests, withTransition } from '../orgData'
-import { useCampaigns } from '../pipeline'
+import { useDecide, setRequests, withTransition } from '../orgData'
 import { ProductImage } from '../../routine/productUi'
-import { useProducts } from '../productData'
-import { canAct, proofApi, proofError, ROLE_LABEL, type DecisionLogEntry, type EvidenceRequest } from '../proofApi'
+import { canAct, isNotMember, proofApi, proofError, ROLE_LABEL, type DecisionLogEntry, type EvidenceRequest } from '../proofApi'
 import { coverage, statusOf } from '../range'
-import { rangeIds, useOnceFlag, useRange } from '../rangeStore'
-import { purposeOf, sectionPath, useRetailState } from '../state'
+import { rangeIds, useOnceFlag } from '../rangeStore'
+import { sectionPath, useRetailState } from '../state'
 import type { Insights, ProductRow } from '../types'
 import { Badge, Bone, Button, downloadText, EmptyState, int, KpiStrip, Menu, MenuItem, MenuLabel, PageHeader, Panel, SidePanel, SkeletonPanel, Tabs, useTooltip } from '../ui'
-import { useAutopilot } from './promote/useAutopilot'
 import { Spotlight } from './Overview'
 import { spotlightOf } from '../productModel'
 import { InsightsGate } from './shared'
-import { useSegments } from '../useView'
 import { agoText } from '../autopilot'
 
 /*
@@ -66,6 +61,10 @@ const KIND_ICON: Record<CardKind, { icon: LucideIcon; tone: string }> = {
   proven_not_promoted: { icon: Megaphone, tone: 'bg-proof-leaf-soft text-proof-leaf' },
   nearly_proven: { icon: CircleDashed, tone: 'bg-pf-amber-soft text-pf-amber' },
   claim_ready: { icon: CheckCircle2, tone: 'bg-proof-leaf-soft text-proof-leaf' },
+  evidence_slipped: { icon: TriangleAlert, tone: 'bg-pf-red-soft text-pf-red' },
+  expectation_gap: { icon: Clock, tone: 'bg-sunken text-ink' },
+  losing_switchers: { icon: ArrowRightLeft, tone: 'bg-pf-amber-soft text-pf-amber' },
+  routine_clash: { icon: Layers, tone: 'bg-sunken text-ink' },
   over_shelved: { icon: TriangleAlert, tone: 'bg-pf-amber-soft text-pf-amber' },
   under_shelved: { icon: TrendingUp, tone: 'bg-proof-leaf-soft text-proof-leaf' },
   unmet_group: { icon: Users, tone: 'bg-sunken text-ink' },
@@ -78,45 +77,11 @@ const KIND_ICON: Record<CardKind, { icon: LucideIcon; tone: string }> = {
 const vt = (key: string) => ({ viewTransitionName: `dc-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}` }) as React.CSSProperties
 
 function Body({ d }: { d: Insights }) {
-  const { filters, workspace } = useRetailData()
   const { carry, param, setParam } = useRetailState()
   const { org, role, orgs, instance } = useOrg()
-  const { user } = useAuth()
-  const uid = user?.uid ?? null
-  const brand = workspace.kind === 'brand' ? workspace.brand : null
-  const mix: 'retailer' | 'brand' = org ? org.kind : workspace.kind
-  const { state: prodState } = useProducts(filters)
-  const rows = useMemo(() => (prodState.status === 'ready' ? prodState.d.products : []), [prodState])
-  const campaigns = useCampaigns()
-  const shelf = useQuery(['shelf-home', uid, filters.cohort, filters.range], (t) => retailerShelf(t, filters), { enabled: Boolean(uid) && mix === 'retailer', staleMs: 5 * 60_000 })
-  const segments = useSegments()
-  const claims = useSavedClaims()
-  const auto = useAutopilot(uid)
-  const decisions = useDecisions()
-  const requests = useRequests()
+  const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards } = useHomeCards(d)
   const decide = useDecide()
-  const { range } = useRange()
   const [showAll, setShowAll] = useState(false)
-
-  const brandOrgs = useMemo(() => new Set(orgs.filter((o) => o.kind === 'brand').flatMap((o) => o.brands)), [orgs])
-  const cards = useMemo(() => {
-    if (!rows.length) return []
-    const shelfProducts = shelf.data ? shelf.data.categories.flatMap((c) => c.products.map((p) => ({ ...p, category_label: c.label }))) : null
-    return composeCards({
-      mix,
-      brand,
-      rows,
-      campaigns,
-      shelf: shelfProducts ? { products: shelfProducts, flags: shelf.data?.flags ?? [] } : null,
-      segments: segments.status === 'ready' ? segments.data : null,
-      demand: d.needs_by_month ?? null,
-      claimed: new Set((claims.data ?? []).map((c) => c.product_id)),
-      proposals: openProposals(auto.data?.activity ?? []),
-      brandOrgs,
-      weeks: d.cohort.weeks,
-      carry,
-    })
-  }, [rows, mix, brand, campaigns, shelf.data, segments, d, claims.data, auto.data, brandOrgs, carry])
 
   const items = decisions.data?.items ?? {}
   const decide_ = cards.filter((c) => c.lane === 'decide' && laneOf(items[c.key]) === 'decide')
@@ -162,12 +127,17 @@ function Body({ d }: { d: Insights }) {
       <PageHeader
         title={org ? org.name : brand ?? 'Home'}
         description={header}
-        purpose={purposeOf('home')}
+        purpose={mix === 'brand' ? 'Prove what works, claim it in words a retailer accepts, and promote it with a measured lift. Each card is one decision with its evidence and one action.' : 'Decide what to stock, what to question and what to promote. Each card is one decision with its evidence and one action.'}
         actions={
           org ? (
-            <Button onClick={() => setParam({ log: '1' }, { push: true })}>
-              <History size={15} strokeWidth={1.6} aria-hidden /> Decision log
-            </Button>
+            <>
+              <Button to={`${sectionPath('digest')}${carry}`}>
+                <Mail size={15} strokeWidth={1.6} aria-hidden /> Weekly digest
+              </Button>
+              <Button onClick={() => setParam({ log: '1' }, { push: true })}>
+                <History size={15} strokeWidth={1.6} aria-hidden /> Decision log
+              </Button>
+            </>
           ) : null
         }
       />
@@ -175,7 +145,7 @@ function Body({ d }: { d: Insights }) {
       <KpiStrip
         label="Your range at a glance"
         items={[
-          { id: 'range', label: brand ? `${brand} products` : ids ? 'Products in your range' : 'Products in the catalog', value: int(cov.total), note: <Link to={`${sectionPath('range')}${carry}`} className="text-ink-2 no-underline hover:text-ink">{ids ? `from ${range?.filename}` : brand ? 'in the retailer’s range →' : 'Connect your range →'}</Link> },
+          { id: 'range', label: ids ? (range?.from ? `In ${range.from}’s range` : 'Products in your range') : brand ? `${brand} products` : 'Products in the catalog', value: int(cov.total), note: <Link to={`${sectionPath('range')}${carry}`} className="text-ink-2 no-underline hover:text-ink">{ids ? `from ${range?.filename}` : brand ? 'in the retailer’s range →' : 'Connect your range →'}</Link> },
           { id: 'measured', label: 'Measured', value: int(cov.measured), note: `${int(cov.collecting)} collecting · ${int(cov.no_users)} no users yet` },
           { id: 'proven', label: 'Proven', value: int(proven), note: cov.measured ? `of ${int(cov.measured)} measured` : 'none measured yet' },
           { id: 'campaigns', label: 'Campaigns running', value: int(running), note: `${ownCampaigns.filter((c) => c.stats.incrementality).length} with a measured lift` },
@@ -375,6 +345,7 @@ function CardMenu({ onDecide }: { onDecide: (status: 'dismissed' | 'snoozed', re
 
 function ActionButton({ a, c, primary = false, canDecide, onAccept, result }: { a: CardAction; c: DecisionCard; primary?: boolean; canDecide: boolean; onAccept: () => void; result: boolean }) {
   const navigate = useNavigate()
+  const { carry } = useRetailState()
   const { org, orgs } = useOrg()
   const { getIdToken } = useAuth()
   const { user } = useAuth()
@@ -426,7 +397,8 @@ function ActionButton({ a, c, primary = false, canDecide, onAccept, result }: { 
           toast(v.campaign_id ? 'Approved · the campaign has started' : (v.outcome ?? 'Approved'))
         } else toast('Declined')
       } catch (e) {
-        toast.error(proofError(e, a.act === 'approve' ? 'approve the proposal' : 'decline the proposal'))
+        if (isNotMember(e)) toast.error('AutoCampaign needs an analyst or admin', { description: 'Approving starts a campaign, so it needs a role that can act for an organisation.', action: { label: 'Choose how to explore', onClick: () => navigate(`/retail${carry}${carry ? '&' : '?'}choose=1`) } })
+        else toast.error(proofError(e, a.act === 'approve' ? 'approve the proposal' : 'decline the proposal'))
       } finally {
         setBusy(false)
       }

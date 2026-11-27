@@ -11,15 +11,28 @@ another organisation's decisions, requests or claims.
 import hashlib
 import re
 import secrets
+import time
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import catalog, proof_ai, proof_orgs, proof_research, retail_intel, retailer
+from app import (
+    catalog,
+    limits,
+    proof_ai,
+    proof_orgs,
+    proof_research,
+    retail_intel,
+    retailer,
+    retailer_ask,
+    safety,
+)
 from app.auth import AuthUser, current_user
 from app.proof_orgs import Member, member_of
+from app.routes import retailer_routes
 from app.store import Doc, Store, get_store, iso
 
 router = APIRouter(prefix="/v1", tags=["proof"])
@@ -598,6 +611,282 @@ def export_claim(
             409, {"code": "not_approved", "message": "Approve the claim before exporting it."}
         )
     return {"claim": _claim_view(cid, doc), "exported_at": iso(_now())}
+
+
+# -- the connected range (item file) ------------------------------------------------------------
+#
+# A retailer connects its range once (research/finals/06 section 6.3): the web reads the item file
+# (CSV), matches each row to the catalog and PUTs the rows with their match. The server keeps them
+# per organisation and checks every match is a catalog product. A brand's range arrives from the
+# retailer's item file, filtered to its own brands; a brand cannot write one.
+
+RangeStatus = Literal["measured", "collecting", "no_users", "not_measured", "unrecognised"]
+MAX_RANGE_ROWS = 500
+
+
+class RangeRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    line: int = Field(ge=1, le=100_000)
+    gtin: str = Field(default="", max_length=32)
+    product_id: str = Field(default="", max_length=120)  # as written in the file
+    brand: str = Field(default="", max_length=120)
+    name: str = Field(default="", max_length=300)
+    category: str = Field(default="", max_length=80)
+    price: str = Field(default="", max_length=32)
+    facings: str = Field(default="", max_length=32)
+    match: str | None = Field(default=None, max_length=120)  # the catalog product it matched
+    status: RangeStatus
+
+
+class RangeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    filename: str = Field(min_length=1, max_length=200)
+    source: Literal["file", "catalog"] = "file"
+    rows: list[RangeRow] = Field(min_length=1, max_length=MAX_RANGE_ROWS)
+
+
+def _range_view(doc: Doc, rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    return {
+        "filename": doc["filename"],
+        "source": doc.get("source", "file"),
+        "rows": doc["rows"] if rows is None else rows,
+        "uploaded_at": iso(doc.get("uploaded_at")),
+        "by_role": doc.get("by_role"),
+    }
+
+
+def _brand_rows(org: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The retailer's rows that are this brand's: matched to one of its products, or (unmatched)
+    written with its brand name."""
+    own = {b.lower() for b in org["brands"]}
+
+    def mine(r: dict[str, Any]) -> bool:
+        p = catalog.by_id(r["match"]) if r.get("match") else None
+        return (p["brand"].lower() if p else (r.get("brand") or "").strip().lower()) in own
+
+    return [r for r in rows if mine(r)]
+
+
+@router.get("/proof/orgs/{org}/range")
+def get_range(
+    m: Member = Depends(member_of("viewer")), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """The org's connected range (null when none). A brand reads the retailer's item file,
+    filtered to its own products; `from` names whose file it is."""
+    if m.org["kind"] == "retailer":
+        doc = store.proof_range_get(m.org_id)
+        return {"range": _range_view(doc) if doc else None, "from": None}
+    ret = proof_orgs.retailer_of(m.instance)
+    doc = store.proof_range_get(ret["id"]) if ret else None
+    if not doc or not ret:
+        return {"range": None, "from": None}
+    return {
+        "range": _range_view(doc, _brand_rows(m.org, doc["rows"])),
+        "from": {"org_id": ret["id"], "name": ret["name"]},
+    }
+
+
+@router.put("/proof/orgs/{org}/range")
+def put_range(
+    body: RangeIn, m: Member = Depends(member_of("analyst")), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """Connect or replace the range (analyst or higher, retailer org). A match that is not a
+    catalog product is dropped (the row becomes "unrecognised")."""
+    if m.org["kind"] != "retailer":
+        raise proof_orgs.forbidden(
+            "The range is the retailer's item file; it reaches brands filtered to their products."
+        )
+    rows = []
+    for r in body.rows:
+        row = r.model_dump()
+        if row["match"] and catalog.by_id(row["match"]) is None:
+            row["match"] = None
+        if row["match"] is None:
+            row["status"] = "unrecognised"
+        elif row["status"] == "unrecognised":
+            row["status"] = "collecting"  # matched: the web re-reads the live status anyway
+        rows.append(row)
+    doc = {
+        "filename": body.filename.strip(),
+        "source": body.source,
+        "rows": rows,
+        "uploaded_at": _now(),
+        "by_role": m.role,
+        "demo": m.demo,
+    }
+    store.proof_range_set(m.org_id, doc)
+    return {"range": _range_view(doc), "from": None}
+
+
+@router.delete("/proof/orgs/{org}/range", status_code=204)
+def delete_range(
+    m: Member = Depends(member_of("analyst")), store: Store = Depends(get_store)
+) -> Response:
+    if m.org["kind"] != "retailer":
+        raise proof_orgs.forbidden("The range is the retailer's item file.")
+    store.proof_range_delete(m.org_id)
+    return Response(status_code=204)
+
+
+# -- Ask, scoped to the organisation --------------------------------------------------------------
+#
+# The same checked Ask as POST /v1/retailer/ask (app/retailer_ask.py), told whose question it is.
+# A brand organisation asks about its own brand; unless the retailer's policy names competitors,
+# Gemini sees other brands only as "Brand A"... and an answer naming one is rejected. The retailer
+# may focus on a brand (`brand`, its "Viewing" lens) and always sees names.
+
+
+class OrgAskIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=3, max_length=300)
+    cohort: retailer.Cohort = "mixed"
+    range: retailer.Range = "all"
+    brand: str | None = Field(default=None, max_length=120)  # retailer only: the brand in focus
+
+
+ASK_TTL_S = 3600
+_answers: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+
+
+@router.post("/proof/orgs/{org}/ask")
+def org_ask(
+    body: OrgAskIn, m: Member = Depends(member_of("viewer")), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    if m.org["kind"] == "brand":
+        brand = m.org["brands"][0] if m.org["brands"] else None
+        hide = not _policy(store, m.instance)["competitor_names"]
+    else:
+        brand = retail_intel.find_brand(body.brand) if body.brand else None
+        hide = False
+    scope = retailer_ask.scope_for(brand, hide)
+    question = " ".join(body.question.lower().split())
+    key = (question, body.cohort, body.range, brand, hide, retailer_routes._data_version())
+    hit = _answers.get(key)
+    if hit and time.time() - hit[0] < ASK_TTL_S:
+        return hit[1]
+    limits.take(store, m.uid, "retailer_ask")
+    try:
+        data = retailer_routes._ask_inputs(body.cohort, body.range)
+    except Exception as exc:
+        limits.refund(store, m.uid, "retailer_ask")
+        raise HTTPException(503, retailer_routes.UNAVAILABLE) from exc
+    try:
+        answer = retailer_ask.ask(body.question, data, scope)
+    except retailer_ask.Unavailable as exc:
+        limits.refund(store, m.uid, "retailer_ask")
+        raise HTTPException(
+            503,
+            {
+                "code": "assistant_unavailable",
+                "message": "The assistant is unavailable right now. Try again in a minute.",
+            },
+        ) from exc
+    answer = {**answer, "scope": {"brand": brand, "names_hidden": scope.masked}}
+    if not answer.get("refused"):
+        _answers[key] = (time.time(), answer)
+    return answer
+
+
+# -- fit: what opted-in shoppers avoid and react to ----------------------------------------------
+#
+# Aggregates of the shopper app's safety profiles (users/{uid}.profile.safety: `avoid` ingredient
+# groups, `avoid_products`) and reaction log (users/{uid}.reactions), counted in people, only for
+# people who opted in to aggregate sharing (users/{uid}.consent.aggregate_insights_opt_in, the same
+# flag the BigQuery export reads). Any count under the minimum group is left out. Never a person.
+
+FIT_TTL_S = 600
+_fit_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _fit_counts(store: Store) -> dict[str, Any]:
+    hit = _fit_cache.get("all")
+    if hit and time.time() - hit[0] < FIT_TTL_S:
+        return hit[1]
+    profiled = 0
+    reacting = 0
+    avoid: Counter[str] = Counter()
+    avoided: Counter[str] = Counter()
+    reacted: Counter[str] = Counter()
+    stopped: Counter[str] = Counter()  # people with a reaction that was not mild
+    for _, doc in store.users_list():
+        doc = doc or {}
+        if not (doc.get("consent") or {}).get("aggregate_insights_opt_in"):
+            continue
+        prof = ((doc.get("profile") or {}).get("safety")) or None
+        if prof:
+            profiled += 1
+            avoid.update({a for a in prof.get("avoid") or [] if a in safety.AVOID_LABEL})
+            avoided.update(set(prof.get("avoid_products") or []))
+        rx = doc.get("reactions") or []
+        if rx:
+            reacting += 1
+            reacted.update({r.get("product_id") for r in rx if r.get("product_id")})
+            stopped.update(
+                {
+                    r.get("product_id")
+                    for r in rx
+                    if r.get("product_id") and r.get("level") != "mild"
+                }
+            )
+    out = {
+        "profiled": profiled,
+        "reacting": reacting,
+        "avoid": dict(avoid),
+        "avoided": dict(avoided),
+        "reacted": dict(reacted),
+        "stopped": dict(stopped),
+    }
+    _fit_cache["all"] = (time.time(), out)
+    return out
+
+
+@router.get("/proof/orgs/{org}/fit")
+def fit(
+    m: Member = Depends(member_of("viewer")), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """People who opted in to sharing: which ingredient groups they avoid, and which products they
+    put on their avoid list or reported a reaction to (a brand: its own products only). Every
+    count is people, 10 or more; smaller groups are left out and counted in `hidden`."""
+    c = _fit_counts(store)
+    floor = retailer.MIN_GROUP
+
+    def shown(n: int) -> int | None:
+        return n if n >= floor else None
+
+    groups = [
+        {"id": k, "label": safety.AVOID_LABEL[k], "people": c["avoid"][k]}
+        for k in sorted(c["avoid"], key=lambda k: (-c["avoid"][k], k))
+        if c["avoid"][k] >= floor and c["profiled"] >= floor
+    ]
+    ids = set(c["avoided"]) | set(c["reacted"])
+    products, hidden = [], 0
+    for pid in sorted(ids):
+        p = catalog.by_id(pid)
+        if p is None or not proof_orgs.owns_brand(m.org, p["brand"]):
+            continue
+        row = {
+            "product_id": pid,
+            "product": p["name"],
+            "brand": p["brand"],
+            "avoided": shown(c["avoided"].get(pid, 0)),
+            "reacted": shown(c["reacted"].get(pid, 0)),
+            "stopped": shown(c["stopped"].get(pid, 0)),
+        }
+        if row["avoided"] is None and row["reacted"] is None:
+            hidden += 1
+            continue
+        products.append(row)
+    products.sort(key=lambda r: (-(r["reacted"] or 0), -(r["avoided"] or 0), r["product"]))
+    return {
+        "min_group": floor,
+        "profiled": shown(c["profiled"]),
+        "reacting": shown(c["reacting"]),
+        "avoid": groups,
+        "products": products[:50],
+        "hidden": hidden,
+        "basis": "People who opted in to anonymised sharing; counts of people, groups under "
+        f"{floor} left out. Self-reported in the Willow app.",
+    }
 
 
 # -- methodology ------------------------------------------------------------------------------

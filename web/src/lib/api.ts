@@ -213,6 +213,8 @@ export type ProductRequest = {
   created_at: string | null
   resolved_at: string | null
   seen: boolean
+  /** Plain status line ("We add products by hand within a few days."); older api builds omit it. */
+  status_text?: string
 }
 
 export class ApiError extends Error {

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { useRetailData } from '../../context'
 import { csvMeta, csvName, type Category, type Flow, type Insights } from '../../data'
+import { productAlias } from '../../masking'
+import { useCompetitorNames } from '../../orgData'
 import { fetchBrandList, useProducts } from '../../productData'
 import { TIER_ORDER } from '../../productModel'
 import { sectionPath, useRetailState } from '../../state'
@@ -27,6 +29,7 @@ export function CategoriesView({ d }: { d: Insights }) {
   const { param, setParam } = useRetailState()
   const { workspace } = useRetailData()
   const mine = workspace.kind === 'brand' ? workspace.brand : null
+  const names = useCompetitorNames()
   const cats = (d.categories ?? []).filter((c) => c.flows.length)
   const cat = cats.find((c) => c.category === param('category')) ?? cats.find((c) => c.category === 'serum') ?? cats[0]
 
@@ -40,7 +43,8 @@ export function CategoriesView({ d }: { d: Insights }) {
 
   const flows = [...cat.flows].sort((a, b) => b.n - a.n)
   const top = flows.find((f) => f.goal_id === param('goal')) ?? flows[0]
-  const ranked = [...cat.brands].sort((a, b) => b.rate - a.rate || b.n - a.n)
+  // A brand organisation under the retailer's naming policy sees other brands as "Brand A"… (orgData).
+  const ranked = [...cat.brands].sort((a, b) => b.rate - a.rate || b.n - a.n).map((b) => ({ ...b, brand: names.name(b.brand) }))
   const myIdx = mine ? ranked.findIndex((b) => b.brand === mine) : -1
 
   const description =
@@ -195,6 +199,7 @@ function TopProducts({ cat, d, mine }: { cat: Category; d: Insights; mine: strin
   const { carry } = useRetailState()
   const navigate = useNavigate()
   const { state, retry } = useProducts(filters)
+  const names = useCompetitorNames()
   if (state.status === 'loading') return <PanelBone height={TOP * 48} />
   if (state.status !== 'ready')
     return (
@@ -203,7 +208,10 @@ function TopProducts({ cat, d, mine }: { cat: Category; d: Insights; mine: strin
       </Panel>
     )
   const all = state.d.products.filter((r) => r.category === cat.category)
-  const rows = [...all].sort((a, b) => TIER_ORDER[b.tier] - TIER_ORDER[a.tier] || (b.rate ?? -1) - (a.rate ?? -1) || (b.n ?? 0) - (a.n ?? 0)).slice(0, TOP)
+  const rows = [...all]
+    .sort((a, b) => TIER_ORDER[b.tier] - TIER_ORDER[a.tier] || (b.rate ?? -1) - (a.rate ?? -1) || (b.n ?? 0) - (a.n ?? 0))
+    .slice(0, TOP)
+    .map((r) => (names.anonymise && r.brand !== names.own ? { ...r, product: productAlias(names.name(r.brand)), brand: names.name(r.brand), image_url: null } : r))
   const allHref = `${sectionPath('products')}${carry ? `${carry}&` : '?'}category=${encodeURIComponent(cat.category)}`
   const cols: Column<ProductRow>[] = [
     { id: 'product', header: 'Product', rowHeader: true, cell: (r) => <ProductCell p={r} size={28} tag={mine === r.brand ? <YoursTag /> : null} />, csv: (r) => `${r.product} (${r.brand})` },

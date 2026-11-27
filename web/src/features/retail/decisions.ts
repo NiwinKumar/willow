@@ -12,11 +12,13 @@ import { topUnmet } from './ui/insight.ts'
  * (PUT /v1/proof/orgs/{org}/decisions/{key}) and survives reloads and colleagues.
  *
  * Insight types implemented (06 §6.5 numbering): 1 Proven, not promoted · 2 Nearly proven · 3 Claim ready ·
- * 6 Over-shelved, under-delivering · 7 Under-shelved performer · 8 Unmet group · 9 Demand shift ·
- * 12 Campaign result in · AutoCampaign proposals (suggest mode) as ordinary cards.
+ * 4 Evidence slipped · 5 Expectation gap · 6 Over-shelved, under-delivering · 7 Under-shelved performer ·
+ * 8 Unmet group · 9 Demand shift · 10 Losing switchers · 11 Routine clash · 12 Campaign result in ·
+ * AutoCampaign proposals (suggest mode) as ordinary cards. A type only appears where its data exists (5 and 11
+ * need the brand's product pages, 10 the brand's switching, 6 and 7 the shelf check).
  */
 
-export type CardKind = 'proven_not_promoted' | 'nearly_proven' | 'claim_ready' | 'over_shelved' | 'under_shelved' | 'unmet_group' | 'demand_shift' | 'campaign_result' | 'auto_proposal'
+export type CardKind = 'proven_not_promoted' | 'nearly_proven' | 'claim_ready' | 'evidence_slipped' | 'expectation_gap' | 'over_shelved' | 'under_shelved' | 'unmet_group' | 'demand_shift' | 'losing_switchers' | 'routine_clash' | 'campaign_result' | 'auto_proposal'
 
 export type CardAction =
   | { kind: 'link'; label: string; to: string }
@@ -51,10 +53,14 @@ export const TYPE_LABEL: Record<CardKind, string> = {
   proven_not_promoted: 'Proven, not promoted',
   nearly_proven: 'Nearly proven',
   claim_ready: 'Claim ready',
+  evidence_slipped: 'Evidence slipped',
+  expectation_gap: 'Expectation gap',
   over_shelved: 'Over-shelved, under-delivering',
   under_shelved: 'Under-shelved performer',
   unmet_group: 'Unmet group',
   demand_shift: 'Demand shift',
+  losing_switchers: 'Losing switchers',
+  routine_clash: 'Routine clash',
   campaign_result: 'Campaign result in',
   auto_proposal: 'AutoCampaign proposal',
 }
@@ -65,6 +71,17 @@ export const SHELF_GAP = 0.05
 export const NEARLY = 60
 /** Demand shift: a goal's share of people up by at least this many points month on month. */
 export const DEMAND_RISE = 0.03
+/** Expectation gap: at least this share of people at week 8 changed but didn't say it's working. */
+export const EXPECTATION_GAP = 0.25
+/** Routine clash: a rule-table conflict in at least this share of the routines (a product's users, or all). */
+export const CLASH_SHARE = 0.2
+
+/** What a brand's own product pages add (GET /v1/retailer/products/{id}): felt vs measured and routine conflicts. */
+export type ProductSignals = {
+  product_id: string
+  agree: { n: number; measured_only: number } | null
+  conflicts: { kind: string; label: string; fix: string; n: number; share: number }[]
+}
 
 export type ComposeInput = {
   /** Whose card mix: the retailer's (range, shelf, sourcing) or a brand's (promotion, evidence, claims). */
@@ -85,8 +102,18 @@ export type ComposeInput = {
   brandOrgs: Set<string>
   weeks: number
   carry: string
+  /** The brand's own measured products' pages (5 Expectation gap, 11 Routine clash for a brand); [] when not loaded. */
+  signals?: ProductSignals[]
+  /** The brand's switching (GET /v1/retailer/brands/{brand}); null when not loaded. */
+  switching?: { lost: { brand: string; n: number }[]; net: number | null } | null
+  /** Rule-table conflicts across routines (insights), for the retailer's 11 Routine clash. */
+  conflicts?: { routines: number | null; rows: { kind?: string; pair: string; n?: number; share: number; fix: string; resolves: string[] }[] }
+  /** Another brand's name as this viewer may see it (the retailer's naming policy); identity when names are on. */
+  nameOf?: (brand: string) => string
 }
 
+/** A count with a true minus sign (−13). */
+const signed = (n: number) => (n < 0 ? `−${int(-n)}` : int(n))
 const q = (carry: string) => (carry ? '&' : '?')
 const productTo = (id: string, carry: string, hash = '') => `/retail/products/${encodeURIComponent(id)}${carry}${hash}`
 const promoteTo = (id: string, carry: string) => `/retail/campaigns${carry}${q(carry)}new=${encodeURIComponent(id)}`
@@ -262,6 +289,150 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
     }
   }
 
+  // 4 · Evidence slipped (both): a live campaign or a saved claim on a product that no longer holds its tier
+  for (const c of x.campaigns) {
+    const r = rowById.get(c.product_id)
+    if (c.status !== 'active' || !r || r.tier === 'proven' || (x.brand && r.brand !== x.brand)) continue
+    cards.push({
+      key: `evidence_slipped--campaign-${c.id}`,
+      kind: 'evidence_slipped',
+      type: TYPE_LABEL.evidence_slipped,
+      title: `${r.product} is promoted but no longer Proven`,
+      trigger: `A campaign is live while the product reads “${r.tier_label ?? r.tier}”${r.n !== null ? ` in ${int(r.n)} people at week ${x.weeks}` : ''}${r.lift !== null ? `, ${pts(r.lift)} over non-users` : ''}. Campaigns are for Proven products only.`,
+      figure: r.lift !== null ? pts(r.lift) : '—',
+      figureNote: r.lift !== null ? 'over non-users now' : 'no measured lift now',
+      n: r.n,
+      interval: liftInterval(r.lift_lo, r.lift_hi),
+      people: c.stats.reach ?? c.stats.impressions ?? 0,
+      product: ref(r),
+      primary: { kind: 'link', label: 'Pause the campaign', to: `/retail/campaigns/${encodeURIComponent(c.id)}${x.carry}` },
+      secondary: { kind: 'link', label: 'View proof', to: productTo(r.product_id, x.carry) },
+      waiting: 'The tier on the next data version',
+      lane: 'decide',
+    })
+  }
+  for (const id of x.claimed) {
+    const r = rowById.get(id)
+    if (!r || r.tier === 'proven' || r.tier === 'promising' || (x.brand && r.brand !== x.brand)) continue
+    cards.push({
+      key: `evidence_slipped--claim-${id}`,
+      kind: 'evidence_slipped',
+      type: TYPE_LABEL.evidence_slipped,
+      title: `A saved claim on ${r.product} rests on evidence that slipped`,
+      trigger: `It now reads “${r.tier_label ?? r.tier}”${r.n !== null ? ` in ${int(r.n)} people at week ${x.weeks}` : ''}. A claim can only quote a Proven or Promising product’s statements.`,
+      figure: r.rate !== null ? pct(r.rate) : '—',
+      figureNote: r.rate !== null ? 'saw a visible change' : 'no measured outcome now',
+      n: r.n,
+      interval: liftInterval(r.lift_lo, r.lift_hi),
+      people: r.users ?? r.n ?? 0,
+      product: ref(r),
+      primary: { kind: 'link', label: 'Withdraw or reword the claim', to: productTo(r.product_id, x.carry, '#claims-h') },
+      secondary: { kind: 'link', label: 'View proof', to: productTo(r.product_id, x.carry) },
+      waiting: 'The tier on the next data version',
+      lane: 'decide',
+    })
+  }
+
+  if (x.mix === 'brand') {
+    // 11 for a brand: one card, its product with the most common clash (a calm Home over one card per product)
+    let clashCard: DecisionCard | null = null
+    let clashBest = -1
+    for (const sig of x.signals ?? []) {
+      const r = rowById.get(sig.product_id)
+      if (!r || (x.brand && r.brand !== x.brand)) continue
+      // 5 · Expectation gap: changed, but didn't say it's working yet (the people most likely to stop early)
+      if (sig.agree && sig.agree.n >= 10 && sig.agree.measured_only >= EXPECTATION_GAP) {
+        cards.push({
+          key: `expectation_gap--${r.product_id}`,
+          kind: 'expectation_gap',
+          type: TYPE_LABEL.expectation_gap,
+          title: `People see ${r.product} work before they feel it`,
+          trigger: `${pct(sig.agree.measured_only)} of ${int(sig.agree.n)} people at week ${x.weeks} had a visible change but hadn’t said it’s working${r.weeks !== null ? `; the first change shows at a median of week ${r.weeks}` : ''}.`,
+          figure: pct(sig.agree.measured_only),
+          figureNote: 'changed, not felt yet',
+          n: sig.agree.n,
+          interval: null,
+          people: Math.round(sig.agree.n * sig.agree.measured_only),
+          product: ref(r),
+          primary: { kind: 'brief', label: 'Expectation line', file: `proof-expectation-line-${r.product_id}.md`, body: expectationBrief(r, sig.agree, x.weeks) },
+          secondary: { kind: 'link', label: 'How it feels', to: productTo(r.product_id, x.carry, '#feel-h') },
+          waiting: `Still using at week ${x.weeks}, and the “working” share four weeks later`,
+          lane: 'decide',
+        })
+      }
+      // 11 · Routine clash (a brand's own product)
+      const clash = [...sig.conflicts].filter((c) => c.n >= 10 && c.share >= CLASH_SHARE).sort((a, b) => b.share - a.share)[0]
+      if (clash && clash.share > clashBest) {
+        clashBest = clash.share
+        clashCard = {
+          key: `routine_clash--${r.product_id}--${clash.kind}`,
+          kind: 'routine_clash',
+          type: TYPE_LABEL.routine_clash,
+          title: `${pct(clash.share)} of routines with ${r.product}: ${clash.label.toLowerCase()}`,
+          trigger: `${int(clash.n)} routines that hold it have this rule-table finding. The usual fix: ${clash.fix.toLowerCase()}.`,
+          figure: pct(clash.share),
+          figureNote: 'of its users’ routines',
+          n: clash.n,
+          interval: null,
+          people: clash.n,
+          product: ref(r),
+          primary: { kind: 'brief', label: 'Layering note', file: `proof-layering-note-${r.product_id}.md`, body: layeringBrief(r.product, clash.label, clash.fix, clash.n, clash.share, []) },
+          secondary: { kind: 'link', label: 'In people’s routines', to: productTo(r.product_id, x.carry, '#ctx-h') },
+          waiting: 'The conflict’s share next month',
+          lane: 'decide',
+        }
+      }
+    }
+    if (clashCard) cards.push(clashCard)
+    // 10 · Losing switchers: net switching negative, at least 10 people to one destination
+    const sw = x.switching
+    const lost = sw?.lost.filter((l) => l.n >= 10).sort((a, b) => b.n - a.n)[0]
+    if (sw && sw.net !== null && sw.net < 0 && lost && x.brand) {
+      const dest = (x.nameOf ?? ((b: string) => b))(lost.brand)
+      cards.push({
+        key: `losing_switchers--${x.brand}--${lost.brand}`,
+        kind: 'losing_switchers',
+        type: TYPE_LABEL.losing_switchers,
+        title: `${x.brand} loses more people than it wins`,
+        trigger: `Net switching is ${signed(sw.net)} people; the largest flow is ${int(lost.n)} people who moved to ${dest}.`,
+        figure: signed(sw.net),
+        figureNote: 'net people',
+        n: lost.n,
+        interval: null,
+        people: lost.n,
+        product: null,
+        primary: { kind: 'brief', label: 'Retention note', file: `proof-retention-note-${x.brand.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`, body: retentionBrief(x.brand, dest, lost.n, sw.net, x.weeks) },
+        secondary: { kind: 'link', label: 'See switching', to: `/retail/market${x.carry}#switching` },
+        waiting: 'Net switching and continuation next month',
+        lane: 'decide',
+      })
+    }
+  }
+
+  if (x.mix === 'retailer' && x.conflicts) {
+    // 11 · Routine clash across the range
+    const top = [...x.conflicts.rows].filter((c) => (c.n ?? 0) >= 10 && c.share >= CLASH_SHARE).sort((a, b) => b.share - a.share)[0]
+    if (top) {
+      cards.push({
+        key: `routine_clash--all--${top.kind ?? top.pair}`,
+        kind: 'routine_clash',
+        type: TYPE_LABEL.routine_clash,
+        title: `${pct(top.share)} of routines: ${top.pair.toLowerCase()}`,
+        trigger: `${int(top.n ?? 0)}${x.conflicts.routines ? ` of ${int(x.conflicts.routines)}` : ''} routines checked have this rule-table finding. The usual fix: ${top.fix.toLowerCase()}${top.resolves.length ? `; ${top.resolves.length} ${top.resolves.length === 1 ? 'product in the catalog resolves it' : 'products in the catalog resolve it'}` : ''}.`,
+        figure: pct(top.share),
+        figureNote: 'of routines checked',
+        n: top.n ?? null,
+        interval: null,
+        people: top.n ?? 0,
+        product: null,
+        primary: { kind: 'brief', label: 'Layering note', file: `proof-layering-note-${(top.kind ?? 'routine').replace(/[^a-z0-9_-]+/gi, '-')}.md`, body: layeringBrief(null, top.pair, top.fix, top.n ?? 0, top.share, top.resolves) },
+        secondary: { kind: 'link', label: 'Routine conflicts', to: `/retail/customers${x.carry}#conflicts-h` },
+        waiting: 'The conflict’s share next month',
+        lane: 'decide',
+      })
+    }
+  }
+
   // 12 · Campaign result in (both)
   for (const c of x.campaigns) {
     const inc = c.stats.incrementality
@@ -390,5 +561,51 @@ function sourcingBrief(skin: string, goal: string, users: number, unmet: number,
     '---',
     'Proof by Willow. Observational, aggregate data; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.',
     '',
+  ].join('\n')
+}
+
+const FOOT = ['---', 'Proof by Willow. Observational, aggregate data; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.', '']
+
+function expectationBrief(r: ProductRow, agree: { n: number; measured_only: number }, weeks: number): string {
+  return [
+    `# Expectation line: ${r.product} (${r.brand})`,
+    '',
+    `${pct(agree.measured_only)} of ${int(agree.n)} people at week ${weeks} had a visible change in what it targets but hadn’t said it’s working yet. People who don’t feel a change are the most likely to stop early.`,
+    r.weeks !== null ? `The first visible change shows at a median of week ${r.weeks}.` : '',
+    '',
+    '## Draft line for the listing and the pack (edit before use)',
+    r.weeks !== null ? `“Give it ${r.weeks} weeks: that is when people using it usually first see a change.”` : '“Give it a few weeks before judging it.”',
+    '',
+    'Quote only the numbers above; say “people using it”, never “clinically proven”.',
+    '',
+    ...FOOT,
+  ].join('\n')
+}
+
+function layeringBrief(product: string | null, label: string, fix: string, n: number, share: number, resolves: string[]): string {
+  return [
+    `# Layering note: ${label}${product ? ` (${product})` : ''}`,
+    '',
+    `${int(n)} routines${product ? ` that hold ${product}` : ''} have this rule-table finding (${pct(share)}${product ? ' of its users’ routines' : ' of the routines checked'}).`,
+    `The usual fix: ${fix}.`,
+    resolves.length ? `Products in the catalog that resolve it: ${resolves.join('; ')}.` : '',
+    '',
+    '## Use',
+    'A short line on the listing or the shelf talker, and a bundle suggestion where one product resolves it.',
+    '',
+    ...FOOT,
+  ].join('\n')
+}
+
+function retentionBrief(brand: string, dest: string, n: number, net: number, weeks: number): string {
+  return [
+    `# Retention note: ${brand}`,
+    '',
+    `Net switching is ${signed(net)} people; ${int(n)} people moved to ${dest}.`,
+    '',
+    '## Ask of the team',
+    `Compare what those people were looking for with what ${brand}’s products deliver by week ${weeks} (Market → switching, and each product’s “Where it works”), then decide on a retention message or a sampling of the product that fits them.`,
+    '',
+    ...FOOT,
   ].join('\n')
 }

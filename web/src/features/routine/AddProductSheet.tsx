@@ -22,6 +22,7 @@ import { failureText, useRoutineWrites } from './writes'
 import { useChecks, type ProductCheck } from '../../lib/safety'
 import { strongActives } from './actives'
 import { CheckForMe, ProductChecked } from './checked'
+import { InAisleCheck } from './InAisleCheck'
 import { StartSlowCard } from './StartSlowCard'
 import { TestSheet, TestThisButton, type TestTarget } from './TestSheet'
 
@@ -423,6 +424,7 @@ function RequestProduct({ asked, inRoutine, onPick }: { asked: string; inRoutine
               <span className="text-[16px] leading-snug">{found.name}</span>
             </span>
           </div>
+          <InAisleCheck product={found} slots={slotsOf(defaultWhen(found.category))} />
           {inRoutine.has(found.product_id) ? (
             <span className="text-[14px]">✓ Already in your routine</span>
           ) : (
@@ -510,7 +512,7 @@ function RequestList({ requests, inRoutine, onPick }: { requests: ProductRequest
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-[15px]">{[r.brand, r.name].filter(Boolean).join(' ') || 'Photo request'}</span>
               <span className="text-[13px] text-ink-2">
-                {STATUS_WORDS[r.status]}
+                {r.status === 'pending' && r.status_text ? r.status_text : STATUS_WORDS[r.status]}
                 {r.status === 'pending' && (r.askers ?? 0) > 1 ? ` · ${r.askers} people asked` : ''}
                 {r.status === 'declined' ? ' · we couldn’t verify its ingredients' : ''}
               </span>

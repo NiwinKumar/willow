@@ -46,3 +46,20 @@ Local signed URLs: the api impersonates `sa-api` to sign. Project Owner does not
 Judging (Oct 19 - Nov 7) and the Grand Finale (Singapore, Dec 4): kept warm since Oct 19 with `--min-instances 2` on `willow-engine` (both places of one check-in start warm) and `--min-instances 1` on `willow-api`. Idle cost about $3.05/day (about ₹255/day). Nov 2: kept warm through the finale (about ₹8,200 more from Nov 2 to Dec 4, within the ₹10,000 the team set for it). If the team is not shortlisted, set both back to `--min-instances 0` that day (`gcloud run services update <service> --region us-central1 --min-instances 0`); otherwise do it on Dec 5.
 
 Finale day (Dec 3-4), a little more headroom: `gcloud run services update willow-api --region us-central1 --min-instances 2` and `gcloud run services update willow-engine --region us-central1 --min-instances 3`; back to 1 and 2 after. Load test Nov 2: 20 people at once on every public judge page, no errors, every page under 2 s from India (about 0.35 s of it network), so the current maxima (api 3, engine 8) and the 20 vCPU quota are enough.
+
+## Finale caps (environment variables, no code change)
+
+The daily caps in `api/app/limits.py` (`CAPS`) can be set per deploy. Cap counts reset at UTC midnight
+(08:00 in Singapore), so a morning rehearsal and the afternoon session share one day's count.
+
+| Variable | Sets | Default | Finale suggestion |
+|---|---|---|---|
+| `DEMO_WISP_DAILY_CAP` | Questions to Wisp on Mei's demo journey, one count shared by everyone on it | 300 | the team's call (e.g. `2000`) |
+| `DAILY_CAP_<ACTION>` | One action's per-person cap, or `per/everyone`: e.g. `DAILY_CAP_ADVISOR=40`, `DAILY_CAP_SAMPLE_RUNS=30/1000` | `CAPS` | as needed |
+
+`<ACTION>` is the `CAPS` key in capitals (`ADVISOR`, `ANALYZE`, `SAMPLE_RUNS`, `LABEL_SCAN`, `RETAILER_ASK`…).
+A value without `/everyone` lifts everyone's cap to at least the new per-person cap. A value that is not a
+positive whole number is ignored (logged as "ignoring cap override") and the default stands. Every raised
+Gemini cap allows more paid calls; check the budget alert before raising it far.
+To set one, add it to `infra/api-env.yaml` (or `--update-env-vars DEMO_WISP_DAILY_CAP=2000` on
+`gcloud run services update willow-api --region us-central1`); this makes a new revision. Remove it on Dec 5.

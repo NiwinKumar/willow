@@ -7,6 +7,7 @@ import { useOwner } from '../../data/hooks'
 import { invalidate } from '../../lib/query'
 import { AVOID_OPTIONS, EMPTY_SAFETY, LIFE_STAGES, MARKETS, marketFromLocale, putSafety, useSafety, type AvoidId, type SafetyProfile } from '../../lib/safety'
 import { useAuth } from '../../lib/useAuth'
+import { PastReactions } from './PastReactions'
 import { chip } from './settingsClasses'
 
 const YES_NO = [
@@ -33,7 +34,7 @@ export function SafetyForm({ initial, onSaved, onCancel, submit = 'Save' }: { in
     setBusy(true)
     setError(null)
     try {
-      await putSafety(await getIdToken(), { ...s, life_stage: s.life_stage ?? 'none', reactive: s.reactive ?? false, rx_treatment: s.rx_treatment ?? false })
+      await putSafety(await getIdToken(), { ...s, note: s.note?.trim() || null, life_stage: s.life_stage ?? 'none', reactive: s.reactive ?? false, rx_treatment: s.rx_treatment ?? false })
       invalidate(['safety'])
       invalidate(['me', uid])
       toast('Saved · products are now checked against your answers')
@@ -73,6 +74,7 @@ export function SafetyForm({ initial, onSaved, onCancel, submit = 'Save' }: { in
           ))}
         </div>
       </div>
+      <PastReactions value={s} onChange={set} dense />
       <YesNo id="sf-reactive" q="Does your skin react easily to new products?" value={s.reactive} onChange={(v) => set({ reactive: v })} />
       <YesNo id="sf-rx" q="Do you use a prescription skin treatment?" value={s.rx_treatment} onChange={(v) => set({ rx_treatment: v })} />
       <div className={q}>
@@ -131,7 +133,7 @@ export function SafetySheet({ open, onClose }: { open: boolean; onClose: () => v
     <Sheet open={open} onClose={onClose} title="Check products for me" variant="modal" size="sm">
       {open ? (
         <div className="flex flex-col gap-3">
-          <p className="m-0 text-[14px] leading-[1.5]">Five quick questions. Willow then marks every product: no flags for you, check this, or not advised for you, with the reason and its source.</p>
+          <p className="m-0 text-[14px] leading-[1.5]">A few quick questions. Willow then marks every product: no flags for you, check this, or not advised for you, with the reason and its source.</p>
           <SafetyForm initial={safety.data ?? null} onSaved={onClose} onCancel={onClose} submit="Save and check" />
         </div>
       ) : null}

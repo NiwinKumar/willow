@@ -34,6 +34,12 @@ AVOID_LABEL = {
 }
 PRODUCT_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,119}$")
 MAX_AVOID_PRODUCTS = 200
+# "Anything you've reacted to before?": ingredient names the person typed or picked
+MAX_AVOID_INGREDIENTS = 30
+INGREDIENT_NAME = re.compile(r"^[\w][\w ().,/'+&-]{1,79}$")
+# "Tell us about past reactions or breakouts": free text, read only by the note reader
+# (app/safety_note.py) and Wisp; never a flag by itself, never exported
+MAX_NOTE = 500
 Status = Literal["clear", "check", "avoid", "not_sold"]
 STATUS_WORDS = {
     "clear": "No flags for you",
@@ -55,6 +61,25 @@ class SafetyProfile(BaseModel):
     avoid_products: list[str] = Field(default_factory=list, max_length=MAX_AVOID_PRODUCTS)
     rx_treatment: bool | None = None  # uses a prescription skin treatment
     market: regulatory.Market | None = None
+    avoid_ingredients: list[str] = Field(default_factory=list, max_length=MAX_AVOID_INGREDIENTS)
+    note: str | None = Field(default=None, max_length=MAX_NOTE)
+
+    @field_validator("avoid_ingredients")
+    @classmethod
+    def _ingredients(cls, v: list[str]) -> list[str]:
+        out: dict[str, str] = {}
+        for raw in v:
+            name = " ".join(raw.split())
+            if not INGREDIENT_NAME.match(name):
+                raise ValueError("avoid_ingredients are ingredient names (2 to 80 characters)")
+            out.setdefault(name.lower(), name)  # one per name, whatever its case
+        return list(out.values())
+
+    @field_validator("note")
+    @classmethod
+    def _note(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
 
     @field_validator("avoid")
     @classmethod
@@ -228,11 +253,57 @@ AVOID_PRODUCT_FLAG = {
 }
 
 
+def _ingredient_forms(name: str) -> set[str]:
+    """Ways one label entry can be named: as written, without its brackets, each bracket's text,
+    and each part of an "A (and) B" blend, all lower case."""
+    out: set[str] = set()
+    for part in re.split(r"\s*\(and\)\s*", name.lower()):
+        low, bare = _forms(part)
+        out |= {low, bare}
+        out |= {" ".join(b.split()) for b in re.findall(r"\(([^)]*)\)", low)}
+    return {f for f in out if f}
+
+
+def _lists_ingredient(wanted: str, product: dict[str, Any]) -> str | None:
+    """The label entry that is this ingredient (case does not matter): the same name, or a name
+    that starts with it ("lanolin" lists "Lanolin Alcohol"; "alcohol" does not list "Cetyl
+    Alcohol"). None when the label does not list it."""
+    w = " ".join(wanted.lower().split())
+    for raw in product.get("inci") or []:
+        if any(f == w or f.startswith(w + " ") for f in _ingredient_forms(str(raw))):
+            return str(raw)
+    return None
+
+
+def _reacted_flags(product: dict[str, Any], names: list[str]) -> list[dict[str, Any]]:
+    out = []
+    for name in names:
+        listed = _lists_ingredient(name, product)
+        if listed is None:
+            continue
+        same = listed.lower() == name.lower()
+        out.append(
+            {
+                "rule": f"avoid_ingredient:{name.lower()}",
+                "id": "avoid_ingredient",
+                "level": "avoid",
+                "title": f"You've reacted to {name}",
+                "detail": f"You told Willow you've reacted to {name}. "
+                + ("It is on this label." if same else f"The label lists {listed}."),
+                "source": {"label": "What you told Willow", "url": None},
+                "grade": "A",
+            }
+        )
+    return out
+
+
 def flags(product: dict[str, Any], profile: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Every flag for this product and person; one per rule group (the stronger level wins)."""
     out: dict[str, dict[str, Any]] = {}
     if profile and product.get("product_id") in (profile.get("avoid_products") or []):
         out["avoid_product"] = dict(AVOID_PRODUCT_FLAG)
+    for flag in _reacted_flags(product, list((profile or {}).get("avoid_ingredients") or [])):
+        out[flag["rule"]] = flag
     for rule in rules():
         if not _applies(rule.when, profile):
             continue
@@ -295,3 +366,137 @@ def has_fragrance(product: dict[str, Any]) -> bool:
     """Lists fragrance or a named fragrance allergen (the fragrance rules' own match)."""
     rule = next(r for r in rules() if r.id == "avoid_fragrance")
     return bool(_hits(rule, product))
+
+
+# --- public views: the rule families and the ingredient vocabulary --------------------------
+
+# How /checks names each rule group, and who it applies to (words, never a condition).
+FAMILIES: dict[str, tuple[str, str]] = {
+    "medicine_ingredient": ("Medicines, not cosmetics", "Everyone"),
+    "mi_leave_on": ("Restricted preservative left on the skin", "Everyone"),
+    "retinoid_life_stage": ("Retinoids", "Pregnant, trying for a baby or breastfeeding"),
+    "hydroquinone_life_stage": ("Hydroquinone", "Pregnant, trying for a baby or breastfeeding"),
+    "salicylic_life_stage": ("Salicylic acid left on, or in a peel", "Pregnant"),
+    "fragrance": (
+        "Fragrance and the labelled fragrance allergens",
+        "Skin reacts easily, or you avoid fragrance",
+    ),
+    "essential_oils": ("Essential oils", "Skin reacts easily, or you avoid them"),
+    "drying_alcohol": ("Drying alcohol", "Skin reacts easily, or you avoid it"),
+    "cooling_agents": ("Menthol, camphor and other cooling agents", "Skin reacts easily"),
+    "witch_hazel": ("Witch hazel", "Skin reacts easily"),
+    "bpo_reactive": ("Benzoyl peroxide", "Skin reacts easily"),
+    "retinoid_reactive": ("Retinoids", "Skin reacts easily"),
+    "acid_reactive": ("Exfoliating acids (AHA, BHA)", "Skin reacts easily"),
+    "azelaic_reactive": ("Azelaic acid", "Skin reacts easily"),
+    "scrub": ("Gritty scrubs", "Skin reacts easily"),
+    "stack_reactive": ("Two strong actives in one product", "Skin reacts easily"),
+    "rx_treatment": ("Strong actives beside a prescription skin treatment", "You use one"),
+    "lanolin": ("Lanolin", "You avoid it"),
+    "nut_oils": ("Nut oils", "You avoid them"),
+    "mi_preservatives": ("MI preservatives", "You avoid them"),
+    "under_18": ("Actives made for adult skin", "Under 18"),
+}
+
+
+def rule_families() -> list[dict[str, Any]]:
+    """GET /v1/safety/rules: each rule group with its sources and grades (no person data)."""
+    groups: dict[str, dict[str, Any]] = {}
+    for r in rules():
+        label, applies = FAMILIES.get(r.group, (r.group.replace("_", " ").capitalize(), ""))
+        g = groups.setdefault(
+            r.group,
+            {
+                "id": r.group,
+                "label": label,
+                "applies": applies,
+                "levels": [],
+                "grades": [],
+                "sources": [],
+                "rules": [],
+            },
+        )
+        if r.level not in g["levels"]:
+            g["levels"].append(r.level)
+        if r.grade not in g["grades"]:
+            g["grades"].append(r.grade)
+        src = r.source.model_dump()
+        if src not in g["sources"]:
+            g["sources"].append(src)
+        g["rules"].append({"id": r.id, "title": r.title, "level": r.level, "grade": r.grade})
+    for g in groups.values():
+        g["levels"].sort(key=lambda lv: lv != "avoid")
+        g["grades"].sort()
+    return list(groups.values())
+
+
+# Words too general to be an ingredient someone reacted to.
+_GENERIC = frozenset(
+    {
+        "water",
+        "aqua",
+        "eau",
+        "oil",
+        "extract",
+        "acid",
+        "vitamin",
+        "and",
+        "fragrance",
+        "parfum",
+        "perfume",
+        "alcohol",
+    }
+)
+
+
+def _display(name: str) -> str:
+    """Catalog labels shout in places ("SODIUM HYALURONATE"): read them in title case."""
+    name = " ".join(name.split()).strip(" .;,")
+    return name.title() if name.isupper() else name
+
+
+@lru_cache
+def vocabulary() -> tuple[str, ...]:
+    """Every ingredient name on a catalog label, plus the rule file's ingredient names: what the
+    "reacted to" typeahead offers and the only names the note reader may suggest. One spelling
+    per name (case and brackets aside), blends split into their parts."""
+    from app import catalog
+
+    seen: dict[str, str] = {}
+
+    def add(raw: str) -> None:
+        for part in re.split(r"\s*\(and\)\s*", raw, flags=re.I):
+            name = _display(part)
+            bare = _forms(name)[1]
+            if not re.search(r"[a-z]{3}", bare) or not INGREDIENT_NAME.match(name):
+                continue
+            # "1,2-Hexanediol" and "1,2- Hexanediol" are one name
+            seen.setdefault(re.sub(r"[^a-z0-9]", "", bare), name)
+
+    for p in catalog.products():
+        for i in p.get("inci") or []:
+            add(str(i))
+    for r in rules():
+        for term in [
+            *r.match.inci_any,
+            *r.match.actives_any,
+            *(t for g in r.match.all_groups for t in g),
+        ]:
+            add(term[:1].upper() + term[1:])
+    return tuple(sorted(seen.values(), key=str.lower))
+
+
+@lru_cache
+def vocabulary_index() -> dict[str, str]:
+    """Each way a vocabulary name can be written (lower case) to its spelling in the vocabulary."""
+    index: dict[str, str] = {}
+    for name in vocabulary():
+        for form in _forms(name):
+            index.setdefault(form, name)
+    return index
+
+
+def in_vocabulary(name: str) -> str | None:
+    """The vocabulary's spelling of this ingredient, or None when no label or rule names it."""
+    low = " ".join(name.lower().split())
+    return vocabulary_index().get(low) or vocabulary_index().get(_forms(low)[1])

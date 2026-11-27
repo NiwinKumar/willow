@@ -44,3 +44,5 @@ jobs:
       - run: npm ci --no-fund --no-audit
       - run: npm run lint
       - run: npm run build
+      # Pure-function tests under `node --test`; Node 24 strips the TypeScript types itself.
+      - run: npm test

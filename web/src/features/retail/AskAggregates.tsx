@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError, api, type RetailerAnswer } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
 import { useMediaQuery } from '../../lib/useMediaQuery'
+import { useOrgMaybe } from './org'
+import { useCompetitorNames } from './orgData'
+import { proofApi } from './proofApi'
 import type { Filters, Insights } from './types'
 import { cohortKind, MIN_GROUP } from './ui'
 
@@ -31,7 +34,7 @@ const UNIT: Record<NonNullable<RetailerAnswer['chart']>['unit'], (v: number) => 
 function errorOf(e: unknown): Turn['error'] {
   if (e instanceof ApiError) {
     if (e.status === 429) return { title: e.code === 'busy' ? 'Busy today' : 'Daily limit reached', message: e.message }
-    if (e.status === 401 || e.status === 403) return { title: 'Not signed in', message: 'Asking needs a guest sign-in, which did not work. Reload the page and try again.' }
+    if (e.status === 401 || e.status === 403) return { title: e.status === 403 ? 'Not allowed' : 'Not signed in', message: e.status === 403 ? e.message || 'Your organisation membership doesn’t allow this.' : 'Asking needs a guest sign-in, which did not work. Reload the page and try again.' }
     if (e.status === 503) return { title: 'Service unavailable', message: `${e.message} The dashboard is unaffected.` }
     return { title: 'No answer', message: e.message || 'Could not get an answer. Try again.' }
   }
@@ -42,8 +45,10 @@ function errorOf(e: unknown): Turn['error'] {
  * "Ask the aggregates", inside the Ask side panel: Gemini answers from the same aggregates and filters as the
  * screen, and the api checks every number against them (GEMINI_SPEC section 6). Guest sign-in on first ask.
  */
-export function AskAggregates({ d, filters, scope = '' }: { d: Insights | null; filters: Filters; scope?: string }) {
+export function AskAggregates({ d, filters, scope = '', focusBrand = null }: { d: Insights | null; filters: Filters; scope?: string; focusBrand?: string | null }) {
   const { user, continueAsGuest, getIdToken } = useAuth()
+  const org = useOrgMaybe()?.org ?? null
+  const names = useCompetitorNames()
   const [thread, setThreadState] = useState<Turn[]>(() => (kept.scope === scope ? kept.turns : []))
   const setThread = (f: (t: Turn[]) => Turn[]) =>
     setThreadState((t) => {
@@ -82,7 +87,16 @@ export function AskAggregates({ d, filters, scope = '' }: { d: Insights | null; 
     setBusy(true)
     try {
       if (!user) await continueAsGuest()
-      const reply = await api.retailerAsk(await getIdToken(), q, filters)
+      const t = await getIdToken()
+      // Inside an organisation the question is scoped to it: a brand asks about its own brand, with other
+      // brands anonymised when the retailer's policy says so (checked by the api). An api build without the
+      // organisation Ask answers the unscoped way.
+      const reply = org
+        ? await proofApi.ask(t, org.id, { question: q, cohort: filters.cohort, range: filters.range, brand: org.kind === 'retailer' ? focusBrand : null }).catch((e: unknown) => {
+            if (e instanceof ApiError && e.status === 404 && !names.anonymise) return api.retailerAsk(t, q, filters)
+            throw e
+          })
+        : await api.retailerAsk(t, q, filters)
       setThread((t) => t.map((m) => (m.id === id ? { ...m, reply } : m)))
       setRevealing(id)
     } catch (e) {
@@ -98,6 +112,7 @@ export function AskAggregates({ d, filters, scope = '' }: { d: Insights | null; 
     <div className="flex h-full flex-col gap-4">
       <p className="m-0 text-proof-body text-ink-2">
         Gemini answers from the aggregates on screen only (same filters), with suppression applied. Any number it writes that is not in them is rejected. Individual people can’t be looked up.
+        {org?.kind === 'brand' ? ` Questions are about ${org.brands[0] ?? org.name}${names.anonymise ? '; other brands read “Brand A”, “Brand B”, as the retailer’s policy sets' : ''}.` : focusBrand ? ` Focused on ${focusBrand}.` : ''}
       </p>
 
       <div aria-live="polite" className="flex flex-col gap-4">

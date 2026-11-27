@@ -4,6 +4,7 @@ import { CheckedChip } from '../../components/willow/CheckedChip'
 import { CHECK_WORDS, LABELS_NOTE, REGULATORY_WORDS, useSafety, type CheckStatus, type ProductCheck } from '../../lib/safety'
 import { useOwner } from '../../data/hooks'
 import { SafetySheet } from '../you/SafetyForm'
+import { Link } from 'react-router-dom'
 
 export type ChecksMap = Record<string, ProductCheck | undefined>
 
@@ -60,11 +61,15 @@ export function CheckReasons({ check, profileComplete }: { check: ProductCheck; 
               <span className="mt-0.5 block text-ink-2">{f.detail}</span>
               {f.source ? (
                 <span className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-ink-2">
-                  <a href={f.source.url} target="_blank" rel="noopener noreferrer" className="hit44 text-ink underline underline-offset-2">
-                    {f.source.label}
-                    <span aria-hidden> ↗</span>
-                    <span className="sr-only"> (opens in new tab)</span>
-                  </a>
+                  {f.source.url ? (
+                    <a href={f.source.url} target="_blank" rel="noopener noreferrer" className="hit44 text-ink underline underline-offset-2">
+                      {f.source.label}
+                      <span aria-hidden> ↗</span>
+                      <span className="sr-only"> (opens in new tab)</span>
+                    </a>
+                  ) : (
+                    <span className="text-ink">{f.source.label}</span>
+                  )}
                   {f.grade ? <span className="rounded-pill bg-sunken px-1.5 py-0.5 font-mono text-[10px]">Evidence grade {f.grade}</span> : null}
                 </span>
               ) : null}
@@ -77,7 +82,10 @@ export function CheckReasons({ check, profileComplete }: { check: ProductCheck; 
       <span className="text-[12px] leading-[1.45] text-ink-2">
         {check.regulatory ? `${REGULATORY_WORDS[check.regulatory.class]} in ${check.regulatory.market === 'UK' || check.regulatory.market === 'US' ? `the ${check.regulatory.market}` : check.regulatory.market}. ` : ''}
         {profileComplete === false ? 'Checked against part of your profile. ' : ''}
-        {LABELS_NOTE} Checked by fixed rules from published sources, not by AI.
+        {LABELS_NOTE} Checked by fixed rules from published sources, not by AI.{' '}
+        <Link to="/checks" className="text-ink underline underline-offset-2">
+          How we check
+        </Link>
       </span>
     </div>
   )

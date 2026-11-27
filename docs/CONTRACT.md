@@ -258,12 +258,16 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 Validator: every number in `summary` must appear in the metrics JSON sent to Gemini; otherwise regenerate once, then fall back to a template.
 
 ### 3b. Safety, routine builder, reactions, clicks, Proof organisations (added Nov 27, finals build)
-Code: `api/app/routes/plan_routes.py`, `api/app/routes/proof_routes.py`, `api/app/similar.py`. Every number, flag and plan is computed in code; Gemini is not called by any endpoint in this section.
+Code: `api/app/routes/plan_routes.py`, `api/app/routes/proof_routes.py`, `api/app/similar.py`. Every number, flag and plan is computed in code; the only Gemini call in this section is `POST /v1/safety/note/read`, which suggests and never applies or flags (`api/app/safety_note.py`).
 
 | Endpoint | Request | Response |
 |---|---|---|
-| `PUT /v1/me/profile` (extended) | `safety: {adult, life_stage: none\|pregnant\|breastfeeding\|trying, reactive, avoid: [fragrance\|essential_oils\|drying_alcohol\|lanolin\|nut_oils\|mi_preservatives], avoid_products: [id], rx_treatment, market: US\|IN\|SG\|UK\|EU}` (whole object replaced) | `profile.safety` (also in `GET /v1/me`) |
+| `PUT /v1/me/profile` (extended) | `safety: {adult, life_stage: none\|pregnant\|breastfeeding\|trying, reactive, avoid: [fragrance\|essential_oils\|drying_alcohol\|lanolin\|nut_oils\|mi_preservatives], avoid_products: [id], rx_treatment, market: US\|IN\|SG\|UK\|EU, avoid_ingredients: [name ≤30, 2–80 chars], note: string ≤500 \| null}` (whole object replaced; a label listing an `avoid_ingredients` name, case aside, gets an `avoid` flag “You've reacted to <name>”) | `profile.safety` (also in `GET /v1/me`) |
 | `POST /v1/safety/check` | `{product_ids: [≤80], safety?}` | `{profile_complete, checks: {id: {status: clear\|check\|avoid\|not_sold, flags: [{rule, level, title, detail, source: {label, url}, grade: A\|B\|C}], regulatory: {class: cosmetic\|otc_drug\|pharmacy\|rx, market}}}}`; catalog search items carry the same `check` when the caller has a safety profile |
+| `GET /v1/safety/rules` | – (public) | `{families: [{id, label, applies, levels, grades, sources: [{label, url}], rules: [{id, title, level, grade}]}], rules: n, personal: [{id, label, applies, level}], note}` (no person data; the /checks page) |
+| `GET /v1/safety/ingredients` | – (public) | `{names: [string]}`: every catalog INCI name plus the rule file's names (the “reacted to” typeahead; the only names the note reader may suggest) |
+| `POST /v1/safety/note/read` | `{note: 1–500 chars}` | `{suggest: {avoid: [avoid ids], avoid_ingredients: [vocabulary names], reactive: bool\|null, life_stage: pregnant\|breastfeeding\|trying\|null}, summary, source: model\|rules}`; Gemini picks from candidates the code found in the note, validated (vocabulary, enums, banned words, no new digits); else the keyword reading. Counts on the `label_scan` cap (past it, or on a Gemini failure, keywords only and the use is given back). Nothing is saved |
+| `POST /v1/routine/check/preview` | `{product_id, slots?: [am\|pm]}` | `{product_id, in_routine, routine_size, clashes: [{issue, suggestion, severity, with: [names]}], gaps: [{need, why, suggestion}], already_use: [{active, products: [names]}], note}`: what adding the product would newly bring (rule table only, no Gemini, no cap, nothing saved) |
 | `GET /v1/evidence-clock` | – | `{actives: {name: {first_look_weeks, verdict_weeks, source, grade}}, default}` |
 | `POST /v1/plan` | `{skin_type, reactive, goals[≤3], budget: {max_per_product, currency}, tier, steps: 3\|4\|5, market, safety}` | `{profile: {title, traits, focus, avoid, cautions}, funnel: [{id, label, n}], picks: [{slot, when, goal, product, why[], check, start_week, verdict_week, evidence, proof: {tier, n, simulated}\|null, alternatives[]}], schedule: [{week, text}], notes[], total, currency_note?}`; 422 `{message, step}` when nothing fits |
 | `POST /v1/me/reactions`, `GET /v1/me/reactions` | `{product_id, entry_id?, signs[], strength: mild\|strong, since_days}` | `{reaction, outcome: {level: urgent\|stop\|mild, title, steps[], report}}`; non-mild adds the product to `safety.avoid_products` |
@@ -279,6 +283,8 @@ Code: `api/app/routes/plan_routes.py`, `api/app/routes/proof_routes.py`, `api/ap
 | `POST/GET /v1/proof/orgs/{org}/requests`, `PATCH …/requests/{id}` | `{to_org, product_id, message, snapshot}`; patch `{status: answered\|declined, reply}` | `{inbox, outbox}` |
 | `GET/POST /v1/proof/orgs/{org}/claims`, `PATCH …/claims/{id}`, `GET …/claims/{id}/export` | `{product_id, text, statements, cohort}`; patch `{status: draft\|approved}` | claims carry cohort, n, window, method, caveat, `exportable`; export 403 unless real-only evidence |
 | `GET /v1/proof/research` | – | methodology facts from code constants: tier thresholds, noise rule, min group, holdout share, cohort counts, `data_from`/`data_to`, metric dictionary, consent basis, what brands see / never see |
+
+Product requests (`GET /v1/product-requests`) now carry `status_text` (a plain status line), and a pending request whose product has since been added is resolved on read.
 
 Campaign rules (`POST /v1/retailer/campaigns`, AutoCampaign rules and approvals): an analyst+ membership of the retailer org or of the brand org that owns the product's brand, else 403 `not_a_member`; a brand org promotes only its own brands. Campaigns carry `org_id` and `demo`; demo campaigns are served only to guest accounts.
 
@@ -360,7 +366,7 @@ Security rules: users read/write only their own `users/{uid}/**`; `products` rea
 
 Added Nov 27 (finals build):
 ```
-users/{uid}.profile.safety      {adult, life_stage, reactive, avoid[], avoid_products[], rx_treatment, market}
+users/{uid}.profile.safety      {adult, life_stage, reactive, avoid[], avoid_products[], rx_treatment, market, avoid_ingredients[], note}  (note: never exported; deleted with the user doc)
 users/{uid}.reactions[]         last 50: {id, product_id, entry_id?, signs[], strength, since_days, level, created_at}
 users/{uid}/routine/{entry}     + sample: true on the guest starter routine
 store_clicks/{auto}             {product_id, store, surface, day, at}  (no uid)

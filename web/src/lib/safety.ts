@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 
-import { ApiError, request } from './api'
+import { ApiError, request, retailerGet } from './api'
 import { useQuery } from './query'
 import { useAuth } from './useAuth'
 
@@ -30,9 +30,14 @@ export type SafetyProfile = {
   /** Uses a prescription skin treatment. */
   rx_treatment: boolean | null
   market: Market | null
+  /** "Anything you've reacted to before?": ingredient names, matched against labels (case aside) as "Not advised for you". */
+  avoid_ingredients: string[]
+  /** "Tell us about past reactions or breakouts" (≤500 chars): read by Willow only when asked, and by Wisp; never a flag by itself. */
+  note: string | null
 }
 
-export const EMPTY_SAFETY: SafetyProfile = { adult: null, life_stage: null, reactive: null, avoid: [], avoid_products: [], rx_treatment: null, market: null }
+export const EMPTY_SAFETY: SafetyProfile = { adult: null, life_stage: null, reactive: null, avoid: [], avoid_products: [], rx_treatment: null, market: null, avoid_ingredients: [], note: null }
+export const NOTE_MAX = 500
 
 export const LIFE_STAGES: { id: LifeStage; label: string }[] = [
   { id: 'none', label: 'None of these' },
@@ -90,7 +95,7 @@ export function marketFromLocale(): Market {
 export async function fetchSafety(token: string): Promise<SafetyProfile | null> {
   const me = await request<{ profile: { safety?: Partial<SafetyProfile> | null } | null }>(token, '/v1/me')
   const s = me.profile?.safety
-  return s ? { ...EMPTY_SAFETY, ...s, avoid: s.avoid ?? [], avoid_products: s.avoid_products ?? [] } : null
+  return s ? { ...EMPTY_SAFETY, ...s, avoid: s.avoid ?? [], avoid_products: s.avoid_products ?? [], avoid_ingredients: s.avoid_ingredients ?? [], note: s.note ?? null } : null
 }
 
 /** Save the whole safety object (a partial `safety` replaces it, so send everything); clears cached checks. */
@@ -110,7 +115,7 @@ export function useSafety() {
 
 export type CheckStatus = 'clear' | 'check' | 'avoid' | 'not_sold'
 export type Grade = 'A' | 'B' | 'C'
-export type SourceRef = { label: string; url: string }
+export type SourceRef = { label: string; url: string | null }
 export type SafetyFlag = { rule: string; level: 'check' | 'avoid'; title: string; detail: string; source: SourceRef | null; grade: Grade | null }
 export type RegulatoryClass = 'cosmetic' | 'otc_drug' | 'pharmacy' | 'rx'
 export type ProductCheck = { status: CheckStatus; flags: SafetyFlag[]; regulatory: { class: RegulatoryClass; market: string } | null }
@@ -263,3 +268,67 @@ export function clockFor(clock: EvidenceClock | undefined, actives: { name: stri
   }
   return best
 }
+
+// ---------------------------------------------------------------- past reactions
+
+/** GET /v1/safety/ingredients (public): every name on a catalog label or in the rule file, for the typeahead. */
+export function useIngredientNames(enabled = true) {
+  return useQuery(['safety-ingredients'], () => retailerGet<{ names: string[] }>('/v1/safety/ingredients').then((r) => r.names), { enabled, public: true, staleMs: 24 * 60 * 60_000 })
+}
+
+/** Up to `n` names for what was typed: names that start with it first, then names with a word that does. */
+export function matchIngredients(names: readonly string[], typed: string, exclude: readonly string[] = [], n = 6): string[] {
+  const q = typed.trim().toLowerCase()
+  if (q.length < 2) return []
+  const out = new Set(exclude.map((x) => x.toLowerCase()))
+  const starts: string[] = []
+  const words: string[] = []
+  for (const name of names) {
+    const low = name.toLowerCase()
+    if (out.has(low)) continue
+    if (low.startsWith(q)) starts.push(name)
+    else if (low.split(/[\s(/,-]+/).some((w) => w.startsWith(q))) words.push(name)
+  }
+  const byLength = (a: string, b: string) => a.length - b.length
+  return [...starts.sort(byLength), ...words.sort(byLength)].slice(0, n)
+}
+
+export type NoteSuggest = { avoid: AvoidId[]; avoid_ingredients: string[]; reactive: boolean | null; life_stage: Exclude<LifeStage, 'none'> | null }
+export type NoteRead = { suggest: NoteSuggest; summary: string; source: 'model' | 'rules' }
+
+/** POST /v1/safety/note/read: suggestions from the note (nothing saved; the person taps what to add). */
+export const readNote = (token: string, note: string) => request<NoteRead>(token, '/v1/safety/note/read', { method: 'POST', body: JSON.stringify({ note }) })
+
+// ---------------------------------------------------------------- rule families (/checks)
+
+export type RuleFamily = {
+  id: string
+  label: string
+  applies: string
+  levels: ('check' | 'avoid')[]
+  grades: Grade[]
+  sources: SourceRef[]
+  rules: { id: string; title: string; level: 'check' | 'avoid'; grade: Grade }[]
+}
+export type SafetyRules = { families: RuleFamily[]; rules: number; personal: { id: string; label: string; applies: string; level: 'avoid' }[]; note: string }
+
+/** GET /v1/safety/rules (public): the rule file by family, with sources and grades. */
+export function useSafetyRules() {
+  return useQuery(['safety-rules'], () => retailerGet<SafetyRules>('/v1/safety/rules'), { public: true, staleMs: 60 * 60_000 })
+}
+
+// ---------------------------------------------------------------- in-aisle preview
+
+export type RoutinePreview = {
+  product_id: string
+  in_routine: boolean
+  routine_size: number
+  clashes: { issue: string; suggestion: string; severity: 'info' | 'caution' | 'avoid_same_routine'; with: string[] }[]
+  gaps: { need: string; why: string; suggestion: string }[]
+  already_use: { active: string; products: string[] }[]
+  note: string
+}
+
+/** POST /v1/routine/check/preview: what adding this product would newly bring to the routine (rules only, nothing saved). */
+export const routinePreview = (token: string, productId: string, slots?: ('am' | 'pm')[]) =>
+  request<RoutinePreview>(token, '/v1/routine/check/preview', { method: 'POST', body: JSON.stringify({ product_id: productId, ...(slots ? { slots } : {}) }) })

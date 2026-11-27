@@ -17,7 +17,7 @@
    "detail": "It lists {hits}. Hydroquinone is prescription-only in the US, and not allowed in cosmetics in the EU or Singapore. Willow never suggests it.",
    "source": {
     "label": "FDA: potentially harmful OTC skin lightening products",
-    "url": "https://www.fda.gov/drugs/drug-safety-and-availability/fda-works-protect-consumers-potentially-harmful-otc-skin-lightening-products"
+    "url": "https://www.fda.gov/drugs/drug-safety-communications/fda-works-protect-consumers-potentially-harmful-otc-skin-lightening-products"
    },
    "grade": "A"
   },
@@ -590,7 +590,7 @@
    "detail": "Your skin reacts easily, and it lists {hits}. Dryness, peeling and stinging are common with benzoyl peroxide; its US drug label warns of them.",
    "source": {
     "label": "FDA: OTC drug products with benzoyl peroxide or salicylic acid (rulemaking history)",
-    "url": "https://www.fda.gov/drugs/status-otc-rulemakings/rulemaking-history-otc-acne-drug-products"
+    "url": "https://www.fda.gov/drugs/historical-status-otc-rulemakings/rulemaking-history-otc-acne-drug-products"
    },
    "grade": "B"
   },
@@ -676,7 +676,7 @@
    "detail": "Your skin reacts easily, and it lists {hits}. Salicylic acid left on the skin can dry and sting.",
    "source": {
     "label": "FDA: OTC drug products with benzoyl peroxide or salicylic acid (rulemaking history)",
-    "url": "https://www.fda.gov/drugs/status-otc-rulemakings/rulemaking-history-otc-acne-drug-products"
+    "url": "https://www.fda.gov/drugs/historical-status-otc-rulemakings/rulemaking-history-otc-acne-drug-products"
    },
    "grade": "B"
   },
@@ -720,7 +720,7 @@
    "detail": "Your skin reacts easily, and it lists {hits}. Gritty scrubs rub skin that reacts easily; a gentle cleanser is the usual advice.",
    "source": {
     "label": "American Academy of Dermatology: how to exfoliate at home",
-    "url": "https://www.aad.org/public/everyday-care/skin-care-basics/care/exfoliation"
+    "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/routine/safely-exfoliate-at-home"
    },
    "grade": "B"
   },
@@ -787,7 +787,7 @@
    "detail": "Your skin reacts easily, and it lists {hits}. Two exfoliating acids together can over-exfoliate skin that reacts easily.",
    "source": {
     "label": "American Academy of Dermatology: how to exfoliate at home",
-    "url": "https://www.aad.org/public/everyday-care/skin-care-basics/care/exfoliation"
+    "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/routine/safely-exfoliate-at-home"
    },
    "grade": "C"
   },

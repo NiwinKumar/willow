@@ -209,7 +209,9 @@ def run_reminders(
         if not store.reminder_claim(uid, day.isoformat(), {"day": day.isoformat(), "at": now}):
             totals["skipped"] += 1  # already reminded today
             continue
-        result = _deliver(store, uid, reminders.payload("checkin"), settings)
+        testing = any(t.get("ended_at") is None for _, t in store.product_tests_list(uid))
+        places = reminders.places_of(doc.get("profile"), test_running=testing)
+        result = _deliver(store, uid, reminders.payload("checkin", places), settings)
         for k, v in result.items():
             totals[k] += v
     log.info("reminders run: %s", totals)

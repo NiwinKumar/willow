@@ -16,6 +16,8 @@ function summary(s: SafetyProfile): { k: string; v: string }[] {
   return [
     { k: 'Pregnancy and breastfeeding', v: LIFE_STAGES.find((l) => l.id === s.life_stage)?.label ?? 'Not answered' },
     { k: 'Avoid', v: s.avoid.length ? s.avoid.map((a) => AVOID_OPTIONS.find((o) => o.id === a)?.label ?? a).join(', ') : 'Nothing' },
+    { k: 'Reacted to before', v: s.avoid_ingredients.length ? s.avoid_ingredients.join(', ') : 'Nothing added' },
+    { k: 'Your note', v: s.note ? (s.note.length > 90 ? `${s.note.slice(0, 90).trimEnd()}…` : s.note) : 'None' },
     { k: 'Reacts easily', v: yesNo(s.reactive) },
     { k: 'Prescription skin treatment', v: yesNo(s.rx_treatment) },
     { k: 'Where you buy', v: MARKETS.find((m) => m.id === s.market)?.label ?? 'Not answered' },
@@ -45,7 +47,7 @@ export function SafetyRows() {
               <div className="flex flex-col items-start gap-2">
                 <span className="text-[14px] text-ink-2">Not answered yet, so products aren’t checked for you.</span>
                 <button type="button" onClick={() => setEditing(true)} className={outline}>
-                  Answer five questions
+                  Answer a few questions
                 </button>
               </div>
             ) : (

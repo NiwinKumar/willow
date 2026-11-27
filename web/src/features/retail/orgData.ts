@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { getQueryData, setQueryData, useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { useRetailData } from './context'
+import { brandAlias, brandOrder } from './masking'
 import { useOrg } from './org'
 import { proofApi, proofError, type DecisionItem, type DecisionsView, type DecisionSnapshot, type DecisionStatus, type OrgSettings, type RequestsView, type SavedClaim } from './proofApi'
 
@@ -86,17 +87,6 @@ export function useOrgSettings() {
 }
 export const setSettings = (org: string, v: OrgSettings) => setQueryData<OrgSettings>(settingsKey(org), v)
 
-/** "A", "B", … "Z", "AA", "AB" … */
-function letters(i: number): string {
-  let s = ''
-  let n = i
-  do {
-    s = String.fromCharCode(65 + (n % 26)) + s
-    n = Math.floor(n / 26) - 1
-  } while (n >= 0)
-  return s
-}
-
 /**
  * The retailer's competitor-naming policy, applied in the browser for brand organisations (research 06 §4.2; the
  * api stores the policy but its retailer views have no organisation context). Off by default and while the
@@ -108,12 +98,8 @@ export function useCompetitorNames(): { anonymise: boolean; name: (brand: string
   const allBrands = useRetailData().brands.map((b) => b.brand)
   const settings = useOrgSettings()
   const anonymise = org?.kind === 'brand' && !(settings.data?.policy.competitor_names ?? false)
-  const order = [...new Set(allBrands)].sort((a, b) => a.localeCompare(b))
-  const name = (brand: string) => {
-    if (!anonymise || brand === lockedBrand) return brand
-    const i = order.indexOf(brand)
-    return i < 0 ? 'Another brand' : `Brand ${letters(i)}`
-  }
+  const order = brandOrder(allBrands)
+  const name = (brand: string) => (anonymise ? brandAlias(brand, order, lockedBrand) : brand)
   return { anonymise, name, own: lockedBrand }
 }
 

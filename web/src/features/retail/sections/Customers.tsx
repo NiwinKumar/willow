@@ -8,6 +8,7 @@ import { Bone, ErrorState, int, MIN_GROUP, PageHeader, pct, SkeletonPanel } from
 import { topUnmet } from '../ui/insight'
 import { fetchProducts } from '../productData'
 import { useSegments, useView } from '../useView'
+import { Fit } from './customers/Fit'
 import { Conflicts, Gaps, WhatPeopleWant } from './customers/Demand'
 import { MatrixPanel } from './customers/Matrix'
 import { cellKey, ownForGoal, parseMode } from './customers/model'
@@ -101,6 +102,9 @@ function Page({ d }: { d: Insights }) {
         </section>
       </div>
       <Gaps d={d} />
+      <section id="fit">
+        <Fit />
+      </section>
       {s ? (
         <>
           <CellPanel cell={cell} s={s} catalog={products} mine={mine} onClose={() => setParam({ cell: null })} />

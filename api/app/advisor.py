@@ -27,6 +27,7 @@ from app import (
     feel,
     gemini,
     numbers,
+    plan,
     regulatory,
     routine_check,
     routine_log,
@@ -93,6 +94,13 @@ own measurements, check their routine and find products from Willow's facts-only
   exfoliating acid. Products in tool results carry check {status, flags}: never recommend one
   whose status is avoid or not_sold; when you suggest one with status check, name its flag.
   Never call a product safe; say "no flags for your profile".
+- CONTEXT.profile.safety.avoid_ingredients are ingredients the person says they reacted to
+  before: never suggest a product that lists one (tool results already flag them). CONTEXT.
+  profile.past_reactions_note is their own note about past reactions or breakouts: respect it
+  when suggesting, but never diagnose from it, never name a condition it might suggest, and
+  never repeat it back in full.
+- search_catalog returns products sold where the person shops first (sold_here true); prefer
+  those, and say so when you suggest one that is not sold there.
 - Never recommend, name or comment on the dose of a prescription medicine (tretinoin,
   hydroquinone, steroid creams, antibiotics, anything taken by mouth): say to ask a doctor or
   pharmacist. Never write acne, treat, cure or heal; say blemishes or breakouts.
@@ -300,7 +308,10 @@ def context(store: Store, uid: str) -> dict[str, Any]:
         "profile": {
             "skin_type": saved.get("skin_type"),
             "goals": list(saved.get("goals") or []),
-            "safety": safety.profile_of(doc),
+            "safety": {k: v for k, v in (safety.profile_of(doc) or {}).items() if k != "note"}
+            or None,
+            # their own words about past reactions, trimmed (never a flag by itself)
+            "past_reactions_note": _trimmed(((safety.profile_of(doc) or {}).get("note")) or ""),
         },
         "latest_sessions": latest,
         "routine": routine,
@@ -309,6 +320,16 @@ def context(store: Store, uid: str) -> dict[str, Any]:
         "(pores and texture come only from close-ups) and the forearm squares. Lines, shine, "
         "glow and blemishes are always indicative (trends).",
     }
+
+
+NOTE_IN_CONTEXT = 300
+
+
+def _trimmed(note: str) -> str | None:
+    note = " ".join(note.split())
+    if len(note) <= NOTE_IN_CONTEXT:
+        return note or None
+    return note[:NOTE_IN_CONTEXT].rsplit(" ", 1)[0] + "…"
 
 
 def _outcomes(ids: list[str]) -> dict[str, Any]:
@@ -342,6 +363,7 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
     profile = safety.profile_of(store.user_get(uid))
     if name == "search_catalog":
         # search is where suggestions come from: only products Willow may suggest to this person
+        market = (profile or {}).get("market")
         found = [
             p
             for p in catalog.search_all(
@@ -353,9 +375,13 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
                 exclude_ingredients=args.get("exclude_ingredients"),
             )
             if suggestible(p, profile)
-        ][:6]
+        ]
+        # sold where the person shops (or everywhere) first; the search's own order within each
+        found = sorted(found, key=lambda p: not plan.sold_in(p, market))[:6]
         return {
-            "products": [_compact(p, profile) for p in found],
+            "products": [
+                {**_compact(p, profile), "sold_here": plan.sold_in(p, market)} for p in found
+            ],
             "measured_outcomes": _outcomes([p["product_id"] for p in found]),
         }
     if name == "compare_products":

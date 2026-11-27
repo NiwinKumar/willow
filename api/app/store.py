@@ -137,6 +137,11 @@ class Store(Protocol):
     def proof_claim_get(self, cid: str) -> Doc | None: ...
     def proof_claim_update(self, cid: str, fields: Doc) -> None: ...
     def proof_claims_of(self, org: str) -> list[tuple[str, Doc]]: ...
+    # proof_ranges/{org} {filename, source, rows[{line, gtin, product_id, brand, name, category,
+    # price, facings, match, status}], uploaded_at, by_role}: the org's connected range (item file)
+    def proof_range_get(self, org: str) -> Doc | None: ...
+    def proof_range_set(self, org: str, doc: Doc) -> None: ...
+    def proof_range_delete(self, org: str) -> None: ...
 
 
 def _running(doc: Doc, stale: timedelta) -> bool:
@@ -606,6 +611,16 @@ class FirestoreStore:
         q = self._db().collection("proof_claims").where("org_id", "==", org)
         return [(s.id, s.to_dict()) for s in q.stream()]
 
+    def proof_range_get(self, org: str) -> Doc | None:
+        snap = self._db().document(f"proof_ranges/{org}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def proof_range_set(self, org: str, doc: Doc) -> None:
+        self._db().document(f"proof_ranges/{org}").set(doc)
+
+    def proof_range_delete(self, org: str) -> None:
+        self._db().document(f"proof_ranges/{org}").delete()
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -640,6 +655,7 @@ class MemoryStore:
         self.proof_log: dict[str, Doc] = {}
         self.proof_requests: dict[str, Doc] = {}
         self.proof_claims: dict[str, Doc] = {}
+        self.proof_ranges: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -993,6 +1009,15 @@ class MemoryStore:
 
     def proof_claims_of(self, org: str) -> list[tuple[str, Doc]]:
         return [(c, copy.deepcopy(d)) for c, d in self.proof_claims.items() if d["org_id"] == org]
+
+    def proof_range_get(self, org: str) -> Doc | None:
+        return copy.deepcopy(self.proof_ranges.get(org))
+
+    def proof_range_set(self, org: str, doc: Doc) -> None:
+        self.proof_ranges[org] = copy.deepcopy(doc)
+
+    def proof_range_delete(self, org: str) -> None:
+        self.proof_ranges.pop(org, None)
 
 
 @lru_cache

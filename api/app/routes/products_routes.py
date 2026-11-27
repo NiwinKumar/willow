@@ -481,7 +481,7 @@ def _chat_answer(
             advisor.remember(store, uid, body.messages[-1].text, len(images), reply, asked_at)
         except Exception:  # the answer matters more than its copy in the history
             log.exception("advisor history not saved")
-    return {**reply, "remaining_today": max(0, limits.CAPS[action][0] - used)}
+    return {**reply, "remaining_today": max(0, limits.cap(action)[0] - used)}
 
 
 @router.post("/advisor/chat")

@@ -11,6 +11,8 @@ import { purposeOf, sectionPath, useRetailState } from '../state'
 import type { Insights, ProductDetail as Detail, ProductRow, Seg } from '../types'
 import { Bone, Combobox, CurveChart, downloadCsv, EmptyState, int, interval, LiftValue, PageHeader, Panel, pct, ProofTierChip, pts, Suppressed, ToolButton, useTooltip, weeks, type CsvValue } from '../ui'
 import { HeadTip, RateInterval } from './productParts'
+import { NamesHidden } from './NamesHidden'
+import { useCompetitorNames } from '../orgData'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
@@ -66,6 +68,17 @@ function Body({ d }: { d: Insights }) {
   const states = useProductDetails(ids, filters)
   const list = useProducts(filters).state
   const rows = list.status === 'ready' ? list.d.products : []
+  const names = useCompetitorNames()
+  // A brand organisation under the retailer's naming policy compares its own products only: a hand-typed or
+  // old link that names another brand's product shows the policy state, not that product's figures.
+  const brandOfId = (id: string, i: number): string | null => {
+    const r = rows.find((x) => x.product_id === id)
+    if (r) return r.brand
+    const st = states[i]
+    return st?.status === 'ready' ? st.d.product.brand : null
+  }
+  const foreign = names.anonymise ? ids.filter((id, i) => { const b = brandOfId(id, i); return b !== null && b !== names.own }) : []
+  const pending = names.anonymise && ids.some((id, i) => brandOfId(id, i) === null && states[i]?.status === 'loading')
   const setIds = (next: string[]) => setParam({ ids: next.join(',') || null })
   const xs = states.filter((s): s is Ready => s.status === 'ready').map((s) => s.d)
   const missing = ids.filter((_, i) => states[i]?.status === 'missing' || states[i]?.status === 'failed')
@@ -88,13 +101,23 @@ function Body({ d }: { d: Insights }) {
         width={380}
         disabled={ids.length >= MAX_COMPARE || !rows.length}
         options={rows
-          .filter((r) => !ids.includes(r.product_id))
+          .filter((r) => !ids.includes(r.product_id) && (!names.anonymise || r.brand === names.own))
           .sort((a, b) => a.category_label.localeCompare(b.category_label) || a.product.localeCompare(b.product))
           .map((r) => ({ value: r.product_id, label: `${r.product} · ${r.brand}`, hint: r.rate === null ? 'No data' : pct(r.rate), group: r.category_label }))}
         onChange={(v) => setIds([...ids, v])}
       />
     </div>
   )
+
+  if (pending && !foreign.length) return <CompareSkeleton />
+  if (foreign.length) {
+    return (
+      <div className="flex flex-col gap-6">
+        {back}
+        <NamesHidden what="Comparing with another brand’s product" />
+      </div>
+    )
+  }
 
   if (ids.length < 2) {
     return (

@@ -7,6 +7,7 @@ import { GOAL_LOOK, GOAL_NOTE } from './looks'
 import { BUDGET_RANGE, money, type PlanSkin, type StepCount, type Tier } from './planApi'
 import { card, cardStyle, primary, stagger } from './styles'
 import { Field, Frame, Pills, Tick } from './ui'
+import { PastReactions } from '../you/PastReactions'
 
 const arrow = <span aria-hidden>→</span>
 
@@ -216,6 +217,9 @@ export function CareStep() {
         </Field>
         <Field title="Ingredients you avoid" note="Choose any">
           <Pills<AvoidId> multi label="Ingredients to avoid" options={AVOID_OPTIONS} value={draft.avoid} onChange={toggleAvoid} />
+        </Field>
+        <Field title="Past reactions" note="Optional">
+          <PastReactions dense value={draft} onChange={set} />
         </Field>
         <Field title="Do you use a prescription skin treatment?" note="From a doctor, for your face">
           <Pills<'yes' | 'no'>

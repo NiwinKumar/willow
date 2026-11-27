@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, model_validator
 
-from app import catalog, limits, product_requests
+from app import limits, product_requests
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store
 
@@ -50,14 +50,14 @@ def create_request(
 ) -> dict[str, Any]:
     """Queue a product for Willow to check and add. A product the catalog already has is not
     queued: 409 `in_catalog` carries it, so the app can offer it instead."""
-    found = catalog.match(body.brand, body.name)
-    if found and found[1] >= 0.85:
+    found = product_requests.in_catalog(body.brand, body.name)
+    if found is not None:
         raise HTTPException(
             409,
             {
                 "code": "in_catalog",
-                "message": "That product is already in the catalog.",
-                "product": found[0],
+                "message": f"It's in the catalog: {found['name']}",
+                "product": found,
             },
         )
     photo = None
