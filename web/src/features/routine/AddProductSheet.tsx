@@ -8,9 +8,9 @@ import { AITag } from '../../components/willow/AITag'
 import { useOwner, useProductRequests } from '../../data/hooks'
 import type { Product } from '../../data/types'
 import { ApiError, api, localDay, type ProductRequest } from '../../lib/api'
-import { CONCERN_LABEL, categoryLabel } from '../../lib/catalog'
+import { CONCERN_LABEL, categoryLabel, hasFullFacts } from '../../lib/catalog'
 import { fmtPrice, plural } from '../../lib/format'
-import { toJpegBase64 } from '../../lib/image'
+import { packImage } from '../../lib/image'
 import { setQueryData } from '../../lib/query'
 import { sampleLabelFile } from '../../lib/sampleLabel'
 import { useAuth } from '../../lib/useAuth'
@@ -41,16 +41,6 @@ const WHEN: { value: When; label: string }[] = [
 // A new product starts in the slot it usually belongs to; the person can change it before saving.
 const defaultWhen = (category: string): When => (category === 'sunscreen' ? 'am' : category === 'cleanser' || category === 'moisturizer' ? 'both' : 'pm')
 const slotsOf = (w: When): ('am' | 'pm')[] => (w === 'both' ? ['am', 'pm'] : [w])
-
-const MAX_B64 = 8_000_000 // api photo data_base64 max_length
-
-/** Shrink a pack photo until it fits the api's limit (big phone photos first go to 1600 px). */
-async function packImage(file: File) {
-  let img = await toJpegBase64(file)
-  if (img.data_base64.length > MAX_B64) img = await toJpegBase64(file, 1100, 0.75)
-  if (img.data_base64.length > MAX_B64) throw new Error('too big')
-  return img
-}
 
 /**
  * "Add a product" bottom sheet (design: Willow App Routine, addOpen; it rises from the bottom at every width):
@@ -364,7 +354,9 @@ function RequestProduct({ asked, inRoutine, onPick }: { asked: string; inRoutine
     setSending(true)
     setError(null)
     try {
-      const made = await api.requestProduct(await getIdToken(), { brand: brand.trim(), name: name.trim(), ...(photo ? { photo } : {}) })
+      // a product the catalog knows only by name: the request (and the photo) is for its full facts
+      const facts = found && !hasFullFacts(found) ? { product_id: found.product_id } : {}
+      const made = await api.requestProduct(await getIdToken(), { brand: brand.trim(), name: name.trim(), ...facts, ...(photo ? { photo } : {}) })
       setSent(made)
       setQueryData<ProductRequest[]>(['product-requests', uid], (prev) => [made, ...(prev ?? [])])
     } catch (e) {
@@ -415,7 +407,7 @@ function RequestProduct({ asked, inRoutine, onPick }: { asked: string; inRoutine
 
       {found ? (
         <div className="flex flex-col gap-3 rounded-[24px] bg-sunken p-4">
-          <span className="text-[14px] text-ink-2">Good news: it’s already in the catalog</span>
+          <span className="text-[14px] text-ink-2">{hasFullFacts(found) ? 'Good news: it’s already in the catalog' : 'It’s in the catalog, but its ingredient list isn’t in Willow yet. Send the photo below and we’ll add it.'}</span>
           <div className="flex items-center gap-3.5">
             <ProductImage product={found} size={50} decorative />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -554,7 +546,13 @@ function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveEr
           <span className="text-[17px] leading-snug">{p.name}</span>
         </span>
       </div>
-      <p className="-mt-1 text-[13px] text-ink-2">{draft.source === 'label_scan' ? 'Matched from your photo. Ingredients, price and store links come from the catalog.' : 'Ingredients, price and store links come from the catalog.'}</p>
+      <p className="-mt-1 text-[13px] text-ink-2">
+        {!hasFullFacts(p)
+          ? 'Its ingredient list isn’t in Willow yet, so it hasn’t been checked for you. You can still add it; open it from your routine to scan the label.'
+          : draft.source === 'label_scan'
+            ? 'Matched from your photo. Ingredients, price and store links come from the catalog.'
+            : 'Ingredients, price and store links come from the catalog.'}
+      </p>
       {check && warning ? (
         <div className="flex flex-col gap-2">
           <p role="note" className="m-0 text-[14px] leading-[1.45] text-ink">

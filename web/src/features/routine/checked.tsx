@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { CheckedChip } from '../../components/willow/CheckedChip'
-import { CHECK_WORDS, LABELS_NOTE, REGULATORY_WORDS, useSafety, type CheckStatus, type ProductCheck } from '../../lib/safety'
+import { CHECK_WORDS, LABELS_NOTE, noFlagsText, REGULATORY_WORDS, useSafety, type CheckStatus, type ProductCheck } from '../../lib/safety'
 import { useOwner } from '../../data/hooks'
 import { SafetySheet } from '../you/SafetyForm'
 import { Link } from 'react-router-dom'
@@ -14,6 +14,7 @@ const LOOK: Record<CheckStatus, { fg: string; bg: string }> = {
   check: { fg: 'var(--state-caution-fg)', bg: 'var(--state-caution-bg)' },
   avoid: { fg: 'var(--state-avoid-fg)', bg: 'var(--state-avoid-bg)' },
   not_sold: { fg: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
+  unknown: { fg: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
 }
 
 /**
@@ -77,12 +78,11 @@ export function CheckReasons({ check, profileComplete }: { check: ProductCheck; 
           ))}
         </ul>
       ) : (
-        <span className="text-[13px] leading-[1.45] text-ink-2">{check.status === 'not_sold' ? 'In your market this is sold as a medicine, not a cosmetic, so Willow does not suggest it.' : 'Nothing on its ingredient list matches what you told Willow.'}</span>
+        <span className="text-[13px] leading-[1.45] text-ink-2">{noFlagsText(check)}</span>
       )}
       <span className="text-[12px] leading-[1.45] text-ink-2">
-        {check.regulatory ? `${REGULATORY_WORDS[check.regulatory.class]} in ${check.regulatory.market === 'UK' || check.regulatory.market === 'US' ? `the ${check.regulatory.market}` : check.regulatory.market}. ` : ''}
-        {profileComplete === false ? 'Checked against part of your profile. ' : ''}
-        {LABELS_NOTE} Checked by fixed rules from published sources, not by AI.{' '}
+        {check.regulatory ? `${REGULATORY_WORDS[check.regulatory.class]}${check.regulatory.market ? ` in ${check.regulatory.market === 'UK' || check.regulatory.market === 'US' ? `the ${check.regulatory.market}` : check.regulatory.market}` : ''}. ` : ''}
+        {check.status === 'unknown' ? 'Checks use the ingredient list, by fixed rules from published sources, not by AI.' : `${profileComplete === false ? 'Checked against part of your profile. ' : ''}${LABELS_NOTE} Checked by fixed rules from published sources, not by AI.`}{' '}
         <Link to="/checks" className="text-ink underline underline-offset-2">
           How we check
         </Link>

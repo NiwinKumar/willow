@@ -13,7 +13,7 @@ import { COMMISSION_NOTE, useStoreClick } from '../../lib/clicks'
 import { useChecks } from '../../lib/safety'
 import { useAuth } from '../../lib/useAuth'
 import { usePlan } from './draft'
-import { SLOT_WORDS, WHEN_WORDS, errorText, money, priceIn, type PlanPick, type PlanWhen } from './planApi'
+import { SLOT_WORDS, WHEN_WORDS, errorText, money, moneyOf, priceIn, type PlanPick, type PlanWhen } from './planApi'
 import { card, cardStyle, primary, secondary, stagger } from './styles'
 import { Frame } from './ui'
 
@@ -47,7 +47,7 @@ export function PlanRoutineStep() {
   const currency = result.total.currency
   const total = picks.reduce((s, p) => {
     const price = priceIn(p.product, currency)
-    return s + (price.currency === currency ? price.amount : 0)
+    return s + (price && price.currency === currency ? price.amount : 0)
   }, 0)
   const base = picks.filter((p) => p.slot !== 'active')
 
@@ -237,7 +237,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
           </span>
         </div>
         <span className="flex flex-none flex-col items-end gap-1.5">
-          <span className="text-[15px] tabular-nums">{money(priceIn(p, currency).amount, priceIn(p, currency).currency)}</span>
+          <span className="text-[15px] tabular-nums">{moneyOf(priceIn(p, currency))}</span>
           {pick.alternatives.length || pick.why.length > 1 || p.stores.length ? (
             <button type="button" aria-expanded={open} aria-controls={panel} onClick={onToggle} className="flex min-h-8 items-center gap-1 rounded-pill px-2 text-[12.5px] text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
               {open ? 'Less' : 'More'}
@@ -301,7 +301,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-[13.5px]">{a.name}</span>
                       <span className="truncate text-[12px] text-ink-2">
-                        {a.brand} · {money(priceIn(a, currency).amount, priceIn(a, currency).currency)}
+                        {[a.brand, moneyOf(priceIn(a, currency))].filter(Boolean).join(' · ')}
                       </span>
                     </span>
                     <CheckedChip check={checks[a.product_id]} short />

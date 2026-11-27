@@ -6,7 +6,9 @@ C: weak or self-reported evidence, or convention). Everything here is plain code
 (INCI and key actives) and what the person told Willow; Gemini never adds or removes a flag.
 
 A flag never says a product is "safe": the best status is "clear" ("No flags for you"). Labels can
-be incomplete, and a name missing from a label is "not listed", never "free from".
+be incomplete, and a name missing from a label is "not listed", never "free from". A catalog
+product whose ingredient list Willow does not have yet (an index product, docs/CATALOG_SPEC.md)
+is "unknown" ("Not checked yet"), never "clear".
 """
 
 import json
@@ -40,14 +42,17 @@ INGREDIENT_NAME = re.compile(r"^[\w][\w ().,/'+&-]{1,79}$")
 # "Tell us about past reactions or breakouts": free text, read only by the note reader
 # (app/safety_note.py) and Wisp; never a flag by itself, never exported
 MAX_NOTE = 500
-Status = Literal["clear", "check", "avoid", "not_sold"]
+Status = Literal["clear", "check", "avoid", "not_sold", "unknown"]
 STATUS_WORDS = {
     "clear": "No flags for you",
     "check": "Check this",
     "avoid": "Not advised for you",
     "not_sold": "Not sold as a cosmetic in your market",
+    "unknown": "Not checked yet",
 }
 LABELS_NOTE = "Labels can be incomplete."
+# The one explanation an "unknown" check carries: nothing on the label was read.
+NO_LABEL = "No ingredient list yet \u2014 scan the label to check it"
 
 
 class SafetyProfile(BaseModel):
@@ -332,11 +337,42 @@ def _not_sold(product: dict[str, Any], market: str | None) -> bool:
     return all(regulatory.classify(product, m) in ("rx", "pharmacy") for m in regulatory.MARKETS)
 
 
+def _check_without_label(
+    product: dict[str, Any], profile: dict[str, Any] | None, market: str | None
+) -> dict[str, Any]:
+    """No ingredient list: nothing on the label can be flagged, so never "clear". What is known
+    without it still counts: the person's own avoid list ("avoid"), and a name or key active that
+    makes it a medicine where they are ("not_sold"). The regulatory class is given only when the
+    name or actives show it is not a plain cosmetic; otherwise it is null (not known)."""
+    if profile and product.get("product_id") in (profile.get("avoid_products") or []):
+        return {
+            "status": "avoid",
+            "flags": [dict(AVOID_PRODUCT_FLAG)],
+            "regulatory": None,
+            "explanation": NO_LABEL,
+        }
+    reg = regulatory.of(product, market)
+    return {
+        "status": "not_sold" if _not_sold(product, market) else "unknown",
+        "flags": [],
+        "regulatory": reg if reg["class"] != "cosmetic" else None,
+        "explanation": NO_LABEL,
+    }
+
+
+def has_label(product: dict[str, Any]) -> bool:
+    """Willow has this product's ingredient list (index products do not, yet)."""
+    return bool(product.get("inci"))
+
+
 def check(
     product: dict[str, Any], profile: dict[str, Any] | None, market: str | None = None
 ) -> dict[str, Any]:
-    """{status, flags, regulatory}. `market` overrides the profile's."""
+    """{status, flags, regulatory}, plus `explanation` when there is no ingredient list.
+    `market` overrides the profile's."""
     market = market or (profile or {}).get("market")
+    if not has_label(product):
+        return _check_without_label(product, profile, market)
     found = flags(product, profile)
     if any(f["level"] == "avoid" for f in found):
         status = "avoid"

@@ -127,8 +127,8 @@ def product_rows() -> list[dict]:
             "target_metrics": sorted(
                 {m for c in p["concerns"] for m in cohort.CONCERN_METRICS.get(c, [])}
             ),
-            "price_amount": float(p["price"]["amount"]),
-            "price_currency": p["price"]["currency"],
+            "price_amount": float(p["price"]["amount"]) if p.get("price") else None,
+            "price_currency": p["price"]["currency"] if p.get("price") else None,
             "tier": cohort.tier(p["price"]),
         }
         for p in catalog.products()

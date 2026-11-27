@@ -215,6 +215,10 @@ export type ProductRequest = {
   seen: boolean
   /** Plain status line ("We add products by hand within a few days."); older api builds omit it. */
   status_text?: string
+  /** "facts": the full facts of a catalog product known only by name (an index product). */
+  kind?: 'product' | 'facts'
+  /** The index product a facts request is for. */
+  for_product_id?: string | null
 }
 
 export class ApiError extends Error {
@@ -366,7 +370,8 @@ export const api = {
   },
   productRequests: (token: string) => request<{ requests: ProductRequest[] }>(token, '/v1/product-requests'),
   /** 409 `in_catalog` (detail.product) when the catalog already has it. */
-  requestProduct: (token: string, body: { brand: string; name: string; photo?: { mime_type: string; data_base64: string } }) =>
+  /** `product_id` of an index product asks for its full facts (answered by the same request when asked again). */
+  requestProduct: (token: string, body: { brand?: string; name?: string; product_id?: string; photo?: { mime_type: string; data_base64: string } }) =>
     request<ProductRequest>(token, '/v1/product-requests', { method: 'POST', ...json(body) }),
   seenProductRequest: (token: string, id: string) => request<void>(token, `/v1/product-requests/${id}`, { method: 'PATCH', ...json({ seen: true }) }),
   catalogProduct: (token: string, productId: string) => request<Product>(token, `/v1/catalog/${productId}`),

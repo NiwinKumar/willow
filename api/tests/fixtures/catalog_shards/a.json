@@ -1,0 +1,72 @@
+[
+  {
+    "product_id": "hada-labo-gokujyun-premium-lotion",
+    "brand": "Hada Labo",
+    "name": "Gokujyun Premium Hyaluronic Lotion",
+    "category": "toner",
+    "concerns": ["dryness_barrier"],
+    "key_actives": [],
+    "inci": [],
+    "price": null,
+    "size": "170 ml",
+    "region": ["SG", "MY", "GLOBAL"],
+    "stores": [{"store": "Watsons", "url": "https://www.watsons.com.sg/x", "region": "SG", "price": null}],
+    "image_url": "https://example.com/hada.png",
+    "image_source": "https://example.com/hada",
+    "source_url": "https://example.com/hada",
+    "last_verified": "2026-11-27",
+    "detail": "index",
+    "notes": "Name and pack from the brand page; INCI not opened yet."
+  },
+  {
+    "product_id": "cosrx-snail-96-mucin-power-essence",
+    "brand": "COSRX",
+    "name": "Advanced Snail 96 Mucin Power Essence",
+    "category": "serum",
+    "concerns": ["dryness_barrier"],
+    "key_actives": [{"name": "snail secretion filtrate", "pct": 96}],
+    "inci": ["Snail Secretion Filtrate", "Betaine", "Butylene Glycol"],
+    "price": {"amount": 25, "currency": "USD"},
+    "size": "100 ml",
+    "region": ["US", "KR"],
+    "stores": [],
+    "source_url": "https://www.cosrx.com/x",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "INCI from the brand page."
+  },
+  {
+    "product_id": "cosrx-no-label",
+    "brand": "COSRX",
+    "name": "Full Fit Propolis Light Ampoule",
+    "category": "serum",
+    "concerns": [],
+    "inci": [],
+    "price": {"amount": 20, "currency": "USD"},
+    "region": ["KR"],
+    "source_url": "https://www.cosrx.com/y",
+    "last_verified": "2026-11-27",
+    "detail": "full"
+  },
+  {
+    "product_id": "Bad ID",
+    "brand": "X",
+    "name": "Y",
+    "category": "perfume",
+    "region": ["XX"],
+    "price": {"amount": 5, "currency": "usd"},
+    "source_url": "ftp://x",
+    "last_verified": "2026-11-27",
+    "detail": "index"
+  },
+  {
+    "product_id": "the-ordinary-niacinamide-10-zinc-1",
+    "brand": "The Ordinary",
+    "name": "Another listing",
+    "category": "serum",
+    "region": ["GLOBAL"],
+    "source_url": "https://theordinary.com/z",
+    "last_verified": "2026-11-27",
+    "detail": "index"
+  }
+]

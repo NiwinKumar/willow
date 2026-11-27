@@ -52,9 +52,12 @@ def _has(names: list[str], term: str) -> bool:
 
 
 def _names(product: dict[str, Any]) -> list[str]:
-    """Key active names and every INCI entry, normalised (parenthesised words kept)."""
+    """Key active names and every INCI entry, normalised (parenthesised words kept). Without an
+    ingredient list (an index product), its name stands in: "Adapalene Gel 0.1%" is still
+    adapalene."""
     actives = [_norm(a["name"]) for a in product.get("key_actives") or []]
-    return actives + [_norm(i) for i in product.get("inci") or []]
+    inci = [_norm(str(i)) for i in product.get("inci") or []]
+    return actives + (inci or [_norm(str(product.get("name") or ""))])
 
 
 def _pct(product: dict[str, Any], term: str) -> float | None:

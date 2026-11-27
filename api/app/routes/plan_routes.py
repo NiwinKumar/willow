@@ -199,6 +199,8 @@ class PreviewIn(BaseModel):
 
 
 PROPOSED = "_proposed"
+NOTE_CHECKED = "Checked by fixed rules, not by AI."
+NOTE_NO_LABEL = "Its ingredient list isn't in Willow yet, so it can't be checked with your routine."
 
 
 def _active_key(name: str) -> str:
@@ -214,7 +216,9 @@ def routine_check_preview(
 ) -> dict[str, Any]:
     """In-aisle check: what adding this product would newly bring to the person's routine, by the
     rule table only (no Gemini, no cap): clashes and gaps that appear only with it, and the key
-    actives the routine already has. Nothing is saved."""
+    actives the routine already has. Nothing is saved. A product whose ingredient list Willow
+    does not have yet (an index product) answers `checked: false`: no clash found is not "no
+    clash"."""
     product = catalog.by_id(body.product_id)
     if product is None:
         raise HTTPException(404, {"code": "not_found", "message": "product not found"})
@@ -270,5 +274,6 @@ def routine_check_preview(
         "already_use": []
         if in_routine
         else [{"active": k, "products": sorted(v)} for k, v in already.items()],
-        "note": "Checked by fixed rules, not by AI.",
+        "checked": safety.has_label(product),
+        "note": NOTE_CHECKED if safety.has_label(product) else NOTE_NO_LABEL,
     }

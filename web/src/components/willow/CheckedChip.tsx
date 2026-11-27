@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
 
-import { CHECK_WORDS, LABELS_NOTE, REGULATORY_WORDS, type CheckStatus, type ProductCheck } from '../../lib/safety'
+import { CHECK_WORDS, LABELS_NOTE, noFlagsText, REGULATORY_WORDS, type CheckStatus, type ProductCheck } from '../../lib/safety'
 import { Link } from 'react-router-dom'
 
 /** Status colours from the routine-check state tokens; the meaning is always in the glyph and the words too. */
@@ -9,6 +9,7 @@ const LOOK: Record<CheckStatus, { fg: string; bg: string }> = {
   check: { fg: 'var(--state-caution-fg)', bg: 'var(--state-caution-bg)' },
   avoid: { fg: 'var(--state-avoid-fg)', bg: 'var(--state-avoid-bg)' },
   not_sold: { fg: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
+  unknown: { fg: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
 }
 
 const POP_W = 300
@@ -16,7 +17,8 @@ const MARKET_NAME: Record<string, string> = { IN: 'India', SG: 'Singapore' }
 
 /**
  * A product's check for this person, as a compact chip: glyph + words ("No flags for you", "Check this",
- * "Not advised for you", "Not sold as a cosmetic in your market"). Hover (mouse), tap or Enter opens the
+ * "Not advised for you", "Not sold as a cosmetic in your market", or "Not checked yet" when Willow has no
+ * ingredient list for it). Hover (mouse), tap or Enter opens the
  * reasons: each flag's title, detail, source link and evidence grade, how the product is sold, and
  * "Labels can be incomplete". `loading` draws a quiet placeholder; no check and not loading draws nothing.
  * The panel stays in the chip's own tree (so it works inside a modal <dialog>) as a manual popover: shown,
@@ -185,9 +187,7 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
                   ))}
                 </ul>
               ) : (
-                <p className="m-0 mt-1.5 text-[12.5px] text-ink-2">
-                  {check.status === 'not_sold' ? 'In your market this is sold as a medicine, not a cosmetic, so Willow does not suggest it.' : 'Nothing on its ingredient list matches what you told Willow.'}
-                </p>
+                <p className="m-0 mt-1.5 text-[12.5px] text-ink-2">{noFlagsText(check)}</p>
               )}
               {check.regulatory ? (
                 <p className="m-0 mt-2.5 text-[12px] text-ink-2">
@@ -195,9 +195,9 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
                   {check.regulatory.market ? ` in ${check.regulatory.market === 'UK' || check.regulatory.market === 'US' || check.regulatory.market === 'EU' ? `the ${check.regulatory.market}` : MARKET_NAME[check.regulatory.market] ?? check.regulatory.market}` : ''}.
                 </p>
               ) : null}
-              {profileComplete === false ? <p className="m-0 mt-1.5 text-[12px] text-ink-2">Checked against part of your profile. Answer the questions in Build a routine for a full check.</p> : null}
+              {profileComplete === false && check.status !== 'unknown' ? <p className="m-0 mt-1.5 text-[12px] text-ink-2">Checked against part of your profile. Answer the questions in Build a routine for a full check.</p> : null}
               <p className="m-0 mt-2.5 border-t border-line pt-2 text-[11.5px] text-ink-2">
-                {LABELS_NOTE} Checked by fixed rules from published sources, not by AI.{' '}
+                {check.status === 'unknown' ? 'Checks use the ingredient list, by fixed rules from published sources, not by AI.' : `${LABELS_NOTE} Checked by fixed rules from published sources, not by AI.`}{' '}
                 <Link to="/checks" className="text-ink underline underline-offset-2">
                   How we check
                 </Link>

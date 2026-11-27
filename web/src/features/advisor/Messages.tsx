@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import type { MetricId, Product } from '../../data/types'
 import type { AdvisorReply, AnswerBlock } from '../../lib/api'
+import { NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { ProductImage } from '../routine/productUi'
@@ -239,7 +240,7 @@ function ProductCard({ p, check, loading, profileComplete, onStore, onOpen }: { 
         <span className="text-[12px] text-ink-2">{metaLine(p.brand, p.category, p.size)}</span>
         <span className="text-[13px]">{p.name}</span>
         <span className="text-[12px] text-ink-2">
-          {fmtPrice(p.price)} · price checked {fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}
+          {p.price ? `${fmtPrice(p.price)} · price checked ${fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}` : NO_PRICE}
         </span>
       </button>
       <CheckedChip check={check} loading={loading} profileComplete={profileComplete} short />

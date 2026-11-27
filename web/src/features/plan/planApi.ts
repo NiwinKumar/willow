@@ -87,6 +87,9 @@ export const WHEN_WORDS: Record<PlanWhen, string> = { am: 'AM', pm: 'PM', both: 
 
 const SYMBOL: Record<string, string> = { USD: '$', INR: '₹', SGD: 'S$', GBP: '£', EUR: '€' }
 
+/** A price as the plan writes it; '' when there is none. */
+export const moneyOf = (x: { amount: number; currency: string } | null): string => (x ? money(x.amount, x.currency) : '')
+
 /** Money as the plan's currency writes it ("$25", "₹800", "S$12.50"); other currencies by the browser. */
 export function money(amount: number, currency: string): string {
   const digits = amount % 1 ? 2 : 0
@@ -100,8 +103,8 @@ export function money(amount: number, currency: string): string {
 }
 
 /** The lowest listed price in the plan's currency (reference or a store's), as the api's plan.price_in reads it;
- * the reference price only when none is in that currency. Never converted. */
-export function priceIn(p: Product, currency: string): { amount: number; currency: string } {
+ * the reference price only when none is in that currency (null when it has none). Never converted. */
+export function priceIn(p: Product, currency: string): { amount: number; currency: string } | null {
   const amounts = [p.price, ...p.stores.map((s) => s.price)].flatMap((x) => (x && x.currency === currency ? [x.amount] : []))
   return amounts.length ? { amount: Math.min(...amounts), currency } : p.price
 }

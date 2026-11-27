@@ -96,6 +96,7 @@ def plan(org: dict[str, Any] | None, taken: set[str]) -> list[tuple[dict[str, An
             p
             for p in catalog.products()
             if p["brand"] in brands
+            and catalog.is_full(p)
             and p["product_id"] not in used
             and cohort.goals_of(p.get("concerns"))
         ]

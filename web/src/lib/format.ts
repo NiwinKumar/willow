@@ -42,7 +42,9 @@ export function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
 }
 
-export function fmtPrice(price: { amount: number; currency: string }): string {
+/** A price in its own currency; '' for no price (an index product nobody has priced yet). */
+export function fmtPrice(price: { amount: number; currency: string } | null | undefined): string {
+  if (!price) return ''
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: price.currency, maximumFractionDigits: price.amount % 1 ? 2 : 0 }).format(price.amount)
   } catch {
