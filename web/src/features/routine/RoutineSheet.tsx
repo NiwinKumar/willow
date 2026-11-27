@@ -100,11 +100,12 @@ export function RoutineSheet({ open, onClose, kind, title, onBack, fixedHeight =
           <div className="flex items-center justify-between gap-2.5">
             <div className="flex min-w-0 items-center gap-2.5">
               {onBack ? (
-                <button type="button" onClick={onBack} aria-label="Back" className={`${round} size-12 bg-canvas hover:bg-muted`}>
+                <button type="button" onClick={onBack} aria-label="Back" className={`${round} size-12 bg-canvas hover:bg-muted motion-safe:animate-[wDotIn_.25s_var(--ease-standard)_both]`}>
                   <ArrowLeft size={18} strokeWidth={1.8} aria-hidden />
                 </button>
               ) : null}
-              <h2 className="m-0 font-serif text-[clamp(34px,4vw,44px)] leading-none font-normal">{title}</h2>
+              {/* a step change (Add a product → Confirm details) rises the new title in instead of swapping it */}
+              <h2 key={title} className="m-0 font-serif text-[clamp(34px,4vw,44px)] leading-none font-normal motion-safe:animate-[wRise_.3s_var(--ease-standard)_both]">{title}</h2>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" className={`${round} size-[52px] bg-canvas hover:bg-muted`}>
               <X size={18} strokeWidth={1.8} aria-hidden />

@@ -33,8 +33,8 @@ export function ProductTestTile({ read, onOpen, className = '' }: { read: Forear
     >
       <span className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[11px] tracking-[.08em]">■ PRODUCT TEST</span>
-          <span className="line-clamp-2 text-[14px] leading-[1.3]">{name ? `${name} on your forearm` : 'Arm with product vs arm without'}</span>
+          <span className="text-[15px] leading-[1.25] font-medium">Product test</span>
+          <span className="line-clamp-2 text-[13px] leading-[1.35]">{name ? `${name} on your forearm` : 'Arm with product vs arm without'}</span>
           <span className="text-[12px] leading-[1.35]">
             <span aria-hidden>{standing.g} </span>
             {standing.t}
@@ -71,11 +71,12 @@ export function BaselineTile({ baseline, onOpen, className = '' }: { baseline: S
     >
       <span className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ YOUR BASELINE</span>
-          <span className="text-[14px] leading-[1.3]">Every check-in is compared with this one</span>
+          <span className="text-[15px] leading-[1.25]">Your baseline</span>
+          <span className="text-[13px] leading-[1.35] text-ink-2">Every check-in is compared with this one</span>
         </span>
-        <span className="flex flex-none flex-col items-end">
-          <span className="font-dot text-[34px] leading-none tnum">{fmtDate(baseline.created_at)}</span>
+        {/* A date, not a measurement: Outfit light, not the dot-matrix numerals (which are for metric values). */}
+        <span className="flex flex-none flex-col items-end gap-0.5">
+          <span className="text-[24px] leading-none font-light tracking-[-0.02em] whitespace-nowrap tnum">{fmtDate(baseline.created_at)}</span>
           <span className="text-[12px] text-ink-2">{ago}</span>
         </span>
       </span>
@@ -115,8 +116,8 @@ export function PhotosTile({ session, onOpen, className = '' }: { session: Sessi
     >
       <span className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ LAST PHOTOS</span>
-          <span className="text-[14px] leading-[1.3]">
+          <span className="text-[15px] leading-[1.25]">Last photos</span>
+          <span className="text-[13px] leading-[1.35] text-ink-2">
             {place} · {fmtDate(session.created_at)}
           </span>
         </span>

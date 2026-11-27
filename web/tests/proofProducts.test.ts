@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { packCsv, packHtml, packMarkdown, packName, statementLine } from '../src/features/retail/evidencePack.ts'
-import { bestSeg, brandShares, categorySpot, filterRows, hintOf, productsLead, sortRows, leaderOf, money, noDataReason, parseIds, rivalOf, segInterval, toggleId, verdictLine, wilson } from '../src/features/retail/productModel.ts'
+import { bestSeg, brandShares, categorySpot, filterRows, hintOf, productsLead, promoHistory, promoNote, leaderOf, money, noDataReason, parseIds, rivalOf, segInterval, toggleId, verdictLine, wilson } from '../src/features/retail/productModel.ts'
 import type { ProductDetail, ProductRow } from '../src/features/retail/types.ts'
 
 function row(p: Partial<ProductRow> & { product_id: string }): ProductRow {
@@ -154,7 +154,7 @@ test('category spot: the product against the median of the other measured produc
   assert.equal(categorySpot([{ rate: null, is_self: true }, { rate: 0.5 }, { rate: 0.4 }]), null)
 })
 
-test('products lead: Proven without a running campaign, the nearest Promising, the most-used unclear', () => {
+test('products lead: Proven without a running campaign (a finished one counts as ran before), the nearest Promising, the most-used unclear', () => {
   const rows = [
     row({ product_id: 'a', lift_lo: 0.05 }),
     row({ product_id: 'b', lift_lo: 0.2 }),
@@ -165,16 +165,24 @@ test('products lead: Proven without a running campaign, the nearest Promising, t
     row({ product_id: 'u1', tier: 'unclear', users: 20 }),
     row({ product_id: 'u2', tier: 'unclear', users: 90 }),
   ]
-  const lead = productsLead(rows, new Set(['c']))
+  const lead = productsLead(rows, new Map([['c', { state: 'running' as const }], ['a', { state: 'ended' as const }]]))
   assert.deepEqual(lead.toPromote.map((r) => r.product_id), ['b', 'a'])
+  assert.equal(lead.ranBefore, 1)
   assert.equal(lead.proven, 3)
   assert.deepEqual(lead.close.map((r) => r.product_id), ['p2', 'p1', 'p3'])
   assert.deepEqual(lead.unclear.map((r) => r.product_id), ['u2', 'u1'])
 })
 
-test('long tables sort the whole list before a page is cut, nulls last both ways', () => {
-  const rs = [{ v: 2 }, { v: null }, { v: 9 }, { v: 5 }]
-  assert.deepEqual(sortRows(rs, (r) => r.v, 'desc').map((r) => r.v), [9, 5, 2, null])
-  assert.deepEqual(sortRows(rs, (r) => r.v, 'asc').map((r) => r.v), [2, 5, 9, null])
-  assert.equal(sortRows(rs, undefined, 'asc'), rs)
+
+test('promotion history: running beats paused beats the latest finished; samples count; notes never say never promoted', () => {
+  const c = (id: string, product_id: string, status: 'active' | 'paused' | 'ended', created_at: string, lift: number | null, sample = true) => ({ id, product_id, status, created_at, sample, stats: { incrementality: lift === null ? null : { lift } } })
+  const m = promoHistory([c('1', 'x', 'ended', '2026-10-01', 0.04), c('2', 'x', 'ended', '2026-11-01', 0.08), c('3', 'y', 'ended', '2026-11-01', null), c('4', 'y', 'active', '2026-10-01', null), c('5', 'z', 'paused', '2026-11-02', 0.06, false)])
+  assert.deepEqual(m.get('x'), { state: 'ended', lift: 0.08, campaignId: '2', sample: true })
+  assert.equal(m.get('y')?.state, 'running')
+  assert.equal(m.get('z')?.sample, false)
+  assert.equal(promoNote(m.get('x')), 'Promoted before, +8 pts adoption')
+  assert.equal(promoNote(m.get('y')), 'Campaign running')
+  assert.equal(promoNote(m.get('z')), 'Campaign paused')
+  assert.equal(promoNote({ state: 'ended', lift: null, campaignId: '3', sample: true }), 'Promoted before')
+  assert.equal(promoNote(undefined), null)
 })

@@ -216,8 +216,9 @@ export const siteLower = (site: Site) => SITE_NAME[site].toLowerCase()
 export const pad2 = (n: number) => String(n).padStart(2, '0')
 
 /** "15 OCT · AFTERNOON" (APP capWhen). */
+/** "28 Nov · evening": the check-in sheet's context line (sentence case since the polish pass). */
 export function whenCaps(d = new Date()): string {
-  const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()
+  const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   const h = d.getHours()
-  return `${day} · ${h < 12 ? 'MORNING' : h < 18 ? 'AFTERNOON' : 'EVENING'}`
+  return `${day} · ${h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'}`
 }

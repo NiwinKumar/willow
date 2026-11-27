@@ -47,7 +47,7 @@ export function Menu({ trigger, label, children, align = 'left', width = 280, cl
           role="menu"
           aria-label={label}
           style={{ width, ...clamp }}
-          className={`absolute top-[calc(100%+6px)] z-[70] flex max-h-[min(70vh,560px)] max-w-[calc(100vw-32px)] flex-col overflow-y-auto rounded-card border border-line bg-surface p-1 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[proofDrop_.14s_var(--ease-standard)_both] ${align === 'right' ? 'right-0' : 'left-0'}`}
+          className={`absolute top-[calc(100%+6px)] z-[70] flex max-h-[min(70vh,560px)] max-w-[calc(100vw-32px)] flex-col overflow-y-auto rounded-card border border-line bg-surface p-1 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[proofDrop_.16s_var(--ease-standard)_both] ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}
         >
           {children(() => setOpen(false))}
         </div>

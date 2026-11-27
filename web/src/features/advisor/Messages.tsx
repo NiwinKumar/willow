@@ -38,7 +38,7 @@ function Stamp({ at, align }: { at: string; align: 'left' | 'right' }) {
 export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessage, { role: 'user' }> }) {
   return (
     <div className="group flex flex-col items-end gap-1">
-      {m.context ? <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {m.context.toUpperCase()}</span> : null}
+      {m.context ? <span className="text-[12px] text-ink-2">From {m.context}</span> : null}
       <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
         {m.photos?.length ? (
           <span className="flex flex-wrap justify-end gap-1.5">
@@ -47,8 +47,8 @@ export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessa
             ))}
           </span>
         ) : m.photoCount ? (
-          <span className="font-mono text-[10px] tracking-[.06em] text-inverse/70">
-            ■ {m.photoCount} PRODUCT PHOTO{m.photoCount === 1 ? '' : 'S'} · NOT KEPT
+          <span className="text-[12px] text-inverse/70">
+            {m.photoCount} product photo{m.photoCount === 1 ? '' : 's'} · not kept
           </span>
         ) : null}
         <span>{m.text}</span>
@@ -89,7 +89,7 @@ function HowMade({ r }: { r: AdvisorReply }) {
       </button>
       {open ? (
         <span role="tooltip" className="absolute right-0 bottom-full z-10 mb-1.5 flex w-[280px] flex-col gap-1.5 rounded-[18px] bg-surface/95 p-3.5 text-left text-[12px] leading-[1.45] text-[#3E3C38] shadow-[0_24px_50px_-20px_rgba(0,0,0,.35),inset_0_0_0_1px_rgba(18,18,18,.06)] backdrop-blur-[18px]" style={{ animation: 'wRise .2s both' }}>
-          <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ HOW THIS ANSWER WAS MADE</span>
+          <span className="text-[13px] text-ink">How this answer was made</span>
           {lines.map((x) => (
             <span key={x}>✓ {x}</span>
           ))}

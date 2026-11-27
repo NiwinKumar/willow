@@ -17,7 +17,7 @@ const SEVERITY_RANK: Record<Finding['severity'], number> = { High: 0, Moderate: 
 const ROWS_FROM = 3
 
 /**
- * The compatibility check, first on the page and the only blue thing on it (design: "■ ROUTINE CHECK"): a
+ * The compatibility check, first on the page and the only blue thing on it (no eyebrow: the sub line says "Routine check of N products"): a
  * compact card with the verdict at the top left, "How this was checked" and a small re-run icon button at the top
  * right, and every finding under it, most serious first, each in its own soft inset panel (severity and kind are
  * words, not pills; the actions sit bottom right). On a phone the
@@ -49,7 +49,8 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
   const shown = all ? sorted : sorted.slice(0, SHOWN)
   const rows = sorted.length >= ROWS_FROM
   const title = count === 0 ? 'Do these work together?' : running ? 'Checking…' : failed ? 'The check didn’t finish' : done ? (findings.length ? `${findings.length} thing${findings.length > 1 ? 's' : ''} to look at` : 'Looks compatible') : 'Do these work together?'
-  const sub = count === 0 ? 'Compares ingredient lists across your morning and evening products.' : `${count} product${count === 1 ? '' : 's'} checked. Runs again when your routine changes.`
+  // No eyebrow: the sub line names the check, the title is its answer.
+  const sub = count === 0 ? 'The routine check compares ingredient lists across your morning and evening products.' : `Routine check of ${count} product${count === 1 ? '' : 's'}. Runs again when your routine changes.`
 
   const runAgain = async () => {
     setRerun(true)
@@ -63,24 +64,23 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
   return (
     <section
       aria-label="Compatibility check"
-      className="@container relative flex min-w-0 flex-col gap-3.5 overflow-hidden rounded-[28px] p-5 text-inverse squircle"
+      className="@container relative flex min-w-0 flex-col gap-3 overflow-hidden rounded-[26px] p-4 text-inverse squircle sm:gap-3.5 sm:rounded-[28px] sm:p-5"
       style={{
         background: 'radial-gradient(70% 90% at 15% 0%, #4A5BFF 0%, #1D237A 50%, #0A0C2A 95%)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -40px 80px rgba(110,139,255,.2), 0 40px 80px -44px rgba(29,35,122,.8)',
       }}
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
-        <div className="flex min-w-0 flex-1 basis-[13rem] flex-col gap-1.5">
-          <span className="font-mono text-[11px] tracking-[.08em] text-[#C9CFFF]">■ ROUTINE CHECK</span>
-          <h2 className="text-[clamp(21px,1.9vw,25px)] leading-[1.1] font-light tracking-[-0.02em]">{title}</h2>
+      <div className="flex items-start justify-between gap-x-3 gap-y-2.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h2 key={title} className="text-[clamp(22px,1.9vw,25px)] leading-[1.1] font-light tracking-[-0.02em] motion-safe:animate-[wRise_.3s_var(--ease-standard)_both]">{title}</h2>
           <p className={`text-[13px] leading-[1.45] ${MUTED}`}>{sub}</p>
         </div>
         {count > 0 ? (
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
             {done && findings.length ? (
-              <button type="button" aria-expanded={showHow} aria-controls={howId} onClick={() => setShowHow((v) => !v)} className="hit44 inline-flex h-9 items-center gap-1.5 rounded-pill bg-white/[.14] px-3.5 text-[12.5px] text-inverse transition-colors hover:bg-white/[.26]">
+              <button type="button" aria-expanded={showHow} aria-controls={howId} onClick={() => setShowHow((v) => !v)} aria-label="How this was checked" className="hit44 inline-flex size-9 items-center justify-center gap-1.5 rounded-pill bg-white/[.14] text-[12.5px] text-inverse transition-colors hover:bg-white/[.26] sm:w-auto sm:px-3.5">
                 <Info size={14} strokeWidth={1.8} aria-hidden />
-                How this was checked
+                <span className="hidden sm:inline">How this was checked</span>
               </button>
             ) : null}
             <button type="button" onClick={() => void runAgain()} disabled={running} aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'} title={failed ? 'Try again' : 'Run again'} className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-colors hover:bg-white/[.26] disabled:opacity-60">
@@ -91,7 +91,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
       </div>
 
       {showHow && done && findings.length ? (
-        <p id={howId} className="max-w-[760px] rounded-[16px] bg-white/[.07] px-4 py-3 text-[12.5px] leading-[1.55] text-[#D5D8FF]">
+        <p id={howId} className="max-w-[760px] rounded-[16px] bg-white/[.07] px-4 py-3 text-[12.5px] leading-[1.55] text-[#D5D8FF] motion-safe:animate-[wRise_.3s_var(--ease-standard)_both]">
           Findings come from Willow’s ingredient rules.{anyAi ? ' Findings tagged AI suggestion are Gemini’s reading of the lists, which can be wrong.' : ''}
           {check.data?.notes.length ? ` Also checked: ${check.data.notes.join(' ')}` : ''}
         </p>
@@ -153,7 +153,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                 </ul>
               ) : null
               return (
-                <article key={f.key} className={rows ? 'flex flex-col gap-2.5 rounded-[16px] bg-white/[.07] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-5' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
+                <article key={f.key} className={rows ? 'flex flex-col gap-2.5 rounded-[16px] bg-white/[.07] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] @min-[700px]:flex-row @min-[700px]:items-center @min-[700px]:gap-5' : 'flex flex-col gap-3 rounded-[20px] bg-white/[.07] p-3.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)] sm:p-4'} style={{ animation: `wRise .45s ${i * 70}ms both` }}>
                   <div className={`flex min-w-0 flex-1 flex-col ${rows ? 'gap-1.5' : 'gap-3'}`}>
                     <div className="flex items-start gap-2.5">
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">

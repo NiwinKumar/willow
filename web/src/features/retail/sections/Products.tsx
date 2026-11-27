@@ -1,5 +1,5 @@
-import { Columns3, Download } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Columns3 } from 'lucide-react'
+import { useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 
 import { GOALS } from '../../../lib/metrics'
@@ -7,13 +7,13 @@ import { useRetailData } from '../context'
 import { csvMeta, csvName } from '../data'
 import { feltText } from '../feel'
 import { useProducts } from '../productData'
-import { filterRows, hintOf, MAX_COMPARE, noDataReason, PAGE_ROWS, parseIds, productsLead, sortRows, TIER_ORDER, TIER_TABS, toggleId } from '../productModel'
+import { filterRows, hintOf, MAX_COMPARE, noDataReason, PAGE_ROWS, parseIds, productsLead, promoHistory, promoNote, TIER_ORDER, TIER_TABS, toggleId, type Promo } from '../productModel'
 import { useCompetitorNames } from '../orgData'
 import { rangeIds, useRange } from '../rangeStore'
 import { purposeOf, sectionPath, useRetailState } from '../state'
 import { ProductsNav } from './ProductsNav'
 import type { Insights, ProductRow, ProofTier } from '../types'
-import { Bone, Button, DataTable, downloadCsv, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, ToolButton, weeks, type Column, type Sort } from '../ui'
+import { Bone, Button, DataTable, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, weeks, type Column, type Sort } from '../ui'
 import { FeltCell, HeadTip, RateInterval } from './productParts'
 import { ProductsLead } from './ProductsLead'
 import { useRememberedView } from './useRememberedView'
@@ -87,19 +87,16 @@ function Body({ d }: { d: Insights }) {
   const wk = d.cohort.weeks
   useRememberedView('products', VIEW_KEYS)
   const campaigns = useCampaigns()
-  const running = useMemo(() => new Set(campaigns.filter((c) => c.status === 'active').map((c) => c.product_id)), [campaigns])
-  // Long tables draw PAGE_ROWS at a time (3,000+ rows took ~0.7 s to draw at once); any view change starts over.
-  const viewKey = ['tier', 'q', 'brand', 'category', 'goal', 'sort', 'scope'].map((k) => param(k) ?? '').join('|')
-  const [page, setPage] = useState({ key: viewKey, n: PAGE_ROWS })
-  const shown = page.key === viewKey ? page.n : PAGE_ROWS
+  // Every campaign this organisation ran, samples included: a finished one is history ("Promoted before"), never "not promoted".
+  const promo = useMemo(() => promoHistory(campaigns), [campaigns])
 
   const brandName = workspace.kind === 'brand' ? workspace.brand : null
   const { range } = useRange()
-  const ids = rangeIds(range)
+  const ids = useMemo(() => rangeIds(range), [range])
   const names = useCompetitorNames()
   // "Your range": a brand's own products, or the retailer's connected item file. ?scope=all opens the whole
   // catalog, except for a brand organisation whose retailer keeps competitor names off (then it is its range only).
-  const mine = brandName ? all.filter((r) => r.brand === brandName) : ids ? all.filter((r) => ids.has(r.product_id)) : []
+  const mine = useMemo(() => (brandName ? all.filter((r) => r.brand === brandName) : ids ? all.filter((r) => ids.has(r.product_id)) : []), [all, brandName, ids])
   const brandView = brandName && mine.length ? brandName : null
   const hasRange = mine.length > 0
   const wholeAllowed = !names.anonymise
@@ -116,6 +113,11 @@ function Body({ d }: { d: Insights }) {
     return (SORTS as readonly string[]).includes(id) && (dir === 'asc' || dir === 'desc') ? { id, dir } : DEFAULT_SORT
   })()
 
+  // Tab counts follow every other filter, so each tab says how many rows it would show. Memoised: the table keeps
+  // its "Show more" page until the rows really change (a campaigns refetch must not fold it back).
+  const scoped = useMemo(() => filterRows(yoursOnly ? mine : all, { q, brand, category, goal }), [yoursOnly, mine, all, q, brand, category, goal])
+  const rows = useMemo(() => (tier ? scoped.filter((r) => r.tier === tier) : scoped), [scoped, tier])
+
   // Round-1 links (?product=<id> opened a quick look) now land on the product page.
   const legacy = param('product')
   if (legacy) return <Navigate to={`${sectionPath('products', legacy)}${carry}`} replace />
@@ -128,10 +130,6 @@ function Body({ d }: { d: Insights }) {
   const goalIds = new Set(all.flatMap((r) => r.goal_ids))
   const goals = GOALS.filter((g) => goalIds.has(g.id))
 
-  // Tab counts follow every other filter, so each tab says how many rows it would show.
-  const pool0 = yoursOnly ? mine : all
-  const scoped = filterRows(pool0, { q, brand, category, goal })
-  const rows = tier ? scoped.filter((r) => r.tier === tier) : scoped
   const count = (t: 'all' | ProofTier) => (t === 'all' ? scoped.length : scoped.filter((r) => r.tier === t).length)
   const filtered = Boolean(q || brand || category || goal)
   const clearFilters = () => setParam({ q: null, brand: null, category: null, goal: null, tier: null })
@@ -198,7 +196,7 @@ function Body({ d }: { d: Insights }) {
       sortValue: (r) => r.product,
       firstDir: 'asc',
       // "Yours" only where it tells rows apart (All products in a brand workspace).
-      cell: (r) => <ProductCell p={{ ...r, brand: names.name(r.brand) }} tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} />,
+      cell: (r) => <ProductCell p={{ ...r, brand: names.name(r.brand) }} logo tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} sub={<PromoNote p={promo.get(r.product_id)} />} />,
       csv: (r) => `${r.product} (${names.name(r.brand)})`,
     },
     {
@@ -213,8 +211,8 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'rate',
-      header: <HeadTip label="Visible change" tip={`Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`} />,
-      headerText: `Visible change by week ${wk} (%)`,
+      header: <HeadTip label="Users who changed" tip={`Share of the people using it who saw a visible change held to week ${wk}. Bar: 95% interval. Grey tick: people with the same goals not using it.`} />,
+      headerText: `Users with a visible change by week ${wk} (%)`,
       width: '196px',
       sortValue: (r) => r.rate,
       firstDir: 'desc',
@@ -223,18 +221,18 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'base',
-      header: <HeadTip label="Non-users" tip={`Share of people with the same goals who don’t use it and saw a visible change by week ${wk}.`} />,
-      headerText: `Non-users with a visible change by week ${wk} (%)`,
+      header: <HeadTip label="Same goals, not using it" tip={`The comparison group: people with the same goals who don’t use it, and the share of them who changed anyway by week ${wk}.`} />,
+      headerText: `Same goals, not using it: changed anyway by week ${wk} (%)`,
       align: 'right',
-      width: '104px',
+      width: '184px',
       sortValue: (r) => r.base_rate,
       cell: (r) => (r.rate === null ? none : r.base_rate === null ? <Suppressed short /> : <span className="tnum text-ink-2">{pct(r.base_rate)}</span>),
       csv: (r) => (r.base_rate === null ? '' : Math.round(r.base_rate * 100)),
     },
     {
       id: 'lift',
-      header: <HeadTip label="Lift" tip="Visible change among users minus non-users, in percentage points. Hover a value for its 95% interval." />,
-      headerText: 'Lift vs non-users (pts)',
+      header: <HeadTip label="Lift" tip="Users who changed minus people with the same goals not using it, in percentage points. Hover a value for its 95% interval." />,
+      headerText: 'Lift vs same goals, not using it (pts)',
       align: 'right',
       width: '88px',
       sortValue: (r) => r.lift,
@@ -243,7 +241,7 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'n',
-      header: <HeadTip label="People" tip={`People with ${wk} weeks of photos who used it: the n behind the rate.`} />,
+      header: <HeadTip label="People" tip={`People who used it and reached week ${wk} of photos: the n behind the rate.`} />,
       headerText: `People at week ${wk} (n)`,
       align: 'right',
       width: '88px',
@@ -323,19 +321,8 @@ function Body({ d }: { d: Insights }) {
     },
   ]
 
-  // Sorted here (the table's own order) so a page is the top of the whole list, not of a slice.
-  const sortCol = columns.find((c) => c.id === sort.id)
-  const ordered = sortRows(rows, sortCol?.sortValue, sort.dir)
-  const paged = ordered.slice(0, shown)
   const csvName_ = csvName('products', res)
   const csvMeta_ = csvMeta(res, [yoursOnly && (brandView ? `brand ${brandView}` : 'your range'), brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined)
-  // Every row in view, not only the drawn page; the columns the viewer shows (the table's Columns menu choice).
-  const exportAll = () => {
-    const off = hiddenCols('products', columns)
-    const cols = columns.filter((c) => !c.noCsv && (!c.optional || !off.has(c.id)))
-    const text = (c: Column<ProductRow>) => c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)
-    downloadCsv(csvName_, csvMeta_, cols.map(text), ordered.map((r) => cols.map((c) => (c.csv ? c.csv(r) : (c.sortValue?.(r) ?? '')))))
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -364,7 +351,7 @@ function Body({ d }: { d: Insights }) {
         }
       />
 
-      {measured ? <ProductsLead lead={productsLead(scoped, running)} promoteTo={(id) => `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(id)}`} onTier={(t) => setParam({ tier: t })} /> : null}
+      {measured ? <ProductsLead lead={productsLead(scoped, promo)} promo={promo} promoteTo={(id) => `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(id)}`} onTier={(t) => setParam({ tier: t })} /> : null}
 
       <div className="flex flex-col gap-4">
         <Tabs label="Status" panelId="products-table" value={tier || 'all'} onChange={(t) => setParam({ tier: t === 'all' ? null : t })} tabs={TIER_TABS.map((t) => ({ ...t, count: count(t.id) }))} />
@@ -374,7 +361,9 @@ function Body({ d }: { d: Insights }) {
             caption="Products"
             columns={columns}
             columnsKey="products"
-            rows={paged}
+            rows={rows}
+            pageSize={PAGE_ROWS}
+            csv={{ name: csvName_, meta: csvMeta_ }}
             rowKey={(r) => r.product_id}
             onRowClick={(r) => navigate(`${sectionPath('products', r.product_id)}${carry}`)}
             rowLabel={(r) => `${r.product}, ${r.brand}, ${TIERS[r.tier].label}: open product page`}
@@ -382,7 +371,7 @@ function Body({ d }: { d: Insights }) {
             onSortChange={(s) => setParam({ sort: s && !(s.id === DEFAULT_SORT.id && s.dir === DEFAULT_SORT.dir) ? `${s.id}.${s.dir}` : null })}
             defaultSort={DEFAULT_SORT}
             maxHeight="max(440px, calc(100dvh - 330px))"
-            minWidth={880}
+            minWidth={1060}
             empty={
               <span className="flex flex-col items-center gap-3">
                 No product matches these filters.
@@ -415,43 +404,23 @@ function Body({ d }: { d: Insights }) {
                 ) : null}
                 <Select label="Category" hideLabel value={category} onChange={(v) => setParam({ category: v })} options={[{ value: '', label: 'All categories' }, ...categories.map(([value, label]) => ({ value, label }))]} />
                 <Select label="Goal" hideLabel value={goal} onChange={(v) => setParam({ goal: v })} options={[{ value: '', label: 'All goals' }, ...goals.map((g) => ({ value: g.id, label: g.label }))]} />
-                <ToolButton onClick={exportAll} label={`Export all ${int(ordered.length)} products in view as CSV`} disabled={!ordered.length}>
-                  <Download size={15} strokeWidth={1.6} aria-hidden />
-                  Export
-                </ToolButton>
               </>
             }
           />
-          {ordered.length > shown ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-pf-bg2 px-5 py-3 text-proof-small text-ink-2">
-              <span className="tnum" aria-live="polite">
-                Showing {int(shown)} of {int(ordered.length)}
-              </span>
-              <span className="flex gap-2">
-                <Button size="sm" onClick={() => setPage({ key: viewKey, n: shown + PAGE_ROWS })}>
-                  Show {int(Math.min(PAGE_ROWS, ordered.length - shown))} more
-                </Button>
-                {ordered.length - shown > PAGE_ROWS ? (
-                  <Button size="sm" kind="ghost" onClick={() => setPage({ key: viewKey, n: ordered.length })} title="Drawing every row can take a moment">
-                    Show all
-                  </Button>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
-/** The Columns menu's choice for a table (the kit stores it under willow.proof.cols.<key>), or each column's default. */
-function hiddenCols<T>(key: string, cols: Column<T>[]): Set<string> {
-  try {
-    const v = window.localStorage.getItem(`willow.proof.cols.${key}`)
-    if (v) return new Set(JSON.parse(v) as string[])
-  } catch {
-    /* storage blocked: defaults */
-  }
-  return new Set(cols.filter((c) => c.hidden).map((c) => c.id))
+/** The promotion note in a product row: running in leaf, paused and finished (history, with its adoption lift) in grey. */
+function PromoNote({ p }: { p: Promo | undefined }) {
+  const note = promoNote(p)
+  if (!note || !p) return null
+  return (
+    <span className={`inline-flex items-center gap-1 ${p.state === 'running' ? 'text-proof-leaf' : 'text-ink-2'}`}>
+      <span aria-hidden className="text-ink-3">·</span>
+      {note}
+    </span>
+  )
 }

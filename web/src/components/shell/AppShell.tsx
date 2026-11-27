@@ -4,7 +4,6 @@ import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'rea
 import type { CaptureMode, Site } from '../../data/types'
 import type { TrackPlace } from '../../lib/track'
 import { useActivateData, useData } from '../../data/useData'
-import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
 import { useKeyboardInset } from '../../lib/useKeyboardInset'
 import { useMediaQuery } from '../../lib/useMediaQuery'
@@ -13,6 +12,7 @@ import { useAuth } from '../../lib/useAuth'
 import { useResultReady } from '../../features/progress/useResultReady'
 import { WillowLoader } from '../willow/WillowLoader'
 import { CanvasBlobs } from './CanvasBlobs'
+import { useCheckInState } from './checkInState'
 import { AdvisorFab } from './AdvisorFab'
 import { Dock } from './Dock'
 import { Header } from './Header'
@@ -56,8 +56,8 @@ export function AppShell() {
   // The advisor as a full-screen chat (Expand, or ?advisor=full); the same chat, Esc or Collapse returns to the panel.
   const [advisorFull, setAdvisorFull] = useState(false)
   const current = destinationOf(location.pathname)
-  // The check-in schedule: the Check in button says when one is due today or late (null otherwise).
-  const due = useCheckinDue()?.short ?? null
+  // The Check in button's state: due (schedule in You), done today, or idle.
+  const checkInState = useCheckInState()
 
   // A new page starts at the top (a #anchor scrolls itself); query changes keep the scroll.
   useEffect(() => {
@@ -176,17 +176,17 @@ export function AppShell() {
               setCollapsed(!collapsed)
             }}
             onCheckIn={() => setCheckIn({ open: true })}
-            due={due}
+            checkIn={checkInState}
             name={me.short}
             initials={me.initials}
           />
         ) : (
-          <Header current={current} name={me.short} initials={me.initials} />
+          <Header />
         )}
         <div className="relative z-[1]">
           <Outlet />
         </div>
-        {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} />}
+        {wide ? null : <Dock current={current} checkIn={checkInState} onCheckIn={() => setCheckIn({ open: true })} />}
         </div>
         <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} covered={advisor.open} />
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />

@@ -20,7 +20,7 @@ export function RequestEvidence({ x }: { x: ProductDetail }) {
   const requests = useRequests()
   const p = x.product
   const to = orgs.find((o) => o.kind === 'brand' && o.brands.includes(p.brand))
-  const figure = p.rate !== null ? `${pct(p.rate)} saw a visible change${p.lift !== null ? `, ${pts(p.lift)} over non-users` : ''}` : TIERS[p.tier].label
+  const figure = p.rate !== null ? `${pct(p.rate)} saw a visible change${p.lift !== null ? `, ${pts(p.lift)} over people not using it` : ''}` : TIERS[p.tier].label
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState(() => `Before our next range review, can you share the evidence you hold for ${p.product}? In Proof it reads ${TIERS[p.tier].label.toLowerCase()}${p.n ? `: ${figure} (${int(p.n)} people at week 8)` : ''}.`)
   const [busy, setBusy] = useState(false)

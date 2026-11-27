@@ -150,7 +150,7 @@ function Dashboard({ c, back, productTo, againTo, eligibility, at, confirm, setC
   const name = c.product ?? c.product_id
   const kpis: Kpi[] = [
     { id: 'reach', label: 'People reached', value: s.reach !== undefined ? int(s.reach) : '—', note: s.impressions ? `Saw the card ${count(s.impressions, 'time')} in all` : 'No one yet' },
-    { id: 'adds', label: 'Added to routine', value: int(s.adds), note: s.clicks ? `After ${count(s.clicks, 'click')} through the card` : 'From the card' },
+    { id: 'adds', label: 'Added to routine', value: int(s.adds), note: s.clicks ? `From ${count(s.clicks, 'click')} on the card` : 'From the card' },
     inc ? { id: 'lift', label: 'Lift over holdout', value: pts(inc.lift), note: `${pct(inc.exposed.rate)} vs ${pct(inc.holdout.rate)} added it` } : { id: 'lift', label: 'Lift over holdout', value: '—', note: c.status === 'ended' ? 'Not measured' : `Needs ${HOLDOUT_MIN} people in each group` },
   ]
 
@@ -186,12 +186,17 @@ function Dashboard({ c, back, productTo, againTo, eligibility, at, confirm, setC
               <span aria-hidden className="text-ink-3">
                 ·
               </span>
-              <span className="tnum">{day ? `Day ${day.day} of ${day.of} · ${timeLeft(c)}` : timeLeft(c)}</span>
-              <span aria-hidden className="text-ink-3">
-                ·
-              </span>
+              {/* Ended: the badge already says so; "Ended 16 Nov · … ended early" said it three times. */}
+              {c.status !== 'ended' ? (
+                <>
+                  <span className="tnum">{day ? `Day ${day.day} of ${day.of} · ${timeLeft(c)}` : timeLeft(c)}</span>
+                  <span aria-hidden className="text-ink-3">
+                    ·
+                  </span>
+                </>
+              ) : null}
               <span className="tnum">
-                {dateRange(c.starts_at, c.ends_at)} · {durationText(c)}
+                {dateRange(c.starts_at, c.ends_at)} · {durationText(c).replace(/^ended early after/, 'stopped after')}
               </span>
             </span>
           }
@@ -324,12 +329,15 @@ function Story({ c, at, className }: { c: Campaign; at: number | null; className
     <Panel
       id="cmp-story"
       title="Shown, clicked, added"
-      description="Running totals by day: the outer band is everyone who saw the card, the middle those who clicked, the core those who added the product."
+      description="Running totals by day; the pills above the stream are the card’s showings so far on that day."
       className={className}
       footnote={`${at ? `Updated ${new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}, refreshes every 30 s. ` : ''}Willow measures adds to a routine, not store sales or channels.`}
     >
       {days.length ? (
-        <div className="-mx-5 -mb-1">
+        // Drawn near its own 560-unit width: stretched to the panel, its day and count pills grew to 1.4× and read
+        // as headings. The legend under it names each band with its total, so the stream decodes at a glance.
+        <div className="-mb-1 flex flex-col gap-3">
+          <div className="mx-auto w-full max-w-[600px]">
           <StreamChart
             height={190}
             days={days.map((d) => ({ label: dayLabel(d.day), values: d.values }))}
@@ -340,6 +348,19 @@ function Story({ c, at, className }: { c: Campaign; at: number | null; className
             ]}
             caption={`Running totals of the card shown, clicked and added to a routine, day by day, for ${c.product ?? 'this campaign'}`}
           />
+          </div>
+          <ul aria-label="Totals so far" className="m-0 flex list-none flex-wrap justify-center gap-x-6 gap-y-1 p-0 text-proof-small text-ink-2">
+            {[
+              { id: 'shown', label: 'Card shown', v: c.stats.impressions, o: 0.5 },
+              { id: 'clicked', label: 'Clicked through', v: c.stats.clicks, o: 0.78 },
+              { id: 'added', label: 'Added to routine', v: c.stats.adds, o: 1 },
+            ].map((b) => (
+              <li key={b.id} className="inline-flex items-center gap-1.5">
+                <span aria-hidden className="size-2.5 rounded-[3px] bg-proof-leaf" style={{ opacity: b.o }} />
+                {b.label} <span className="font-medium text-ink tnum">{int(b.v)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : (
         <p className="m-0 py-6 text-proof-body text-ink-2">The first day’s numbers appear here once the card has been shown.</p>

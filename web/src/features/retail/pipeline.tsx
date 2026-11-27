@@ -57,13 +57,13 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
       state: p.tier === 'proven' ? 'done' : p.tier === 'promising' ? 'partial' : 'todo',
       detail:
         p.tier === 'proven'
-          ? `${pts(p.lift)} vs non-users${p.lift_lo !== null ? `, at least ${pts(p.lift_lo)}` : ''}`
+          ? `${pts(p.lift)} vs same goals, not using it${p.lift_lo !== null ? `; at least ${pts(p.lift_lo)}` : ''}`
           : p.tier === 'promising'
             ? p.to_proven
               ? `About ${int(p.to_proven)} more people to settle it`
               : 'Positive lift; needs more people'
             : p.tier === 'unclear'
-              ? 'No lift over non-users yet'
+              ? 'No lift over people not using it yet'
               : 'Not enough data',
     },
     saved
@@ -81,7 +81,7 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
               ? `${ready} ${ready === 1 ? 'statement' : 'statements'} ready; no claim saved`
               : claimable
                 ? 'After it is measured'
-                : 'Once it shows a change above non-users',
+                : 'Once it shows a change above people not using it',
           ...(!saved.total && ready && claimsTo ? { to: claimsTo, cta: 'Draft a claim' } : {}),
         }
         })()

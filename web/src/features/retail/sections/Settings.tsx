@@ -1,4 +1,4 @@
-import { Building2, ShieldCheck, Store, UserPlus } from 'lucide-react'
+import { ArrowRight, Building2, ShieldCheck, Store, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -44,14 +44,32 @@ export default function Settings() {
         title="Settings"
         description={
           <>
-            <strong>{org.name}</strong> · {org.kind === 'brand' ? 'Brand' : 'Retailer'} on <InstanceName instance={instance} short /> · you are {role ? ROLE_LABEL[role].toLowerCase() : 'a member'}
+            <strong>{org.name}</strong> · {org.kind === 'brand' ? 'brand' : 'retailer'}
+            {instance.name !== org.name ? (
+              <>
+                {' '}
+                on <InstanceName instance={instance} short />
+              </>
+            ) : null}{' '}
+            · you are {role ? ROLE_LABEL[role].toLowerCase() : 'a member'}
           </>
         }
         purpose={purposeOf('settings')}
       />
       <Tabs label="Settings" panelId="settings-panel" value={tab} onChange={(t) => setParam({ tab: t === 'org' ? null : t })} tabs={TABS.map((t) => ({ id: t.id, label: t.label }))} />
       <div id="settings-panel" role="tabpanel" key={tab} className="flex flex-col gap-4 animate-[proofPage_.2s_var(--ease-standard)_both]">
-        {tab === 'org' ? <Profile /> : tab === 'team' ? <Team /> : tab === 'sharing' ? <Sharing /> : <Plan />}
+        {tab === 'org' ? (
+          <>
+            <AtAGlance onTab={(t) => setParam({ tab: t })} />
+            <Profile />
+          </>
+        ) : tab === 'team' ? (
+          <Team />
+        ) : tab === 'sharing' ? (
+          <Sharing />
+        ) : (
+          <Plan />
+        )}
       </div>
     </div>
   )
@@ -63,6 +81,68 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
       <dt className="text-proof-small font-medium text-ink">{k}</dt>
       <dd className="m-0 text-proof-small text-ink-2">{children}</dd>
     </div>
+  )
+}
+
+/*
+ * At a glance (Q2, finals polish): the three settings that change what people see and do, each with its state and
+ * the tab that changes it. The Organisation tab was a read-only list with no next step.
+ * Four tests: (1) team size, the naming rule brands live under and the plan, which the profile list doesn't say;
+ * (2) a label, a value, a link that says where it goes; (3) one compact row above the profile, no motion beyond
+ * the kit's hover; (4) the KpiStrip/ProductsLead look (hairline cells on a card).
+ */
+function AtAGlance({ onTab }: { onTab: (t: TabId) => void }) {
+  const { org, role } = useOrg()
+  const settings = useOrgSettings()
+  const id = org?.id ?? ''
+  const team = useQuery<MembersView>(['proof-members', id], (t) => proofApi.members(t, id).then(membersOf), { enabled: Boolean(org), staleMs: 30_000 })
+  const policy = settings.data?.policy
+  const people = team.data ? team.data.members.length : null
+  const invites = team.data ? team.data.invites.length : 0
+  const cells: { id: TabId; label: string; value: string; sub: string; cta: string }[] = [
+    {
+      id: 'team',
+      label: 'Team',
+      value: people === null ? '…' : `${people} ${people === 1 ? 'member' : 'members'}`,
+      sub: invites ? `${invites} invite${invites === 1 ? '' : 's'} pending` : role === 'admin' ? 'You can invite analysts and viewers' : 'Admins invite new members',
+      cta: role === 'admin' ? 'Invite' : 'See team',
+    },
+    {
+      id: 'sharing',
+      label: 'Data sharing',
+      value: policy ? (policy.competitor_names ? 'Competitor names shown' : 'Competitors anonymised') : '…',
+      sub: policy ? `Groups under ${policy.min_group} people are always hidden` : 'Groups under 10 people are always hidden',
+      cta: org?.kind === 'retailer' && role === 'admin' ? 'Change' : 'See rules',
+    },
+    {
+      id: 'plan',
+      label: 'Plan',
+      value: settings.data?.plan.name ?? 'Pilot',
+      sub: settings.data?.plan.billed === false || !settings.data ? 'Not billed during the pilot' : 'Billed',
+      cta: 'See plan',
+    },
+  ]
+  return (
+    <section aria-label="Settings at a glance" className="grid grid-cols-1 overflow-hidden rounded-card border border-line bg-surface md:grid-cols-3">
+      {cells.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onTab(c.id)}
+          className="group flex min-w-0 items-end justify-between gap-3 border-0 border-line bg-transparent px-5 py-4 text-left transition-colors hover:bg-pf-hover active:bg-pf-hover [&:not(:last-child)]:border-b md:[&:not(:last-child)]:border-b-0 md:[&:not(:last-child)]:border-r"
+        >
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-proof-small text-ink-2">{c.label}</span>
+            <span className="truncate text-proof-h text-ink">{c.value}</span>
+            <span className="truncate text-proof-small text-ink-2">{c.sub}</span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-proof-small font-medium text-ink">
+            {c.cta}
+            <ArrowRight size={13} strokeWidth={1.7} aria-hidden className="transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />
+          </span>
+        </button>
+      ))}
+    </section>
   )
 }
 

@@ -36,6 +36,8 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
   /** "COSRX’s workspace" for a campaign from another workspace (null: this one). */
   workspaceOf: (c: Campaign) => string | null
 }) {
+  // Every row a sample (a demo seat's portfolio): the heading says so once instead of a badge on each row.
+  const allSample = campaigns.length > 0 && campaigns.every((c) => c.sample)
   const rows = [...campaigns].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || b.created_at.localeCompare(a.created_at))
   const columns: Column<Campaign>[] = [
     {
@@ -47,7 +49,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
       firstDir: 'asc',
       cell: (c) => {
         const other = workspaceOf(c)
-        return <ProductCell p={{ product: c.product ?? c.product_id, brand: c.brand ?? '', category: c.category ?? '', image_url: c.image_url }} sub={[c.rule ? `· Auto · ${c.rule.name}` : null, other ? `· ${other}` : null].filter(Boolean).join(' ') || undefined} />
+        return <ProductCell p={{ product: c.product ?? c.product_id, brand: c.brand ?? '', category: c.category ?? '', image_url: c.image_url }} logo sub={[c.rule ? `· Auto · ${c.rule.name}` : null, other ? `· ${other}` : null].filter(Boolean).join(' ') || undefined} />
       },
       csv: (c) => `${c.product ?? c.product_id} (${c.brand ?? ''})`,
     },
@@ -60,7 +62,7 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
       cell: (c) => (
         <span className="flex items-center gap-2 whitespace-nowrap">
           <StatusBadge status={c.status} />
-          {c.sample ? <SampleBadge short /> : null}
+          {c.sample && !allSample ? <SampleBadge short /> : null}
           <span className="truncate text-proof-small text-ink-2">{c.status === 'ended' ? '' : timeLeft(c)}</span>
         </span>
       ),
@@ -171,8 +173,8 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
         return (
           <span className="inline-flex items-baseline justify-end gap-2 whitespace-nowrap">
             <LiftValue lift={inc.lift} lo={inc.lift_lo} hi={inc.lift_hi} />
-            <span className="text-proof-label text-ink-2 tnum">
-              n={int(inc.exposed.n)}/{int(inc.holdout.n)}
+            <span className="text-proof-label text-ink-2 tnum" title={`${int(inc.exposed.n)} people could see the card; ${int(inc.holdout.n)} were held out at random`}>
+              n={int(inc.exposed.n + inc.holdout.n)}
             </span>
           </span>
         )
@@ -192,7 +194,12 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
   return (
     <DataTable
       caption="Campaigns"
-      heading={heading}
+      heading={
+        <>
+          {heading}
+          {allSample ? <SampleBadge /> : null}
+        </>
+      }
       toolbar={toolbar}
       columns={columns}
       columnsKey="campaigns"
