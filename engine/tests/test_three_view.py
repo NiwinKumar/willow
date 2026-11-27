@@ -16,6 +16,7 @@ from app.pipeline_face import (
     _mark_depth_mm,
     _owned_zone_px,
     _owns,
+    _photo_marks,
     _shares,
     _view_skin,
     _zone_marks,
@@ -259,3 +260,27 @@ def test_side_marks_keep_away_from_eyes_and_the_ear_side_edge_only():
     assert e[50, 5] and e[5, 50]  # outside the face on the ear side and above the nose
     assert not e[45, 45]  # the hole inside the face
     assert not e[95, 60]  # the jawline on the nose side, under the nose
+
+
+def test_every_counted_mark_is_placed_on_its_photo_not_only_the_candidates():
+    """extras.marks (_photo_marks): every mark the session counts, at photo pixels of its own
+    photo, so the marks drawn add up to the count; a mark the photo does not measure is left out."""
+    chin = facemap.ZONES.index("chin") + 1
+    own = np.zeros(len(facemap.triangle_zones()), bool)
+    own[[3, 4]] = True
+    tri_map = np.array([[3, 3, 5, -1], [4, 5, 5, -1]], np.int16)
+    label = np.where(tri_map >= 0, chin, 0).astype(np.uint8)
+    side = _tri_frame("right", own, tri_map, label, [3, 5, -1, 4], [8.0, 8.0, 8.0, 1.0])
+    side |= {"box": M(x=100, y=50), "index": 3}
+    side["blemishes"] = [M(x=float(i), y=2.0, radius=1.5) for i in range(4)]
+    side["spots"] = [M(x=9.0, y=9.0, radius=3.0)]
+    side["mark_tris"] = [3, 5, -1, 4, 3]
+    side["mark_zones"] = ["chin"] * 5
+    side["mark_depth_mm"] = [8.0, 8.0, 8.0, 1.0, 8.0]
+    marks = _photo_marks([side], {"right"})
+    # its own triangle (kept); the front's; off the face; at the jaw edge; a dark spot of its own
+    assert [(m["x"], m["y"]) for m in marks["blemish"]] == [(100.0, 52.0)]
+    assert marks["spot"] == [
+        {"view": "right", "frame_index": 3, "x": 109.0, "y": 59.0, "r": 3.0, "zone": "chin"}
+    ]
+    assert len(marks["blemish"]) == sum(_keeps(side, {"right"})[:4])

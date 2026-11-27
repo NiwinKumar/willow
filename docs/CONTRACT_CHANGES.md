@@ -9,6 +9,12 @@ Template:
 - Impact on engine / api / web:
 - Approved by: [ ] Harshini [ ] Niwin
 
+## 2026-11-28: extras.marks: every counted blemish and dark spot, placed on its photo (proposed by Harshini)
+- Why: `candidates` stop at `max_candidates` (40) and the front photo takes them first, so the spot diary followed about a third of the marks the counts are made of, and mostly the front's (a check-in with 53 blemishes and 57 dark spots had 40 candidates, 34 of them blemishes).
+- Change (no schema change: `metrics[].extras` is an open object, like `by_zone`): on `face_full` results (engine 0.4.3+), `blemishes.extras.marks` and `pigment_spots.extras.marks` list every mark the session counts, each `{view, frame_index, x, y, r, zone}` in photo pixels of that view's reference photo (the photo `views[]` / the top-level preview show). `len(blemishes.extras.marks)` equals the reference photo's blemish count and the marks per zone equal `by_zone` (checked on a real 3-view week: 53 and 57, zone for zone). `candidates` are unchanged (crops and Gemini labels).
+- Impact: engine adds the lists (about 15 KB a session); api reads them for the spot diary; older results have none (the api falls back to candidates).
+- Approved by: [x] Harshini [ ] Niwin
+
 ## 2026-10-13: Aligned preview image in AnalysisResult (proposed by Niwin)
 - Why: browsers cannot render DNG. The Report overlay toggle, the before/after slider and the timeline compare all need a viewable image in the same pixel frame as `overlays[]` and `rois[]`.
 - Change: add optional top-level `preview` to `AnalysisResult`: `{"uri": "gs://.../results/{uid}/{session}/preview.jpg", "width": int, "height": int}`. sRGB JPEG of the aligned reference frame, long edge <= 1600 px; `rois`/`candidates.bbox`/overlay PNGs scale by `preview.width / image_size.width`. Null when no frame passed decoding.

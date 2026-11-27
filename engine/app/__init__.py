@@ -1,4 +1,6 @@
-__version__ = "0.4.2"  # bump on every change that can move a number: baselines record it
+__version__ = "0.4.3"  # bump on every change that can move a number: baselines record it
+# 0.4.3: extras.marks on blemishes and pigment_spots: every counted mark placed on its photo
+# (candidates stop at max_candidates); no number moved, 0.4.x baselines compare
 # 0.4.2: side photos measure the chin and around-mouth skin they see more squarely than the front
 # (SIDE_FACING_MARGIN): a front + side session's blemish and dark-spot totals can move a little.
 # The shift is within the noise band, so 0.4.x baselines still compare (a deliberate exception)

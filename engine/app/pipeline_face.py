@@ -500,6 +500,7 @@ def _count_confirmed(good: list[dict]) -> None:
 # front, left cheek, right cheek): each cheek and jaw from the photo that faces it, the rest
 # from the front. A side with no photo of its own is measured on the front.
 SIDE_ZONES = {"right": {"right_cheek", "right_jaw"}, "left": {"left_cheek", "left_jaw"}}
+MARK_KIND = {"blemishes": "blemish", "pigment_spots": "spot"}  # extras.marks (_photo_marks)
 VIEW_CODE = {"front": 0.0, "right": 1.0, "left": 2.0}  # candidate feature `view` (numbers only)
 
 
@@ -585,6 +586,32 @@ def _owned_marks(f: dict, sides: set[str]) -> list[bool]:
     """_keeps, and confirmed by another photo of the same view when there was one."""
     confirmed = f.get("confirmed") or [True] * len(f["mark_zones"])
     return [ok and k for ok, k in zip(confirmed, _keeps(f, sides), strict=True)]
+
+
+def _photo_marks(refs: list[dict], sides: set[str]) -> dict[str, list[dict]]:
+    """Every mark the session counts on each view's reference photo (Nov 28): blemishes and
+    dark spots in the zones that photo measures, confirmed by another photo of its view when
+    there was one (_owned_marks), at photo pixels of that photo (frame_index). Unlike
+    `candidates` (at most max_candidates, with crops for labelling) nothing is left out, so the
+    marks drawn add up to the photo's counts. extras.marks of blemishes / pigment_spots."""
+    out: dict[str, list[dict]] = {"blemish": [], "spot": []}
+    for f in refs:
+        box, n_b = f["box"], len(f["blemishes"])
+        marks = [*f["blemishes"], *f["spots"]]
+        own = _owned_marks(f, sides)
+        for i, (m, zone, ok) in enumerate(zip(marks, f["mark_zones"], own, strict=True)):
+            if ok:
+                out["blemish" if i < n_b else "spot"].append(
+                    {
+                        "view": f["view"],
+                        "frame_index": f["index"],
+                        "x": round(box.x + m.x, 1),
+                        "y": round(box.y + m.y, 1),
+                        "r": round(float(m.radius), 1),
+                        "zone": zone,
+                    }
+                )
+    return out
 
 
 def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
@@ -1231,6 +1258,7 @@ def analyze_face(
         _assign_views(good, side_groups)
         _combine_views(good, side_refs)
     _zone_marks(good, side_refs)
+    marks = _photo_marks([good[0], *side_refs.values()], set(side_refs)) if good else {}
 
     metrics = []
     _session_lines(good)
@@ -1251,6 +1279,8 @@ def analyze_face(
                     extras[k] = have[0]["extras"]["lines"].get(k, [])
             if metric_id in ZONE_METRICS and (zones := _by_zone(metric_id, have)):
                 extras["by_zone"] = zones
+            if metric_id in MARK_KIND:  # every counted mark, placed on its photo
+                extras["marks"] = marks.get(MARK_KIND[metric_id], [])
         else:
             summary = {
                 "value": None,
