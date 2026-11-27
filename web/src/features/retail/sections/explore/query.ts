@@ -32,7 +32,7 @@ export type MeasureKind = 'rate' | 'points' | 'count' | 'weeks'
 
 export const MEASURES: { id: MeasureId; label: string; kind: MeasureKind }[] = [
   { id: 'rate', label: 'Visible change rate', kind: 'rate' },
-  { id: 'lift', label: 'Lift vs non-users', kind: 'points' },
+  { id: 'lift', label: 'Lift vs not using it', kind: 'points' },
   { id: 'n', label: 'People measured', kind: 'count' },
   { id: 'cont8', label: 'Still using at week 8', kind: 'rate' },
   { id: 'weeks', label: 'Weeks to first change', kind: 'weeks' },

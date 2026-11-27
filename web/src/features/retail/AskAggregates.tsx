@@ -12,7 +12,7 @@ import { useCompetitorNames } from './orgData'
 import { fallbackSuggestions, proofApi, type AskThread, type OrgAnswer } from './proofApi'
 import { COHORTS, RANGES } from './state'
 import type { Filters, Insights } from './types'
-import { BrandLogo, cohortKind, copyText, Menu, MenuDivider, MenuLabel, MIN_GROUP, SidePanel } from './ui'
+import { BrandLogo, cohortKind, copyText, Menu, MenuDivider, MIN_GROUP, SidePanel } from './ui'
 
 /*
  * Ask: a chat over the same aggregates as the screen (GEMINI_SPEC §6). Gemini writes, the api checks every number
@@ -356,7 +356,6 @@ export function AskAggregates({ d, filters, scope = '', focusBrand = null, prefi
         >
           {(close) => (
             <>
-              <MenuLabel>Recent conversations</MenuLabel>
               {threads.length ? (
                 threads.slice(0, 20).map((t) => (
                   <div key={t.id} className={`group flex items-center gap-1 rounded-ctl ${t.id === threadId ? 'bg-pf-hover' : ''}`}>
@@ -396,10 +395,9 @@ export function AskAggregates({ d, filters, scope = '', focusBrand = null, prefi
           <div className="flex flex-col gap-4 pt-2 animate-[proofPage_.24s_var(--ease-standard)_both]">
             <div className="flex flex-col gap-1">
               <span className="text-proof-h text-ink">{brand ? `Ask about ${brand}` : 'Ask about your range'}</span>
-              <span className="text-proof-small text-ink-2 [text-wrap:pretty]">Gemini answers from the aggregates on screen (same filters), with groups under {MIN_GROUP} hidden. Every number it writes is checked against them; individual people can’t be looked up.</span>
+              <span className="max-w-[52ch] text-proof-small text-ink-2 [text-wrap:pretty]">Answers come from the same aggregates as the screen. Every number is checked against them; groups under {MIN_GROUP} people stay hidden and no one person can be looked up.</span>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-proof-small font-medium text-ink-2">Try asking</span>
+            <div role="group" aria-label="Questions to start with" className="flex flex-col gap-1.5">
               {starters.map((t, i) => (
                 <button key={t} type="button" disabled={!d} onClick={() => void ask(t)} className="group flex min-h-10 items-center gap-2 rounded-ctl border border-line px-3 py-2 text-left text-proof-body text-ink transition-[background,border-color] hover:border-line-strong hover:bg-pf-hover animate-[proofPage_.24s_var(--ease-standard)_both] disabled:opacity-50" style={{ animationDelay: `${40 + i * 30}ms` }}>
                   <span className="min-w-0 flex-1">{t}</span>
@@ -507,7 +505,7 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled, onRe
     ? 'Validator: no draft used only numbers from the aggregates · no numbers returned'
     : refused
       ? `Policy · aggregates only · n≥${MIN_GROUP} · ${checked.model}`
-      : `Source ${sources.length ? sources.join(', ') : 'retailer aggregates'} · n≥${MIN_GROUP} · ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model}`
+      : `From ${sources.length ? sources.map((x) => x.replace(/_/g, ' ')).join(', ') : 'the retailer aggregates'} · n≥${MIN_GROUP} · ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model}`
   const copy = async () => {
     const ok = await copyText(`${reply.answer}\n\n— Proof by Willow, ${kind} aggregates (${prov})`, 'Answer copied')
     if (!ok) return
@@ -561,7 +559,8 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled, onRe
 }
 
 function AnswerChart({ chart }: { chart: NonNullable<RetailerAnswer['chart']> }) {
-  const max = Math.max(...chart.bars.map((b) => Math.abs(b.value)), 1)
+  // A share is drawn on 0–100% (a 71% bar is never full width); counts and weeks scale to their largest.
+  const max = Math.max(...chart.bars.map((b) => Math.abs(b.value)), chart.unit === 'percent' ? 100 : 1)
   const bars = chart.bars.map((b) => ({ ...b, n: chart.unit === 'percent' ? (b.n ?? null) : null }))
   const axis = chart.unit === 'percent' ? `% of people${bars.some((b) => b.n !== null) ? ' · n per bar' : ''} · 0–${max}%` : chart.unit === 'weeks' ? `Weeks · 0–${max}` : `Count · 0–${max}`
   const alt = `${chart.title}: ${bars.map((b) => `${b.label} ${UNIT[chart.unit](b.value)}${b.n !== null ? `, n=${b.n}` : ''}`).join('; ')}`

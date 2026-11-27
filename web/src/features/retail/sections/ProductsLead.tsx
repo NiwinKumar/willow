@@ -1,7 +1,7 @@
-import { ArrowRight, Megaphone } from 'lucide-react'
+import { ArrowRight, Megaphone, RotateCcw } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import type { ProductsLead as Lead } from '../productModel'
+import type { ProductsLead as Lead, Promo } from '../productModel'
 import type { ProofTier } from '../types'
 import { Button, int, pts, TierDot } from '../ui'
 
@@ -9,7 +9,9 @@ import { Button, int, pts, TierDot } from '../ui'
  * The Products page's lead (P2B, finals polish): the three decisions the table holds, before the table. A buyer
  * opens Products to decide what to promote, what to wait on and what to question; the tabs count tiers but not
  * which of them need an action.
- *  - Ready to promote: Proven with no campaign running, with the strongest one and a Promote button.
+ *  - Ready to promote: Proven with no campaign running, with the strongest one and a Promote button. A product
+ *    whose campaign finished is history, not "never promoted": its line says "Promoted before, +8 pts adoption"
+ *    and the button reads "Run again" (Q2, finals polish).
  *  - Close to Proven: Promising, the nearest one and how many more people at week 8 would settle it.
  *  - No clear effect: measured, users change about as much as non-users: the products to question.
  * Each figure opens its tab. Follows the search and filters above the table.
@@ -18,8 +20,10 @@ import { Button, int, pts, TierDot } from '../ui'
  * kit's hover; (4) the KpiStrip's look (hairline cells, kpi type, tier dots), one primary button.
  */
 
-export function ProductsLead({ lead, promoteTo, onTier }: { lead: Lead; promoteTo: (id: string) => string; onTier: (t: ProofTier) => void }) {
+export function ProductsLead({ lead, promo, promoteTo, onTier }: { lead: Lead; promo: ReadonlyMap<string, Promo>; promoteTo: (id: string) => string; onTier: (t: ProofTier) => void }) {
   const top = lead.toPromote[0]
+  const before = top ? promo.get(top.product_id) : undefined
+  const ready = lead.toPromote.length - lead.ranBefore
   const near = lead.close[0]
   const asked = lead.unclear[0]
   return (
@@ -29,13 +33,13 @@ export function ProductsLead({ lead, promoteTo, onTier }: { lead: Lead; promoteT
         label="Ready to promote"
         value={lead.toPromote.length}
         onOpen={() => onTier('proven')}
-        note={lead.toPromote.length ? 'Proven, no campaign running' : lead.proven ? 'Every Proven product has a campaign' : 'No product here is Proven yet'}
+        note={lead.toPromote.length ? (!lead.ranBefore ? 'Proven, never promoted' : ready ? `Proven, no campaign running · ${int(ready)} never promoted` : 'Proven, no campaign running; all promoted before') : lead.proven ? 'Every Proven product has a campaign running' : 'No product here is Proven yet'}
         detail={
           top ? (
             <span className="flex min-w-0 items-center justify-between gap-3">
-              <Line name={top.product} meta={pts(top.lift)} />
-              <Button to={promoteTo(top.product_id)} kind="primary" size="sm" label={`Promote ${top.product}`}>
-                <Megaphone size={14} strokeWidth={1.7} aria-hidden /> Promote
+              <Line name={top.product} meta={before ? (before.lift !== null ? `promoted before, ${pts(before.lift)} adoption` : 'promoted before') : `${pts(top.lift)} lift`} />
+              <Button to={promoteTo(top.product_id)} kind="primary" size="sm" label={before ? `Run a campaign for ${top.product} again` : `Promote ${top.product}`}>
+                {before ? <RotateCcw size={14} strokeWidth={1.7} aria-hidden /> : <Megaphone size={14} strokeWidth={1.7} aria-hidden />} {before ? 'Run again' : 'Promote'}
               </Button>
             </span>
           ) : null
@@ -46,10 +50,10 @@ export function ProductsLead({ lead, promoteTo, onTier }: { lead: Lead; promoteT
         label="Close to Proven"
         value={lead.close.length}
         onOpen={() => onTier('promising')}
-        note="Ahead of non-users; the interval still reaches zero"
+        note="Ahead of people with the same goals not using it; the interval still reaches zero"
         detail={
           near ? (
-            <Line name={near.product} meta={near.to_proven ? `${int(near.to_proven)} more at week 8` : null} />
+            <Line name={near.product} meta={near.to_proven ? `needs ${int(near.to_proven)} more at week 8` : null} />
           ) : null
         }
       />
@@ -58,7 +62,7 @@ export function ProductsLead({ lead, promoteTo, onTier }: { lead: Lead; promoteT
         label="No clear effect"
         value={lead.unclear.length}
         onOpen={() => onTier('unclear')}
-        note="Users change about as much as non-users"
+        note="Users change about as much as people not using it"
         detail={
           asked ? (
             <Line name={asked.product} meta={asked.users ? `${int(asked.users)} users` : null} />
@@ -72,9 +76,10 @@ export function ProductsLead({ lead, promoteTo, onTier }: { lead: Lead; promoteT
 /** One product in a cell: the name truncates, its figure never does. */
 function Line({ name, meta }: { name: string; meta: string | null }) {
   return (
-    <span className="flex min-w-0 items-baseline gap-1.5 text-proof-small" title={name}>
+    // Stacked: name over its figure, so a long name and "promoted before, +11 pts adoption" both stay readable.
+    <span className="flex min-w-0 flex-col text-proof-small" title={name}>
       <span className="min-w-0 truncate text-ink">{name}</span>
-      {meta ? <span className="shrink-0 text-ink-2 tnum">· {meta}</span> : null}
+      {meta ? <span className="truncate text-proof-label text-ink-2 tnum">{meta}</span> : null}
     </span>
   )
 }
@@ -88,9 +93,12 @@ function Cell({ tier, label, value, note, detail, onOpen }: { tier: ProofTier; l
           {label}
           <ArrowRight size={13} strokeWidth={1.7} aria-hidden className="-translate-x-1 opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100" />
         </span>
-        <span className="flex items-baseline gap-2">
-          <span className="text-proof-kpi text-ink tnum">{int(value)}</span>
-          <span className="min-w-0 text-proof-small text-ink-2 md:truncate">{note}</span>
+        <span className="flex items-center gap-3">
+          {/* keyed by value: a filter that changes the count cross-fades it instead of swapping digits in place */}
+          <span key={value} className="text-proof-kpi text-ink tnum animate-[proofSwap_.22s_var(--ease-standard)_both]">
+            {int(value)}
+          </span>
+          <span className="min-w-0 text-proof-small leading-[18px] text-ink-2 [text-wrap:pretty] md:line-clamp-2">{note}</span>
         </span>
       </button>
       {detail ? <div className="min-h-8 min-w-0 content-center">{detail}</div> : null}

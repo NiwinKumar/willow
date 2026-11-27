@@ -154,16 +154,6 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           <span aria-hidden>←</span>
           {date.toLocaleDateString('en-GB', { month: 'long' })}
         </button>
-        <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">
-          HISTORY /{' '}
-          {date
-            .toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-            .toUpperCase()}
-        </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {actions}
@@ -204,9 +194,10 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
     for (const k of ['changed', 'normal', 'notEnough', 'notCompared'] as const) kinds[k] += c[k]
   }
   const firstState = states[0].st
+  const oneWayCount = (['improved', 'otherWay', 'shifted'] as const).filter((w) => ways[w]).length
   const chips: { g: VerdictKind | null; t: string; way?: ChangeWay }[] = compared.length
     ? [
-        ...(['improved', 'otherWay', 'shifted'] as const).filter((w) => ways[w]).map((w) => ({ g: 'changed' as const, way: w, t: `${ways[w]} ${CHANGE_WORDS[w].label.toLowerCase()}` })),
+        ...(['improved', 'otherWay', 'shifted'] as const).filter((w) => ways[w] && oneWayCount > 1).map((w) => ({ g: 'changed' as const, way: w, t: `${ways[w]} ${CHANGE_WORDS[w].label.toLowerCase()}` })),
         ...(['normal', 'notEnough', 'notCompared'] as const).filter((k) => kinds[k]).map((k) => ({ g: k, t: `${kinds[k]} ${VERDICT_WORDS[k].label.toLowerCase()}` })),
         ...baselines.map((s) => ({ g: 'baseline' as const, t: `${placeOf(s)}: your starting point` })),
       ]
@@ -218,8 +209,21 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
       : states.every((x) => x.st === 'rejected')
         ? [{ g: 'notCompared', t: 'Not measured' }]
         : [{ g: 'notCompared', t: firstState === 'former' ? 'An earlier baseline, not compared' : firstState === 'pending' ? 'Still measuring' : firstState === 'failed' ? 'Did not finish measuring' : 'Not measured' }]
-  const big = compared.length ? String(kinds.changed).padStart(2, '0') : baselines.length ? String(baselines.reduce((n, s) => n + usedFrames(s), 0)).padStart(2, '0') : states.every((x) => x.st === 'rejected') ? '00' : '—'
-  const bigLabel = compared.length ? (kinds.changed === 1 ? 'reading moved beyond your normal range' : 'readings moved beyond your normal range') : baselines.length ? 'photos in your baseline' : states.every((x) => x.st === 'rejected') ? 'usable photos' : 'not compared'
+  // The count says the changes once: when every change went one way, the label names the way and that chip goes.
+  const oneWay = (['improved', 'otherWay', 'shifted'] as const).filter((w) => ways[w])
+  const soleWay = compared.length && oneWay.length === 1 ? oneWay[0] : null
+  const big = compared.length ? String(kinds.changed) : baselines.length ? String(baselines.reduce((n, s) => n + usedFrames(s), 0)) : states.every((x) => x.st === 'rejected') ? '0' : '—'
+  const bigLabel = compared.length
+    ? soleWay
+      ? `${kinds.changed === 1 ? 'reading' : 'readings'} ${CHANGE_WORDS[soleWay].label.toLowerCase()}, beyond your normal range`
+      : kinds.changed === 1
+        ? 'reading moved beyond your normal range'
+        : 'readings moved beyond your normal range'
+    : baselines.length
+      ? 'photos in your baseline'
+      : states.every((x) => x.st === 'rejected')
+        ? 'usable photos'
+        : 'not compared'
 
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
   // What else was different (asked at face check-ins): shown on the day of a measured face check-in.
@@ -331,7 +335,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             }}
           >
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-              <span className="font-mono text-[11px] tracking-[.08em]">■ {(multi ? shown.map(placeOf).join(' · ') : `${placeOf(primary)} · ${usableLine(primary)}`).toUpperCase()}</span>
+              <span className="text-[13px] leading-[1.3] text-ink/80">{multi ? shown.map(placeOf).join(' · ') : `${placeOf(primary)} · ${usableLine(primary)}`}</span>
               <div className="ml-auto flex flex-wrap justify-end gap-2">
                 <ShareButton card={resultShare(primary, baseOf(primary), data.goals)} />
                 <NotesButton session={primary} notes={notes} />
@@ -360,7 +364,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 </div>
               </div>
               <div className="ml-auto flex flex-col items-end gap-1.5 text-right">
-                <span className="font-dot text-[clamp(52px,5vw,72px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
+                <span key={big} className="animate-[wRise_.5s_.15s_both] font-dot text-[clamp(56px,5.4vw,80px)] leading-[.8] font-extrabold tracking-[-0.02em] tnum">{big}</span>
                 <span className="max-w-[190px] text-[13.5px] leading-[1.3]">{bigLabel}</span>
               </div>
             </div>
@@ -376,13 +380,13 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
         </div>
 
         {states.map(({ s, st }) => {
-          const where = multi ? ` · ${placeOf(s).toUpperCase()}` : ''
+          const where = multi ? placeOf(s) : undefined
           if (st === 'pending' && stalled(s))
             // Home's "didn't finish" links here: waiting longer will not change this one (polling has stopped).
             return (
               <StatusCard
                 key={s.id}
-                eyebrow={`DID NOT FINISH${where}`}
+                place={where}
                 title="This check-in did not finish."
                 body={<>{s.status === 'uploading' ? 'The photos never finished uploading, so nothing was measured.' : 'Measuring stopped before a result came back. The photos are saved, so it can be measured again.'}</>}
                 action={
@@ -403,7 +407,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
               <StatusCard
                 key={s.id}
                 busy
-                eyebrow={`STILL MEASURING${where}`}
+                place={where}
                 title="This check-in is still being measured."
                 body={<>Your photos are uploaded. Results show here as soon as the measurement finishes; this page checks again on its own.</>}
                 action={
@@ -417,7 +421,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             return (
               <StatusCard
                 key={s.id}
-                eyebrow={`DID NOT FINISH${where}`}
+                place={where}
                 title="This check-in did not finish measuring."
                 body={<>{retryable(s) ? 'The photos are saved, so it can be measured again.' : (s.error?.message ?? 'The photos could not be read.')}</>}
                 action={
@@ -447,12 +451,14 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
               </h2>
             ) : null}
             {read.length ? (
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3">
+              <div className="@container">
+              <div className={`grid grid-cols-1 gap-3 @min-[460px]:grid-cols-2 ${tileGrid(read.length).cols}`}>
                 {read.map(({ m }, i) => {
                   // counts of a check-in with (or without) cheek photos compare with one taken the same way
                   const ref = referenceFor(m.id, s, baseOf(s), seriesOf(s))
                   return (
                     <MetricTile
+                      className={i === read.length - 1 ? tileGrid(read.length).last : ''}
                       key={`${s.id}:${m.id}`}
                       metric={m}
                       session={s}
@@ -462,6 +468,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                     />
                   )
                 })}
+              </div>
               </div>
             ) : null}
             {unread.length ? <p className="m-0 text-[14px] leading-[1.45] text-ink-2">{unreadLine(s, unread)}</p> : null}
@@ -504,6 +511,20 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
       <TomorrowSheet open={tomorrow} onClose={() => setTomorrow(false)} />
     </Page>
   )
+}
+
+/**
+ * The readings grid never leaves a hole: two columns from 460px (an odd last tile spans both), and from 940px four
+ * columns, or three when that fills the rows better (9 readings: 3 × 3); a short last row's final tile stretches to
+ * the edge. Literal classes, so Tailwind generates them.
+ */
+const WIDE: Record<number, string> = { 3: '@min-[940px]:grid-cols-3', 4: '@min-[940px]:grid-cols-4' }
+const WIDE_SPAN: Record<number, string> = { 1: '', 2: '@min-[940px]:col-span-2', 3: '@min-[940px]:col-span-3', 4: '@min-[940px]:col-span-4' }
+function tileGrid(n: number): { cols: string; last: string } {
+  const c = n % 4 === 0 || n % 4 === 3 ? 4 : n % 3 === 0 ? 3 : n % 3 === 2 ? 3 : 4
+  const rem = n % c
+  const wide = rem ? WIDE_SPAN[c - rem + 1] : '@min-[940px]:col-span-1'
+  return { cols: WIDE[c], last: n % 2 === 1 ? `@min-[460px]:col-span-2 ${wide}` : rem ? wide : '' }
 }
 
 /** One place's part of the day below the readings: its photo (spots, redness, areas; hold to compare with the

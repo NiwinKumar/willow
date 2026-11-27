@@ -157,7 +157,8 @@ function Method() {
               <li key={t.id} className="grid grid-cols-1 gap-2 border-t border-line px-5 py-3.5 sm:grid-cols-[200px_minmax(0,1fr)_120px] sm:items-center">
                 <span>{['proven', 'promising', 'unclear', 'too_few'].includes(t.id) ? <ProofTierChip tier={t.id as 'proven'} size="sm" /> : <Badge>{t.label}</Badge>}</span>
                 <span className="text-proof-small text-ink-2">{t.rule}</span>
-                <span className="text-proof-small text-ink-2 tnum sm:text-right">n ≥ {t.min_n}</span>
+                {/* "Not enough data" is the tier under the threshold: n < 10, not n ≥ 10 (the api sends the threshold). */}
+                <span className="text-proof-small text-ink-2 tnum sm:text-right">{t.id === 'too_few' ? `under ${t.min_n} people` : `${t.min_n}+ people`}</span>
               </li>
             ))}
           </ul>

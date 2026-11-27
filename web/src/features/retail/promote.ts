@@ -293,9 +293,11 @@ export function campaignInsight(c: Pick<Campaign, 'status' | 'stats'>): { tone: 
       detail: `${delivery} The real test is the holdout: it unlocks once ${HOLDOUT_MIN} people are in each group.`,
     }
   const per100 = `${Math.round(inc.exposed.rate * 100)} in 100 people who could see the card added the product, against ${Math.round(inc.holdout.rate * 100)} in 100 who could not.`
-  if (inc.lift_lo > 0) return { tone: 'good', headline: 'The card is making people add this product.', detail: per100 }
+  // An ended campaign's verdict is final: past tense, and "no clear effect" instead of "too early".
+  const done = c.status === 'ended'
+  if (inc.lift_lo > 0) return { tone: 'good', headline: done ? 'The card made people add this product.' : 'The card is making people add this product.', detail: per100 }
   if (inc.lift_hi < 0) return { tone: 'neutral', headline: 'People who saw the card were less likely to add the product.', detail: per100 }
-  return { tone: 'wait', headline: 'Too early to say whether the card changes anything.', detail: `${per100} The gap could still be chance.` }
+  return done ? { tone: 'neutral', headline: 'The card made no clear difference.', detail: `${per100} The gap is within chance.` } : { tone: 'wait', headline: 'Too early to say whether the card changes anything.', detail: `${per100} The gap could still be chance.` }
 }
 
 /** The product's own record in a sentence (before any promotion): users' share with a visible change vs non-users with the same goals. */

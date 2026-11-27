@@ -19,6 +19,16 @@ export function Requests({ inbox, outbox, loading, className }: { inbox: Evidenc
   const { org, orgs } = useOrg()
   const [tab, setTab] = useState<'inbox' | 'sent'>(org?.kind === 'brand' || (inbox.length > 0 && !outbox.length) ? 'inbox' : 'sent')
   const list = tab === 'inbox' ? inbox : outbox
+  // Nothing either way: one quiet line, not an empty panel with tabs (it says where requests will appear).
+  if (!loading && !inbox.length && !outbox.length)
+    return (
+      <section aria-labelledby="requests-h" className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card border border-line px-5 py-4 ${className ?? ''}`}>
+        <h2 id="requests-h" className="m-0 text-proof-h text-ink">
+          Evidence requests
+        </h2>
+        <span className="text-proof-small text-ink-2">{org?.kind === 'brand' ? 'None yet. When the retailer asks for evidence on one of your products, it appears here and in Needs you.' : 'None sent. Ask a brand from an “Over-shelved, under-delivering” card; its answer lands in Results.'}</span>
+      </section>
+    )
   return (
     <Panel
       title="Evidence requests"

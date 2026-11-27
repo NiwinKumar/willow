@@ -119,3 +119,17 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Change: the api waits up to 280 s for `/v1/analyze` (was 120 s); the engine's Cloud Run request timeout is 300 s (was 120 s). No request or response change.
 - Impact: engine code none; schemas none; api and infra only.
 - Approved by: n/a (api and infra, both Niwin's)
+
+## 2026-11-27: Readings by area (proposed by Harshini; engine, then api/web)
+- Why: a face reading is one number for the whole face, so a check-in could not say where it moved (the left cheek calmer, the chin with more blemishes). The metric detail needs that to be useful.
+- What: on `face_full` results, `metrics[].extras.by_zone` for `redness`, `tone_evenness`, `blemishes`, `pigment_spots` and `dark_circles`: `{zone: {value, within_session_sd, mdc95, n}}`. Zones are the face map's (`forehead`, `nose`, `right_cheek`, `left_cheek`, `around_mouth`, `chin`, `right_jaw`, `left_jaw`; `right_under_eye` / `left_under_eye` for dark circles), each measured on the photos that show at least `ZONE_MIN_MM2` of its skin, with its own photo-to-photo SD (the metric's `MIN_SD` floor) and noise band. Blemishes and dark spots per zone come from the same confirmed marks as the totals (cheek photos own the cheeks and jaws). Skin tone, shine, glow and lines are not split (lines already report zones in its extras). Definitions in `docs/METRICS.md` "Readings by area".
+- Areas are the app's drawn "Areas" outlines: each counts only the face skin inside its outline, and the nose zone now includes its bridge up to the forehead (it was split between the cheeks and drawn in no outline). Candidate `features.zone` follows the same nose zone.
+- Schema: none (`extras` is a free object). Whole-face values, bands and verdicts are unchanged for front-only sessions (checked: identical totals on a real session). In a front + cheek-photo session, marks on the nose bridge and under-brow eyelids are now counted on the front photo instead of a cheek photo, which can move those sessions' blemish and dark-spot totals slightly.
+- Version: engine 0.4.1 (additive). A result without `by_zone` (older engine) simply has no areas; re-measuring a session adds them.
+- Impact: engine; api reads `by_zone` to compare each zone with the same zone of the baseline session (metric story); web shows it.
+- Approved by: [x] Harshini [x] Niwin (Nov 28; added to CONTRACT.md §2.5)
+
+## 2026-11-27: Metric story by area, spots and product timing (proposed by Harshini; api/web)
+- What: `GET /v1/sessions/{id}/story/{metric_id}` adds `areas` (per face area: value, baseline value, change, its own normal range, verdict, way), `spots` (per area: new this time, still there, fading, not seen this time, faded so far, typical days visible) and `products[].since_start` (weeks, check-ins, status). Existing fields unchanged. Needs engine 0.4.1 `extras.by_zone` for areas; older results simply have none. Details in `docs/GEMINI_SPEC.md` section 7.
+- Impact: engine none beyond 0.4.1; schemas none; api and web.
+- Approved by: [x] Harshini [x] Niwin (Nov 28)

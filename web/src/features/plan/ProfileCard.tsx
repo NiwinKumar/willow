@@ -24,7 +24,6 @@ export function ProfileStep() {
   if (!result) return null
   return (
     <Frame
-      eyebrow="YOUR SKIN PROFILE"
       title="Here's what Willow heard"
       sub="From your answers only. Your check-ins measure the rest."
       actions={

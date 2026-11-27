@@ -70,9 +70,17 @@ def _zone_bounds() -> dict:
     mesh = canonical()
     assert mesh is not None
     v = mesh[0]
-    nose = cv2.convexHull(v[[i for i in NOSE_ALL if i < len(v)], :2].astype(np.float32))
+    brow_y = float(v[[105, 334], 1].mean()) - config.FOREHEAD_ZONE_BELOW_BROW_MM
+    # the nose runs up its bridge to the forehead's lower edge, between the inner eye corners
+    # (133, 362): that strip was split between the cheeks, outside both cheeks' drawn areas
+    bridge = [
+        (v[i, 0] * config.NOSE_BRIDGE_WIDTH_FRAC, y) for i in (133, 362) for y in (v[i, 1], brow_y)
+    ]
+    nose = cv2.convexHull(
+        np.vstack([v[[i for i in NOSE_ALL if i < len(v)], :2], bridge]).astype(np.float32)
+    )
     return {
-        "brow_y": float(v[[105, 334], 1].mean()) - config.FOREHEAD_ZONE_BELOW_BROW_MM,
+        "brow_y": brow_y,
         "nose": nose,
         "mouth_x": float(abs(v[61, 0])) + config.MOUTH_ZONE_MARGIN_MM,
         "subnasal_y": float(v[2, 1]),
@@ -112,11 +120,10 @@ def _barycentric(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> 
     return np.stack([1 - w1 - w2, w1, w2], -1)
 
 
-def zone_map(points: np.ndarray, shape: tuple[int, int]) -> np.ndarray | None:
-    """Per pixel of a (h, w) image whose landmarks are `points`: 1-based index into FACE_ZONES of
-    the face mesh triangle covering it (0 = off the mesh), each triangle in the zone of its
-    centre on the canonical face (zone_of, as marks are placed). Only triangles facing the
-    camera are drawn. None without the model."""
+def _facing_tris(points: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """(T,) whether each mesh triangle faces the camera (wound as in the front view; the side
+    turned away folds over the visible side), the (T,) photo areas (px2) and the (T, 3, 2)
+    photo corners. None without the model."""
     mesh = canonical()
     if mesh is None:
         return None
@@ -130,12 +137,79 @@ def zone_map(points: np.ndarray, shape: tuple[int, int]) -> np.ndarray | None:
         rc[:, 0] - ra[:, 0]
     )
     facing = (np.sign(area_img) == np.sign(area_ref)) & (np.abs(area_img) > 1e-6)
+    return facing, 0.5 * np.abs(area_img), img[tris]
+
+
+@lru_cache(maxsize=1)
+def triangle_zones() -> np.ndarray | None:
+    """(T,) 1-based FACE_ZONES code of each mesh triangle (zone_of its canonical centre)."""
+    mesh = canonical()
+    if mesh is None:
+        return None
+    verts, tris = mesh
     centre = verts[tris].mean(axis=1)
-    out = np.zeros(shape, np.uint8)
-    for t in np.flatnonzero(facing):
-        code = ZONES.index(zone_of(float(centre[t, 0]), float(centre[t, 1]))) + 1
-        cv2.fillConvexPoly(out, np.round(img[tris[t]]).astype(np.int32), code)
+    return np.array(
+        [ZONES.index(zone_of(float(x), float(y))) + 1 for x, y in centre[:, :2]], np.uint8
+    )
+
+
+@lru_cache(maxsize=1)
+def triangle_sides() -> np.ndarray | None:
+    """(T,) "right" / "left": the half of the face each triangle's canonical centre is on."""
+    mesh = canonical()
+    if mesh is None:
+        return None
+    verts, tris = mesh
+    return np.where(verts[tris].mean(axis=1)[:, 0] < 0, "right", "left")
+
+
+def facing(points: np.ndarray) -> np.ndarray | None:
+    """(T,) how squarely the photo sees each mesh triangle, about the cosine of the angle
+    between the skin and the camera's view: 1 face-on, 0 edge-on or turned away. It is the
+    triangle's photo area over its canonical area, divided by the same ratio of the photo's
+    most face-on triangles (their 95th percentile), so it needs no pose angles or scale and
+    reads the same at any camera distance. None without the model."""
+    got = _facing_tris(points)
+    mesh = canonical()
+    if got is None or mesh is None:
+        return None
+    ok, area_img, _ = got
+    verts, tris = mesh
+    area_ref = 0.5 * np.linalg.norm(
+        np.cross(verts[tris[:, 1]] - verts[tris[:, 0]], verts[tris[:, 2]] - verts[tris[:, 0]]),
+        axis=1,
+    )
+    ratio = np.where(ok, area_img / np.maximum(area_ref, 1e-9), 0.0)
+    if not ok.any():
+        return np.zeros(len(tris))
+    top = float(np.percentile(ratio[ok], 95))
+    return np.clip(ratio / top, 0.0, 1.0) if top > 0 else np.zeros(len(tris))
+
+
+def triangle_map(points: np.ndarray, shape: tuple[int, int]) -> np.ndarray | None:
+    """Per pixel of a (h, w) image whose landmarks are `points`: the index of the face mesh
+    triangle covering it (-1 = off the mesh). Only triangles facing the camera are drawn.
+    None without the model."""
+    got = _facing_tris(points)
+    if got is None:
+        return None
+    ok, _, corners = got
+    out = np.full(shape, -1, np.int16)
+    for t in np.flatnonzero(ok):
+        cv2.fillConvexPoly(out, np.round(corners[t]).astype(np.int32), int(t))
     return out
+
+
+def zone_map(points: np.ndarray, shape: tuple[int, int]) -> np.ndarray | None:
+    """Per pixel of a (h, w) image whose landmarks are `points`: 1-based index into FACE_ZONES of
+    the face mesh triangle covering it (0 = off the mesh), each triangle in the zone of its
+    centre on the canonical face (zone_of, as marks are placed). Only triangles facing the
+    camera are drawn. None without the model."""
+    tri = triangle_map(points, shape)
+    codes = triangle_zones()
+    if tri is None or codes is None:
+        return None
+    return np.where(tri >= 0, codes[np.clip(tri, 0, None)], 0).astype(np.uint8)
 
 
 def locate(points: np.ndarray, xy: np.ndarray) -> list[dict | None]:

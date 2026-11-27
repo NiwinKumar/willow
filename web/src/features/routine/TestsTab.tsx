@@ -37,7 +37,6 @@ export function TestStrip({ read, onStart }: { read: ForearmRead | null; onStart
       {read ? (
         <>
           <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
-            <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">PRODUCT TEST · FOREARM</span>
             <span className="text-[17px] leading-[1.25] tracking-[-0.01em] text-pretty">{read.name ? `${read.name} on your forearm` : 'Treated arm vs control arm'}</span>
             <span className="text-[13.5px] leading-[1.4] text-ink-2">
               <span aria-hidden>{read.standing.g} </span>
@@ -61,7 +60,6 @@ export function TestStrip({ read, onStart }: { read: ForearmRead | null; onStart
       ) : (
         <>
           <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-1">
-            <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">PRODUCT TEST · FOREARM</span>
             <span className="text-[17px] leading-[1.25] tracking-[-0.01em] text-pretty">Try a product on your forearm first</span>
             <span className="text-[13.5px] leading-[1.4] text-ink-2">One square treated, one left untouched on the other arm, photographed together.</span>
           </div>
@@ -87,7 +85,6 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
         <section aria-label={running ? 'Test in progress' : 'How a forearm test works'} className="flex flex-col gap-3.5 rounded-[28px] p-5 text-willow-900 squircle sm:p-6" style={BAND}>
-          <span className="font-mono text-[11px] tracking-[.08em]">■ {running ? 'TEST IN PROGRESS' : read ? 'FOREARM CHECK-INS' : 'HOW IT WORKS'}</span>
           {read ? (
             <>
               <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.01em] text-pretty">{read.name ?? 'Treated arm vs control arm'}</span>
@@ -112,11 +109,12 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
             </>
           ) : (
             <>
-              <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.01em] text-pretty">Test a product on one forearm square</span>
+              {/* The page title already says "Test a product": this card answers how. */}
+              <h2 className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] font-normal tracking-[-0.01em] text-pretty">How a forearm test works</h2>
               <span className="max-w-[460px] text-[14px] leading-[1.45] text-pretty" style={{ animation: 'wRise .5s 120ms both' }}>
                 It shows whether a product changes your skin, measured against untouched skin on your other arm, before it goes on your face.
               </span>
-              <ol className="flex max-w-[460px] flex-1 flex-col justify-between gap-3 text-[14px] leading-[1.45]">
+              <ol className="flex max-w-[460px] flex-col gap-3 text-[14px] leading-[1.45]">
                 {['Choose what to test, and for how long.', 'Use it on a small square on one forearm. Leave the same square on the other forearm untouched.', `Photograph both arms together before the first use, then every few days. Willow gives a verdict after day ${VERDICT_AFTER_DAYS}.`].map((s, i) => (
                   <li key={s} className="flex gap-3">
                     <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-full bg-willow-900 font-mono text-[11px] text-inverse">
@@ -126,6 +124,7 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
                   </li>
                 ))}
               </ol>
+              <ArmsDrawing />
             </>
           )}
         </section>
@@ -162,6 +161,30 @@ function PastRow({ t }: { t: ProductTest }) {
         </span>
       </span>
     </li>
+  )
+}
+
+/**
+ * The two forearms, drawn: one square with the product (the lime accent), the same square on the other arm left
+ * untouched. Line drawing per the capture-guide rules (1.5px ink, round caps, one lime fill, no skin).
+ * Four tests: shows the treated/untouched pairing the steps describe in one look; labelled in words under each arm;
+ * sits at the card's foot below the steps, still; drawn in the guide illustrations' style.
+ */
+function ArmsDrawing() {
+  const arm = (x: number, treated: boolean, label: string) => (
+    <g transform={`translate(${x} 0)`}>
+      <path d="M18 8c6-4 16-4 22 0l4 14c1 4 1 8 0 12l-4 46c-1 6-5 9-11 9s-10-3-11-9L14 34c-1-4-1-8 0-12z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <rect x="21" y="44" width="16" height="16" rx="2" fill={treated ? 'var(--signal-baseline)' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeDasharray={treated ? undefined : '2.5 2.5'} />
+      <text x="29" y="104" textAnchor="middle" fontSize="12" fill="currentColor" style={{ fontFamily: 'var(--font-ui)' }}>
+        {label}
+      </text>
+    </g>
+  )
+  return (
+    <svg viewBox="0 0 190 110" role="img" aria-label="Two forearms: one square with the product, the same square on the other arm untouched" className="mt-auto w-[190px] self-end opacity-90 motion-safe:animate-[wRise_.6s_var(--ease-standard)_.3s_both]">
+      {arm(24, true, 'With it')}
+      {arm(108, false, 'Untouched')}
+    </svg>
   )
 }
 

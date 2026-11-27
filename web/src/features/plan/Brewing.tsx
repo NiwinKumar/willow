@@ -100,7 +100,7 @@ export function Brewing() {
 
   if (error)
     return (
-      <Frame eyebrow={error.fits ? 'SOMETHING WENT WRONG' : 'NOTHING FITS YET'} title={error.fits ? 'Your routine is not ready' : 'Nothing fits all of that yet'}>
+      <Frame title={error.fits ? 'Your routine is not ready' : 'Nothing fits all of that yet'}>
         <div className={`${card} flex animate-[wRise_.45s_var(--ease-standard)_both] flex-col gap-3 px-5 py-5`} style={cardStyle}>
           <p className="m-0 text-[15px] leading-[1.5]">{error.text}</p>
           {!error.fits && error.nearest ? (
@@ -145,7 +145,6 @@ export function Brewing() {
   return (
     <Frame
       wide
-      eyebrow={done ? 'BREWED' : 'BREWING YOUR ROUTINE'}
       title={done ? <span key="d" className="inline-block animate-[wWord_.5s_both]">{`${funnel[last].n} ${funnel[last].n === 1 ? 'product fits' : 'products fit'} you`}</span> : <span key={now?.id ?? 'w'} className="inline-block animate-[wWord_.45s_both]">{now ? checkingWords(now, stage) : 'Reading the catalog'}</span>}
       sub="Fixed rules from published sources do the choosing. No AI picks a product."
       actions={
@@ -220,7 +219,7 @@ function Dish({ funnel, stage, reduce }: { funnel: FunnelStep[]; stage: number; 
   return (
     <figure className="m-0 flex flex-col items-center gap-2">
       <div
-        className="relative aspect-square w-[min(300px,62vw,38vh)] rounded-full"
+        className="relative aspect-square w-[min(220px,52vw,27vh)] rounded-full sm:w-[min(300px,62vw,38vh)]"
         style={{ background: 'radial-gradient(circle at 50% 38%, rgba(255,255,255,.9), rgba(255,255,255,.45) 62%, rgba(255,255,255,.2))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.9), inset 0 -18px 40px rgba(156,211,255,.25), inset 0 10px 30px rgba(255,255,255,.7), 0 40px 80px -40px rgba(15,59,58,.45)' }}
       >
         {/* the brew itself: a slow turning bloom under the dots */}
@@ -273,7 +272,7 @@ function Dish({ funnel, stage, reduce }: { funnel: FunnelStep[]; stage: number; 
         </div>
         {!d0 ? <span className="absolute inset-0 grid place-items-center font-mono text-[11px] tracking-[.08em] text-ink-2">MIXING…</span> : null}
       </div>
-      <figcaption className="text-center text-[12px] text-ink-2">{d0 ? (per > 1 ? `Each dot is about ${Math.round(per)} products` : 'Each dot is one product in the catalog') : 'Willow’s catalog, checked for you'}</figcaption>
+      <figcaption className="text-center text-[12px] text-ink-2 [@media(max-height:720px)]:hidden">{d0 ? (per > 1 ? `Each dot is about ${Math.round(per)} products` : 'Each dot is one product in the catalog') : 'Willow’s catalog, checked for you'}</figcaption>
     </figure>
   )
 }
@@ -294,7 +293,7 @@ function FunnelList({ funnel, stage }: { funnel: FunnelStep[]; stage: number }) 
         const st = i < stage ? 'done' : i === stage ? 'on' : 'up'
         const lastRow = i === funnel.length - 1
         return (
-          <li key={f.id} className={`relative flex items-center gap-3 rounded-[18px] px-3 py-[clamp(6px,1.1vh,10px)] transition-[background-color,opacity] duration-500 ${st === 'on' ? 'bg-white' : ''} ${st === 'up' ? 'opacity-45' : 'opacity-100'}`}>
+          <li key={f.id} className={`relative flex items-center gap-3 rounded-[18px] px-3 py-[clamp(5px,.9vh,10px)] transition-[background-color,opacity] duration-500 ${st === 'on' ? 'bg-white' : ''} ${st === 'up' ? 'opacity-45' : 'opacity-100'}`}>
             <span aria-hidden className={`grid size-[22px] flex-none place-items-center rounded-full text-[11px] transition-colors duration-500 ${st === 'up' ? 'border-[1.5px] border-ink/25' : lastRow && st === 'on' ? 'bg-[var(--willow-400)] text-white' : 'bg-selected text-inverse'}`}>
               {st === 'done' || (lastRow && st === 'on') ? <span className="animate-[wDotIn_.3s_var(--ease-bounce)_both]">✓</span> : st === 'on' ? <span className="size-1.5 animate-[wBreathe_1s_ease-in-out_infinite] rounded-full bg-lime" /> : null}
             </span>

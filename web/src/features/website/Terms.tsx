@@ -58,15 +58,16 @@ export default function Terms() {
 
       <main className="relative mx-auto flex w-full max-w-[820px] animate-[wRiseLg_.6s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-5 pb-12">
         <div className="px-1 pt-[clamp(20px,4vw,40px)] pb-2">
-          <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">
-            ■ LAST UPDATED {day(UPDATED).toUpperCase()} · PHOTO CONSENT VERSION {day(CONSENT_VERSION).toUpperCase()}
-          </span>
-          <h1 className="mt-3.5 mb-0 font-serif text-[clamp(44px,6vw,76px)] leading-[.95] font-normal tracking-[-0.01em]">Terms and privacy notice</h1>
+          <h1 className="mb-0 font-serif text-[clamp(40px,6vw,76px)] leading-[.95] font-normal tracking-[-0.01em] text-balance">Terms and privacy notice</h1>
+          {/* the versions are a record, not a heading: one quiet line under the title */}
+          <p className="mt-3 mb-0 text-[13.5px] text-ink-2">
+            Last updated {day(UPDATED)} · photo consent version {day(CONSENT_VERSION)}
+          </p>
           <p className="mt-4 mb-0 max-w-[640px] text-[17px] leading-[1.5] text-[#3E3C38]">What Willow is, what it keeps about you, where, for how long, and how to remove it. Written to be read, not skimmed past.</p>
         </div>
 
         <Card>
-          <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ IN SHORT</span>
+          <h2 className="m-0 text-[20px] font-normal tracking-[-0.01em]">In short</h2>
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-[16px] leading-[1.5]">
             {[
               'Willow is for adults (18+). It tracks how your skin looks over time against your own baseline. It is cosmetic only and never diagnoses.',
@@ -220,8 +221,8 @@ export default function Terms() {
           <Card>
             <h2 className="m-0 font-serif text-[clamp(28px,3.4vw,38px)] leading-[1.05] font-normal">What Willow does, and never does</h2>
             <div className="grid grid-cols-2 gap-x-4 text-[15px] leading-[1.5] text-[#2A2926] max-sm:grid-cols-1">
-              <span className="hidden pb-2 font-mono text-[12px] tracking-[.08em] text-ink-2 sm:block">■ WE DO</span>
-              <span className="hidden pb-2 font-mono text-[12px] tracking-[.08em] text-ink-2 sm:block">■ WE NEVER DO</span>
+              <span className="hidden pb-2 text-[14px] text-ink-2 sm:block">We do</span>
+              <span className="hidden pb-2 text-[14px] text-ink-2 sm:block">We never do</span>
               {DO_NEVER.map(([yes, no]) => (
                 <div key={yes} className="contents">
                   <span className="flex gap-2.5 border-t border-ink/[.07] py-3 max-sm:pb-1">

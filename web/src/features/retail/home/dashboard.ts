@@ -140,8 +140,9 @@ export function weekBrief(x: BriefInput): string[] {
     const d = Math.round((x.rate.rate - x.market.rate) * 100)
     s.push(`${pct(x.rate.rate)} of people using them saw a visible change (n=${int(x.rate.n)}), ${d === 0 ? 'level with' : `${Math.abs(d)} ${Math.abs(d) === 1 ? 'point' : 'points'} ${d > 0 ? 'above' : 'below'}`} the market’s ${pct(x.market.rate)}.`)
   }
-  if (x.camp.best) s.push(`Best campaign lift: ${pts(x.camp.best.lift)} against its holdout, for ${x.camp.best.product}${x.camp.best.sample ? ' (a sample campaign, simulated)' : ''}.`)
-  else if (x.rising && x.rising.change !== null && Math.round(x.rising.change * 100) > 0) s.push(`Demand for ${x.rising.goal.toLowerCase()} grew ${Math.round(x.rising.change * 100)}% last month, to ${int(x.rising.latest)} people.`)
+  // What moved: demand first (no tile shows it); the best campaign lift only when demand is flat.
+  if (x.rising && x.rising.change !== null && Math.round(x.rising.change * 100) > 0) s.push(`Demand for ${x.rising.goal.toLowerCase()} grew ${Math.round(x.rising.change * 100)}% last month, to ${int(x.rising.latest)} people.`)
+  else if (x.camp.best) s.push(`Best campaign lift: ${pts(x.camp.best.lift)} against its holdout, for ${x.camp.best.product}${x.camp.best.sample ? ' (a sample campaign, simulated)' : ''}.`)
   return s
 }
 
@@ -150,4 +151,18 @@ export function risingGoal(rows: GoalTrend[]): GoalTrend | null {
   const pool = rows.some((r) => r.focus) ? rows.filter((r) => r.focus) : rows
   const up = pool.filter((r) => r.change !== null && r.change > 0 && (r.latest ?? 0) >= 10).sort((a, b) => (b.change ?? 0) - (a.change ?? 0))
   return up[0] ?? null
+}
+
+const TIER_RANK: Record<string, number> = { proven: 0, promising: 1, unclear: 2 }
+
+/**
+ * "How your products compare" (Home): measured products that have a comparison group (base rate and lift),
+ * Proven first, then Promising, then no clear effect; within a tier the widest gap first (the figure the row
+ * shows, so the column reads in order), then n.
+ * `count`: how many qualify in all, so the panel can say "5 of 14".
+ */
+export function proofRows<R extends Pick<ProductRow, 'rate' | 'base_rate' | 'lift' | 'lift_lo' | 'n' | 'tier'>>(rows: R[], limit = 5): { rows: R[]; count: number } {
+  const ok = rows.filter((r) => r.rate !== null && r.base_rate !== null && r.lift !== null && r.n !== null && r.tier in TIER_RANK)
+  ok.sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || (b.lift ?? 0) - (a.lift ?? 0) || (b.n ?? 0) - (a.n ?? 0))
+  return { rows: ok.slice(0, limit), count: ok.length }
 }

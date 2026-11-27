@@ -33,7 +33,7 @@ function TileCell({ t, i }: { t: Tile; i: number }) {
   const body = (
     <>
       <span className="flex items-center justify-between gap-2 text-proof-small text-ink-2">
-        <span className="truncate">{t.label}</span>
+        <span className="line-clamp-2 sm:line-clamp-1">{t.label}</span>
         {t.to ? <ArrowRight size={14} strokeWidth={1.7} aria-hidden className="shrink-0 -translate-x-1 opacity-0 transition-[opacity,translate] duration-150 group-hover:translate-x-0 group-hover:opacity-100" /> : null}
       </span>
       <span className="flex min-h-[44px] items-end justify-between gap-3">
@@ -51,7 +51,7 @@ function TileCell({ t, i }: { t: Tile; i: number }) {
         </span>
         {t.mark ? <span className="mb-1 hidden shrink-0 sm:block">{t.mark}</span> : null}
       </span>
-      <span className="truncate text-proof-small text-ink-2">{t.note}</span>
+      <span className="line-clamp-2 text-proof-small text-ink-2 sm:line-clamp-1" title={typeof t.note === 'string' ? t.note : undefined}>{t.note}</span>
     </>
   )
   const cls = `group flex min-w-0 flex-col gap-1.5 border-line px-4 py-3.5 text-left no-underline animate-[proofPage_.28s_var(--ease-standard)_both] sm:px-5 sm:py-4 [&:nth-child(odd)]:border-r [&:nth-child(-n+2)]:border-b xl:!border-b-0 xl:[&:not(:last-child)]:border-r`
@@ -84,11 +84,11 @@ export function DemandPanel({ months, rows, brand, className = '', loading }: { 
   const anyFocus = shown.some((r) => r.focus)
   return (
     <section aria-labelledby="demand-h" className={`flex min-w-0 flex-col rounded-card border border-line bg-surface ${className}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 pb-2 pt-4">
+      <div className="flex flex-col gap-0.5 px-5 pb-2 pt-4">
         <h2 id="demand-h" className="m-0 text-proof-h text-ink">
           What people come for
         </h2>
-        <span className="text-proof-small text-ink-2">People with a reading each month{span ? ` · ${span}` : ''}</span>
+        <span className="text-proof-small text-ink-2">People with a reading, by goal{span ? ` · ${span}` : ''}</span>
       </div>
       {loading ? null : !shown.length ? (
         <p className="m-0 px-5 pb-5 text-proof-small text-ink-2">Goal demand appears once a month has 10 people with readings.</p>
@@ -99,7 +99,6 @@ export function DemandPanel({ months, rows, brand, className = '', loading }: { 
               <span className="flex min-w-0 items-center gap-2">
                 {anyFocus ? <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${r.focus ? 'bg-proof-leaf' : 'bg-transparent'}`} /> : null}
                 <span className={`truncate text-proof-body ${r.focus ? 'font-medium text-ink' : 'text-ink'}`}>{r.goal}</span>
-                {r.focus && i === 0 && brand ? <span className="hidden shrink-0 text-proof-label text-ink-2 md:inline">{brand}’s goals</span> : null}
               </span>
               <span className="hidden sm:block">
                 <Sparkline values={r.counts} label={`${r.goal}: ${r.counts.map((c, j) => `${monthShort(months[j])} ${c ?? 'fewer than 10'}`).join(', ')}`} width={96} height={24} tone={r.focus ? 'leaf' : 'ink'} area={r.focus} />
@@ -111,7 +110,7 @@ export function DemandPanel({ months, rows, brand, className = '', loading }: { 
         </ul>
       )}
       <p className="m-0 mt-auto border-t border-line px-5 py-2.5 text-proof-label text-ink-2">
-        {anyFocus ? 'Green: goals your products target. ' : ''}Change is the latest month against the one before.
+        {anyFocus ? `Green: goals ${brand ? `${brand}’s` : 'your'} products target. ` : ''}Change: the latest month against the one before.
       </p>
     </section>
   )
@@ -134,8 +133,7 @@ export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = ''
         </h2>
         {t.count ? (
           <Link to={campaignsTo} className="text-proof-small text-ink-2 no-underline hover:text-ink">
-            {int(t.count)} {t.count === 1 ? 'campaign' : 'campaigns'}
-            {t.live ? ` · ${int(t.live)} live` : ''} →
+            All campaigns →
           </Link>
         ) : null}
       </div>

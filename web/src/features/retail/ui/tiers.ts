@@ -5,7 +5,7 @@ export const TIERS: Record<ProofTier, { label: string; glyph: string; text: stri
   proven: {
     label: 'Proven',
     glyph: '●',
-    text: '30+ people, and the lift over non-users stays above zero across its 95% interval.',
+    text: '30+ people, and the gap over people with the same goals not using it stays above zero across its 95% interval.',
     tone: 'text-proof-leaf',
   },
   promising: {
@@ -17,7 +17,7 @@ export const TIERS: Record<ProofTier, { label: string; glyph: string; text: stri
   unclear: {
     label: 'No clear effect yet',
     glyph: '○',
-    text: '10+ people, but no lift over non-users (or fewer than 10 non-users to compare with).',
+    text: '10+ people, but users change about as often as people with the same goals not using it (or fewer than 10 of those to compare with).',
     tone: 'text-ink-2',
   },
   too_few: {

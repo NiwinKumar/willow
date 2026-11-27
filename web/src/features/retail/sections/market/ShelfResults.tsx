@@ -157,10 +157,17 @@ export function ShelfResults({ category: picked, standalone = false }: { categor
           open ? (
             v.source === 'gemini' && v.summary ? v.summary : 'Each product’s share of the shelf against its share of the visible changes, with what to act on.'
           ) : (
-            <>
-              <strong>{v.flags.length} {v.flags.length === 1 ? 'product' : 'products'}</strong> to look at
-              {here ? `, ${here} in ${cat?.label.toLowerCase() ?? 'this category'}` : ''}. Shelf = {basisWord}.
-            </>
+            v.flags.length === 0 && v.pending ? (
+              // "0 products to look at" beside "Gemini is checking…" read as a verdict before there was one.
+              <>Checking each product’s share of the shelf against its share of the visible changes. Shelf = {basisWord}.</>
+            ) : v.flags.length === 0 ? (
+              <>Nothing to act on: every product’s shelf share is in line with its share of the visible changes. Shelf = {basisWord}.</>
+            ) : (
+              <>
+                <strong>{v.flags.length} {v.flags.length === 1 ? 'product' : 'products'}</strong> to look at
+                {here ? `, ${here} in ${cat?.label.toLowerCase() ?? 'this category'}` : ''}. Shelf = {basisWord}.
+              </>
+            )
           )
         }
         actions={

@@ -13,9 +13,10 @@ import { ProductImage } from './productUi'
 import { compactName, entryName, imageOf, metaLine } from './routineModel'
 import { isBasic, verdictDue, type EvidenceClock } from './actives'
 import { ProductChecked, type ChecksMap } from './checked'
+import { trialWindow } from './trialWindow'
 
 type Group = 'earning' | 'shifted' | 'noClear' | 'early'
-type ShelfRow = { e: RoutineEntry; group: Group; line: string; due: Date | null; shared: string | null; away: boolean }
+type ShelfRow = { e: RoutineEntry; group: Group; line: string; due: Date | null; firstLook: Date | null; shared: string | null; away: boolean }
 
 const GROUPS: { id: Group; title: string; hint: string; glyph: string }[] = [
   { id: 'earning', title: 'Earning its place', hint: 'A change beyond your normal range after you started it.', glyph: '◆' },
@@ -44,12 +45,12 @@ function shelfOf(entries: RoutineEntry[], sessions: Session[], check: RoutineChe
     // Another product started within two weeks: a change can't be told apart between them.
     const near = r && r.effect === 'helping' ? judged.find((x) => x.id !== e.id && Math.abs(new Date(x.started_at).getTime() - new Date(e.started_at).getTime()) <= 14 * DAY) : undefined
     const shared = near ? `Shared with ${compactName(near)}: started within two weeks of each other` : null
-    if (r && r.effect === 'helping') return { e, group: 'earning', line: r.o.text, due: null, shared, away: false }
-    if (r && r.effect === 'changed') return { e, group: 'shifted', line: r.o.text, due: null, shared: null, away: false }
-    if (r && (r.effect === 'steady' || r.effect === 'away') && windowOver) return { e, group: 'noClear', line: r.effect === 'away' ? `${r.o.text}` : `Nothing beyond your normal range after ${weeks} weeks`, due: null, shared: null, away: r.effect === 'away' }
+    if (r && r.effect === 'helping') return { e, group: 'earning', line: r.o.text, due: null, firstLook: null, shared, away: false }
+    if (r && r.effect === 'changed') return { e, group: 'shifted', line: r.o.text, due: null, firstLook: null, shared: null, away: false }
+    if (r && (r.effect === 'steady' || r.effect === 'away') && windowOver) return { e, group: 'noClear', line: r.effect === 'away' ? `${r.o.text}` : `Nothing beyond your normal range after ${weeks} weeks`, due: null, firstLook: null, shared: null, away: r.effect === 'away' }
     const o = r?.o ?? outcomeFor(e, sessions)
     const line = due && !windowOver ? `Verdict due ${fmtDate(localDay(due.due))} · ${due.weeks}-week window for ${due.active.toLowerCase()}` : o.text
-    return { e, group: 'early', line, due: due?.due ?? null, shared: null, away: false }
+    return { e, group: 'early', line, due: due && !windowOver ? due.due : null, firstLook: due?.firstLook ?? null, shared: null, away: false }
   })
   return { rows, basics: live.filter((e) => isBasic(e.category)) }
 }
@@ -100,6 +101,7 @@ export function ShelfVerdict({ entries, sessions, check, clock, checks, onOpen, 
                     {r.shared ? <span className="text-[12px] leading-[1.4] text-ink-2">{r.shared}</span> : null}
                     {r.e.product_id ? <ProductChecked check={checks[r.e.product_id]} /> : null}
                   </span>
+                  {r.due ? <WindowBar start={r.e.started_at} due={r.due} firstLook={r.firstLook} /> : null}
                   {g.id === 'noClear' ? (
                     <span className="flex shrink-0 gap-1.5">
                       <button type="button" onClick={() => onStop(r.e)} className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill px-3 text-[12.5px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/5 active:scale-[.97]">
@@ -132,5 +134,28 @@ export function ShelfVerdict({ entries, sessions, check, clock, checks, onOpen, 
         </p>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Too early: how far the product is through its usual trial window, so "too early" reads as "week 3 of 24"
+ * instead of a date to do sums with. A grey track (not ember: nothing has changed), an ink fill that grows in
+ * once, and a notch where the first look falls (its date is in the tooltip). The words say it too, for anyone who skips the bar.
+ * Four tests: tells how far along each trial is at a glance; labelled in words; sits at the row's right edge and
+ * never moves after it fills; ink and grey from the tokens, the same track as the product-test dots.
+ */
+function WindowBar({ start, due, firstLook }: { start: string; due: Date; firstLook: Date | null }) {
+  const w = trialWindow(start, due, firstLook)
+  if (!w) return null
+  return (
+    <span className="flex w-full shrink-0 flex-col gap-1.5 pl-[52px] sm:w-[200px] sm:pl-0" title={firstLook ? `First look ${fmtDate(localDay(firstLook))} · verdict ${fmtDate(localDay(due))}` : `Verdict ${fmtDate(localDay(due))}`}>
+      <span className="flex items-baseline gap-2 text-[12px] text-ink-2">
+        <span className="tabular-nums">{w.week ? `Week ${w.week} of ${w.weeks}` : `${w.weeks}-week window`}</span>
+      </span>
+      <span aria-hidden className="relative block h-1.5 overflow-hidden rounded-pill bg-sunken shadow-[inset_0_0_0_1px_var(--line-subtle)]">
+        <span className="absolute inset-y-0 left-0 origin-left rounded-pill bg-ink motion-safe:animate-[wFill_.9s_var(--ease-standard)_.25s_both]" style={{ width: `${Math.max(w.done, 0.02) * 100}%` }} />
+        {w.look !== null ? <span className="absolute inset-y-0 w-px bg-ink/40" style={{ left: `${w.look * 100}%` }} /> : null}
+      </span>
+    </span>
   )
 }

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 
 import type { PromoEligibility } from '../../../../lib/api'
 import { goalLabel, skinLabel } from '../../promote'
+import { promoNote, type Promo } from '../../productModel'
 import { sectionPath } from '../../state'
 import type { ProductRow } from '../../types'
 import { Button, DataTable, int, LiftValue, pct, ProductCell, ProofTierChip, RateCell, type Column } from '../../ui'
@@ -9,29 +10,34 @@ import { HeadTip } from './CampaignsTable'
 
 /*
  * Products this workspace can promote (Proven, and its own brand in a brand workspace), best lift first: the
- * outcome against non-users, the lift, what the evidence lets a campaign target, and Promote. Five at first,
- * "Show all" for the rest. Not-eligible products sit behind one toggle, each with the api's reason.
+ * outcome against people with the same goals not using it, the lift, what the evidence lets a campaign target, and
+ * Promote. Five at first, then 50 more at a time. A product with a campaign carries it: "Campaign running" (the
+ * button opens it), or "Promoted before, +8 pts adoption" with "Run again" (a finished sample is history too).
+ * Not-eligible products sit behind one toggle, each with the api's reason.
  */
 
 const FIRST = 5
+const MORE = 50
 const GHOST = 'hit44 inline-flex h-8 items-center gap-1.5 rounded-ctl border-0 bg-transparent px-2.5 text-proof-small font-medium text-ink transition-colors hover:bg-pf-hover'
 
-export function EligibleList({ title, eligible, notEligible, extras, runningFor, onPromote, carry, empty }: {
+export function EligibleList({ title, eligible, notEligible, extras, promo, onPromote, onOpenCampaign, carry, empty }: {
   title: string
   eligible: PromoEligibility[]
   notEligible: PromoEligibility[]
   extras: Map<string, ProductRow>
-  runningFor: Map<string, number>
+  /** This workspace's campaigns per product (promoHistory). */
+  promo: ReadonlyMap<string, Promo>
   onPromote: (id: string) => void
+  onOpenCampaign: (id: string) => void
   carry: string
   /** Shown instead of the table when nothing is eligible. */
   empty: ReactNode
 }) {
-  const [all, setAll] = useState(false)
+  const [limit, setLimit] = useState(FIRST)
   const [blockedOpen, setBlocked] = useState(false)
   // With nothing eligible, what each product still needs is the useful answer: always shown.
   const blocked = blockedOpen || !eligible.length
-  const rows = all ? eligible : eligible.slice(0, FIRST)
+  const rows = eligible.slice(0, limit)
   const product = (p: PromoEligibility) => {
     const x = extras.get(p.product_id)
     return { product: p.product, brand: p.brand, category: x?.category ?? '', image_url: x?.image_url }
@@ -43,14 +49,15 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
       rowHeader: true,
       width: '38%',
       cell: (p) => {
-        const live = runningFor.get(p.product_id) ?? 0
-        return <ProductCell p={product(p)} tag={live ? <span className="ml-1.5 shrink-0 text-proof-leaf">· {live === 1 ? 'Running' : `${live} running`}</span> : undefined} />
+        const h = promo.get(p.product_id)
+        const note = promoNote(h)
+        return <ProductCell p={product(p)} logo tag={note ? <span className={`ml-1.5 shrink-0 ${h?.state === 'running' ? 'text-proof-leaf' : ''}`}>· {note}</span> : undefined} />
       },
     },
     {
       id: 'rate',
-      header: <HeadTip label="Visible change" tip="Share of its users with a visible change held to week 8, against non-users with the same goals. Hover a figure for n and the 95% interval." />,
-      headerText: 'Visible change vs non-users',
+      header: <HeadTip label="Visible change" tip="Share of its users with a visible change held to week 8, against people with the same goals not using it (the grey figure). Hover a figure for n and the 95% interval." />,
+      headerText: 'Visible change vs same goals, not using it',
       width: '148px',
       cell: (p) => {
         const x = extras.get(p.product_id)
@@ -65,7 +72,8 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
     },
     {
       id: 'lift',
-      header: 'Lift',
+      header: <HeadTip label="Lift" tip="Users who changed minus people with the same goals not using it, in points. Hover a value for its 95% interval." />,
+      headerText: 'Lift vs same goals, not using it (pts)',
       align: 'right',
       width: '76px',
       cell: (p) => {
@@ -93,13 +101,23 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
       headerText: 'Promote',
       align: 'right',
       width: '112px',
-      cell: (p) => (
-        <span className="inline-flex justify-end" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-          <Button kind="secondary" size="sm" onClick={() => onPromote(p.product_id)} label={`Promote ${p.product}`}>
-            Promote
-          </Button>
-        </span>
-      ),
+      cell: (p) => {
+        const h = promo.get(p.product_id)
+        const live = h && h.state !== 'ended' ? h : null
+        return (
+          <span className="inline-flex justify-end" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            {live ? (
+              <Button kind="ghost" size="sm" onClick={() => onOpenCampaign(live.campaignId)} label={`Open the campaign for ${p.product}`}>
+                Open
+              </Button>
+            ) : (
+              <Button kind="secondary" size="sm" onClick={() => onPromote(p.product_id)} label={h ? `Run a campaign for ${p.product} again` : `Promote ${p.product}`}>
+                {h ? 'Run again' : 'Promote'}
+              </Button>
+            )}
+          </span>
+        )
+      },
     },
   ]
 
@@ -119,8 +137,12 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
           columns={columns}
           rows={rows}
           rowKey={(p) => p.product_id}
-          onRowClick={(p) => onPromote(p.product_id)}
-          rowLabel={(p) => `Promote ${p.product}`}
+          onRowClick={(p) => {
+            const h = promo.get(p.product_id)
+            if (h && h.state !== 'ended') onOpenCampaign(h.campaignId)
+            else onPromote(p.product_id)
+          }}
+          rowLabel={(p) => (promo.get(p.product_id)?.state && promo.get(p.product_id)!.state !== 'ended' ? `Open the campaign for ${p.product}` : `Promote ${p.product}`)}
           minWidth={720}
         />
       ) : (
@@ -134,9 +156,21 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
       {eligible.length > FIRST || (notEligible.length && eligible.length) ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-2.5">
           {eligible.length > FIRST ? (
-            <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className={GHOST}>
-              {all ? 'Show fewer' : `Show all ${int(eligible.length)}`}
-            </button>
+            <>
+              <span className="px-2.5 text-proof-small text-ink-2 tnum" aria-live="polite">
+                Showing {int(rows.length)} of {int(eligible.length)}
+              </span>
+              {rows.length < eligible.length ? (
+                <button type="button" onClick={() => setLimit((l) => l + MORE)} className={GHOST}>
+                  Show {int(Math.min(MORE, eligible.length - rows.length))} more
+                </button>
+              ) : null}
+              {rows.length > FIRST ? (
+                <button type="button" onClick={() => setLimit(FIRST)} className={GHOST}>
+                  Show fewer
+                </button>
+              ) : null}
+            </>
           ) : null}
           {notEligible.length && eligible.length ? (
             <span className="ml-auto">

@@ -88,7 +88,7 @@ export function CardView({ c, index, canDecide, legacy, result = false, onDecide
   const Icon = k.icon
   const ivTip = useTooltip(c.interval ?? '')
   return (
-    <article style={{ ...vt(c.key), animationDelay: `${index * 40}ms` }} className={`group/card flex h-full min-w-0 flex-col gap-3 rounded-card border bg-surface p-4 transition-[border-color,box-shadow] duration-150 hover:border-line-strong animate-[proofPage_.28s_var(--ease-standard)_both] ${lead ? 'border-line-strong shadow-raised' : 'border-line'}`}>
+    <article style={{ ...vt(c.key), animationDelay: `${Math.min(index % 6, 5) * 40}ms` }} className={`group/card flex h-full min-w-0 flex-col gap-3 rounded-card border bg-surface p-4 transition-[border-color,box-shadow] duration-150 hover:border-line-strong animate-[proofPage_.28s_var(--ease-standard)_both] ${lead ? 'border-line-strong shadow-raised' : 'border-line'}`}>
       <div className="flex items-center gap-2">
         <span aria-hidden className={`grid size-6 shrink-0 place-items-center rounded-ctl ${k.tone}`}>
           <Icon size={13} strokeWidth={1.9} />
