@@ -25,6 +25,7 @@ import { BaselineDialog } from './BaselineDialog'
 import { InsightsCard, NextAction } from './ExplanationCard'
 import { frameFor, photoSize } from './frame'
 import { RollingNumber } from '../../components/willow/RollingNumber'
+import { Words } from '../../components/willow/Words'
 import { MetricTile } from './MetricCard'
 import { MetricSheet } from './MetricSheet'
 import { DAY_HERO, DAY_RANK, bandOf, baselineFor, referenceFor, canBeBaseline, counts, daySession, dayStatus, metricQuestion, optionLabel, orderMetrics, photoExpired, retryable, sessionState, usableLine, usedFrames } from './model'
@@ -351,13 +352,10 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
             <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
               <div className="flex min-w-0 flex-col gap-3">
                 <h1 className="m-0 font-serif text-[clamp(30px,3vw,42px)] leading-[.9] font-normal tracking-[-0.01em]">
-                  {date.toLocaleDateString('en-GB', { weekday: 'long' })},
+                  <Words text={`${date.toLocaleDateString('en-GB', { weekday: 'long' })},`} delay={120} step={90} />
                   <br />
                   <span className="italic">
-                    {date.toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'long',
-                    })}
+                    <Words text={date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} delay={260} step={90} />
                   </span>
                 </h1>
                 <div className="flex flex-col items-start gap-1.5">

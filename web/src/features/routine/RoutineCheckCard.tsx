@@ -2,6 +2,7 @@ import { ChevronDown, Info, RefreshCw, Sparkles } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { useShell } from '../../components/shell/ShellContext'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import type { RoutineCheck } from '../../data/types'
 import type { QueryResult } from '../../lib/query'
 import { useMediaQuery } from '../../lib/useMediaQuery'
@@ -48,7 +49,8 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
   const anyAi = findings.some((f) => f.ai)
   const shown = all ? sorted : sorted.slice(0, SHOWN)
   const rows = sorted.length >= ROWS_FROM
-  const title = count === 0 ? 'Do these work together?' : running ? 'Checking…' : failed ? 'The check didn’t finish' : done ? (findings.length ? `${findings.length} thing${findings.length > 1 ? 's' : ''} to look at` : 'Looks compatible') : 'Do these work together?'
+  // The number of findings is the check's answer, so it arrives by counting (once, when the check lands).
+  const title = count === 0 ? 'Do these work together?' : running ? 'Checking…' : failed ? 'The check didn’t finish' : done ? (findings.length ? <><RollingNumber value={findings.length} duration={500} format={(v) => String(Math.round(v))} /> thing{findings.length > 1 ? 's' : ''} to look at</> : 'Looks compatible') : 'Do these work together?'
   const sub = count === 0 ? 'Compares ingredient lists across your morning and evening products.' : `${count} product${count === 1 ? '' : 's'} checked. Runs again when your routine changes.`
 
   const runAgain = async () => {
@@ -83,7 +85,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                 How this was checked
               </button>
             ) : null}
-            <button type="button" onClick={() => void runAgain()} disabled={running} aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'} title={failed ? 'Try again' : 'Run again'} className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-white/[.26] disabled:opacity-60">
+            <button type="button" onClick={() => void runAgain()} disabled={running} aria-label={running ? 'Checking' : failed ? 'Try the check again' : 'Run the check again'} title={failed ? 'Try again' : 'Run again'} className="hit44 grid size-9 shrink-0 place-items-center rounded-full bg-white/[.14] text-inverse transition-[color,background-color,box-shadow,scale] duration-200 ease-standard active:scale-[.92] hover:bg-white/[.26] disabled:opacity-60 disabled:active:scale-100">
               <RefreshCw size={15} strokeWidth={1.8} aria-hidden className={running ? 'motion-safe:animate-spin' : ''} />
             </button>
           </div>
@@ -91,7 +93,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
       </div>
 
       {showHow && done && findings.length ? (
-        <p id={howId} className="max-w-[760px] rounded-[16px] bg-white/[.07] px-4 py-3 text-[12.5px] leading-[1.55] text-[#D5D8FF]">
+        <p id={howId} className="max-w-[760px] rounded-[16px] bg-white/[.07] px-4 py-3 text-[12.5px] leading-[1.55] text-[#D5D8FF]" style={{ animation: 'wRise .35s both' }}>
           Findings come from Willow’s ingredient rules.{anyAi ? ' Findings tagged AI suggestion are Gemini’s reading of the lists, which can be wrong.' : ''}
           {check.data?.notes.length ? ` Also checked: ${check.data.notes.join(' ')}` : ''}
         </p>
@@ -115,7 +117,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
         </p>
       ) : done && findings.length === 0 ? (
         <div className="flex items-center gap-4">
-          <span className="font-dot text-[34px] leading-none text-lime">00</span>
+          <span className="font-dot text-[34px] leading-none text-lime animate-[wDotIn_.4s_var(--ease-standard)_both]">00</span>
           <span className="text-[14.5px] leading-[1.45]">No conflicts, duplicates or gaps found in this routine.</span>
         </div>
       ) : done ? (
@@ -128,12 +130,12 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
               const actions = (
                 <span className={`flex flex-wrap gap-2 ${rows ? 'justify-end @min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto justify-end pt-1'}`}>
                   {f.find ? (
-                    <button type="button" onClick={() => onFind(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink">
+                    <button type="button" onClick={() => onFind(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink transition-[background-color,scale] duration-200 ease-standard hover:bg-[#EEF0FF] active:scale-[.97]">
                       Find one
                     </button>
                   ) : null}
                   {f.alternate && f.entries.length === 2 ? (
-                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink disabled:opacity-60">
+                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink transition-[background-color,scale,opacity] duration-200 ease-standard hover:bg-[#EEF0FF] active:scale-[.97] disabled:opacity-60 disabled:active:scale-100">
                       {alternating === f.key ? 'Saving…' : 'Alternate these'}
                     </button>
                   ) : null}
@@ -175,7 +177,7 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                         </h3>
                       </div>
                       {phone ? (
-                        <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12]">
+                        <button type="button" aria-expanded={open} aria-label={open ? 'Hide details' : 'Show details'} onClick={() => setOpenKey(open ? null : f.key)} className="hit44 grid size-8 shrink-0 place-items-center rounded-full bg-white/[.12] transition-[background-color,scale] duration-200 ease-standard hover:bg-white/[.22] active:scale-[.92]">
                           <ChevronDown size={16} strokeWidth={1.8} aria-hidden className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                         </button>
                       ) : null}

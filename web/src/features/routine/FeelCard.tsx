@@ -174,10 +174,10 @@ export function FeelNudge({ entries, onOpen }: { entries: RoutineEntry[]; onOpen
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => onOpen(answered.entry)} className="hit44 min-h-8 rounded-pill px-3 text-[13px] shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5">
+          <button type="button" onClick={() => onOpen(answered.entry)} className="hit44 min-h-8 rounded-pill px-3 text-[13px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/5 active:scale-[.97]">
             Add how it feels
           </button>
-          <button type="button" onClick={() => setHidden(true)} aria-label="Close" className="hit44 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-ink/5">
+          <button type="button" onClick={() => setHidden(true)} aria-label="Close" className="hit44 grid size-8 place-items-center rounded-full text-ink-2 transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/5 active:scale-[.92]">
             <X size={16} strokeWidth={1.6} aria-hidden />
           </button>
         </div>
@@ -197,7 +197,7 @@ export function FeelNudge({ entries, onOpen }: { entries: RoutineEntry[]; onOpen
         </div>
       </div>
       <VerdictButtons compact label={`How ${entryName(n.entry)} is going for you`} value={null} disabled={saving !== null} onPick={(v) => void pick(n, v)} />
-      <button type="button" onClick={notNow} disabled={saving !== null} aria-label="Not now" title="Not now: hides this for a few days" className="hit44 absolute top-1.5 right-1.5 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-ink/5 disabled:opacity-60 sm:static">
+      <button type="button" onClick={notNow} disabled={saving !== null} aria-label="Not now" title="Not now: hides this for a few days" className="hit44 absolute top-1.5 right-1.5 grid size-8 place-items-center rounded-full text-ink-2 transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/5 active:scale-[.92] disabled:opacity-60 sm:static">
         <X size={16} strokeWidth={1.6} aria-hidden />
       </button>
       {error ? (

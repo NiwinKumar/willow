@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom'
 
 import { TimelineChart } from '../../components/charts'
 import { Sheet } from '../../components/ui/Sheet'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { VerdictGlyph } from '../../components/willow/Verdict'
+import { Words } from '../../components/willow/Words'
 import type { Metric, Session } from '../../data/types'
 import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
 import { changeWay, confidenceOf, verdictKind, wordsFor } from '../../lib/verdict'
@@ -42,14 +44,21 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
   const highlight = series.sessions.findIndex((s) => s.id === session.id)
   const unit = unitOf(m).trim()
   const label = METRIC_META[m.id].label
-  const stats: [string, string, boolean][] = [
-    [baselineLabel, session.is_baseline ? valueText(m) : bm ? valueText(bm) : '—', false],
-    ['This check-in', valueText(m), false],
-    ['Change', session.is_baseline || m.delta === null ? '—' : deltaText(m), true],
-    ['Normal range', band !== null ? bandText(m, band) : 'none yet', false],
-    ['Confidence', conf.label.toLowerCase(), false],
+  // Each stat: its text, and for the two that are this check-in's own, the number to count to and where from
+  // (this check-in from the baseline, the change from zero), so the sheet opens with the same movement as the tile.
+  type Stat = { k: string; v: string; dark?: boolean; roll?: { value: number; from: number; text: (v: number) => string } }
+  const stats: Stat[] = [
+    { k: baselineLabel, v: session.is_baseline ? valueText(m) : bm ? valueText(bm) : '—' },
+    { k: 'This check-in', v: valueText(m), roll: m.value !== null && !session.is_baseline && bm?.value != null ? { value: m.value, from: bm.value, text: (v) => valueText(m, v) } : undefined },
+    { k: 'Change', v: session.is_baseline || m.delta === null ? '—' : deltaText(m), dark: true, roll: !session.is_baseline && m.delta !== null ? { value: m.delta, from: 0, text: (v) => deltaText(m, v) } : undefined },
+    { k: 'Normal range', v: band !== null ? bandText(m, band) : 'none yet' },
+    { k: 'Confidence', v: conf.label.toLowerCase() },
   ]
-  const numeric = (v: string) => /^[±+−-]?[\d.,]+/.test(v)
+  // "−0.30 pts" → the digits (with a sign or degree) and the unit, drawn in two sizes.
+  const split = (v: string): [string, string] | null => {
+    const hit = /^([±+−-]?[\d.,]+°?)(.*)$/.exec(v)
+    return hit ? [hit[1], hit[2].trim()] : null
+  }
   return (
     <Sheet open={open} onClose={onClose} title={`${label} detail`} hideTitle variant="bottom" size="lg">
       <div className="flex flex-col gap-5 pb-2">
@@ -57,21 +66,35 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
           <span className="font-mono text-[12px] leading-[1.4] text-ink-2 uppercase">
             ■ {conf.label} · {look.unitLabel}
           </span>
-          <h2 className="m-0 font-serif text-[clamp(28px,3.25vw,42px)] leading-[1.05] font-normal">{label}</h2>
+          <h2 className="m-0 font-serif text-[clamp(28px,3.25vw,42px)] leading-[1.05] font-normal">
+            <Words text={label} delay={150} step={90} />
+          </h2>
         </div>
         {/* What changed first, in words; the numbers below are the detail behind it. */}
         <StoryCard session={session} metricId={m.id} />
         <p className="m-0 max-w-[760px] text-[17px] leading-[1.55] text-ink-2">{look.explain}</p>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
-          {stats.map(([k, v, dark]) => (
-            <div key={k} className={`flex flex-col gap-2 rounded-[24px] p-4 ${dark ? 'bg-selected text-inverse' : 'bg-sunken'}`}>
-              <span className="text-[13px] opacity-80">{k}</span>
-              <span className={numeric(v) ? 'font-dot text-[30px] leading-[1.1] font-extrabold tnum' : 'text-[20px] leading-[1.1]'}>{v}</span>
-            </div>
-          ))}
+          {stats.map(({ k, v, dark, roll }, i) => {
+            const parts = split(v)
+            return (
+              <div key={k} className={`flex flex-col gap-2 rounded-[24px] p-4 ${dark ? 'bg-selected text-inverse' : 'bg-sunken'}`} style={{ animation: `wRise .5s ${200 + i * 70}ms both` }}>
+                <span className="text-[13px] opacity-80">{k}</span>
+                {parts ? (
+                  <span className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="font-dot text-[30px] leading-[1.1] font-extrabold tnum">{roll ? <RollingNumber value={roll.value} from={roll.from} delay={450 + i * 70} format={(x) => split(roll.text(x))?.[0] ?? roll.text(x)} /> : parts[0]}</span>
+                    {parts[1] ? <span className="text-[14px] opacity-80">{parts[1]}</span> : null}
+                  </span>
+                ) : (
+                  <span className="text-[20px] leading-[1.1]">{v}</span>
+                )}
+              </div>
+            )
+          })}
         </div>
-        <div className="flex items-center gap-3.5 rounded-[28px] bg-selected px-5 py-[18px] text-inverse">
-          <VerdictGlyph kind={kind} way={changeWay(m)} size={20} onDark />
+        <div className="flex items-center gap-3.5 rounded-[28px] bg-selected px-5 py-[18px] text-inverse" style={{ animation: 'wRise .5s 600ms both' }}>
+          <span className="animate-[wDotIn_.4s_var(--ease-standard)_both]" style={{ animationDelay: '900ms' }}>
+            <VerdictGlyph kind={kind} way={changeWay(m)} size={20} onDark />
+          </span>
           <span className="flex flex-col gap-[3px]">
             <span className="text-[17px]">{wordsFor(m, session).label}</span>
             <span className="text-[14px] text-white/70">{why(m, session, band)}</span>
@@ -111,10 +134,10 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
           <p className="m-0 text-[14px] text-ink-2">Average size {(m.extras.mean_diameter_mm as number).toFixed(2)} mm across, on this check-in’s close-ups.</p>
         ) : null}
         <div className="flex flex-wrap gap-[18px]">
-          <Link to="/science" className="flex min-h-11 items-center text-[15px]">
+          <Link to="/science" className="flex min-h-11 items-center text-[15px] transition-[scale] duration-200 ease-standard active:scale-[.97]">
             How this is measured
           </Link>
-          <button type="button" onClick={() => onAsk(m)} className="flex min-h-11 items-center text-[15px] underline">
+          <button type="button" onClick={() => onAsk(m)} className="flex min-h-11 items-center text-[15px] underline transition-[scale] duration-200 ease-standard active:scale-[.97]">
             Ask Wisp about this
           </button>
         </div>

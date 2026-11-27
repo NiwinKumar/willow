@@ -73,7 +73,7 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
                 Check in
               </h2>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="grid size-11 place-items-center rounded-full bg-sunken text-ink transition-[scale] active:scale-[.97]">
+            <button type="button" onClick={onClose} aria-label="Close" className="grid size-11 place-items-center rounded-full bg-sunken text-ink transition-[scale,background-color] duration-200 ease-standard hover:bg-ink/10 active:scale-[.92] active:duration-100">
               <X size={16} strokeWidth={1.8} aria-hidden />
             </button>
           </div>

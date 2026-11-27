@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useShell, type AdvisorSeed } from '../../components/shell/ShellContext'
+import { Words } from '../../components/willow/Words'
 import { useRoutine, useRoutineCheck } from '../../data/hooks'
 import type { MetricId, Product, Session } from '../../data/types'
 import { useData } from '../../data/useData'
@@ -41,11 +42,11 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className={`relative z-[3] flex min-h-[52px] flex-none items-center gap-2.5 px-3.5 pt-3 ${full ? 'mx-auto w-full max-w-[960px]' : ''}`}>
-        <button type="button" onClick={onClose} aria-label="Close Wisp" title="Close · Esc" className="hit44 grid size-10 place-items-center rounded-[16px] bg-ink/5 transition-colors hover:bg-ink/10 squircle">
+        <button type="button" onClick={onClose} aria-label="Close Wisp" title="Close · Esc" className="hit44 grid size-10 place-items-center rounded-[16px] bg-ink/5 transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/10 active:scale-[.92] squircle">
           <X size={16} strokeWidth={1.8} aria-hidden />
         </button>
         {onToggleFull && !phone ? (
-          <button type="button" onClick={onToggleFull} aria-pressed={full} title={full ? 'Collapse to the side panel · Esc' : 'Expand to full screen'} className="hit44 inline-flex min-h-10 items-center gap-1.5 rounded-[16px] bg-ink/5 px-3 text-[12.5px] transition-colors hover:bg-ink/10 squircle">
+          <button type="button" onClick={onToggleFull} aria-pressed={full} title={full ? 'Collapse to the side panel · Esc' : 'Expand to full screen'} className="hit44 inline-flex min-h-10 items-center gap-1.5 rounded-[16px] bg-ink/5 px-3 text-[12.5px] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/10 active:scale-[.97] squircle">
             {full ? <Minimize2 size={14} strokeWidth={1.8} aria-hidden /> : <Maximize2 size={14} strokeWidth={1.8} aria-hidden />}
             {full ? 'Collapse' : 'Expand'}
           </button>
@@ -262,7 +263,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
               {status}
             </span>
           </div>
-          <button type="button" onClick={newChat} disabled={busy} className="hit44 min-h-9 rounded-pill border border-ink/12 bg-surface px-4 text-[13px]">
+          <button type="button" onClick={newChat} disabled={busy} className="hit44 min-h-9 rounded-pill border border-ink/12 bg-surface px-4 text-[13px] transition-[background-color,scale,opacity] duration-200 ease-standard hover:bg-white active:scale-[.97] disabled:opacity-50 disabled:active:scale-100">
             New chat
           </button>
         </div>
@@ -283,10 +284,31 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
           style={{ maskImage: 'linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%)' }}
         >
           {started ? null : (
-            <div className="flex flex-col items-center gap-3 text-center" style={{ animation: 'wRise .5s both' }}>
+            // One group, centred: Wisp, the title, the one line of what answers use, then the questions to start
+            // from. Before, the questions sat above the composer with an empty screen between them and the title.
+            <div className="flex flex-col items-center gap-3 px-2 text-center" style={{ animation: 'wRise .6s both' }}>
               <EmptyWisp />
-              <h2 className="font-serif text-[26px] leading-none font-normal">Ask about your results</h2>
-              <p className="max-w-[440px] leading-[1.5] text-ink-2">Answers use your measured results, your routine and the product catalog. Wisp can’t diagnose, and won’t quote a number Willow didn’t measure.</p>
+              <h2 className="font-serif text-[26px] leading-none font-normal">
+                <Words text="Ask about your results" delay={250} step={90} />
+              </h2>
+              <p className="max-w-[440px] leading-[1.5] text-ink-2" style={{ animation: 'wWord .5s 550ms both' }}>
+                Answers use your measured results, your routine and the product catalog. Wisp can’t diagnose, and won’t quote a number Willow didn’t measure.
+              </p>
+              {!capped ? (
+                <div className="mt-2 flex max-w-[640px] flex-wrap justify-center gap-2">
+                  {starters.map((t, i) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => ask(t)}
+                      className="max-w-[min(100%,380px)] rounded-pill border border-ink/[.08] bg-surface/90 px-[18px] py-2.5 text-[13px] leading-[1.35] text-pretty backdrop-blur-[12px] transition-[background-color,scale,box-shadow] duration-200 ease-standard hover:bg-white hover:shadow-[0_10px_24px_-16px_rgba(0,0,0,.35)] active:scale-[.97]"
+                      style={{ animation: `wRise .5s ${750 + i * 70}ms both` }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {chat.history === 'loading' ? (
                 <span role="status" className="text-[12px] text-ink-2">
                   Loading your earlier conversation…
@@ -334,7 +356,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
                 setAtEnd(true)
                 toEnd()
               }}
-              className="pointer-events-auto inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse shadow-[0_12px_30px_-12px_rgba(0,0,0,.45)]"
+              className="pointer-events-auto inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse shadow-[0_12px_30px_-12px_rgba(0,0,0,.45)] transition-[scale] duration-200 ease-standard active:scale-[.97]"
               style={{ animation: 'wRise .25s both' }}
             >
               <ArrowDown size={13} strokeWidth={2} aria-hidden /> Latest
@@ -344,15 +366,6 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
       </div>
 
       <div className="relative z-[2] flex flex-none flex-col items-center gap-2.5 pt-1" style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}>
-        {!started && !capped ? (
-          <div className="flex flex-wrap justify-center gap-2">
-            {starters.map((t, i) => (
-              <button key={t} type="button" onClick={() => ask(t)} className="min-h-11 rounded-pill border border-ink/[.08] bg-surface/90 px-[18px] text-[13px] backdrop-blur-[12px] transition-transform hover:-translate-y-0.5" style={{ animation: `wRise .5s ${i * 70}ms both` }}>
-                {t}
-              </button>
-            ))}
-          </div>
-        ) : null}
         <Composer busy={busy} thinking={chat.phase === 'thinking'} capped={capped} />
       </div>
 
@@ -381,7 +394,7 @@ function Thinking({ stages }: { stages: AdvisorStage[] }) {
       <div className="flex min-w-[220px] flex-col gap-1.5 rounded-[8px_24px_24px_24px] bg-surface px-3.5 py-3">
         {done.map((w) => (
           <span key={w} className="flex items-center gap-2 text-[12.5px] text-ink-2" style={{ animation: 'advIn .35s both' }}>
-            <Check size={13} strokeWidth={2} className="text-willow-700" aria-hidden />
+            <Check size={13} strokeWidth={2} className="text-willow-700 animate-[wDotIn_.35s_var(--ease-standard)_both]" aria-hidden />
             {w}
           </span>
         ))}
@@ -513,7 +526,7 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
                   <span className="truncate text-[12px]">{a.name}</span>
                   <span className="font-mono text-[10px] text-ink-2">{a.meta}</span>
                 </span>
-                <button type="button" onClick={() => setAttach((xs) => xs.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hit44 grid size-8 place-items-center rounded-full bg-sunken text-[12px]">
+                <button type="button" onClick={() => setAttach((xs) => xs.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hit44 grid size-8 place-items-center rounded-full bg-sunken text-[12px] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/10 active:scale-[.92]">
                   <X size={12} strokeWidth={2} aria-hidden />
                 </button>
               </span>
@@ -530,7 +543,7 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
         }}
         className="flex items-end gap-2 rounded-[28px] border border-white/90 bg-white/[.82] p-1.5 shadow-[0_20px_40px_-24px_rgba(0,0,0,.35)] backdrop-blur-[20px]"
       >
-        <label title="Attach a photo of a product or its label (product photos only)" className="hit44 relative mb-2 ml-1 grid size-[30px] flex-none cursor-pointer place-items-center rounded-full bg-sunken text-[15px] transition-colors hover:bg-ink/10 has-[input:disabled]:cursor-default has-[input:disabled]:opacity-50">
+        <label title="Attach a photo of a product or its label (product photos only)" className="hit44 relative mb-2 ml-1 grid size-[30px] flex-none cursor-pointer place-items-center rounded-full bg-sunken text-[15px] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/10 active:scale-[.92] has-[input:disabled]:cursor-default has-[input:disabled]:opacity-50">
           <input
             type="file"
             accept="image/*,.heic,.heif"
@@ -582,7 +595,7 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
             aria-label={listening ? 'Stop dictation' : 'Dictate'}
             title={listening ? 'Stop dictation' : 'Dictate'}
             disabled={capped}
-            className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full transition-colors"
+            className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full transition-[background-color,color,box-shadow,scale] duration-200 ease-standard active:scale-[.92]"
             style={{ background: listening ? 'var(--aura-coral)' : 'var(--bg-sunken)', color: listening ? '#fff' : 'var(--text-primary)', boxShadow: listening ? '0 0 0 6px rgba(255,107,74,.25)' : 'none' }}
           >
             <span aria-hidden className="flex h-[18px] items-center gap-[2.5px]">
@@ -593,11 +606,11 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           </button>
         ) : null}
         {thinking ? (
-          <button type="button" onClick={stopWaiting} aria-label="Stop waiting for this answer" title="Stop waiting (the question still counts)" className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full bg-selected">
+          <button type="button" onClick={stopWaiting} aria-label="Stop waiting for this answer" title="Stop waiting (the question still counts)" className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full bg-selected transition-[scale] duration-200 ease-standard active:scale-[.92] animate-[wDotIn_.3s_var(--ease-standard)_both]">
             <span aria-hidden className="size-3.5 rounded-[3px] bg-white" />
           </button>
         ) : (
-          <button type="submit" aria-label="Send" disabled={(!draft.trim() && !attach.length) || busy || capped || reading}className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full text-inverse transition-transform active:scale-[.92]" style={{ background: 'radial-gradient(circle at 35% 30%, var(--aura-ice), var(--aura-sky) 50%, #1B1F7A)' }}>
+          <button type="submit" aria-label="Send" disabled={(!draft.trim() && !attach.length) || busy || capped || reading}className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full text-inverse transition-[scale,opacity,filter] duration-200 ease-standard active:scale-[.92] disabled:opacity-60 disabled:saturate-50 disabled:active:scale-100" style={{ background: 'radial-gradient(circle at 35% 30%, var(--aura-ice), var(--aura-sky) 50%, #1B1F7A)' }}>
             <ArrowUp size={16} strokeWidth={2} aria-hidden />
           </button>
         )}

@@ -146,17 +146,6 @@ export function AppShell() {
     [checkIn.open, startCheckIn, openAdvisor, closeAdvisor, advisor.open, advisor.seed, data],
   )
 
-  if (data.mode === 'live') {
-    if (loading) return <WillowLoader label="Opening Willow" />
-    if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
-  }
-
-  const panelOpen = advisor.open && wide && roomy
-  // On phones the advisor covers the whole screen: the app behind it takes no focus or clicks.
-  const covered = advisor.open && (phone || advisorFull)
-  // The design pads the page around the sidebar (12px gutter + sidebar + 24px) and, when the advisor panel
-  // fits beside the content (≥1280px), around the panel too.
-  const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   // The spotlight on .spot cards: the pointer's place is written straight onto the card under it (no renders).
   useEffect(() => {
     if (!matchMedia('(hover: hover)').matches) return
@@ -170,6 +159,18 @@ export function AppShell() {
     document.addEventListener('pointermove', move, { passive: true })
     return () => document.removeEventListener('pointermove', move)
   }, [])
+
+  if (data.mode === 'live') {
+    if (loading) return <WillowLoader label="Opening Willow" />
+    if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
+  }
+
+  const panelOpen = advisor.open && wide && roomy
+  // On phones the advisor covers the whole screen: the app behind it takes no focus or clicks.
+  const covered = advisor.open && (phone || advisorFull)
+  // The design pads the page around the sidebar (12px gutter + sidebar + 24px) and, when the advisor panel
+  // fits beside the content (≥1280px), around the panel too.
+  const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   return (
     <ShellContext.Provider value={api}>
       <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>

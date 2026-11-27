@@ -107,11 +107,11 @@ export default function Routine() {
       <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal"><Words key={tab} text={tab === 'tests' ? 'Test a product' : 'Your routine'} /></h1>
-          <span className="text-[14px] text-ink-2">{tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : meta}</span>
+          <span key={tab} className="text-[14px] text-ink-2" style={{ animation: 'wWord .5s 350ms both' }}>{tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : meta}</span>
         </div>
-        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
+        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="group order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97] sm:order-3">
           Add product
-          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-white text-[18px] leading-none text-ink">
+          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-white text-[18px] leading-none text-ink transition-[rotate] duration-300 ease-standard group-hover:rotate-90">
             +
           </span>
         </button>
@@ -187,7 +187,7 @@ export default function Routine() {
           <span className="font-dot text-[44px] leading-none font-extrabold text-coral">—</span>
           <span className="text-[20px]">Your routine didn’t load</span>
           <span className="leading-[1.5] text-ink-2">{navigator.onLine ? 'Nothing has been lost. Check your connection and try again.' : 'You’re offline. Nothing has been lost; try again when you’re connected.'}</span>
-          <button type="button" onClick={() => void routine.refetch()} className="min-h-11 rounded-pill bg-selected px-[22px] text-[15px] text-inverse">
+          <button type="button" onClick={() => void routine.refetch()} className="min-h-11 rounded-pill bg-selected px-[22px] text-[15px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
             Try again
           </button>
         </div>
@@ -199,10 +199,10 @@ export default function Routine() {
               <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.02em]">No products yet</span>
               <span className="max-w-[440px] leading-[1.55] text-[#3E3C38]">Add what you use and when you started. Willow lines start dates up with your readings and checks the ingredients against each other.</span>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-11 rounded-pill bg-selected px-5 text-[15px] text-inverse">
+                <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-11 rounded-pill bg-selected px-5 text-[15px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
                   Search catalog
                 </button>
-                <button type="button" onClick={() => setAdd({ mode: 'request' })} className="min-h-11 rounded-pill border border-ink/15 bg-white px-5 text-[15px]">
+                <button type="button" onClick={() => setAdd({ mode: 'request' })} className="min-h-11 rounded-pill border border-ink/15 bg-white px-5 text-[15px] transition-[background-color,scale] duration-200 ease-standard hover:bg-sunken active:scale-[.97]">
                   Request a product
                 </button>
               </div>

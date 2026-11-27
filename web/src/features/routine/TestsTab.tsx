@@ -16,9 +16,9 @@ import { StartTest, type TestPreset } from './StartTest'
 const BAND = { background: 'radial-gradient(120% 140% at 0% 0%, #B8E986 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #4FB866 0%, transparent 60%), #DDF3C9', boxShadow: 'inset 0 0 50px 8px rgba(255,255,255,.45), 0 26px 54px -42px rgba(15,59,58,.5)' }
 
 const OpenTest = ({ onClick, children = 'Open test', className = 'self-start' }: { onClick: () => void; children?: string; className?: string }) => (
-  <button type="button" onClick={onClick} className={`flex min-h-11 items-center gap-2.5 ${className} rounded-pill bg-willow-900 pr-1.5 pl-[18px] text-[14px] text-inverse transition-transform hover:-translate-y-0.5`}>
+  <button type="button" onClick={onClick} className={`flex min-h-11 items-center gap-2.5 ${className} group rounded-pill bg-willow-900 pr-1.5 pl-[18px] text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]`}>
     {children}
-    <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white text-willow-900">
+    <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white text-willow-900 transition-[translate] duration-200 ease-standard group-hover:translate-x-0.5">
       →
     </span>
   </button>
@@ -118,8 +118,8 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
               <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.01em] text-pretty">Test a product on one forearm square</span>
               <ol className="flex max-w-[460px] flex-1 flex-col justify-between gap-3 text-[14px] leading-[1.45]">
                 {['Choose what to test, and for how long.', 'Use it on a small square on one forearm. Leave the same square on the other forearm untouched.', `Photograph both arms together before the first use, then every few days. Willow gives a verdict after day ${VERDICT_AFTER_DAYS}.`].map((s, i) => (
-                  <li key={s} className="flex gap-3">
-                    <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-full bg-willow-900 font-mono text-[11px] text-inverse">
+                  <li key={s} className="flex gap-3" style={{ animation: `wRise .5s ${200 + i * 110}ms both` }}>
+                    <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-full bg-willow-900 font-mono text-[11px] text-inverse animate-[wDotIn_.35s_var(--ease-standard)_both]" style={{ animationDelay: `${450 + i * 110}ms` }}>
                       {i + 1}
                     </span>
                     {s}
@@ -139,8 +139,8 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
             Past tests
           </h2>
           <ul className="flex flex-col">
-            {past.map((t) => (
-              <PastRow key={t.id} t={t} />
+            {past.map((t, i) => (
+              <PastRow key={t.id} t={t} delay={Math.min(i, 8) * 70} />
             ))}
           </ul>
         </section>
@@ -149,9 +149,9 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
   )
 }
 
-function PastRow({ t }: { t: ProductTest }) {
+function PastRow({ t, delay }: { t: ProductTest; delay: number }) {
   return (
-    <li className="flex items-center gap-3 border-t border-line py-2.5 first:border-t-0">
+    <li className="flex items-center gap-3 border-t border-line py-2.5 first:border-t-0" style={{ animation: `wRise .5s ${delay}ms both` }}>
       <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-sunken">
         <FlaskConical size={16} strokeWidth={1.6} />
       </span>
@@ -188,7 +188,7 @@ function StartPanel({ current, running, ready }: { current: RoutineEntry[]; runn
               {current.map((e) => {
                 const on = pick === e.id
                 return (
-                  <button key={e.id} type="button" role="radio" aria-checked={on} disabled={!ready} onClick={() => setPick(e.id)} className={`flex min-h-11 items-center gap-2.5 rounded-[14px] px-2 py-1 text-left transition-colors disabled:opacity-60 ${on ? 'bg-selected text-inverse' : 'bg-sunken hover:bg-ink/5'}`}>
+                  <button key={e.id} type="button" role="radio" aria-checked={on} disabled={!ready} onClick={() => setPick(e.id)} className={`flex min-h-11 items-center gap-2.5 rounded-[14px] px-2 py-1 text-left transition-[background-color,color,scale] duration-200 ease-standard active:scale-[.985] disabled:opacity-60 disabled:active:scale-100 ${on ? 'bg-selected text-inverse' : 'bg-sunken hover:bg-ink/5'}`}>
                     <ProductImage product={imageOf(e)} size={30} decorative />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-[13.5px] leading-tight">{entryName(e)}</span>
@@ -198,7 +198,7 @@ function StartPanel({ current, running, ready }: { current: RoutineEntry[]; runn
                 )
               })}
             </div>
-            <button type="button" role="radio" aria-checked={pick === OTHER} disabled={!ready} onClick={() => setPick(OTHER)} className={`flex min-h-11 items-center gap-2.5 rounded-[14px] border border-dashed px-2 py-1 text-left transition-colors disabled:opacity-60 ${pick === OTHER ? 'border-transparent bg-selected text-inverse' : 'border-line-strong hover:bg-ink/5'}`}>
+            <button type="button" role="radio" aria-checked={pick === OTHER} disabled={!ready} onClick={() => setPick(OTHER)} className={`flex min-h-11 items-center gap-2.5 rounded-[14px] border border-dashed px-2 py-1 text-left transition-[background-color,color,scale,border-color] duration-200 ease-standard active:scale-[.985] disabled:opacity-60 disabled:active:scale-100 ${pick === OTHER ? 'border-transparent bg-selected text-inverse' : 'border-line-strong hover:bg-ink/5'}`}>
               <span aria-hidden className="grid size-[30px] shrink-0 place-items-center rounded-full bg-white/80 text-ink">
                 <Plus size={16} strokeWidth={1.8} />
               </span>

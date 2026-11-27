@@ -3,11 +3,12 @@ import { useState } from 'react'
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { MEASURED_SITES } from '../../lib/metrics'
 import { baselineLine, neededFor, pad2, SITE_CARD, SITE_MEASURES, SITE_NAME, sitesFor } from './model'
-import { MonoEyebrow, SerifTitle } from './parts'
+import { MonoEyebrow, press, SerifTitle } from './parts'
 
 /**
  * Step "site" (CAP 04): the places with their real baseline line, and the photo count this
  * check-in needs. Reached from the guide's ← or when the check-in opens without a place.
+ * Cards arrive in order and press like rows; the tick lands on the chosen one; the count pops when it is known.
  */
 export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: { site: Site; mode: CaptureMode; sessionsOf: (s: Site) => Session[]; known: boolean; onSite: (s: Site) => void; onContinue: () => void }) {
   const n = known ? neededFor(sessionsOf(site), mode) : null
@@ -25,7 +26,7 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: 
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-3.5">
-        {sitesFor(mode).map((s) => {
+        {sitesFor(mode).map((s, i) => {
           const on = s === site
           const line = known ? baselineLine(sessionsOf(s), mode).text : 'Checking…'
           return (
@@ -34,13 +35,17 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: 
               type="button"
               aria-pressed={on}
               onClick={() => onSite(s)}
-              className="relative flex h-[270px] flex-col justify-between rounded-[36px] p-[22px] text-left transition-[translate] duration-[350ms] ease-standard hover:-translate-y-1"
-              style={{ background: SITE_CARD[s].bg, color: SITE_CARD[s].fg, boxShadow: `${on ? '0 0 0 2.5px var(--text-primary)' : '0 0 0 0 transparent'}, inset 0 0 40px 6px rgba(255,255,255,.35), 0 24px 50px -36px rgba(0,0,0,.45)` }}
+              className="relative flex h-[270px] animate-[wRise_.5s_var(--ease-standard)_both] flex-col justify-between rounded-[36px] p-[22px] text-left transition-[translate,scale,box-shadow] duration-[350ms] ease-standard hover:-translate-y-1 active:translate-y-0 active:scale-[.985] active:duration-100"
+              style={{ animationDelay: `${200 + i * 70}ms`, background: SITE_CARD[s].bg, color: SITE_CARD[s].fg, boxShadow: `${on ? '0 0 0 2.5px var(--text-primary)' : '0 0 0 0 transparent'}, inset 0 0 40px 6px rgba(255,255,255,.35), 0 24px 50px -36px rgba(0,0,0,.45)` }}
             >
               <span className="flex items-start justify-between gap-2">
                 <span className="rounded-pill bg-white/50 px-2.5 py-1.5 font-mono text-[11px] tracking-[.06em]">{MEASURED_SITES.includes(s) ? 'MEASURED' : 'SAVED · NOT MEASURED YET'}</span>
-                <span aria-hidden className={`grid size-[30px] flex-none place-items-center rounded-full text-[14px] text-inverse transition-[background] ${on ? 'bg-selected' : 'bg-white/45'}`}>
-                  {on ? '✓' : ''}
+                <span aria-hidden className={`grid size-[30px] flex-none place-items-center rounded-full text-[14px] text-inverse transition-[background] duration-300 ${on ? 'bg-selected' : 'bg-white/45'}`}>
+                  {on ? (
+                    <span key={s} className="inline-block animate-[wDotIn_.35s_var(--ease-bounce)_both] motion-reduce:animate-none">
+                      ✓
+                    </span>
+                  ) : null}
                 </span>
               </span>
               <span className="flex flex-col gap-1.5">
@@ -56,16 +61,21 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: 
 
       <div className="flex flex-wrap items-center justify-between gap-3.5 rounded-lg bg-surface/85 px-5 py-[18px]">
         <span className="flex items-center gap-3.5">
-          <span className="font-dot text-[44px] leading-none">{n === null ? '··' : pad2(n)}</span>
+          <span key={n === null ? 'wait' : n} className="inline-block animate-[wDotIn_.4s_var(--ease-bounce)_both] font-dot text-[44px] leading-none motion-reduce:animate-none">
+            {n === null ? '··' : pad2(n)}
+          </span>
           <span className="flex flex-col gap-0.5">
-            <span className="text-[17px]">{n === null ? 'Checking your baselines…' : first ? `First session · ${n} photos for a baseline` : `Later session · ${n} photos`}</span>
-            <span className="text-[14px] text-ink-2">
-              {SITE_NAME[site]}
+            <span key={`${site}-${n}`} className="animate-[wWord_.4s_both] text-[17px]">
+              {n === null ? 'Checking your baselines…' : first ? `First session · ${n} photos for a baseline` : `Later session · ${n} photos`}
             </span>
+            <span className="text-[14px] text-ink-2">{SITE_NAME[site]}</span>
           </span>
         </span>
-        <button type="button" disabled={n === null} onClick={onContinue} className="min-h-[58px] rounded-pill bg-selected px-[30px] text-[17px] text-inverse transition-[translate] duration-200 hover:translate-x-[3px]">
-          Continue <span aria-hidden>→</span>
+        <button type="button" disabled={n === null} onClick={onContinue} className={`group min-h-[58px] rounded-pill bg-selected px-[30px] text-[17px] text-inverse ${press} disabled:opacity-55`}>
+          Continue{' '}
+          <span aria-hidden className="inline-block transition-[translate] duration-300 ease-standard group-hover:translate-x-1">
+            →
+          </span>
         </button>
       </div>
     </div>

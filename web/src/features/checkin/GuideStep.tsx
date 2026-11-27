@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { Toggle } from '../../components/ui/Toggle'
 import { RollingNumber } from '../../components/willow/RollingNumber'
+import { Words } from '../../components/willow/Words'
 import type { CaptureMode, Session, Site } from '../../data/types'
 import { fmtDate } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
@@ -75,7 +76,7 @@ export function GuideStep(props: {
             ■ {name.toUpperCase()} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
           </span>
           <h1 id="ck-title" tabIndex={-1} className="mt-[18px] mb-0 text-[clamp(30px,3.4vw,44px)] leading-[1.05] font-light tracking-[-0.02em] outline-none">
-            {sides ? `${total} photos: ${total - 2} facing the camera, then each cheek.` : first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
+            <Words key={`${total}${sides}${first}`} text={sides ? `${total} photos: ${total - 2} facing the camera, then each cheek.` : first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`} delay={150} step={70} />
           </h1>
         </div>
         <div className="flex items-start justify-center gap-[clamp(8px,2vw,18px)]" role="img" aria-label={sides ? `${total} photos: ${total - 2} facing the camera, then the left and the right cheek` : `${n} photos`}>
@@ -85,14 +86,17 @@ export function GuideStep(props: {
                 className={`h-[clamp(52px,8vw,80px)] rounded-full border-[1.5px] border-dashed border-white/65 transition-[width] duration-300 ${pose === 'front' ? 'w-[clamp(40px,6vw,62px)]' : 'w-[clamp(30px,4.5vw,46px)]'}`}
                 style={{ background: `radial-gradient(circle at ${pose === 'left' ? 35 : pose === 'right' ? 65 : 50}% 40%, rgba(255,255,255,.25), transparent 70%)`, rotate: `${(i - (total - 1) / 2) * 6}deg`, animation: `wBreathe 4s ease-in-out ${-i * 0.6}s infinite` }}
               />
-              <span className="font-dot text-[20px]">{pad2(i + 1)}</span>
+              {/* the photo numbers land one after another under their ovals */}
+              <span className="font-dot text-[20px]" style={{ animation: `wDotIn .4s var(--ease-bounce) ${400 + i * 90}ms both` }}>
+                {pad2(i + 1)}
+              </span>
               {pose !== 'front' ? <span className="-mt-1.5 font-mono text-[10px] tracking-[.08em] opacity-85">{pose === 'left' ? 'LEFT' : 'RIGHT'}</span> : null}
             </span>
           ))}
         </div>
         <div className="flex flex-col gap-2.5">
           <p className="m-0 text-[16px] leading-[1.55]">{body}</p>
-          <button type="button" onClick={props.onChangePlace} className="min-h-11 self-start text-[14px] underline underline-offset-4 opacity-90">
+          <button type="button" onClick={props.onChangePlace} className="min-h-11 self-start text-[14px] underline underline-offset-4 opacity-90 transition-[opacity,scale] duration-200 ease-standard hover:opacity-100 active:scale-[.97] active:duration-100">
             Change place
           </button>
         </div>
@@ -102,7 +106,7 @@ export function GuideStep(props: {
         {site === 'face_full' && goals.includes('pores_texture') ? (
           <p className="m-0 rounded-[24px] bg-surface/80 px-5 py-4 text-[14px] leading-[1.45] text-[#3E3C38]">
             Tracking texture and pores? They are measured on the cheek close-up (pores on the nose close-up too), not the full face.{' '}
-            <button type="button" onClick={() => props.onSite('cheek_macro')} className="min-h-11 font-medium text-ink underline underline-offset-4">
+            <button type="button" onClick={() => props.onSite('cheek_macro')} className="min-h-11 font-medium text-ink underline underline-offset-4 transition-[scale] duration-200 ease-standard active:scale-[.97] active:duration-100">
               Photograph a cheek close-up
             </button>
           </p>
@@ -111,7 +115,7 @@ export function GuideStep(props: {
         {/* RAW: the one-time Lightroom setup comes first, before the shot checklist. */}
         {raw ? (
           <div className="rounded-[36px] bg-selected p-[clamp(20px,3vw,30px)] text-inverse squircle">
-            <button type="button" onClick={() => setRawOpen(!rawOpen)} aria-expanded={rawOpen} className="flex min-h-11 w-full items-center justify-between gap-3 text-left">
+            <button type="button" onClick={() => setRawOpen(!rawOpen)} aria-expanded={rawOpen} className="flex min-h-11 w-full items-center justify-between gap-3 text-left transition-[scale] duration-200 ease-standard active:scale-[.985] active:duration-100">
               <span className="flex flex-col gap-1">
                 <span className="text-[20px]">RAW setup in Lightroom</span>
                 <span className="text-[14px]" style={{ color: rawDone ? 'var(--signal-baseline)' : 'var(--aura-apricot)' }}>
@@ -124,10 +128,13 @@ export function GuideStep(props: {
             </button>
             {rawOpen ? (
               <>
-                <ol className="m-0 mt-[18px] flex animate-rise list-none flex-col gap-2.5 p-0">
+                <ol className="m-0 mt-[18px] flex list-none flex-col gap-2.5 p-0">
+                  {/* the steps arrive in order, each number landing after its line */}
                   {lightroomSteps(site).map((t, i) => (
-                    <li key={t} className="flex items-start gap-3 text-[15px] leading-[1.45] text-[#E4E1DB]">
-                      <span className="grid size-7 flex-none place-items-center rounded-full bg-[#242424] font-dot text-[13px] text-lime">{i + 1}</span>
+                    <li key={t} className="flex animate-[wRise_.5s_var(--ease-standard)_both] items-start gap-3 text-[15px] leading-[1.45] text-[#E4E1DB]" style={{ animationDelay: `${i * 70}ms` }}>
+                      <span className="grid size-7 flex-none animate-[wDotIn_.35s_var(--ease-bounce)_both] place-items-center rounded-full bg-[#242424] font-dot text-[13px] text-lime motion-reduce:animate-none" style={{ animationDelay: `${200 + i * 70}ms` }}>
+                        {i + 1}
+                      </span>
                       {t}
                     </li>
                   ))}
@@ -206,7 +213,7 @@ export function GuideStep(props: {
                     props.onNote(note ? `${note}, ${t.toLowerCase()}` : t)
                     props.onDeviation(true)
                   }}
-                  className="min-h-9 rounded-pill border border-ink/10 bg-white px-3 text-[13px]"
+                  className="min-h-9 rounded-pill border border-ink/10 bg-white px-3 text-[13px] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/[.03] active:scale-[.97] active:duration-100"
                 >
                   + {t}
                 </button>
@@ -222,10 +229,10 @@ export function GuideStep(props: {
         )}
 
         <div className="grid grid-cols-2 gap-2.5">
-          <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.97] disabled:active:scale-100 ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse'}`}>
+          <button type="button" onClick={props.onCamera} disabled={raw} className={`min-h-16 rounded-[24px] text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.97] active:duration-100 disabled:active:scale-100 ${raw ? 'bg-[#E4E3DE] text-[#8E8B85]' : 'bg-selected text-inverse hover:bg-[#2a2a2a]'}`}>
             Use camera
           </button>
-          <button type="button" onClick={props.onFiles} className={`min-h-16 rounded-[24px] border border-ink/15 text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.97] ${raw ? 'bg-selected text-inverse' : 'bg-white text-ink'}`}>
+          <button type="button" onClick={props.onFiles} className={`min-h-16 rounded-[24px] border border-ink/15 text-[16px] transition-[scale,background-color] duration-200 ease-standard active:scale-[.97] active:duration-100 ${raw ? 'bg-selected text-inverse hover:bg-[#2a2a2a]' : 'bg-white text-ink hover:bg-ink/[.03]'}`}>
             Upload files
           </button>
         </div>

@@ -47,7 +47,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
       </h2>
       <ul className="flex flex-col">
         {tonight ? (
-          <li className={row}>
+          <li className={row} style={{ animation: 'wRise .5s both' }}>
             <span aria-hidden className="relative h-9 w-[52px] shrink-0">
               <span className="absolute top-0 left-0">
                 <ProductImage product={imageOf(tonight.on)} size={36} />
@@ -69,10 +69,10 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
             )}
           </li>
         ) : null}
-        {gaps.map((f) => {
+        {gaps.map((f, i) => {
           const sun = f.find?.category === 'sunscreen'
           return (
-            <li key={f.key} className={row}>
+            <li key={f.key} className={row} style={{ animation: `wRise .5s ${(i + (tonight ? 1 : 0)) * 70}ms both` }}>
               <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-sunken font-mono text-[11px]">
                 {sun ? 'SPF' : '+'}
               </span>
@@ -88,8 +88,8 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
             </li>
           )
         })}
-        {changes.map(({ e, o, latest, m }) => (
-          <li key={e.id} className={row}>
+        {changes.map(({ e, o, latest, m }, i) => (
+          <li key={e.id} className={row} style={{ animation: `wRise .5s ${(i + gaps.length + (tonight ? 1 : 0)) * 70}ms both` }}>
             <ProductImage product={imageOf(e)} size={36} />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className={tag}>

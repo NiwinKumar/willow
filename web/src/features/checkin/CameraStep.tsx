@@ -1,6 +1,7 @@
 import { ArrowLeft, SwitchCamera, Volume2, VolumeX } from 'lucide-react'
 import { useState } from 'react'
 
+import { Words } from '../../components/willow/Words'
 import type { Site } from '../../data/types'
 import { photoSteps, WHY_FIVE } from '../../lib/baselineGuide'
 import { closeUpPlace, isCloseUp } from '../../lib/metrics'
@@ -10,7 +11,9 @@ import { useCamera } from './useCamera'
 
 type Shot = { file: File; url: string }
 
-const DARK_BTN = 'grid flex-none place-items-center rounded-full bg-black/35 text-white backdrop-blur-[16px]'
+const DARK_BTN = 'grid flex-none place-items-center rounded-full bg-black/35 text-white backdrop-blur-[16px] transition-[scale,background-color] duration-200 ease-standard hover:bg-black/50 active:scale-[.92] active:duration-100 disabled:opacity-50 disabled:active:scale-100'
+/** The white pills of the permission and error screens. */
+const LIGHT_PILL = 'bg-white text-ink transition-[scale,opacity] duration-200 ease-standard active:scale-[.97] active:duration-100 disabled:opacity-60 disabled:active:scale-100'
 
 /**
  * Step "camera" (CAP 06): ask for the camera, explain a blocked or missing one, then the live viewfinder
@@ -37,7 +40,7 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
     return (
       <div className="flex min-h-full flex-col items-center bg-[#050505] px-2.5 pt-[max(10px,env(safe-area-inset-top))] pb-[max(6px,env(safe-area-inset-bottom))] text-white">
         <div className="flex w-full max-w-[980px] items-center justify-between gap-3">
-          <button type="button" onClick={onBack} aria-label="Back to preparation" className="grid size-[52px] place-items-center rounded-full bg-[#1C1C1C]">
+          <button type="button" onClick={onBack} aria-label="Back to preparation" className="grid size-[52px] place-items-center rounded-full bg-[#1C1C1C] transition-[scale,background-color] duration-200 ease-standard hover:bg-[#2a2a2a] active:scale-[.92] active:duration-100">
             <ArrowLeft size={20} aria-hidden />
           </button>
           <span className="text-center text-[clamp(18px,2.4vw,26px)] tracking-[-0.01em]" aria-live="polite">
@@ -48,11 +51,16 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
         <div className="grid w-full max-w-[560px] flex-1 place-items-center py-6 text-center" role={blocked ? 'alert' : undefined}>
           {!blocked ? (
             <div className="flex flex-col items-center gap-5">
-              <div aria-hidden className="size-[200px] rounded-full" style={{ background: 'radial-gradient(circle at 40% 35%, #9CD3FF, #3D7BFF 45%, #1B1F7A 80%)', boxShadow: '0 0 80px 10px rgba(61,123,255,.35)', animation: 'wBreathe 4s ease-in-out infinite' }} />
+              {/* the orb lands first, then the words, then the buttons */}
+              <div aria-hidden className="size-[200px] animate-[wIgnite_.8s_var(--ease-standard)_both] rounded-full motion-reduce:animate-none" style={{ background: 'radial-gradient(circle at 40% 35%, #9CD3FF, #3D7BFF 45%, #1B1F7A 80%)', boxShadow: '0 0 80px 10px rgba(61,123,255,.35)' }}>
+                <div className="size-full rounded-full" style={{ animation: 'wBreathe 4s ease-in-out .8s infinite' }} />
+              </div>
               <h1 id="ck-title" tabIndex={-1} className="m-0 text-[32px] font-light outline-none">
-                Willow needs your camera
+                <Words text="Willow needs your camera" delay={300} step={90} />
               </h1>
-              <p className="m-0 leading-normal text-[#BDBAB4]">The preview stays on this device; only the photos you keep are uploaded, to your private space, and deleted after 30 days. Your browser asks for permission next.</p>
+              <p className="m-0 leading-normal text-[#BDBAB4]" style={{ animation: 'wRise .5s var(--ease-standard) 550ms both' }}>
+                The preview stays on this device; only the photos you keep are uploaded, to your private space, and deleted after 30 days. Your browser asks for permission next.
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -60,11 +68,13 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
                   cam.start()
                 }}
                 disabled={cam.phase === 'starting'}
-                className="min-h-14 rounded-pill bg-white px-[30px] text-[16px] text-ink"
+                aria-busy={cam.phase === 'starting' || undefined}
+                className={`min-h-14 rounded-pill px-[30px] text-[16px] ${LIGHT_PILL}`}
+                style={{ animation: 'wRise .5s var(--ease-standard) 700ms both' }}
               >
                 {cam.phase === 'starting' ? 'Opening the camera…' : 'Allow camera'}
               </button>
-              <button type="button" onClick={onFiles} className="min-h-11 text-[15px] text-white underline underline-offset-4">
+              <button type="button" onClick={onFiles} className="min-h-11 text-[15px] text-white underline underline-offset-4 transition-[scale] duration-200 ease-standard active:scale-[.97] active:duration-100" style={{ animation: 'wRise .5s var(--ease-standard) 770ms both' }}>
                 Upload photos instead
               </button>
             </div>
@@ -84,10 +94,10 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
                     : 'This device has no camera Willow can use here, or another app is using it. Close other camera apps, or upload photos instead.'}
               </p>
               <div className="flex flex-wrap justify-center gap-2.5">
-                <button type="button" onClick={cam.start} className="min-h-[52px] rounded-pill bg-white px-6 text-[15px] text-ink">
+                <button type="button" onClick={cam.start} className={`min-h-[52px] rounded-pill px-6 text-[15px] ${LIGHT_PILL}`}>
                   Try again
                 </button>
-                <button type="button" onClick={onFiles} className="min-h-[52px] rounded-pill border border-[#444] px-6 text-[15px]">
+                <button type="button" onClick={onFiles} className="min-h-[52px] rounded-pill border border-[#444] px-6 text-[15px] transition-[scale,background-color] duration-200 ease-standard hover:bg-white/10 active:scale-[.97] active:duration-100">
                   Upload photos
                 </button>
               </div>
@@ -190,7 +200,7 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
               type="button"
               onClick={() => setGhost(!ghost)}
               aria-pressed={ghost}
-              className="absolute right-3.5 bottom-[68px] min-h-9 rounded-pill border bg-black/35 px-3.5 text-[12px] backdrop-blur-[16px] transition-[color,border-color] duration-300"
+              className="absolute right-3.5 bottom-[68px] min-h-9 rounded-pill border bg-black/35 px-3.5 text-[12px] backdrop-blur-[16px] transition-[color,border-color,scale] duration-300 ease-standard active:scale-[.97] active:duration-100"
               style={{ borderColor: ghost ? 'var(--signal-baseline)' : 'rgba(255,255,255,.25)', color: ghost ? 'var(--signal-baseline)' : '#fff' }}
             >
               Align to last
@@ -216,7 +226,7 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
               }}
               aria-label={`Retake photo ${taken}`}
               title="Retake last photo"
-              className="relative h-[66px] w-[52px] animate-[wCkDot_.35s_both] rounded-[16px] border-[1.5px] border-white/70 bg-cover bg-center p-0"
+              className="relative h-[66px] w-[52px] animate-[wCkDot_.35s_both] rounded-[16px] border-[1.5px] border-white/70 bg-cover bg-center p-0 transition-[scale] duration-200 ease-standard active:scale-[.92] active:duration-100"
               style={{ backgroundImage: `url(${last.url})` }}
             >
               <span className="absolute -top-2 -right-2 grid h-6 min-w-6 place-items-center rounded-pill bg-lime px-1.5 font-dot text-[13px] text-ink">{taken}</span>
@@ -225,11 +235,14 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
           ) : null}
         </span>
         {all ? (
-          <button type="button" onClick={onReview} className="min-h-[60px] animate-[wCkDot_.4s_both] rounded-pill bg-lime px-[30px] text-[16px] whitespace-nowrap text-ink">
-            Review {n} photos →
+          <button type="button" onClick={onReview} className="group min-h-[60px] animate-[wCkDot_.4s_both] rounded-pill bg-lime px-[30px] text-[16px] whitespace-nowrap text-ink transition-[scale] duration-200 ease-standard active:scale-[.97] active:duration-100">
+            Review {n} photos{' '}
+            <span aria-hidden className="inline-block transition-[translate] duration-300 ease-standard group-hover:translate-x-1">
+              →
+            </span>
           </button>
         ) : (
-          <button type="button" onClick={cam.shoot} disabled={!cam.canShoot} aria-label={`Take photo ${taken + 1} of ${n}${pose === 'front' ? '' : `, ${shotName.toLowerCase()}`}`} className="grid size-20 place-items-center rounded-full border-[3px] border-white p-[5px] transition-[scale] active:scale-[.92]">
+          <button type="button" onClick={cam.shoot} disabled={!cam.canShoot} aria-label={`Take photo ${taken + 1} of ${n}${pose === 'front' ? '' : `, ${shotName.toLowerCase()}`}`} className="grid size-20 place-items-center rounded-full border-[3px] border-white p-[5px] transition-[scale,opacity] duration-200 ease-standard active:scale-[.92] active:duration-100 disabled:opacity-60 disabled:active:scale-100">
             <span aria-hidden className="size-full rounded-full transition-[background] duration-300" style={{ background: cam.allPass ? '#fff' : 'rgba(255,255,255,.55)' }} />
           </button>
         )}
@@ -240,7 +253,7 @@ export function CameraStep({ site, n, poses, first, shots, onShot, onRetakeLast,
               onClick={cam.timer}
               disabled={!cam.canShoot && cam.countdown?.by !== 'timer'}
               aria-label={cam.countdown?.by === 'timer' ? 'Cancel timer' : 'Take photo after 3 seconds'}
-              className="size-[52px] rounded-full border border-white/25 font-mono text-[13px] transition-[background] duration-300"
+              className="size-[52px] rounded-full border border-white/25 font-mono text-[13px] transition-[background,scale,opacity] duration-300 ease-standard active:scale-[.92] active:duration-100 disabled:opacity-50 disabled:active:scale-100"
               style={{ background: cam.countdown?.by === 'timer' ? '#fff' : 'rgba(255,255,255,.08)', color: cam.countdown?.by === 'timer' ? 'var(--text-primary)' : '#fff' }}
             >
               {cam.countdown?.by === 'timer' ? '✕' : '3s'}

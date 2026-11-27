@@ -33,7 +33,7 @@ export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessa
   return (
     <div className="group flex flex-col items-end gap-1">
       {m.context ? <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {m.context.toUpperCase()}</span> : null}
-      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
+      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .45s var(--ease-standard) both' }}>
         {m.photos?.length ? (
           <span className="flex flex-wrap justify-end gap-1.5">
             {m.photos.map((p) => (
@@ -78,7 +78,7 @@ function HowMade({ r }: { r: AdvisorReply }) {
         }
       }}
     >
-      <button type="button" aria-label="How this answer was made" aria-expanded={open} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={(e) => setOpen((o) => ((e.nativeEvent as PointerEvent).pointerType === 'mouse' ? true : !o))} className="hit44 grid size-7 place-items-center rounded-full text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
+      <button type="button" aria-label="How this answer was made" aria-expanded={open} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={(e) => setOpen((o) => ((e.nativeEvent as PointerEvent).pointerType === 'mouse' ? true : !o))} className="hit44 grid size-7 place-items-center rounded-full text-ink-2 transition-[background-color,color,scale] duration-200 ease-standard hover:bg-ink/5 hover:text-ink active:scale-[.92]">
         <Info size={15} strokeWidth={1.7} aria-hidden />
       </button>
       {open ? (
@@ -95,7 +95,7 @@ function HowMade({ r }: { r: AdvisorReply }) {
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className="hit44 grid size-7 place-items-center rounded-full text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
+    <button type="button" aria-label={label} title={label} onClick={onClick} className="hit44 grid size-7 place-items-center rounded-full text-ink-2 transition-[background-color,color,scale] duration-200 ease-standard hover:bg-ink/5 hover:text-ink active:scale-[.92]">
       {children}
     </button>
   )
@@ -181,7 +181,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
           ))}
           {revealing ? <span aria-hidden className="h-3 w-16 rounded-full advShimmer" /> : null}
           {!revealing ? (
-            <span className="-mr-1.5 flex items-center justify-end gap-0.5">
+            <span className="-mr-1.5 flex items-center justify-end gap-0.5 animate-[wFadeIn_.4s_both]">
               <HowMade r={r} />
               {last && !busy && !capped ? (
                 <IconButton label="Regenerate this answer" onClick={actions.onRegenerate}>
@@ -220,8 +220,8 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
 /** A product the advisor named (from reply.products: real catalog listings). Stores are links, with the price read off each store's page when the catalog has one. */
 function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3" style={{ animation: 'wRise .5s both' }}>
-      <button type="button" onClick={onOpen} aria-label={`Product details: ${p.name}`} className="shrink-0 rounded-full transition-transform hover:scale-105">
+    <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3 transition-[scale] duration-200 ease-standard has-[button:active]:scale-[.985]" style={{ animation: 'wRise .5s both' }}>
+      <button type="button" onClick={onOpen} aria-label={`Product details: ${p.name}`} className="shrink-0 rounded-full transition-[scale] duration-200 ease-standard hover:scale-105">
         <ProductImage product={p} size={44} />
       </button>
       <button type="button" onClick={onOpen} className="flex min-w-[170px] flex-1 flex-col gap-0.5 text-left">
@@ -241,7 +241,7 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
               rel="noopener noreferrer"
               title={s.price ? `Price on the store's page, checked ${fmtDate(s.price.checked)}` : undefined}
               aria-label={`${s.store}${s.price ? `, ${fmtPrice(s.price)}, checked ${fmtDate(s.price.checked)}` : ''}, opens in new tab`}
-              className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline"
+              className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/[.04] active:scale-[.97]"
             >
               {s.store}
               {s.price ? <span className="tnum text-ink-2">{fmtPrice(s.price)}</span> : null}
@@ -292,7 +292,7 @@ export function StandardCard({ m, busy }: { m: Extract<ChatMessage, { role: 'sta
         ) : (
           <p className="m-0 text-[14.5px] leading-[1.55] text-pretty">Wisp is unavailable right now, and there is no measured check-in yet to summarise. Your results, routine and the compatibility check still work.</p>
         )}
-        <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse">
+        <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse transition-[scale,opacity] duration-200 ease-standard active:scale-[.97] disabled:opacity-50 disabled:active:scale-100">
           Ask Wisp again
         </button>
       </div>
@@ -310,7 +310,7 @@ export function ErrorBubble({ m, busy }: { m: Extract<ChatMessage, { role: 'erro
         <span className="text-[13px]">{m.title}</span>
         <span className="text-[13px] text-ink-2">{m.body}</span>
         {m.question ? (
-          <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse">
+          <button type="button" disabled={busy} onClick={() => retry(m.id)} className="hit44 min-h-9 self-start rounded-pill bg-selected px-[18px] text-[13px] text-inverse transition-[scale,opacity] duration-200 ease-standard active:scale-[.97] disabled:opacity-50 disabled:active:scale-100">
             Try again
           </button>
         ) : null}

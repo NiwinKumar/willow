@@ -623,7 +623,7 @@ export default function CheckInFlow() {
       {sampleParam !== null ? <SampleBanner /> : null}
       {dark ? (
         // The camera view hides the header; keep a way out besides Esc and Back.
-        <button type="button" onClick={requestClose} aria-label="Close check-in" title="Close check-in" className="absolute right-[clamp(16px,4vw,40px)] top-[calc(env(safe-area-inset-top,0px)+16px)] z-30 grid size-12 place-items-center rounded-full bg-white/15 text-white backdrop-blur-[14px] hover:bg-white/25">
+        <button type="button" onClick={requestClose} aria-label="Close check-in" title="Close check-in" className="absolute right-[clamp(16px,4vw,40px)] top-[calc(env(safe-area-inset-top,0px)+16px)] z-30 grid size-12 place-items-center rounded-full bg-white/15 text-white backdrop-blur-[14px] transition-[scale,background-color] duration-200 ease-standard hover:bg-white/25 active:scale-[.92] active:duration-100">
           <X size={18} strokeWidth={1.8} aria-hidden />
         </button>
       ) : (
@@ -632,7 +632,7 @@ export default function CheckInFlow() {
             <LogoMark size={32} />
             <span className="text-[26px] font-light tracking-[-0.03em]">willow</span>
           </span>
-          <button type="button" onClick={requestClose} aria-label="Close check-in" title="Close check-in" className="glass-pill grid size-12 place-items-center rounded-full text-ink">
+          <button type="button" onClick={requestClose} aria-label="Close check-in" title="Close check-in" className="glass-pill grid size-12 place-items-center rounded-full text-ink transition-[scale,background-color] duration-200 ease-standard hover:bg-white/80 active:scale-[.92] active:duration-100">
             <X size={18} strokeWidth={1.8} aria-hidden />
           </button>
         </header>

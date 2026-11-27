@@ -7,6 +7,7 @@ import { ArrowUpRight, Check } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import { Sparkline } from '../../components/charts/Sparkline'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { activeIn, useRoutine, useRoutineLog } from '../../data/hooks'
 import type { MetricId, Product, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
@@ -32,8 +33,8 @@ function Frame({ title, link, onLink, children }: { title: string; link: string;
     <div className="flex flex-col gap-2.5 rounded-[22px] bg-sunken/80 p-3.5" style={{ animation: 'wRise .5s both' }}>
       <span className="flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {title.toUpperCase()}</span>
-        <button type="button" onClick={onLink} className="hit44 inline-flex items-center gap-1 rounded-pill bg-white px-2.5 py-1 text-[12px] transition-colors hover:bg-ink/5">
-          {link} <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden />
+        <button type="button" onClick={onLink} className="hit44 group inline-flex items-center gap-1 rounded-pill bg-white px-2.5 py-1 text-[12px] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/5 active:scale-[.97]">
+          {link} <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden className="transition-[translate] duration-200 ease-standard group-hover:translate-x-px group-hover:-translate-y-px" />
         </button>
       </span>
       {children}
@@ -72,19 +73,21 @@ function MetricTrend({ metricId, site, links }: { metricId: MetricId; site?: Sit
   const sessions = best?.sessions ?? []
   const last = sessions.at(-1)
   const lastMetric = last?.result?.metrics.find((m) => m.id === metricId)
+  // The reading before the latest: the count starts there, so the number moves by the amount that changed.
+  const prev = sessions.at(-2)?.result?.metrics.find((m) => m.id === metricId)?.value ?? undefined
   const where = best ? SITE_LABEL[best.site] : SITE_LABEL[sites[0]]
   return (
     <Frame title={`${meta.label} · ${where}`} link="Progress" onLink={() => links.go(`/progress?site=${best?.site ?? sites[0]}&metric=${metricId}`)}>
-      {last && lastMetric ? (
+      {last && lastMetric && lastMetric.value !== null ? (
         <span className="flex items-center gap-4">
           <span className="text-sky">
-            <Sparkline values={sessions.map((s) => s.result?.metrics.find((m) => m.id === metricId)?.value ?? null)} width={140} height={40} label={`${meta.label} over ${sessions.length} check-ins`} />
+            <Sparkline values={sessions.map((s) => s.result?.metrics.find((m) => m.id === metricId)?.value ?? null)} width={140} height={40} draw={200} label={`${meta.label} over ${sessions.length} check-ins`} />
           </span>
           <span className="flex flex-col gap-0.5">
             <span className="text-[17px] tabular-nums">
-              {fmtValue(lastMetric.value, lastMetric)} <span className="text-[12px] text-ink-2">{unitOf(lastMetric)}</span>
+              <RollingNumber value={lastMetric.value} from={prev ?? lastMetric.value} delay={300} format={(v) => fmtValue(v, lastMetric)} /> <span className="text-[12px] text-ink-2">{unitOf(lastMetric)}</span>
             </span>
-            <span className="text-[12px] text-ink-2">
+            <span className="text-[12px] text-ink-2" style={{ animation: 'wWord .5s 1050ms both' }}>
               {wordsFor(lastMetric, last).glyph} {wordsFor(lastMetric, last).label} · {fmtDate(last.created_at)}
             </span>
           </span>
@@ -182,11 +185,11 @@ function ProductWidget({ productId, links }: { productId: string; links: WidgetL
         {entry ? (
           <span className="flex min-h-9 items-center rounded-pill bg-lime px-3.5 text-[12.5px]">✓ In your routine since {fmtDate(entry.started_at)}</span>
         ) : (
-          <button type="button" onClick={() => links.onAdd(p)} className="hit44 min-h-9 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse">
+          <button type="button" onClick={() => links.onAdd(p)} className="hit44 min-h-9 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
             Add to routine
           </button>
         )}
-        <button type="button" onClick={() => links.onProduct(p)} className="hit44 min-h-9 rounded-pill bg-white px-3.5 text-[12.5px]">
+        <button type="button" onClick={() => links.onProduct(p)} className="hit44 min-h-9 rounded-pill bg-white px-3.5 text-[12.5px] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/[.04] active:scale-[.97]">
           Ingredients and stores
         </button>
       </span>

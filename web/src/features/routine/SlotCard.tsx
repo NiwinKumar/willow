@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useSetRoutineUse } from '../../data/hooks'
@@ -14,9 +15,11 @@ import { compactName, entryName, imageOf, metaLine } from './routineModel'
 import { dayNote, restsOn, scheduleWords } from './schedule'
 
 const THEME = {
-  am: { name: 'Morning', when: 'this morning', bg: 'radial-gradient(90% 55% at 50% 0%, #FFF6D6 0%, var(--bg-surface) 70%)', fg: 'text-ink', card: 'rgba(255,255,255,.78)', track: 'var(--bg-sunken)', chip: 'var(--bg-canvas)', line: 'rgba(18,18,18,.18)', dark: false },
-  pm: { name: 'Evening', when: 'this evening', bg: 'radial-gradient(90% 55% at 50% 0%, #3A2A6E 0%, #15122A 70%)', fg: 'text-inverse', card: 'rgba(255,255,255,.07)', track: 'rgba(255,255,255,.08)', chip: 'rgba(255,255,255,.14)', line: 'rgba(255,255,255,.25)', dark: true },
+  am: { name: 'Morning', when: 'this morning', bg: 'radial-gradient(90% 55% at 50% 0%, #FFF6D6 0%, var(--bg-surface) 70%)', fg: 'text-ink', card: 'rgba(255,255,255,.78)', track: 'var(--bg-sunken)', chip: 'var(--bg-canvas)', line: 'rgba(18,18,18,.18)', ring: 'rgba(18,18,18,.5)', dark: false },
+  pm: { name: 'Evening', when: 'this evening', bg: 'radial-gradient(90% 55% at 50% 0%, #3A2A6E 0%, #15122A 70%)', fg: 'text-inverse', card: 'rgba(255,255,255,.07)', track: 'rgba(255,255,255,.08)', chip: 'rgba(255,255,255,.14)', line: 'rgba(255,255,255,.25)', ring: 'rgba(255,255,255,.7)', dark: true },
 } as const
+
+type Slot = keyof typeof THEME
 
 /**
  * One slot of the routine as a compact list: the product's photo is its "used today" tick (full colour with ✓
@@ -24,7 +27,7 @@ const THEME = {
  * and only what changes how you use it today (a schedule note, or a ◆ when your readings moved after you
  * started it). Everything else about a product lives in its sheet.
  */
-export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAdd }: { slot: 'am' | 'pm'; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onAdd: () => void }) {
+export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAdd }: { slot: Slot; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onAdd: () => void }) {
   const t = THEME[slot]
   const setUse = useSetRoutineUse()
   const today = localDay()
@@ -53,77 +56,89 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
             </span>
           ) : null}
         </div>
-        <button type="button" onClick={onAdd} aria-label={`Add a product to your ${t.name.toLowerCase()} routine`} title="Add a product" className="hit44 grid size-9 place-items-center rounded-full transition-[color,background-color,box-shadow,scale] duration-200 active:scale-[.97] hover:bg-[rgba(128,128,128,.18)]" style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }}>
+        <button type="button" onClick={onAdd} aria-label={`Add a product to your ${t.name.toLowerCase()} routine`} title="Add a product" className="hit44 grid size-9 place-items-center rounded-full transition-[color,background-color,box-shadow,scale] duration-200 ease-standard active:scale-[.92] hover:bg-[rgba(128,128,128,.18)]" style={{ boxShadow: `inset 0 0 0 1px ${t.line}` }}>
           <Plus size={15} strokeWidth={1.8} aria-hidden />
         </button>
       </div>
       {entries.length === 0 ? (
-        <button type="button" onClick={onAdd} className="min-h-[72px] rounded-[22px] border-[1.5px] border-dashed text-[15px]" style={{ borderColor: t.line }}>
+        <button type="button" onClick={onAdd} className="min-h-[72px] rounded-[22px] border-[1.5px] border-dashed text-[15px] transition-[background-color,scale] duration-200 ease-standard hover:bg-[rgba(128,128,128,.08)] active:scale-[.985]" style={{ borderColor: t.line }}>
           Nothing here yet · add a product
         </button>
       ) : null}
-      {entries.map((e, i) => {
-        const on = ticked(e.id)
-        const starts = e.started_at.slice(0, 10) > today
-        const o = outcomeFor(e, sessions)
-        const name = entryName(e)
-        const short = compactName(e)
-        const rest = restsOn(e, today)
-        const note = starts ? `FROM ${fmtDate(e.started_at).toUpperCase()}` : dayNote(e, slot, today)
-        return (
-          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .5s ${i * 70}ms both` }}>
-            <button
-              type="button"
-              aria-pressed={on}
-              disabled={starts}
-              onClick={() => void toggle(e, on)}
-              aria-label={starts ? `${name} starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}: ${name}` : `Mark as used ${t.when}: ${name}${rest ? ' (it rests today)' : ''}`}
-              title={starts ? `Starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}` : rest ? 'Rests today on its schedule' : `Mark as used ${t.when}`}
-              className="group relative grid size-[46px] shrink-0 place-items-center rounded-[16px] transition-transform hover:scale-[1.04] active:scale-[.97]"
-              style={{ background: t.track }}
-            >
-              <ProductImage product={imageOf(e)} size={34} muted={!on} rest={rest} />
-              <span
-                aria-hidden
-                className="absolute -right-0.5 -bottom-0.5 grid size-[17px] place-items-center rounded-full bg-selected text-[9px] text-inverse transition-[opacity,scale] duration-300 ease-bounce"
-                style={{ opacity: on ? 1 : 0, scale: on ? '1' : '.4', boxShadow: `0 0 0 2px ${t.dark ? '#17143D' : '#FAFAF8'}` }}
-              >
-                ✓
-              </span>
-            </button>
-            <div className="flex min-w-0 flex-1 flex-col">
-              <button type="button" onClick={() => onOpen(e)} title={name} className="hit44 block max-w-full truncate text-left text-[15px] leading-[1.3] underline-offset-4 hover:underline">
-                {short}
-              </button>
-              <span className="flex min-w-0 items-center gap-2 text-[12px] leading-[1.4]">
-                <span className="truncate opacity-70">{metaLine(e.brand, e.category)}</span>
-                {note ? (
-                  <span className={`shrink-0 font-mono text-[10.5px] tracking-[.05em] ${rest ? 'opacity-60' : ''}`} title={scheduleWords(e.schedule, !e.slots.includes('am'))}>
-                    {note}
-                  </span>
-                ) : null}
-                {o.kind === 'real' ? (
-                  <span className="shrink-0 text-[11.5px]" title={`${o.text}, an association and not proof. ${o.detail}`}>
-                    <span aria-hidden>{CHANGE_WORDS[o.way].glyph} </span>
-                    {METRIC_META[o.metric].label}
-                    <span className="sr-only">: {o.text}, an association, not proof</span>
-                  </span>
-                ) : null}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onStop(e)}
-              aria-label={`Stop using ${name}`}
-              title="Stop using (you can undo)"
-              className="hit44 grid size-9 shrink-0 place-items-center rounded-full opacity-60 transition-[opacity,background] hover:bg-[rgba(255,107,74,.18)] hover:opacity-100 focus-visible:opacity-100"
-            >
-              <X size={16} strokeWidth={1.8} aria-hidden />
-            </button>
-          </div>
-        )
-      })}
+      {entries.map((e, i) => (
+        <Row key={e.id} e={e} i={i} slot={slot} on={ticked(e.id)} today={today} sessions={sessions} onOpen={onOpen} onStop={onStop} onToggle={toggle} />
+      ))}
     </section>
   )
 }
 
+/** One product of the slot. The photo is the tick: a tick the person makes sends one ring out, the same ring as the orbs on Home. */
+function Row({ e, i, slot, on, today, sessions, onOpen, onStop, onToggle }: { e: RoutineEntry; i: number; slot: Slot; on: boolean; today: string; sessions: Session[]; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onToggle: (e: RoutineEntry, on: boolean) => Promise<void> }) {
+  const t = THEME[slot]
+  // Only a tick just made ripples (not on load, not when unticking).
+  const [ripple, setRipple] = useState(0)
+  const wasOn = useRef(on)
+  useEffect(() => {
+    if (on && !wasOn.current) setRipple((n) => n + 1)
+    wasOn.current = on
+  }, [on])
+  const starts = e.started_at.slice(0, 10) > today
+  const o = outcomeFor(e, sessions)
+  const name = entryName(e)
+  const short = compactName(e)
+  const rest = restsOn(e, today)
+  const note = starts ? `FROM ${fmtDate(e.started_at).toUpperCase()}` : dayNote(e, slot, today)
+  return (
+    <div className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .5s ${i * 70}ms both` }}>
+      <button
+        type="button"
+        aria-pressed={on}
+        disabled={starts}
+        onClick={() => void onToggle(e, on)}
+        aria-label={starts ? `${name} starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}: ${name}` : `Mark as used ${t.when}: ${name}${rest ? ' (it rests today)' : ''}`}
+        title={starts ? `Starts ${fmtDate(e.started_at)}` : on ? `Used ${t.when}` : rest ? 'Rests today on its schedule' : `Mark as used ${t.when}`}
+        className="group relative grid size-[46px] shrink-0 place-items-center rounded-[16px] transition-[scale] duration-200 ease-standard hover:scale-[1.04] active:scale-[.92] disabled:hover:scale-100 disabled:active:scale-100"
+        style={{ background: t.track }}
+      >
+        {ripple ? <span key={ripple} aria-hidden className="pointer-events-none absolute inset-0 animate-[wRingOut_.7s_ease-out_both] rounded-[16px] border-[1.5px] motion-reduce:hidden" style={{ borderColor: t.ring }} /> : null}
+        <ProductImage product={imageOf(e)} size={34} muted={!on} rest={rest} />
+        <span
+          aria-hidden
+          className="absolute -right-0.5 -bottom-0.5 grid size-[17px] place-items-center rounded-full bg-selected text-[9px] text-inverse transition-[opacity,scale] duration-300 ease-bounce"
+          style={{ opacity: on ? 1 : 0, scale: on ? '1' : '.4', boxShadow: `0 0 0 2px ${t.dark ? '#17143D' : '#FAFAF8'}` }}
+        >
+          ✓
+        </span>
+      </button>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <button type="button" onClick={() => onOpen(e)} title={name} className="hit44 block max-w-full truncate text-left text-[15px] leading-[1.3] underline-offset-4 hover:underline">
+          {short}
+        </button>
+        <span className="flex min-w-0 items-center gap-2 text-[12px] leading-[1.4]">
+          <span className="truncate opacity-70">{metaLine(e.brand, e.category)}</span>
+          {note ? (
+            <span className={`shrink-0 font-mono text-[10.5px] tracking-[.05em] ${rest ? 'opacity-60' : ''}`} title={scheduleWords(e.schedule, !e.slots.includes('am'))}>
+              {note}
+            </span>
+          ) : null}
+          {o.kind === 'real' ? (
+            <span className="shrink-0 text-[11.5px]" title={`${o.text}, an association and not proof. ${o.detail}`}>
+              <span aria-hidden>{CHANGE_WORDS[o.way].glyph} </span>
+              {METRIC_META[o.metric].label}
+              <span className="sr-only">: {o.text}, an association, not proof</span>
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => onStop(e)}
+        aria-label={`Stop using ${name}`}
+        title="Stop using (you can undo)"
+        className="hit44 grid size-9 shrink-0 place-items-center rounded-full opacity-60 transition-[opacity,background-color,scale] duration-200 ease-standard hover:bg-[rgba(255,107,74,.18)] hover:opacity-100 focus-visible:opacity-100 active:scale-[.92]"
+      >
+        <X size={16} strokeWidth={1.8} aria-hidden />
+      </button>
+    </div>
+  )
+}

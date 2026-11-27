@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react'
 
+import { Words } from '../../components/willow/Words'
+
 /** "■ NEW SESSION · 15 OCT" in Geist Mono caps (CAP eyebrows are 12px, .08em). */
 export function MonoEyebrow({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <span className={`font-mono text-[12px] tracking-[.08em] text-ink-2 uppercase ${className}`}>■ {children}</span>
 }
 
-/** Instrument Serif page title of the capture steps. */
+/** Instrument Serif page title of the capture steps; a plain string arrives word by word, like every other serif title. */
 export function SerifTitle({ children, id, size = 'lg' }: { children: ReactNode; id?: string; size?: 'lg' | 'md' }) {
   return (
     <h1 id={id} tabIndex={-1} className={`m-0 font-serif font-normal leading-[.95] outline-none ${size === 'lg' ? 'text-[clamp(31px,3vw,40px)]' : 'text-[clamp(28px,3.25vw,42px)]'}`}>
-      {children}
+      {typeof children === 'string' ? <Words text={children} delay={120} step={90} /> : children}
     </h1>
   )
 }
@@ -57,12 +59,17 @@ export function SampleBanner() {
   )
 }
 
-/** Notice cards in the design's language: ink bar (offline), yellow status, quiet sunken note. */
+/** Notice cards in the design's language: ink bar (offline), yellow status, quiet sunken note. Each rises in when it appears. */
 export function Notice({ tone = 'quiet', role, children, className = '' }: { tone?: 'ink' | 'yellow' | 'quiet'; role?: 'alert' | 'status'; children: ReactNode; className?: string }) {
   const t = tone === 'ink' ? 'bg-selected text-inverse' : tone === 'yellow' ? 'bg-cta text-ink' : 'bg-surface/70 text-ink'
   return (
-    <div role={role} className={`m-0 rounded-[20px] px-[18px] py-3.5 text-[15px] leading-[1.45] ${t} ${className}`}>
+    <div role={role} className={`m-0 animate-[wRise_.4s_var(--ease-standard)_both] rounded-[20px] px-[18px] py-3.5 text-[15px] leading-[1.45] ${t} ${className}`}>
       {children}
     </div>
   )
 }
+
+/** The press every pill in the flow shares (.97, 100 ms down); a disabled one never sinks. */
+export const press = 'transition-[scale,background-color,color,opacity] duration-200 ease-standard active:scale-[.97] active:duration-100 disabled:active:scale-100'
+/** The press of a round icon button (.92). */
+export const pressIcon = 'transition-[scale,background-color,color] duration-200 ease-standard active:scale-[.92] active:duration-100 disabled:active:scale-100'

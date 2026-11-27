@@ -1,4 +1,5 @@
 import { metricAura } from '../home/derive'
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import { Words } from '../../components/willow/Words'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -132,19 +133,30 @@ function AccountRows() {
 
   const done = data.all.filter((s) => s.status === 'done').length
   const days = new Set(data.all.map((s) => dayOf(s.created_at))).size
-  // Sessions take a few seconds to arrive on a cold load: no false zeros meanwhile.
-  const counting = data.status !== 'ready' && !data.all.length
+  // Sessions take a few seconds to arrive on a cold load: no false zeros meanwhile (and no "Loading…" for ever when they never come).
+  const counting = data.status !== 'ready' && data.status !== 'error' && !data.all.length
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4">
-        <span aria-hidden className="grid size-12 flex-none place-items-center rounded-full text-[17px] text-white" style={{ background: 'radial-gradient(circle at 40% 30%, #E9DAFF, #7A5CFF 60%, #3A1F9E)' }}>
+        <span aria-hidden className="grid size-12 flex-none animate-[wDotIn_.5s_var(--ease-bounce)_.2s_both] place-items-center rounded-full text-[17px] text-white motion-reduce:animate-none" style={{ background: 'radial-gradient(circle at 40% 30%, #E9DAFF, #7A5CFF 60%, #3A1F9E)' }}>
           {me.initials}
         </span>
         <span className="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
           <span className="truncate text-[17px]">{me.name}</span>
           <span className="truncate text-[13px] text-ink-2">{me.guest ? 'Guest on this browser · not backed up' : (me.email ?? 'Google account')}</span>
         </span>
-        <span className="text-[13px] text-ink-2 tnum">{counting ? 'Loading…' : `${done} ${done === 1 ? 'check-in' : 'check-ins'} · ${days} ${days === 1 ? 'day' : 'days'} tracked`}</span>
+        {/* the counts arrive once; they fade in as words do, and roll up from nothing */}
+        <span key={counting ? 'wait' : 'count'} className="text-[13px] text-ink-2 tnum" style={{ animation: 'wWord .5s both' }}>
+          {counting ? (
+            'Loading…'
+          ) : data.status === 'error' && !data.all.length ? (
+            'Couldn’t count your check-ins'
+          ) : (
+            <>
+              <RollingNumber value={done} duration={500} delay={100} format={(v) => String(Math.round(v))} /> {done === 1 ? 'check-in' : 'check-ins'} · <RollingNumber value={days} duration={500} delay={200} format={(v) => String(Math.round(v))} /> {days === 1 ? 'day' : 'days'} tracked
+            </>
+          )}
+        </span>
       </div>
       {me.guest ? (
         <Row label="Save with Google" hint="Keep your check-ins across devices. Your guest account becomes your Google account, so nothing is lost.">
@@ -155,7 +167,7 @@ function AccountRows() {
             {pending ? 'Signing in…' : 'Continue with Google'}
           </button>
           {failed ? (
-            <p role="alert" className="m-0 basis-full rounded-[14px] bg-avoid-bg px-3.5 py-2.5 text-[13px]">
+            <p role="alert" className="m-0 basis-full animate-[wRise_.35s_var(--ease-standard)_both] rounded-[14px] bg-avoid-bg px-3.5 py-2.5 text-[13px]">
               {failed}
             </p>
           ) : null}
@@ -174,10 +186,10 @@ function AccountRows() {
         </p>
         <p className="mt-2 mb-0 text-[13px] text-ink-2">Signing out also clears your goals and settings saved on this device.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => void signOut()} disabled={leaving} className={`min-h-[54px] flex-1 rounded-pill text-[15px] text-ink ${me.guest ? 'bg-coral' : 'bg-cta'}`}>
+          <button type="button" onClick={() => void signOut()} disabled={leaving} className={`min-h-[54px] flex-1 rounded-pill text-[15px] text-ink transition-[scale,opacity] duration-200 ease-standard active:scale-[.97] active:duration-100 disabled:opacity-55 disabled:active:scale-100 ${me.guest ? 'bg-coral' : 'bg-cta'}`}>
             {leaving ? 'Signing out…' : 'Sign out'}
           </button>
-          <button type="button" onClick={() => setAskOut(false)} className="min-h-[54px] flex-1 rounded-pill bg-white text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]">
+          <button type="button" onClick={() => setAskOut(false)} className="min-h-[54px] flex-1 rounded-pill bg-white text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)] transition-[background-color,scale] duration-200 ease-standard hover:bg-ink/[.03] active:scale-[.97] active:duration-100">
             Stay signed in
           </button>
         </div>
@@ -202,7 +214,15 @@ function GoalsRows({ demo }: { demo: boolean }) {
       .catch(() => toast.error(offline))
   return (
     <>
-      <Row stack label={`Goals · ${goals.length} of ${MAX_GOALS}`} hint={`Up to ${MAX_GOALS}. Their readings come first in your results${demo ? ', the demo journey included' : ''}.`}>
+      <Row
+        stack
+        label={
+          <>
+            Goals · <RollingNumber value={goals.length} duration={400} format={(v) => String(Math.round(v))} /> of {MAX_GOALS}
+          </>
+        }
+        hint={`Up to ${MAX_GOALS}. Their readings come first in your results${demo ? ', the demo journey included' : ''}.`}
+      >
         <div className="flex flex-wrap gap-1.5">
           {GOALS.map((g) => {
             const on = goals.includes(g.id)
@@ -218,8 +238,8 @@ function GoalsRows({ demo }: { demo: boolean }) {
           })}
         </div>
         {hint ? (
-          <span role="status" className="text-[13px] text-avoid">
-            Three is the limit. Remove one first.
+          <span role="status" className="animate-[wRise_.35s_var(--ease-standard)_both] text-[13px] text-avoid">
+            {MAX_GOALS} is the limit. Remove one first.
           </span>
         ) : null}
       </Row>
@@ -264,7 +284,10 @@ function PlacesRow() {
           const on = picked.includes(c)
           return (
             <button key={c} type="button" aria-pressed={on} aria-disabled={(on && picked.length === 1) || undefined} onClick={() => toggle(c)} className={chip(on)}>
-              {on ? '✓ ' : ''}
+              {/* the tick makes room for itself instead of jumping the label sideways */}
+              <span aria-hidden className="inline-block overflow-hidden align-baseline transition-[width,opacity,margin] duration-300 ease-standard motion-reduce:transition-none" style={{ width: on ? 14 : 0, marginRight: on ? 3 : 0, opacity: on ? 1 : 0 }}>
+                ✓
+              </span>
               {CHOICE_COPY[c].title}
             </button>
           )
@@ -395,15 +418,16 @@ function PrivacyRows() {
           </span>
           <span aria-hidden className="text-ink-2 transition-transform group-open:rotate-90">›</span>
         </summary>
+        {/* the receipt's lines arrive in order each time it opens (display:none until then, so the animation starts on open) */}
         <dl className="m-0 mt-2 flex flex-col">
-          {rows.map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-3 border-t border-ink/[.06] py-2.5 text-[14px]">
+          {rows.map(([k, v], i) => (
+            <div key={k} className="flex justify-between gap-3 border-t border-ink/[.06] py-2.5 text-[14px] group-open:animate-[wRise_.45s_var(--ease-standard)_both]" style={{ animationDelay: `${i * 50}ms` }}>
               <dt className="text-ink-2">{k}</dt>
               <dd className="m-0 text-right">{v}</dd>
             </div>
           ))}
         </dl>
-        <p className="mt-2 mb-1 text-[13px] leading-[1.55] text-ink-2">
+        <p className="mt-2 mb-1 text-[13px] leading-[1.55] text-ink-2 group-open:animate-[wRise_.45s_var(--ease-standard)_both]" style={{ animationDelay: `${rows.length * 50}ms` }}>
           Willow stores your original photos privately for 30 days, then deletes them, with their small previews and spot close-ups. Measurements, verdicts and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers your questions to Wisp; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
         </p>
       </details>
@@ -471,11 +495,11 @@ function CaptureSetupRow() {
               setStep('done')
               toast('Capture setup reset')
             }}
-            className="min-h-11 rounded-pill bg-selected px-4 text-[14px] text-inverse"
+            className="min-h-11 animate-[wRise_.35s_var(--ease-standard)_both] rounded-pill bg-selected px-4 text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97] active:duration-100"
           >
             Yes, reset
           </button>
-          <button type="button" onClick={() => setStep('idle')} className={outline}>
+          <button type="button" onClick={() => setStep('idle')} className={`${outline} animate-[wRise_.35s_var(--ease-standard)_70ms_both]`}>
             Cancel
           </button>
         </>
@@ -496,9 +520,10 @@ function ServiceStatus() {
       </span>
       {status && !failed ? (
         <span className="flex flex-wrap gap-1.5">
-          {chips.map((c) => (
-            <span key={c.key} className="flex items-center gap-1.5 rounded-pill bg-sunken px-3 py-1.5 text-[12.5px]">
-              <span aria-hidden className="size-2 rounded-full" style={{ background: CHIP_DOT[c.state] }} />
+          {/* the chips arrive with the answer, in order; each dot lands once its chip is there */}
+          {chips.map((c, i) => (
+            <span key={c.key} className="flex animate-[wRise_.45s_var(--ease-standard)_both] items-center gap-1.5 rounded-pill bg-sunken px-3 py-1.5 text-[12.5px]" style={{ animationDelay: `${i * 50}ms` }}>
+              <span aria-hidden className="size-2 animate-[wDotIn_.35s_var(--ease-bounce)_both] rounded-full motion-reduce:animate-none" style={{ background: CHIP_DOT[c.state], animationDelay: `${200 + i * 50}ms` }} />
               {c.label}
             </span>
           ))}
@@ -581,16 +606,30 @@ function DeleteGroup() {
     failed: ['Deletion didn’t finish', 'The connection dropped part-way. Run it again to finish; anything not yet removed is removed then.'],
   }
   const [title, text] = TEXT[state]
-  const btn = 'min-h-11 rounded-pill px-4 text-[14px]'
+  // Every button that appears with a new state rises in; the pills press like every other.
+  const rise = 'animate-[wRise_.35s_var(--ease-standard)_both]'
+  const btn = `min-h-11 rounded-pill px-4 text-[14px] transition-[scale,opacity,background-color] duration-200 ease-standard active:scale-[.97] active:duration-100 disabled:active:scale-100 ${rise}`
   return (
     <Group id="delete" title="Delete my data" tone="danger">
       <div aria-live="polite" aria-busy={state === 'deleting' || undefined} className="flex flex-col gap-3 py-4">
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[15px]">{title}</span>
+        {/* the words change with the state: they fade in as words do, the done tick lands */}
+        <span key={state} className="flex flex-col gap-0.5" style={{ animation: 'wWord .4s both' }}>
+          <span className="text-[15px]">
+            {state === 'done' ? (
+              <>
+                <span aria-hidden className="inline-block animate-[wDotIn_.4s_var(--ease-bounce)_.15s_both] motion-reduce:animate-none">
+                  ✓
+                </span>{' '}
+                {title.slice(2)}
+              </>
+            ) : (
+              title
+            )}
+          </span>
           <span className="max-w-[620px] text-[13px] leading-[1.5] text-ink-2">{text}</span>
         </span>
         {state === 'deleting' ? (
-          <span aria-hidden className="block h-1.5 max-w-[420px] overflow-hidden rounded-[6px] bg-sunken">
+          <span aria-hidden className={`block h-1.5 max-w-[420px] overflow-hidden rounded-[6px] bg-sunken ${rise}`}>
             <span className="block h-full w-2/5 animate-[wShimmer_1.2s_linear_infinite] rounded-[6px] bg-[length:200%_100%]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, #FF6B4A, transparent)' }} />
           </span>
         ) : null}
@@ -608,23 +647,23 @@ function DeleteGroup() {
         ) : null}
         {state === 'confirm' ? (
           <>
-            <label className="flex max-w-[360px] flex-col gap-1.5 text-[13px] text-ink-2">
+            <label className={`flex max-w-[360px] flex-col gap-1.5 text-[13px] text-ink-2 ${rise}`}>
               Type DELETE to confirm
               {/* the button pressed to get here is gone: the confirmation field takes focus */}
               <input type="text" autoFocus value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} className="min-h-11 rounded-[14px] bg-white px-3.5 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]" />
             </label>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void run()} disabled={word.trim().toUpperCase() !== 'DELETE'} className={`${btn} bg-coral text-ink disabled:opacity-55`}>
+              <button type="button" onClick={() => void run()} disabled={word.trim().toUpperCase() !== 'DELETE'} className={`${btn} bg-coral text-ink [animation-delay:70ms] disabled:opacity-55`}>
                 Delete permanently
               </button>
-              <button type="button" onClick={() => setState('idle')} className={outline}>
+              <button type="button" onClick={() => setState('idle')} className={`${outline} ${rise} [animation-delay:140ms]`}>
                 Cancel
               </button>
             </div>
           </>
         ) : null}
         {state === 'failed' ? (
-          <button type="button" onClick={() => void run()} className={`${outline} self-start`}>
+          <button type="button" onClick={() => void run()} className={`${outline} self-start ${rise}`}>
             Try again
           </button>
         ) : null}
@@ -634,7 +673,7 @@ function DeleteGroup() {
             onClick={() => {
               void removeAccount().then(() => navigate('/', { replace: true }))
             }}
-            className={`${outline} self-start`}
+            className={`${outline} self-start ${rise} [animation-delay:200ms]`}
           >
             Back to start
           </button>

@@ -1,7 +1,7 @@
 import { WillowLoader } from '../../components/willow/WillowLoader'
 import { useSamples } from '../../lib/useSamples'
 import { plural, SITE_NAME } from './model'
-import { MonoEyebrow, SerifTitle } from './parts'
+import { MonoEyebrow, press, SerifTitle } from './parts'
 
 /**
  * Step "samples": the hosted, consented sample photos (GET /v1/demo/samples). Running one copies its
@@ -22,12 +22,12 @@ export function SampleStep({ busy, error, onRun, onOwn }: { busy: string | null;
       <p className="m-0 leading-normal text-[#3E3C38]">The photos are copied into your own account and measured for real: the engine on Cloud Run, then a Gemini explanation with every number checked.</p>
       {samples.state === 'loading' ? <WillowLoader inline label="Loading the sample photos" /> : null}
       {samples.state === 'error' || (samples.state === 'ready' && samples.samples.length === 0) ? (
-        <p className="m-0 rounded-[26px] bg-surface/60 p-6 text-center text-ink-2">Sample photos are not available right now.</p>
+        <p className="m-0 animate-[wRise_.4s_var(--ease-standard)_both] rounded-[26px] bg-surface/60 p-6 text-center text-ink-2">Sample photos are not available right now.</p>
       ) : null}
       {samples.state === 'ready' && samples.samples.length ? (
         <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-          {samples.samples.map((s) => (
-            <li key={s.id} className="flex flex-wrap items-center gap-3.5 rounded-[26px] bg-surface/[.92] p-4 shadow-[0_20px_40px_-36px_rgba(0,0,0,.4)]">
+          {samples.samples.map((s, i) => (
+            <li key={s.id} className="flex animate-[wRise_.5s_var(--ease-standard)_both] flex-wrap items-center gap-3.5 rounded-[26px] bg-surface/[.92] p-4 shadow-[0_20px_40px_-36px_rgba(0,0,0,.4)]" style={{ animationDelay: `${i * 70}ms` }}>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="text-[17px]">{s.title}</span>
                 <span className="text-[13px] text-ink-2">
@@ -36,7 +36,7 @@ export function SampleStep({ busy, error, onRun, onOwn }: { busy: string | null;
                 </span>
                 {s.credit ? <span className="text-[12px] text-ink-2">{s.credit}</span> : null}
               </span>
-              <button type="button" disabled={busy !== null} onClick={() => onRun(s.id)} className="min-h-11 rounded-pill bg-selected px-5 text-[15px] text-inverse">
+              <button type="button" disabled={busy !== null} aria-busy={busy === s.id || undefined} onClick={() => onRun(s.id)} className={`min-h-11 rounded-pill bg-selected px-5 text-[15px] text-inverse hover:bg-[#2a2a2a] disabled:opacity-55 ${press}`}>
                 {busy === s.id ? 'Starting…' : 'Run'}
               </button>
             </li>
@@ -44,7 +44,7 @@ export function SampleStep({ busy, error, onRun, onOwn }: { busy: string | null;
         </ul>
       ) : null}
       {error ? (
-        <p role="alert" className="m-0 rounded-[20px] bg-surface/80 px-[18px] py-3.5 text-[15px]">
+        <p role="alert" className="m-0 animate-[wRise_.4s_var(--ease-standard)_both] rounded-[20px] bg-surface/80 px-[18px] py-3.5 text-[15px]">
           {error}
         </p>
       ) : null}

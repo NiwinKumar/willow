@@ -111,7 +111,7 @@ export function InsightsCard({ session, measured, actions, place }: { session: S
       {(long && !busy) || hasActions ? (
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
         {long && !busy ? (
-          <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="min-h-9 text-[13px] underline underline-offset-4">
+          <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="min-h-9 text-[13px] underline underline-offset-4 transition-[scale] duration-200 ease-standard active:scale-[.97]">
             {more ? 'Show less' : 'Read more'}
           </button>
         ) : (

@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 
+import { RollingNumber } from '../../components/willow/RollingNumber'
 import type { CaptureMode } from '../../data/types'
 import { type FileRow, formatBytes, totalLine, usable } from './files'
-import { MonoEyebrow, Notice, SerifTitle } from './parts'
+import { MonoEyebrow, Notice, press, pressIcon, SerifTitle } from './parts'
 import type { Upload } from './useUpload'
 
 const STATUS: Record<FileRow['state'], { text: string; glyph: string; color: string; bar: string }> = {
@@ -83,7 +84,7 @@ export function FilesStep({
           </div>
         </div>
         <span className="font-dot text-[52px] leading-none" aria-label={`${ok.length} of ${n} usable photos selected`}>
-          {ok.length}/{n}
+          <RollingNumber value={ok.length} duration={450} format={(v) => String(Math.round(v))} />/{n}
         </span>
       </div>
 
@@ -99,7 +100,7 @@ export function FilesStep({
       ) : null}
 
       {canPick ? (
-        <label className="relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-2 rounded-[32px] border-[1.5px] border-dashed border-ink/25 bg-surface/60 p-5 text-center transition-[background] hover:bg-surface/95">
+        <label className="group relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-2 rounded-[32px] border-[1.5px] border-dashed border-ink/25 bg-surface/60 p-5 text-center transition-[background-color,scale] duration-200 ease-standard hover:bg-surface/95 active:scale-[.985] active:duration-100">
           <input
             type="file"
             multiple
@@ -112,7 +113,7 @@ export function FilesStep({
             className="absolute inset-0 cursor-pointer opacity-0"
           />
           <span aria-hidden className="grid size-[46px] place-items-center rounded-full bg-selected text-[22px] text-inverse">
-            +
+            <span className="inline-block transition-[rotate] duration-300 ease-standard group-hover:rotate-90">+</span>
           </span>
           <span className="text-[19px]">{rows.length ? 'Choose more photos' : 'Choose photos'}</span>
           <span className="text-[14px] text-ink-2">{raw ? 'Pick the DNG originals you exported to Files.' : 'From your photo library or Files.'} To pick several in Files: Browse, then the … menu, then Select.</span>
@@ -122,7 +123,7 @@ export function FilesStep({
       {offline ? (
         <Notice tone="ink" role="alert" className="flex flex-wrap items-center justify-between gap-2.5">
           <span>You’re offline. Finished uploads are kept; the rest will continue when you reconnect.</span>
-          <button type="button" onClick={upload.retryNow} className="min-h-[42px] rounded-pill bg-white px-4 text-ink">
+          <button type="button" onClick={upload.retryNow} className={`min-h-[42px] rounded-pill bg-white px-4 text-ink ${press}`}>
             Retry now
           </button>
         </Notice>
@@ -146,7 +147,7 @@ export function FilesStep({
       {held ? (
         <Notice tone="yellow" role="alert" className="flex flex-wrap items-center justify-between gap-2.5">
           <span>Willow has seen {dups === 1 ? 'this photo' : 'these photos'} before. The same photo twice would hide real change; replace {dups === 1 ? 'it with a new one' : 'them with new ones'}, or measure anyway.</span>
-          <button type="button" onClick={upload.proceed} className="min-h-[42px] rounded-pill border border-ink/15 bg-white px-4 text-ink">
+          <button type="button" onClick={upload.proceed} className={`min-h-[42px] rounded-pill border border-ink/15 bg-white px-4 text-ink hover:bg-ink/[.03] ${press}`}>
             Measure anyway
           </button>
         </Notice>
@@ -160,14 +161,15 @@ export function FilesStep({
             {locked && !busy ? <span>Remove or replace any photo until measuring starts</span> : null}
           </div>
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-            {rows.map((r) => {
+            {rows.map((r, i) => {
               const bad = Boolean(r.problem)
               const st = STATUS[r.state]
               const pct = bad ? 0 : Math.round(r.progress * 100)
               const dup = !bad && r.duplicate ? dupLabel(r.duplicate) : null
               const looksSoft = !bad && !dup && soft.has(r.id)
               return (
-                <li key={r.id} className="flex animate-rise items-center gap-3.5 rounded-[26px] bg-surface/[.92] p-3 shadow-[0_20px_40px_-36px_rgba(0,0,0,.4)]">
+                // rows arrive in order (a batch picked together lands 70 ms apart, capped so ten don't take a second)
+                <li key={r.id} className="flex animate-rise items-center gap-3.5 rounded-[26px] bg-surface/[.92] p-3 shadow-[0_20px_40px_-36px_rgba(0,0,0,.4)]" style={{ animationDelay: `${Math.min(i, 6) * 70}ms` }}>
                   {r.thumb ? (
                     <img src={r.thumb} alt="" className="h-[76px] w-[60px] flex-none rounded-[16px] object-cover" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
                   ) : (
@@ -185,14 +187,15 @@ export function FilesStep({
                     <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${r.file.name} upload progress`} className="h-1.5 overflow-hidden rounded-[6px] bg-[#E4E3DE]">
                       <div className="h-full rounded-[6px] transition-[width] duration-300 ease-linear" style={{ width: `${pct}%`, background: st.bar }} />
                     </div>
-                    <span className="text-[13px]" style={{ color: bad || dup ? 'var(--state-avoid-fg)' : st.color }}>
+                    {/* the status line cross-fades as the upload moves on */}
+                    <span key={`${r.state}${bad}${dup}`} className="animate-[wWord_.4s_both] text-[13px]" style={{ color: bad || dup ? 'var(--state-avoid-fg)' : st.color }}>
                       {bad ? `! ${r.problem}` : dup ? `! ${dup}` : `${st.glyph} ${r.state === 'failed' && r.error ? r.error : st.text}`}
                     </span>
-                    {looksSoft ? <span className="self-start rounded-pill bg-cta px-2.5 py-1 text-[12px] text-ink">Looks soft · consider retaking</span> : null}
+                    {looksSoft ? <span className="animate-[wRise_.4s_var(--ease-standard)_both] self-start rounded-pill bg-cta px-2.5 py-1 text-[12px] text-ink">Looks soft · consider retaking</span> : null}
                   </div>
                   <div className="flex flex-none gap-1.5">
                     {r.state === 'failed' && !busy ? (
-                      <button type="button" onClick={() => void upload.run()} className="min-h-11 rounded-pill bg-selected px-3.5 text-[13px] text-inverse">
+                      <button type="button" onClick={() => void upload.run()} className={`min-h-11 rounded-pill bg-selected px-3.5 text-[13px] text-inverse hover:bg-[#2a2a2a] ${press}`}>
                         Retry
                       </button>
                     ) : null}
@@ -203,13 +206,13 @@ export function FilesStep({
                           setReplacing(r.id)
                           replaceInput.current?.click()
                         }}
-                        className="min-h-11 rounded-pill border border-ink/15 bg-white px-3.5 text-[13px]"
+                        className={`min-h-11 rounded-pill border border-ink/15 bg-white px-3.5 text-[13px] hover:bg-ink/[.03] ${press}`}
                       >
                         Replace
                       </button>
                     ) : null}
                     {!busy ? (
-                      <button type="button" onClick={() => onRemove(r.id)} disabled={busy} aria-label={`Remove ${r.file.name}`} className="grid size-11 place-items-center rounded-full border border-ink/12 bg-white">
+                      <button type="button" onClick={() => onRemove(r.id)} disabled={busy} aria-label={`Remove ${r.file.name}`} className={`grid size-11 place-items-center rounded-full border border-ink/12 bg-white hover:bg-[rgba(255,107,74,.12)] ${pressIcon}`}>
                         ✕
                       </button>
                     ) : null}
@@ -240,7 +243,7 @@ export function FilesStep({
       {fatal ? (
         <Notice tone="quiet" role="alert" className="flex flex-wrap items-center justify-between gap-2.5">
           <span>Upload stopped: {fatal}</span>
-          <button type="button" disabled={busy} onClick={() => void upload.run()} className="min-h-11 rounded-pill bg-selected px-4 text-[13px] text-inverse">
+          <button type="button" disabled={busy} onClick={() => void upload.run()} className={`min-h-11 rounded-pill bg-selected px-4 text-[13px] text-inverse hover:bg-[#2a2a2a] disabled:opacity-55 ${press}`}>
             Try again
           </button>
         </Notice>
@@ -250,12 +253,15 @@ export function FilesStep({
         type="button"
         onClick={() => void upload.run()}
         disabled={busy || allUp || ok.length === 0}
-        className={`min-h-[60px] rounded-[24px] text-[17px] transition-[background] duration-300 ${allUp ? 'bg-lime text-ink' : 'bg-selected text-inverse'}`}
+        className={`min-h-[60px] rounded-[24px] text-[17px] transition-[background-color,scale,opacity] duration-300 ease-standard active:scale-[.97] active:duration-100 disabled:active:scale-100 ${allUp ? 'bg-lime text-ink' : 'bg-selected text-inverse hover:bg-[#2a2a2a] disabled:opacity-55'}`}
       >
-        {cta}
+        {/* the label changes as the upload moves on: it cross-fades instead of swapping */}
+        <span key={cta} className="inline-block animate-[wWord_.4s_both]">
+          {cta}
+        </span>
       </button>
       {locked && !busy && !allUp && !topup ? (
-        <button type="button" onClick={onStartOver} className="min-h-11 self-center text-[14px] text-ink-2 underline underline-offset-4">
+        <button type="button" onClick={onStartOver} className="min-h-11 animate-[wRise_.4s_var(--ease-standard)_both] self-center text-[14px] text-ink-2 underline underline-offset-4 transition-[color,scale] duration-200 ease-standard hover:text-ink active:scale-[.97] active:duration-100">
           {camera ? 'Start over with new photos' : 'Start over with different files'}
         </button>
       ) : null}

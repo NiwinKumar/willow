@@ -122,7 +122,7 @@ export function ReminderRows() {
       <div className="flex flex-col gap-2 border-t border-ink/[.07] py-2.5">
         <Toggle label="Notifications on this device" checked={Boolean(on)} disabled={!canToggle} onChange={(v) => void onPush(v)} description={pushNote} />
         {on && pushReady ? (
-          <button type="button" onClick={() => void sendTest()} disabled={busy !== null} aria-busy={busy === 'test' || undefined} className={`${outline} mb-1.5 self-start`}>
+          <button type="button" onClick={() => void sendTest()} disabled={busy !== null} aria-busy={busy === 'test' || undefined} className={`${outline} mb-1.5 animate-[wRise_.35s_var(--ease-standard)_both] self-start`}>
             {busy === 'test' ? 'Sending…' : 'Send a test notification'}
           </button>
         ) : null}

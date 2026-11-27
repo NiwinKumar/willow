@@ -44,8 +44,10 @@ export function StoryCard({ session, metricId }: { session: Session; metricId: s
       ) : story ? (
         <>
           <ul className="m-0 flex flex-col gap-2 pl-5 text-[15px] leading-[1.5]">
-            {story.points.map((p) => (
-              <li key={p}>{p}</li>
+            {story.points.map((p, i) => (
+              <li key={p} style={{ animation: `wRise .5s ${i * 70}ms both` }}>
+                {p}
+              </li>
             ))}
           </ul>
           {story.reasons.length ? (
