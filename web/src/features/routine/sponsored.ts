@@ -23,3 +23,14 @@ export function whyLines(item: Pick<SponsoredItem, 'matched' | 'disclosure'>, go
 export function showSponsored(item: Pick<SponsoredItem, 'product_id'> | null | undefined, opts: { demo: boolean; inRoutine: ReadonlySet<string> }): boolean {
   return Boolean(item) && !opts.demo && !opts.inRoutine.has(item!.product_id)
 }
+
+/**
+ * The one-line why under "Sponsored": what it is measured to work for, for whom, and that payment never
+ * changes anything else. Built only from the matched profile; goals and skin type fall away when absent.
+ */
+export function sponsoredWhy(item: Pick<SponsoredItem, 'matched'>, goalLabel: (id: string) => string): string {
+  const goals = item.matched.goals.map((g) => goalLabel(g).toLowerCase())
+  const goal = goals.length ? goals.join(' and ') : 'goals like yours'
+  const skin = item.matched.skin_type ? ` on ${(SKIN_LABEL[item.matched.skin_type] ?? item.matched.skin_type).toLowerCase()} skin` : ''
+  return `Shown because it's measured to work for ${goal}${skin}; payment never changes your other suggestions.`
+}

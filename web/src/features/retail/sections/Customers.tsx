@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { useRetailData } from '../context'
-import { useRetailState } from '../state'
+import { purposeOf, useRetailState } from '../state'
 import type { Insights, Products, ProductRow, Segments } from '../types'
 import { Bone, ErrorState, int, MIN_GROUP, PageHeader, pct, SkeletonPanel } from '../ui'
 import { topUnmet } from '../ui/insight'
@@ -69,7 +69,7 @@ function Page({ d }: { d: Insights }) {
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Customers" description={<Finding s={s} d={d} mine={mine} products={products} />} />
+      <PageHeader title="Customers" description={<Finding s={s} d={d} mine={mine} products={products} />} purpose={purposeOf('customers')} />
       <section id="unmet" aria-label="Skin type by goal">
         {seg.status === 'loading' ? (
           <div role="status" aria-label="Loading skin types" aria-busy="true">

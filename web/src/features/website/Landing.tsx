@@ -121,7 +121,7 @@ function Hero({ grow }: { grow: boolean }) {
           <WayIn delay={150} to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
           <WayIn delay={260} to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
           <WayIn delay={370} onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
-          <WayIn delay={480} to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
+          <WayIn delay={480} to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Proof by Willow" tag="live app" sub="For brands: which products measurably work, for whom" />
         </nav>
       </div>
     </section>
@@ -196,7 +196,7 @@ function Try() {
         <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Her eight weeks, narrated, with the app in between" />
         <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
         <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
-        <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
+        <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Proof by Willow" tag="live app" sub="For brands: which products measurably work, for whom" />
       </nav>
     </section>
   )

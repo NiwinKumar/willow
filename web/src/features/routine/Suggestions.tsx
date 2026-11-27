@@ -7,6 +7,8 @@ import { METRIC_META, fmtSigned, unitOf } from '../../lib/metrics'
 import { ProductImage } from './productUi'
 import { compactName, imageOf, type Finding } from './routineModel'
 import { suggestionsOf } from './suggestedToday'
+import { useChecks } from '../../lib/safety'
+import { ProductChecked } from './checked'
 
 /**
  * "Suggested today" as a row of small tiles, built only from what the api answered: tonight's alternating pair
@@ -26,6 +28,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const { tonight, gaps, changes } = suggestionsOf(findings, entries, sessions, usedLastNight)
+  const checks = useChecks(changes.map((c) => c.e.product_id).filter((x): x is string => Boolean(x)))
   if (gaps.length + changes.length === 0 && !tonight) return null
 
   const alternate = async (on: RoutineEntry, off: RoutineEntry) => {
@@ -99,6 +102,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
               <span className={title} title={`It moved beyond your normal range since you started it on ${fmtDate(e.started_at)}. Timing is an association, not proof.`}>
                 {METRIC_META[o.metric].label} changed after you started {compactName(e)}.
               </span>
+              {e.product_id ? <ProductChecked check={checks.checks[e.product_id]} /> : null}
             </div>
             <button type="button" onClick={() => navigate(`/result/${latest.id}`)} className={`${act} shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5`}>
               See reading

@@ -30,7 +30,7 @@ export function HomeCard({ label, className = '', delay = 0, children }: { label
 /** Rows What changed lists before folding the rest into one line. */
 const ROWS = 3
 
-/** What changed: the latest measured face check-in against the baseline, changed measures first, with how far each moved. */
+/** What changed: the latest measured check-in (of the place Home reads) against the baseline, changed measures first, with how far each moved. */
 export function ChangedCard({ session, baseline, goals, series = [], onOpen, onFull, onAsk, className, rows: count = ROWS }: { session: Session; baseline: Session | null; goals: string[]; /** The face check-ins, for each row's trend. */ series?: Session[]; onOpen: (metricId: string) => void; onFull: () => void; onAsk?: () => void; className?: string; rows?: number }) {
   const trendOf = (id: string) =>
     series

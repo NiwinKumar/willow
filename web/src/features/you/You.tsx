@@ -25,6 +25,7 @@ import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
 import { ReminderRows } from './Reminders'
+import { SafetyRows } from './SafetyRows'
 import { Group, Row, ToggleRow } from './settings'
 import { chip, outline } from './settingsClasses'
 
@@ -44,6 +45,11 @@ export default function You() {
       <Group id="tracking" title="What Willow tracks">
         <GoalsRows demo={demo} />
       </Group>
+      {demo ? null : (
+        <Group id="checks" title="Product checks">
+          <SafetyRows />
+        </Group>
+      )}
       {demo ? null : (
         <Group id="checkins" title="Check-ins">
           <CheckinRows />

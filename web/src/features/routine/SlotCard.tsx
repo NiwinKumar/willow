@@ -1,4 +1,4 @@
-import { Plus, X } from 'lucide-react'
+import { MoreHorizontal, Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -13,6 +13,8 @@ import { RollingNumber } from '../../components/willow/RollingNumber'
 import { ProductImage } from './productUi'
 import { compactName, entryName, imageOf, metaLine } from './routineModel'
 import { dayNote, restsOn, scheduleWords } from './schedule'
+import { verdictDue, type EvidenceClock } from './actives'
+import { ProductChecked, type ChecksMap } from './checked'
 
 const THEME = {
   am: { name: 'Morning', when: 'this morning', bg: 'radial-gradient(90% 55% at 50% 0%, #FFF6D6 0%, var(--bg-surface) 70%)', fg: 'text-ink', card: 'rgba(255,255,255,.78)', track: 'var(--bg-sunken)', chip: 'var(--bg-canvas)', line: 'rgba(18,18,18,.18)', ring: 'rgba(18,18,18,.5)', dark: false },
@@ -27,7 +29,7 @@ type Slot = keyof typeof THEME
  * and only what changes how you use it today (a schedule note, or a ◆ when your readings moved after you
  * started it). Everything else about a product lives in its sheet.
  */
-export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAdd }: { slot: Slot; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onAdd: () => void }) {
+export function SlotCard({ slot, entries, ticked, sessions, clock = null, checks = {}, onOpen, onStop, onMore, onAdd }: { slot: Slot; entries: RoutineEntry[]; ticked: (id: string) => boolean; sessions: Session[]; clock?: EvidenceClock | null; checks?: ChecksMap; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; /** The row's ⋯: test it, log a reaction, details. */ onMore?: (e: RoutineEntry) => void; onAdd: () => void }) {
   const t = THEME[slot]
   const setUse = useSetRoutineUse()
   const today = localDay()
@@ -66,14 +68,14 @@ export function SlotCard({ slot, entries, ticked, sessions, onOpen, onStop, onAd
         </button>
       ) : null}
       {entries.map((e, i) => (
-        <Row key={e.id} e={e} i={i} slot={slot} on={ticked(e.id)} today={today} sessions={sessions} onOpen={onOpen} onStop={onStop} onToggle={toggle} />
+        <Row key={e.id} e={e} i={i} slot={slot} on={ticked(e.id)} today={today} sessions={sessions} clock={clock} check={e.product_id ? checks[e.product_id] : undefined} onOpen={onOpen} onStop={onStop} onMore={onMore} onToggle={toggle} />
       ))}
     </section>
   )
 }
 
 /** One product of the slot. The photo is the tick: a tick the person makes sends one ring out, the same ring as the orbs on Home. */
-function Row({ e, i, slot, on, today, sessions, onOpen, onStop, onToggle }: { e: RoutineEntry; i: number; slot: Slot; on: boolean; today: string; sessions: Session[]; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onToggle: (e: RoutineEntry, on: boolean) => Promise<void> }) {
+function Row({ e, i, slot, on, today, sessions, clock, check, onOpen, onStop, onMore, onToggle }: { e: RoutineEntry; i: number; slot: Slot; on: boolean; today: string; sessions: Session[]; clock: EvidenceClock | null; check: Parameters<typeof ProductChecked>[0]['check']; onOpen: (e: RoutineEntry) => void; onStop: (e: RoutineEntry) => void; onMore?: (e: RoutineEntry) => void; onToggle: (e: RoutineEntry, on: boolean) => Promise<void> }) {
   const t = THEME[slot]
   // Only a tick just made ripples (not on load, not when unticking).
   const [ripple, setRipple] = useState(0)
@@ -88,6 +90,9 @@ function Row({ e, i, slot, on, today, sessions, onOpen, onStop, onToggle }: { e:
   const short = compactName(e)
   const rest = restsOn(e, today)
   const note = starts ? `FROM ${fmtDate(e.started_at).toUpperCase()}` : dayNote(e, slot, today)
+  // Evidence clock: only products with a clocked active (basics never get a verdict date).
+  const due = verdictDue(e, clock)
+  const dueDay = due ? localDay(due.due) : null
   return (
     <div className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .5s ${i * 70}ms both` }}>
       <button
@@ -129,7 +134,29 @@ function Row({ e, i, slot, on, today, sessions, onOpen, onStop, onToggle }: { e:
             </span>
           ) : null}
         </span>
+        {check || dueDay ? (
+          <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] leading-[1.3]">
+            {/* on the evening panel the chip's translucent colours sit on white, so they read the same as in the morning */}
+            {check ? <span className={`inline-flex rounded-pill ${t.dark ? 'bg-white' : ''}`}><ProductChecked check={check} /></span> : null}
+            {dueDay ? (
+              <span className="opacity-75" title={`A ${due!.weeks}-week window for ${due!.active.toLowerCase()}, from the start date.`}>
+                {dueDay <= today ? 'Verdict window passed' : `Verdict due ${fmtDate(dueDay)}`}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
+      {onMore ? (
+        <button
+          type="button"
+          onClick={() => onMore(e)}
+          aria-label={`More for ${name}: test it, log a reaction`}
+          title="Test it, log a reaction"
+          className="hit44 grid size-9 shrink-0 place-items-center rounded-full opacity-60 transition-[opacity,background-color,scale] duration-200 ease-standard hover:bg-[rgba(128,128,128,.18)] hover:opacity-100 focus-visible:opacity-100 active:scale-[.92]"
+        >
+          <MoreHorizontal size={16} strokeWidth={1.8} aria-hidden />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => onStop(e)}

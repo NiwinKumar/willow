@@ -7,7 +7,7 @@ import { useRetailData } from '../context'
 import { csvMeta } from '../data'
 import { useProductDetails, useProducts, type Load } from '../productData'
 import { hintOf, leaderOf, MAX_COMPARE, noDataReason, parseIds, segInterval } from '../productModel'
-import { sectionPath, useRetailState } from '../state'
+import { purposeOf, sectionPath, useRetailState } from '../state'
 import type { Insights, ProductDetail as Detail, ProductRow, Seg } from '../types'
 import { Bone, Combobox, CurveChart, downloadCsv, EmptyState, int, interval, LiftValue, PageHeader, Panel, pct, ProofTierChip, pts, Suppressed, ToolButton, useTooltip, weeks, type CsvValue } from '../ui'
 import { HeadTip, RateInterval } from './productParts'
@@ -101,7 +101,7 @@ function Body({ d }: { d: Insights }) {
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-3">
           {back}
-          <PageHeader title="Compare" description="Pick two or three products to see their outcomes side by side." />
+          <PageHeader title="Compare" description="Pick two or three products to see their outcomes side by side." purpose={purposeOf('compare')} />
         </div>
         <EmptyState title={ids.length ? 'Add one more product' : 'Pick two or three products'} body="Tick rows on Products, or search the catalog here." secondary={{ label: 'Go to Products', to: backHref }}>
           <div className="mt-1">{picker}</div>
@@ -216,7 +216,7 @@ function Body({ d }: { d: Insights }) {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         {back}
-        <PageHeader title="Compare" description={answer} />
+        <PageHeader title="Compare" description={answer} purpose={purposeOf('compare')} />
       </div>
 
       <div className="flex flex-col gap-4">

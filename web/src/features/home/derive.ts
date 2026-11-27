@@ -3,14 +3,16 @@
  * range, back after a gap, active), what today's check-in is doing, and the sentences built from verdicts.
  * Pure functions over api data; every number and name comes from a session or a routine entry.
  */
-import type { Metric, MetricId, RoutineEntry, Session } from '../../data/types'
-import { baselineFor, inFlight, isUnmeasured, stalled } from '../../data/live'
-import { localDay } from '../../lib/api'
-import { parseDate } from '../../lib/format'
-import { byGoalOrder, METRIC_META, SITE_LABEL } from '../../lib/metrics'
-import { CHANGE_WORDS, changeWay, verdictKind, type VerdictKind } from '../../lib/verdict'
+import type { Metric, MetricId, RoutineEntry, Session, Site } from '../../data/types'
+import { baselineFor, inFlight, isUnmeasured, stalled } from '../../data/live.ts'
+import { parseDate } from '../../lib/format.ts'
+import { byGoalOrder, METRIC_META, SITE_LABEL } from '../../lib/metrics.ts'
+import { CHANGE_WORDS, changeWay, verdictKind, type VerdictKind } from '../../lib/verdict.ts'
 
-/** Back after this many days without a face check-in when no check-in schedule is set (lib/schedule gapDaysFor). */
+/** lib/api localDay (YYYY-MM-DD, local time), repeated so `npm test` can load this file (lib/api reads import.meta.env). */
+const localDay = (d: Date = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/** Back after this many days without a check-in when no check-in schedule is set (lib/schedule gapDaysFor). */
 export const GAP_DAYS = 14
 /** A baseline needs this many usable photos for a normal range (api baselines.NOISE_BAND_FRAMES). */
 export const BAND_FRAMES = 3
@@ -35,39 +37,62 @@ export function daysSince(iso: string, to: Date = new Date()): number {
 }
 
 export type PersonKind = 'new' | 'noBand' | 'gap' | 'active'
-export type TodayKind = 'none' | 'measuring' | 'stalled' | 'failed' | 'rejected' | 'unmeasured' | 'done'
+export type TodayKind = 'none' | 'measuring' | 'stalled' | 'failed' | 'rejected' | 'done'
+
+/** One place the person tracks and its sessions, oldest first. */
+export type Place = { site: Site; sessions: Session[] }
 
 export type HomeRead = {
-  face: Session[]
-  /** Latest face session whose numbers can be read (the one What changed and the hero speak about). */
+  /** The place Home speaks about: the first place (in the order given, the face first) that has a baseline. */
+  site: Site
+  /** That place's sessions, oldest first. */
+  series: Session[]
+  /** Latest session of that place whose numbers can be read (the one What changed and the hero speak about). */
   lead: Session | null
-  /** The face baseline the lead session is compared with (or the latest face baseline). */
+  /** The baseline the lead session is compared with (or that place's latest baseline). */
   baseline: Session | null
   baselineFrames: number | null
   hasBand: boolean
   person: PersonKind
-  /** Today's session Home leads with (face first), and what it is doing. */
+  /** Today's session Home leads with (a running one, else that place's), and what it is doing. */
   todaySession: Session | null
   todayKind: TodayKind
-  /** Latest face session of any status (gap rule, "last check-in"). */
-  lastFace: Session | null
+  /** Latest session of any tracked place, any status (gap rule, "last check-in"). */
+  last: Session | null
 }
 
-export function readHome(all: Session[], face: Session[], gapDays: number = GAP_DAYS): HomeRead {
-  const lead = latest(face, usable)
-  const baseline = lead ? baselineFor(lead, face) : latest(face, (s) => s.is_baseline)
+/**
+ * Pick the place Home reads: a baseline on ANY tracked place means the person has started (a cheek-only
+ * tracker is not "new"); the face leads when it has one, since its readings cover the most. `places` is in
+ * preference order (Home passes the face first, then the tracked places).
+ */
+export function pickPlace(places: Place[]): Place {
+  return (
+    places.find((p) => p.sessions.some((s) => s.is_baseline)) ??
+    places.find((p) => p.sessions.some(usable)) ??
+    places.find((p) => p.sessions.length) ??
+    places[0] ?? { site: 'face_full', sessions: [] }
+  )
+}
+
+export function readHome(all: Session[], places: Place[], gapDays: number = GAP_DAYS): HomeRead {
+  const { site, sessions: series } = pickPlace(places)
+  const lead = latest(series, usable)
+  const baseline = lead ? baselineFor(lead, series) : latest(series, (s) => s.is_baseline)
   // The lead's own baseline ref describes the baseline it was compared with (a demoted former baseline has
   // no ref of its own); the baseline's ref describes itself when it is the current one.
   const ref = baseline && lead?.baseline_ref?.session_id === baseline.id ? lead.baseline_ref : baseline?.baseline_ref
   const baselineFrames = baseline ? (ref?.frames ?? baseline.result?.frames_used ?? null) : null
   const hasBand = baseline ? (ref?.has_noise_band ?? (baselineFrames ?? 0) >= BAND_FRAMES) : false
-  const lastFace = latest(face)
+  const last = places
+    .map((p) => latest(p.sessions))
+    .reduce<Session | null>((a, b) => (b && (!a || Date.parse(b.created_at) > Date.parse(a.created_at)) ? b : a), null)
 
   const t = today()
   const todays = all.filter((s) => dayOf(s.created_at) === t)
-  // A running check-in leads, whatever the site; otherwise today's face check-in, otherwise any.
+  // A running check-in leads, whatever the site; otherwise today's check-in of the place Home reads, otherwise any.
   const running = latest(todays, (s) => inFlight(s) && !stalled(s))
-  const todaySession = running ?? latest(todays, (s) => s.site === 'face_full') ?? latest(todays)
+  const todaySession = running ?? latest(todays, (s) => s.site === site) ?? latest(todays)
   const todayKind: TodayKind = !todaySession
     ? 'none'
     : inFlight(todaySession)
@@ -76,14 +101,12 @@ export function readHome(all: Session[], face: Session[], gapDays: number = GAP_
         : 'measuring'
       : todaySession.status === 'failed'
         ? 'failed'
-        : isUnmeasured(todaySession)
-          ? 'unmeasured'
-          : todaySession.result && !todaySession.result.quality.passed
-            ? 'rejected'
-            : 'done'
+        : todaySession.result && !todaySession.result.quality.passed
+          ? 'rejected'
+          : 'done'
 
-  const person: PersonKind = !baseline ? 'new' : !hasBand ? 'noBand' : lastFace && daysSince(lastFace.created_at) >= gapDays ? 'gap' : 'active'
-  return { face, lead, baseline, baselineFrames, hasBand, person, todaySession, todayKind, lastFace }
+  const person: PersonKind = !baseline ? 'new' : !hasBand ? 'noBand' : last && daysSince(last.created_at) >= gapDays ? 'gap' : 'active'
+  return { site, series, lead, baseline, baselineFrames, hasBand, person, todaySession, todayKind, last }
 }
 
 /** Metrics in goal order (the person's goal metrics and their groups first), keeping the engine's order

@@ -22,6 +22,8 @@ import { MAX_TEST_DAYS, MIN_TEST_DAYS, VERDICT_AFTER_DAYS, planDots, testDay, us
 import { StartTest } from '../routine/StartTest'
 import { baselineFor, dayOf, metricOf, sessionState } from './model'
 import { Crumb, Page, Pills } from './parts'
+import { ShareButton } from './ShareButton'
+import { testShare } from '../../lib/share'
 
 
 /** What the test compares: skin tone (ITA°, descriptive) or redness (each arm against its own baseline). */
@@ -49,6 +51,8 @@ const isArmMetric = (v: string | null): v is ArmMetric => v === 'tone_ita' || v 
  * the difference of the two changes, against their combined uncertainty (independent errors add in quadrature).
  */
 type Kind = 'treated' | 'both_more' | 'not_attributable' | 'treated_small_gap' | 'noise' | 'no_band' | 'missing'
+/** Verdicts worth a share card: a real comparison, either way (not "no comparison" or "no range yet"). */
+const SHAREABLE: Kind[] = ['treated', 'both_more', 'not_attributable', 'noise']
 const KIND: Record<Kind, { glyph: VerdictKind; words: string }> = {
   treated: { glyph: 'changed', words: 'Moved on the product side' },
   both_more: { glyph: 'changed', words: 'Both moved, the product side more' },
@@ -330,6 +334,10 @@ export default function ProductTest() {
             <VerdictGlyph kind={early ? 'notEnough' : res ? KIND[res.kind].glyph : 'baseline'} onDark />
             {early ? `Too early · after day ${VERDICT_AFTER_DAYS}` : res ? KIND[res.kind].words : 'Baseline'}
           </span>
+          {/* A verdict after day 14 can be shared, in words only (lib/share.ts). */}
+          {test && td && !early && res && SHAREABLE.includes(res.kind) ? (
+            <ShareButton className="self-start" card={testShare(test.name, td.day, KIND[res.kind].words, metricId === 'redness' ? 'Redness' : 'Skin tone', KIND[res.kind].glyph === 'changed')} />
+          ) : null}
         </div>
       </div>
       <section aria-label="Both arms over time" className="flex flex-col gap-3.5 rounded-[44px] bg-black p-[clamp(20px,3vw,32px)] text-white squircle">

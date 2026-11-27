@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { useRetailState } from '../../state'
+import { purposeOf, useRetailState } from '../../state'
 import { Bone, PageHeader, Tabs } from '../../ui'
 import type { MarketView } from './model'
 
@@ -9,7 +9,7 @@ export function MarketFrame({ view, description, actions, children }: { view: Ma
   const { setParam } = useRetailState()
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Market" description={description ?? <Bone className="mt-1 h-4 w-[min(520px,80vw)]" />} actions={actions} />
+      <PageHeader title="Market" description={description ?? <Bone className="mt-1 h-4 w-[min(520px,80vw)]" />} actions={actions} purpose={purposeOf('market')} />
       <div className="flex flex-col gap-6">
         <Tabs
           label="Market views"

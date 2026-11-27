@@ -56,7 +56,7 @@ const CHAPTERS: { title: string; used: [string, string][]; retail: string }[] = 
     title: 'Weeks 2–3: a new routine',
     used: [
       ['Photo checks', 'A turned head isn’t compared with her front-on baseline, and Willow says so.'],
-      ['Wisp, the adviser', 'Answers “should I stop one?” from her own data, without inventing a number.'],
+      ['Wisp, the adviser', 'Answers “do these clash?” from her own data and routine, without inventing a number.'],
       ['Routine check', 'Names the retinol and BHA clash, with a one-tap fix.'],
     ],
     retail: 'A clash caught early, before she gives up on both products or sends them back.',
@@ -352,7 +352,7 @@ function Intro({ face, count, closeUps }: { face: Session; count: number; closeU
       <div className="flex flex-col gap-4">
         <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h1>
         <p className="m-0 max-w-[520px] text-[clamp(16px,1.4vw,19px)] leading-[1.5] text-pretty">
-          Mei is 26, lives in Singapore and has acne along her cheeks, jaw and chin. She checks in with Willow every Sunday evening: {count} face check-ins and {closeUps} cheek close-ups over eight weeks, while she changes her routine.
+          Mei is 26, lives in Singapore and has blemish-prone skin, with breakouts along her cheeks, jaw and chin around her cycle. She checks in with Willow every Sunday evening: {count} face check-ins and {closeUps} cheek close-ups over eight weeks, while she changes her routine.
         </p>
         <p className="m-0 max-w-[520px] text-[14px] leading-[1.5] text-ink-2">
           Mei is simulated: her photos are generated and show no real person. Every number in this story was measured from them by Willow’s live engine and explained by Gemini, exactly as for anyone. Her eight weeks play in five chapters, by themselves; tap or use the arrow keys to move faster.
@@ -578,14 +578,14 @@ function End({ first, latest, onApp, onBrand, onProof, onOwn }: { first: Week; l
             Open Mei’s account
           </button>
           <button type="button" onClick={onProof} className="min-h-12 rounded-pill bg-white px-6 text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]">
-            Open Willow Proof
+            Open Proof by Willow
           </button>
           <button type="button" onClick={onOwn} className="min-h-12 rounded-pill bg-white px-6 text-[15px] shadow-[inset_0_0_0_1px_rgba(18,18,18,.15)]">
             Start my own baseline
           </button>
         </div>
         <button type="button" onClick={onBrand} className="self-start text-[14px] text-ink-2 underline underline-offset-4">
-          See how a brand uses Willow Proof
+          See how a brand uses Proof by Willow
         </button>
         <p className="m-0 text-[12.5px] text-ink-2">Cosmetic appearance only, not a medical assessment.</p>
       </div>

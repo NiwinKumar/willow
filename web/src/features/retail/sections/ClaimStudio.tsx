@@ -1,11 +1,16 @@
-import { Check, Copy } from 'lucide-react'
+import { BookmarkPlus, Check, CheckCircle2, Copy, Lock } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { ApiError, api } from '../../../lib/api'
 import { useAuth } from '../../../lib/useAuth'
+import { useOrg } from '../org'
+import { setClaims, useSavedClaims, withTransition } from '../orgData'
+import { canAct, claimCohortText, proofApi, proofError, type SavedClaim } from '../proofApi'
 import { ANCHOR, CHANNELS, CLAIM_TIERS, channelLabel, sourceLabel } from '../proofAi'
 import type { ClaimChannel, Claims, ClaimSource, Filters, ProductDetail } from '../types'
-import { Bone, Button, copyText, EmptyState, int, Panel, Segmented, useTooltip } from '../ui'
+import { exportBlock } from '../evidencePack'
+import { Badge, Bone, Button, copyText, EmptyState, int, Panel, Segmented, useTooltip } from '../ui'
 
 /*
  * "Claim drafts" on the product page (POST /v1/retailer/products/{id}/claims): marketing copy for one channel,
@@ -98,6 +103,11 @@ export function ClaimStudio({ x, filters, channel, onChannel, onNextSteps }: { x
               {loading ? 'Drafting…' : run?.status === 'ready' ? 'Draft again' : 'Draft claims'}
             </Button>
           </div>
+          {exportBlock(x.cohort) ? (
+            <p className="m-0 flex items-start gap-2 rounded-ctl bg-pf-bg2 px-3 py-2 text-proof-small text-ink-2">
+              <Lock size={14} strokeWidth={1.7} aria-hidden className="mt-0.5 shrink-0" /> {exportBlock(x.cohort)} You can still draft, save and approve claims to review them.
+            </p>
+          ) : null}
           <div aria-live="polite" aria-busy={loading} className="flex flex-col">
             {!run ? (
               <p className="m-0 text-proof-body text-ink-2">
@@ -120,16 +130,85 @@ export function ClaimStudio({ x, filters, channel, onChannel, onNextSteps }: { x
                 <span className="text-proof-small text-ink-2">{run.message}</span>
               </div>
             ) : (
-              <Drafts d={run.d} />
+              <Drafts d={run.d} x={x} filters={filters} />
             )}
           </div>
+          <SavedList x={x} />
         </div>
       )}
     </Panel>
   )
 }
 
-function Drafts({ d }: { d: Claims }) {
+/** The organisation's saved claims for this product: draft or approved, with export gated on the cohort. */
+function SavedList({ x }: { x: ProductDetail }) {
+  const { org, role } = useOrg()
+  const { getIdToken } = useAuth()
+  const q = useSavedClaims()
+  const [busy, setBusy] = useState<string | null>(null)
+  if (!org) return null
+  const list = (q.data ?? []).filter((c) => c.product_id === x.product.product_id)
+  const approve = async (c: SavedClaim, status: 'draft' | 'approved') => {
+    setBusy(c.id)
+    try {
+      const next = await proofApi.setClaim(await getIdToken(), org.id, c.id, status)
+      withTransition(() => setClaims(org.id, (v) => (v ?? []).map((y) => (y.id === c.id ? { ...y, ...next } : y))))
+      toast(status === 'approved' ? 'Claim approved' : 'Back to draft')
+    } catch (e) {
+      toast.error(proofError(e, 'change the claim'))
+    } finally {
+      setBusy(null)
+    }
+  }
+  const exportIt = async (c: SavedClaim) => {
+    setBusy(c.id)
+    try {
+      const r = await proofApi.exportClaim(await getIdToken(), org.id, c.id)
+      await copyText(`${r.claim.text} (n=${r.claim.n ?? '—'}${r.claim.window ? `, ${r.claim.window}` : ''}, observational)`, 'Approved claim copied with its basis')
+    } catch (e) {
+      toast.error(proofError(e, 'export the claim'))
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <section aria-labelledby="saved-claims-h" className="flex flex-col gap-2 border-t border-line pt-4">
+      <h3 id="saved-claims-h" className="m-0 flex items-center gap-2 text-proof-body font-medium text-ink">
+        Saved claims <Badge>{list.length}</Badge>
+      </h3>
+      {!list.length ? (
+        <p className="m-0 text-proof-small text-ink-2">Save a draft to keep it for {org.name}; an analyst approves it. The pipeline’s “Claims ready” step turns green with the first saved claim.</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col p-0">
+          {list.map((c) => (
+            <li key={c.id} className="flex flex-col gap-2 border-b border-line py-3 last:border-b-0 animate-[proofPage_.24s_var(--ease-standard)_both]">
+              <p className="m-0 text-proof-body text-ink [text-wrap:pretty]">{c.text}</p>
+              <span className="flex flex-wrap items-center gap-2 text-proof-label text-ink-2">
+                <Badge tone={c.status === 'approved' ? 'green' : 'gray'}>{c.status === 'approved' ? 'Approved' : 'Draft'}</Badge>
+                <span>{claimCohortText(c.cohort)}</span>
+                {c.channel ? <span>· {channelLabel(c.channel as ClaimChannel)}</span> : null}
+                {c.statements.length ? <span>· cites {c.statements.map(sourceLabel).join(', ')}</span> : null}
+                <span className="ml-auto flex items-center gap-2">
+                  {canAct(role) ? (
+                    <Button size="sm" kind={c.status === 'approved' ? 'ghost' : 'secondary'} onClick={() => void approve(c, c.status === 'approved' ? 'draft' : 'approved')} disabled={busy === c.id}>
+                      {c.status === 'approved' ? 'Back to draft' : (<><CheckCircle2 size={14} strokeWidth={1.7} aria-hidden /> Approve</>)}
+                    </Button>
+                  ) : null}
+                  <Button size="sm" onClick={() => void exportIt(c)} disabled={!c.exportable || c.status !== 'approved' || busy === c.id} title={!c.exportable ? (c.export_note ?? 'Claims from simulated data can’t be exported') : c.status !== 'approved' ? 'Approve it first' : undefined}>
+                    {c.exportable ? <Copy size={14} strokeWidth={1.6} aria-hidden /> : <Lock size={14} strokeWidth={1.6} aria-hidden />} Export
+                  </Button>
+                </span>
+              </span>
+              {!c.exportable ? <span className="text-proof-label text-ink-2">{c.export_note ?? 'Claims from simulated data can’t be exported.'}</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function Drafts({ d, x, filters }: { d: Claims; x: ProductDetail; filters: Filters }) {
   const by = new Map(d.sources.map((s) => [s.id, s]))
   return (
     <div className="flex flex-col gap-3">
@@ -140,7 +219,7 @@ function Drafts({ d }: { d: Claims }) {
       {d.drafts.length ? (
         <ol className="m-0 flex list-none flex-col p-0">
           {d.drafts.map((dr, i) => (
-            <DraftRow key={`${d.channel}-${i}`} text={dr.text} sources={dr.sources.map((id) => by.get(id) ?? { id, kind: id, text: '', n: 0, measured: true })} />
+            <DraftRow key={`${d.channel}-${i}`} text={dr.text} ids={dr.sources} channel={d.channel} x={x} filters={filters} sources={dr.sources.map((id) => by.get(id) ?? { id, kind: id, text: '', n: 0, measured: true })} />
           ))}
         </ol>
       ) : (
@@ -150,9 +229,30 @@ function Drafts({ d }: { d: Claims }) {
   )
 }
 
-function DraftRow({ text, sources }: { text: string; sources: ClaimSource[] }) {
+function DraftRow({ text, sources, ids, channel, x, filters }: { text: string; sources: ClaimSource[]; ids: string[]; channel: ClaimChannel; x: ProductDetail; filters: Filters }) {
   const [open, setOpen] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const { org, role } = useOrg()
+  const { getIdToken } = useAuth()
+  const saved = useSavedClaims()
+  const [saving, setSaving] = useState(false)
+  const isSaved = (saved.data ?? []).some((c) => c.product_id === x.product.product_id && c.text === text)
+  const blockedCopy = exportBlock(x.cohort)
+  const save = async () => {
+    if (!org) return
+    setSaving(true)
+    try {
+      // statements: only the measured statement ids it cites (self-reported sources are not evidence ids)
+      const statements = ids.filter((id) => x.evidence.some((e) => e.id === id)).slice(0, 6)
+      const c = await proofApi.saveClaim(await getIdToken(), org.id, { product_id: x.product.product_id, text, statements, cohort: filters.cohort, channel })
+      withTransition(() => setClaims(org.id, (v) => [c, ...(v ?? []).filter((y) => y.id !== c.id)]))
+      toast('Claim saved as a draft')
+    } catch (e) {
+      toast.error(proofError(e, 'save the claim'))
+    } finally {
+      setSaving(false)
+    }
+  }
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
   const id = useId()
@@ -183,8 +283,14 @@ function DraftRow({ text, sources }: { text: string; sources: ClaimSource[] }) {
           ) : null}
         </div>
       </div>
-      <span className="flex flex-col items-end">
-        <button type="button" onClick={() => void copy()} aria-label={copied ? 'Copied' : 'Copy draft'} className="hit44 inline-flex h-8 items-center gap-1.5 rounded-ctl border border-line bg-surface px-2.5 text-proof-small text-ink hover:border-line-strong hover:bg-pf-hover">
+      <span className="flex flex-col items-end gap-1.5">
+        {org ? (
+          <button type="button" onClick={() => void save()} disabled={saving || isSaved || !canAct(role)} aria-label={isSaved ? 'Saved' : 'Save this claim'} title={!canAct(role) ? 'An analyst or admin saves claims' : undefined} className="hit44 inline-flex h-8 items-center gap-1.5 rounded-ctl border border-line bg-surface px-2.5 text-proof-small text-ink hover:border-line-strong hover:bg-pf-hover disabled:opacity-60">
+            {isSaved ? <Check size={14} strokeWidth={1.8} aria-hidden className="text-proof-leaf" /> : <BookmarkPlus size={14} strokeWidth={1.6} aria-hidden />}
+            <span className="hidden sm:inline">{isSaved ? 'Saved' : saving ? 'Saving…' : 'Save'}</span>
+          </button>
+        ) : null}
+        <button type="button" onClick={() => void copy()} disabled={Boolean(blockedCopy)} title={blockedCopy ?? undefined} aria-label={copied ? 'Copied' : 'Copy draft'} className="hit44 inline-flex h-8 items-center gap-1.5 rounded-ctl border border-line bg-surface px-2.5 text-proof-small text-ink hover:border-line-strong hover:bg-pf-hover disabled:cursor-not-allowed disabled:opacity-50">
           {copied ? <Check size={14} strokeWidth={1.8} aria-hidden className="text-proof-leaf" /> : <Copy size={14} strokeWidth={1.6} aria-hidden />}
           <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
         </button>

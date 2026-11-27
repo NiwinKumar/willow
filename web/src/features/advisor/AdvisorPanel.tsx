@@ -18,7 +18,7 @@ import { verdictCounts } from '../../lib/verdict'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
-import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment } from './chatStore'
+import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
 import { useComposing, WispMark, wispState } from './Wisp'
 
@@ -321,11 +321,11 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
             </div>
           )}
           <div aria-live="polite" className={`flex flex-col gap-3 ${column}`}>
-            {chat.messages.map((m) =>
+            {chat.messages.map((m, i) =>
               m.role === 'user' ? (
                 <UserBubble key={m.id} m={m} />
               ) : m.role === 'willow' ? (
-                <Answer key={m.id} m={m} last={m === lastAnswer && m === last} busy={busy} capped={capped} actions={actions} />
+                <Answer key={m.id} m={m} last={m === lastAnswer && m === last} busy={busy} capped={capped} actions={actions} question={questionBefore(chat.messages, i)} />
               ) : m.role === 'error' ? (
                 <ErrorBubble key={m.id} m={m} busy={busy} />
               ) : m.role === 'standard' ? (
@@ -369,7 +369,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
         <Composer busy={busy} thinking={chat.phase === 'thinking'} capped={capped} />
       </div>
 
-      <ProductSheet target={product ? { product } : null} onClose={() => setProduct(null)} onAdd={onAdd} />
+      <ProductSheet target={product ? { product } : null} surface="wisp" onClose={() => setProduct(null)} onAdd={onAdd} />
     </div>
   )
 }
@@ -624,4 +624,13 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
 function EmptyWisp() {
   const composing = useComposing()
   return <WispMark size={112} state={composing ? 'listening' : 'idle'} />
+}
+
+/** The person's question an answer replies to: the nearest user message before it. */
+function questionBefore(messages: ChatMessage[], i: number): string | undefined {
+  for (let j = i - 1; j >= 0; j--) {
+    const m = messages[j]
+    if (m.role === 'user') return m.text
+  }
+  return undefined
 }
