@@ -9,7 +9,9 @@ import { GOALS } from '../../lib/metrics'
 import { invalidate, useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { ProductImage } from './productUi'
-import { SPONSORED_EYEBROW, showSponsored, whyLines } from './sponsored'
+import { SPONSORED_EYEBROW, showSponsored, sponsoredWhy, whyLines } from './sponsored'
+import { useChecks, type ProductCheck } from '../../lib/safety'
+import { ProductChecked } from './checked'
 
 const goalLabel = (id: string) => GOALS.find((g) => g.id === id)?.label ?? id
 // Impressions already sent this page session (the api also counts one per person per day).
@@ -37,6 +39,7 @@ export function SponsoredCard({ inRoutine, onView }: { inRoutine: ReadonlySet<st
   const viewed = useRef<string | null>(null)
   const ref = useRef<HTMLElement>(null)
   const visible = !hidden && showSponsored(item, { demo: !uid, inRoutine })
+  const checks = useChecks(item && visible ? [item.product_id] : [])
 
   const send = (it: SponsoredItem, kind: SponsoredEventKind) => {
     void getIdToken()
@@ -120,7 +123,7 @@ export function SponsoredCard({ inRoutine, onView }: { inRoutine: ReadonlySet<st
   const lines = whyLines(item, goalLabel)
 
   return (
-    <SponsoredCardView ref={ref} item={item} onWhy={() => setWhy(true)} onView={view} onHide={() => void hide()}>
+    <SponsoredCardView ref={ref} item={item} why={sponsoredWhy(item, goalLabel)} check={checks.checks[item.product_id]} onWhy={() => setWhy(true)} onView={view} onHide={() => void hide()}>
       <Sheet open={why} onClose={() => setWhy(false)} title="Why am I seeing this?" variant="modal" size="sm">
         <div className="flex flex-col gap-3 text-[15px] leading-[1.5]">
           <WhySeeing brand={item.brand} lines={lines} />
@@ -143,8 +146,12 @@ export function SponsoredCard({ inRoutine, onView }: { inRoutine: ReadonlySet<st
  * Proof's Promote screen renders the same component as its campaign preview, so the two never drift apart.
  * `children` sits inside the card's section (Routine's "Why am I seeing this?" sheet).
  */
-export function SponsoredCardView({ item, onWhy, onView, onHide, ref, headingId = 'sponsored-h', children }: {
+export function SponsoredCardView({ item, why, check, onWhy, onView, onHide, ref, headingId = 'sponsored-h', children }: {
   item: Pick<SponsoredItem, 'product' | 'brand' | 'image_url' | 'category' | 'evidence' | 'cohort_label'>
+  /** The one-line why under the disclosure (sponsoredWhy). */
+  why?: string
+  /** This person's check of the product (live card only). */
+  check?: ProductCheck
   onWhy: () => void
   onView: () => void
   onHide: () => void
@@ -164,6 +171,7 @@ export function SponsoredCardView({ item, onWhy, onView, onHide, ref, headingId 
           Why am I seeing this?
         </button>
       </div>
+      {why ? <p className="-mt-1.5 m-0 text-[12.5px] leading-[1.45] text-ink-2">{why}</p> : null}
       <div className="flex items-start gap-4">
         <ProductImage product={{ image_url: item.image_url, category: item.category, name: item.product }} size={64} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -171,6 +179,7 @@ export function SponsoredCardView({ item, onWhy, onView, onHide, ref, headingId 
           <span className="text-[17px] leading-[1.25] text-pretty">{item.product}</span>
           {item.evidence ? <span className="text-[13px] leading-[1.45] text-pretty text-ink-2">{item.evidence}</span> : null}
           <span className="mt-1 self-start rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.04em] text-[var(--synthetic-fg)]">{item.cohort_label}</span>
+          {check ? <ProductChecked check={check} /> : null}
         </div>
       </div>
       <div className="flex flex-wrap gap-2">

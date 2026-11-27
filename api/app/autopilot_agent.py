@@ -45,9 +45,9 @@ PER_CALL_S = 25.0
 MIN_ROUND_S = 3.0  # less than this left: no new round
 DAYS = (7, 14, 30)
 
-INSTRUCTIONS = """You are AutoCampaign, the campaign agent inside Willow Proof, a retail analytics
-product for skincare. A brand or retailer wrote one standing RULE. Run its check now: look at the
-evidence with the read tools, decide, act with the act tools, then call finish.
+INSTRUCTIONS = """You are AutoCampaign, the campaign agent inside Proof by Willow, a retail
+analytics product for skincare. A brand or retailer wrote one standing RULE. Run its check now:
+look at the evidence with the read tools, decide, act with the act tools, then call finish.
 
 How to work:
 - Start with get_rule, list_products and list_campaigns; use get_demand or get_underserved when the
@@ -245,7 +245,8 @@ class Episode:
     # -- state --------------------------------------------------------------------------------
 
     def _mine(self) -> list[tuple[str, Doc]]:
-        return self.store.campaigns_of(self.uid)
+        # sample campaigns (simulated, app/dev_seed.py) are never the agent's to read or act on
+        return [(c, d) for c, d in self.store.campaigns_of(self.uid) if not campaigns.is_sample(d)]
 
     def _rule_campaigns(self) -> list[tuple[str, Doc]]:
         return [(c, d) for c, d in self._mine() if d.get("rule_id") == self.rid]
@@ -524,6 +525,8 @@ class Episode:
                 return {"ok": False, "error": "Its product is not rated Proven, so it can't run."}
             if campaigns.active_count(self.store, self.uid) >= campaigns.MAX_ACTIVE:
                 return {"ok": False, "error": "3 campaigns are already running."}
+            if campaigns.live_on(self.store, self.uid, d["product_id"], exclude=campaign_id):
+                return {"ok": False, "error": campaigns.already_running().detail["message"]}
         if action == "extend":
             if change.get("days") not in DAYS:
                 return {"ok": False, "error": "Extend by 7, 14 or 30 days."}

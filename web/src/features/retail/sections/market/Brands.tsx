@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { retailerBrand } from '../../../../lib/api'
 import { useRetailData } from '../../context'
 import { csvMeta, csvName } from '../../data'
+import { useCompetitorNames } from '../../orgData'
 import { useRetailState } from '../../state'
 import type { BrandDetail, BrandSummary, Insights } from '../../types'
 import { Button, DataTable, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, Panel, pct, PositioningChart, ShareBar, SidePanel, slugOf, Stat, Suppressed, type Column } from '../../ui'
@@ -53,8 +54,8 @@ export function BrandsView({ d }: { d: Insights }) {
 function UnknownBrand({ slug }: { slug: string }) {
   const { setWorkspace } = useRetailState()
   return (
-    <MarketFrame view="brands" description="This workspace doesn’t match a catalogue brand.">
-      <EmptyState title="No brand by that name" body={`“${slug}” isn’t one of the catalogue brands in this filter.`} action={{ label: 'View as retailer', onClick: () => setWorkspace({ kind: 'retailer' }) }} />
+    <MarketFrame view="brands" description="This workspace doesn’t match a catalog brand.">
+      <EmptyState title="No brand by that name" body={`“${slug}” isn’t one of the catalog brands in this filter.`} action={{ label: 'View as retailer', onClick: () => setWorkspace({ kind: 'retailer' }) }} />
     </MarketFrame>
   )
 }
@@ -230,10 +231,27 @@ function BrandWorkspace({ brand, brands, d }: { brand: string; brands: BrandSumm
         <ErrorState title={`${brand} couldn’t load`} body="The brand’s aggregates didn’t answer. No partial numbers are shown." onRetry={detail.retry} />
       </MarketFrame>
     )
-  return <BrandBody b={detail.data} brands={brands} d={d} />
+  return <Anonymised b={detail.data} brands={brands} d={d} />
 }
 
-function BrandBody({ b, brands }: { b: BrandDetail; brands: BrandSummary[]; d: Insights }) {
+/**
+ * A brand organisation sees other brands as "Brand A", "Brand B" unless the retailer's policy names them
+ * (orgData.useCompetitorNames); its own brand keeps its name. The retailer always sees names.
+ */
+function Anonymised({ b, brands, d }: { b: BrandDetail; brands: BrandSummary[]; d: Insights }) {
+  const names = useCompetitorNames()
+  if (!names.anonymise) return <BrandBody b={b} brands={brands} d={d} />
+  const n = names.name
+  const masked: BrandDetail = {
+    ...b,
+    goals: b.goals.map((g) => (g.best_competitor ? { ...g, best_competitor: { ...g.best_competitor, brand: n(g.best_competitor.brand) } } : g)),
+    switching: { ...b.switching, won: b.switching.won.map((w) => ({ ...w, brand: n(w.brand) })), lost: b.switching.lost.map((w) => ({ ...w, brand: n(w.brand) })) },
+    positioning: b.positioning.map((p) => ({ ...p, brand: p.is_self ? p.brand : n(p.brand) })),
+  }
+  return <BrandBody b={masked} brands={brands.map((x) => ({ ...x, brand: x.brand === b.brand ? x.brand : n(x.brand) }))} d={d} locked />
+}
+
+function BrandBody({ b, brands, locked = false }: { b: BrandDetail; brands: BrandSummary[]; d: Insights; locked?: boolean }) {
   const { param, setParam } = useRetailState()
   const { hash } = useLocation()
   const note = b.note ?? NOTE
@@ -291,7 +309,7 @@ function BrandBody({ b, brands }: { b: BrandDetail; brands: BrandSummary[]; d: I
           {b.goals.length === 0 ? <EmptyState compact title="No measured goal yet" body={`${b.brand} has no product for a measured goal in this filter.`} /> : <VsMarketRows rows={goalRows(b.goals)} rival youLabel="You" labelHeader="Goal" selected={param('goal')} caption={`${b.brand} against the market, by goal`} />}
         </Panel>
         <Panel title="Positioning" id="positioning-h" description="Each dot is a brand. Further up: more of its people saw a visible change. Further right: more kept using it." className="xl:col-span-5">
-          <PositioningChart caption={`${b.brand} among brands: visible change against still using at week 8`} points={points} onSelect={(id) => id !== b.brand && setParam({ brand: slugOf(id) }, { push: true })} height={360} />
+          <PositioningChart caption={`${b.brand} among brands: visible change against still using at week 8`} points={points} onSelect={(id) => !locked && id !== b.brand && setParam({ brand: slugOf(id) }, { push: true })} height={360} />
         </Panel>
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -318,7 +336,7 @@ function SharePanel({ b }: { b: BrandDetail }) {
   return (
     <Panel title="Share of category routines" id="share-h" description="Of everyone using a product in the category, the share using yours." className="h-full">
       {b.share.length === 0 ? (
-        <EmptyState compact title="No categories yet" body={`${b.brand} has no catalogue products in a category with users.`} />
+        <EmptyState compact title="No categories yet" body={`${b.brand} has no catalog products in a category with users.`} />
       ) : (
         <ul className="m-0 flex list-none flex-col p-0">
           {b.share.map((s) => (

@@ -112,7 +112,7 @@ def _starter_routine(store: Store, uid: str) -> int:
             source="catalog",
             started_at=datetime.now(UTC).date() - timedelta(days=1),
         )
-        add_routine_entry(store, uid, body, entry_id=f"r_judge{i}")
+        add_routine_entry(store, uid, body, entry_id=f"r_judge{i}", sample=True)
         added += 1
     return added
 
@@ -169,9 +169,11 @@ def journey_routine_check(store: Store = Depends(get_store)) -> dict[str, Any]:
 
 @router.get("/advisor/history")
 def journey_advisor_history(store: Store = Depends(get_store)) -> dict[str, Any]:
-    """Mei's stored Wisp chat, read-only."""
+    """Mei's stored Wisp chat, read-only. Demo questions are never stored, so it only changes when
+    the journey is seeded again; kept 5 minutes like the other journey reads (app/warm.py)."""
     uid = get_settings().demo_user_id
-    return {"messages": advisor.history(store, uid), "keep": advisor.HISTORY_KEEP}
+    messages = demo._cached(f"advisor-history:{uid}", 300, lambda: advisor.history(store, uid))
+    return {"messages": messages, "keep": advisor.HISTORY_KEEP}
 
 
 @router.post("/advisor/chat")

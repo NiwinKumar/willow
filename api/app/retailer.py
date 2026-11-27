@@ -608,7 +608,11 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     kinds = Counter(r["kind"] for r in conflict_rows)
     checked = len({r["user_hash"] for r in conflict_rows})
     sunscreens = sorted(
-        (p for p in products.values() if p["category"] == "sunscreen"),
+        (
+            p
+            for p in products.values()
+            if p["category"] == "sunscreen" and p.get("price") and catalog.is_full(p)
+        ),
         key=lambda p: p["price"]["amount"] * (83 if p["price"]["currency"] == "USD" else 1),
     )
     conflicts = (

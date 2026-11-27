@@ -1,4 +1,5 @@
 import type { Evidence, ProductDetail } from './types'
+import { cohortKind } from './ui/cohort.ts'
 
 /**
  * The claim-evidence pack of one product, built in the browser from GET /v1/retailer/products/{id}: the api's
@@ -96,4 +97,11 @@ export function packCsv(d: PackInput): { header: string[]; rows: (string | numbe
     header: ['product', 'brand', 'kind', 'statement', 'n', 'window', 'cohort', 'method'],
     rows: d.evidence.map((e) => [d.product.product, d.product.brand, KIND_LABEL[e.kind], e.text, e.n, e.window ?? '', e.cohort_label ?? '', e.method ?? '']),
   }
+}
+
+/** Why claims and packs built on this cohort can't leave Proof (null when they can: real people only). */
+export function exportBlock(cohort: ProductDetail['cohort']): string | null {
+  const kind = cohortKind(cohort)
+  if (kind === 'real') return null
+  return kind === 'simulated' ? 'Built on the simulated cohort, so it can’t be copied or exported for external use.' : 'Built on a mixed cohort (simulated and real), so it can’t be copied or exported for external use.'
 }

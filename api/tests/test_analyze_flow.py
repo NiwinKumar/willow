@@ -230,7 +230,8 @@ def test_delete_me_removes_photos_results_and_documents(client, fake):
     client.post(f"/v1/sessions/{created['session_id']}/analyze")
     res = client.delete("/v1/me")
     assert res.status_code == 204
-    assert fake.deleted_prefixes == ["uploads/u_test/", "results/u_test/"]
+    # product-request pack photos go too
+    assert fake.deleted_prefixes == ["uploads/u_test/", "results/u_test/", "requests/u_test/"]
     assert fake.store.sessions_list("u_test") == []
     assert fake.store.baseline_get("u_test", "forearm_treated") is None
 

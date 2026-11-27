@@ -165,3 +165,12 @@ export const TIER_TABS: { id: 'all' | ProofTier; label: string }[] = [
   { id: 'unclear', label: 'No clear effect' },
   { id: 'too_few', label: 'Not enough data' },
 ]
+
+/** The spotlight: highest lift lower bound among Proven rows, else the Promising row closest to Proven. */
+export function spotlightOf(rows: ProductRow[]): ProductRow | null {
+  const proven = rows.filter((r) => r.tier === 'proven' && r.lift_lo !== null).sort((a, b) => (b.lift_lo ?? 0) - (a.lift_lo ?? 0))
+  if (proven[0]) return proven[0]
+  const promising = rows.filter((r) => r.tier === 'promising').sort((a, b) => (a.to_proven ?? 1e9) - (b.to_proven ?? 1e9) || (b.lift ?? 0) - (a.lift ?? 0))
+  return promising[0] ?? null
+}
+

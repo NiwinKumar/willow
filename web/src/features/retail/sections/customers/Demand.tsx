@@ -185,7 +185,7 @@ export function Gaps({ d }: { d: Insights }) {
           rowKey={(r) => r.g.goal}
           csv={{ name: csvName('assortment-gaps', d), meta: csvMeta(d) }}
           minWidth={760}
-          empty="No goal has products in the catalogue yet."
+          empty="No goal has products in the catalog yet."
         />
       </Panel>
     </section>

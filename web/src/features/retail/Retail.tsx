@@ -1,17 +1,26 @@
 import './retail.css'
 
-import { ChevronDown, Monitor, Moon, Search, Sun } from 'lucide-react'
+import { Check, ChevronDown, ChevronsUpDown, LogOut, Monitor, Moon, MoreHorizontal, Search, ShieldCheck, Sun } from 'lucide-react'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import { AskAggregates } from './AskAggregates'
 import { ProofMark } from './brand'
-import { RetailDataProvider, useRetailData } from './context'
+import { useAuth } from '../../lib/useAuth'
+import { fetchInsights, RetailDataProvider, useRetailData } from './context'
 import { totalUsers } from './data'
-import { COHORTS, LEGACY_PATHS, RANGES, SECTIONS, sectionPath, useRetailState } from './state'
-import type { Insights } from './types'
-import { cohortKind, Combobox, int, Segmented, SidePanel, SkeletonHeader, SkeletonKpis, SkeletonTable } from './ui'
+import { useDataTo } from './freshness'
+import { buildMask, maskText } from './masking'
+import { InstanceName, OrgProvider, useOrg } from './org'
+import { useCompetitorNames } from './orgData'
+import { useProducts } from './productData'
+import { ROLE_LABEL, verifiedText } from './proofApi'
+import { ADVANCED, COHORTS, LEGACY_PATHS, RANGES, SECTIONS, sectionPath, useRetailState } from './state'
+import type { Insights, Range } from './types'
+import { setExportFilter } from './ui/format'
+import { cohortKind, Combobox, int, Menu, MenuDivider, MenuItem, MenuLabel, Segmented, SidePanel, SkeletonHeader, SkeletonKpis, SkeletonTable, useTooltip } from './ui'
 
 /*
  * Willow Proof (docs/RETAIL_BRAND.md, docs/RETAILER_INSIGHTS.md "App structure"): the business app at
@@ -20,7 +29,12 @@ import { cohortKind, Combobox, int, Segmented, SidePanel, SkeletonHeader, Skelet
  * the URL (state.ts); the insights aggregates are fetched once per filter (context.tsx).
  */
 
+const Home = lazy(() => import('./sections/Home'))
 const Overview = lazy(() => import('./sections/Overview'))
+const Range = lazy(() => import('./sections/Range'))
+const Digest = lazy(() => import('./sections/Digest'))
+const Research = lazy(() => import('./sections/Research'))
+const Settings = lazy(() => import('./sections/Settings'))
 const Products = lazy(() => import('./sections/Products'))
 const ProductDetail = lazy(() => import('./sections/ProductDetail'))
 const Compare = lazy(() => import('./sections/Compare'))
@@ -76,32 +90,65 @@ function useProofTheme(): [ThemePref, (t: ThemePref) => void] {
 }
 
 export default function Retail() {
+  const [theme, setTheme] = useProofTheme()
   return (
-    <RetailDataProvider>
-      <Shell />
-    </RetailDataProvider>
+    <div className="proof-root relative min-h-dvh bg-canvas font-geist text-proof-body text-ink antialiased">
+      <OrgProvider>
+        <RetailDataProvider>
+          <Shell theme={theme} onTheme={setTheme} />
+        </RetailDataProvider>
+      </OrgProvider>
+    </div>
   )
 }
 
-/** Which section a path is in ("/retail/products/x" → products; compare belongs to Products). */
-function sectionOf(pathname: string): (typeof SECTIONS)[number] {
+type Section = (typeof SECTIONS)[number]
+
+/** Which section a path is in ("/retail/products/x" → products; Range and Compare belong to Products). */
+function sectionOf(pathname: string): { nav: Section; page: Section } {
   const seg = pathname.replace(/^\/retail\/?/, '').split('/')[0]
-  const id = seg === 'compare' ? 'products' : LEGACY_PATHS[seg as keyof typeof LEGACY_PATHS]?.section
-  return SECTIONS.find((s) => (id ? s.id === id : s.path === seg)) ?? SECTIONS[0]
+  const adv = ADVANCED.find((a) => a.path === seg)
+  const navId = seg === 'compare' || seg === 'range' ? 'products' : seg === 'digest' ? 'home' : LEGACY_PATHS[seg as keyof typeof LEGACY_PATHS]?.section
+  const nav = SECTIONS.find((s) => (navId ? s.id === navId : s.path === seg)) ?? SECTIONS[0]
+  if (seg === 'digest') return { nav, page: { ...nav, id: 'digest', label: 'Weekly digest', decision: '' } }
+  if (seg === 'range') return { nav, page: { ...nav, id: 'range', label: 'Range', decision: 'Connect your range once: Proof matches your item file to the measured catalog and says what is measured, collecting or new.' } }
+  return { nav, page: adv && seg !== 'compare' ? adv : seg === 'compare' ? (ADVANCED.find((a) => a.id === 'compare') ?? nav) : nav }
 }
 
-function Shell() {
+/**
+ * While a brand organisation sees competitors anonymised, every file that leaves Proof (CSV, evidence pack,
+ * brief, copied text) is filtered through the same names the screens use (masking.ts), so no export path can
+ * carry another brand's name. Built from the brand list at once and from the catalog once it loads.
+ */
+function useExportMask() {
+  const names = useCompetitorNames()
+  const { filters, brands } = useRetailData()
+  const { state } = useProducts(filters)
+  const rows = state.status === 'ready' ? state.d.products : null
+  const brandNames = brands.map((b) => b.brand).join('|')
+  useEffect(() => {
+    if (!names.anonymise) return setExportFilter(null)
+    const brandList = brandNames ? brandNames.split('|') : []
+    const list = rows ? rows.map((r) => ({ brand: r.brand, product: r.product })) : brandList.map((b) => ({ brand: b, product: '' }))
+    const m = buildMask(list, names.own, brandList)
+    setExportFilter((t) => maskText(t, m))
+    return () => setExportFilter(null)
+  }, [names.anonymise, names.own, rows, brandNames])
+}
+
+function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
+  useExportMask()
   const { pathname } = useLocation()
-  const section = sectionOf(pathname)
+  const { page } = sectionOf(pathname)
   const { param, setParam } = useRetailState()
-  const { insights, filters } = useRetailData()
-  const [theme, setTheme] = useProofTheme()
+  const { insights, filters, workspace } = useRetailData()
+  const { org } = useOrg()
   const head = useRef<HTMLDivElement>(null)
   const askOpen = param('ask') === '1'
 
   useEffect(() => {
-    document.title = `${section.label} · Proof by Willow`
-  }, [section.label])
+    document.title = `${page.label} · Proof by Willow`
+  }, [page.label])
   // A new page starts at the top (filters and tabs change the query string, not the path, so they keep it).
   useEffect(() => {
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
@@ -137,12 +184,12 @@ function Shell() {
   const d = insights.status === 'ready' || insights.status === 'empty' ? insights.d : null
 
   return (
-    <div className="proof-root relative min-h-dvh bg-canvas font-geist text-proof-body text-ink antialiased">
+    <>
       <a href="#proof-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-ctl focus:bg-selected focus:px-3 focus:py-2 focus:text-inverse">
         Skip to content
       </a>
-      <div ref={head} className="sticky top-0 z-40 border-b border-line bg-canvas/90 [-webkit-backdrop-filter:blur(16px)_saturate(1.4)] [backdrop-filter:blur(16px)_saturate(1.4)]">
-        <TopBar d={d} loading={insights.status === 'loading'} theme={theme} onTheme={setTheme} onAsk={() => setParam({ ask: '1' }, { push: true })} />
+      <div ref={head} className="sticky top-0 z-40 [view-transition-name:proof-head] border-b border-line bg-canvas/90 [-webkit-backdrop-filter:blur(16px)_saturate(1.4)] [backdrop-filter:blur(16px)_saturate(1.4)]">
+        <TopBar d={d} loading={insights.status === 'loading'} theme={theme} onTheme={onTheme} onAsk={() => setParam({ ask: '1' }, { push: true })} />
         <SectionTabs />
       </div>
 
@@ -150,9 +197,14 @@ function Shell() {
         <div className="mx-auto w-full max-w-[1200px]">
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<SectionFallback />}>
-              <div key={section.id} className="animate-[proofPage_.2s_var(--ease-standard)_both]">
+              <div key={page.id} className="animate-[proofPage_.2s_var(--ease-standard)_both]">
                 <Routes>
-                  <Route index element={<Overview />} />
+                  <Route index element={<Home />} />
+                  <Route path="board" element={<Overview />} />
+                  <Route path="range" element={<Range />} />
+                  <Route path="digest" element={<Digest />} />
+                  <Route path="research" element={<Research />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="products" element={<Products />} />
                   <Route path="products/:productId" element={<ProductDetail />} />
                   <Route path="compare" element={<Compare />} />
@@ -170,9 +222,9 @@ function Shell() {
       </main>
 
       <SidePanel open={askOpen} onClose={() => setParam({ ask: null })} title="Ask" subtitle={`Answers from the same data as the screen · ${RANGES.find((r) => r.value === filters.range)?.label} · ${COHORTS.find((c) => c.value === filters.cohort)?.label}`} width={480} labelledBy="proof-ask-title">
-        <AskAggregates d={d} filters={filters} />
+        <AskAggregates d={d} filters={filters} scope={`${org?.id ?? ''}|${workspace.kind === 'brand' ? workspace.slug : 'retailer'}`} focusBrand={workspace.kind === 'brand' ? (workspace.brand ?? null) : null} />
       </SidePanel>
-    </div>
+    </>
   )
 }
 
@@ -208,34 +260,161 @@ function Avatar({ name, retailer = false }: { name: string; retailer?: boolean }
   )
 }
 
+/**
+ * Top-left: the organisation you are in (name, kind, verified basis on hover, your role). Its menu is the account
+ * menu: who is signed in, "Try as" another organisation of a demo instance, sign out.
+ */
+function OrgSwitcher() {
+  const { instance, org, role, orgs, memberships, switchOrg, signOut } = useOrg()
+  const { user } = useAuth()
+  const basis = org ? verifiedText(org) : null
+  const tip = useTooltip(basis ?? '')
+  if (!instance || !org) return null
+  const who = user?.isAnonymous ? 'Guest account' : (user?.email ?? 'Signed in')
+  const go = async (id: string, close: () => void) => {
+    close()
+    if (id === org.id) return
+    try {
+      await switchOrg(id)
+      toast(`Now in ${orgs.find((o) => o.id === id)?.name ?? id}`)
+    } catch {
+      toast.error('Couldn’t switch. Try again.')
+    }
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Menu
+        label={`Organisation: ${org.name}. Account menu`}
+        width={300}
+        triggerClass="hit44 flex h-9 min-w-0 items-center gap-2 rounded-ctl border border-transparent bg-transparent px-1.5 text-left hover:bg-pf-hover"
+        trigger={
+          <>
+            <Avatar name={org.name} retailer={org.kind === 'retailer'} />
+            <span className="flex min-w-0 flex-col leading-[15px]">
+              <span className="truncate text-proof-small font-medium text-ink">{org.name}</span>
+              <span className="hidden truncate text-[11px] text-ink-2 sm:block">
+                {org.kind === 'brand' ? 'Brand' : 'Retailer'}
+                {role ? ` · ${ROLE_LABEL[role]}` : ''}
+              </span>
+            </span>
+            <ChevronsUpDown size={14} strokeWidth={1.6} aria-hidden className="shrink-0 text-ink-2" />
+          </>
+        }
+      >
+        {(close) => (
+          <>
+            <div className="flex flex-col gap-0.5 px-3 pb-2 pt-2">
+              <span className="text-proof-small font-medium text-ink">{who}</span>
+              <span className="text-proof-label text-ink-2">
+                <InstanceName instance={instance} short /> {instance.domains[0] ? `· ${instance.domains[0]}` : ''}
+              </span>
+            </div>
+            <MenuDivider />
+            <MenuLabel>{instance.demo ? 'Try as (demo)' : 'Your organisations'}</MenuLabel>
+            {orgs
+              .filter((o) => instance.demo || memberships.some((m) => m.org_id === o.id))
+              .map((o) => {
+                const m = memberships.find((x) => x.org_id === o.id)
+                return (
+                  <MenuItem key={o.id} current={o.id === org.id} onClick={() => void go(o.id, close)} sub={`${o.kind === 'brand' ? 'Brand' : 'Retailer'}${m ? ` · ${ROLE_LABEL[m.role]}` : instance.demo ? ' · joins as a demo member' : ''}`}>
+                    <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                    {o.id === org.id ? <Check size={14} strokeWidth={1.8} aria-hidden className="text-proof-leaf" /> : null}
+                  </MenuItem>
+                )
+              })}
+            <MenuDivider />
+            <MenuItem
+              onClick={() => {
+                close()
+                void signOut()
+              }}
+            >
+              <LogOut size={14} strokeWidth={1.7} aria-hidden className="text-ink-2" /> Sign out
+            </MenuItem>
+          </>
+        )}
+      </Menu>
+      {basis ? (
+        <>
+          <span {...tip.trigger} tabIndex={0} className="hidden cursor-help lg:inline-flex">
+            <span className="inline-flex h-6 items-center gap-1 rounded-pill bg-proof-leaf-soft px-2 text-proof-label font-medium text-proof-leaf">
+              <ShieldCheck size={12} strokeWidth={1.9} aria-hidden /> {org.kind === 'brand' ? 'Verified brand' : 'Verified'}
+            </span>
+          </span>
+          {tip.node}
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * "Viewing": which brand's lens the retailer is looking through (?as=brand:<slug>). Retailer organisations (and
+ * the legacy single-workspace mode) only: a brand organisation always sees its own brand.
+ */
 function Workspace() {
   const { brands, workspace } = useRetailData()
   const { setWorkspace } = useRetailState()
+  const { org, lockedBrand, instance } = useOrg()
+  if (lockedBrand) return null
   const options = [
-    { value: 'retailer', label: 'All brands', hint: 'Retailer', group: 'Retailer' },
-    ...brands.map((b) => ({ value: `brand:${b.slug}`, label: b.brand, hint: b.products ? `${b.products} products` : undefined, group: 'Brands' })),
+    { value: 'retailer', label: 'All brands', hint: org ? 'Your whole range' : 'Retailer', group: org ? org.name : 'Retailer' },
+    ...brands.map((b) => ({ value: `brand:${b.slug}`, label: b.brand, hint: b.products ? `${b.products} products` : undefined, group: 'View as a brand' })),
   ]
   const value = workspace.kind === 'brand' ? `brand:${workspace.slug}` : 'retailer'
-  if (workspace.kind === 'brand' && !options.some((o) => o.value === value)) options.push({ value, label: workspace.slug, hint: undefined, group: 'Brands' })
+  if (workspace.kind === 'brand' && !options.some((o) => o.value === value)) options.push({ value, label: workspace.slug, hint: undefined, group: 'View as a brand' })
   const name = workspace.kind === 'brand' ? (workspace.brand ?? workspace.slug) : 'All brands'
   return (
     <Combobox
-      label="Workspace"
+      label={org ? 'Viewing' : 'Workspace'}
       value={value}
       options={options}
-      prefix={<Avatar name={name} retailer={workspace.kind === 'retailer'} />}
+      prefix={org ? null : <Avatar name={name} retailer={workspace.kind === 'retailer'} />}
       onChange={(v) => setWorkspace(v.startsWith('brand:') ? { kind: 'brand', slug: v.slice(6) } : { kind: 'retailer' })}
       width={300}
-      footer="Demo: every brand workspace is open to everyone. Competitors are named; all brands get the same method and the same small-group rules."
+      footer={
+        instance
+          ? 'As the retailer you can see any brand’s view. A brand organisation sees only its own brand, and never another brand’s campaigns, claims or requests.'
+          : 'Demo: every brand workspace is open to everyone. Competitors are named; all brands get the same method and the same small-group rules.'
+      }
     />
   )
 }
 
-/** Data scope (range and cohort) in one control; its label says what is counted, so no banner is needed. */
+/** Which periods hold data for this cohort (an empty "last 30 days" is hidden, not offered). */
+function useRangesWithData(open: boolean): Set<Range> | null {
+  const { filters } = useRetailState()
+  const [res, setRes] = useState<{ key: string; ok: Set<Range> } | null>(null)
+  const key = filters.cohort
+  useEffect(() => {
+    if (!open || res?.key === key) return
+    let alive = true
+    const probe = (range: Range) =>
+      fetchInsights({ cohort: filters.cohort, range }).then(
+        (x) => !x.empty && totalUsers(x.cohort) >= 10,
+        () => true,
+      )
+    void Promise.all([probe('30d'), probe('90d')]).then(([a, b]) => {
+      if (!alive) return
+      const ok = new Set<Range>(['all'])
+      if (a) ok.add('30d')
+      if (b) ok.add('90d')
+      setRes({ key, ok })
+    })
+    return () => {
+      alive = false
+    }
+  }, [open, key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return res?.key === key ? res.ok : null
+}
+
+/** Data scope (range and cohort) in one control; its label says what is counted and the date the data runs to. */
 function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
   const { filters, setFilters } = useRetailState()
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  const to = useDataTo(d)
+  const withData = useRangesWithData(open)
   useEffect(() => {
     if (!open) return
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
@@ -250,6 +429,9 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
   const kind = d ? cohortKind(d.cohort) : null
   const range = RANGES.find((r) => r.value === filters.range)!.label
   const data = filters.cohort === 'real' ? 'Real users' : filters.cohort === 'simulated' ? 'Simulated' : 'Mixed data'
+  // A period with no readings is left out (the one picked stays, so the control never hides the current state).
+  const ranges = RANGES.filter((r) => !withData || withData.has(r.value) || r.value === filters.range)
+  const hidden = withData ? RANGES.filter((r) => !withData.has(r.value) && r.value !== filters.range) : []
   const who = !d
     ? loading
       ? 'Loading…'
@@ -266,13 +448,21 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
         <span className="hidden sm:inline">{data}</span>
         <span aria-hidden className="hidden text-ink-3 sm:inline">/</span>
         {range}
+        {to ? <span className="hidden text-ink-2 xl:inline">· {to.label.replace('Data to', 'to')}</span> : null}
         <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="hidden text-ink-2 sm:block" />
       </button>
       {open ? (
-        <div role="dialog" aria-label="Data scope" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-[320px] max-w-[calc(100vw-32px)] flex-col gap-4 rounded-card border border-line bg-surface p-4 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[wFadeIn_.12s_ease_both]">
+        <div role="dialog" aria-label="Data scope" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-[320px] max-w-[calc(100vw-32px)] flex-col gap-4 rounded-card border border-line bg-surface p-4 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[proofDrop_.14s_var(--ease-standard)_both]">
+          {to ? (
+            <p className="m-0 flex items-center justify-between gap-2 text-proof-small">
+              <span className="font-medium text-ink">{to.label}</span>
+              <span className="text-ink-2">newest readings</span>
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2">
             <span className="text-proof-small font-medium text-ink">Period</span>
-            <Segmented label="Period" options={RANGES} value={filters.range} onChange={(range) => setFilters({ range })} />
+            <Segmented label="Period" options={ranges} value={filters.range} onChange={(range) => setFilters({ range })} />
+            {hidden.length ? <span className="text-proof-label text-ink-2">{hidden.map((r) => r.label).join(' and ')}: no readings in that window, so not offered.</span> : null}
           </div>
           <div className="flex flex-col gap-2">
             <span className="text-proof-small font-medium text-ink">People</span>
@@ -299,19 +489,31 @@ function ThemeButton({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
 
 function TopBar({ d, loading, theme, onTheme, onAsk }: { d: Insights | null; loading: boolean; theme: ThemePref; onTheme: (t: ThemePref) => void; onAsk: () => void }) {
   const { carry } = useRetailState()
+  const { instance, org } = useOrg()
   return (
     <header className="flex h-[var(--proof-topbar)] items-center gap-1.5 px-4 sm:gap-2 sm:px-6">
-      <Link to={`/retail${carry}`} aria-label="Proof by Willow, Overview" className="flex shrink-0 items-center gap-2 rounded-ctl text-ink no-underline">
+      <Link to={`/retail${carry}`} aria-label="Proof by Willow, Home" className="flex shrink-0 items-center gap-2 rounded-ctl text-ink no-underline">
         <ProofMark size={26} />
         <span className="hidden items-baseline gap-1.5 text-[15px] tracking-[-0.01em] md:inline-flex">
           <span className="font-semibold">Proof</span>
           <span className="text-ink-2">by Willow</span>
         </span>
       </Link>
+      {instance && org ? (
+        <>
+          <span aria-hidden className="mx-0.5 hidden text-[20px] font-light text-line-strong lg:inline">
+            /
+          </span>
+          <span className="hidden lg:inline-flex">
+            <InstanceName instance={instance} short />
+          </span>
+        </>
+      ) : null}
       <span aria-hidden className="mx-1 hidden text-[20px] font-light text-line-strong sm:inline">
         /
       </span>
-      <div className="min-w-0">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <OrgSwitcher />
         <Workspace />
       </div>
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
@@ -332,18 +534,56 @@ function TopBar({ d, loading, theme, onTheme, onAsk }: { d: Insights | null; loa
 function SectionTabs() {
   const { carry } = useRetailState()
   const { pathname } = useLocation()
-  const current = sectionOf(pathname)
+  const navigate = useNavigate()
+  const { nav: current, page } = sectionOf(pathname)
+  const advOn = ADVANCED.some((a) => a.id === page.id) && page.id !== 'compare'
   return (
-    <nav aria-label="Proof by Willow sections" className="no-scrollbar flex gap-1 overflow-x-auto px-2 sm:px-4">
+    <nav aria-label="Proof by Willow sections" className="flex items-center gap-1 px-2 sm:px-4">
+      <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
       {SECTIONS.map((s) => {
-        const on = s.id === current.id
+        const on = s.id === current.id && !advOn
         return (
-          <NavLink key={s.id} to={`${sectionPath(s.id)}${carry}`} end={s.id === 'overview'} aria-current={on ? 'page' : undefined} title={s.question} className={`relative flex h-11 shrink-0 items-center px-2 text-proof-small no-underline transition-colors duration-150 ${on ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}>
+          <NavLink key={s.id} to={`${sectionPath(s.id)}${carry}`} end={s.id === 'home'} aria-current={on ? 'page' : undefined} title={s.question} className={`relative flex h-11 shrink-0 items-center px-2 text-proof-small no-underline transition-colors duration-150 ${on ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}>
             <span className={`rounded-ctl px-2 py-1.5 ${on ? '' : 'hover:bg-pf-hover'}`}>{s.label}</span>
-            {on ? <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-ink" /> : null}
+            {on ? <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-ink [view-transition-name:proof-tab]" /> : null}
           </NavLink>
         )
       })}
+      </div>
+      <Menu
+        label="Advanced"
+        align="right"
+        width={300}
+        className="shrink-0"
+        triggerClass={`hit44 relative flex h-11 shrink-0 items-center gap-1 border-0 bg-transparent px-2 text-proof-small transition-colors ${advOn ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}
+        trigger={
+          <>
+            <span className="flex items-center gap-1 rounded-ctl px-2 py-1.5 hover:bg-pf-hover">
+              <MoreHorizontal size={15} strokeWidth={1.7} aria-hidden /> {advOn ? page.label : 'Advanced'}
+            </span>
+            {advOn ? <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-ink" /> : null}
+          </>
+        }
+      >
+        {(close) => (
+          <>
+            <MenuLabel>Advanced</MenuLabel>
+            {ADVANCED.map((a) => (
+              <MenuItem
+                key={a.id}
+                current={page.id === a.id}
+                sub={a.question}
+                onClick={() => {
+                  close()
+                  navigate(`${sectionPath(a.id)}${carry}`)
+                }}
+              >
+                {a.label}
+              </MenuItem>
+            ))}
+          </>
+        )}
+      </Menu>
     </nav>
   )
 }

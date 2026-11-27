@@ -9,6 +9,7 @@ import { identity } from '../../lib/identity'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { prefs } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
+import { useResultReady } from '../../features/progress/useResultReady'
 import { WillowLoader } from '../willow/WillowLoader'
 import { CanvasBlobs } from './CanvasBlobs'
 import { AdvisorFab } from './AdvisorFab'
@@ -40,6 +41,8 @@ export function AppShell() {
   const { user, loading } = useAuth()
   const data = useData()
   useActivateData()
+  // "Your result is ready" on whichever page the person is on (never twice for one result).
+  useResultReady()
   const location = useLocation()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()

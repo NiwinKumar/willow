@@ -5,8 +5,9 @@ import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } 
 
 import type { MetricId, Site } from '../../data/types'
 import type { PhotoTime, SkinType } from '../../lib/api'
-import { syncConsent } from '../../lib/consent'
+import { consentChoices, setConsentChoices, syncConsent } from '../../lib/consent'
 import { CLOSE_UPS, GOALS, MAX_GOALS, METRIC_META, type GoalId } from '../../lib/metrics'
+import { GOAL_LOOK } from '../plan/looks'
 import { browserTz, PHOTO_TIME_CLOCK, PHOTO_TIMES, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION, nextPath, prefs } from '../../lib/prefs'
@@ -21,11 +22,11 @@ import { MeetWisp } from './MeetWisp'
 
 const BACKDROP = 'radial-gradient(40% 40% at 15% 20%, rgba(255,178,122,.55), transparent 70%), radial-gradient(40% 45% at 85% 80%, rgba(156,211,255,.6), transparent 70%), radial-gradient(35% 35% at 80% 15%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
 
-type Step = 'consent' | 'goals' | 'places' | 'about' | 'wisp'
-const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Meet Wisp', 'Capture']
-const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3, wisp: 4 }
-const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places', wisp: '/welcome/about' }
-const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places', wisp: 'about you' }
+type Step = 'consent' | 'goals' | 'places' | 'about' | 'routine' | 'wisp'
+const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Routine', 'Meet Wisp', 'Capture']
+const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3, routine: 4, wisp: 5 }
+const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places', routine: '/welcome/about', wisp: '/welcome/routine' }
+const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places', routine: 'about you', wisp: 'your routine' }
 
 /**
  * Onboarding: /welcome = consent, /welcome/goals = goals, /welcome/places = places to track (every check-in covers
@@ -37,7 +38,7 @@ const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places:
 export default function Welcome() {
   const { step: raw } = useParams()
   const { search } = useLocation()
-  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' || raw === 'wisp' ? raw : 'consent'
+  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' || raw === 'routine' || raw === 'wisp' ? raw : 'consent'
   const { user } = useAuth()
   // Onboarding shows (and saves) the account's profile and consent.
   useActivateData()
@@ -57,7 +58,7 @@ export default function Welcome() {
         <Stepper current={STEP_INDEX[step]} />
         <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
       </header>
-      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : step === 'wisp' ? <Wisp key="wisp" /> : <Consent key="consent" />}
+      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : step === 'routine' ? <RoutineChoice key="routine" /> : step === 'wisp' ? <Wisp key="wisp" /> : <Consent key="consent" />}
     </div>
   )
 }
@@ -145,9 +146,9 @@ const primary = 'flex min-h-[52px] items-center justify-center gap-3 rounded-[20
 /** The consent wording (version CONSENT_VERSION). Every line is true of the running system. */
 const CONSENT_ITEMS = [
   {
-    title: 'Private photo storage',
-    summary: 'Your original photos are kept privately, then deleted 30 days after upload.',
-    detail: 'Photos go to a private Cloud Storage bucket in us-central1 that only Willow’s own services read. They are deleted automatically 30 days after upload. Nobody at a retailer can see them.',
+    title: 'Private photo storage, in the US',
+    summary: 'Your photos are kept privately in the United States, then deleted 30 days after upload.',
+    detail: 'Photos go to a private Cloud Storage bucket in Google Cloud’s us-central1 region (Iowa, United States) that only Willow’s own services read. They are deleted automatically 30 days after upload. Nobody at a retailer or brand can see them.',
     swatch: 'radial-gradient(circle at 40% 30%, var(--aura-ice), var(--aura-sky))',
   },
   {
@@ -157,30 +158,61 @@ const CONSENT_ITEMS = [
     swatch: 'radial-gradient(circle at 40% 30%, var(--aura-apricot), var(--aura-coral))',
   },
   {
+    title: 'Face data',
+    summary: 'We measure skin appearance; we never recognise faces or build an identity template.',
+    detail: 'To place its measurement areas, the engine finds points such as the eyes and nose in each photo. They are used to measure that photo and nothing else. Willow never recognises who you are, never compares your face with anyone else’s and never builds a face template for identity.',
+    swatch: 'radial-gradient(circle at 40% 30%, var(--aura-ice), var(--aura-lilac))',
+  },
+  {
     title: 'How AI is used',
-    summary: 'Gemini explains results, names detected spots, reads ingredient labels and answers questions.',
-    detail: 'Measurements come from computer vision. Gemini sees small close-ups of the spots the engine found, and label photos you scan. It may only quote numbers the measurement produced; an answer with any other number is rejected. Your photos are not used to train models.',
+    summary: 'Google’s Gemini explains results, names detected spots, reads ingredient labels and answers questions.',
+    detail: 'Measurements come from computer vision. Gemini, on Google Cloud, sees small close-ups of the spots the engine found, and label photos you scan. It may only quote numbers the measurement produced; an answer with any other number is rejected. Your photos are not used to train models.',
     swatch: 'radial-gradient(circle at 40% 30%, var(--aura-lilac), var(--aura-violet))',
   },
   {
-    title: 'Cosmetic scope only',
-    summary: 'Willow tracks appearance. It does not diagnose.',
+    title: 'A wellness product, not a medical one',
+    summary: 'Willow is a wellness product for cosmetic appearance. It does not diagnose, treat or prevent any disease and is not a medical device.',
     detail: 'No disease labels, skin age or invented scores. If a mole changes, or anything worries you, see a dermatologist.',
     swatch: 'radial-gradient(circle at 40% 30%, var(--willow-200), var(--willow-400))',
+    // Singapore HSA's wellness clarification: shown in full, never clipped.
+    full: true,
   },
 ]
+
+/** One consent choice: its own unticked box, a title and a line saying what it covers. */
+function Choice({ checked, onChange, title, note, tag }: { checked: boolean; onChange: (v: boolean) => void; title: string; note: string; tag: string }) {
+  return (
+    <label className={`flex cursor-pointer items-start gap-3 rounded-[16px] px-2.5 py-2 transition-colors duration-200 [@media(max-height:700px)]:py-1.5 ${checked ? 'bg-white/70' : 'hover:bg-white/40'}`}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="m-0 mt-px size-5 flex-none accent-[var(--action-selected)]" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-[14px] leading-[1.35]">
+          {title}
+          <span className="font-mono text-[9.5px] tracking-[.08em] text-ink-2">{tag}</span>
+        </span>
+        <span className="text-[12.5px] leading-[1.35] text-ink-2 [@media(max-height:760px)]:line-clamp-1">{note}</span>
+      </span>
+    </label>
+  )
+}
 
 function Consent() {
   const { user, getIdToken } = useAuth()
   const navigate = useNavigate()
   const { search } = useLocation()
   const saved = prefs.consent()
+  const chosen = consentChoices()
   const [open, setOpen] = useState<number | null>(null)
-  const [agree, setAgree] = useState(hasConsent())
+  // Someone who agreed before the separate choices existed agreed to photos and AI together: shown ticked.
+  const [photos, setPhotos] = useState(chosen?.photos ?? hasConsent())
+  const [ai, setAi] = useState(chosen?.ai ?? hasConsent())
+  const [adult, setAdult] = useState(chosen?.adult ?? false)
   const [share, setShare] = useState(saved?.aggregate_opt_in ?? false)
+  const [minor, setMinor] = useState(false)
+  const ready = adult && photos && ai
 
   const accept = () => {
-    if (!agree) return
+    if (!ready) return
+    setConsentChoices({ photos, ai, adult })
     // Re-agreeing to the same version keeps the original date.
     prefs.setConsent({ version: CONSENT_VERSION, accepted_at: saved?.version === CONSENT_VERSION ? saved.accepted_at : new Date().toISOString(), aggregate_opt_in: share })
     // The data layer syncs on sign-in; someone already signed in is saved now (a failure retries next load).
@@ -188,27 +220,52 @@ function Consent() {
     navigate(`/welcome/goals${search}`)
   }
 
+  // Under 18: a kind stop. Nothing is written anywhere.
+  if (minor)
+    return (
+      <StepFrame
+        eyebrow="WILLOW IS FOR ADULTS"
+        title="Thanks for telling us"
+        actions={
+          <>
+            <Link to="/" className={`${primary} no-underline`}>
+              Back to the start
+            </Link>
+            <button type="button" onClick={() => setMinor(false)} className="min-h-11 self-center rounded-pill px-4 text-[14px] text-ink-2 underline underline-offset-2">
+              I chose this by mistake
+            </button>
+          </>
+        }
+      >
+        <div className={`${card} flex flex-col gap-3 px-5 py-5`} style={cardStyle}>
+          <p className="m-0 text-[16px] leading-[1.5]">Willow is made for people aged 18 and over, so it can’t be set up for you. Nothing has been saved.</p>
+          <p className="m-0 text-[14px] leading-[1.5] text-ink-2">Skin changes a lot in the teenage years, and that is normal. A gentle cleanser, a moisturiser and sunscreen are a good start. A parent, a pharmacist or a doctor can help with anything more.</p>
+        </div>
+      </StepFrame>
+    )
+
   return (
     <StepFrame
       eyebrow={`CONSENT · VERSION ${fmtDate(CONSENT_VERSION, { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}`}
       title="Before your first photo"
       actions={
         <>
-          <div className={`${card} flex flex-col gap-2.5 px-4 py-3 sm:px-5`} style={cardStyle}>
-            <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-[1.4]">
-              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="m-0 mt-px size-5 flex-none accent-[var(--action-selected)]" />
-              <span>I agree to private storage and analysis of my photos for cosmetic appearance tracking, as described above.</span>
-            </label>
-            <label className="flex cursor-pointer flex-col gap-0.5 rounded-[18px] bg-sunken px-3.5 py-2.5 [@media(max-height:700px)]:py-2">
-              <span className="flex items-center justify-between gap-3">
-                <span className="text-[14px]">Share anonymized aggregate results</span>
-                <input type="checkbox" role="switch" checked={share} onChange={(e) => setShare(e.target.checked)} className="m-0 size-5 flex-none accent-[var(--action-selected)]" />
-              </span>
-              <span className="text-[12.5px] leading-[1.3] text-ink-2">Optional. Off by default. Numbers only, never photos or your name. Helps retailers see which products work for whom. Groups under 10 people are never shown.</span>
-            </label>
+          <div className={`${card} flex flex-col gap-0.5 px-2 py-2 sm:px-3`} style={cardStyle}>
+            <div className="flex items-center justify-between gap-2 border-b border-ink/[.07] px-2.5 pt-1 pb-2">
+              <label className="flex cursor-pointer items-center gap-3 text-[14px]">
+                <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="m-0 size-5 flex-none accent-[var(--action-selected)]" />
+                I’m 18 or older
+              </label>
+              <button type="button" onClick={() => setMinor(true)} className="min-h-9 rounded-pill px-2.5 text-[13px] text-ink-2 underline underline-offset-2 hover:text-ink">
+                I’m under 18
+              </button>
+            </div>
+            <Choice checked={photos} onChange={setPhotos} tag="REQUIRED" title="Photos and measurements" note="Kept privately in the US for 30 days; skin appearance is measured from them." />
+            <Choice checked={ai} onChange={setAi} tag="REQUIRED" title="AI processing with Gemini" note="Close-ups, label photos and measurements go to Google’s Gemini to explain results." />
+            <Choice checked={share} onChange={setShare} tag="OPTIONAL" title="Share aggregate results with brands and retailers" note="Numbers only, never photos or your name; groups under 10 hidden. Brands and retailers pay for these insights." />
           </div>
-          <button type="button" onClick={accept} disabled={!agree} className={`${primary} disabled:opacity-60`}>
-            {agree ? 'Agree and continue' : 'Tick the agreement to continue'}
+          <button type="button" onClick={accept} disabled={!ready} className={`${primary} disabled:opacity-60`}>
+            {ready ? 'Agree and continue' : !adult ? 'Confirm you’re 18 or older to continue' : 'Tick both required choices to continue'}
           </button>
         </>
       }
@@ -216,11 +273,11 @@ function Consent() {
       <div className={`${card} overflow-hidden`} style={cardStyle}>
         {CONSENT_ITEMS.map((c, i) => (
           <div key={c.title} className="border-b border-ink/[.07] last:border-b-0">
-            <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`consent-${i}`} className="flex w-full items-center gap-3.5 px-4 py-[clamp(8px,1.3vh,14px)] text-left text-ink sm:px-5 [@media(max-height:700px)]:py-1.5">
-              <span aria-hidden className="size-8 flex-none rounded-[11px] [@media(max-height:700px)]:size-6 [@media(max-height:700px)]:rounded-[9px]" style={{ background: c.swatch, boxShadow: 'inset 0 0 10px 2px rgba(255,255,255,.6)' }} />
+            <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`consent-${i}`} className="flex w-full items-center gap-3.5 px-4 py-[clamp(7px,1.1vh,12px)] text-left text-ink sm:px-5 [@media(max-height:760px)]:py-1.5">
+              <span aria-hidden className="size-8 flex-none rounded-[11px] [@media(max-height:760px)]:size-6 [@media(max-height:760px)]:rounded-[9px]" style={{ background: c.swatch, boxShadow: 'inset 0 0 10px 2px rgba(255,255,255,.6)' }} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[15.5px]">{c.title}</span>
-                <span className={`text-[13px] leading-[1.35] text-ink-2 ${open === i ? '' : 'line-clamp-1 [@media(max-height:700px)]:hidden'}`}>{c.summary}</span>
+                <span className="text-[15px]">{c.title}</span>
+                <span className={`text-[13px] leading-[1.35] text-ink-2 ${open === i || 'full' in c ? '' : 'line-clamp-1 [@media(max-height:760px)]:hidden'}`}>{c.summary}</span>
               </span>
               <span aria-hidden className="text-[20px] text-ink-2">
                 {open === i ? '−' : '+'}
@@ -233,7 +290,7 @@ function Consent() {
             ) : null}
           </div>
         ))}
-        <p className="m-0 border-t border-ink/[.07] px-4 py-2.5 text-[12.5px] [@media(max-height:700px)]:py-2 leading-[1.4] text-ink-2 sm:px-5">
+        <p className="m-0 border-t border-ink/[.07] px-4 py-2 text-[12.5px] leading-[1.4] text-ink-2 sm:px-5">
           Change sharing or delete your data any time, in You. Read the full{' '}
           <Link to="/terms" target="_blank" rel="noopener" className="text-ink underline underline-offset-2">
             terms and privacy notice
@@ -245,18 +302,6 @@ function Consent() {
   )
 }
 
-/** Each goal drawn with one of the design's goal gradients (decoration only) and its ink colour. */
-const GOAL_LOOK: Record<GoalId, { bg: string; fg: string }> = {
-  dark_spots: { bg: 'radial-gradient(90% 80% at 30% 100%, #FF8A3D 0%, #FFB27A 35%, #F6E3D4 75%)', fg: '#2A1206' },
-  even_tone: { bg: 'radial-gradient(90% 80% at 70% 100%, #3D7BFF 0%, #9CD3FF 45%, #E6EEF6 85%)', fg: '#0A1840' },
-  redness: { bg: 'radial-gradient(90% 80% at 50% 100%, #F25FA8 0%, #F7A6C9 45%, #F4E6EC 85%)', fg: '#3A0A22' },
-  blemishes: { bg: 'radial-gradient(90% 80% at 40% 100%, #4FB866 0%, #B8E986 45%, #EAF2E2 85%)', fg: '#0E2A12' },
-  pores_texture: { bg: 'radial-gradient(90% 80% at 60% 100%, #7A5CFF 0%, #D8B8FF 45%, #EEE8F6 85%)', fg: '#1C0F4A' },
-  lines: { bg: 'radial-gradient(90% 80% at 50% 100%, #9CD3FF 0%, #D8B8FF 45%, #F1ECF8 85%)', fg: '#1C0F4A' },
-  under_eye: { bg: 'radial-gradient(90% 80% at 40% 100%, #FF6B4A 0%, #F7A6C9 45%, #F6E8E6 85%)', fg: '#3A0E06' },
-  oil_glow: { bg: 'radial-gradient(90% 80% at 50% 100%, #F2B53A 0%, #F6DE5C 40%, #F5F0DA 85%)', fg: '#2A2410' },
-}
-
 const PLACE: Record<Site, string> = { face_full: 'FACE', cheek_macro: 'CLOSE-UP', left_cheek_macro: 'CLOSE-UP', right_cheek_macro: 'CLOSE-UP', forehead_macro: 'CLOSE-UP', chin_macro: 'CLOSE-UP', nose_macro: 'CLOSE-UP', forearm_treated: 'ARM', forearm_control: 'ARM' }
 
 /** Where a goal's measurements come from, read off the metric table: "FACE · CLOSE-UPS". */
@@ -265,6 +310,9 @@ function goalPlaces(metrics: MetricId[]): string {
   const order: Site[] = ['face_full', ...CLOSE_UPS, 'forearm_treated', 'forearm_control']
   return [...new Set(order.filter((s) => sites.includes(s)).map((s) => PLACE[s]))].join(' · ')
 }
+
+/** MAX_GOALS in words (it matches the api's limit in me_routes.py). */
+const GOAL_WORD = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'][MAX_GOALS] ?? String(MAX_GOALS)
 
 function Goals() {
   const { setGoals, profile } = useData()
@@ -294,19 +342,19 @@ function Goals() {
   return (
     <StepFrame
       wide
-      eyebrow="CHOOSE UP TO THREE"
+      eyebrow={`CHOOSE UP TO ${GOAL_WORD.toUpperCase()}`}
       title="What would you like to track?"
       sub="Goals set the order of your report. Every measurement is still shown."
       aside={
-        <span className="font-dot text-[clamp(28px,4vh,40px)] leading-none font-extrabold" role="status" aria-label={`${picked.length} of 3 goals chosen`}>
-          {picked.length}/3
+        <span className="font-dot text-[clamp(28px,4vh,40px)] leading-none font-extrabold" role="status" aria-label={`${picked.length} of ${MAX_GOALS} goals chosen`}>
+          {picked.length}/{MAX_GOALS}
         </span>
       }
       actions={
         <>
           {hint ? (
             <p role="status" className="m-0 self-start rounded-[14px] bg-selected px-3.5 py-2 text-[13px] text-inverse">
-              Five goals is the limit. Remove one to choose another.
+              {GOAL_WORD} goals is the limit. Remove one to choose another.
             </p>
           ) : null}
           <button type="button" onClick={next} className={primary}>
@@ -416,7 +464,7 @@ function About() {
         return setError('Could not start a guest session. Check your connection and try again.')
       }
     }
-    navigate(`/welcome/wisp${search}`)
+    navigate(`/welcome/routine${search}`)
   }
 
   return (
@@ -468,6 +516,65 @@ function About() {
             })}
           </div>
         </Field>
+      </div>
+    </StepFrame>
+  )
+}
+
+type RoutineWay = 'have' | 'build' | 'track'
+const ROUTINE_WAYS: { id: RoutineWay; title: string; line: string; tag: string; bg: string; fg: string }[] = [
+  { id: 'have', title: 'I have a routine', line: 'Add the products you already use in Routine. Willow follows how each one does.', tag: 'ADD YOURS LATER', bg: 'radial-gradient(90% 80% at 40% 100%, #4FB866 0%, #B8E986 45%, #EAF2E2 85%)', fg: '#0E2A12' },
+  { id: 'build', title: 'Build me one', line: 'Four short questions, then a simple routine in your budget, each product checked against what you tell us.', tag: 'ABOUT 2 MINUTES', bg: 'radial-gradient(90% 80% at 60% 100%, #7A5CFF 0%, #D8B8FF 45%, #EEE8F6 85%)', fg: '#1C0F4A' },
+  { id: 'track', title: 'Just tracking for now', line: 'Measure your skin first. You can build a routine any time from Routine.', tag: 'SKIP', bg: 'radial-gradient(90% 80% at 50% 100%, #9CD3FF 0%, #E6EEF6 60%, #F3F2EE 90%)', fg: '#0A1840' },
+]
+
+/** Your routine: keep your own, have Willow build one (/plan, which comes back here via ?next=), or skip. */
+function RoutineChoice() {
+  const navigate = useNavigate()
+  const { search } = useLocation()
+  const [way, setWay] = useState<RoutineWay | null>(null)
+  const next = () => {
+    if (way === 'build') navigate(`/plan?next=${encodeURIComponent(`/welcome/wisp${search}`)}`)
+    else navigate(`/welcome/wisp${search}`)
+  }
+  return (
+    <StepFrame
+      wide
+      eyebrow="YOUR ROUTINE"
+      title="Do you already use skincare?"
+      sub="Willow measures your skin either way. A routine lets it say which product did what."
+      actions={
+        <button type="button" onClick={next} disabled={!way} className={`${primary} disabled:opacity-60`}>
+          {way === 'build' ? 'Build my routine' : way ? 'Continue' : 'Choose one to continue'} {way ? <span aria-hidden>→</span> : null}
+        </button>
+      }
+    >
+      <div role="radiogroup" aria-label="Your routine" className="grid gap-2.5 sm:grid-cols-3">
+        {ROUTINE_WAYS.map((w, i) => {
+          const on = way === w.id
+          return (
+            <button
+              key={w.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => setWay(w.id)}
+              className="w-lift-sm relative flex min-h-[clamp(96px,17vh,210px)] flex-col justify-between gap-3 rounded-[24px] p-3.5 text-left transition-[box-shadow,transform] duration-300 ease-standard active:scale-[.98] sm:p-4"
+              style={{ background: w.bg, color: w.fg, animation: `wRise .5s var(--ease-standard) ${60 + i * 70}ms both`, boxShadow: on ? 'inset 0 0 0 2px #121212, inset 0 0 30px 4px rgba(255,255,255,.35)' : 'inset 0 0 30px 4px rgba(255,255,255,.35), 0 18px 40px -32px rgba(0,0,0,.45)' }}
+            >
+              <span className="flex items-start justify-between gap-2">
+                <span className="rounded-pill bg-white/40 px-2 py-1 font-mono text-[9.5px] tracking-[.06em]">{w.tag}</span>
+                <span aria-hidden className={`grid size-6 flex-none place-items-center rounded-full border-[1.5px] border-white/80 text-[12px] text-inverse transition-colors ${on ? 'bg-selected' : 'bg-white/30'}`}>
+                  {on ? <span className="animate-[wDotIn_.28s_var(--ease-bounce)_both]">✓</span> : ''}
+                </span>
+              </span>
+              <span>
+                <span className="block text-[clamp(18px,2.4vh,22px)] leading-[1.1] tracking-[-0.01em]">{w.title}</span>
+                <span className="mt-1 block text-[13px] leading-[1.35] opacity-85">{w.line}</span>
+              </span>
+            </button>
+          )
+        })}
       </div>
     </StepFrame>
   )

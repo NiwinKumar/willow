@@ -1,0 +1,2984 @@
+{
+ "cohort": {
+  "synthetic": 1701,
+  "real": 3,
+  "weeks": 8,
+  "dropout": 0.07,
+  "seed": 7
+ },
+ "empty": false,
+ "tiles": [
+  {
+   "label": "Active users",
+   "value": "540",
+   "n": 540,
+   "sub": "week 8, after dropout"
+  },
+  {
+   "label": "Top goal",
+   "value": "Shine and glow",
+   "n": 594,
+   "sub": "35% of users"
+  },
+  {
+   "label": "Unmet by week 8",
+   "value": "77%",
+   "n": 540,
+   "sub": "no visible change in a goal metric"
+  },
+  {
+   "label": "Median weeks to first visible change",
+   "value": "7",
+   "n": 441,
+   "sub": "among goals that got one"
+  }
+ ],
+ "needs": [
+  {
+   "goal": "Shine and glow",
+   "goal_id": "oil_glow",
+   "n": 594,
+   "real": 20,
+   "none": 19,
+   "early": 61,
+   "weeks": 7.0,
+   "weeks_n": 116
+  },
+  {
+   "goal": "Blemishes",
+   "goal_id": "blemishes",
+   "n": 543,
+   "real": 18,
+   "none": 22,
+   "early": 60,
+   "weeks": 7.0,
+   "weeks_n": 98
+  },
+  {
+   "goal": "Pores and texture",
+   "goal_id": "pores_texture",
+   "n": 471,
+   "real": 20,
+   "none": 16,
+   "early": 64,
+   "weeks": 7,
+   "weeks_n": 93
+  },
+  {
+   "goal": "Tone evenness",
+   "goal_id": "even_tone",
+   "n": 439,
+   "real": 3,
+   "none": 28,
+   "early": 69,
+   "weeks": 8,
+   "weeks_n": 11
+  },
+  {
+   "goal": "Dark spots",
+   "goal_id": "dark_spots",
+   "n": 434,
+   "real": 6,
+   "none": 16,
+   "early": 78,
+   "weeks": 8,
+   "weeks_n": 27
+  },
+  {
+   "goal": "Redness",
+   "goal_id": "redness",
+   "n": 334,
+   "real": 16,
+   "none": 12,
+   "early": 72,
+   "weeks": 7,
+   "weeks_n": 53
+  },
+  {
+   "goal": "Under-eye",
+   "goal_id": "under_eye",
+   "n": 285,
+   "real": 8,
+   "none": 27,
+   "early": 65,
+   "weeks": 8,
+   "weeks_n": 23
+  },
+  {
+   "goal": "Lines",
+   "goal_id": "lines",
+   "n": 234,
+   "real": 9,
+   "none": 18,
+   "early": 73,
+   "weeks": 7.0,
+   "weeks_n": 20
+  }
+ ],
+ "needs_by_month": {
+  "months": [
+   "2026-08",
+   "2026-09",
+   "2026-10"
+  ],
+  "people": [
+   690,
+   1371,
+   1594
+  ],
+  "goals": [
+   {
+    "goal": "Shine and glow",
+    "goal_id": "oil_glow",
+    "counts": [
+     286,
+     514,
+     546
+    ],
+    "share_of_peak": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "goal": "Blemishes",
+    "goal_id": "blemishes",
+    "counts": [
+     249,
+     456,
+     508
+    ],
+    "share_of_peak": [
+     0.87,
+     0.89,
+     0.93
+    ]
+   },
+   {
+    "goal": "Pores and texture",
+    "goal_id": "pores_texture",
+    "counts": [
+     200,
+     390,
+     443
+    ],
+    "share_of_peak": [
+     0.7,
+     0.76,
+     0.81
+    ]
+   },
+   {
+    "goal": "Tone evenness",
+    "goal_id": "even_tone",
+    "counts": [
+     160,
+     343,
+     404
+    ],
+    "share_of_peak": [
+     0.56,
+     0.67,
+     0.74
+    ]
+   },
+   {
+    "goal": "Dark spots",
+    "goal_id": "dark_spots",
+    "counts": [
+     99,
+     311,
+     414
+    ],
+    "share_of_peak": [
+     0.35,
+     0.61,
+     0.76
+    ]
+   },
+   {
+    "goal": "Redness",
+    "goal_id": "redness",
+    "counts": [
+     96,
+     236,
+     325
+    ],
+    "share_of_peak": [
+     0.34,
+     0.46,
+     0.6
+    ]
+   },
+   {
+    "goal": "Under-eye",
+    "goal_id": "under_eye",
+    "counts": [
+     114,
+     230,
+     263
+    ],
+    "share_of_peak": [
+     0.4,
+     0.45,
+     0.48
+    ]
+   },
+   {
+    "goal": "Lines",
+    "goal_id": "lines",
+    "counts": [
+     78,
+     179,
+     221
+    ],
+    "share_of_peak": [
+     0.27,
+     0.35,
+     0.4
+    ]
+   }
+  ]
+ },
+ "kpis": {
+  "catalog": {
+   "products": 152,
+   "with_outcomes": 43,
+   "below_min": 0,
+   "unused": 88,
+   "not_measured": 21
+  },
+  "continuation_wk8": {
+   "k": 525,
+   "n": 540,
+   "rate": 0.97
+  }
+ },
+ "products": [
+  {
+   "product_id": "dot-and-key-watermelon-sunscreen-spf-50",
+   "product": "Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin",
+   "brand": "Dot & Key",
+   "category": "sunscreen",
+   "concern": "shine",
+   "goal_ids": [
+    "oil_glow"
+   ],
+   "n": 101,
+   "cells": [
+    {
+     "value": 0.72,
+     "n": 18,
+     "suppressed": false
+    },
+    {
+     "value": 0.89,
+     "n": 19,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": 0.84,
+     "n": 19,
+     "suppressed": false
+    },
+    {
+     "value": 0.93,
+     "n": 15,
+     "suppressed": false
+    },
+    {
+     "value": 0.71,
+     "n": 21,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 0.9,
+     "n": 29,
+     "suppressed": false
+    },
+    {
+     "value": 0.95,
+     "n": 37,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": 0.6,
+     "n": 10,
+     "suppressed": false
+    },
+    {
+     "value": 0.69,
+     "n": 16,
+     "suppressed": false
+    }
+   ],
+   "rate": 0.81,
+   "lift": 0.37,
+   "base": {
+    "k": 80,
+    "n": 180,
+    "rate": 0.44
+   },
+   "weeks": 5.0,
+   "cont": 0.92,
+   "cont8": 0.74
+  },
+  {
+   "product_id": "the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50",
+   "product": "1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++",
+   "brand": "The Derma Co",
+   "category": "sunscreen",
+   "concern": "dark spots",
+   "goal_ids": [
+    "dark_spots",
+    "lines"
+   ],
+   "n": 100,
+   "cells": [
+    {
+     "value": 0.69,
+     "n": 16,
+     "suppressed": false
+    },
+    {
+     "value": 0.88,
+     "n": 16,
+     "suppressed": false
+    },
+    {
+     "value": 0.69,
+     "n": 16,
+     "suppressed": false
+    },
+    {
+     "value": 0.76,
+     "n": 17,
+     "suppressed": false
+    },
+    {
+     "value": 0.75,
+     "n": 16,
+     "suppressed": false
+    },
+    {
+     "value": 0.74,
+     "n": 19,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 0.83,
+     "n": 24,
+     "suppressed": false
+    },
+    {
+     "value": 0.79,
+     "n": 34,
+     "suppressed": false
+    },
+    {
+     "value": 0.55,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": 0.67,
+     "n": 15,
+     "suppressed": false
+    },
+    {
+     "value": 0.75,
+     "n": 16,
+     "suppressed": false
+    }
+   ],
+   "rate": 0.75,
+   "lift": 0.47,
+   "base": {
+    "k": 32,
+    "n": 113,
+    "rate": 0.28
+   },
+   "weeks": 6,
+   "cont": 0.95,
+   "cont8": 0.81
+  },
+  {
+   "product_id": "neutrogena-ultra-sheer-dry-touch-sunscreen-spf-55",
+   "product": "Ultra Sheer Dry-Touch Sunscreen Lotion Broad Spectrum SPF 55",
+   "brand": "Neutrogena",
+   "category": "sunscreen",
+   "concern": "shine",
+   "goal_ids": [
+    "oil_glow"
+   ],
+   "n": 86,
+   "cells": [
+    {
+     "value": 0.47,
+     "n": 17,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": 0.62,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": 0.76,
+     "n": 17,
+     "suppressed": false
+    },
+    {
+     "value": 0.5,
+     "n": 12,
+     "suppressed": false
+    },
+    {
+     "value": 0.56,
+     "n": 18,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 0.71,
+     "n": 17,
+     "suppressed": false
+    },
+    {
+     "value": 0.84,
+     "n": 25,
+     "suppressed": false
+    },
+    {
+     "value": 0.24,
+     "n": 17,
+     "suppressed": false
+    },
+    {
+     "value": 0.42,
+     "n": 12,
+     "suppressed": false
+    },
+    {
+     "value": 0.67,
+     "n": 15,
+     "suppressed": false
+    }
+   ],
+   "rate": 0.6,
+   "lift": 0.17,
+   "base": {
+    "k": 80,
+    "n": 185,
+    "rate": 0.43
+   },
+   "weeks": 6.0,
+   "cont": 0.87,
+   "cont8": 0.69
+  },
+  {
+   "product_id": "cosrx-the-niacinamide-15-serum",
+   "product": "The Niacinamide 15 Serum",
+   "brand": "COSRX",
+   "category": "serum",
+   "concern": "blemishes",
+   "goal_ids": [
+    "blemishes",
+    "dark_spots",
+    "oil_glow"
+   ],
+   "n": 68,
+   "cells": [
+    {
+     "value": 0.75,
+     "n": 12,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 4,
+     "suppressed": true
+    },
+    {
+     "value": 1.0,
+     "n": 10,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 15,
+     "suppressed": false
+    },
+    {
+     "value": 0.86,
+     "n": 14,
+     "suppressed": false
+    },
+    {
+     "value": 0.92,
+     "n": 13,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 1.0,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 17,
+     "suppressed": false
+    },
+    {
+     "value": 0.64,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 12,
+     "suppressed": false
+    },
+    {
+     "value": 0.8,
+     "n": 15,
+     "suppressed": false
+    }
+   ],
+   "rate": 0.9,
+   "lift": 0.2,
+   "base": {
+    "k": 245,
+    "n": 353,
+    "rate": 0.69
+   },
+   "weeks": 6,
+   "cont": 0.94,
+   "cont8": 0.79
+  },
+  {
+   "product_id": "minimalist-salicylic-acid-2-face-serum",
+   "product": "Salicylic Acid 2% Face Serum",
+   "brand": "Minimalist",
+   "category": "exfoliant",
+   "concern": "blemishes",
+   "goal_ids": [
+    "blemishes",
+    "oil_glow",
+    "pores_texture"
+   ],
+   "n": 68,
+   "cells": [
+    {
+     "value": 0.91,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 7,
+     "suppressed": true
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": 0.87,
+     "n": 15,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 17,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 1.0,
+     "n": 16,
+     "suppressed": false
+    },
+    {
+     "value": 0.96,
+     "n": 27,
+     "suppressed": false
+    },
+    {
+     "value": 0.91,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": null,
+     "n": 5,
+     "suppressed": true
+    }
+   ],
+   "rate": 0.96,
+   "lift": 0.22,
+   "base": {
+    "k": 281,
+    "n": 381,
+    "rate": 0.74
+   },
+   "weeks": 4,
+   "cont": 0.94,
+   "cont8": 0.75
+  },
+  {
+   "product_id": "beauty-of-joseon-glow-deep-serum-rice-alpha-arbutin",
+   "product": "Glow Deep Serum : Rice + Alpha-Arbutin",
+   "brand": "Beauty of Joseon",
+   "category": "serum",
+   "concern": "dark spots",
+   "goal_ids": [
+    "dark_spots",
+    "even_tone",
+    "oil_glow"
+   ],
+   "n": 67,
+   "cells": [
+    {
+     "value": 0.62,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": 0.45,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    },
+    {
+     "value": 0.8,
+     "n": 15,
+     "suppressed": false
+    },
+    {
+     "value": 0.4,
+     "n": 10,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 0.5,
+     "n": 14,
+     "suppressed": false
+    },
+    {
+     "value": 0.68,
+     "n": 22,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 8,
+     "suppressed": true
+    },
+    {
+     "value": 0.71,
+     "n": 14,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 9,
+     "suppressed": true
+    }
+   ],
+   "rate": 0.64,
+   "lift": 0.35,
+   "base": {
+    "k": 89,
+    "n": 309,
+    "rate": 0.29
+   },
+   "weeks": 7,
+   "cont": 0.93,
+   "cont8": 0.76
+  },
+  {
+   "product_id": "some-by-mi-aha-bha-pha-30-days-miracle-toner",
+   "product": "AHA-BHA-PHA 30 Days Miracle Toner",
+   "brand": "Some By Mi",
+   "category": "toner",
+   "concern": "blemishes",
+   "goal_ids": [
+    "blemishes",
+    "oil_glow",
+    "pores_texture"
+   ],
+   "n": 67,
+   "cells": [
+    {
+     "value": null,
+     "n": 4,
+     "suppressed": true
+    },
+    {
+     "value": 0.93,
+     "n": 14,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": 0.91,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 14,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 11,
+     "suppressed": false
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 1.0,
+     "n": 15,
+     "suppressed": false
+    },
+    {
+     "value": 0.95,
+     "n": 20,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 8,
+     "suppressed": true
+    }
+   ],
+   "rate": 0.97,
+   "lift": 0.23,
+   "base": {
+    "k": 288,
+    "n": 389,
+    "rate": 0.74
+   },
+   "weeks": 4,
+   "cont": 0.96,
+   "cont8": 0.81
+  },
+  {
+   "product_id": "minimalist-niacinamide-10-face-serum",
+   "product": "Niacinamide 10% Face Serum",
+   "brand": "Minimalist",
+   "category": "serum",
+   "concern": "blemishes",
+   "goal_ids": [
+    "blemishes",
+    "oil_glow",
+    "pores_texture"
+   ],
+   "n": 66,
+   "cells": [
+    {
+     "value": 0.85,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": 0.93,
+     "n": 14,
+     "suppressed": false
+    },
+    {
+     "value": 0.91,
+     "n": 11,
+     "suppressed": false
+    },
+    {
+     "value": 1.0,
+     "n": 10,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 5,
+     "suppressed": true
+    }
+   ],
+   "cells_skin": [
+    {
+     "value": 0.92,
+     "n": 12,
+     "suppressed": false
+    },
+    {
+     "value": 0.95,
+     "n": 19,
+     "suppressed": false
+    },
+    {
+     "value": 0.85,
+     "n": 13,
+     "suppressed": false
+    },
+    {
+     "value": 0.94,
+     "n": 16,
+     "suppressed": false
+    },
+    {
+     "value": null,
+     "n": 6,
+     "suppressed": true
+    }
+   ],
+   "rate": 0.92,
+   "lift": 0.18,
+   "base": {
+    "k": 287,
+    "n": 385,
+    "rate": 0.75
+   },
+   "weeks": 6,
+   "cont": 0.92,
+   "cont8": 0.8
+  }
+ ],
+ "product_outcomes": {
+  "dot-and-key-watermelon-sunscreen-spf-50": {
+   "n": 101,
+   "rate": 0.81,
+   "weeks": 5.0,
+   "product": "Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin",
+   "brand": "Dot & Key",
+   "category": "sunscreen",
+   "concern": "shine",
+   "cont": 0.92,
+   "cont8": 0.74,
+   "lift": 0.37
+  },
+  "the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50": {
+   "n": 100,
+   "rate": 0.75,
+   "weeks": 6,
+   "product": "1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++",
+   "brand": "The Derma Co",
+   "category": "sunscreen",
+   "concern": "dark spots",
+   "cont": 0.95,
+   "cont8": 0.81,
+   "lift": 0.47
+  },
+  "neutrogena-ultra-sheer-dry-touch-sunscreen-spf-55": {
+   "n": 86,
+   "rate": 0.6,
+   "weeks": 6.0,
+   "product": "Ultra Sheer Dry-Touch Sunscreen Lotion Broad Spectrum SPF 55",
+   "brand": "Neutrogena",
+   "category": "sunscreen",
+   "concern": "shine",
+   "cont": 0.87,
+   "cont8": 0.69,
+   "lift": 0.17
+  },
+  "cosrx-the-niacinamide-15-serum": {
+   "n": 68,
+   "rate": 0.9,
+   "weeks": 6,
+   "product": "The Niacinamide 15 Serum",
+   "brand": "COSRX",
+   "category": "serum",
+   "concern": "blemishes",
+   "cont": 0.94,
+   "cont8": 0.79,
+   "lift": 0.2
+  },
+  "minimalist-salicylic-acid-2-face-serum": {
+   "n": 68,
+   "rate": 0.96,
+   "weeks": 4,
+   "product": "Salicylic Acid 2% Face Serum",
+   "brand": "Minimalist",
+   "category": "exfoliant",
+   "concern": "blemishes",
+   "cont": 0.94,
+   "cont8": 0.75,
+   "lift": 0.22
+  },
+  "beauty-of-joseon-glow-deep-serum-rice-alpha-arbutin": {
+   "n": 67,
+   "rate": 0.64,
+   "weeks": 7,
+   "product": "Glow Deep Serum : Rice + Alpha-Arbutin",
+   "brand": "Beauty of Joseon",
+   "category": "serum",
+   "concern": "dark spots",
+   "cont": 0.93,
+   "cont8": 0.76,
+   "lift": 0.35
+  },
+  "some-by-mi-aha-bha-pha-30-days-miracle-toner": {
+   "n": 67,
+   "rate": 0.97,
+   "weeks": 4,
+   "product": "AHA-BHA-PHA 30 Days Miracle Toner",
+   "brand": "Some By Mi",
+   "category": "toner",
+   "concern": "blemishes",
+   "cont": 0.96,
+   "cont8": 0.81,
+   "lift": 0.23
+  },
+  "minimalist-niacinamide-10-face-serum": {
+   "n": 66,
+   "rate": 0.92,
+   "weeks": 6,
+   "product": "Niacinamide 10% Face Serum",
+   "brand": "Minimalist",
+   "category": "serum",
+   "concern": "blemishes",
+   "cont": 0.92,
+   "cont8": 0.8,
+   "lift": 0.18
+  },
+  "beauty-of-joseon-revive-eye-serum-ginseng-retinal": {
+   "n": 64,
+   "rate": 0.64,
+   "weeks": 7,
+   "product": "Revive Eye Serum : Ginseng + Retinal",
+   "brand": "Beauty of Joseon",
+   "category": "eye_care",
+   "concern": "fine lines",
+   "cont": 0.93,
+   "cont8": 0.73,
+   "lift": 0.32
+  },
+  "paulas-choice-skin-perfecting-2-bha-liquid-exfoliant": {
+   "n": 63,
+   "rate": 0.87,
+   "weeks": 5,
+   "product": "Skin Perfecting 2% BHA Liquid Exfoliant",
+   "brand": "Paula's Choice",
+   "category": "exfoliant",
+   "concern": "texture",
+   "cont": 0.88,
+   "cont8": 0.65,
+   "lift": 0.12
+  },
+  "la-roche-posay-anthelios-uvmune-400-invisible-fluid-spf50": {
+   "n": 62,
+   "rate": 0.32,
+   "weeks": 7.0,
+   "product": "Anthelios UVMune 400 Invisible Fluid SPF50+",
+   "brand": "La Roche-Posay",
+   "category": "sunscreen",
+   "concern": "redness",
+   "cont": 0.9,
+   "cont8": 0.77,
+   "lift": -0.28
+  },
+  "cosrx-bha-blackhead-power-liquid": {
+   "n": 61,
+   "rate": 0.72,
+   "weeks": 6.5,
+   "product": "BHA Blackhead Power Liquid",
+   "brand": "COSRX",
+   "category": "exfoliant",
+   "concern": "texture",
+   "cont": 0.94,
+   "cont8": 0.82,
+   "lift": -0.06
+  },
+  "the-ordinary-retinal-0-2-emulsion": {
+   "n": 61,
+   "rate": 0.57,
+   "weeks": 7,
+   "product": "Retinal 0.2% Emulsion",
+   "brand": "The Ordinary",
+   "category": "treatment",
+   "concern": "fine lines",
+   "cont": 0.93,
+   "cont8": 0.87,
+   "lift": -0.01
+  },
+  "plum-vitamin-c-peptide-caffeine-under-eye-cream": {
+   "n": 60,
+   "rate": 0.68,
+   "weeks": 7,
+   "product": "3% Vitamin C, 3% Peptide & 3% Caffeine Under Eye Cream with Mandarin",
+   "brand": "Plum",
+   "category": "eye_care",
+   "concern": "under-eye",
+   "cont": 0.93,
+   "cont8": 0.78,
+   "lift": 0.35
+  },
+  "the-derma-co-sali-cinamide-anti-acne-face-wash": {
+   "n": 55,
+   "rate": 0.85,
+   "weeks": 5,
+   "product": "2% Sali-Cinamide Anti-Acne Face Wash with 2% Salicylic Acid & 2% Niacinamide - 80ml",
+   "brand": "The Derma Co",
+   "category": "cleanser",
+   "concern": "blemishes",
+   "cont": 0.94,
+   "cont8": 0.8,
+   "lift": 0.1
+  },
+  "dot-and-key-cica-calming-night-gel": {
+   "n": 53,
+   "rate": 0.85,
+   "weeks": 6,
+   "product": "Cica Calming Night Gel (Niacinamide + Green Tea)",
+   "brand": "Dot & Key",
+   "category": "moisturizer",
+   "concern": "redness",
+   "cont": 0.92,
+   "cont8": 0.75,
+   "lift": 0.21
+  },
+  "kiehls-creamy-eye-treatment-with-avocado": {
+   "n": 53,
+   "rate": 0.04,
+   "weeks": 6.5,
+   "product": "Creamy Eye Treatment with Avocado",
+   "brand": "Kiehl's",
+   "category": "eye_care",
+   "concern": "under-eye",
+   "cont": 0.92,
+   "cont8": 0.74,
+   "lift": -0.32
+  },
+  "plum-green-tea-alcohol-free-toner": {
+   "n": 52,
+   "rate": 0.62,
+   "weeks": 6.0,
+   "product": "Green Tea Alcohol-Free Pore Tightening Face Toner For Oily & Acne-Prone Skin",
+   "brand": "Plum",
+   "category": "toner",
+   "concern": "shine",
+   "cont": 0.93,
+   "cont8": 0.73,
+   "lift": -0.17
+  },
+  "the-ordinary-azelaic-acid-suspension-10": {
+   "n": 51,
+   "rate": 0.51,
+   "weeks": 6.5,
+   "product": "Azelaic Acid Suspension 10%",
+   "brand": "The Ordinary",
+   "category": "treatment",
+   "concern": "uneven tone",
+   "cont": 0.95,
+   "cont8": 0.76,
+   "lift": -0.05
+  },
+  "the-derma-co-tran-zelaic-pigmentation-corrector-serum": {
+   "n": 49,
+   "rate": 0.88,
+   "weeks": 7,
+   "product": "Tran-Zelaic Pigmentation Corrector Serum with Tranexamic Acid & Azelaic Acid - 30ml",
+   "brand": "The Derma Co",
+   "category": "serum",
+   "concern": "dark spots",
+   "cont": 0.94,
+   "cont8": 0.86,
+   "lift": 0.3
+  },
+  "the-ordinary-glycolic-acid-7-exfoliating-toner": {
+   "n": 49,
+   "rate": 0.78,
+   "weeks": 6.0,
+   "product": "Glycolic Acid 7% Exfoliating Toner",
+   "brand": "The Ordinary",
+   "category": "toner",
+   "concern": "texture",
+   "cont": 0.9,
+   "cont8": 0.65,
+   "lift": 0.26
+  },
+  "beauty-of-joseon-red-bean-refreshing-pore-mask": {
+   "n": 47,
+   "rate": 0.53,
+   "weeks": 6,
+   "product": "Red Bean Refreshing Pore Mask",
+   "brand": "Beauty of Joseon",
+   "category": "mask",
+   "concern": "texture",
+   "cont": 0.94,
+   "cont8": 0.72,
+   "lift": -0.12
+  },
+  "clinique-even-better-clinical-dark-spot-clearing-serum": {
+   "n": 47,
+   "rate": 0.32,
+   "weeks": 8,
+   "product": "Even Better Clinical\u2122 Dark Spot Clearing Serum",
+   "brand": "Clinique",
+   "category": "serum",
+   "concern": "dark spots",
+   "cont": 0.94,
+   "cont8": 0.74,
+   "lift": -0.03
+  },
+  "cosrx-low-ph-good-morning-gel-cleanser": {
+   "n": 45,
+   "rate": 0.78,
+   "weeks": 6,
+   "product": "Low pH Good Morning Gel Cleanser",
+   "brand": "COSRX",
+   "category": "cleanser",
+   "concern": "shine",
+   "cont": 0.95,
+   "cont8": 0.84,
+   "lift": 0.12
+  },
+  "cerave-resurfacing-retinol-serum": {
+   "n": 44,
+   "rate": 0.68,
+   "weeks": 8.0,
+   "product": "Resurfacing Retinol Serum",
+   "brand": "CeraVe",
+   "category": "serum",
+   "concern": "dark spots",
+   "cont": 0.91,
+   "cont8": 0.82,
+   "lift": -0.09
+  },
+  "the-ordinary-niacinamide-10-zinc-1": {
+   "n": 44,
+   "rate": 0.84,
+   "weeks": 6,
+   "product": "Niacinamide 10% + Zinc 1%",
+   "brand": "The Ordinary",
+   "category": "serum",
+   "concern": "shine",
+   "cont": 0.94,
+   "cont8": 0.8,
+   "lift": 0.08
+  },
+  "minimalist-glycolic-acid-8-exfoliating-liquid": {
+   "n": 43,
+   "rate": 0.44,
+   "weeks": 7,
+   "product": "Glycolic Acid 8% Exfoliating Liquid",
+   "brand": "Minimalist",
+   "category": "exfoliant",
+   "concern": "texture",
+   "cont": 0.88,
+   "cont8": 0.74,
+   "lift": -0.12
+  },
+  "some-by-mi-galactomyces-pure-vitamin-c-glow-serum": {
+   "n": 43,
+   "rate": 0.3,
+   "weeks": 8,
+   "product": "Galactomyces Pure Vitamin C Glow Serum",
+   "brand": "Some By Mi",
+   "category": "serum",
+   "concern": "dullness",
+   "cont": 0.91,
+   "cont8": 0.88,
+   "lift": -0.05
+  },
+  "minimalist-retinol-0-3-face-serum": {
+   "n": 41,
+   "rate": 0.51,
+   "weeks": 7,
+   "product": "Retinol 0.3% Face Serum",
+   "brand": "Minimalist",
+   "category": "treatment",
+   "concern": "fine lines",
+   "cont": 0.92,
+   "cont8": 0.8,
+   "lift": -0.09
+  },
+  "cosrx-the-retinol-0-1-cream": {
+   "n": 40,
+   "rate": 0.8,
+   "weeks": 6.0,
+   "product": "The Retinol 0.1 Cream",
+   "brand": "COSRX",
+   "category": "treatment",
+   "concern": "fine lines",
+   "cont": 0.92,
+   "cont8": 0.7,
+   "lift": 0.23
+  },
+  "cerave-acne-foaming-cream-cleanser": {
+   "n": 40,
+   "rate": 0.68,
+   "weeks": 7,
+   "product": "Acne Foaming Cream Cleanser",
+   "brand": "CeraVe",
+   "category": "cleanser",
+   "concern": "blemishes",
+   "cont": 0.9,
+   "cont8": 0.82,
+   "lift": 0.01
+  },
+  "kiehls-rare-earth-pore-minimizing-clay-mask": {
+   "n": 39,
+   "rate": 0.85,
+   "weeks": 5,
+   "product": "Rare Earth Pore-Minimizing Clay Mask",
+   "brand": "Kiehl's",
+   "category": "mask",
+   "concern": "texture",
+   "cont": 0.92,
+   "cont8": 0.67,
+   "lift": 0.22
+  },
+  "paulas-choice-c15-super-booster": {
+   "n": 38,
+   "rate": 0.47,
+   "weeks": 7.0,
+   "product": "C15 Super Booster",
+   "brand": "Paula's Choice",
+   "category": "serum",
+   "concern": "dullness",
+   "cont": 0.93,
+   "cont8": 0.82,
+   "lift": 0.13
+  },
+  "bioderma-sensibio-h2o-micellar-water": {
+   "n": 36,
+   "rate": 0.31,
+   "weeks": 6,
+   "product": "Sensibio H2O Micellar Water",
+   "brand": "Bioderma",
+   "category": "cleanser",
+   "concern": "redness",
+   "cont": 0.92,
+   "cont8": 0.75,
+   "lift": -0.34
+  },
+  "the-ordinary-alpha-arbutin-2-ha": {
+   "n": 35,
+   "rate": 0.17,
+   "weeks": 8.0,
+   "product": "Alpha Arbutin 2% + HA",
+   "brand": "The Ordinary",
+   "category": "serum",
+   "concern": "dark spots",
+   "cont": 0.93,
+   "cont8": 0.71,
+   "lift": -0.1
+  },
+  "dot-and-key-barrier-repair-intense-moisturizer-ceramides": {
+   "n": 34,
+   "rate": 0.41,
+   "weeks": 7.0,
+   "product": "Barrier Repair Intense Moisturizer With Ceramides",
+   "brand": "Dot & Key",
+   "category": "moisturizer",
+   "concern": "dryness",
+   "cont": 0.92,
+   "cont8": 0.85,
+   "lift": -0.18
+  },
+  "the-derma-co-2-niacinamide-gentle-skin-cleanser": {
+   "n": 32,
+   "rate": 0.66,
+   "weeks": 7,
+   "product": "2% Niacinamide Gentle Skin Cleanser for Sensitive, Dry & Normal Skin - 125 ml",
+   "brand": "The Derma Co",
+   "category": "cleanser",
+   "concern": "dryness",
+   "cont": 0.94,
+   "cont8": 0.84,
+   "lift": 0.11
+  },
+  "dot-and-key-mango-detan-clay-mask": {
+   "n": 31,
+   "rate": 0.42,
+   "weeks": 7,
+   "product": "Mango Detan Clay Mask",
+   "brand": "Dot & Key",
+   "category": "mask",
+   "concern": "dullness",
+   "cont": 0.9,
+   "cont8": 0.61,
+   "lift": -0.14
+  },
+  "la-roche-posay-cicaplast-baume-b5-plus": {
+   "n": 31,
+   "rate": 0.77,
+   "weeks": 5.0,
+   "product": "Cicaplast Baume B5+",
+   "brand": "La Roche-Posay",
+   "category": "moisturizer",
+   "concern": "dryness",
+   "cont": 0.95,
+   "cont8": 0.68,
+   "lift": 0.25
+  },
+  "plum-15-vitamin-c-mandarin-glow-boost-serum": {
+   "n": 31,
+   "rate": 0.61,
+   "weeks": 8,
+   "product": "15% Vitamin C & Mandarin Glow Boost Serum",
+   "brand": "Plum",
+   "category": "serum",
+   "concern": "dullness",
+   "cont": 0.95,
+   "cont8": 0.9,
+   "lift": 0.32
+  },
+  "round-lab-mugwort-calming-toner": {
+   "n": 28,
+   "rate": 0.75,
+   "weeks": 5,
+   "product": "Mugwort Calming Toner",
+   "brand": "Round Lab",
+   "category": "toner",
+   "concern": "redness",
+   "cont": 0.9,
+   "cont8": 0.75,
+   "lift": 0.21
+  },
+  "cosrx-acne-pimple-master-patch": {
+   "n": 25,
+   "rate": 0.84,
+   "weeks": 4,
+   "product": "Acne Pimple Master Patch",
+   "brand": "COSRX",
+   "category": "treatment",
+   "concern": "blemishes",
+   "cont": 0.97,
+   "cont8": 0.88,
+   "lift": 0.25
+  },
+  "minimalist-alpha-arbutin-2-face-serum": {
+   "n": 25,
+   "rate": 0.12,
+   "weeks": 6,
+   "product": "Alpha Arbutin 2% Face Serum",
+   "brand": "Minimalist",
+   "category": "serum",
+   "concern": "dark spots",
+   "cont": 0.93,
+   "cont8": 0.8,
+   "lift": -0.16
+  }
+ },
+ "tone_bands": [
+  "very light",
+  "light",
+  "intermediate",
+  "tan",
+  "brown",
+  "dark"
+ ],
+ "skin_types": [
+  "Oily",
+  "Combination",
+  "Dry",
+  "Normal",
+  "Sensitive"
+ ],
+ "brands": [
+  {
+   "brand": "COSRX",
+   "n": 209,
+   "rate": 0.81,
+   "lo": 0.76,
+   "hi": 0.86,
+   "cont": 0.92
+  },
+  {
+   "brand": "The Derma Co",
+   "n": 204,
+   "rate": 0.79,
+   "lo": 0.73,
+   "hi": 0.84,
+   "cont": 0.94
+  },
+  {
+   "brand": "Round Lab",
+   "n": 28,
+   "rate": 0.75,
+   "lo": 0.57,
+   "hi": 0.87,
+   "cont": 0.86
+  },
+  {
+   "brand": "Some By Mi",
+   "n": 106,
+   "rate": 0.73,
+   "lo": 0.63,
+   "hi": 0.8,
+   "cont": 0.96
+  },
+  {
+   "brand": "CeraVe",
+   "n": 78,
+   "rate": 0.72,
+   "lo": 0.61,
+   "hi": 0.81,
+   "cont": 0.9
+  },
+  {
+   "brand": "Paula's Choice",
+   "n": 100,
+   "rate": 0.72,
+   "lo": 0.63,
+   "hi": 0.8,
+   "cont": 0.87
+  },
+  {
+   "brand": "Dot & Key",
+   "n": 197,
+   "rate": 0.71,
+   "lo": 0.64,
+   "hi": 0.77,
+   "cont": 0.89
+  },
+  {
+   "brand": "Minimalist",
+   "n": 205,
+   "rate": 0.71,
+   "lo": 0.64,
+   "hi": 0.77,
+   "cont": 0.92
+  }
+ ],
+ "brands_hidden": 0,
+ "categories": [
+  {
+   "category": "cleanser",
+   "label": "Cleansers",
+   "flows": [
+    {
+     "goal": "Blemishes",
+     "goal_id": "blemishes",
+     "n": 67,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      3,
+      14,
+      40
+     ],
+     "using": [
+      64,
+      63,
+      60
+     ],
+     "rate": 0.6,
+     "median_weeks": 7.0,
+     "base": {
+      "k": 58,
+      "n": 151,
+      "rate": 0.38
+     }
+    },
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 64,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      8,
+      39
+     ],
+     "using": [
+      63,
+      61,
+      60
+     ],
+     "rate": 0.61,
+     "median_weeks": 7,
+     "base": {
+      "k": 77,
+      "n": 164,
+      "rate": 0.47
+     }
+    },
+    {
+     "goal": "Redness",
+     "goal_id": "redness",
+     "n": 36,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      5,
+      18
+     ],
+     "using": [
+      30,
+      31,
+      33
+     ],
+     "rate": 0.5,
+     "median_weeks": 7.0,
+     "base": {
+      "k": 35,
+      "n": 56,
+      "rate": 0.62
+     }
+    },
+    {
+     "goal": "Pores and texture",
+     "goal_id": "pores_texture",
+     "n": 17,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      4,
+      10
+     ],
+     "using": [
+      14,
+      13,
+      13
+     ],
+     "rate": 0.59,
+     "median_weeks": 5.5,
+     "base": {
+      "k": 83,
+      "n": 153,
+      "rate": 0.54
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "COSRX",
+     "n": 45,
+     "rate": 0.78,
+     "lo": 0.64,
+     "hi": 0.87,
+     "cont": 0.93
+    },
+    {
+     "brand": "The Derma Co",
+     "n": 85,
+     "rate": 0.78,
+     "lo": 0.68,
+     "hi": 0.85,
+     "cont": 0.93
+    },
+    {
+     "brand": "CeraVe",
+     "n": 40,
+     "rate": 0.68,
+     "lo": 0.52,
+     "hi": 0.8,
+     "cont": 0.9
+    },
+    {
+     "brand": "Bioderma",
+     "n": 36,
+     "rate": 0.31,
+     "lo": 0.18,
+     "hi": 0.47,
+     "cont": 0.94
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "exfoliant",
+   "label": "Exfoliants",
+   "flows": [
+    {
+     "goal": "Blemishes",
+     "goal_id": "blemishes",
+     "n": 89,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      11,
+      47
+     ],
+     "using": [
+      84,
+      83,
+      75
+     ],
+     "rate": 0.53,
+     "median_weeks": 6,
+     "base": {
+      "k": 51,
+      "n": 129,
+      "rate": 0.4
+     }
+    },
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 82,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      12,
+      45
+     ],
+     "using": [
+      78,
+      77,
+      72
+     ],
+     "rate": 0.55,
+     "median_weeks": 6,
+     "base": {
+      "k": 71,
+      "n": 146,
+      "rate": 0.49
+     }
+    },
+    {
+     "goal": "Pores and texture",
+     "goal_id": "pores_texture",
+     "n": 76,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      3,
+      17,
+      48
+     ],
+     "using": [
+      72,
+      71,
+      67
+     ],
+     "rate": 0.63,
+     "median_weeks": 6.5,
+     "base": {
+      "k": 45,
+      "n": 94,
+      "rate": 0.48
+     }
+    },
+    {
+     "goal": "Tone evenness",
+     "goal_id": "even_tone",
+     "n": 12,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      0,
+      2
+     ],
+     "using": [
+      12,
+      10,
+      8
+     ],
+     "rate": 0.17,
+     "median_weeks": null,
+     "base": {
+      "k": 9,
+      "n": 120,
+      "rate": 0.07
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "Paula's Choice",
+     "n": 63,
+     "rate": 0.87,
+     "lo": 0.77,
+     "hi": 0.93,
+     "cont": 0.84
+    },
+    {
+     "brand": "Minimalist",
+     "n": 107,
+     "rate": 0.76,
+     "lo": 0.67,
+     "hi": 0.83,
+     "cont": 0.92
+    },
+    {
+     "brand": "COSRX",
+     "n": 61,
+     "rate": 0.72,
+     "lo": 0.6,
+     "hi": 0.82,
+     "cont": 0.93
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "eye_care",
+   "label": "Eye care",
+   "flows": [
+    {
+     "goal": "Under-eye",
+     "goal_id": "under_eye",
+     "n": 99,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      2,
+      23
+     ],
+     "using": [
+      83,
+      86,
+      82
+     ],
+     "rate": 0.23,
+     "median_weeks": 8,
+     "base": null
+    },
+    {
+     "goal": "Lines",
+     "goal_id": "lines",
+     "n": 22,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      3,
+      9
+     ],
+     "using": [
+      17,
+      16,
+      17
+     ],
+     "rate": 0.41,
+     "median_weeks": null,
+     "base": {
+      "k": 11,
+      "n": 41,
+      "rate": 0.27
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "Plum",
+     "n": 60,
+     "rate": 0.68,
+     "lo": 0.56,
+     "hi": 0.79,
+     "cont": 0.9
+    },
+    {
+     "brand": "Beauty of Joseon",
+     "n": 64,
+     "rate": 0.64,
+     "lo": 0.52,
+     "hi": 0.75,
+     "cont": 0.92
+    },
+    {
+     "brand": "Kiehl's",
+     "n": 53,
+     "rate": 0.04,
+     "lo": 0.01,
+     "hi": 0.13,
+     "cont": 0.87
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "mask",
+   "label": "Masks",
+   "flows": [
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 55,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      8,
+      25
+     ],
+     "using": [
+      52,
+      51,
+      46
+     ],
+     "rate": 0.45,
+     "median_weeks": 5,
+     "base": {
+      "k": 91,
+      "n": 173,
+      "rate": 0.53
+     }
+    },
+    {
+     "goal": "Pores and texture",
+     "goal_id": "pores_texture",
+     "n": 40,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      5,
+      18
+     ],
+     "using": [
+      39,
+      39,
+      30
+     ],
+     "rate": 0.45,
+     "median_weeks": 7.0,
+     "base": {
+      "k": 75,
+      "n": 130,
+      "rate": 0.58
+     }
+    },
+    {
+     "goal": "Tone evenness",
+     "goal_id": "even_tone",
+     "n": 15,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      0,
+      1
+     ],
+     "using": [
+      11,
+      12,
+      10
+     ],
+     "rate": 0.07,
+     "median_weeks": null,
+     "base": {
+      "k": 10,
+      "n": 117,
+      "rate": 0.09
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "Kiehl's",
+     "n": 39,
+     "rate": 0.85,
+     "lo": 0.7,
+     "hi": 0.93,
+     "cont": 0.9
+    },
+    {
+     "brand": "Beauty of Joseon",
+     "n": 47,
+     "rate": 0.53,
+     "lo": 0.39,
+     "hi": 0.67,
+     "cont": 0.94
+    },
+    {
+     "brand": "Dot & Key",
+     "n": 31,
+     "rate": 0.42,
+     "lo": 0.26,
+     "hi": 0.59,
+     "cont": 0.84
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "moisturizer",
+   "label": "Moisturisers",
+   "flows": [
+    {
+     "goal": "Redness",
+     "goal_id": "redness",
+     "n": 39,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      10,
+      27
+     ],
+     "using": [
+      33,
+      32,
+      34
+     ],
+     "rate": 0.69,
+     "median_weeks": 6,
+     "base": {
+      "k": 26,
+      "n": 53,
+      "rate": 0.49
+     }
+    },
+    {
+     "goal": "Blemishes",
+     "goal_id": "blemishes",
+     "n": 29,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      4,
+      19
+     ],
+     "using": [
+      23,
+      22,
+      22
+     ],
+     "rate": 0.66,
+     "median_weeks": 8,
+     "base": {
+      "k": 79,
+      "n": 189,
+      "rate": 0.42
+     }
+    },
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 16,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      4,
+      9
+     ],
+     "using": [
+      9,
+      9,
+      11
+     ],
+     "rate": 0.56,
+     "median_weeks": null,
+     "base": {
+      "k": 107,
+      "n": 212,
+      "rate": 0.5
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "La Roche-Posay",
+     "n": 31,
+     "rate": 0.77,
+     "lo": 0.6,
+     "hi": 0.89,
+     "cont": 0.9
+    },
+    {
+     "brand": "Dot & Key",
+     "n": 83,
+     "rate": 0.67,
+     "lo": 0.57,
+     "hi": 0.77,
+     "cont": 0.9
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "serum",
+   "label": "Serums",
+   "flows": [
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 127,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      13,
+      66
+     ],
+     "using": [
+      117,
+      121,
+      120
+     ],
+     "rate": 0.52,
+     "median_weeks": 6.5,
+     "base": {
+      "k": 50,
+      "n": 101,
+      "rate": 0.5
+     }
+    },
+    {
+     "goal": "Blemishes",
+     "goal_id": "blemishes",
+     "n": 111,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      2,
+      10,
+      51
+     ],
+     "using": [
+      98,
+      100,
+      99
+     ],
+     "rate": 0.46,
+     "median_weeks": 7,
+     "base": {
+      "k": 47,
+      "n": 107,
+      "rate": 0.44
+     }
+    },
+    {
+     "goal": "Tone evenness",
+     "goal_id": "even_tone",
+     "n": 89,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      0,
+      9
+     ],
+     "using": [
+      84,
+      84,
+      81
+     ],
+     "rate": 0.1,
+     "median_weeks": null,
+     "base": {
+      "k": 2,
+      "n": 43,
+      "rate": 0.05
+     }
+    },
+    {
+     "goal": "Dark spots",
+     "goal_id": "dark_spots",
+     "n": 87,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      0,
+      21
+     ],
+     "using": [
+      77,
+      80,
+      84
+     ],
+     "rate": 0.24,
+     "median_weeks": 8,
+     "base": null
+    },
+    {
+     "goal": "Pores and texture",
+     "goal_id": "pores_texture",
+     "n": 58,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      10,
+      37
+     ],
+     "using": [
+      54,
+      54,
+      50
+     ],
+     "rate": 0.64,
+     "median_weeks": 7,
+     "base": {
+      "k": 56,
+      "n": 112,
+      "rate": 0.5
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "COSRX",
+     "n": 68,
+     "rate": 0.9,
+     "lo": 0.8,
+     "hi": 0.95,
+     "cont": 0.91
+    },
+    {
+     "brand": "The Derma Co",
+     "n": 49,
+     "rate": 0.88,
+     "lo": 0.76,
+     "hi": 0.94,
+     "cont": 0.96
+    },
+    {
+     "brand": "Minimalist",
+     "n": 89,
+     "rate": 0.72,
+     "lo": 0.62,
+     "hi": 0.8,
+     "cont": 0.92
+    },
+    {
+     "brand": "CeraVe",
+     "n": 44,
+     "rate": 0.68,
+     "lo": 0.53,
+     "hi": 0.8,
+     "cont": 0.91
+    },
+    {
+     "brand": "Beauty of Joseon",
+     "n": 67,
+     "rate": 0.64,
+     "lo": 0.52,
+     "hi": 0.75,
+     "cont": 0.93
+    },
+    {
+     "brand": "Plum",
+     "n": 31,
+     "rate": 0.61,
+     "lo": 0.44,
+     "hi": 0.76,
+     "cont": 0.97
+    },
+    {
+     "brand": "The Ordinary",
+     "n": 76,
+     "rate": 0.55,
+     "lo": 0.44,
+     "hi": 0.66,
+     "cont": 0.96
+    },
+    {
+     "brand": "Paula's Choice",
+     "n": 38,
+     "rate": 0.47,
+     "lo": 0.32,
+     "hi": 0.63,
+     "cont": 0.92
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "sunscreen",
+   "label": "Sunscreens",
+   "flows": [
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 71,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      14,
+      48
+     ],
+     "using": [
+      59,
+      55,
+      61
+     ],
+     "rate": 0.68,
+     "median_weeks": 6.0,
+     "base": {
+      "k": 68,
+      "n": 157,
+      "rate": 0.43
+     }
+    },
+    {
+     "goal": "Dark spots",
+     "goal_id": "dark_spots",
+     "n": 24,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      0,
+      16
+     ],
+     "using": [
+      22,
+      21,
+      20
+     ],
+     "rate": 0.67,
+     "median_weeks": 8.0,
+     "base": {
+      "k": 11,
+      "n": 72,
+      "rate": 0.15
+     }
+    },
+    {
+     "goal": "Redness",
+     "goal_id": "redness",
+     "n": 22,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      3,
+      11
+     ],
+     "using": [
+      18,
+      17,
+      16
+     ],
+     "rate": 0.5,
+     "median_weeks": 7,
+     "base": {
+      "k": 42,
+      "n": 70,
+      "rate": 0.6
+     }
+    },
+    {
+     "goal": "Lines",
+     "goal_id": "lines",
+     "n": 18,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      3,
+      9
+     ],
+     "using": [
+      15,
+      16,
+      14
+     ],
+     "rate": 0.5,
+     "median_weeks": null,
+     "base": {
+      "k": 11,
+      "n": 45,
+      "rate": 0.24
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "Dot & Key",
+     "n": 101,
+     "rate": 0.81,
+     "lo": 0.72,
+     "hi": 0.88,
+     "cont": 0.91
+    },
+    {
+     "brand": "The Derma Co",
+     "n": 100,
+     "rate": 0.75,
+     "lo": 0.66,
+     "hi": 0.82,
+     "cont": 0.95
+    },
+    {
+     "brand": "Neutrogena",
+     "n": 86,
+     "rate": 0.6,
+     "lo": 0.5,
+     "hi": 0.7,
+     "cont": 0.83
+    },
+    {
+     "brand": "La Roche-Posay",
+     "n": 62,
+     "rate": 0.32,
+     "lo": 0.22,
+     "hi": 0.45,
+     "cont": 0.89
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "toner",
+   "label": "Toners",
+   "flows": [
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 67,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      11,
+      38
+     ],
+     "using": [
+      56,
+      62,
+      60
+     ],
+     "rate": 0.57,
+     "median_weeks": 7.0,
+     "base": {
+      "k": 78,
+      "n": 161,
+      "rate": 0.48
+     }
+    },
+    {
+     "goal": "Pores and texture",
+     "goal_id": "pores_texture",
+     "n": 51,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      4,
+      13,
+      32
+     ],
+     "using": [
+      45,
+      47,
+      42
+     ],
+     "rate": 0.63,
+     "median_weeks": 6.0,
+     "base": {
+      "k": 61,
+      "n": 119,
+      "rate": 0.51
+     }
+    },
+    {
+     "goal": "Blemishes",
+     "goal_id": "blemishes",
+     "n": 48,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      2,
+      10,
+      30
+     ],
+     "using": [
+      34,
+      39,
+      43
+     ],
+     "rate": 0.62,
+     "median_weeks": 7.0,
+     "base": {
+      "k": 68,
+      "n": 170,
+      "rate": 0.4
+     }
+    },
+    {
+     "goal": "Redness",
+     "goal_id": "redness",
+     "n": 12,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      5,
+      10
+     ],
+     "using": [
+      10,
+      9,
+      9
+     ],
+     "rate": 0.83,
+     "median_weeks": 4.5,
+     "base": {
+      "k": 43,
+      "n": 80,
+      "rate": 0.54
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "Some By Mi",
+     "n": 67,
+     "rate": 0.97,
+     "lo": 0.9,
+     "hi": 0.99,
+     "cont": 0.97
+    },
+    {
+     "brand": "The Ordinary",
+     "n": 49,
+     "rate": 0.78,
+     "lo": 0.64,
+     "hi": 0.87,
+     "cont": 0.84
+    },
+    {
+     "brand": "Round Lab",
+     "n": 28,
+     "rate": 0.75,
+     "lo": 0.57,
+     "hi": 0.87,
+     "cont": 0.86
+    },
+    {
+     "brand": "Plum",
+     "n": 52,
+     "rate": 0.62,
+     "lo": 0.48,
+     "hi": 0.74,
+     "cont": 0.94
+    }
+   ],
+   "brands_hidden": 0
+  },
+  {
+   "category": "treatment",
+   "label": "Treatments",
+   "flows": [
+    {
+     "goal": "Pores and texture",
+     "goal_id": "pores_texture",
+     "n": 69,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      2,
+      11,
+      40
+     ],
+     "using": [
+      66,
+      66,
+      63
+     ],
+     "rate": 0.58,
+     "median_weeks": 7.0,
+     "base": {
+      "k": 53,
+      "n": 101,
+      "rate": 0.52
+     }
+    },
+    {
+     "goal": "Tone evenness",
+     "goal_id": "even_tone",
+     "n": 49,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      0,
+      3
+     ],
+     "using": [
+      44,
+      44,
+      42
+     ],
+     "rate": 0.06,
+     "median_weeks": null,
+     "base": {
+      "k": 8,
+      "n": 83,
+      "rate": 0.1
+     }
+    },
+    {
+     "goal": "Lines",
+     "goal_id": "lines",
+     "n": 34,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      1,
+      10
+     ],
+     "using": [
+      29,
+      31,
+      29
+     ],
+     "rate": 0.29,
+     "median_weeks": 7.5,
+     "base": {
+      "k": 10,
+      "n": 29,
+      "rate": 0.34
+     }
+    },
+    {
+     "goal": "Shine and glow",
+     "goal_id": "oil_glow",
+     "n": 25,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      0,
+      2,
+      11
+     ],
+     "using": [
+      21,
+      21,
+      19
+     ],
+     "rate": 0.44,
+     "median_weeks": 7,
+     "base": {
+      "k": 105,
+      "n": 203,
+      "rate": 0.52
+     }
+    },
+    {
+     "goal": "Blemishes",
+     "goal_id": "blemishes",
+     "n": 16,
+     "weeks": [
+      2,
+      4,
+      8
+     ],
+     "changed": [
+      1,
+      6,
+      11
+     ],
+     "using": [
+      14,
+      14,
+      14
+     ],
+     "rate": 0.69,
+     "median_weeks": 4,
+     "base": {
+      "k": 87,
+      "n": 202,
+      "rate": 0.43
+     }
+    }
+   ],
+   "brands": [
+    {
+     "brand": "COSRX",
+     "n": 63,
+     "rate": 0.83,
+     "lo": 0.71,
+     "hi": 0.9,
+     "cont": 0.92
+    },
+    {
+     "brand": "The Ordinary",
+     "n": 107,
+     "rate": 0.55,
+     "lo": 0.46,
+     "hi": 0.64,
+     "cont": 0.94
+    },
+    {
+     "brand": "Minimalist",
+     "n": 41,
+     "rate": 0.51,
+     "lo": 0.36,
+     "hi": 0.66,
+     "cont": 0.93
+    }
+   ],
+   "brands_hidden": 0
+  }
+ ],
+ "gaps": [
+  {
+   "goal": "Dark spots",
+   "goal_id": "dark_spots",
+   "budget": {
+    "options": 16,
+    "rate": 0.4,
+    "n": 161
+   },
+   "mid": {
+    "options": 7,
+    "rate": 0.26,
+    "n": 152
+   },
+   "premium": {
+    "options": 7,
+    "rate": 0.24,
+    "n": 139
+   },
+   "action": "Covered in every tier."
+  },
+  {
+   "goal": "Tone evenness",
+   "goal_id": "even_tone",
+   "budget": {
+    "options": 16,
+    "rate": 0.1,
+    "n": 135
+   },
+   "mid": {
+    "options": 12,
+    "rate": 0.15,
+    "n": 226
+   },
+   "premium": {
+    "options": 6,
+    "rate": 0.07,
+    "n": 114
+   },
+   "action": "Outcome rates are low in every tier: an education opportunity."
+  },
+  {
+   "goal": "Redness",
+   "goal_id": "redness",
+   "budget": {
+    "options": 13,
+    "rate": 0.57,
+    "n": 109
+   },
+   "mid": {
+    "options": 14,
+    "rate": 0.42,
+    "n": 119
+   },
+   "premium": {
+    "options": 6,
+    "rate": 0.75,
+    "n": 28
+   },
+   "action": "Covered in every tier."
+  },
+  {
+   "goal": "Blemishes",
+   "goal_id": "blemishes",
+   "budget": {
+    "options": 20,
+    "rate": 0.44,
+    "n": 317
+   },
+   "mid": {
+    "options": 8,
+    "rate": 0.48,
+    "n": 216
+   },
+   "premium": {
+    "options": 4,
+    "rate": 0.4,
+    "n": 125
+   },
+   "action": "Covered in every tier."
+  },
+  {
+   "goal": "Pores and texture",
+   "goal_id": "pores_texture",
+   "budget": {
+    "options": 15,
+    "rate": 0.46,
+    "n": 305
+   },
+   "mid": {
+    "options": 13,
+    "rate": 0.48,
+    "n": 294
+   },
+   "premium": {
+    "options": 8,
+    "rate": 0.62,
+    "n": 135
+   },
+   "action": "Covered in every tier."
+  },
+  {
+   "goal": "Lines",
+   "goal_id": "lines",
+   "budget": {
+    "options": 7,
+    "rate": 0.4,
+    "n": 174
+   },
+   "mid": {
+    "options": 3,
+    "rate": 0.35,
+    "n": 121
+   },
+   "premium": {
+    "options": 7,
+    "rate": 0.32,
+    "n": 74
+   },
+   "action": "Covered in every tier."
+  },
+  {
+   "goal": "Under-eye",
+   "goal_id": "under_eye",
+   "budget": {
+    "options": 1,
+    "rate": 0.45,
+    "n": 60
+   },
+   "mid": {
+    "options": 3,
+    "rate": 0.38,
+    "n": 64
+   },
+   "premium": {
+    "options": 3,
+    "rate": 0.04,
+    "n": 53
+   },
+   "action": "Add a second budget option for under-eye."
+  },
+  {
+   "goal": "Shine and glow",
+   "goal_id": "oil_glow",
+   "budget": {
+    "options": 40,
+    "rate": 0.55,
+    "n": 357
+   },
+   "mid": {
+    "options": 26,
+    "rate": 0.54,
+    "n": 371
+   },
+   "premium": {
+    "options": 20,
+    "rate": 0.5,
+    "n": 239
+   },
+   "action": "Covered in every tier."
+  }
+ ],
+ "conflicts": [
+  {
+   "kind": "duplicate_active",
+   "pair": "Duplicate active",
+   "n": 859,
+   "share": 0.5,
+   "fix": "Keep one product per active",
+   "resolves": []
+  },
+  {
+   "kind": "no_spf",
+   "pair": "No morning sunscreen with a retinoid or acid",
+   "n": 473,
+   "share": 0.28,
+   "fix": "Add daily SPF",
+   "resolves": [
+    "Naked Sundays CabanaClear\u2122 Water Gel Serum SPF50",
+    "Ultra Violette Queen Screen SPF 50+ Luminising SKINSCREEN\u2122"
+   ]
+  },
+  {
+   "kind": "two_exfoliants",
+   "pair": "Two or more exfoliants",
+   "n": 294,
+   "share": 0.17,
+   "fix": "Reduce frequency",
+   "resolves": []
+  },
+  {
+   "kind": "retinoid_acid",
+   "pair": "Retinoid + AHA/BHA, same routine",
+   "n": 234,
+   "share": 0.14,
+   "fix": "Alternate nights",
+   "resolves": []
+  },
+  {
+   "kind": "bpo_retinoid",
+   "pair": "Benzoyl peroxide + retinoid",
+   "n": 25,
+   "share": 0.01,
+   "fix": "BPO in the morning, retinoid at night",
+   "resolves": []
+  }
+ ],
+ "routines_checked": 1704
+}

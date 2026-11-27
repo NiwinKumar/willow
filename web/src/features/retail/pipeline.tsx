@@ -32,7 +32,12 @@ export function campaignFor(list: Campaign[], productId: string): Campaign | nul
   return mine.find((c) => c.status === 'active') ?? mine.sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null
 }
 
-export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promoteTo }: { p: Pick<ProductRow, 'n' | 'tier' | 'lift' | 'lift_lo' | 'lift_hi' | 'to_proven'>; weeksN: number; statements: number | null; eligible: boolean; campaign: Campaign | null; promoteTo: string }): Step[] {
+/**
+ * `saved`: the organisation's saved claims for this product (null in legacy mode, where "Claims ready" falls back
+ * to "claim-ready statements exist"). With organisations, "Claims ready" means a saved claim; statements alone
+ * are the step in progress.
+ */
+export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promoteTo, saved = null, claimsTo }: { p: Pick<ProductRow, 'n' | 'tier' | 'lift' | 'lift_lo' | 'lift_hi' | 'to_proven'>; weeksN: number; statements: number | null; eligible: boolean; campaign: Campaign | null; promoteTo: string; saved?: { total: number; approved: number } | null; claimsTo?: string }): Step[] {
   const measured = p.n !== null && p.n >= 10
   const inc = campaign?.stats.incrementality ?? null
   const ended = campaign?.status === 'ended'
@@ -61,12 +66,31 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
               ? 'No lift over non-users yet'
               : 'Not enough data',
     },
-    {
-      id: 'claims',
-      title: 'Claims ready',
-      state: statements ? 'done' : 'todo',
-      detail: statements ? `${statements} ${statements === 1 ? 'statement' : 'statements'} with n and method` : 'After it is measured',
-    },
+    saved
+      ? (() => {
+          // Claims rest on a visible change above non-users: only Proven and Promising products can have one.
+          const claimable = p.tier === 'proven' || p.tier === 'promising'
+          const ready = claimable ? statements : 0
+          return {
+          id: 'claims',
+          title: 'Claims ready',
+          state: (saved.total ? 'done' : ready ? 'partial' : 'todo') as StepState,
+          detail: saved.total
+            ? `${saved.total} saved ${saved.total === 1 ? 'claim' : 'claims'}${saved.approved ? `, ${saved.approved} approved` : ''}`
+            : ready
+              ? `${ready} ${ready === 1 ? 'statement' : 'statements'} ready; no claim saved`
+              : claimable
+                ? 'After it is measured'
+                : 'Once it shows a change above non-users',
+          ...(!saved.total && ready && claimsTo ? { to: claimsTo, cta: 'Draft a claim' } : {}),
+        }
+        })()
+      : {
+          id: 'claims',
+          title: 'Claims ready',
+          state: statements ? 'done' : 'todo',
+          detail: statements ? `${statements} ${statements === 1 ? 'statement' : 'statements'} with n and method` : 'After it is measured',
+        },
     {
       id: 'promoted',
       title: 'Promoted',

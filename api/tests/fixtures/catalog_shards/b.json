@@ -1,0 +1,23 @@
+[
+  {
+    "product_id": "hadalabo-gokujyun-premium-lotion-2",
+    "brand": "HADA LABO",
+    "name": "Gokujyun Premium Hyaluronic Lotion",
+    "category": "toner",
+    "region": ["GLOBAL"],
+    "source_url": "https://example.com/hada-2",
+    "last_verified": "2026-11-27",
+    "detail": "index"
+  },
+  {
+    "product_id": "dr-jart-cicapair-cream",
+    "brand": "Dr. Jart+",
+    "name": "Cicapair Tiger Grass Cream",
+    "category": "moisturizer",
+    "region": ["GLOBAL"],
+    "source_url": "https://example.com/cica",
+    "last_verified": "2026-11-27",
+    "detail": "index",
+    "barcode": "8809"
+  }
+]

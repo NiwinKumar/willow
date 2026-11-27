@@ -13,7 +13,7 @@ import { fetchProduct } from '../productData'
 import type { ProductDetail } from '../types'
 import { Bone, Button, EmptyState, ErrorState, int, PageHeader, Panel, pct, ProofTierChip, pts, SkeletonKpis, SkeletonPanel, type Kpi } from '../ui'
 import { BlobRadial, StreamChart } from '../ui/widgets'
-import { ErrorBox, StatusBadge, type Confirm } from './promote/CampaignCard'
+import { ErrorBox, SampleBadge, StatusBadge, type Confirm } from './promote/CampaignCard'
 import { ShopperPreview } from './promote/ShopperPreview'
 import { useCampaignActions } from './promote/useCampaignActions'
 import { useCampaignPoll } from './promote/useCampaignPoll'
@@ -174,6 +174,7 @@ function Dashboard({ c, back, productTo, eligibility, at, confirm, setConfirm, o
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
               <span className="font-medium text-ink">{c.brand}</span>
               <StatusBadge status={c.status} />
+              {c.sample ? <SampleBadge /> : null}
               <span aria-hidden className="text-ink-3">
                 ·
               </span>

@@ -1,0 +1,31 @@
+{
+  "_doc": "Proof by Willow instances and their organisations (app/proof_orgs.py). An instance is one retailer's Proof deployment; its orgs are the retailer and the brands it stocks. Brand names must match api/seed/products.json exactly. \"brands\": \"*\" = every brand in the catalog. \"brand_orgs_from_catalog\": one brand org per catalog brand, id \"<instance>-<slug>\" (today's 'view as any brand'). Memberships are stored, never seeded.",
+  "default": "willow",
+  "instances": [
+    {
+      "id": "northside",
+      "name": "Northside Beauty",
+      "accent": "#1F7F45",
+      "domains": ["proof.northside.beauty", "northside.localhost"],
+      "demo": true,
+      "verified_basis": "Verified from Northside's supplier list",
+      "orgs": [
+        {"id": "northside", "name": "Northside Beauty", "kind": "retailer", "brands": "*"},
+        {"id": "the-derma-co", "name": "The Derma Co", "kind": "brand", "brands": ["The Derma Co"]},
+        {"id": "minimalist", "name": "Minimalist", "kind": "brand", "brands": ["Minimalist"]}
+      ]
+    },
+    {
+      "id": "willow",
+      "name": "Willow (all brands)",
+      "accent": "#1F7F45",
+      "domains": [],
+      "demo": true,
+      "verified_basis": null,
+      "brand_orgs_from_catalog": true,
+      "orgs": [
+        {"id": "willow", "name": "Willow retail", "kind": "retailer", "brands": "*"}
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { compactName } from '../src/features/routine/names.ts'
+import { compactName, notAdvisedLine } from '../src/features/routine/names.ts'
 
 const n = (custom_name: string, category: string, brand = '') => compactName({ custom_name, brand, category })
 
@@ -17,4 +17,13 @@ test('short names, strengths and brands', () => {
   assert.equal(n('15% Vitamin C & Mandarin Glow Boost Serum', 'serum', 'Plum'), 'Vitamin C')
   assert.equal(n('Plum 15% Vitamin C Serum', 'serum', 'Plum'), 'Vitamin C Serum')
   assert.equal(n('', 'serum', 'CeraVe'), 'CeraVe')
+})
+
+test('the Add product confirm step warns about a product that is not advised, with its first reason', () => {
+  const flag = (level: 'check' | 'avoid', title: string) => ({ rule: title, level, title, detail: '', source: null, grade: null })
+  assert.equal(notAdvisedLine({ status: 'avoid', flags: [flag('check', 'Lists fragrance'), flag('avoid', 'On your avoid list')] }), 'Not advised for you: on your avoid list. You can still add it.')
+  assert.equal(notAdvisedLine({ status: 'avoid', flags: [flag('avoid', 'MI preservatives')] }), 'Not advised for you: MI preservatives. You can still add it.')
+  assert.equal(notAdvisedLine({ status: 'not_sold', flags: [] }), 'Not advised for you: it is not sold as a cosmetic in your market. You can still add it.')
+  assert.equal(notAdvisedLine({ status: 'check', flags: [flag('check', 'Lists fragrance')] }), null)
+  assert.equal(notAdvisedLine(null), null)
 })
