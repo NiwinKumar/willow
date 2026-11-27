@@ -387,7 +387,7 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "redness_map": redness_map,
         # a side photo's own redness layer covers the skin it measures in its session, known only
         # once the session's photos are in (_views): its a* is kept until then
-        "a_star": lab[..., 1].astype(np.float32) if overlays and face.view != "front" else None,
+        "a_star": lab[..., 1].astype(np.float32) if overlays else None,
         "map_ms": map_ms,
         # how squarely this photo sees each mesh triangle, the triangle under each face-skin
         # pixel and under each mark's centre (crop pixels): _assign_views, _keeps
@@ -1084,8 +1084,12 @@ def _view_skin(f: dict) -> np.ndarray | None:
     px, label = _own_pixels(f), f.get("zone_label")
     if label is None:
         return None
-    if px is None:
-        px = np.isin(label, _zone_codes(SIDE_ZONES.get(f["view"], ())))
+    if px is None:  # no side photos took any skin: a front photo measures all of it
+        px = (
+            label > 0
+            if f["view"] == "front"
+            else np.isin(label, _zone_codes(SIDE_ZONES[f["view"]]))
+        )
     return px & (label > 0)
 
 
@@ -1104,17 +1108,39 @@ def _view_areas(f: dict, sides: set[str]) -> dict[str, np.ndarray]:
 
 
 def _view_redness_map(f: dict) -> dict | None:
-    """The redness layer's a* on the preview grid for a view's photo: a front photo, the redness
-    metric's skin (cheeks and nose); a side photo, the skin it measures (_view_skin), so redness
-    lower on the cheek, along the jaw and on the side of the chin is drawn, not only on the
-    cheekbone patch the metric reads (Nov 27). It moves no number."""
-    if f["view"] == "front" or f.get("a_star") is None:
+    """The redness layer's a* on the preview grid for a view's photo, over the skin it measures
+    in its session (_view_skin): a front photo draws the forehead, nose, around the mouth and
+    chin (and the cheeks and jaw when no side photos took them), a side photo its cheek, jaw and
+    the side of the chin (Nov 27-28). Before Nov 28 a front photo drew only the redness metric's
+    cheek and nose patches, so forehead and chin redness was never drawn.
+
+    Each pixel is drawn against the skin around it (a* minus its OVERLAY_LOCAL_MM neighbourhood
+    mean over skin), not against one value for the whole face: an area that is redder or more
+    shaded as a whole (the nose, the chin under the lip, a cheek in warmer light) is not painted
+    as a block, and the same marks show whatever the skin tone, light or angle, since only the
+    difference from the person's own nearby skin counts. It moves no number."""
+    if f.get("a_star") is None:
         return f.get("redness_map")
     skin = _view_skin(f)
     if skin is None or not skin.any():
         return f.get("redness_map")
     box = f["box"]
-    return to_preview(f["a_star"], skin, f["shape"][:2], origin=(box.x, box.y))
+    return to_preview(
+        _local_a(f["a_star"], skin, f["face"].px_per_mm),
+        skin,
+        f["shape"][:2],
+        origin=(box.x, box.y),
+    )
+
+
+def _local_a(a_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
+    """a* minus the mean a* of the skin within about OVERLAY_LOCAL_MM (a normalised blur over the
+    skin only, so hair, brows and background never pull it)."""
+    sigma = config.OVERLAY_LOCAL_MM * px_per_mm
+    m = skin.astype(np.float32)
+    num = cv2.GaussianBlur(np.where(skin, a_star, 0).astype(np.float32), (0, 0), sigma)
+    den = cv2.GaussianBlur(m, (0, 0), sigma)
+    return (a_star - num / np.maximum(den, 1e-6)).astype(np.float32)
 
 
 def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list[dict]:
@@ -1308,7 +1334,8 @@ def analyze_face(
     overlays, overlay_ms = [], sum(f["map_ms"] for f in frames)
     if good and good[0]["redness_map"] is not None:  # same photo as preview.jpg, same size
         t_o = time.perf_counter()
-        rgba = redness_rgba(good[0]["redness_map"], good[0]["face"].px_per_mm)
+        # the front photo's layer, drawn as on its own view (_view_redness_map)
+        rgba = redness_rgba(_view_redness_map(good[0]), good[0]["face"].px_per_mm)
         if rgba is not None:
             dest = f"{output_prefix.rstrip('/')}/overlays/redness.png"
             overlays.append({"metric_id": "redness", "uri": save_png(rgba, dest)})
