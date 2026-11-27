@@ -112,7 +112,7 @@ def _starter_routine(store: Store, uid: str) -> int:
             source="catalog",
             started_at=datetime.now(UTC).date() - timedelta(days=1),
         )
-        add_routine_entry(store, uid, body, entry_id=f"r_judge{i}")
+        add_routine_entry(store, uid, body, entry_id=f"r_judge{i}", sample=True)
         added += 1
     return added
 

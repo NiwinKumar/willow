@@ -101,6 +101,43 @@ class Store(Protocol):
     def waitlist_get(self, key: str) -> Doc | None: ...
     def waitlist_set(self, key: str, doc: Doc) -> None: ...
 
+    # -- Finals block (builder C) -----------------------------------------------------------
+    # Store clicks (app/clicks.py): store_clicks/{auto} {product_id, store, surface, day, at}
+    # (no uid stored).
+    def click_add(self, day: str, doc: Doc) -> None: ...
+    def clicks_since(self, first_day: str) -> list[Doc]: ...
+    # Proof by Willow organisations (app/proof_orgs.py). Instances and orgs are seeded
+    # (api/seed/proof_instances.json); only what people create is stored:
+    # proof_members/{instance}__{org}__{uid} {instance, org_id, uid, role, demo, joined_at}
+    def proof_member_get(self, instance: str, org: str, uid: str) -> Doc | None: ...
+    def proof_member_set(self, instance: str, org: str, uid: str, doc: Doc) -> None: ...
+    def proof_members_of_user(self, uid: str) -> list[Doc]: ...
+    def proof_members_of_org(self, org: str) -> list[Doc]: ...
+    # proof_invites/{id} {org_id, email_hash, email_hint, role, status, created_at}
+    def proof_invite_set(self, iid: str, doc: Doc) -> None: ...
+    def proof_invites_of(self, org: str) -> list[tuple[str, Doc]]: ...
+    # proof_orgs/{org} {policy, plan, updated_at}: the org's settings (absent = defaults)
+    def proof_org_get(self, org: str) -> Doc | None: ...
+    def proof_org_set(self, org: str, doc: Doc) -> None: ...
+    # proof_orgs/{org}/decisions/{key} {status, reason, updated_at, by_role}: current state;
+    # proof_decision_log/{id} {org_id, key, status, reason, at, by_role, snapshot}: append-only
+    def proof_decision_set(self, org: str, key: str, doc: Doc) -> None: ...
+    def proof_decisions(self, org: str) -> list[tuple[str, Doc]]: ...
+    def proof_decision_log_add(self, lid: str, doc: Doc) -> None: ...
+    def proof_decision_log(self, org: str) -> list[Doc]: ...
+    # proof_requests/{id} {instance, from_org, to_org, product_id, message, snapshot, status,
+    # reply, created_at, updated_at}: one doc, read by both orgs (outbox and inbox)
+    def proof_request_set(self, rid: str, doc: Doc) -> None: ...
+    def proof_request_get(self, rid: str) -> Doc | None: ...
+    def proof_request_update(self, rid: str, fields: Doc) -> None: ...
+    def proof_requests_from(self, org: str) -> list[tuple[str, Doc]]: ...
+    def proof_requests_to(self, org: str) -> list[tuple[str, Doc]]: ...
+    # proof_claims/{id} {org_id, product_id, text, statements, cohort, exportable, status, ...}
+    def proof_claim_set(self, cid: str, doc: Doc) -> None: ...
+    def proof_claim_get(self, cid: str) -> Doc | None: ...
+    def proof_claim_update(self, cid: str, fields: Doc) -> None: ...
+    def proof_claims_of(self, org: str) -> list[tuple[str, Doc]]: ...
+
 
 def _running(doc: Doc, stale: timedelta) -> bool:
     started = doc.get("processing_started_at")
@@ -486,6 +523,89 @@ class FirestoreStore:
     def waitlist_set(self, key: str, doc: Doc) -> None:
         self._db().document(f"waitlist/{key}").set(doc)
 
+    # -- Finals block (builder C): see the Store protocol for the paths -----------------------
+    def click_add(self, day: str, doc: Doc) -> None:
+        self._db().collection("store_clicks").add({**doc, "day": day})
+
+    def clicks_since(self, first_day: str) -> list[Doc]:
+        q = self._db().collection("store_clicks").where("day", ">=", first_day)
+        return [s.to_dict() for s in q.stream()]
+
+    def proof_member_get(self, instance: str, org: str, uid: str) -> Doc | None:
+        snap = self._db().document(f"proof_members/{instance}__{org}__{uid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def proof_member_set(self, instance: str, org: str, uid: str, doc: Doc) -> None:
+        self._db().document(f"proof_members/{instance}__{org}__{uid}").set(doc)
+
+    def proof_members_of_user(self, uid: str) -> list[Doc]:
+        q = self._db().collection("proof_members").where("uid", "==", uid)
+        return [s.to_dict() for s in q.stream()]
+
+    def proof_members_of_org(self, org: str) -> list[Doc]:
+        q = self._db().collection("proof_members").where("org_id", "==", org)
+        return [s.to_dict() for s in q.stream()]
+
+    def proof_invite_set(self, iid: str, doc: Doc) -> None:
+        self._db().document(f"proof_invites/{iid}").set(doc)
+
+    def proof_invites_of(self, org: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("proof_invites").where("org_id", "==", org)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def proof_org_get(self, org: str) -> Doc | None:
+        snap = self._db().document(f"proof_orgs/{org}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def proof_org_set(self, org: str, doc: Doc) -> None:
+        self._db().document(f"proof_orgs/{org}").set(doc)
+
+    def proof_decision_set(self, org: str, key: str, doc: Doc) -> None:
+        self._db().document(f"proof_orgs/{org}/decisions/{key}").set(doc)
+
+    def proof_decisions(self, org: str) -> list[tuple[str, Doc]]:
+        snaps = self._db().collection(f"proof_orgs/{org}/decisions").stream()
+        return [(s.id, s.to_dict()) for s in snaps]
+
+    def proof_decision_log_add(self, lid: str, doc: Doc) -> None:
+        self._db().document(f"proof_decision_log/{lid}").set(doc)
+
+    def proof_decision_log(self, org: str) -> list[Doc]:
+        q = self._db().collection("proof_decision_log").where("org_id", "==", org)
+        return [s.to_dict() for s in q.stream()]
+
+    def proof_request_set(self, rid: str, doc: Doc) -> None:
+        self._db().document(f"proof_requests/{rid}").set(doc)
+
+    def proof_request_get(self, rid: str) -> Doc | None:
+        snap = self._db().document(f"proof_requests/{rid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def proof_request_update(self, rid: str, fields: Doc) -> None:
+        self._db().document(f"proof_requests/{rid}").update(fields)
+
+    def proof_requests_from(self, org: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("proof_requests").where("from_org", "==", org)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def proof_requests_to(self, org: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("proof_requests").where("to_org", "==", org)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
+    def proof_claim_set(self, cid: str, doc: Doc) -> None:
+        self._db().document(f"proof_claims/{cid}").set(doc)
+
+    def proof_claim_get(self, cid: str) -> Doc | None:
+        snap = self._db().document(f"proof_claims/{cid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def proof_claim_update(self, cid: str, fields: Doc) -> None:
+        self._db().document(f"proof_claims/{cid}").update(fields)
+
+    def proof_claims_of(self, org: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("proof_claims").where("org_id", "==", org)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -511,6 +631,15 @@ class MemoryStore:
         self.survey: dict[str, Doc] = {}
         self.survey_contacts: dict[str, Doc] = {}
         self.waitlist: dict[str, Doc] = {}
+        # Finals block (builder C)
+        self.clicks: list[Doc] = []
+        self.proof_members: dict[tuple[str, str, str], Doc] = {}
+        self.proof_invites: dict[str, Doc] = {}
+        self.proof_orgs: dict[str, Doc] = {}
+        self.proof_decisions_: dict[tuple[str, str], Doc] = {}
+        self.proof_log: dict[str, Doc] = {}
+        self.proof_requests: dict[str, Doc] = {}
+        self.proof_claims: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -792,6 +921,78 @@ class MemoryStore:
 
     def waitlist_set(self, key: str, doc: Doc) -> None:
         self.waitlist[key] = copy.deepcopy(doc)
+
+    # -- Finals block (builder C) --------------------------------------------------------------
+    def click_add(self, day: str, doc: Doc) -> None:
+        self.clicks.append({**copy.deepcopy(doc), "day": day})
+
+    def clicks_since(self, first_day: str) -> list[Doc]:
+        return [copy.deepcopy(d) for d in self.clicks if d["day"] >= first_day]
+
+    def proof_member_get(self, instance: str, org: str, uid: str) -> Doc | None:
+        return copy.deepcopy(self.proof_members.get((instance, org, uid)))
+
+    def proof_member_set(self, instance: str, org: str, uid: str, doc: Doc) -> None:
+        self.proof_members[(instance, org, uid)] = copy.deepcopy(doc)
+
+    def proof_members_of_user(self, uid: str) -> list[Doc]:
+        return [copy.deepcopy(d) for (_, _, u), d in self.proof_members.items() if u == uid]
+
+    def proof_members_of_org(self, org: str) -> list[Doc]:
+        return [copy.deepcopy(d) for (_, o, _), d in self.proof_members.items() if o == org]
+
+    def proof_invite_set(self, iid: str, doc: Doc) -> None:
+        self.proof_invites[iid] = copy.deepcopy(doc)
+
+    def proof_invites_of(self, org: str) -> list[tuple[str, Doc]]:
+        return [(i, copy.deepcopy(d)) for i, d in self.proof_invites.items() if d["org_id"] == org]
+
+    def proof_org_get(self, org: str) -> Doc | None:
+        return copy.deepcopy(self.proof_orgs.get(org))
+
+    def proof_org_set(self, org: str, doc: Doc) -> None:
+        self.proof_orgs[org] = copy.deepcopy(doc)
+
+    def proof_decision_set(self, org: str, key: str, doc: Doc) -> None:
+        self.proof_decisions_[(org, key)] = copy.deepcopy(doc)
+
+    def proof_decisions(self, org: str) -> list[tuple[str, Doc]]:
+        return [(k, copy.deepcopy(d)) for (o, k), d in self.proof_decisions_.items() if o == org]
+
+    def proof_decision_log_add(self, lid: str, doc: Doc) -> None:
+        self.proof_log[lid] = copy.deepcopy(doc)
+
+    def proof_decision_log(self, org: str) -> list[Doc]:
+        return [copy.deepcopy(d) for d in self.proof_log.values() if d["org_id"] == org]
+
+    def proof_request_set(self, rid: str, doc: Doc) -> None:
+        self.proof_requests[rid] = copy.deepcopy(doc)
+
+    def proof_request_get(self, rid: str) -> Doc | None:
+        return copy.deepcopy(self.proof_requests.get(rid))
+
+    def proof_request_update(self, rid: str, fields: Doc) -> None:
+        self.proof_requests[rid].update(copy.deepcopy(fields))
+
+    def proof_requests_from(self, org: str) -> list[tuple[str, Doc]]:
+        rows = self.proof_requests.items()
+        return [(r, copy.deepcopy(d)) for r, d in rows if d["from_org"] == org]
+
+    def proof_requests_to(self, org: str) -> list[tuple[str, Doc]]:
+        rows = self.proof_requests.items()
+        return [(r, copy.deepcopy(d)) for r, d in rows if d["to_org"] == org]
+
+    def proof_claim_set(self, cid: str, doc: Doc) -> None:
+        self.proof_claims[cid] = copy.deepcopy(doc)
+
+    def proof_claim_get(self, cid: str) -> Doc | None:
+        return copy.deepcopy(self.proof_claims.get(cid))
+
+    def proof_claim_update(self, cid: str, fields: Doc) -> None:
+        self.proof_claims[cid].update(copy.deepcopy(fields))
+
+    def proof_claims_of(self, org: str) -> list[tuple[str, Doc]]:
+        return [(c, copy.deepcopy(d)) for c, d in self.proof_claims.items() if d["org_id"] == org]
 
 
 @lru_cache

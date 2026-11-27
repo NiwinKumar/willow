@@ -10,6 +10,7 @@ every product id from a tool result. Up to 5 tool calls per turn.
 
 import json
 import logging
+import re
 import secrets
 import time
 from collections.abc import Callable
@@ -20,7 +21,17 @@ from google.genai import types
 from pydantic import BaseModel, Field, model_validator
 
 from app import advisor_blocks as blocks_mod
-from app import catalog, explain, feel, gemini, numbers, routine_check, routine_log
+from app import (
+    catalog,
+    explain,
+    feel,
+    gemini,
+    numbers,
+    regulatory,
+    routine_check,
+    routine_log,
+    safety,
+)
 from app.results import measured_result
 from app.settings import get_settings
 from app.store import Store, iso
@@ -67,9 +78,24 @@ own measurements, check their routine and find products from Willow's facts-only
   only days_used and of_days; a product used on few days has not had a fair test.
 - feel on a routine product = the person's own verdict and how it feels to them, in week N of
   using it (null = not answered). It is their view, not a measurement: never present it as a
-  result. Use it to tailor advice (stings or dries: fewer nights a week or a gentler step;
-  heavy: a lighter texture; working but readings unchanged: readings often trail what people
-  feel, keep checking in). If it differs from the readings, say both plainly.
+  result. Heavy: a lighter texture; working but readings unchanged: readings often trail what
+  people feel, keep checking in. If it differs from the readings, say both plainly.
+- A product that stings, burns, itches, reddens or dries the skin: never suggest using it
+  differently or less often. Say to stop using it and rinse with water, and to see a doctor or
+  pharmacist if it doesn't settle in a few days; swelling, blisters, hives, a reaction near the
+  eyes or lips, or trouble breathing: get medical help now. They can log it with the product's
+  reaction button, which keeps it out of their suggestions.
+- CONTEXT.profile.safety is what the person told Willow (null = not set). life_stage pregnant,
+  trying or breastfeeding: never suggest a retinoid or hydroquinone. reactive: prefer products
+  with no fragrance, one new product at a time. avoid: ingredient groups they avoid.
+  avoid_products: never suggest these. rx_treatment: they use a prescription skin treatment;
+  never comment on it, and say to ask whoever prescribed it before adding a retinoid or an
+  exfoliating acid. Products in tool results carry check {status, flags}: never recommend one
+  whose status is avoid or not_sold; when you suggest one with status check, name its flag.
+  Never call a product safe; say "no flags for your profile".
+- Never recommend, name or comment on the dose of a prescription medicine (tretinoin,
+  hydroquinone, steroid creams, antibiotics, anything taken by mouth): say to ask a doctor or
+  pharmacist. Never write acne, treat, cure or heal; say blemishes or breakouts.
 - Quote measurements only when the question is about results; never pad an answer with them.
 - British spelling (colour, moisturiser), but say "catalog"."""
 
@@ -170,19 +196,35 @@ SCOPE_REPLY = (
     "medical question, or a spot or mole that changes, please see a dermatologist. I can explain "
     "what your check-ins measured or check your routine."
 )
+# Asked about a prescription medicine: answered by this fixed reply, never by the model.
+MEDICINE_REPLY = (
+    "Willow doesn't give advice on medicines, including ones a doctor gave you; please ask your "
+    "doctor or a pharmacist. If you use a skin medicine, turn that on in your profile so Willow "
+    "flags products to check with them first. I can check the cosmetic products in your routine."
+)
+MEDICINE_ASK = re.compile(
+    r"\b(prescri\w*|tretinoin|retin-?a|isotretinoin|accutane|roaccutane|adapalene|differin|"
+    r"tazarotene|trifarotene|hydroquinone|clindamycin|doxycycline|minocycline|erythromycin|"
+    r"spironolactone|clobetasol|betamethasone|hydrocortisone|mometasone|steroids?|"
+    r"antibiotics?|metronidazole|ivermectin|minoxidil|birth control pills?)\b",
+    re.I,
+)
 PHOTO_REFUSAL = (
     "Willow reads product and label photos only, so I have not looked at this photo. To follow "
     "your skin, take a check-in: those photos are measured by Willow, not by Wisp."
 )
 
 
-def _compact(p: dict[str, Any]) -> dict[str, Any]:
+def _compact(p: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[str, Any]:
+    check = safety.check(p, profile)
     return {
         "product_id": p["product_id"],
         "brand": p["brand"],
         "name": p["name"],
         "category": p["category"],
-        "concerns": p["concerns"],
+        # words, not ids ("blemishes", never the id's condition word)
+        "concerns": [_words(c) for c in p["concerns"]],
+        "check": {"status": check["status"], "flags": [f["title"] for f in check["flags"]]},
         "key_actives": p["key_actives"],
         "price": p["price"],
         "size": p["size"],
@@ -252,7 +294,14 @@ def context(store: Store, uid: str) -> dict[str, Any]:
         }
         for eid, e in entries
     ]
+    doc = store.user_get(uid) or {}
+    saved = doc.get("profile") or {}
     return {
+        "profile": {
+            "skin_type": saved.get("skin_type"),
+            "goals": list(saved.get("goals") or []),
+            "safety": safety.profile_of(doc),
+        },
         "latest_sessions": latest,
         "routine": routine,
         "recent_window_days": routine_log.RECENT_DAYS,
@@ -279,30 +328,46 @@ def _outcomes(ids: list[str]) -> dict[str, Any]:
     }
 
 
+def suggestible(p: dict[str, Any], profile: dict[str, Any] | None) -> bool:
+    """Wisp may suggest it: a cosmetic (or sunscreen) where the person is, not a never-suggest
+    ingredient, not "avoid" or "not sold" for their profile (app/regulatory.py, app/safety.py)."""
+    market = (profile or {}).get("market")
+    return regulatory.is_suggestible(p, market) and safety.check(p, profile)["status"] not in (
+        "avoid",
+        "not_sold",
+    )
+
+
 def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[str, Any]:
+    profile = safety.profile_of(store.user_get(uid))
     if name == "search_catalog":
-        found = catalog.search(
-            q=args.get("query"),
-            concern=args.get("concern"),
-            category=args.get("category"),
-            max_price=args.get("max_price"),
-            currency=args.get("currency"),
-            exclude_ingredients=args.get("exclude_ingredients"),
-            limit=6,
-        )
+        # search is where suggestions come from: only products Willow may suggest to this person
+        found = [
+            p
+            for p in catalog.search_all(
+                q=args.get("query"),
+                concern=args.get("concern"),
+                category=args.get("category"),
+                max_price=args.get("max_price"),
+                currency=args.get("currency"),
+                exclude_ingredients=args.get("exclude_ingredients"),
+            )
+            if suggestible(p, profile)
+        ][:6]
         return {
-            "products": [_compact(p) for p in found],
+            "products": [_compact(p, profile) for p in found],
             "measured_outcomes": _outcomes([p["product_id"] for p in found]),
         }
     if name == "compare_products":
+        # what the person asked about, flags and all (never a suggestion by itself)
         found = [catalog.by_id(i) for i in (args.get("product_ids") or [])[:4]]
         return {
-            "products": [_compact(p) for p in found if p],
+            "products": [_compact(p, profile) for p in found if p],
             "measured_outcomes": _outcomes([p["product_id"] for p in found if p]),
         }
     if name == "check_routine":
         entries = [{"id": eid, **e} for eid, e in store.routine_list(uid)]
-        return routine_check.rule_findings(entries)
+        return routine_check.findings_for(entries, profile)
     return {"error": f"unknown tool {name}"}
 
 
@@ -368,6 +433,10 @@ def chat(
     last message (up to 3). `on_stage` hears each real step as it starts (streaming route)."""
     stage = on_stage or _no_stage
     images = images or []
+    asked = next((m["text"] for m in reversed(messages) if m["role"] == "user"), "")
+    if MEDICINE_ASK.search(asked):
+        # a question about a prescription medicine gets the fixed reply, never the model's
+        return _fixed(MEDICINE_REPLY, ["Not sent to the model: a question about a medicine"])
     stage("reading_context", {})
     ctx = context(store, uid)
     instructions = INSTRUCTIONS + (PHOTO_RULES if images else "")
@@ -487,6 +556,7 @@ def chat(
         bad_ids = {i for i in used_ids if i not in product_ids or not catalog.by_id(i)}
         bad_metrics = blocks_mod.bad_metric_refs(reply.blocks)
         written = [blocks_mod.strip(t) for t in blocks_mod.texts(reply.blocks)]
+        unnamed = [_without_names(t, product_ids) for t in written]
         # the chips are tappable questions: same rules as the text, failing ones dropped
         follow_ups = [
             q
@@ -496,9 +566,8 @@ def chat(
         has_answer = any(b.type == "answer" and (b.text or "").strip() for b in reply.blocks)
         if (
             has_answer
-            and all(
-                numbers.only_known(t, allowed) and not explain.BANNED.search(t) for t in written
-            )
+            and all(numbers.only_known(t, allowed) for t in written)
+            and not any(explain.BANNED.search(t) for t in unnamed)
             and not bad_ids
             and not bad_metrics
         ):
@@ -531,16 +600,32 @@ def chat(
             sorted(bad_metrics),
             has_answer,
         )
-    asked = next((m["text"] for m in reversed(messages) if m["role"] == "user"), "")
     fixed = SCOPE_REPLY if explain.BANNED.search(asked) else NO_ANSWER
+    return _fixed(fixed, retrieval)
+
+
+def _fixed(text: str, retrieval: list[str]) -> dict[str, Any]:
     return {
-        "message": fixed,
-        "blocks": [{"type": "answer", "text": fixed}],
+        "message": text,
+        "blocks": [{"type": "answer", "text": text}],
         "product_ids": [],
         "products": [],
         "follow_up_suggestions": [],
         "retrieval": retrieval,
     }
+
+
+def _without_names(text: str, ids: set[str]) -> str:
+    """The text with these products' own names taken out: a brand's product name ("... Acne
+    Foaming Cream Cleanser") is a catalog fact, not Wisp's wording, so the banned-word check
+    reads around it."""
+    for pid in ids:
+        p = catalog.by_id(pid)
+        if not p:
+            continue
+        for name in (f"{p['brand']} {p['name']}", p["name"]):
+            text = re.sub(re.escape(name), " ", text, flags=re.I)
+    return text
 
 
 # --- History (users/{uid}/advisor_messages, newest HISTORY_KEEP kept) -------------------------

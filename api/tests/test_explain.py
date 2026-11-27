@@ -431,3 +431,19 @@ def test_the_deadline_caps_each_call_and_skips_a_late_second_try(monkeypatch):
     timeouts.clear()
     assert explain.generate(result, {}, deadline=time.monotonic())[1] == "template"
     assert timeouts == []
+
+
+def test_a_metric_with_no_real_change_is_not_described_as_moving():
+    data = _data(-0.8)  # within the usual range
+    for bad in ("Calmer skin than at your start.", "Redness is reduced a little."):
+        assert any("direction words" in i for i in explain.problems(_exp(bad), data)), bad
+    for ok in (
+        "Redness is about the same as at your start.",
+        "Redness: no calmer than at your start yet.",
+        "Lower values mean calmer skin; this one is within your usual range.",
+    ):
+        assert not [i for i in explain.problems(_exp(ok), data) if "direction words" in i], ok
+    real = _data(-3.0, verdict="real_change")
+    assert not [
+        i for i in explain.problems(_exp("Calmer skin than at your start."), real) if "words" in i
+    ]
