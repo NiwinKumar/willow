@@ -6,7 +6,7 @@ import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
+import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpotWeeks } from '../../data/hooks'
 import { useCheckin, useCheckinDue } from '../../data/useCheckin'
 import type { RoutineEntry, Session, Site } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
@@ -124,7 +124,7 @@ function HomeBody() {
   const setUse = useSetRoutineUse()
   const check = useRoutineCheck(entries)
   const tests = useProductTests()
-  const spots = useSpots()
+  const spotWeeks = useSpotWeeks()
   const byId = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e])), [entries])
 
   const day = today()
@@ -232,8 +232,8 @@ function HomeBody() {
   const last: Slot[] = []
   if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} onOpen={() => openResult(lastPhotos)} /> })
   if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
-  const diary = !demo && spots.data?.enough_data ? spots.data : null
-  if (diary) last.push({ key: 'spots', node: <SpotDiaryTile className="flex-1" diary={diary} onOpen={() => navigate('/spots')} /> })
+  const weeks = !demo ? (spotWeeks.data?.weeks ?? []) : []
+  if (weeks.length) last.push({ key: 'spots', node: <SpotDiaryTile className="flex-1" weeks={weeks} onOpen={() => navigate('/spots')} /> })
   const daily: Slot[] = [{ key: 'routine', node: null, grow: true }]
   if (forearm) daily.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
   if (read.baseline && !demo) daily.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })

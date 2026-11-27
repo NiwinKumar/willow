@@ -142,6 +142,12 @@ export function useSpots() {
   return useQuery(['spots', uid], (t) => api.spots(t), { enabled: Boolean(uid), staleMs: 10 * 60_000 })
 }
 
+/** The spot diary week by week (api GET /v1/spots/weeks). Signed photo links last about an hour. */
+export function useSpotWeeks() {
+  const uid = useOwner()
+  return useQuery(['spot-weeks', uid], (t) => api.spotWeeks(t), { enabled: Boolean(uid), staleMs: 10 * 60_000 })
+}
+
 /** The account as the api knows it (consent on record). */
 export function useMe() {
   const uid = useOwner()

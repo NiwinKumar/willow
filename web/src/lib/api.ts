@@ -182,6 +182,30 @@ export type StoryProduct = {
 /** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
  * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
  * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
+/** One counted mark on a photo (engine extras.marks, photo pixels): a blemish or a dark spot. */
+export type SpotMark = { kind: 'blemish' | 'spot'; x: number; y: number; r: number; zone: string | null }
+/** One photo of a check-in (front, or a cheek) with its areas and every mark counted on it. */
+export type SpotWeekView = {
+  view: ViewName
+  photo: { url: string; width: number | null; height: number | null }
+  rois: { name: string; polygon: [number, number][] }[]
+  marks: SpotMark[]
+  /** This photo's counts; null on a check-in measured before every mark was listed. */
+  blemishes: number | null
+  dark_spots: number | null
+}
+/** One face check-in for the spot diary: the counts Progress shows, and its photos. `complete`: every mark is placed
+ * (engine 0.4.3+); older check-ins draw only the up to 40 marks the engine handed out, until measured again. */
+export type SpotWeek = {
+  id: string
+  created_at: string
+  complete: boolean
+  blemishes: number | null
+  dark_spots: number | null
+  by_zone: Record<string, { blemishes?: number; dark_spots?: number }>
+  views: SpotWeekView[]
+}
+
 export type MetricStory = {
   metric_id: string
   points: string[]
@@ -522,6 +546,8 @@ export const api = {
   retailerClaims: (token: string, productId: string, body: { channel: RetailerClaimChannel } & RetailerFilters) =>
     request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }, LONG_TIMEOUT_MS),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
+  /** The spot diary week by week: each face check-in's photos with every counted mark (api app/spot_weeks.py). */
+  spotWeeks: (token: string) => request<{ weeks: SpotWeek[] }>(token, '/v1/spots/weeks'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),

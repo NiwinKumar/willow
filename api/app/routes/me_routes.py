@@ -7,7 +7,7 @@ from zoneinfo import available_timezones
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import baselines, campaigns, storage, tracks, views
+from app import baselines, campaigns, spot_weeks, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
@@ -56,6 +56,16 @@ def timeline(
         },
         "metrics": series,
     }
+
+
+@router.get("/spots/weeks")
+def spots_by_week(
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Spot diary, week by week: each face check-in's photos (front, cheeks) with every mark it
+    counted and the counts Progress shows; nothing matched across weeks (app/spot_weeks.py)."""
+    return spot_weeks.weeks(store, user.uid)
 
 
 @router.get("/spots")
