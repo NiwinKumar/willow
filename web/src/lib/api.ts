@@ -257,6 +257,12 @@ export type ProductRequest = {
   created_at: string | null
   resolved_at: string | null
   seen: boolean
+  /** Plain status line ("We add products by hand within a few days."); older api builds omit it. */
+  status_text?: string
+  /** "facts": the full facts of a catalog product known only by name (an index product). */
+  kind?: 'product' | 'facts'
+  /** The index product a facts request is for. */
+  for_product_id?: string | null
 }
 
 export class ApiError extends Error {
@@ -289,7 +295,7 @@ async function timedFetch(url: string, init: RequestInit | undefined, timeoutMs:
   }
 }
 
-async function request<T>(token: string, path: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
+export async function request<T>(token: string, path: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
   const res = await timedFetch(`${API_URL}${path}`, {
     ...init,
     headers: {
@@ -401,14 +407,17 @@ export const api = {
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }, LONG_TIMEOUT_MS),
   /** The account as the api knows it: uid, the consent and the profile on record (each null before any). */
   me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null; profile: Profile | null }>(token, '/v1/me'),
-  /** `concern` may be several: products made for every one of them. `total` counts every match (past `limit`). */
-  catalogSearch: (token: string, params: { q?: string; concern?: string | string[]; category?: string; max_price?: number; currency?: string; limit?: number }) => {
+  /** `concern` may be several: products made for every one of them. `total` counts every match (past `limit`).
+   * Nearest to where the person shops first: their saved market, else `market` (the browser's guess); the answer's
+   * `market` is the one used (api app/regions.py). */
+  catalogSearch: (token: string, params: { q?: string; concern?: string | string[]; category?: string; max_price?: number; currency?: string; limit?: number; market?: string }) => {
     const qs = new URLSearchParams(Object.entries(params).flatMap(([k, v]) => (v === undefined || v === '' ? [] : Array.isArray(v) ? v.map((x) => [k, x]) : [[k, String(v)]])))
-    return request<{ products: Product[]; total?: number; catalog_size?: number }>(token, `/v1/catalog/search?${qs}`)
+    return request<{ products: Product[]; total?: number; catalog_size?: number; market?: string | null }>(token, `/v1/catalog/search?${qs}`)
   },
   productRequests: (token: string) => request<{ requests: ProductRequest[] }>(token, '/v1/product-requests'),
   /** 409 `in_catalog` (detail.product) when the catalog already has it. */
-  requestProduct: (token: string, body: { brand: string; name: string; photo?: { mime_type: string; data_base64: string } }) =>
+  /** `product_id` of an index product asks for its full facts (answered by the same request when asked again). */
+  requestProduct: (token: string, body: { brand?: string; name?: string; product_id?: string; photo?: { mime_type: string; data_base64: string } }) =>
     request<ProductRequest>(token, '/v1/product-requests', { method: 'POST', ...json(body) }),
   seenProductRequest: (token: string, id: string) => request<void>(token, `/v1/product-requests/${id}`, { method: 'PATCH', ...json({ seen: true }) }),
   catalogProduct: (token: string, productId: string) => request<Product>(token, `/v1/catalog/${productId}`),
@@ -633,6 +642,8 @@ export type Campaign = {
   created_at: string
   /** Started by an AutoCampaign rule; null for one a person created. Missing from older api builds. */
   rule?: { id: string; name: string } | null
+  /** A sample campaign: simulated history seeded when a demo seat is joined. Never served to shoppers, never takes a running slot. */
+  sample?: boolean
   product: string | null
   brand: string | null
   category: string | null
@@ -888,7 +899,7 @@ function retailerQs(filters?: Partial<RetailerFilters> & { brand?: string }): st
 }
 
 /** GETs that keep the api's status on failure (404 = unknown id, or an endpoint this api build doesn't have yet). */
-async function retailerGet<T>(path: string): Promise<T> {
+export async function retailerGet<T>(path: string): Promise<T> {
   const res = await timedFetch(`${API_URL}${path}`, undefined, RETAILER_TIMEOUT_MS)
   if (!res.ok) throw new ApiError(res.status, `${path.split('?')[0]} unavailable`)
   return (await res.json()) as T

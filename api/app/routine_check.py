@@ -41,6 +41,8 @@ CLASSES: dict[str, tuple[str, ...]] = {
     "copper_peptide": ("copper tripeptide-1", "copper peptide"),
     "niacinamide": ("niacinamide",),
 }
+# azelaic acid is matched by findings_for only (not a class: the synthetic cohort's table above
+# stays as it was)
 INCI_DEPTH = 12
 LABEL = {
     "retinoid": "a retinoid",
@@ -200,6 +202,103 @@ def rule_findings(entries: list[Entry]) -> dict[str, Any]:
     return {"conflicts": conflicts, "duplicates": duplicates, "gaps": gaps, "notes": notes}
 
 
+# --- the person's own routine: checks beyond the shared table ---------------------------------
+# rule_findings above is also the synthetic cohort's table (app/cohort.py), so it stays as it is;
+# a real person's routine gets these as well (findings_for).
+
+AZELAIC = ("azelaic acid",)
+SUN_SENSITISING = {"retinoid", "aha", "bha", "bpo"}
+OTHER_ACTIVES = {"laa", "pha", "niacinamide", "copper_peptide"}
+
+
+def _has_azelaic(entry: Entry) -> bool:
+    return any(t in n for n in _names(entry) for t in AZELAIC)
+
+
+def findings_for(entries: list[Entry], profile: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The rule table plus what applies to this person: benzoyl peroxide or any active without
+    a morning sunscreen, two azelaic acid products, and from their safety profile (app/safety.py)
+    a retinoid with an exfoliating acid on skin that reacts easily, fragrance on reactive skin or
+    on their avoid list, and strong actives beside a skin medicine from a doctor."""
+    from app import safety
+
+    result = rule_findings(entries)
+    profile = profile or {}
+    active = [e for e in entries if not e.get("ended_at")]
+    cls = {e["id"]: classes_of(e) for e in active}
+    has_am_spf = any(is_sunscreen(e) and "am" in (e.get("slots") or []) for e in active)
+    if not has_am_spf and not result["gaps"]:
+        if any(cls[e["id"]] & SUN_SENSITISING for e in active):
+            why = (
+                "Benzoyl peroxide, retinoids and exfoliating acids make skin more sensitive to "
+                "the sun."
+            )
+        elif any(cls[e["id"]] & OTHER_ACTIVES or _has_azelaic(e) for e in active):
+            why = "Sunscreen keeps the work of any active from being undone by the sun."
+        else:
+            why = None
+        if why:
+            result["gaps"].append(
+                {
+                    "need": "Daily sunscreen in the morning",
+                    "why": why,
+                    "suggestion": "Add a broad-spectrum SPF 30 or higher to the morning routine.",
+                }
+            )
+    azelaic = [e for e in active if _has_azelaic(e)]
+    if len(azelaic) >= 2:
+        result["duplicates"].append(
+            {
+                "active": "azelaic acid",
+                "products": [e["id"] for e in azelaic],
+                "note": "The same active in more than one product adds up; keeping one is "
+                "usually enough.",
+            }
+        )
+    reactive = bool(profile.get("reactive"))
+    retinoids = [e for e in active if "retinoid" in cls[e["id"]]]
+    acids = [e for e in active if cls[e["id"]] & {"aha", "bha"}]
+    if reactive and retinoids and acids:
+        result["conflicts"].append(
+            {
+                "products": [e["id"] for e in retinoids + acids],
+                "issue": "Your skin reacts easily, and this routine has a retinoid and an "
+                "exfoliating acid.",
+                "severity": "caution",
+                "suggestion": "Start with one of them, and add the other only once your skin "
+                "has settled.",
+                "source": "rule",
+            }
+        )
+    avoids_fragrance = "fragrance" in (profile.get("avoid") or [])
+    if reactive or avoids_fragrance:
+        reason = "you avoid fragrance" if avoids_fragrance else "your skin reacts easily"
+        for e in active:
+            if safety.has_fragrance(e):
+                result["conflicts"].append(
+                    {
+                        "products": [e["id"]],
+                        "issue": f"This lists fragrance, and {reason}.",
+                        "severity": "caution",
+                        "suggestion": "A fragrance-free option is gentler.",
+                        "source": "rule",
+                    }
+                )
+    strong = [e for e in active if cls[e["id"]] & {"retinoid", "aha", "bha", "pha", "bpo"}]
+    if profile.get("rx_treatment") and strong:
+        result["conflicts"].append(
+            {
+                "products": [e["id"] for e in strong],
+                "issue": "You use a skin medicine from a doctor, and this routine has "
+                "retinoids, exfoliating acids or benzoyl peroxide as well.",
+                "severity": "caution",
+                "suggestion": "Ask your doctor before using them with it.",
+                "source": "rule",
+            }
+        )
+    return result
+
+
 class ModelConflict(BaseModel):
     products: list[str] = Field(min_length=1, max_length=4)
     issue: str = Field(max_length=240)
@@ -275,8 +374,10 @@ _answers: dict[str, tuple[float, dict[str, Any]]] = {}
 _answers_lock = threading.Lock()
 
 
-def _prompt_of(entries: list[Entry]) -> tuple[str, str, dict[str, Any]]:
-    result = rule_findings(entries)
+def _prompt_of(
+    entries: list[Entry], profile: dict[str, Any] | None = None
+) -> tuple[str, str, dict[str, Any]]:
+    result = findings_for(entries, profile)
     listing = _listing(_active(entries))
     return f"Routine:\n{listing}\n\nRule-based findings (final):\n{result}", listing, result
 
@@ -285,11 +386,11 @@ def _key(prompt: str) -> str:
     return hashlib.sha256(prompt.encode()).hexdigest()
 
 
-def answered(entries: list[Entry]) -> dict[str, Any] | None:
-    """The kept complete answer for this exact routine, or None."""
+def answered(entries: list[Entry], profile: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """The kept complete answer for this exact routine (and profile), or None."""
     if not needs_model(entries):
         return None
-    key = _key(_prompt_of(entries)[0])
+    key = _key(_prompt_of(entries, profile)[0])
     with _answers_lock:
         hit = _answers.get(key)
         if hit and time.time() - hit[0] < ANSWER_TTL_S:
@@ -302,17 +403,22 @@ def clear_answers() -> None:
         _answers.clear()
 
 
-def check(entries: list[Entry], use_model: bool = True) -> dict[str, Any]:
-    return run(entries, use_model)[0]
+def check(
+    entries: list[Entry], use_model: bool = True, profile: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    return run(entries, use_model, profile)[0]
 
 
-def run(entries: list[Entry], use_model: bool = True) -> tuple[dict[str, Any], bool]:
+def run(
+    entries: list[Entry], use_model: bool = True, profile: dict[str, Any] | None = None
+) -> tuple[dict[str, Any], bool]:
     """(findings, complete). complete: Gemini answered, or the routine needs no Gemini; False
-    when Gemini was wanted and failed (or use_model is off), so the rules stand alone."""
+    when Gemini was wanted and failed (or use_model is off), so the rules stand alone.
+    `profile`: the person's safety profile (findings_for)."""
     active = _active(entries)
     if len(active) < 2:
-        return rule_findings(entries), True
-    prompt, listing, result = _prompt_of(entries)
+        return findings_for(entries, profile), True
+    prompt, listing, result = _prompt_of(entries, profile)
     if not use_model:
         return result, False
     try:

@@ -9,6 +9,10 @@ users/{uid}/product_requests/{id}: {brand, name, key, status, product_id, photo_
 resolved_at, seen}. product_requests/{key}: {brand, name, requesters[], count, status, product_id,
 first_at, last_at}; `key` is the normalised brand + name, so the same product asked for twice is one
 entry. A request with only a photo gets its own key until it is checked.
+
+A request can also be for the full facts of a product the catalog knows only by name (an index
+product, docs/CATALOG_SPEC.md): `kind: "facts"`, `for_product_id` set, keyed by the catalog's own
+brand and name. It is answered (`added`) once that product has its ingredient list.
 """
 
 import base64
@@ -23,6 +27,9 @@ from app import catalog, storage
 from app.store import Doc, Store, iso
 
 Status = Literal["pending", "added", "declined"]
+Kind = Literal["product", "facts"]
+# catalog.match score at which a request names a product the catalog has (brand and name agree)
+IN_CATALOG = 0.85
 PHOTO_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 
 
@@ -53,16 +60,23 @@ def create(
     name: str,
     photo: tuple[str, bytes] | None,
     now: datetime | None = None,
+    facts_for: dict[str, Any] | None = None,
 ) -> tuple[str, Doc, Doc]:
-    """Save one request and count the person once for that product. Returns (id, doc, wish)."""
+    """Save one request and count the person once for that product. Returns (id, doc, wish).
+    `facts_for`: the index product whose full facts are asked for (its brand and name win)."""
     now = now or datetime.now(UTC)
     rid = f"pr_{secrets.token_hex(5)}"
+    if facts_for:
+        brand, name = facts_for["brand"], facts_for["name"]
     brand, name = " ".join(brand.split()), " ".join(name.split())
     key = key_of(brand, name) if (brand or name) else f"photo-{rid}"
+    kind: Kind = "facts" if facts_for else "product"
     doc: Doc = {
         "brand": brand,
         "name": name,
         "key": key,
+        "kind": kind,
+        "for_product_id": facts_for["product_id"] if facts_for else None,
         "status": "pending",
         "product_id": None,
         "photo_name": None,
@@ -81,6 +95,8 @@ def create(
         {
             "brand": brand,
             "name": name,
+            "kind": kind,
+            "for_product_id": doc["for_product_id"],
             "status": "pending",
             "product_id": None,
             "first_at": now,
@@ -90,13 +106,52 @@ def create(
     return rid, doc, wish
 
 
+def in_catalog(brand: str, name: str) -> dict[str, Any] | None:
+    """The catalog product a brand and name already name, if any (full or index)."""
+    found = catalog.match(brand, name)
+    return found[0] if found and found[1] >= IN_CATALOG else None
+
+
+def pending_of(store: Store, uid: str, key: str) -> tuple[str, Doc] | None:
+    """This person's pending request for this product key, if they already asked."""
+    return next(
+        (
+            (rid, doc)
+            for rid, doc in store.product_requests_of(uid)
+            if doc.get("key") == key and doc.get("status") == "pending"
+        ),
+        None,
+    )
+
+
+def status_text(status: str, product: dict[str, Any] | None, kind: str = "product") -> str:
+    """One honest line for the request's state. Products are checked and added by hand
+    (scripts/product_requests.py), so a pending request says so instead of an open "Checking"."""
+    if kind == "facts":
+        if status == "added":
+            return f"Its full facts are in: {product['name']}" if product else "Full facts added"
+        if status == "declined":
+            return "We couldn't verify its ingredients yet."
+        return "We add its ingredient list by hand within a few days."
+    if status == "added":
+        return f"It's in the catalog: {product['name']}" if product else "Added to the catalog"
+    if status == "declined":
+        return "We couldn't verify its ingredients, so it isn't in the catalog."
+    return "We add products by hand within a few days."
+
+
 def view(rid: str, doc: Doc, askers: int | None = None) -> dict[str, Any]:
     product = catalog.by_id(doc["product_id"]) if doc.get("product_id") else None
+    status = doc.get("status") or "pending"
+    kind = doc.get("kind") or "product"
     return {
         "id": rid,
         "brand": doc.get("brand") or "",
         "name": doc.get("name") or "",
-        "status": doc.get("status") or "pending",
+        "kind": kind,
+        "for_product_id": doc.get("for_product_id"),
+        "status": status,
+        "status_text": status_text(status, product, kind),
         "product_id": doc.get("product_id"),
         # the catalog entry once it is added, so the app can offer "Add to routine" right away
         "product": product,
@@ -109,7 +164,24 @@ def view(rid: str, doc: Doc, askers: int | None = None) -> dict[str, Any]:
 
 
 def list_views(store: Store, uid: str) -> list[dict[str, Any]]:
+    """This person's requests, newest first. A pending one whose product the catalog now has
+    (added since, or asked for by photo and named later) is answered here, for everyone who
+    asked, as the queue script would: nobody waits on a product that is already in."""
     rows = store.product_requests_of(uid)
+    answered: set[str] = set()
+    for _rid, doc in rows:
+        if doc.get("status") != "pending" or doc.get("key") in answered:
+            continue
+        product = in_catalog(doc.get("brand") or "", doc.get("name") or "")
+        if product is None or not catalog.is_full(product):
+            continue  # not in yet, or known only by name (its facts are what was asked for)
+        try:
+            resolve(store, doc["key"], "added", product["product_id"])
+            answered.add(doc["key"])
+        except KeyError:  # the shared entry is gone (an account deleted mid-way): leave it
+            continue
+    if answered:
+        rows = store.product_requests_of(uid)
     oldest = datetime.min.replace(tzinfo=UTC)
     rows.sort(key=lambda r: r[1].get("created_at") or oldest, reverse=True)
     out = []

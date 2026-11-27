@@ -10,6 +10,7 @@ import { Sparkline } from '../../components/charts/Sparkline'
 import { activeIn, useRoutine, useRoutineLog } from '../../data/hooks'
 import type { MetricId, Product, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
+import { NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, fmtValue, unitOf } from '../../lib/metrics'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, verdictCounts, wordsFor, type VerdictKind } from '../../lib/verdict'
@@ -174,7 +175,7 @@ function ProductWidget({ productId, links }: { productId: string; links: WidgetL
           <span className="text-[12px] text-ink-2">{metaLine(p.brand, p.category, p.size)}</span>
           <span className="text-[14px]">{p.name}</span>
           <span className="text-[12px] text-ink-2">
-            {fmtPrice(p.price)} · checked {fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}
+            {p.price ? `${fmtPrice(p.price)} · checked ${fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}` : NO_PRICE}
           </span>
         </span>
       </span>

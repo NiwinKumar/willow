@@ -2,13 +2,17 @@ import os
 
 os.environ.setdefault("AUTH_MODE", "dev")
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
+# Tests never reach the real Firestore, even one that forgets the `fake` fixture.
+os.environ["DEV_STORE"] = "memory"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import storage  # noqa: E402
+from app import dev_seed, storage  # noqa: E402
 from app.main import app  # noqa: E402
 from app.store import MemoryStore, get_store  # noqa: E402
+
+SEED_SAMPLES = dev_seed.seed_demo_campaigns
 
 
 class FakeCloud:
@@ -54,6 +58,18 @@ def no_real_gemini(monkeypatch: pytest.MonkeyPatch):
     from app import autopilot_agent
 
     monkeypatch.setattr(autopilot_agent, "model_round", offline)
+
+
+@pytest.fixture(autouse=True)
+def no_sample_campaigns(monkeypatch: pytest.MonkeyPatch):
+    """Joining a demo org seeds sample campaigns (app/dev_seed.py); tests that count campaigns
+    start without them. A test that needs them asks for `samples_on`."""
+    monkeypatch.setattr(dev_seed, "seed_demo_campaigns", lambda *a, **k: [])
+
+
+@pytest.fixture
+def samples_on(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(dev_seed, "seed_demo_campaigns", SEED_SAMPLES)
 
 
 @pytest.fixture(autouse=True)

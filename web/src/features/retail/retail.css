@@ -136,3 +136,8 @@ html[data-proof] body::before {
     animation: wFadeIn .01ms both !important;
   }
 }
+
+/* Decision cards glide between lanes in a view transition (orgData.withTransition); the sticky top bar stays on
+   top of them while they move, and the glide is short and calm. */
+html[data-proof]::view-transition-group(proof-head) { z-index: 50; }
+html[data-proof]::view-transition-group(*) { animation-duration: .28s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }

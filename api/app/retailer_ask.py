@@ -13,13 +13,16 @@ and `source` (which aggregate tables the chart and the answer drew on).
 """
 
 import calendar
+import copy
 import json
 import logging
+import re
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app import gemini, numbers
+from app import catalog, gemini, numbers
 from app.explain import BANNED
 from app.settings import get_settings
 
@@ -45,7 +48,8 @@ who said it is working for them; quote it only as what people said, never as a m
 - Quote numbers exactly as they appear; a fraction may be written as a whole percent (0.36 -> 36%).
   Never compute new numbers (no differences, sums, averages or ratios you derive yourself).
 - refused: true when the question asks about individual people (who, which user, a named
-  person) or for something INSIGHTS does not hold; then give no numbers and no chart, say what
+  person) or for something INSIGHTS does not hold (sales, revenue, prices paid, profit, margins,
+  returns, stock levels, anything per person); then give no numbers and no chart, say what
   is not available and what group-level view could answer instead. Otherwise false.
 - Skin-tone bands describe coverage of the cohort; never rank or compare people by skin tone and
   never imply lighter skin is better.
@@ -157,19 +161,148 @@ def _names(insights: dict[str, Any]) -> set[str]:
     return set(_index(insights))
 
 
-def problems(reply: Answer, insights: dict[str, Any], question: str) -> list[str]:
+# -- whose question it is (Proof organisations, routes/proof_routes.py POST .../ask) --------------
+#
+# A brand organisation asks about its own brand ("we", "our", "mine"). When the retailer's
+# policy keeps competitor names off for brands (research/finals/06 section 4.2), Gemini never sees
+# another brand's name: other brands read "Brand A", "Brand B"... (the letters the web uses: the
+# catalog's brands in code-point order) and their products "Brand C's serum", and any answer,
+# follow-up or chart label that still names one (from Gemini's own knowledge) is rejected.
+
+_ORDINALS = ("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth")
+
+
+def letters(i: int) -> str:
+    """0 -> "A", 25 -> "Z", 26 -> "AA" (the web's letters(), features/retail/masking.ts)."""
+    s = ""
+    n = i
+    while True:
+        s = chr(65 + n % 26) + s
+        n = n // 26 - 1
+        if n < 0:
+            return s
+
+
+@dataclass(frozen=True)
+class Scope:
+    """`brand`: the asking organisation's brand (None: the retailer). `hidden`: every name Gemini
+    may not see or write, mapped to the alias it sees instead (empty when names are allowed)."""
+
+    brand: str | None = None
+    hidden: dict[str, str] = field(default_factory=dict)
+    # the asking brand's own names: matched first, so another brand's shorter product name
+    # inside one of them ("Vitamin C Serum" in "Vitamin C Serum 10%") is never masked
+    kept: frozenset[str] = frozenset()
+
+    @property
+    def masked(self) -> bool:
+        return bool(self.hidden)
+
+
+def scope_for(brand: str | None, hide_others: bool) -> Scope:
+    """The scope of a question from `brand`'s team; other brands anonymised when `hide_others`."""
+    if not brand or not hide_others:
+        return Scope(brand=brand)
+    products = catalog.products()
+    brands = sorted({p["brand"] for p in products})
+    alias = {b: f"Brand {letters(i)}" for i, b in enumerate(brands)}
+    hidden: dict[str, str] = {b: alias[b] for b in brands if b != brand}
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for p in sorted(products, key=lambda p: p["product_id"]):
+        if p["brand"] != brand:
+            groups.setdefault((p["brand"], p.get("category") or "product"), []).append(p)
+    for (b, category), rows in groups.items():
+        for k, p in enumerate(rows):
+            nth = f"{_ORDINALS[k]} " if len(rows) > 1 and k < len(_ORDINALS) else ""
+            hidden.setdefault(p["name"], f"{alias[b]}'s {nth}{category}")
+            hidden.setdefault(f"{b} {p['name']}", f"{alias[b]}'s {nth}{category}")
+    own = [p for p in products if p["brand"] == brand]
+    kept = frozenset([brand, *(p["name"] for p in own), *(f"{brand} {p['name']}" for p in own)])
+    return Scope(brand=brand, hidden=hidden, kept=kept - set(hidden))
+
+
+def _hidden_pattern(scope: Scope) -> re.Pattern[str] | None:
+    if not scope.hidden:
+        return None
+    # longest first: "Brand X Serum" before "Brand X", and own names before what they contain
+    names = sorted({*scope.hidden, *scope.kept}, key=len, reverse=True)
+    return re.compile("|".join(rf"(?<![\w]){re.escape(n)}(?![\w])" for n in names))
+
+
+def mask(insights: dict[str, Any], scope: Scope) -> dict[str, Any]:
+    """The aggregates with every hidden name replaced by its alias, in every string (field values
+    and words inside text such as a gap's action or a conflict's `resolves`)."""
+    pattern = _hidden_pattern(scope)
+    if pattern is None:
+        return insights
+
+    def walk(x: Any) -> Any:
+        if isinstance(x, str):
+            return pattern.sub(lambda m: scope.hidden.get(m.group(0), m.group(0)), x)
+        if isinstance(x, dict):
+            return {k: walk(v) for k, v in x.items()}
+        if isinstance(x, list):
+            return [walk(v) for v in x]
+        return x
+
+    return walk(copy.deepcopy(insights))
+
+
+def named_others(texts: list[str], scope: Scope) -> list[str]:
+    """Hidden names (other brands or their products) that appear in any of `texts`."""
+    pattern = _hidden_pattern(scope)
+    if pattern is None:
+        return []
+    found = {m.group(0) for t in texts for m in pattern.finditer(t)}
+    return sorted(n for n in found if n in scope.hidden)
+
+
+def scope_instructions(scope: Scope) -> str:
+    if not scope.brand:
+        return ""
+    out = (
+        f"\nSCOPE: the question comes from {scope.brand}'s own team: 'we', 'our' and 'mine' mean "
+        f"{scope.brand}. Lead with {scope.brand}'s products; compare them with the category, never "
+        "rank people."
+    )
+    if scope.masked:
+        out += (
+            " The retailer keeps other brands' names hidden from brands: INSIGHTS calls them "
+            "'Brand A', 'Brand B'... and their products \"Brand C's serum\". Use only those labels "
+            "or 'the category'; never write, guess or hint at another brand's real name."
+        )
+    return out
+
+
+_ASKED_PERCENT = re.compile(r"\d+(?:[.,]\d+)?(?=\s*(?:%|percent))", re.IGNORECASE)
+# Proof never says a product is safe, in an answer or a suggested follow-up.
+_UNSAFE_WORDS = re.compile(r"\bsafe(?:ly|st|r|ty)?\b", re.IGNORECASE)
+
+
+def problems(
+    reply: Answer, insights: dict[str, Any], question: str, scope: Scope | None = None
+) -> list[str]:
     """Everything shown is checked: answer, chart title, follow-ups, bar labels and values.
-    The question's own digits are not allowed back ("is it 95%?" must not be echoed)."""
+    The question's own digits are not allowed back ("is it 95%?" must not be echoed). In a masked
+    scope no text or bar label may name another brand or one of its products."""
     plain, pct = numbers.collect(insights), numbers.percents(insights)
-    allowed = plain | pct
+    # A percent the question supplies may not come back, even when the same figure sits somewhere
+    # in the data ("is it 95%?" must not be echoed as if it were the answer). Bare numbers in the
+    # question (weeks, counts) stay allowed: "by week 8" is a legitimate thing to answer about.
+    asked = set().union(*(numbers.in_text(m) for m in _ASKED_PERCENT.findall(question)))
+    allowed = (plain | pct) - asked
     found = []
     texts = [reply.answer, *reply.follow_ups, reply.chart.title if reply.chart else ""]
     if not all(numbers.only_known(t, allowed) for t in texts):
         found.append("text quotes a number that is not in the data")
-    if any(BANNED.search(t) for t in texts):
+    if any(BANNED.search(t) or _UNSAFE_WORDS.search(t) for t in texts):
         found.append("banned wording")
     if reply.refused and reply.chart:
         found.append("a refusal has no chart")
+    if scope and scope.masked:
+        labels = [b.label for b in reply.chart.bars] if reply.chart else []
+        if named := named_others([*texts, *labels], scope):
+            found.append(f"names another brand: {', '.join(named)}")
     if reply.chart:
         names = _names(insights)
         # A percent bar must come from a share; a count or weeks bar from the number itself.
@@ -201,28 +334,39 @@ def provenance(reply: Answer, insights: dict[str, Any]) -> dict[str, Any]:
     return {"chart": chart, "source": sources}
 
 
-def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
+NAMES_HIDDEN = (
+    "I could not answer without naming other brands, which the retailer's policy keeps hidden "
+    "from brands. Ask about your own products, or compare them with the category."
+)
+
+
+def ask(question: str, insights: dict[str, Any], scope: Scope | None = None) -> dict[str, Any]:
+    scope = scope or Scope()
+    # A masked scope: Gemini sees aliases only, and the checks (names, numbers, provenance) run
+    # on the same masked aggregates.
+    insights = mask(insights, scope)
     data = view(insights)
     # Compact JSON: fewer input tokens, a faster answer.
     prompt = f"INSIGHTS (JSON):\n{json.dumps(data, separators=(',', ':'))}\n\nQUESTION: {question}"
+    found: list[str] = []
     for attempt in range(2):
         try:
             reply = gemini.generate_json(
                 "retailer_ask",
                 [prompt],
                 Answer,
-                instructions=INSTRUCTIONS,
+                instructions=INSTRUCTIONS + scope_instructions(scope),
                 temperature=0.2,
                 max_output_tokens=2048,
                 attempts=1,
-                keep=lambda r: not problems(r, data, question),
+                keep=lambda r: not problems(r, data, question, scope),
                 # INSIGHTS is about 25 KB: 25 s was not always enough (Oct 14, deadline exceeded).
                 timeout_ms=50_000,
             )
         except gemini.GeminiError as exc:
             # Gemini itself is unavailable: say so (the route refunds the question).
             raise Unavailable from exc
-        found = problems(reply, data, question)
+        found = problems(reply, data, question, scope)
         if not found:
             return {
                 **reply.model_dump(),
@@ -235,8 +379,11 @@ def ask(question: str, insights: dict[str, Any]) -> dict[str, Any]:
                 },
             }
         log.warning("retailer answer rejected: %s", found)
+    named = any(f.startswith("names another brand") for f in found)
     return {
-        "answer": "I could not put together an answer that only uses numbers from this data. "
+        "answer": NAMES_HIDDEN
+        if named
+        else "I could not put together an answer that only uses numbers from this data. "
         "Try asking about one goal, product or brand at a time.",
         "refused": True,
         "chart": None,

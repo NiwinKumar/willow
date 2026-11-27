@@ -1,9 +1,11 @@
 import { Button } from '../../components/ui/Button'
 import type { Site } from '../../data/types'
+import { useData } from '../../data/useData'
 import { plural } from '../../lib/format'
 import { unlockCues } from './cue'
 import { quickChecks, SITE_NAME, SITE_SWATCH } from './model'
 import { MonoEyebrow, SerifTitle } from './parts'
+import { placeState, sentTitle } from './sent'
 
 const camOf = (site: Site) => (site === 'face_full' ? 'Front camera' : 'Back camera')
 
@@ -81,33 +83,56 @@ export function PlaceStep({
 }
 
 /**
- * Step "sent": every place of the check-in is uploaded and being measured on Willow's side. The person can
- * close the app; each result lands in Home (and Progress) when it is ready.
+ * Step "sent": every place of the check-in is uploaded and measured on Willow's side. Each row reads its session
+ * live (the DataProvider polls sessions in flight), so a face that is ready says so while a cheek close-up is
+ * still measuring (the engine needs a few minutes on a close-up). A ready place opens its result; Home is one tap
+ * away, and the app-wide "Your result is ready" note (progress/useResultReady.ts) says when the rest land.
  */
-export function SentStep({ sent, skipped, onHome }: { sent: Site[]; skipped: Site[]; onHome: () => void }) {
+export function SentStep({ sent, skipped, onHome, onView }: { sent: { site: Site; id: string }[]; skipped: Site[]; onHome: () => void; onView: (id: string) => void }) {
+  const data = useData()
+  const states = sent.map(({ site, id }) => placeState(site, data.all.find((x) => x.id === id)))
+  const waiting = states.some((s) => s.kind === 'measuring')
+  const rows = [...sent.map(({ site, id }, i) => ({ s: site, id, state: states[i] })), ...skipped.map((s) => ({ s, id: null, state: null }))]
   return (
     <div className="mx-auto flex max-w-[560px] animate-rise flex-col items-start gap-5 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-col gap-2">
         <MonoEyebrow>Check-in sent</MonoEyebrow>
-        <SerifTitle id="ck-title">{sent.length ? 'All photos are in' : 'Nothing was sent'}</SerifTitle>
+        <SerifTitle id="ck-title">{sentTitle(states)}</SerifTitle>
       </div>
       <p className="m-0 text-[16px] leading-normal text-[#3E3C38]">
-        {sent.length ? 'Willow is measuring them now. Your report is ready in a few minutes; you can close the app, it will be in Home when you come back.' : 'Every place was skipped, so there is nothing to measure today.'}
+        {!sent.length
+          ? 'Every place was skipped, so there is nothing to measure today.'
+          : waiting
+            ? 'Willow is measuring on its side; close-ups take a few minutes. You can go to Home or close the app: a note says when each result is ready.'
+            : 'Every place is back. Open one to see it, or find them all in Home.'}
       </p>
-      {sent.length || skipped.length ? (
-        <ul className="m-0 flex w-full list-none flex-col gap-1.5 p-0">
-          {[...sent.map((s) => ({ s, done: true })), ...skipped.map((s) => ({ s, done: false }))].map(({ s, done }) => (
+      {rows.length ? (
+        <ul aria-live="polite" className="m-0 flex w-full list-none flex-col gap-1.5 p-0">
+          {rows.map(({ s, id, state }) => (
             <li key={s} className="flex min-h-14 items-center gap-3 rounded-[20px] bg-white/80 py-2 pr-3 pl-2">
               <span aria-hidden className="size-10 flex-none rounded-[14px] shadow-[inset_0_0_12px_rgba(255,255,255,.5)]" style={{ background: SITE_SWATCH[s] }} />
-              <span className="flex-1 text-[15px]">{SITE_NAME[s]}</span>
-              <span className="text-[13px] text-ink-2">{done ? 'Measuring' : 'Skipped today'}</span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-[15px]">{SITE_NAME[s]}</span>
+                <span className="flex items-center gap-1.5 text-[13px] text-ink-2">
+                  {/* a measuring place breathes; a finished or skipped one sits still */}
+                  {state?.kind === 'measuring' ? <span aria-hidden className="size-1.5 flex-none rounded-full bg-[var(--aura-lilac)] motion-safe:animate-[wBreathe_2.4s_ease-in-out_infinite]" /> : null}
+                  {state ? state.line : 'Skipped today'}
+                </span>
+              </span>
+              {id && state?.view ? (
+                <button type="button" onClick={() => onView(id)} className="min-h-11 flex-none rounded-pill px-3 text-[14px] underline underline-offset-4 transition-[color,scale] duration-200 ease-standard hover:text-ink active:scale-[.97]">
+                  View
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
-      <Button variant="ink" onClick={onHome}>
-        Done
-      </Button>
+      <div>
+        <Button variant="ink" onClick={onHome}>
+          {sent.length ? 'Go to Home' : 'Done'}
+        </Button>
+      </div>
     </div>
   )
 }

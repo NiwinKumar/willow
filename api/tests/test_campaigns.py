@@ -58,6 +58,9 @@ def _as(uid: str) -> TestClient:
 
 
 def _create(client, pid=PROVEN, workspace="retailer", goals=("dark_spots",), skin=(), days=14):
+    # creating needs a Proof org membership (app/proof_orgs.py): "Try as" the demo retailer
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
     return client.post(
         "/v1/retailer/campaigns",
         json={
@@ -182,6 +185,33 @@ def test_at_most_three_running(client, fake):
     assert _create(client, pid=PROVEN_4).status_code == 201
     res = client.patch(f"/v1/retailer/campaigns/{ids[0]}", json={"status": "active"})
     assert res.status_code == 429
+
+
+def test_one_live_campaign_per_product(client, fake):
+    first = _create(client).json()["id"]
+    res = _create(client)
+    assert res.status_code == 409
+    assert res.json()["detail"] == {
+        "code": "already_running",
+        "message": "This product already has a running campaign; end it or wait for its result.",
+    }
+    # another guest's demo campaign is theirs alone: it doesn't block this one
+    assert _create(_as("other")).status_code == 201
+    # a paused one isn't live: a new one may start, and then the old one can't resume
+    client.patch(f"/v1/retailer/campaigns/{first}", json={"status": "paused"})
+    second = _create(client).json()["id"]
+    res = client.patch(f"/v1/retailer/campaigns/{first}", json={"status": "active"})
+    assert res.status_code == 409 and res.json()["detail"]["code"] == "already_running"
+    client.patch(f"/v1/retailer/campaigns/{second}", json={"status": "ended"})
+    assert client.patch(f"/v1/retailer/campaigns/{first}", json={"status": "active"}).is_success
+
+
+def test_a_real_team_shares_one_live_campaign_per_product(client, fake):
+    # a real (non-demo) campaign of the same Proof instance, made by a teammate
+    cid = _create(_as("teammate")).json()["id"]
+    fake.store.campaigns[cid] |= {"demo": False, "instance": "willow"}
+    res = _create(client)
+    assert res.status_code == 409 and res.json()["detail"]["code"] == "already_running"
 
 
 def test_creation_is_rate_limited(client, fake, monkeypatch):
@@ -368,6 +398,27 @@ def test_rotation_is_deterministic_per_person_and_day(client, fake):
     assert len(days) > 1  # and the same person rotates across days
 
 
+def test_several_eligible_the_nearest_product_to_the_shopper_is_shown(client, fake):
+    # PROVEN is sold in the US; PROVEN_2 and PROVEN_3 in India only (app/regions.py)
+    owners = [_as(f"brand{i}") for i in range(3)]
+    for c, pid in zip(owners, (PROVEN, PROVEN_2, PROVEN_3), strict=True):
+        assert _create(c, pid=pid).status_code == 201
+    us = {
+        _shopper(f"us{i}", safety={"market": "US"})
+        .get("/v1/sponsored")
+        .json()["item"]["product_id"]
+        for i in range(8)
+    }
+    assert us == {PROVEN}
+    india = {
+        _shopper(f"in{i}", safety={"market": "IN"})
+        .get("/v1/sponsored")
+        .json()["item"]["product_id"]
+        for i in range(12)
+    }
+    assert len(india) > 1  # all three sold there: the rotation as before
+
+
 # -- events and stats ----------------------------------------------------------------------------
 
 
@@ -505,6 +556,8 @@ def test_assignment_is_stable_and_near_the_share():
 
 
 def _holdout_campaign(client, fake, pct=0.5):
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
     res = client.post(
         "/v1/retailer/campaigns",
         json={
@@ -607,20 +660,23 @@ def test_incrementality_in_the_campaign_stats(client, fake):
     assert inc["lift"] == 0.0 and inc["lift_lo"] == 0.0 and inc["lift_hi"] == 0.0
 
 
-def test_dev_seed_gives_each_kind_of_campaign_with_history():
+def test_dev_seed_gives_each_kind_of_campaign_with_history(samples_on):
     from app import dev_seed
     from app.store import MemoryStore
 
     store = MemoryStore()
     ids = dev_seed.seed_demo_campaigns(store)
     assert len(ids) == 3 and dev_seed.seed_demo_campaigns(store) == []  # once
-    by = {cid: campaigns.view(store, cid, store.campaign_get(cid)) for cid in ids}
-    clear, collecting, ended = (by[s["id"]] for s in dev_seed.SPECS)
-    assert clear["status"] == "active" and len(clear["stats"]["daily"]) == 12
-    inc = clear["stats"]["incrementality"]
-    assert inc["lift"] > 0 and inc["lift_lo"] > 0 and inc["exposed"]["n"] == 640
+    running, collecting, ended = (campaigns.view(store, i, store.campaign_get(i)) for i in ids)
+    assert running["sample"] and running["demo"] and running["org_id"] is None
+    assert running["status"] == "active" and len(running["stats"]["daily"]) == 12
+    inc = running["stats"]["incrementality"]
+    # still running: a lift so far whose interval still includes zero
+    assert inc["lift"] > 0 and inc["lift_lo"] < 0 < inc["lift_hi"] and inc["exposed"]["n"] == 420
     assert collecting["status"] == "active" and collecting["stats"]["incrementality"] is None
     assert ended["status"] == "ended" and len(ended["stats"]["daily"]) == 14
+    # the finished one is the clear result judges open: interval above zero
     inc = ended["stats"]["incrementality"]
-    assert inc["lift_lo"] < 0 < inc["lift_hi"]
-    assert campaigns.active_count(store, dev_seed.DEV_OWNER) == 2
+    assert inc["lift"] > 0 and inc["lift_lo"] > 0
+    # samples never take a running slot
+    assert campaigns.active_count(store, dev_seed.DEV_OWNER) == 0

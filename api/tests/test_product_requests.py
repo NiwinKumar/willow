@@ -80,3 +80,30 @@ def test_deleting_an_account_removes_the_person_from_requests(client, fake, phot
     ((key, wish),) = fake.store.product_wishes()
     assert wish["requesters"] == [] and wish["count"] == 0
     assert fake.store.product_requests_of("u_test") == []
+
+
+def test_a_pending_request_says_how_long_it_takes_instead_of_checking(client, fake, photos):
+    made = client.post("/v1/product-requests", json={"brand": "Anua", "name": "Toner"}).json()
+    assert made["status"] == "pending"
+    assert made["status_text"] == "We add products by hand within a few days."
+
+
+def test_a_request_for_a_product_now_in_the_catalog_is_answered_when_read(
+    client, fake, photos, monkeypatch
+):
+    """Asked for before the catalog had it: the next read answers it for everyone who asked,
+    with the product, instead of leaving it pending."""
+    body = {"brand": "COSRX", "name": "Snail Essence", "photo": PHOTO}
+    mine = client.post("/v1/product-requests", json=body).json()
+    client.post("/v1/product-requests", json=body, headers={"X-Dev-Uid": "u_other"})
+    renamed = ({**CATALOG[0], "product_id": "cosrx-snail", "name": "Snail Essence"},)
+    monkeypatch.setattr(catalog, "products", lambda: renamed)
+    monkeypatch.setattr(catalog, "by_id", lambda i: renamed[0] if i == "cosrx-snail" else None)
+
+    (row,) = client.get("/v1/product-requests").json()["requests"]
+    assert row["id"] == mine["id"] and row["status"] == "added"
+    assert row["product"]["product_id"] == "cosrx-snail"
+    assert row["status_text"] == "It's in the catalog: Snail Essence"
+    assert photos == {}  # answered, so the pack photos go
+    other = fake.store.product_requests_of("u_other")
+    assert [d["status"] for _, d in other] == ["added"]

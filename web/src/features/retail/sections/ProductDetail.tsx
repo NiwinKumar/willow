@@ -1,11 +1,11 @@
-import { ChevronDown, Columns3, Copy, Download, Megaphone } from 'lucide-react'
+import { ChevronDown, Columns3, Copy, Download, Lock, Megaphone } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { useRetailData } from '../context'
 import { retailerActions } from '../../../lib/api'
 import { csvMeta } from '../data'
-import { KIND_LABEL, packCsv, packHtml, packMarkdown, packName, statementLine } from '../evidencePack'
+import { exportBlock, KIND_LABEL, packCsv, packHtml, packMarkdown, packName, statementLine } from '../evidencePack'
 import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipeline'
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail } from '../productData'
@@ -14,9 +14,13 @@ import { ANCHOR, channelOf, CLAIM_TIERS, DEFAULT_CHANNEL, type ActionTarget } fr
 import { sectionPath, useRetailState } from '../state'
 import type { Actions, BrandFlow, Filters, Insights, ProductDetail as Detail, Seg } from '../types'
 import { useView } from '../useView'
+import { useClaimCounts, useCompetitorNames } from '../orgData'
+import { useOnceFlag } from '../rangeStore'
 import { Badge, Bone, Button, copyText, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, ProofTierChip, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
 import { ClaimStudio } from './ClaimStudio'
-import { FeelPanel } from './FeelPanel'
+import { FeelAndClicks } from './StoreClicks'
+import { NamesHidden } from './NamesHidden'
+import { RequestEvidence } from './RequestEvidence'
 import { NextSteps } from './NextSteps'
 import { ProductJourney } from './ProductJourney'
 import { InsightsGate, YoursTag } from './shared'
@@ -78,9 +82,11 @@ function Body({ d }: { d: Insights }) {
   const { filters, workspace } = useRetailData()
   const { carry } = useRetailState()
   const state = useProductDetail(productId, filters)
+  const names = useCompetitorNames()
   if (state.status === 'loading') return <DetailSkeleton />
   if (state.status === 'missing') return <EmptyState title="This product isn’t in the catalog" body="The link may be old or mistyped. Every catalog product is on the Products list, with its status." action={{ label: 'Open products', to: `${sectionPath('products')}${carry}` }} />
   if (state.status === 'failed') return <ErrorState title="The product couldn’t load" body="The products service didn’t answer. No partial numbers are shown." onRetry={() => window.location.reload()} />
+  if (names.anonymise && state.d.product.brand !== names.own) return <NamesHidden what="Another brand’s product" />
   return <Page x={state.d} weeksN={d.cohort.weeks} brandView={workspace.kind === 'brand' ? workspace.brand : null} filters={filters} />
 }
 
@@ -102,11 +108,14 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
   const ctx: CtxTab = CTX_TABS.find((t) => t.id === param('ctx'))?.id ?? 'co'
   const comp = x.competitors
   const rival = comp.rows.find((r) => !r.is_self)
-  const compareTo = `/retail/compare${carry}${carry ? '&' : '?'}ids=${[p.product_id, ...(rival ? [rival.product_id] : [])].map(encodeURIComponent).join(',')}`
+  const names = useCompetitorNames()
+  const rivalOk = rival && !(names.anonymise && rival.brand !== names.own) ? rival : null
+  const compareTo = `/retail/compare${carry}${carry ? '&' : '?'}ids=${[p.product_id, ...(rivalOk ? [rivalOk.product_id] : [])].map(encodeURIComponent).join(',')}`
   const promoteTo = `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(p.product_id)}`
   const facts = [p.category_label, `${tierWord(p.price_tier)} price`, p.size, money(p.price)].filter(Boolean).join(' · ')
   const campaign = campaignFor(useCampaigns(), p.product_id)
-  const steps = pipelineSteps({ p, weeksN, statements: x.evidence.length, eligible: x.eligibility.eligible, campaign, promoteTo })
+  const saved = useClaimCounts(p.product_id)
+  const steps = pipelineSteps({ p, weeksN, statements: x.evidence.length, eligible: x.eligibility.eligible, campaign, promoteTo, saved, claimsTo: `${sectionPath('products', p.product_id)}${carry}${carry ? '&' : '?'}claim=listing#${ANCHOR.claims}` })
   const actions = useView<Actions>(`actions|${p.product_id}|${filters.cohort}|${filters.range}`, () => retailerActions(p.product_id, filters))
   const hasSteps = actions.status === 'ready' && actions.data.actions.length > 0
   const showSteps = actions.status !== 'failed' && !(actions.status === 'ready' && !actions.data.actions.length)
@@ -119,8 +128,11 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
   // Brief cards link to #feel; the panel exists only once the product is in, so scroll then.
   const { hash } = useLocation()
   useEffect(() => {
-    if (hash === '#feel') document.getElementById('feel')?.scrollIntoView({ block: 'start' })
+    // #feel, #ev-h, #claims-h (cards on Home link to the evidence and the claim drafts)
+    if (hash) window.setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }), 60)
   }, [hash, p.product_id])
+  const [, markVisited] = useOnceFlag('visited-product')
+  useEffect(() => markVisited(), [markVisited])
 
   return (
     <div className="flex flex-col gap-4">
@@ -155,9 +167,10 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
           }
           actions={
             <>
-              <Button to={compareTo} label={rival ? `Compare with ${rival.product}` : 'Compare'}>
+              <Button to={compareTo} label={rivalOk ? `Compare with ${rivalOk.product}` : 'Compare'}>
                 <Columns3 size={15} strokeWidth={1.6} aria-hidden /> Compare
               </Button>
+              <RequestEvidence x={x} />
               <ExportMenu x={x} />
               {x.eligibility.eligible ? (
                 <Button to={promoteTo} kind="primary">
@@ -218,13 +231,14 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
           className="lg:col-span-7"
           meta={x.evidence.length ? <Badge>{x.evidence.length}</Badge> : null}
           actions={
-            x.evidence.length ? (
+            x.evidence.length && !exportBlock(x.cohort) ? (
               <ToolButton onClick={() => copyText(x.evidence.map(statementLine).join('\n'), `Copied ${x.evidence.length} statements`)} label="Copy every statement">
                 <Copy size={14} strokeWidth={1.6} aria-hidden /> Copy all
               </ToolButton>
             ) : null
           }
           footnote={x.evidence.length ? <EvidenceMethod x={x} /> : undefined}
+          description={x.evidence.length && exportBlock(x.cohort) ? exportBlock(x.cohort)! : undefined}
         >
           <EvidenceList x={x} />
         </Panel>
@@ -245,7 +259,7 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
 
       <ClaimStudio key={p.product_id} x={x} filters={filters} channel={channel} onChannel={(c) => setParam({ claim: c === DEFAULT_CHANNEL ? null : c })} onNextSteps={hasSteps ? () => goTo(ANCHOR.next) : null} />
 
-      <FeelPanel x={x} />
+      <FeelAndClicks x={x} />
     </div>
   )
 }
@@ -330,6 +344,8 @@ function SegList({ segs }: { segs: Seg[] }) {
 }
 
 function Competitors({ x, brandView, carry }: { x: Detail; brandView: string | null; carry: string }) {
+  const names = useCompetitorNames()
+  const hide = (r: { brand: string; is_self?: boolean }) => names.anonymise && !r.is_self && r.brand !== names.own
   const rows = x.competitors.rows
   if (!rows.length) return <EmptyState compact title="No benchmark yet" body={`No product in ${x.product.category_label.toLowerCase()} sharing a goal with it has ${MIN_GROUP} or more people at week 8.`} />
   const self = rows.findIndex((r) => r.is_self)
@@ -340,7 +356,7 @@ function Competitors({ x, brandView, carry }: { x: Detail; brandView: string | n
       {shown.map(({ r, i }) => (
         <li key={r.product_id} aria-current={r.is_self || undefined} className={`grid min-h-14 grid-cols-[24px_minmax(0,1fr)_52px] items-center gap-3 border-t border-line px-5 ${r.is_self ? 'bg-pf-hover' : ''}`}>
           <span className="text-right text-proof-small text-ink-2 tnum">{i + 1}</span>
-          <ProductCell p={r} to={r.is_self ? undefined : `${sectionPath('products', r.product_id)}${carry}`} tag={r.is_self ? <span className="ml-1.5 shrink-0 text-ink">· This product</span> : brandView === r.brand ? <YoursTag /> : null} />
+          <ProductCell p={hide(r) ? { ...r, product: `A ${r.category_label.toLowerCase().replace(/s$/, '')}`, brand: names.name(r.brand), image_url: null } : r} to={r.is_self || hide(r) ? undefined : `${sectionPath('products', r.product_id)}${carry}`} tag={r.is_self ? <span className="ml-1.5 shrink-0 text-ink">· This product</span> : brandView === r.brand ? <YoursTag /> : null} />
           <span className="text-right text-proof-body font-medium tnum">{pct(r.rate)}</span>
         </li>
       ))}
@@ -373,7 +389,7 @@ function EvidenceList({ x }: { x: Detail }) {
               {e.window ? ` · ${e.window}` : ''}
             </span>
           </div>
-          <button type="button" onClick={() => copyText(statementLine(e), 'Statement copied')} aria-label="Copy statement" title="Copy with n, window and cohort" className="hit44 grid size-8 place-items-center rounded-ctl border border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink">
+          <button type="button" onClick={() => copyText(statementLine(e), 'Statement copied')} disabled={Boolean(exportBlock(x.cohort))} aria-label="Copy statement" title={exportBlock(x.cohort) ?? 'Copy with n, window and cohort'} className="hit44 grid size-8 place-items-center rounded-ctl border border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">
             <Copy size={14} strokeWidth={1.6} aria-hidden />
           </button>
         </li>
@@ -398,6 +414,7 @@ function ExportMenu({ x }: { x: Detail }) {
     }
   }, [open])
   const p = x.product
+  const blocked = exportBlock(x.cohort)
   const items: { label: string; sub: string; run: () => void }[] = [
     { label: 'Evidence pack', sub: 'Print-ready page (HTML)', run: () => downloadText(packName(x, 'html'), packHtml(x), 'text/html') },
     { label: 'Markdown', sub: 'For briefs and docs', run: () => downloadText(packName(x, 'md'), packMarkdown(x), 'text/markdown') },
@@ -412,8 +429,8 @@ function ExportMenu({ x }: { x: Detail }) {
   ]
   return (
     <div ref={box} className="relative">
-      <Button onClick={() => setOpen((o) => !o)} disabled={!x.evidence.length} title={x.evidence.length ? undefined : 'No statements yet'}>
-        <Download size={15} strokeWidth={1.6} aria-hidden /> Export <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="text-ink-2" />
+      <Button onClick={() => setOpen((o) => !o)} disabled={!x.evidence.length || Boolean(blocked)} title={blocked ?? (x.evidence.length ? undefined : 'No statements yet')}>
+        {blocked ? <Lock size={15} strokeWidth={1.6} aria-hidden /> : <Download size={15} strokeWidth={1.6} aria-hidden />} Export <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="text-ink-2" />
       </Button>
       {open ? (
         <div role="menu" aria-label="Export" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-60 flex-col rounded-card border border-line bg-surface p-1 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[wFadeIn_.12s_ease_both]">
@@ -438,6 +455,12 @@ function ExportMenu({ x }: { x: Detail }) {
   )
 }
 
+function CoUsedCell({ c, carry }: { c: Detail['co_used'][number]; carry: string }) {
+  const names = useCompetitorNames()
+  if (names.anonymise && c.brand !== names.own) return <ProductCell p={{ ...c, product: `A ${names.name(c.brand)} product`, brand: names.name(c.brand), image_url: null }} />
+  return <ProductCell p={c} to={`${sectionPath('products', c.product_id)}${carry}`} />
+}
+
 function CoUsed({ x, carry }: { x: Detail; carry: string }) {
   if (!x.co_used.length) return <EmptyState compact title="No pairing reaches 10 people yet" body="Products used together by fewer than 10 people are not shown." />
   const max = Math.max(...x.co_used.map((c) => c.share))
@@ -445,7 +468,7 @@ function CoUsed({ x, carry }: { x: Detail; carry: string }) {
     <ul className="m-0 grid list-none grid-cols-1 gap-x-8 p-0">
       {x.co_used.map((c) => (
         <li key={c.product_id} className="grid min-h-14 grid-cols-[minmax(0,1fr)_88px_56px] items-center gap-3 border-b border-line">
-          <ProductCell p={c} to={`${sectionPath('products', c.product_id)}${carry}`} />
+          <CoUsedCell c={c} carry={carry} />
           <ShareBar value={c.share} max={max} />
           <span className="text-right text-proof-body font-medium tnum" title={`${int(c.n)} people`}>
             {pct(c.share)}
@@ -460,8 +483,10 @@ type FlowItem = { key: string; label: string; sub?: string; n: number; to?: stri
 
 function Switching({ x, carry }: { x: Detail; carry: string }) {
   const s = x.switching
-  const brands = (b: BrandFlow[] | undefined): FlowItem[] => (b ?? []).map((f) => ({ key: `b:${f.brand}`, label: f.label, n: f.n }))
-  const products = (ps: Detail['switching']['to']): FlowItem[] => ps.map((f) => ({ key: f.product_id, label: f.product, sub: f.brand, n: f.n, to: `${sectionPath('products', f.product_id)}${carry}` }))
+  const names = useCompetitorNames()
+  const other = (brand: string) => names.anonymise && brand !== names.own
+  const brands = (b: BrandFlow[] | undefined): FlowItem[] => (b ?? []).map((f) => ({ key: `b:${f.brand}`, label: f.same_brand ? f.label : other(f.brand) ? names.name(f.brand) : f.label, n: f.n }))
+  const products = (ps: Detail['switching']['to']): FlowItem[] => ps.map((f) => (other(f.brand) ? { key: f.product_id, label: `A ${names.name(f.brand)} product`, n: f.n } : { key: f.product_id, label: f.product, sub: f.brand, n: f.n, to: `${sectionPath('products', f.product_id)}${carry}` }))
   const from = { products: products(s.from), brands: brands(s.from_brands) }
   const to = { products: products(s.to), brands: brands(s.to_brands) }
   const any = (g: typeof from) => g.products.length + g.brands.length > 0

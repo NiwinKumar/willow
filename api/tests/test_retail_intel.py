@@ -99,6 +99,8 @@ def test_lift_ci_tiers_and_what_it_would_take():
     assert retail_intel.tier_of(30, None, None) == "unclear"  # no base to compare with
     assert retail_intel.to_proven(12, 20, 3, 10) == 79
     assert retail_intel.to_proven(10, 20, 10, 20) is None
+    # the approximation clears zero but the tier's interval doesn't: never "0 more people"
+    assert retail_intel.to_proven(30, 40, 5, 40) == 1
 
 
 def test_complementary_suppression():

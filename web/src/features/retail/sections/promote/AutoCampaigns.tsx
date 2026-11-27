@@ -6,7 +6,9 @@ import { api, ApiError, type AutopilotActivity, type AutopilotView, type AutoRul
 import { setQueryData } from '../../../../lib/query'
 import { useAuth } from '../../../../lib/useAuth'
 import { agoText, feedOrder, KIND, LEVELS, openProposals, TEMPLATES } from '../../autopilot'
+import { isNotMember } from '../../proofApi'
 import { Badge, Button, ErrorState, Panel, SkeletonTable, ToolButton } from '../../ui'
+import { NotMemberNote } from './NotMember'
 import { RuleEditor } from './RuleEditor'
 import { autopilotKey, useAutopilot } from './useAutopilot'
 
@@ -28,6 +30,8 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
   const setEditor = (e: { open: boolean; editing: AutoRule | null; template: number | null }) => setEditorState((prev) => ({ ...e, n: e.open ? prev.n + 1 : prev.n }))
   const [running, setRunning] = useState(false)
   const [acting, setActing] = useState<string | null>(null)
+  // The api's 403 not_a_member on a run or an approval: say why and offer the way in, once, above the rules.
+  const [blocked, setBlocked] = useState(false)
 
   // On open: a check when the last one is stale (the api decides), so the page shows what changed overnight.
   const checked = useRef(false)
@@ -59,7 +63,8 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
       const how = r?.source === 'rules' ? ' (Gemini was unavailable: fixed logic ran)' : ''
       toast(did.length ? `Check done · ${did.join(', ')}${how}` : `Check done · nothing new to do${how}`)
     } catch (e) {
-      toast.error(e instanceof ApiError && e.status === 503 ? 'The evidence is unavailable right now, so nothing was changed.' : 'The check didn’t run. Try again.')
+      if (isNotMember(e)) setBlocked(true)
+      else toast.error(e instanceof ApiError && e.status === 503 ? 'The evidence is unavailable right now, so nothing was changed.' : 'The check didn’t run. Try again.')
     } finally {
       setRunning(false)
     }
@@ -73,7 +78,8 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
       if (kind !== 'dismiss') onCampaignsChanged()
       toast(kind === 'approve' ? 'Approved' : kind === 'undo' ? (v.outcome === 'deleted' ? 'Undone · the campaign was deleted before anyone saw it' : 'Undone · the campaign ended') : 'Dismissed')
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'That didn’t go through. Try again.')
+      if (isNotMember(e)) setBlocked(true)
+      else toast.error(e instanceof ApiError ? e.message : 'That didn’t go through. Try again.')
     } finally {
       setActing(null)
     }
@@ -137,6 +143,11 @@ export function AutoCampaigns({ uid, workspace, onCampaignsChanged }: { uid: str
         }
         flush
       >
+        {blocked ? (
+          <div className="px-5 pb-4">
+            <NotMemberNote />
+          </div>
+        ) : null}
         {q.status === 'error' && !q.data ? (
           <ErrorState compact title="Rules couldn’t load" onRetry={() => void q.refetch()} />
         ) : !q.data ? (
