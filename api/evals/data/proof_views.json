@@ -1,0 +1,188 @@
+{
+ "the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50": {
+  "product": {
+   "product_id": "the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50",
+   "brand": "The Derma Co",
+   "product": "1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++",
+   "tier": "proven"
+  },
+  "evidence": [
+   {
+    "id": "efficacy",
+    "kind": "efficacy",
+    "text": "Measured in 100 Willow users: 75% had a visible change in lines or dark spots held to week 8 (non-users with the same goals 28%). Mixed.",
+    "n": 100
+   },
+   {
+    "id": "efficacy_dark_spots",
+    "kind": "efficacy",
+    "text": "Measured in 24 Willow users with a dark spots goal: 67% had a visible change held to week 8 (non-users 15%). Mixed.",
+    "n": 24
+   },
+   {
+    "id": "efficacy_lines",
+    "kind": "efficacy",
+    "text": "Measured in 18 Willow users with a lines goal: 50% had a visible change held to week 8 (non-users 24%). Mixed.",
+    "n": 18
+   },
+   {
+    "id": "speed",
+    "kind": "speed",
+    "text": "Among the Willow users with a visible change, half saw it begin by week 6. Mixed.",
+    "n": 75
+   },
+   {
+    "id": "segment_sensitive",
+    "kind": "segment",
+    "text": "Measured in 16 Willow users with sensitive skin: 75% had a visible change held to week 8 (non-users with sensitive skin 19%). Mixed.",
+    "n": 16
+   },
+   {
+    "id": "retention",
+    "kind": "retention",
+    "text": "Measured in 100 Willow users: 81% were still using it at week 8. Mixed.",
+    "n": 100
+   }
+  ],
+  "evidence_caveat": "Observational real-world data, not a controlled trial. Do not present as clinical substantiation. Measured outcomes only; no self-reported results are included.",
+  "feel": {
+   "working": 0.51,
+   "n": 142
+  }
+ },
+ "beauty-of-joseon-glow-deep-serum-rice-alpha-arbutin": {
+  "product": {
+   "product_id": "beauty-of-joseon-glow-deep-serum-rice-alpha-arbutin",
+   "brand": "Beauty of Joseon",
+   "product": "Glow Deep Serum : Rice + Alpha-Arbutin",
+   "tier": "proven"
+  },
+  "evidence": [
+   {
+    "id": "efficacy",
+    "kind": "efficacy",
+    "text": "Measured in 67 Willow users: 64% had a visible change in glow, dark spots or tone evenness held to week 8 (non-users with the same goals 29%). Mixed.",
+    "n": 67
+   },
+   {
+    "id": "efficacy_oil_glow",
+    "kind": "efficacy",
+    "text": "Measured in 32 Willow users with a shine and glow goal: 41% had a visible change held to week 8 (non-users 11%). Mixed.",
+    "n": 32
+   },
+   {
+    "id": "efficacy_even_tone",
+    "kind": "efficacy",
+    "text": "Measured in 27 Willow users with a tone evenness goal: 26% had a visible change held to week 8 (non-users 4%). Mixed.",
+    "n": 27
+   },
+   {
+    "id": "speed",
+    "kind": "speed",
+    "text": "Among the Willow users with a visible change, half saw it begin by week 7. Mixed.",
+    "n": 43
+   },
+   {
+    "id": "segment_normal",
+    "kind": "segment",
+    "text": "Measured in 14 Willow users with normal skin: 71% had a visible change held to week 8 (non-users with normal skin 17%). Mixed.",
+    "n": 14
+   },
+   {
+    "id": "retention",
+    "kind": "retention",
+    "text": "Measured in 67 Willow users: 76% were still using it at week 8. Mixed.",
+    "n": 67
+   }
+  ],
+  "evidence_caveat": "Observational real-world data, not a controlled trial. Do not present as clinical substantiation. Measured outcomes only; no self-reported results are included.",
+  "feel": {
+   "working": 0.52,
+   "n": 106
+  }
+ },
+ "cosrx-acne-pimple-master-patch": {
+  "product": {
+   "product_id": "cosrx-acne-pimple-master-patch",
+   "brand": "COSRX",
+   "product": "Acne Pimple Master Patch",
+   "tier": "promising"
+  },
+  "evidence": [
+   {
+    "id": "efficacy",
+    "kind": "efficacy",
+    "text": "Measured in 25 Willow users: 84% had a visible change in blemishes or redness held to week 8 (non-users with the same goals 59%). Mixed.",
+    "n": 25
+   },
+   {
+    "id": "efficacy_blemishes",
+    "kind": "efficacy",
+    "text": "Measured in 16 Willow users with a blemishes goal: 69% had a visible change held to week 8 (non-users 43%). Mixed.",
+    "n": 16
+   },
+   {
+    "id": "speed",
+    "kind": "speed",
+    "text": "Among the Willow users with a visible change, half saw it begin by week 4. Mixed.",
+    "n": 21
+   },
+   {
+    "id": "segment_combination",
+    "kind": "segment",
+    "text": "Measured in 12 Willow users with combination skin: 92% had a visible change held to week 8 (non-users with combination skin 56%). Mixed.",
+    "n": 12
+   },
+   {
+    "id": "retention",
+    "kind": "retention",
+    "text": "Measured in 25 Willow users: 88% were still using it at week 8. Mixed.",
+    "n": 25
+   }
+  ],
+  "evidence_caveat": "Observational real-world data, not a controlled trial. Do not present as clinical substantiation. Measured outcomes only; no self-reported results are included.",
+  "feel": {
+   "working": 0.64,
+   "n": 53
+  }
+ },
+ "round-lab-mugwort-calming-toner": {
+  "product": {
+   "product_id": "round-lab-mugwort-calming-toner",
+   "brand": "Round Lab",
+   "product": "Mugwort Calming Toner",
+   "tier": "promising"
+  },
+  "evidence": [
+   {
+    "id": "efficacy",
+    "kind": "efficacy",
+    "text": "Measured in 28 Willow users: 75% had a visible change in redness held to week 8 (non-users with the same goals 54%). Mixed.",
+    "n": 28
+   },
+   {
+    "id": "efficacy_redness",
+    "kind": "efficacy",
+    "text": "Measured in 12 Willow users with a redness goal: 83% had a visible change held to week 8 (non-users 54%). Mixed.",
+    "n": 12
+   },
+   {
+    "id": "speed",
+    "kind": "speed",
+    "text": "Among the Willow users with a visible change, half saw it begin by week 5. Mixed.",
+    "n": 21
+   },
+   {
+    "id": "retention",
+    "kind": "retention",
+    "text": "Measured in 28 Willow users: 75% were still using it at week 8. Mixed.",
+    "n": 28
+   }
+  ],
+  "evidence_caveat": "Observational real-world data, not a controlled trial. Do not present as clinical substantiation. Measured outcomes only; no self-reported results are included.",
+  "feel": {
+   "working": 0.54,
+   "n": 52
+  }
+ }
+}

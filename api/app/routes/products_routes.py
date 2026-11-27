@@ -21,6 +21,7 @@ from app import (
     limits,
     routine_check,
     routine_log,
+    safety,
 )
 from app.auth import AuthUser, current_user
 from app.schedule import Schedule
@@ -52,10 +53,16 @@ def catalog_search(
     currency: str | None = Query(default=None, max_length=3),
     limit: int = Query(default=8, ge=1, le=200),
     user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """`concern` may repeat: products made for every one given. `total` counts every match."""
-    found = catalog.search_all(q, concern, category, max_price, currency)
-    return {"products": found[:limit], "total": len(found), "catalog_size": len(catalog.products())}
+    """`concern` may repeat: products made for every one given. `total` counts every match.
+    With a safety profile, each product carries `check` (app/safety.py)."""
+    every = catalog.search_all(q, concern, category, max_price, currency)
+    found, total = every[:limit], len(every)
+    profile = safety.profile_of(store.user_get(user.uid))
+    if profile:
+        found = [{**p, "check": safety.check(p, profile)} for p in found]
+    return {"products": found, "total": total, "catalog_size": len(catalog.products())}
 
 
 @router.get("/catalog/{product_id}")
@@ -94,6 +101,9 @@ def post_label_scan(
     return read
 
 
+MAX_START_AHEAD = timedelta(weeks=16)  # a routine entry's latest start date, from today
+
+
 class KeyActive(BaseModel):
     name: str = Field(max_length=80)
     pct: float | None = Field(default=None, ge=0, le=100)
@@ -116,10 +126,11 @@ class RoutineEntryIn(BaseModel):
 
     @field_validator("started_at")
     @classmethod
-    def _not_in_future(cls, v: date | None) -> date | None:
+    def _not_too_far_ahead(cls, v: date | None) -> date | None:
+        # A plan can schedule a product to start later (week 2, 4, 8...), up to MAX_START_AHEAD.
         # One day of slack: the person's "today" can be ahead of UTC.
-        if v is not None and v > datetime.now(UTC).date() + timedelta(days=1):
-            raise ValueError("the start date cannot be in the future")
+        if v is not None and v > datetime.now(UTC).date() + MAX_START_AHEAD + timedelta(days=1):
+            raise ValueError("the start date can be at most 16 weeks ahead")
         return v
 
 
@@ -136,6 +147,8 @@ def _entry_view(entry_id: str, doc: dict[str, Any]) -> dict[str, Any]:
     view.setdefault("feel", None)
     view.setdefault("feel_history", [])
     view.setdefault("updated_at", view.get("created_at"))
+    # a guest's starter routine (app/demo.py): the app offers "Replace with my own"
+    view["sample"] = bool(doc.get("sample"))
     # The catalog packshot, linked where the brand already publishes it (never copied), so the
     # routine shows product photos without a second request per product.
     product = catalog.by_id(doc["product_id"]) if doc.get("product_id") else None
@@ -263,8 +276,14 @@ def routine_add(
 
 
 def add_routine_entry(
-    store: Store, uid: str, body: RoutineEntryIn, entry_id: str | None = None
+    store: Store,
+    uid: str,
+    body: RoutineEntryIn,
+    entry_id: str | None = None,
+    *,
+    sample: bool = False,
 ) -> tuple[str, dict[str, Any]]:
+    """`sample`: an entry Willow added for a guest, not one the person chose."""
     doc = body.model_dump(mode="json")
     if body.product_id:
         product = catalog.by_id(body.product_id)
@@ -285,6 +304,8 @@ def add_routine_entry(
     doc["ended_at"] = None
     doc["created_at"] = datetime.now(UTC)
     doc["updated_at"] = doc["created_at"]
+    if sample:
+        doc["sample"] = True
     entry_id = entry_id or f"r_{secrets.token_hex(4)}"
     store.routine_set(uid, entry_id, doc)
     if body.product_id:
@@ -379,16 +400,17 @@ def routine_check_route(
     asks no Gemini and uses none of the cap; the same routine checked within the hour answers
     from the kept check (no new call, no use); a Gemini failure gives the use back."""
     entries = [{"id": eid, **e} for eid, e in store.routine_list(user.uid)]
+    profile = safety.profile_of(store.user_get(user.uid))
     if not routine_check.needs_model(entries):
-        return routine_check.check(entries, use_model=False)
-    kept = routine_check.answered(entries)
+        return routine_check.check(entries, use_model=False, profile=profile)
+    kept = routine_check.answered(entries, profile)
     if kept is not None:
         return kept
     try:
         limits.take(store, user.uid, "routine_check")
     except HTTPException:
-        return routine_check.check(entries, use_model=False)
-    result, complete = routine_check.run(entries)
+        return routine_check.check(entries, use_model=False, profile=profile)
+    result, complete = routine_check.run(entries, profile=profile)
     if not complete:
         limits.refund(store, user.uid, "routine_check")
     return result
@@ -463,7 +485,7 @@ def _chat_answer(
             advisor.remember(store, uid, body.messages[-1].text, len(images), reply, asked_at)
         except Exception:  # the answer matters more than its copy in the history
             log.exception("advisor history not saved")
-    return {**reply, "remaining_today": max(0, limits.CAPS[action][0] - used)}
+    return {**reply, "remaining_today": max(0, limits.cap(action)[0] - used)}
 
 
 @router.post("/advisor/chat")

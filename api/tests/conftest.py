@@ -2,6 +2,8 @@ import os
 
 os.environ.setdefault("AUTH_MODE", "dev")
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
+# Tests never reach the real Firestore, even one that forgets the `fake` fixture.
+os.environ["DEV_STORE"] = "memory"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

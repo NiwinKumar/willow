@@ -49,15 +49,26 @@ export function slugOf(name: string): string {
 export type CsvValue = string | number | null | undefined
 
 /**
+ * A text filter every export passes through (downloadCsv, downloadText). The shell sets it while a brand
+ * organisation sees competitors anonymised (masking.ts), so no file can carry another brand's name whichever
+ * screen built it; null otherwise.
+ */
+let exportFilter: ((text: string) => string) | null = null
+export function setExportFilter(f: ((text: string) => string) | null) {
+  exportFilter = f
+}
+const filtered = (t: string) => (exportFilter ? exportFilter(t) : t)
+
+/**
  * Download a CSV in the browser. `meta` lines go first as "# " comments (cohort, filter, suppression and the
  * disclaimer: docs/DESIGN.md rule 13 puts a disclaimer on every retail export).
  */
 export function downloadCsv(file: string, meta: string[], header: string[], rows: CsvValue[][]) {
   const esc = (v: CsvValue) => {
-    const t = v === null || v === undefined ? '' : String(v)
+    const t = v === null || v === undefined ? '' : filtered(String(v))
     return /[",\n#]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
   }
-  const body = [...meta.map((m) => `# ${m}`), header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n')
+  const body = [...meta.map((m) => `# ${filtered(m)}`), header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n')
   try {
     const url = URL.createObjectURL(new Blob([body], { type: 'text/csv' }))
     const a = document.createElement('a')
@@ -75,7 +86,7 @@ export function downloadCsv(file: string, meta: string[], header: string[], rows
 /** Download a text file built in the browser (an evidence pack as HTML or Markdown). */
 export function downloadText(file: string, body: string, type: string) {
   try {
-    const url = URL.createObjectURL(new Blob([body], { type }))
+    const url = URL.createObjectURL(new Blob([filtered(body)], { type }))
     const a = document.createElement('a')
     a.href = url
     a.download = file
@@ -90,7 +101,7 @@ export function downloadText(file: string, body: string, type: string) {
 /** Copy text to the clipboard with a toast either way (claim statements); true when it was copied. */
 export async function copyText(text: string, what = 'Copied'): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(filtered(text))
     toast(what)
     return true
   } catch {

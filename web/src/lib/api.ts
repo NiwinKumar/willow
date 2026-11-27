@@ -213,6 +213,8 @@ export type ProductRequest = {
   created_at: string | null
   resolved_at: string | null
   seen: boolean
+  /** Plain status line ("We add products by hand within a few days."); older api builds omit it. */
+  status_text?: string
 }
 
 export class ApiError extends Error {
@@ -245,7 +247,7 @@ async function timedFetch(url: string, init: RequestInit | undefined, timeoutMs:
   }
 }
 
-async function request<T>(token: string, path: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
+export async function request<T>(token: string, path: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
   const res = await timedFetch(`${API_URL}${path}`, {
     ...init,
     headers: {
@@ -844,7 +846,7 @@ function retailerQs(filters?: Partial<RetailerFilters> & { brand?: string }): st
 }
 
 /** GETs that keep the api's status on failure (404 = unknown id, or an endpoint this api build doesn't have yet). */
-async function retailerGet<T>(path: string): Promise<T> {
+export async function retailerGet<T>(path: string): Promise<T> {
   const res = await timedFetch(`${API_URL}${path}`, undefined, RETAILER_TIMEOUT_MS)
   if (!res.ok) throw new ApiError(res.status, `${path.split('?')[0]} unavailable`)
   return (await res.json()) as T

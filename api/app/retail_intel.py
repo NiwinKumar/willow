@@ -256,7 +256,9 @@ def to_proven(k1: int, n1: int, k2: int, n2: int) -> int | None:
     if room <= 0:
         return None
     need = max(PROVEN_N, math.floor(p1 * (1 - p1) / room) + 1)
-    return max(0, need - n1)
+    # The tier's own interval can sit on zero where this approximation already clears it:
+    # a product that is not Proven yet always needs at least one more person.
+    return max(1, need - n1)
 
 
 def suppress(ns: list[int]) -> set[int]:

@@ -230,9 +230,17 @@
   a {
     color: inherit;
   }
-  /* No focus rings anywhere (owner decision, Oct 18): focus is not outlined on any element. */
-  :focus,
+  /* Focus rings for the keyboard only (the Oct 18 "no rings" decision is reversed for WCAG 2.4.7): a mouse or a
+     tap never draws one (:focus-visible), so the look under a pointer is unchanged. Text fields keep their own
+     look: browsers treat a clicked field as focus-visible, and the caret and field style already show focus. */
+  :focus {
+    outline: none;
+  }
   :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit']), textarea, select, [contenteditable]):focus-visible {
     outline: none;
   }
   h1,
@@ -417,3 +425,9 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
   html[data-touring] dialog[open]:not(:modal) { position: fixed; inset: 0; max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em); overflow: auto; }
   html[data-touring] dialog[open]:not(:modal)::backdrop { background: rgba(18, 18, 18, .3); }
 }
+
+/* Routine builder (features/plan): a ring that spreads and fades, a connecting line drawn from its start,
+   and a line drawing that draws itself (paths carry pathLength=1). */
+@keyframes wRingOut { from { scale: .5; opacity: .9 } to { scale: 2.6; opacity: 0 } }
+@keyframes wLine { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes wDrawPath { to { stroke-dashoffset: 0 } }

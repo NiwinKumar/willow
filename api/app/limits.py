@@ -3,13 +3,23 @@
 Each paid action counts per person and across everyone. Guest accounts are free to create, so
 the per-person cap alone would not bound cost; the global cap does. Counters live in Firestore
 under users/{uid}/usage/{day} (the global one under the pseudo-user "_global").
+
+Caps can be raised for an event without a code change (infra/README.md "Finale caps"):
+DEMO_WISP_DAILY_CAP sets the shared demo Wisp count, and DAILY_CAP_<ACTION> ("40" or "40/5000")
+sets an action's per-person cap and, after a slash, everyone's. Read on every call, so a new
+Cloud Run revision with the variable set is all it takes; a value that is not a positive whole
+number is ignored (the cap in CAPS stands).
 """
 
+import logging
+import os
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 
 from app.store import Store
+
+log = logging.getLogger("willow.limits")
 
 GLOBAL_UID = "_global"
 
@@ -32,25 +42,53 @@ CAPS: dict[str, tuple[int, int]] = {
     "product_request": (10, 2000),  # requests for products the catalog lacks (Firestore + photo)
 }
 
+# {n} is the per-person cap in force (an override included).
 MESSAGES = {
-    "advisor": "That is 20 questions for today.",
+    "advisor": "That is {n} questions for today.",
     "demo_advisor": "The demo's questions for today are used up. Your own account has its own.",
-    "retailer_ask": "That is 20 questions for today.",
-    "campaign_create": "That is 20 new campaigns for today.",
-    "proof_claims": "That is 30 sets of claim drafts for today.",
-    "product_request": "That is 10 product requests for today.",
+    "retailer_ask": "That is {n} questions for today.",
+    "campaign_create": "That is {n} new campaigns for today.",
+    "proof_claims": "That is {n} sets of claim drafts for today.",
+    "product_request": "That is {n} product requests for today.",
 }
+
+DEMO_WISP_ENV = "DEMO_WISP_DAILY_CAP"
+
+
+def _positive(raw: str) -> int | None:
+    raw = raw.strip()
+    return int(raw) if raw.isdigit() and int(raw) > 0 else None
+
+
+def cap(action: str) -> tuple[int, int]:
+    """(per person, everyone) for today: CAPS, unless the environment sets it. An override that
+    names no everyone cap lifts everyone's to at least the new per-person cap, so raising one
+    person's (the shared demo count) is not cut short by the old total."""
+    per_person, everyone = CAPS[action]
+    env = DEMO_WISP_ENV if action == "demo_advisor" else f"DAILY_CAP_{action.upper()}"
+    raw = os.environ.get(env, "")
+    if not raw:
+        return per_person, everyone
+    head, slash, tail = raw.partition("/")
+    p, e = _positive(head), _positive(tail) if slash else None
+    if p is None or (slash and e is None):
+        log.warning("ignoring cap override %s=%r", env, raw)
+        return per_person, everyone
+    return p, e or max(everyone, p)
 
 
 def take(store: Store, uid: str, action: str) -> int:
     """Count one use; raise 429 when either cap is passed. Returns this person's count today."""
-    per_person, everyone = CAPS[action]
+    per_person, everyone = cap(action)
     day = datetime.now(UTC).date().isoformat()
     used = store.usage_incr(uid, day, action)
     if used > per_person:
         raise HTTPException(
             429,
-            {"code": "daily_limit", "message": MESSAGES.get(action, "That is enough for today.")},
+            {
+                "code": "daily_limit",
+                "message": MESSAGES.get(action, "That is enough for today.").format(n=per_person),
+            },
         )
     if store.usage_incr(GLOBAL_UID, day, action) > everyone:
         # Everyone's cap: this attempt did not happen, so the person's own count goes back.
@@ -83,12 +121,12 @@ def usage(store: Store, uid: str, now: datetime | None = None) -> dict[str, dict
     resets = datetime(day.year, day.month, day.day, tzinfo=UTC) + timedelta(days=1)
     out: dict[str, dict[str, object]] = {}
     for action in SHOWN:
-        cap = CAPS[action][0]
+        per_person = cap(action)[0]
         raw = max(0, int(counts.get(action) or 0))
         out[action] = {
-            "used": min(raw, cap),
-            "cap": cap,
-            "remaining": max(0, cap - raw),
+            "used": min(raw, per_person),
+            "cap": per_person,
+            "remaining": max(0, per_person - raw),
             "resets_at": resets.isoformat().replace("+00:00", "Z"),
         }
     return out

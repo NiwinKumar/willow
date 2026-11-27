@@ -58,6 +58,9 @@ def _as(uid: str) -> TestClient:
 
 
 def _create(client, pid=PROVEN, workspace="retailer", goals=("dark_spots",), skin=(), days=14):
+    # creating needs a Proof org membership (app/proof_orgs.py): "Try as" the demo retailer
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
     return client.post(
         "/v1/retailer/campaigns",
         json={
@@ -182,6 +185,33 @@ def test_at_most_three_running(client, fake):
     assert _create(client, pid=PROVEN_4).status_code == 201
     res = client.patch(f"/v1/retailer/campaigns/{ids[0]}", json={"status": "active"})
     assert res.status_code == 429
+
+
+def test_one_live_campaign_per_product(client, fake):
+    first = _create(client).json()["id"]
+    res = _create(client)
+    assert res.status_code == 409
+    assert res.json()["detail"] == {
+        "code": "already_running",
+        "message": "This product already has a running campaign; end it or wait for its result.",
+    }
+    # another guest's demo campaign is theirs alone: it doesn't block this one
+    assert _create(_as("other")).status_code == 201
+    # a paused one isn't live: a new one may start, and then the old one can't resume
+    client.patch(f"/v1/retailer/campaigns/{first}", json={"status": "paused"})
+    second = _create(client).json()["id"]
+    res = client.patch(f"/v1/retailer/campaigns/{first}", json={"status": "active"})
+    assert res.status_code == 409 and res.json()["detail"]["code"] == "already_running"
+    client.patch(f"/v1/retailer/campaigns/{second}", json={"status": "ended"})
+    assert client.patch(f"/v1/retailer/campaigns/{first}", json={"status": "active"}).is_success
+
+
+def test_a_real_team_shares_one_live_campaign_per_product(client, fake):
+    # a real (non-demo) campaign of the same Proof instance, made by a teammate
+    cid = _create(_as("teammate")).json()["id"]
+    fake.store.campaigns[cid] |= {"demo": False, "instance": "willow"}
+    res = _create(client)
+    assert res.status_code == 409 and res.json()["detail"]["code"] == "already_running"
 
 
 def test_creation_is_rate_limited(client, fake, monkeypatch):
@@ -505,6 +535,8 @@ def test_assignment_is_stable_and_near_the_share():
 
 
 def _holdout_campaign(client, fake, pct=0.5):
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
     res = client.post(
         "/v1/retailer/campaigns",
         json={

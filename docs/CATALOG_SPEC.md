@@ -61,8 +61,8 @@ Commands (from `api/`): `uv run python scripts/import_catalog.py from-csv catalo
 
 The api serves search, match and product facts from the bundled `seed/products.json` (fast, no Firestore read per request); Firestore `products/` is the copy for the BigQuery export.
 
-## Status (Oct 13)
-48 SKUs in `api/seed/products.json` (18 global, 16 Indian, 14 Korean brands), every concern and category covered, with the clash-check actives the demo needs (retinoids, AHA/BHA, benzoyl peroxide, L-ascorbic acid, niacinamide, azelaic acid, alpha arbutin, sunscreens). `api/seed/catalog.csv` is the same data in sheet columns, to import into the Google Sheet. Every product has a verified packshot (`image_url`, 47 from the brand's own site, Clinique's from Ulta). `api/seed/VERIFY.md` lists, per product, what came from search results only and any formula or naming caveat; check those before Friday.
+## Status (Nov 27)
+152 products in `api/seed/products.json`: 39 serums, 31 sunscreens, 21 cleansers, 21 moisturisers, 15 toners, 7 treatments, 6 exfoliants, 6 eye care, 6 masks, every concern covered, with the clash-check actives the demo needs (retinoids, AHA/BHA, benzoyl peroxide, L-ascorbic acid, niacinamide, azelaic acid, alpha arbutin, sunscreens). Reference prices in USD, INR, SGD, AUD, IDR, KRW and MYR; per-store prices carry the day they were checked. `api/seed/catalog.csv` is the same data in sheet columns. History: 48 SKUs on Oct 13 (18 global, 16 Indian, 14 Korean brands), about 150 from Oct 18. `api/seed/VERIFY.md` covers the first 48 products only: what came from search results and any formula or naming caveat.
 
 ## Product requests (Oct 18)
 People ask for products the catalog lacks from the add sheet ("Request a product": a pack photo, or brand + name). Requests never add anything by themselves. Work the queue most-asked first: `uv run python scripts/product_requests.py list`, look at the photos with `photo <key> <dir>`, add the product here by the rules above, deploy the api, then `added <key> <product_id>` (everyone who asked sees it on Routine and gets a push; their photos are deleted) or `declined <key>`.

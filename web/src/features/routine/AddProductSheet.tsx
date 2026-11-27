@@ -19,6 +19,13 @@ import { ProductImage } from './productUi'
 import { activeLabel } from './routineModel'
 import { RoutineSheet } from './RoutineSheet'
 import { failureText, useRoutineWrites } from './writes'
+import { useChecks, type ProductCheck } from '../../lib/safety'
+import { strongActives } from './actives'
+import { CheckForMe, CheckReasons, ProductChecked } from './checked'
+import { InAisleCheck } from './InAisleCheck'
+import { notAdvisedLine } from './names'
+import { StartSlowCard } from './StartSlowCard'
+import { TestSheet, TestThisButton, type TestTarget } from './TestSheet'
 
 /** What the confirm step saves: always a catalog product (found by search, or matched from a pack photo). */
 type Draft = { product: Product; source: 'catalog' | 'label_scan' }
@@ -51,8 +58,11 @@ async function packImage(file: File) {
  * requested instead: Willow checks it and adds it with its real ingredients, so everything in a routine comes
  * from the catalog.
  */
+type Step = 'pick' | 'confirm' | 'started'
+const TITLE: Record<Step, string> = { pick: 'Add a product', confirm: 'Confirm details', started: 'Added' }
+
 export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: boolean; preset: AddPreset | null; inRoutine: Set<string>; onClose: () => void }) {
-  const [step, setStep] = useState<'pick' | 'confirm'>('pick')
+  const [step, setStep] = useState<Step>('pick')
   // Each opening starts where its preset says (a product from the advisor goes straight to confirm).
   const [opened, setOpened] = useState(false)
   if (open !== opened) {
@@ -60,13 +70,13 @@ export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: bo
     if (open) setStep(preset?.product ? 'confirm' : 'pick')
   }
   return (
-    <RoutineSheet open={open} onClose={onClose} kind="bottom" fixedHeight title={step === 'confirm' ? 'Confirm details' : 'Add a product'} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
+    <RoutineSheet open={open} onClose={onClose} kind="bottom" fixedHeight title={TITLE[step]} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
       {open ? <AddFlow preset={preset ?? {}} inRoutine={inRoutine} onClose={onClose} step={step} setStep={setStep} /> : null}
     </RoutineSheet>
   )
 }
 
-function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPreset; inRoutine: Set<string>; onClose: () => void; step: 'pick' | 'confirm'; setStep: (s: 'pick' | 'confirm') => void }) {
+function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPreset; inRoutine: Set<string>; onClose: () => void; step: Step; setStep: (s: Step) => void }) {
   const writes = useRoutineWrites()
   const [mode, setMode] = useState<'search' | 'request'>(preset.mode ?? 'search')
   // what was typed into search, handed to the request form when the catalog has nothing
@@ -76,6 +86,8 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
   const [startedAt, setStartedAt] = useState(localDay)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [testing, setTesting] = useState<TestTarget | null>(null)
+  const [started, setStarted] = useState<string | null>(null)
 
   const pick = (product: Product, source: Draft['source'] = 'catalog') => {
     setDraft({ product, source })
@@ -89,8 +101,12 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
     setSaving(true)
     setSaveError(null)
     try {
-      await writes.add({ product_id: draft.product.product_id, slots: slotsOf(when), started_at: startedAt, source: draft.source })
-      onClose()
+      const saved = await writes.add({ product_id: draft.product.product_id, slots: slotsOf(when), started_at: startedAt, source: draft.source })
+      // A strong active: patch test, start slow and sunscreen before the sheet closes.
+      if (strongActives(draft.product.key_actives).length) {
+        setStarted(saved?.id ?? null)
+        setStep('started')
+      } else onClose()
     } catch (e) {
       setSaveError(failureText(e, "Couldn't save. Your details are still here; try again."))
     } finally {
@@ -120,6 +136,7 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
             initial={preset}
             inRoutine={inRoutine}
             onPick={(p) => pick(p)}
+            onTest={(p) => setTesting({ product_id: p.product_id, name: p.name })}
             onRequest={(q) => {
               setAsked(q)
               setMode('request')
@@ -131,14 +148,22 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
             <RequestProduct asked={asked} inRoutine={inRoutine} onPick={pick} />
           </>
         )
+      ) : step === 'started' && draft ? (
+        <div className="flex flex-col gap-3">
+          <StartSlowCard name={draft.product.name} actives={strongActives(draft.product.key_actives)} onTest={() => setTesting({ entry_id: started ?? undefined, product_id: draft.product.product_id, name: draft.product.name })} />
+          <button type="button" onClick={onClose} className="min-h-[54px] rounded-[24px] bg-selected text-[16px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.985]">
+            Got it
+          </button>
+        </div>
       ) : draft ? (
         <Confirm draft={draft} when={when} setWhen={setWhen} startedAt={startedAt} setStartedAt={setStartedAt} saving={saving} saveError={saveError} onSave={() => void save()} />
       ) : null}
+      <TestSheet target={testing} onClose={() => setTesting(null)} />
     </div>
   )
 }
 
-function CatalogSearch({ switcher, initial, inRoutine, onPick, onRequest }: { switcher: ReactNode; initial: AddPreset; inRoutine: Set<string>; onPick: (p: Product) => void; onRequest: (q: string) => void }) {
+function CatalogSearch({ switcher, initial, inRoutine, onPick, onTest, onRequest }: { switcher: ReactNode; initial: AddPreset; inRoutine: Set<string>; onPick: (p: Product) => void; onTest: (p: Product) => void; onRequest: (q: string) => void }) {
   const { getIdToken } = useAuth()
   const [query, setQuery] = useState(initial.q ?? '')
   const [category, setCategory] = useState(initial.category ?? '')
@@ -167,6 +192,9 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onRequest }: { sw
   const state = { status: answer?.key === key ? answer.status : 'loading', products: answer?.products ?? [] }
   // Products already in the routine go to the end, so they never sit between the ones to choose from.
   const listed = [...state.products.filter((p) => !inRoutine.has(p.product_id)), ...state.products.filter((p) => inRoutine.has(p.product_id))]
+  // Search items carry their check when the person has a safety profile; the rest are asked for (first 80 shown).
+  const carried = (p: Product) => (p as Product & { check?: ProductCheck | null }).check ?? undefined
+  const checks = useChecks(listed.slice(0, 80).filter((p) => !carried(p)).map((p) => p.product_id))
 
   const n = state.products.length
   const total = answer?.total ?? n
@@ -216,6 +244,7 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onRequest }: { sw
         ) : null}
       </div>
       {concerns.length > 1 ? <span className="-mt-1 text-[13px] text-ink-2">Showing products made for all {concerns.length}.</span> : null}
+      <CheckForMe />
 
       {state.status === 'loading' && n === 0 ? (
         <div aria-busy aria-label="Searching" className="flex flex-col gap-2">
@@ -250,23 +279,21 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onRequest }: { sw
           {listed.map((p, i) => {
             const has = inRoutine.has(p.product_id)
             return (
-              <li key={p.product_id}>
-                <button
-                  type="button"
-                  disabled={has}
-                  onClick={() => onPick(p)}
-                  className="flex w-full items-center gap-3.5 rounded-[24px] bg-sunken p-3 text-left transition-colors hover:bg-muted disabled:opacity-70"
-                  style={{ animation: `wRise .35s ${Math.min(i, 10) * 40}ms both` }}
-                >
+              <li key={p.product_id} className="flex items-stretch gap-1 rounded-[24px] bg-sunken transition-colors has-[>button:hover]:bg-muted" style={{ animation: `wRise .35s ${Math.min(i, 10) * 40}ms both` }}>
+                <button type="button" disabled={has} onClick={() => onPick(p)} className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[24px] p-3 text-left disabled:opacity-70">
                   <ProductImage product={p} size={50} decorative />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-[13px] text-ink-2">
                       {p.brand} · {categoryLabel(p.category)}
                     </span>
                     <span className="text-[16px] leading-snug">{p.name}</span>
+                    <ProductChecked check={carried(p) ?? checks.checks[p.product_id]} loading={checks.status === 'loading' && i < 80} profileComplete={checks.profileComplete} inDialog />
                   </span>
-                  <span className="text-right text-[14px] whitespace-nowrap">{has ? '✓ In routine' : fmtPrice(p.price)}</span>
                 </button>
+                <span className="flex shrink-0 flex-col items-end justify-between gap-2 py-3 pr-3">
+                  <span className="text-right text-[14px] whitespace-nowrap">{has ? '✓ In routine' : fmtPrice(p.price)}</span>
+                  <TestThisButton onClick={() => onTest(p)} label="Test it" name={p.name} />
+                </span>
               </li>
             )
           })}
@@ -398,6 +425,7 @@ function RequestProduct({ asked, inRoutine, onPick }: { asked: string; inRoutine
               <span className="text-[16px] leading-snug">{found.name}</span>
             </span>
           </div>
+          <InAisleCheck product={found} slots={slotsOf(defaultWhen(found.category))} />
           {inRoutine.has(found.product_id) ? (
             <span className="text-[14px]">✓ Already in your routine</span>
           ) : (
@@ -485,7 +513,7 @@ function RequestList({ requests, inRoutine, onPick }: { requests: ProductRequest
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-[15px]">{[r.brand, r.name].filter(Boolean).join(' ') || 'Photo request'}</span>
               <span className="text-[13px] text-ink-2">
-                {STATUS_WORDS[r.status]}
+                {r.status === 'pending' && r.status_text ? r.status_text : STATUS_WORDS[r.status]}
                 {r.status === 'pending' && (r.askers ?? 0) > 1 ? ` · ${r.askers} people asked` : ''}
                 {r.status === 'declined' ? ' · we couldn’t verify its ingredients' : ''}
               </span>
@@ -509,6 +537,11 @@ function RequestList({ requests, inRoutine, onPick }: { requests: ProductRequest
 function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveError, onSave }: { draft: Draft; when: When; setWhen: (w: When) => void; startedAt: string; setStartedAt: (d: string) => void; saving: boolean; saveError: string | null; onSave: () => void }) {
   const p = draft.product
   const field = 'min-h-[50px] rounded-[16px] bg-canvas px-3.5 text-[16px] text-ink outline-none'
+  // the product's check for this person (carried on a preset product, else read; cached from the search list)
+  const carried = (p as Product & { check?: ProductCheck | null }).check ?? undefined
+  const checks = useChecks(carried ? [] : [p.product_id])
+  const check = carried ?? checks.checks[p.product_id]
+  const warning = notAdvisedLine(check)
 
   return (
     <div className="flex flex-col gap-4">
@@ -522,6 +555,14 @@ function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveEr
         </span>
       </div>
       <p className="-mt-1 text-[13px] text-ink-2">{draft.source === 'label_scan' ? 'Matched from your photo. Ingredients, price and store links come from the catalog.' : 'Ingredients, price and store links come from the catalog.'}</p>
+      {check && warning ? (
+        <div className="flex flex-col gap-2">
+          <p role="note" className="m-0 text-[14px] leading-[1.45] text-ink">
+            {warning}
+          </p>
+          <CheckReasons check={check} profileComplete={checks.profileComplete} />
+        </div>
+      ) : null}
 
       {p.inci.length ? (
         <div className="flex flex-col gap-1.5">

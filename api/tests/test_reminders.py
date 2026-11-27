@@ -246,7 +246,7 @@ def test_run_sends_once_per_day(client, fake, settings, sent, clock):
     _person(fake, "later", at="12:00", endpoint="https://web.push.apple.com/l")
     first = client.post("/v1/internal/reminders").json()
     assert first == {"enabled": True, "due": 1, "sent": 1, "skipped": 0, "removed": 0, "failed": 0}
-    assert sent.calls == [(FCM, reminders.payload("checkin"))]
+    assert sent.calls == [(FCM, reminders.payload("checkin", ["cheek_macro"]))]
     clock.now_value = clock.now_value + timedelta(minutes=15)  # next run, still in the window
     second = client.post("/v1/internal/reminders").json()
     assert second["sent"] == 0 and second["skipped"] == 1

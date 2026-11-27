@@ -23,6 +23,8 @@ from app import catalog, storage
 from app.store import Doc, Store, iso
 
 Status = Literal["pending", "added", "declined"]
+# catalog.match score at which a request names a product the catalog has (brand and name agree)
+IN_CATALOG = 0.85
 PHOTO_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 
 
@@ -90,13 +92,31 @@ def create(
     return rid, doc, wish
 
 
+def in_catalog(brand: str, name: str) -> dict[str, Any] | None:
+    """The catalog product a brand and name already name, if any."""
+    found = catalog.match(brand, name)
+    return found[0] if found and found[1] >= IN_CATALOG else None
+
+
+def status_text(status: str, product: dict[str, Any] | None) -> str:
+    """One honest line for the request's state. Products are checked and added by hand
+    (scripts/product_requests.py), so a pending request says so instead of an open "Checking"."""
+    if status == "added":
+        return f"It's in the catalog: {product['name']}" if product else "Added to the catalog"
+    if status == "declined":
+        return "We couldn't verify its ingredients, so it isn't in the catalog."
+    return "We add products by hand within a few days."
+
+
 def view(rid: str, doc: Doc, askers: int | None = None) -> dict[str, Any]:
     product = catalog.by_id(doc["product_id"]) if doc.get("product_id") else None
+    status = doc.get("status") or "pending"
     return {
         "id": rid,
         "brand": doc.get("brand") or "",
         "name": doc.get("name") or "",
-        "status": doc.get("status") or "pending",
+        "status": status,
+        "status_text": status_text(status, product),
         "product_id": doc.get("product_id"),
         # the catalog entry once it is added, so the app can offer "Add to routine" right away
         "product": product,
@@ -109,7 +129,24 @@ def view(rid: str, doc: Doc, askers: int | None = None) -> dict[str, Any]:
 
 
 def list_views(store: Store, uid: str) -> list[dict[str, Any]]:
+    """This person's requests, newest first. A pending one whose product the catalog now has
+    (added since, or asked for by photo and named later) is answered here, for everyone who
+    asked, as the queue script would: nobody waits on a product that is already in."""
     rows = store.product_requests_of(uid)
+    answered: set[str] = set()
+    for _rid, doc in rows:
+        if doc.get("status") != "pending" or doc.get("key") in answered:
+            continue
+        product = in_catalog(doc.get("brand") or "", doc.get("name") or "")
+        if product is None:
+            continue
+        try:
+            resolve(store, doc["key"], "added", product["product_id"])
+            answered.add(doc["key"])
+        except KeyError:  # the shared entry is gone (an account deleted mid-way): leave it
+            continue
+    if answered:
+        rows = store.product_requests_of(uid)
     oldest = datetime.min.replace(tzinfo=UTC)
     rows.sort(key=lambda r: r[1].get("created_at") or oldest, reverse=True)
     out = []

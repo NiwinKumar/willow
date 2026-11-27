@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { ApiError, retailerSegments } from '../../lib/api'
 import { useRetailData } from './context'
+import { useCompetitorNames } from './orgData'
 import type { Segments } from './types'
 
 /**
@@ -42,5 +43,14 @@ export function useView<T>(key: string | null, load: () => Promise<T>): ViewStat
 /** GET /v1/retailer/segments for the current filter (Skin profiles and Demand share one request). */
 export function useSegments() {
   const { filters } = useRetailData()
-  return useView<Segments>(`segments|${filters.cohort}|${filters.range}`, () => retailerSegments(filters))
+  const v = useView<Segments>(`segments|${filters.cohort}|${filters.range}`, () => retailerSegments(filters))
+  const names = useCompetitorNames()
+  const masked = useMemo(() => (v.status === 'ready' && names.anonymise ? maskSegments(v.data, names.name, names.own) : null), [v, names])
+  return masked ? { ...v, data: masked } : v
+}
+
+/** Other brands' products as "A Brand C product" (the retailer's competitor-naming policy, for brand orgs). */
+function maskSegments(s: Segments, name: (b: string) => string, own: string | null): Segments {
+  const pick = <T extends { product: string; brand: string } | null>(p: T): T => (p && p.brand !== own ? { ...p, product: `A ${name(p.brand)} product`, brand: name(p.brand) } : p)
+  return { ...s, cells: s.cells.map((c) => ({ ...c, best: pick(c.best), runner_up: pick(c.runner_up) })), by_skin: s.by_skin.map((b) => ({ ...b, top_products: b.top_products.map((p) => pick(p)) })) }
 }
