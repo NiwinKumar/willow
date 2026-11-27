@@ -1,4 +1,5 @@
 import type { ProductRow, ProofTier, Seg } from './types'
+import { pct, pts } from './ui/format.ts'
 
 /**
  * Pure helpers for the Products, product page, Compare and Categories screens (no React, so `npm test` covers
@@ -174,3 +175,90 @@ export function spotlightOf(rows: ProductRow[]): ProductRow | null {
   return promising[0] ?? null
 }
 
+
+/* ───────────── The product page's lead: the verdict, who it works for, where it sits in its category ───────────── */
+
+/**
+ * The group a product works best for: the largest lift over non-users of the same group (rate − base rate, above
+ * zero), ties by n, among groups the api did not suppress with 10+ people. The same rule as the api's "Promote to
+ * <skin> skin" next step (proof_ai.py), so the page never recommends two groups. Only skin type and goal are passed
+ * in (tone bands are never ranked). Null when no group beats its own non-users.
+ */
+export function bestSeg(segs: Seg[], min = 10): Seg | null {
+  const ok = segs.filter((s) => !s.suppressed && s.rate !== null && s.n !== null && s.n >= min && s.base_rate !== null && s.rate > s.base_rate)
+  ok.sort((a, b) => b.rate! - b.base_rate! - (a.rate! - a.base_rate!) || b.n! - a.n! || a.label.localeCompare(b.label))
+  return ok[0] ?? null
+}
+
+/**
+ * The verdict in one sentence, in the tier's words: what the evidence says against people with the same goals who
+ * don't use it. Numbers come from the row only (rates and lift as the api sent them).
+ */
+export function verdictLine(p: Pick<ProductRow, 'tier' | 'rate' | 'base_rate' | 'lift' | 'to_proven' | 'n' | 'reason'>): string {
+  if (p.rate === null || p.tier === 'too_few') {
+    if (p.reason === 'not_measured') return 'Its goals have no Willow measure, so no outcome is measured.'
+    if (p.reason === 'unused') return 'No Willow users have it in their routine yet, so there is nothing to measure.'
+    return 'Collecting: fewer than 10 people have reached week 8 with it.'
+  }
+  const vs = p.base_rate !== null ? ` (${pct(p.rate)} against ${pct(p.base_rate)})` : ''
+  if (p.tier === 'proven') return `Linked to a held visible change: ${pts(p.lift)} over people with the same goals who don’t use it.`
+  if (p.tier === 'promising') {
+    const more = p.to_proven ? ` About ${p.to_proven} more ${p.to_proven === 1 ? 'person' : 'people'} at week 8 would settle it, if the rates hold.` : ''
+    return `Ahead of people with the same goals${vs}, but the interval still reaches zero.${more}`
+  }
+  return `Users and non-users with the same goals change at about the same rate${vs}.`
+}
+
+/** Where a product sits among the other measured products of its category (the api's competitor rows). */
+export type CategorySpot = { self: number; median: number; delta: number; others: number[]; min: number; max: number }
+
+/**
+ * This product's rate against the median of the other measured products in its category that share a goal.
+ * Null when the product has no rate or fewer than two others are measured (a median of one is just a rival).
+ */
+export function categorySpot(rows: { rate: number | null; is_self?: boolean }[]): CategorySpot | null {
+  const self = rows.find((r) => r.is_self)?.rate ?? null
+  const others = rows.filter((r) => !r.is_self && r.rate !== null).map((r) => r.rate!)
+  if (self === null || others.length < 2) return null
+  const s = [...others].sort((a, b) => a - b)
+  const mid = s.length / 2
+  const median = r2(s.length % 2 ? s[Math.floor(mid)] : (s[mid - 1] + s[mid]) / 2)
+  return { self, median, delta: r2(self - median), others: s, min: Math.min(self, s[0]), max: Math.max(self, s[s.length - 1]) }
+}
+
+/** The Products page's lead: what to act on in the rows in view. */
+export type ProductsLead = {
+  /** Proven with no campaign running, strongest lower bound first. */
+  toPromote: ProductRow[]
+  /** Proven in total (to tell "all promoted" from "none Proven"). */
+  proven: number
+  /** Promising, closest to Proven first (the api's to_proven; unknown last). */
+  close: ProductRow[]
+  /** Measured, but users change about as much as non-users. */
+  unclear: ProductRow[]
+}
+
+export function productsLead(rows: ProductRow[], running: ReadonlySet<string>): ProductsLead {
+  const proven = rows.filter((r) => r.tier === 'proven')
+  const toPromote = proven.filter((r) => !running.has(r.product_id)).sort((a, b) => (b.lift_lo ?? -1) - (a.lift_lo ?? -1) || (b.n ?? 0) - (a.n ?? 0))
+  const close = rows.filter((r) => r.tier === 'promising').sort((a, b) => (a.to_proven ?? 1e9) - (b.to_proven ?? 1e9) || (b.lift ?? 0) - (a.lift ?? 0))
+  const unclear = rows.filter((r) => r.tier === 'unclear').sort((a, b) => (b.users ?? 0) - (a.users ?? 0))
+  return { toPromote, proven: proven.length, close, unclear }
+}
+
+/** Sort rows by one value, nulls last in both directions (the same order as the kit's DataTable). */
+export function sortRows<T>(rows: T[], get: ((r: T) => number | string | null) | undefined, dir: 'asc' | 'desc'): T[] {
+  if (!get) return rows
+  const k = dir === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => {
+    const x = get(a)
+    const y = get(b)
+    if (x === null && y === null) return 0
+    if (x === null) return 1
+    if (y === null) return -1
+    return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * k
+  })
+}
+
+/** Rows drawn per step on long tables: enough to scan, small enough to open without a stall. */
+export const PAGE_ROWS = 100

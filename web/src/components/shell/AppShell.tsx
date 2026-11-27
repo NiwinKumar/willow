@@ -6,6 +6,7 @@ import type { TrackPlace } from '../../lib/track'
 import { useActivateData, useData } from '../../data/useData'
 import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
+import { useKeyboardInset } from '../../lib/useKeyboardInset'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { prefs } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
@@ -162,7 +163,7 @@ export function AppShell() {
   const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   return (
     <ShellContext.Provider value={api}>
-      <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
+      <div className="relative min-h-dvh overflow-x-clip pb-[calc(140px+env(safe-area-inset-bottom))] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
         <CanvasBlobs />
         <div inert={covered || undefined}>
         <ModeBanner />
@@ -248,6 +249,8 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
     }
   }, [open])
   const inset = phone || full ? 0 : 12
+  // Full screen: while typing, the panel spans only the visible area, so the composer sits on the keyboard.
+  useKeyboardInset(open && (phone || full))
   return (
     <div
       ref={panel}
@@ -259,9 +262,9 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
       tabIndex={-1}
       className="fixed z-[45] flex flex-col overflow-hidden squircle outline-none backdrop-blur-[28px] backdrop-saturate-[1.5]"
       style={{
-        top: inset,
+        top: inset || 'var(--kb-top, 0px)',
         right: inset,
-        bottom: inset,
+        bottom: inset || 'var(--kb, 0px)',
         width: phone || full ? '100vw' : 'min(440px, calc(100vw - 24px))',
         borderRadius: !open && !reduced ? 160 : phone || full ? 0 : 32,
         background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.92)',

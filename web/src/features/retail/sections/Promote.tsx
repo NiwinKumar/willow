@@ -8,7 +8,7 @@ import { setQueryData, useQuery } from '../../../lib/query'
 import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
 import { fetchProducts } from '../productData'
-import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, runningCount, workspaceId } from '../promote'
+import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, portfolioOf, runningCount, workspaceId } from '../promote'
 import { useOrg } from '../org'
 import { purposeOf, sectionPath, useRetailState } from '../state'
 import { ShelfResults } from './market/ShelfResults'
@@ -18,6 +18,7 @@ import { AutoCampaigns } from './promote/AutoCampaigns'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
 import { EligibleList } from './promote/EligibleList'
+import { Portfolio } from './promote/Portfolio'
 import { useCampaignPoll } from './promote/useCampaignPoll'
 
 /*
@@ -238,7 +239,7 @@ function Body({ uid }: { uid: string }) {
     </>
   ) : eligible.length ? (
     <>
-      Promote a Proven product to the people its evidence covers. <strong>{brand ? `${eligible.length} of your products` : `${eligible.length} ${eligible.length === 1 ? 'product' : 'products'}`}</strong> {eligible.length === 1 ? 'is' : 'are'} ready.
+      Promote a Proven product to the people its evidence covers. <strong>{brand ? `${int(eligible.length)} of your products` : `${int(eligible.length)} ${eligible.length === 1 ? 'product' : 'products'}`}</strong> {eligible.length === 1 ? 'is' : 'are'} ready.
     </>
   ) : (
     answerLine(all, brand)
@@ -286,6 +287,8 @@ function Body({ uid }: { uid: string }) {
           <SkeletonTable rows={3} />
         </div>
       ) : listed.length ? (
+        <>
+        <Portfolio p={portfolioOf(listed)} openTo={(id) => `${sectionPath('campaigns', id)}${carry}`} />
         <section aria-labelledby="proof-campaigns-h" className="flex min-w-0 flex-col overflow-hidden rounded-card border border-line bg-surface">
           <CampaignsTable
             campaigns={listed}
@@ -294,8 +297,8 @@ function Body({ uid }: { uid: string }) {
                 <h2 id="proof-campaigns-h" className="m-0 text-proof-h text-ink">
                   Campaigns
                 </h2>
-                <span className="text-proof-small text-ink-2 tnum">
-                  {running} of {MAX_ACTIVE} running
+                <span className="text-proof-small text-ink-2 tnum" title="You can run up to three of your own campaigns at once; sample campaigns don’t take a slot.">
+                  {running} of {MAX_ACTIVE} launch slots in use
                 </span>
               </>
             }
@@ -319,6 +322,7 @@ function Body({ uid }: { uid: string }) {
           />
           <Rules />
         </section>
+        </>
       ) : (
         <HowItWorks />
       )}

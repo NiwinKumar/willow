@@ -146,6 +146,15 @@ class Store(Protocol):
     def proof_range_set(self, org: str, doc: Doc) -> None: ...
     def proof_range_delete(self, org: str) -> None: ...
 
+    # -- P1 block (Proof Ask conversations, routes/proof_routes.py) ---------------------------
+    # proof_ask_threads/{id} {org_id, uid, title, created_at, updated_at, turns[{q, answer, at}]}:
+    # one person's conversation with Ask inside one org; private to that person. Read by uid
+    # (single-field query) and filtered by org in code, so no composite index is needed.
+    def proof_ask_thread_get(self, tid: str) -> Doc | None: ...
+    def proof_ask_thread_set(self, tid: str, doc: Doc) -> None: ...
+    def proof_ask_thread_delete(self, tid: str) -> None: ...
+    def proof_ask_threads_of(self, uid: str) -> list[tuple[str, Doc]]: ...
+
 
 def _running(doc: Doc, stale: timedelta) -> bool:
     started = doc.get("processing_started_at")
@@ -640,6 +649,21 @@ class FirestoreStore:
     def proof_range_delete(self, org: str) -> None:
         self._db().document(f"proof_ranges/{org}").delete()
 
+    # -- P1 block (Proof Ask conversations): see the Store protocol for the path -------------
+    def proof_ask_thread_get(self, tid: str) -> Doc | None:
+        snap = self._db().document(f"proof_ask_threads/{tid}").get()
+        return snap.to_dict() if snap.exists else None
+
+    def proof_ask_thread_set(self, tid: str, doc: Doc) -> None:
+        self._db().document(f"proof_ask_threads/{tid}").set(doc)
+
+    def proof_ask_thread_delete(self, tid: str) -> None:
+        self._db().document(f"proof_ask_threads/{tid}").delete()
+
+    def proof_ask_threads_of(self, uid: str) -> list[tuple[str, Doc]]:
+        q = self._db().collection("proof_ask_threads").where("uid", "==", uid)
+        return [(s.id, s.to_dict()) for s in q.stream()]
+
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -675,6 +699,8 @@ class MemoryStore:
         self.proof_requests: dict[str, Doc] = {}
         self.proof_claims: dict[str, Doc] = {}
         self.proof_ranges: dict[str, Doc] = {}
+        # P1 block (Proof Ask conversations)
+        self.proof_ask_threads: dict[str, Doc] = {}
 
     def session_get(self, uid: str, sid: str) -> Doc | None:
         doc = self.sessions.get((uid, sid))
@@ -1046,6 +1072,21 @@ class MemoryStore:
 
     def proof_range_delete(self, org: str) -> None:
         self.proof_ranges.pop(org, None)
+
+    # -- P1 block (Proof Ask conversations) ---------------------------------------------------
+    def proof_ask_thread_get(self, tid: str) -> Doc | None:
+        return copy.deepcopy(self.proof_ask_threads.get(tid))
+
+    def proof_ask_thread_set(self, tid: str, doc: Doc) -> None:
+        self.proof_ask_threads[tid] = copy.deepcopy(doc)
+
+    def proof_ask_thread_delete(self, tid: str) -> None:
+        self.proof_ask_threads.pop(tid, None)
+
+    def proof_ask_threads_of(self, uid: str) -> list[tuple[str, Doc]]:
+        return [
+            (t, copy.deepcopy(d)) for t, d in self.proof_ask_threads.items() if d.get("uid") == uid
+        ]
 
 
 @lru_cache

@@ -1,6 +1,8 @@
 import { ChevronDown, Search } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 
+import { int } from './format'
+
 /**
  * Text tabs with an underline indicator (docs/DESIGN.md Tabs): role tablist/tab, roving tabindex, ←/→/Home/End.
  * `panelId` links each tab to the panel it controls. `count` adds a quiet number after the label.
@@ -44,7 +46,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
             className={`relative -mb-px flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap border-0 border-b-2 bg-transparent px-0.5 text-proof-body transition-colors duration-150 ${on ? 'border-ink text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}
           >
             {t.label}
-            {t.count !== undefined && t.count !== null ? <span className="rounded-pill bg-sunken px-1.5 text-proof-label text-ink-2 tnum">{t.count}</span> : null}
+            {t.count !== undefined && t.count !== null ? <span className="rounded-pill bg-sunken px-1.5 text-proof-label text-ink-2 tnum">{int(t.count)}</span> : null}
           </button>
         )
       })}

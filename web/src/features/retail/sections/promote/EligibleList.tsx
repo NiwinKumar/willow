@@ -4,7 +4,7 @@ import type { PromoEligibility } from '../../../../lib/api'
 import { goalLabel, skinLabel } from '../../promote'
 import { sectionPath } from '../../state'
 import type { ProductRow } from '../../types'
-import { Button, DataTable, LiftValue, pct, ProductCell, ProofTierChip, RateCell, type Column } from '../../ui'
+import { Button, DataTable, int, LiftValue, pct, ProductCell, ProofTierChip, RateCell, type Column } from '../../ui'
 import { HeadTip } from './CampaignsTable'
 
 /*
@@ -113,7 +113,7 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
               <h2 id="proof-eligible-h" className="m-0 text-proof-h text-ink">
                 {title}
               </h2>
-              <span className="text-proof-small text-ink-2 tnum">{eligible.length}</span>
+              <span className="text-proof-small text-ink-2 tnum">{int(eligible.length)}</span>
             </>
           }
           columns={columns}
@@ -135,7 +135,7 @@ export function EligibleList({ title, eligible, notEligible, extras, runningFor,
         <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-2.5">
           {eligible.length > FIRST ? (
             <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className={GHOST}>
-              {all ? 'Show fewer' : `Show all ${eligible.length}`}
+              {all ? 'Show fewer' : `Show all ${int(eligible.length)}`}
             </button>
           ) : null}
           {notEligible.length && eligible.length ? (

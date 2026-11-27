@@ -38,12 +38,16 @@ if not logging.getLogger().handlers:
 
 @app.on_event("startup")
 def _dev_seed() -> None:
-    """DEV_STORE=memory (with AUTH_MODE=dev): three demo campaigns with history, in memory only."""
+    """DEV_STORE=memory (with AUTH_MODE=dev): the sample campaign portfolio with history, in
+    memory only (needs the BigQuery rows; skipped without them)."""
     if settings.auth_mode == "dev" and settings.dev_store == "memory":
         from app import dev_seed
         from app.store import get_store
 
-        dev_seed.seed_demo_campaigns(get_store())
+        try:
+            dev_seed.seed_demo_campaigns(get_store())
+        except dev_seed.SamplesUnavailable as exc:  # no BigQuery rows: start without samples
+            log.warning("dev sample campaigns skipped: %s", exc)
 
 
 @app.on_event("startup")

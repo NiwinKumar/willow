@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { packCsv, packHtml, packMarkdown, packName, statementLine } from '../src/features/retail/evidencePack.ts'
-import { brandShares, filterRows, hintOf, leaderOf, money, noDataReason, parseIds, rivalOf, segInterval, toggleId, wilson } from '../src/features/retail/productModel.ts'
+import { bestSeg, brandShares, categorySpot, filterRows, hintOf, productsLead, sortRows, leaderOf, money, noDataReason, parseIds, rivalOf, segInterval, toggleId, verdictLine, wilson } from '../src/features/retail/productModel.ts'
 import type { ProductDetail, ProductRow } from '../src/features/retail/types.ts'
 
 function row(p: Partial<ProductRow> & { product_id: string }): ProductRow {
@@ -131,4 +131,50 @@ test('a compare row has one leader or none', () => {
   assert.equal(leaderOf([0.7, 0.7, 0.2]), null)
   assert.equal(leaderOf([0.7, null]), null)
   assert.equal(leaderOf([null, 0.4, 0.3]), 1)
+})
+
+test('the product verdict says what the evidence says, in the tier’s words', () => {
+  assert.equal(verdictLine(row({ product_id: 'p', lift: 0.42 })), 'Linked to a held visible change: +42 pts over people with the same goals who don’t use it.')
+  assert.match(verdictLine(row({ product_id: 'p', tier: 'promising', rate: 0.5, base_rate: 0.4, to_proven: 12 })), /^Ahead of people with the same goals \(50% against 40%\), but the interval still reaches zero\. About 12 more people/)
+  assert.equal(verdictLine(row({ product_id: 'p', tier: 'unclear', rate: 0.31, base_rate: 0.3 })), 'Users and non-users with the same goals change at about the same rate (31% against 30%).')
+  assert.equal(verdictLine(row({ product_id: 'p', tier: 'too_few', rate: null, reason: 'unused' })), 'No Willow users have it in their routine yet, so there is nothing to measure.')
+})
+
+test('works best for: the largest lift over its own non-users, never a suppressed or small group', () => {
+  const seg = (id: string, rate: number | null, base: number | null, n: number | null, suppressed = false) => ({ id, label: id, rate, base_rate: base, n, suppressed })
+  // b has the highest rate, but a has the larger lift over its own non-users (the api's promote rule)
+  assert.equal(bestSeg([seg('a', 0.68, 0.2, 34), seg('b', 0.69, 0.5, 16), seg('c', 0.9, 0.1, 8), seg('d', null, null, null, true)])?.id, 'a')
+  assert.equal(bestSeg([seg('a', 0.3, 0.4, 40)]), null)
+})
+
+test('category spot: the product against the median of the other measured products', () => {
+  const spot = categorySpot([{ rate: 0.65, is_self: true }, { rate: 0.9 }, { rate: 0.4 }, { rate: 0.5 }, { rate: null }])
+  assert.deepEqual(spot && { median: spot.median, delta: spot.delta, n: spot.others.length, min: spot.min, max: spot.max }, { median: 0.5, delta: 0.15, n: 3, min: 0.4, max: 0.9 })
+  assert.equal(categorySpot([{ rate: 0.6, is_self: true }, { rate: 0.5 }]), null)
+  assert.equal(categorySpot([{ rate: null, is_self: true }, { rate: 0.5 }, { rate: 0.4 }]), null)
+})
+
+test('products lead: Proven without a running campaign, the nearest Promising, the most-used unclear', () => {
+  const rows = [
+    row({ product_id: 'a', lift_lo: 0.05 }),
+    row({ product_id: 'b', lift_lo: 0.2 }),
+    row({ product_id: 'c', lift_lo: 0.3 }),
+    row({ product_id: 'p1', tier: 'promising', to_proven: 40 }),
+    row({ product_id: 'p2', tier: 'promising', to_proven: 3 }),
+    row({ product_id: 'p3', tier: 'promising', to_proven: null }),
+    row({ product_id: 'u1', tier: 'unclear', users: 20 }),
+    row({ product_id: 'u2', tier: 'unclear', users: 90 }),
+  ]
+  const lead = productsLead(rows, new Set(['c']))
+  assert.deepEqual(lead.toPromote.map((r) => r.product_id), ['b', 'a'])
+  assert.equal(lead.proven, 3)
+  assert.deepEqual(lead.close.map((r) => r.product_id), ['p2', 'p1', 'p3'])
+  assert.deepEqual(lead.unclear.map((r) => r.product_id), ['u2', 'u1'])
+})
+
+test('long tables sort the whole list before a page is cut, nulls last both ways', () => {
+  const rs = [{ v: 2 }, { v: null }, { v: 9 }, { v: 5 }]
+  assert.deepEqual(sortRows(rs, (r) => r.v, 'desc').map((r) => r.v), [9, 5, 2, null])
+  assert.deepEqual(sortRows(rs, (r) => r.v, 'asc').map((r) => r.v), [2, 5, 9, null])
+  assert.equal(sortRows(rs, undefined, 'asc'), rs)
 })

@@ -1,5 +1,5 @@
-import { Pause, Play, Square, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowRight, Pause, Play, Square, Trash2 } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -7,11 +7,11 @@ import { api, type Campaign } from '../../../lib/api'
 import { setQueryData, useQuery } from '../../../lib/query'
 import { useAuth } from '../../../lib/useAuth'
 import { ProductImage } from '../../routine/productUi'
-import { boostedAdds, campaignInsight, cumulativeDays, dateRange, durationText, goalLabel, HOLDOUT_MIN, ownRecordInsight, runDay, skinLabel, timeLeft } from '../promote'
+import { boostedAdds, campaignInsight, cumulativeDays, dateRange, durationText, goalLabel, HOLDOUT_MIN, nextMove, ownRecordInsight, runDay, skinLabel, timeLeft } from '../promote'
 import { sectionPath, useRetailState } from '../state'
 import { fetchProduct } from '../productData'
 import type { ProductDetail } from '../types'
-import { Bone, Button, EmptyState, ErrorState, int, PageHeader, Panel, pct, ProofTierChip, pts, SkeletonKpis, SkeletonPanel, type Kpi } from '../ui'
+import { Bone, BrandLogo, Button, EmptyState, ErrorState, int, PageHeader, Panel, pct, ProofTierChip, pts, SkeletonKpis, SkeletonPanel, type Kpi } from '../ui'
 import { BlobRadial, StreamChart } from '../ui/widgets'
 import { ErrorBox, SampleBadge, StatusBadge, type Confirm } from './promote/CampaignCard'
 import { ShopperPreview } from './promote/ShopperPreview'
@@ -100,6 +100,7 @@ function Body({ uid }: { uid: string }) {
       c={c}
       back={back}
       productTo={`${sectionPath('products', c.product_id)}${carry}`}
+      againTo={`${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(c.product_id)}${c.skin_types.length ? `&skins=${c.skin_types.map(encodeURIComponent).join(',')}` : ''}`}
       eligibility={elig.data?.find((p) => p.product_id === c.product_id) ?? null}
       at={camps.data.at}
       confirm={confirm}
@@ -115,10 +116,12 @@ function Body({ uid }: { uid: string }) {
   )
 }
 
-function Dashboard({ c, back, productTo, eligibility, at, confirm, setConfirm, onChanged, onDeleted, onStale }: {
+function Dashboard({ c, back, productTo, againTo, eligibility, at, confirm, setConfirm, onChanged, onDeleted, onStale }: {
   c: Campaign
   back: string
   productTo: string
+  /** The create sheet, prefilled with this campaign's product and skin types. */
+  againTo: string
   eligibility: Parameters<typeof ShopperPreview>[0]['product'] | null
   at: number | null
   confirm: Confirm | null
@@ -172,7 +175,12 @@ function Dashboard({ c, back, productTo, eligibility, at, confirm, setConfirm, o
           title={name}
           description={
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-              <span className="font-medium text-ink">{c.brand}</span>
+              {c.brand ? (
+                <span className="inline-flex items-center gap-1.5 font-medium text-ink">
+                  <BrandLogo brand={c.brand} size={18} />
+                  {c.brand}
+                </span>
+              ) : null}
               <StatusBadge status={c.status} />
               {c.sample ? <SampleBadge /> : null}
               <span aria-hidden className="text-ink-3">
@@ -218,7 +226,7 @@ function Dashboard({ c, back, productTo, eligibility, at, confirm, setConfirm, o
         {actions.error ? <ErrorBox error={actions.error} /> : null}
       </div>
 
-      <Summary c={c} kpis={kpis} label={`Results for ${name}`} />
+      <Summary c={c} kpis={kpis} label={`Results for ${name}`} next={<NextMove c={c} againTo={againTo} productTo={productTo} onEnd={() => setConfirm('end')} />} />
 
       <div className="grid gap-4 lg:grid-cols-12">
         <Story c={c} at={at} className="lg:col-span-8" />
@@ -258,10 +266,33 @@ function ConfirmBar({ kind, actions, setConfirm }: { kind: Confirm | null; actio
   )
 }
 
+/**
+ * The step after the verdict (P2B): run a clear winner again (the create sheet with the same product and skin
+ * types), end a running card that does worse than its holdout, or look at where the product works. Four tests:
+ * (1) the page no longer ends at a verdict; (2) the button says what it does, the line says why; (3) one button
+ * under the verdict, nothing while the evidence is still coming; (4) the kit's Button, secondary weight.
+ */
+function NextMove({ c, againTo, productTo, onEnd }: { c: Campaign; againTo: string; productTo: string; onEnd: () => void }) {
+  const m = nextMove(c)
+  if (!m) return null
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+      {m.kind === 'end' ? (
+        <Button onClick={onEnd}>{m.label}</Button>
+      ) : (
+        <Button to={m.kind === 'again' ? againTo : `${productTo}${productTo.includes('?') ? '&' : '?'}seg=skin#seg-h`}>
+          {m.label} <ArrowRight size={14} strokeWidth={1.7} aria-hidden />
+        </Button>
+      )}
+      <span className="text-proof-small text-ink-2">{m.why}</span>
+    </div>
+  )
+}
+
 const TONE_DOT: Record<ReturnType<typeof campaignInsight>['tone'], string> = { good: 'bg-proof-leaf', neutral: 'bg-[var(--pf-base)]', wait: 'bg-pf-amber' }
 
 /** The answer first, and the three figures that back it, in one band: what the campaign is doing, then reach, adds and lift. */
-function Summary({ c, kpis, label }: { c: Campaign; kpis: Kpi[]; label: string }) {
+function Summary({ c, kpis, label, next }: { c: Campaign; kpis: Kpi[]; label: string; next?: ReactNode }) {
   const insight = campaignInsight(c)
   return (
     <section aria-label={label} className="grid overflow-hidden rounded-card border border-line bg-surface lg:grid-cols-12">
@@ -270,6 +301,7 @@ function Summary({ c, kpis, label }: { c: Campaign; kpis: Kpi[]; label: string }
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="m-0 text-[18px] font-semibold leading-6 tracking-[-0.02em] text-ink [text-wrap:balance]">{insight.headline}</h2>
           <p className="m-0 text-proof-body text-ink-2">{insight.detail}</p>
+          {next}
         </div>
       </div>
       <dl className="m-0 grid grid-cols-1 border-t border-line sm:grid-cols-3 lg:col-span-7 lg:border-l lg:border-t-0">

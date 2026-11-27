@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 
 import { feltText } from '../feel'
 import type { ProductRow } from '../types'
@@ -10,17 +9,8 @@ import { int, interval, pct, Suppressed, useTooltip } from '../ui'
  */
 
 /** A column or row label whose definition shows on hover or focus (never in running text). */
-export function HeadTip({ label, tip }: { label: string; tip: ReactNode }) {
-  const t = useTooltip(tip)
-  return (
-    <>
-      <span {...t.trigger} tabIndex={0} className="cursor-help underline decoration-line-strong decoration-dotted underline-offset-4">
-        {label}
-      </span>
-      {t.node}
-    </>
-  )
-}
+/** Moved to the kit (ui/HeadTip.tsx); re-exported so existing imports keep working. */
+export { HeadTip } from '../ui'
 
 /**
  * A visible-change rate as "77%" beside a 0–100% track: the rate as a leaf dot, its 95% interval as a soft

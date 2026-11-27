@@ -558,7 +558,7 @@ function CompareButton({ session, sessions, baseline }: { session: Session; sess
   const select = (lbl: string, value: string, set: (v: string) => void) => (
     <label className="flex min-w-[150px] flex-1 flex-col gap-1 text-[12px] text-ink-2">
       {lbl}
-      <select value={value} onChange={(e) => set(e.target.value)} className="min-h-11 rounded-[14px] border-0 bg-canvas px-3 text-[14px] text-ink">
+      <select value={value} onChange={(e) => set(e.target.value)} className="min-h-11 rounded-[14px] border-0 bg-canvas px-3 text-[16px] text-ink sm:text-[14px]">
         {pool.map((s) => (
           <option key={s.id} value={s.id}>
             {optionLabel(s, pool)}

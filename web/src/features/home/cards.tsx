@@ -186,7 +186,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
                   <span aria-hidden>△ </span>
                   {r.flag.text}
                 </span>
-                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-colors hover:bg-white">
+                <button type="button" onClick={() => onAsk(r.flag!.question)} className="hit44 inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-colors hover:bg-white">
                   Ask Wisp
                 </button>
               </div>

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 
 import type { Campaign } from '../../../../lib/api'
 import { audienceText, ctrText, dateRange, HOLDOUT_MIN, timeLeft } from '../../promote'
-import { DataTable, int, LiftValue, ProductCell, useTooltip, type Column } from '../../ui'
+import { DataTable, HeadTip, int, LiftValue, ProductCell, type Column } from '../../ui'
 import { SampleBadge, StatusBadge, type Confirm } from './CampaignCard'
 import { useCampaignActions } from './useCampaignActions'
 
@@ -18,17 +18,8 @@ import { useCampaignActions } from './useCampaignActions'
 const STATUS_ORDER: Record<Campaign['status'], number> = { active: 0, paused: 1, ended: 2 }
 
 /** A header with its definition in a tooltip (the brief: definitions live in column headers, not running text). */
-export function HeadTip({ label, tip }: { label: string; tip: ReactNode }) {
-  const t = useTooltip(tip)
-  return (
-    <>
-      <span {...t.trigger} tabIndex={0} className="cursor-help underline decoration-line-strong decoration-dotted underline-offset-4">
-        {label}
-      </span>
-      {t.node}
-    </>
-  )
-}
+/** Moved to the kit (ui/HeadTip.tsx); re-exported so existing imports keep working. */
+export { HeadTip }
 
 export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen, onConfirm, onChanged, onDeleted, onStale, workspaceOf }: {
   campaigns: Campaign[]

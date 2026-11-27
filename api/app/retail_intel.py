@@ -149,6 +149,44 @@ class Facts:
             self.memo["eligible"] = [uh for uh in self.users if self.eligible(uh)]
         return self.memo["eligible"]
 
+    def group(self, attr: str, value: str) -> frozenset[str]:
+        """Eligible people with this skin type or tone band ("goal": with this goal)."""
+        key = ("group", attr, value)
+        if key not in self.memo:
+            if attr == "goal":
+                self.memo[key] = frozenset(
+                    uh for uh in self.eligible_users if value in self.users[uh]["goals"]
+                )
+            else:
+                self.memo[key] = frozenset(
+                    uh for uh in self.eligible_users if self.users[uh].get(attr) == value
+                )
+        return self.memo[key]
+
+    def any_goal(self, goals: tuple[str, ...]) -> frozenset[str]:
+        """Eligible people with any of these goals (a product's base before its own users)."""
+        key = ("any_goal", goals)
+        if key not in self.memo:
+            self.memo[key] = frozenset().union(*(self.group("goal", g) for g in goals))
+        return self.memo[key]
+
+    def wins(self, metrics: list[str]) -> frozenset[str]:
+        """Eligible people with an outcome on any of `metrics`."""
+        key = ("wins", tuple(sorted(metrics)))
+        if key not in self.memo:
+            self.memo[key] = frozenset(
+                uh for uh in self.eligible_users if self.outcome(uh, metrics) is not None
+            )
+        return self.memo[key]
+
+    def overlap(self, *sets: frozenset[str]) -> int:
+        """Size of the intersection of memoised sets, memoised (sets are compared by id)."""
+        key = ("overlap", *sorted(id(x) for x in sets))
+        if key not in self.memo:
+            smallest, *rest = sorted(sets, key=len)
+            self.memo[key] = sum(1 for uh in smallest if all(uh in x for x in rest))
+        return self.memo[key]
+
     @property
     def category_users(self) -> dict[str, set[str]]:
         if "cat_users" not in self.memo:
@@ -276,9 +314,25 @@ def suppress(ns: list[int]) -> set[int]:
 
 
 def _base(f: Facts, pid: str) -> list[str]:
+    """Eligible people with a goal the product targets who do not use it, in user order."""
     mine = set(f.users_of.get(pid, []))
-    want = set(_catalog()[2][pid])
-    return [uh for uh in f.eligible_users if uh not in mine and set(f.users[uh]["goals"]) & want]
+    pool = f.any_goal(tuple(_catalog()[2][pid]))
+    return [uh for uh in f.eligible_users if uh in pool and uh not in mine]
+
+
+def _base_nk(
+    f: Facts, pid: str, metrics: list[str], within: frozenset[str] | None = None
+) -> tuple[int, int]:
+    """(people, with an outcome on `metrics`) in the product's base, optionally only those in
+    `within` (a Facts.group): the same counts as filtering _base, from memoised sets, so every
+    product does not walk every person."""
+    pool = f.any_goal(tuple(_catalog()[2][pid]))
+    wins = f.wins(metrics)
+    sets = (pool,) if within is None else (pool, within)
+    mine = [uh for uh in f.users_of.get(pid, []) if all(uh in x for x in sets)]
+    n = f.overlap(*sets) - len(mine)
+    k = f.overlap(*sets, wins) - sum(1 for uh in mine if uh in wins)
+    return n, k
 
 
 def _stats(f: Facts, pid: str) -> dict[str, Any]:
@@ -323,7 +377,7 @@ def _stats(f: Facts, pid: str) -> dict[str, Any]:
         row["felt"] = _r2(sum(1 for a in said if a["feel"] == "working") / len(said))
         row["felt_n"] = len(said)
     el = [uh for uh in members if f.eligible(uh)]
-    out = {"row": row, "el": el, "base": [], "metrics": metrics, "members": members}
+    out = {"row": row, "el": el, "base_n": 0, "metrics": metrics, "members": members}
     if not metrics:
         row["reason"] = "not_measured"
     elif not members:
@@ -332,14 +386,13 @@ def _stats(f: Facts, pid: str) -> dict[str, Any]:
         row["reason"] = "few"
     else:
         wins = [uh for uh in el if f.outcome(uh, metrics) is not None]
-        base = _base(f, pid)
-        base_k = sum(1 for uh in base if f.outcome(uh, metrics) is not None)
+        base_n, base_k = _base_nk(f, pid, metrics)
         lo, hi = retailer._wilson(len(wins), len(el))
         lift = lift_lo = lift_hi = None
-        if len(base) >= MIN:
-            lift, lift_lo, lift_hi = lift_ci(len(wins), len(el), base_k, len(base))
-            row["base_rate"] = _r2(base_k / len(base))
-            out["base"] = base
+        if base_n >= MIN:
+            lift, lift_lo, lift_hi = lift_ci(len(wins), len(el), base_k, base_n)
+            row["base_rate"] = _r2(base_k / base_n)
+            out["base_n"] = base_n
         tier = tier_of(len(el), lift, lift_lo)
         row.update(
             n=len(el),
@@ -355,8 +408,8 @@ def _stats(f: Facts, pid: str) -> dict[str, Any]:
             ),
             tier=tier,
             tier_label=TIER_LABEL[tier],
-            to_proven=to_proven(len(wins), len(el), base_k, len(base))
-            if tier == "promising" and len(base) >= MIN
+            to_proven=to_proven(len(wins), len(el), base_k, base_n)
+            if tier == "promising" and base_n >= MIN
             else None,
         )
     f.memo[key] = out
@@ -396,11 +449,12 @@ def products_view(f: Facts) -> dict[str, Any]:
 
 def _rate_cells(
     f: Facts,
-    groups: list[tuple[str, str, list[str], list[str], list[str]]],
+    groups: list[tuple[str, str, list[str], tuple[int, int], list[str]]],
     hide_extra: bool = True,
 ) -> list[dict[str, Any]]:
-    """Seg cells {id, label, n, rate, base_rate, suppressed} from (id, label, users, base,
-    metrics) groups, with complementary suppression when `hide_extra`."""
+    """Seg cells {id, label, n, rate, base_rate, suppressed} from (id, label, users, (base
+    people, base people with an outcome), metrics) groups, with complementary suppression when
+    `hide_extra`."""
     ns = [len(g[2]) for g in groups]
     hidden = suppress(ns) if hide_extra else {i for i, n in enumerate(ns) if n < MIN}
     out = []
@@ -418,14 +472,14 @@ def _rate_cells(
             )
             continue
         k = sum(1 for uh in us if f.outcome(uh, metrics) is not None)
-        bk = sum(1 for uh in base if f.outcome(uh, metrics) is not None)
+        bn, bk = base
         out.append(
             {
                 "id": gid,
                 "label": label,
                 "n": len(us),
                 "rate": _r2(k / len(us)),
-                "base_rate": _r2(bk / len(base)) if len(base) >= MIN else None,
+                "base_rate": _r2(bk / bn) if bn >= MIN else None,
                 "suppressed": False,
             }
         )
@@ -437,9 +491,14 @@ def _segments(f: Facts, pid: str) -> dict[str, list[dict[str, Any]]]:
     if key in f.memo:
         return f.memo[key]
     s = _stats(f, pid)
-    el, base, metrics = s["el"], s["base"], s["metrics"]
-    if s["row"]["tier"] == "too_few":
-        el, base = [], []
+    el, metrics = s["el"], s["metrics"]
+    measured = s["row"]["tier"] != "too_few"
+    if not measured:
+        el = []
+
+    def base(ms: list[str], within: frozenset[str]) -> tuple[int, int]:
+        # no base without a measured row or with fewer than MIN in the whole base
+        return _base_nk(f, pid, ms, within) if measured and s["base_n"] >= MIN else (0, 0)
 
     def by(attr: str, values: list[str], labels: dict[str, str]):
         return [
@@ -447,7 +506,7 @@ def _segments(f: Facts, pid: str) -> dict[str, list[dict[str, Any]]]:
                 v,
                 labels[v],
                 [uh for uh in el if f.users[uh].get(attr) == v],
-                [uh for uh in base if f.users[uh].get(attr) == v],
+                base(metrics, f.group(attr, v)),
                 metrics,
             )
             for v in values
@@ -458,7 +517,7 @@ def _segments(f: Facts, pid: str) -> dict[str, list[dict[str, Any]]]:
             g,
             retailer.GOAL_LABEL[g],
             [uh for uh in el if g in f.users[uh]["goals"]],
-            [uh for uh in base if g in f.users[uh]["goals"]],
+            base(_goal_metrics(g, pid), f.group("goal", g)),
             _goal_metrics(g, pid),
         )
         for g in _catalog()[2][pid]
@@ -716,10 +775,10 @@ def _journey(f: Facts, pid: str) -> dict[str, Any] | None:
     s = _stats(f, pid)
     if s["row"]["tier"] == "too_few":
         return None
-    members, el, base, metrics = s["members"], set(s["el"]), s["base"], s["metrics"]
+    members, el, metrics = s["members"], set(s["el"]), s["metrics"]
     count: Counter = Counter()
     count["used"] = len(members)
-    count["non"] = len(base)
+    count["non"] = s["base_n"]
     for uh in members:
         r = f.rows_of[(uh, pid)]
         if uh not in el:
@@ -778,7 +837,8 @@ def product_view(f: Facts, pid: str) -> dict[str, Any] | None:
     if pid not in products:
         return None
     p, s = products[pid], _stats(f, pid)
-    row, el, base, members = s["row"], s["el"], s["base"], s["members"]
+    row, el, members = s["row"], s["el"], s["members"]
+    base = _base(f, pid) if s["base_n"] >= MIN else []
     measured = row["tier"] != "too_few"
 
     def curve(us: list[str]) -> list[float | None]:
@@ -973,9 +1033,12 @@ def segments_view(f: Facts) -> dict[str, Any]:
             el = [uh for uh in s_["el"] if f.users[uh].get("skin_type") == s]
             if len(el) < MIN:
                 continue
-            base = [uh for uh in s_["base"] if f.users[uh].get("skin_type") == s]
+            bn, bk = (
+                _base_nk(f, pid, targets[pid], f.group("skin_type", s))
+                if s_["base_n"] >= MIN
+                else (0, 0)
+            )
             k = sum(1 for uh in el if f.outcome(uh, targets[pid]) is not None)
-            bk = sum(1 for uh in base if f.outcome(uh, targets[pid]) is not None)
             tops.append(
                 {
                     "product_id": pid,
@@ -984,7 +1047,7 @@ def segments_view(f: Facts) -> dict[str, Any]:
                     "image_url": products[pid].get("image_url"),
                     "rate": _r2(k / len(el)),
                     "n": len(el),
-                    "lift": _r2(k / len(el) - bk / len(base)) if len(base) >= MIN else None,
+                    "lift": _r2(k / len(el) - bk / bn) if bn >= MIN else None,
                 }
             )
         tops.sort(key=lambda r: (r["lift"] is None, -(r["lift"] or 0), -r["rate"], r["product_id"]))
@@ -1043,12 +1106,18 @@ def _brand_outcomes(f: Facts, brand: str | None, us: list[str] | None = None) ->
 
 
 def _brand_users(f: Facts, brand: str) -> list[str]:
-    products = _catalog()[0]
-    return sorted(
-        uh
-        for uh, rs in f.by_user.items()
-        if any(products.get(r["product_id"], {}).get("brand") == brand for r in rs)
-    )
+    """People with a routine row for any product of `brand`, in user order (one index of every
+    brand, built once per facts)."""
+    if "brand_users" not in f.memo:
+        products = _catalog()[0]
+        index: dict[str, list[str]] = defaultdict(list)
+        for uh, rs in sorted(f.by_user.items()):
+            for b in sorted(
+                {products[r["product_id"]]["brand"] for r in rs if r["product_id"] in products}
+            ):
+                index[b].append(uh)
+        f.memo["brand_users"] = index
+    return f.memo["brand_users"].get(brand, [])
 
 
 def _brand_row(f: Facts, brand: str) -> dict[str, Any]:
@@ -1058,7 +1127,9 @@ def _brand_row(f: Facts, brand: str) -> dict[str, Any]:
     products = _catalog()[0]
     us = _brand_users(f, brand)
     k, n = _brand_outcomes(f, brand, us)
-    with_any = sum(1 for rs in f.by_user.values() if rs)
+    if "with_any" not in f.memo:
+        f.memo["with_any"] = sum(1 for rs in f.by_user.values() if rs)
+    with_any = f.memo["with_any"]
     shown = n >= MIN
     lo, hi = retailer._wilson(k, n) if shown else (None, None)
     el = [uh for uh in us if f.eligible(uh)]
@@ -1763,7 +1834,10 @@ def summary_for(
 
 # ── cached wrappers (what the routes call) ─────────────────────────────────────────────────
 
-_facts: dict[tuple[str, str], tuple[int, date, Facts]] = {}
+# One filter's facts and views hold about 160 MB with the 35,000-person cohort (the api has 1 GiB):
+# keep the FACTS_KEEP most recently used filters, rebuild others on use (a few seconds).
+FACTS_KEEP = 2
+_facts: dict[tuple[str, str], tuple[int, date, Facts]] = {}  # least recently used first
 _lock = threading.Lock()
 
 
@@ -1776,6 +1850,7 @@ def facts(cohort_: str = "mixed", range_: str = "all") -> tuple[Facts, int, date
     today = datetime.now(UTC).date()
     hit = _facts.get((cohort_, range_))
     if hit and hit[0] == version and hit[1] == today:
+        _facts[(cohort_, range_)] = _facts.pop((cohort_, range_))  # most recently used last
         return hit[2], version, today
     with _lock:
         hit = _facts.get((cohort_, range_))
@@ -1791,7 +1866,10 @@ def facts(cohort_: str = "mixed", range_: str = "all") -> tuple[Facts, int, date
                 "today": today.isoformat(),
             },
         )
+        _facts.pop((cohort_, range_), None)
         _facts[(cohort_, range_)] = (version, today, f)
+        while len(_facts) > FACTS_KEEP:  # the least recently used filter goes first
+            del _facts[next(iter(_facts))]
         return f, version, today
 
 

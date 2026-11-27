@@ -9,14 +9,14 @@ import { exportBlock, KIND_LABEL, packCsv, packHtml, packMarkdown, packName, sta
 import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipeline'
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail } from '../productData'
-import { hintOf, money, segInterval } from '../productModel'
+import { money, segInterval } from '../productModel'
 import { ANCHOR, channelOf, CLAIM_TIERS, DEFAULT_CHANNEL, type ActionTarget } from '../proofAi'
 import { sectionPath, useRetailState } from '../state'
 import type { Actions, BrandFlow, Filters, Insights, ProductDetail as Detail, Seg } from '../types'
 import { useView } from '../useView'
 import { useClaimCounts, useCompetitorNames } from '../orgData'
 import { useOnceFlag } from '../rangeStore'
-import { Badge, Bone, Button, copyText, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, ProofTierChip, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
+import { Badge, Bone, BrandLogo, Button, copyText, downloadCsv, downloadText, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, PageHeader, Panel, pct, ProductCell, pts, ShareBar, SkeletonPanel, Stat, Tabs, ToolButton, useTooltip, weeks } from '../ui'
 import { ClaimStudio } from './ClaimStudio'
 import { FeelAndClicks } from './StoreClicks'
 import { NamesHidden } from './NamesHidden'
@@ -24,6 +24,7 @@ import { RequestEvidence } from './RequestEvidence'
 import { NextSteps } from './NextSteps'
 import { ProductJourney } from './ProductJourney'
 import { InsightsGate, YoursTag } from './shared'
+import { CategoryStrip, ProductVerdict } from './ProductLead'
 
 /*
  * Product proof page (/retail/products/:id) on GET /v1/retailer/products/{id}. Read top to bottom it is the
@@ -157,7 +158,10 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
           title={p.product}
           description={
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-medium text-ink">{p.brand}</span>
+              <span className="inline-flex items-center gap-1.5 font-medium text-ink">
+                <BrandLogo brand={p.brand} size={18} />
+                {p.brand}
+              </span>
               {brandView === p.brand ? <YoursTag /> : null}
               <span aria-hidden className="text-ink-3">
                 ·
@@ -184,18 +188,12 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
             </>
           }
         />
-        <div className="flex flex-wrap items-center gap-3 text-proof-small text-ink-2">
-          <ProofTierChip tier={p.tier} hint={hintOf(p)} />
-          {comp.rank && comp.of >= 3 ? (
-            <span className="tnum">
-              #{comp.rank} of {comp.of} {p.category_label.toLowerCase()} on visible change
-            </span>
-          ) : null}
-          {!x.eligibility.eligible && x.eligibility.reasons[0] ? <span>{x.eligibility.reasons[0]}</span> : null}
-        </div>
       </div>
 
-      {measured ? <Facts x={x} weeksN={weeksN} /> : null}
+      <div className="overflow-hidden rounded-card border border-line bg-surface">
+        <ProductVerdict x={x} weeksN={weeksN} promoteTo={promoteTo} />
+        {measured ? <Facts x={x} weeksN={weeksN} /> : null}
+      </div>
 
       <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-12">
         {measured ? <ProductJourney x={x} weeksN={weeksN} className="lg:col-span-8" /> : (
@@ -244,6 +242,7 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
         </Panel>
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-5">
           <Panel title={`Against other ${p.category_label.toLowerCase()}`} id="comp-h" flush description="Same category, sharing a goal, 10+ people. Ranked by visible change.">
+            <CategoryStrip x={x} />
             <Competitors x={x} brandView={brandView} carry={carry} />
           </Panel>
           <Panel title="In people’s routines" id="ctx-h" description={p.users ? `Among its ${int(p.users)} users. Groups under ${MIN_GROUP} people are left out.` : undefined}>
@@ -280,7 +279,7 @@ function Facts({ x, weeksN }: { x: Detail; weeksN: number }) {
   const liftTip = useTooltip(p.lift_lo !== null && p.lift_hi !== null ? `95% interval ${pts(p.lift_lo)} to ${pts(p.lift_hi)}` : '')
   const rateTip = useTooltip(p.rate_lo !== null && p.rate_hi !== null ? `95% interval ${interval(p.rate_lo, p.rate_hi)}` : '')
   return (
-    <section aria-label="Key facts" className="rounded-card border border-line bg-surface px-5 py-3">
+    <section aria-label="Key facts" className="border-t border-line px-5 py-3">
       <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
         <div className="flex min-w-0 flex-col gap-0.5">
           <dt className="truncate text-proof-small text-ink-2">Visible change</dt>
@@ -295,7 +294,7 @@ function Facts({ x, weeksN }: { x: Detail; weeksN: number }) {
         <Stat label="Time to change" value={weeks(p.weeks)} sub="median, of those who changed" />
         <Stat label={`Still using at week ${weeksN}`} value={pct(p.cont8)} sub={p.n ? `of ${int(p.n)}` : undefined} />
         <Stat label="Share of routines" value={pct(p.routine_share)} sub={`${int(p.users)} users`} />
-        <Stat label="Rank in category" value={x.competitors.rank ? `${x.competitors.rank} of ${x.competitors.of}` : '—'} sub={x.competitors.rank ? 'by visible change' : 'not ranked'} />
+        <Stat label="Rank in category" value={x.competitors.rank && x.competitors.of >= 2 ? `${x.competitors.rank} of ${x.competitors.of}` : '—'} sub={x.competitors.rank && x.competitors.of >= 2 ? 'by visible change' : x.competitors.of === 1 ? 'only one measured' : 'not ranked'} />
         <div className="flex min-w-0 flex-col gap-0.5">
           <dt className="truncate text-proof-small text-ink-2">Same goals, not using it</dt>
           <dd className="m-0 flex flex-col">
@@ -347,7 +346,7 @@ function Competitors({ x, brandView, carry }: { x: Detail; brandView: string | n
   const names = useCompetitorNames()
   const hide = (r: { brand: string; is_self?: boolean }) => names.anonymise && !r.is_self && r.brand !== names.own
   const rows = x.competitors.rows
-  if (!rows.length) return <EmptyState compact title="No benchmark yet" body={`No product in ${x.product.category_label.toLowerCase()} sharing a goal with it has ${MIN_GROUP} or more people at week 8.`} />
+  if (rows.length <= 1) return <EmptyState compact title="No benchmark yet" body={`No other product in ${x.product.category_label.toLowerCase()} sharing a goal with it has ${MIN_GROUP} or more people at week 8.`} />
   const self = rows.findIndex((r) => r.is_self)
   // The top 5, plus this product where it sits when it is lower.
   const shown = rows.map((r, i) => ({ r, i })).filter(({ i }) => i < 5 || i === self)

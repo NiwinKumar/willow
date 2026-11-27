@@ -206,7 +206,7 @@ function Body({ d }: { d: Products }) {
                 id="explore-chart"
                 meta={
                   <span className="text-proof-small text-ink-2 tnum">
-                    {groups.length < total ? `${groups.length} of ${total} ${group.plural}` : `${total} ${total === 1 ? group.label.toLowerCase() : group.plural}`}
+                    {groups.length < total ? `${int(groups.length)} of ${int(total)} ${group.plural}` : `${int(total)} ${total === 1 ? group.label.toLowerCase() : group.plural}`}
                   </span>
                 }
                 description={description}

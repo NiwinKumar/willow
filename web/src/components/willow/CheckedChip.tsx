@@ -51,7 +51,9 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
     const left = Math.max(8, Math.min(r.left, vw - w - 8))
     const h = pop.current?.offsetHeight ?? 220
     const below = r.bottom + 6 + h < vh - 8 || r.top < h + 14
-    setPos(below ? { left, top: r.bottom + 6, width: w } : { left, top: r.top - 6 - h, width: w })
+    // Taller than the room on either side (a short phone screen): clamp inside the viewport, it scrolls inside.
+    const top = below ? Math.min(r.bottom + 6, Math.max(8, vh - 8 - h)) : Math.max(8, r.top - 6 - h)
+    setPos({ left, top, width: w })
   }, [])
 
   useLayoutEffect(() => {
@@ -80,15 +82,19 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
       }
     }
     const close = () => setOpen(false)
+    // The page scrolling closes it; scrolling the panel's own reasons (a long list on a phone) does not.
+    const scrolled = (e: Event) => {
+      if (!pop.current?.contains(e.target as Node)) setOpen(false)
+    }
     document.addEventListener('pointerdown', away)
     document.addEventListener('keydown', key)
     window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
+    window.addEventListener('scroll', scrolled, true)
     return () => {
       document.removeEventListener('pointerdown', away)
       document.removeEventListener('keydown', key)
       window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('scroll', scrolled, true)
     }
   }, [open])
 
@@ -130,7 +136,7 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
         }}
         onPointerEnter={hover(true)}
         onPointerLeave={hover(false)}
-        className={`inline-flex min-h-[24px] shrink-0 items-center gap-1.5 rounded-pill py-[3px] pr-2.5 pl-1 text-[12px] leading-none whitespace-nowrap transition-[transform,box-shadow] duration-200 ease-standard active:scale-[.96] ${open ? 'shadow-[0_0_0_1.5px_currentColor]' : ''} ${className}`}
+        className={`hit44 inline-flex min-h-[24px] shrink-0 items-center gap-1.5 rounded-pill py-[3px] pr-2.5 pl-1 text-[12px] leading-none whitespace-nowrap transition-[transform,box-shadow] duration-200 ease-standard active:scale-[.96] ${open ? 'shadow-[0_0_0_1.5px_currentColor]' : ''} ${className}`}
         style={{ color: look.fg, background: look.bg }}
       >
         <span aria-hidden className="grid size-[17px] place-items-center rounded-full bg-white/70 text-[10.5px] font-semibold">
@@ -149,7 +155,7 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
               onPointerLeave={hover(false)}
               // Clicks inside (a source link) never reach a clickable row or sheet around the chip.
               onClick={(e) => e.stopPropagation()}
-              className="fixed inset-auto z-[80] m-0 block max-h-[min(420px,70vh)] border-0 animate-[wWord_.22s_var(--ease-standard)_both] overflow-y-auto rounded-[20px] bg-surface p-3.5 text-left text-[13px] leading-[1.45] text-ink shadow-[0_24px_60px_-20px_rgba(0,0,0,.45),inset_0_0_0_1px_rgba(18,18,18,.06)]"
+              className="fixed inset-auto z-[80] m-0 block max-h-[min(420px,70dvh)] overscroll-contain border-0 animate-[wWord_.22s_var(--ease-standard)_both] overflow-y-auto rounded-[20px] bg-surface p-3.5 text-left text-[13px] leading-[1.45] text-ink shadow-[0_24px_60px_-20px_rgba(0,0,0,.45),inset_0_0_0_1px_rgba(18,18,18,.06)]"
               style={pos ?? { left: -9999, top: 0, width: POP_W }}
             >
               <p className="m-0 flex items-center gap-2 text-[14px]" style={{ color: look.fg }}>

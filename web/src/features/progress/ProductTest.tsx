@@ -157,7 +157,7 @@ export default function ProductTest() {
           <span className="flex flex-wrap items-center gap-2 pt-1">
             <label className="flex items-center gap-2 text-[13px]">
               Length
-              <select value={test.length_days} disabled={lengthBusy} onChange={(e) => void setLength(Number(e.target.value))} className="min-h-11 rounded-pill bg-white/70 px-3 text-[14px] text-ink">
+              <select value={test.length_days} disabled={lengthBusy} onChange={(e) => void setLength(Number(e.target.value))} className="min-h-11 rounded-pill bg-white/70 px-3 text-[16px] text-ink sm:text-[14px]">
                 {Array.from({ length: (MAX_TEST_DAYS - MIN_TEST_DAYS) / 7 + 1 }, (_, i) => MIN_TEST_DAYS + i * 7).map((d) => (
                   <option key={d} value={d}>
                     {d} days

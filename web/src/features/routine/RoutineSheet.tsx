@@ -1,6 +1,7 @@
 import { ArrowLeft, X } from 'lucide-react'
 import { useEffect, useRef, type PointerEvent, type ReactNode } from 'react'
 
+import { useKeyboardInset } from '../../lib/useKeyboardInset'
 import './routine.css'
 
 /** After a sheet closes: if focus fell to <body>, return it to the opener (when it is still on the page). */
@@ -40,6 +41,8 @@ export function RoutineSheet({ open, onClose, kind, title, onBack, fixedHeight =
     }
   }, [open])
   useEffect(() => () => refocus(opener.current), [])
+  // The search and manual-entry fields raise the phone keyboard: the bottom sheet stays above it.
+  useKeyboardInset(open && kind === 'bottom')
 
   // Drag the handle down to close (the sheet follows the finger; short drags spring back).
   const onDown = (e: PointerEvent<HTMLSpanElement>) => {
@@ -66,8 +69,8 @@ export function RoutineSheet({ open, onClose, kind, title, onBack, fixedHeight =
   const round = 'grid shrink-0 place-items-center rounded-full transition-[background,scale] active:scale-95'
   const shape =
     kind === 'bottom'
-      ? `mx-auto mt-auto mb-0 w-full max-w-[760px] max-h-[92dvh] ${fixedHeight ? 'h-[92dvh]' : ''} overflow-y-auto rounded-t-[44px] bg-surface p-[clamp(20px,3vw,32px)] motion-safe:animate-[rtSheet_.45s_cubic-bezier(.2,.7,.2,1)_both]`
-      : 'my-0 mr-0 ml-auto h-dvh max-h-none w-full max-w-[540px] overflow-y-auto bg-canvas p-[clamp(16px,3vw,24px)] motion-safe:animate-[rtSlide_.4s_cubic-bezier(.2,.7,.2,1)_both]'
+      ? `mx-auto mt-auto mb-0 w-full max-w-[760px] max-h-[calc(var(--vvh,100dvh)*.92)] ${fixedHeight ? 'h-[calc(var(--vvh,100dvh)*.92)]' : ''} overflow-y-auto overscroll-contain rounded-t-[44px] bg-surface p-[clamp(20px,3vw,32px)] pb-[max(clamp(20px,3vw,32px),env(safe-area-inset-bottom))] motion-safe:animate-[rtSheet_.45s_cubic-bezier(.2,.7,.2,1)_both]`
+      : 'my-0 mr-0 ml-auto h-dvh max-h-none w-full max-w-[540px] overflow-y-auto overscroll-contain bg-canvas p-[clamp(16px,3vw,24px)] pb-[max(clamp(16px,3vw,24px),env(safe-area-inset-bottom))] motion-safe:animate-[rtSlide_.4s_cubic-bezier(.2,.7,.2,1)_both]'
   return (
     <dialog
       ref={ref}
@@ -80,6 +83,7 @@ export function RoutineSheet({ open, onClose, kind, title, onBack, fixedHeight =
         if (e.target === ref.current) onClose()
       }}
       className={`border-0 text-ink shadow-modal backdrop:bg-[rgba(18,18,18,.35)] backdrop:backdrop-blur-[8px] ${shape}`}
+      style={kind === 'bottom' ? { bottom: 'var(--kb, 0px)' } : undefined}
     >
       {open && kind === 'bottom' ? (
         <div className="flex flex-col gap-4">

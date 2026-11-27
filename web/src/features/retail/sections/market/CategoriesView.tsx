@@ -228,7 +228,7 @@ function TopProducts({ cat, d, mine }: { cat: Category; d: Insights; mine: strin
         toolbar={
           all.length > rows.length ? (
             <Button kind="ghost" to={allHref}>
-              All {all.length} in Products
+              All {int(all.length)} in Products
               <ArrowRight size={14} strokeWidth={1.6} aria-hidden />
             </Button>
           ) : null

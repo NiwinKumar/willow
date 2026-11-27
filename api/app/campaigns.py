@@ -311,15 +311,24 @@ def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
             for k in totals:
                 totals[k] += int(d.get(k) or 0)
     imp = totals["impressions"]
-    members = store.campaign_members(cid)
+    tally = doc.get("tally") if is_sample(doc) else None
+    if tally:  # a sample campaign (app/dev_seed.py) stores its group counts, not its people
+        reach = int(tally["reach"])
+        inc = incrementality_of(
+            {g: (int(tally[g]["n"]), int(tally[g]["added"])) for g in ("exposed", "holdout")}
+        )
+    else:
+        members = store.campaign_members(cid)
+        reach = sum(1 for m in members if m.get("seen"))
+        inc = incrementality(members)
     return {
-        "reach": sum(1 for m in members if m.get("seen")),
+        "reach": reach,
         "impressions": imp,
         "clicks": totals["clicks"],
         "adds": totals["adds"],
         "ctr": round(totals["clicks"] / imp, 3) if imp else None,
         "daily": daily,
-        "incrementality": incrementality(members),
+        "incrementality": inc,
         "incrementality_note": INCREMENTALITY_NOTE,
     }
 
@@ -334,15 +343,21 @@ def incrementality(members: list[Doc]) -> dict[str, Any] | None:
     more, the count and rate are shown as every retail rate is (a rate of n >= 10). Lift CI: the
     difference of two proportions +- 1.96 * sqrt(p1(1-p1)/n1 + p2(1-p2)/n2), to 2 dp."""
     groups = {g: [m for m in members if m.get("group") == g] for g in ("exposed", "holdout")}
-    if any(len(ms) < MIN_GROUP for ms in groups.values()):
+    return incrementality_of(
+        {g: (len(ms), sum(1 for m in ms if m.get("added"))) for g, ms in groups.items()}
+    )
+
+
+def incrementality_of(counts: dict[str, tuple[int, int]]) -> dict[str, Any] | None:
+    """incrementality() from {group: (people, added)} counts."""
+    if any(n < MIN_GROUP for n, _ in counts.values()):
         return None
     out: dict[str, Any] = {}
     p: dict[str, float] = {}
-    for g, ms in groups.items():
-        added = sum(1 for m in ms if m.get("added"))
-        p[g] = added / len(ms)
-        out[g] = {"n": len(ms), "added": added, "rate": _rate(added, len(ms))}
-    n1, n2 = len(groups["exposed"]), len(groups["holdout"])
+    for g, (n, added) in counts.items():
+        p[g] = added / n
+        out[g] = {"n": n, "added": added, "rate": _rate(added, n)}
+    n1, n2 = counts["exposed"][0], counts["holdout"][0]
     diff = p["exposed"] - p["holdout"]
     half = 1.96 * math.sqrt(
         p["exposed"] * (1 - p["exposed"]) / n1 + p["holdout"] * (1 - p["holdout"]) / n2

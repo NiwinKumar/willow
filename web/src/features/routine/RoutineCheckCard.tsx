@@ -128,16 +128,16 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
               const actions = (
                 <span className={`flex flex-wrap gap-2 ${rows ? 'justify-end @min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto justify-end pt-1'}`}>
                   {f.find ? (
-                    <button type="button" onClick={() => onFind(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink">
+                    <button type="button" onClick={() => onFind(f)} className="hit44 min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink">
                       Find one
                     </button>
                   ) : null}
                   {f.alternate && f.entries.length === 2 ? (
-                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink disabled:opacity-60">
+                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="hit44 min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink disabled:opacity-60">
                       {alternating === f.key ? 'Saving…' : 'Alternate these'}
                     </button>
                   ) : null}
-                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="min-h-8 rounded-pill bg-white/[.16] px-3.5 text-[12.5px] whitespace-nowrap transition-colors hover:bg-white/[.26]">
+                  <button type="button" onClick={() => shell.openAdvisor(f.question, 'Routine check')} className="hit44 min-h-8 rounded-pill bg-white/[.16] px-3.5 text-[12.5px] whitespace-nowrap transition-colors hover:bg-white/[.26]">
                     Ask Wisp why →
                   </button>
                 </span>

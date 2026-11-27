@@ -321,7 +321,7 @@ function CheckinRows() {
               onBlur={() => {
                 if (days.length && /^\d{2}:\d{2}$/.test(time) && time !== saved?.time) void save(days, time, `Check-in time: ${time}`)
               }}
-              className="min-h-10 rounded-pill bg-white px-3.5 text-[15px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]"
+              className="min-h-11 rounded-pill bg-white px-3.5 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)] sm:min-h-10 sm:text-[15px]"
             />
           </label>
         </div>

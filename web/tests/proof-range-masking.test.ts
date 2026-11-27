@@ -73,3 +73,8 @@ test('Home counts a brand’s own products: in the range when it lists them, els
   assert.deepEqual(homeScope(rows, noDerma, null), { rows: [rows[2]], scope: 'range' })
   assert.deepEqual(homeScope(rows, null, null), { rows, scope: 'catalog' })
 })
+
+test('the coverage sentence separates thousands at catalog scale', () => {
+  const c = { measured: 1495, collecting: 0, no_users: 1732, not_measured: 0, unrecognised: 0, total: 3227, matched: 3227 }
+  assert.equal(coverageSentence(c), '3,227 products in range: 1,495 measured, 1,732 with no users yet.')
+})
