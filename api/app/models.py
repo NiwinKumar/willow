@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.changes import Changes
+
 Site = Literal[
     "face_full",
     "cheek_macro",
@@ -85,6 +87,12 @@ class SessionObjectsResponse(BaseModel):
 class PatchSessionRequest(BaseModel):
     note: str | None = Field(default=None, max_length=280)
     deviation: bool | None = None
+    # What else was different since the last check-in (app/changes.py); null clears it.
+    changes: Changes | None = None
+
+
+class ReadChangesRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=280)
 
 
 class SetBaselineRequest(BaseModel):

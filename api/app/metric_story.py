@@ -23,7 +23,7 @@ from typing import Any
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from app import baselines, cohort, explain, gemini, limits, numbers, schedule
+from app import baselines, changes, cohort, explain, gemini, limits, numbers, schedule
 from app.results import measured_result
 from app.store import Store
 
@@ -83,6 +83,11 @@ Rules:
   product started only days ago, say it is too early to tell. Light, distance and angle can also
   move a reading.
 - Never call it a real change unless verdict_vs_baseline is real_change.
+- "this_week" lists what the person said was different since their previous check-in. When
+  present, write one short point with the parts that matter for this measurement, e.g. "This
+  check-in came after a week you noted exam stress and poor sleep", never as the reason for a
+  change. "patterns" are found by code and shown to the person below your points: never repeat
+  them in points or reasons, and never write a pattern of your own.
 - Cosmetic language only; never diagnose. Skin tone (tone_ita) is descriptive: never better or
   worse, never lighter or darker as a goal.
 - British spelling."""
@@ -110,7 +115,9 @@ def _same_way(this_result: dict[str, Any], other_result: dict[str, Any], metric_
     return baselines.with_cheeks(this_result) == baselines.with_cheeks(other_result)
 
 
-def _earlier(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str):
+def _earlier(
+    sessions: list[tuple[str, dict[str, Any]]], sid: str, doc: dict[str, Any], metric_id: str
+):
     """Every earlier measured session of the same site and capture mode with this metric, taken
     the same way: [(session id, doc, its metric)]. One read of the sessions and one parse of each
     result, shared by the previous check-in and the history."""
@@ -119,7 +126,7 @@ def _earlier(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: s
         return []
     this_result = measured_result(doc) or {}
     out = []
-    for other_id, other in store.sessions_list(uid):
+    for other_id, other in sessions:
         if other_id == sid or other.get("site") != doc.get("site"):
             continue
         if other.get("capture_mode") != doc.get("capture_mode"):
@@ -198,7 +205,8 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
     if metric_id in explain.DIRECTION_WORDS:
         # the unwanted side is said gently ("moved the other way"), never "more redness"
         out["when_lower"], out["when_higher"] = explain.gentle_words({"id": metric_id})
-    earlier = _earlier(store, uid, sid, doc, metric_id)
+    sessions = store.sessions_list(uid)  # one read, shared by the history and the patterns
+    earlier = _earlier(sessions, sid, doc, metric_id)
     out["history"] = _history(earlier, m)
     prev = _previous(earlier)
     lo = now_day - timedelta(days=13)
@@ -237,6 +245,13 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
                 }
             )
     out["routine"] = products
+    # what else was different (the person's tags, never their free text: it could hold numbers)
+    noted = changes.view(doc)
+    if noted and noted["words"]:
+        out["this_week"] = noted["words"]
+    found = changes.for_metric(sessions, metric_id) if metric_id != "tone_ita" else []
+    if found:
+        out["patterns"] = [p["text"] for p in found]
     return out
 
 
@@ -418,4 +433,7 @@ def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
             {"name": p["name"], "brand": p["brand"], "use": p["use"]} for p in f["routine"]
         ],
         "has_previous": "previous_day" in f,
+        # what else was different and what it lines up with, for the metric detail's rows
+        "this_week": f.get("this_week") or [],
+        "patterns": f.get("patterns") or [],
     }

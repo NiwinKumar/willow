@@ -9,6 +9,17 @@ Template:
 - Impact on engine / api / web:
 - Approved by: [ ] Harshini [ ] Niwin
 
+## 2026-11-28: What changed since the last check-in, on the session (proposed by Harshini)
+- Why: readings move with more than skincare: a period, stress, poor sleep, travel, sun, diet. Without knowing about those, Willow can credit or blame a routine product for them. Asking once per check-in (not daily) keeps the effort low.
+- Change (Firestore `users/{uid}/sessions/{id}` and `SessionView.session`, api only; the engine and `schemas/` are unchanged):
+  - new optional session field `changes: {tags: [tag], other: string|null (<= 280), nothing: bool, answered_at: timestamp}`, absent until answered. `tags` come from a fixed list of 25 (`api/app/changes.py` `TAGS`: period, stress_work, stress_study, sleep_poor, travel (+ hot / cold / humid), sport_gym, sport_swim, sport_outdoor, sun, diet (+ sugar / dairy / spicy / alcohol / less water), routine_skipped, routine_new, makeup_new, clinic, picked, unwell, new_medicine).
+  - `PATCH /v1/sessions/{id}` accepts `changes` (null clears it). `SessionView.session.changes` returns it with `words` (the tags in plain words).
+  - new `GET /v1/sessions/{id}/changes` (the answer so far, the last check-in's day, routine products started, stopped and ticked in between), `POST /v1/sessions/{id}/changes/read` (free text read into tags by Gemini, else a word list; saves nothing), `GET /v1/patterns` (what lines up with the person's readings, found by code).
+  - `GET /v1/sessions/{id}/story/{metric}` adds `this_week` and `patterns`.
+- Privacy: the answers stay in the person's account. They are not in the BigQuery export (`scripts/export_bq.py` reads metrics only), not in Proof, and are deleted with the account. Free text goes to Gemini only to suggest tags; the app says so.
+- Impact on engine / api / web: engine none; api new module `app/changes.py` (+ `changes_ai.py`); web asks the question as its own step after the photos, shows it on the day's result, in each reading's story and as "What else moves your skin" on Progress.
+- Approved by: [x] Harshini [ ] Niwin
+
 ## 2026-10-13: Aligned preview image in AnalysisResult (proposed by Niwin)
 - Why: browsers cannot render DNG. The Report overlay toggle, the before/after slider and the timeline compare all need a viewable image in the same pixel frame as `overlays[]` and `rois[]`.
 - Change: add optional top-level `preview` to `AnalysisResult`: `{"uri": "gs://.../results/{uid}/{session}/preview.jpg", "width": int, "height": int}`. sRGB JPEG of the aligned reference frame, long edge <= 1600 px; `rois`/`candidates.bbox`/overlay PNGs scale by `preview.width / image_size.width`. Null when no frame passed decoding.

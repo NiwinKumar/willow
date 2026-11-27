@@ -40,6 +40,10 @@ CAPS: dict[str, tuple[int, int]] = {
     "shelf_upload": (20, 2000),  # Shelf vs results stock files (app/shelf.py)
     "sponsored_event": (60, 100000),  # a person counts once a day per campaign and kind
     "product_request": (10, 2000),  # requests for products the catalog lacks (Firestore + photo)
+    "changes_read": (
+        30,
+        3000,
+    ),  # "Anything else?" read into tags (app/changes_ai.py); past it, words
 }
 
 # {n} is the per-person cap in force (an override included).

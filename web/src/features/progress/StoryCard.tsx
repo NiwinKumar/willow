@@ -48,6 +48,18 @@ export function StoryCard({ session, metricId }: { session: Session; metricId: s
               <li key={p}>{p}</li>
             ))}
           </ul>
+          {(story.this_week?.length && story.source === 'facts') || story.patterns?.length ? (
+            <div className="flex flex-col gap-1.5 border-t border-ink/10 pt-3">
+              <span className="text-[13px] text-ink-2">What else was going on · lines up with, never a cause</span>
+              {/* Gemini's points already say what was noted; the facts version leaves it to this row. */}
+              {story.this_week?.length && story.source === 'facts' ? <p className="m-0 text-[15px] leading-[1.5]">Since your last check-in you noted: {story.this_week.join(', ')}.</p> : null}
+              {story.patterns?.map((p) => (
+                <p key={p} className="m-0 text-[15px] leading-[1.5]">
+                  {p}
+                </p>
+              ))}
+            </div>
+          ) : null}
           {story.reasons.length ? (
             <div className="flex flex-col gap-1.5 border-t border-ink/10 pt-3">
               <span className="text-[13px] text-ink-2">Possible reasons · not a diagnosis</span>

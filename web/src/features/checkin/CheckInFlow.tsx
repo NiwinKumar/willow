@@ -20,6 +20,7 @@ import { prefs } from '../../lib/prefs'
 import { parsePlaces, type TrackPlace } from '../../lib/track'
 import { useAuth } from '../../lib/useAuth'
 import { CameraStep } from './CameraStep'
+import { ChangesPanel } from './ChangesPanel'
 import { unlockCues } from './cue'
 import './checkin.css'
 import { addFiles, isDng, recheck, rowsFromShots, usable } from './files'
@@ -141,6 +142,16 @@ export default function CheckInFlow() {
   })
   const activeSession = sessionParam ?? held
   const analysis = useAnalysis(activeSession, { note, deviation })
+  // "What changed since your last check-in?": its own step right after the photos of a face check-in (not sample
+  // photos), asked while they are measured; answered or skipped once per session.
+  const [changesDone, setChangesDone] = useState<string | null>(null)
+  const askOutcome = outcomeOf(analysis.state)
+  const askChanges =
+    !!activeSession &&
+    changesDone !== activeSession &&
+    sampleParam === null &&
+    (analysis.meta?.site ?? siteParam) === 'face_full' &&
+    (askOutcome === 'run' || askOutcome === 'success')
 
   const known = data.mode === 'live' && data.status !== 'loading'
   const sessionsOf = useCallback((s: Site) => data.series(s)?.sessions ?? [], [data])
@@ -352,11 +363,12 @@ export default function CheckInFlow() {
     // ?from=check-in lets Result offer its once-per-face-session "Same time tomorrow?" sheet.
     exitTo(`/result/${v.session.id}?from=check-in`)
   }, [analysis.state, user, exitTo])
+  // Results open on their own once measured, but never while "What changed?" is still being answered.
   useEffect(() => {
-    if (outcome !== 'success' || exiting) return
+    if (outcome !== 'success' || exiting || askChanges) return
     const t = window.setTimeout(handOff, reduce ? 500 : 1900)
     return () => window.clearTimeout(t)
-  }, [outcome, exiting, handOff, reduce])
+  }, [outcome, exiting, handOff, reduce, askChanges])
 
   const clearShots = () => {
     setShots([])
@@ -503,6 +515,7 @@ export default function CheckInFlow() {
         onSeeResult={handOff}
         onClose={close}
         onFaceCheckIn={() => newAttempt({ site: 'face_full', mode: 'uncalibrated', n: known ? String(neededFor(sessionsOf('face_full'), 'uncalibrated')) : null, step: 'camera' })}
+        changes={askChanges && activeSession ? <ChangesPanel key={activeSession} sessionId={activeSession} onDone={() => setChangesDone(activeSession)} onSkip={() => setChangesDone(activeSession)} /> : undefined}
       />
     )
   else if (step === 'site')

@@ -1,3 +1,4 @@
+import type { CheckInChanges } from '../lib/api'
 import type { LabelDetail } from '../lib/spotLabels'
 
 /** Types mirroring docs/CONTRACT.md. Keep field names identical to the JSON. */
@@ -126,6 +127,8 @@ export type Session = {
   preview?: Preview | null
   note?: string
   deviation?: boolean
+  /** What else was different since the last check-in (live sessions; null when not answered). */
+  changes?: CheckInChanges | null
   /** Hours since the baseline session; used for the scrubber labels on short series. */
   hours_since_baseline?: number
   /** Live sessions only: where the explanation came from, and why a failed session failed. */

@@ -16,6 +16,7 @@ import { fmtDate, parseDate, plural } from '../../lib/format'
 import { prefs } from '../../lib/prefs'
 import { CLOSE_UPS, METRIC_META, SITE_LABEL, byGoalOrder, unitOf } from '../../lib/metrics'
 import { DayDetail } from './DayDetail'
+import { PatternsCard } from './PatternsCard'
 import { routineMarkers } from './markers'
 import { DAY_BG, DAY_RANK, DAY_WORDS, bandText, chartable, currentBaseline, dayOf, dayStatus, usedFrames, type DayStatus } from './model'
 import { MetricSwitcher, Page } from './parts'
@@ -250,6 +251,7 @@ export default function Progress() {
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-4">
           <BaselinesCard places={places} onCheckIn={() => shell.openCheckIn()} />
           <NotesCard notes={notes} />
+          <PatternsCard />
         </div>
         <Disclaimer />
       </div>

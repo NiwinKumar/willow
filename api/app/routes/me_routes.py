@@ -7,7 +7,7 @@ from zoneinfo import available_timezones
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import baselines, campaigns, storage, tracks, views
+from app import baselines, campaigns, changes, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
@@ -56,6 +56,16 @@ def timeline(
         },
         "metrics": series,
     }
+
+
+@router.get("/patterns")
+def patterns(
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """What else moves this person's skin: each kind of change they noted at check-ins against
+    their readings, found by code against their own normal range (app/changes.py)."""
+    return changes.find(store, user.uid)
 
 
 @router.get("/spots")

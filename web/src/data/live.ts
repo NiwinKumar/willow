@@ -26,6 +26,7 @@ export function toSession(v: SessionView): Session {
       : null,
     note: v.session.note ?? undefined,
     deviation: v.session.deviation,
+    changes: v.session.changes ?? null,
     // Under an hour reads as "+0 h"; those ticks are labelled by time of day instead.
     hours_since_baseline: h !== null && h <= HOURS_LABEL_LIMIT && (h >= 1 || v.session.is_baseline) ? h : undefined,
     explanation_source: v.session.explanation_source,

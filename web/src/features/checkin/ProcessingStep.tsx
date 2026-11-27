@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useReducedMotion } from 'motion/react'
 
 import type { Quality, QualityRegion, Site } from '../../data/types'
@@ -129,6 +129,8 @@ export function ProcessingStep(props: {
   onSeeResult: () => void
   onClose: () => void
   onFaceCheckIn: () => void
+  /** "What changed since your last check-in?" (ChangesPanel): shown in place of the stages while it is asked. */
+  changes?: ReactNode
 }) {
   const { state, site, n, received, sample } = props
   const reduce = useReducedMotion()
@@ -248,6 +250,21 @@ export function ProcessingStep(props: {
         ? 'The connection dropped while waiting for the result. Nothing was lost: Willow keeps measuring, and this page picks it up when you’re back online.'
         : ''
   const slow = state.kind === 'running' && elapsed > 45
+
+  // While "What changed?" is asked, the measuring shows as one quiet line above it, so the question is the screen.
+  if (props.changes)
+    return (
+      <div className="relative mx-auto flex max-w-[640px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-[clamp(8px,2vw,24px)] pb-20">
+        <div aria-live="polite" className="flex items-center gap-3 rounded-pill bg-surface/80 px-4 py-2.5 backdrop-blur-[14px]">
+          <span aria-hidden className={`size-2.5 shrink-0 rounded-full ${outcome === 'run' ? 'animate-pulse bg-[var(--aura-lilac)]' : 'bg-[var(--text-primary)]'}`} />
+          <span className="min-w-0 flex-1 text-[14px]">{outcome === 'run' ? `${title} · keeps going while you answer` : title}</span>
+          <span className="font-dot text-[16px] tnum" aria-hidden>
+            {mmss(elapsed)}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-[36px] bg-surface/90 p-[clamp(20px,3vw,30px)] shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)] backdrop-blur-[20px] squircle">{props.changes}</div>
+      </div>
+    )
 
   return (
     <div className="relative mx-auto grid min-h-[80%] max-w-[1040px] grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-center gap-6 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
