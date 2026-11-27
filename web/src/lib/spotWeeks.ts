@@ -81,3 +81,64 @@ export function areaCounts(w: SpotWeek, area: string): { blemishes: number | nul
   const z = w.by_zone[area]
   return { blemishes: z?.blemishes ?? null, darkSpots: w.complete ? (z?.dark_spots ?? 0) : null }
 }
+
+/** How a place in an area is found again on another week: from the area's steadiest edge, in units of its width.
+ * The forehead from the brow line (its top is the hairline, which moves with hair and framing), the chin and around
+ * the mouth from the lip, the rest from their middle. */
+export type AreaFrame = { x: number; y: number; s: number }
+const ANCHOR: Record<string, 'top' | 'bottom' | 'middle'> = { forehead: 'bottom', chin: 'top', around_mouth: 'top' }
+
+export function areaFrame(view: SpotWeekView, area: string): AreaFrame | null {
+  const roi = view.rois.find((r) => r.name === area)
+  if (!roi || roi.polygon.length < 3) return null
+  const xs = roi.polygon.map((p) => p[0])
+  const ys = roi.polygon.map((p) => p[1])
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  const at = ANCHOR[area] ?? 'middle'
+  return { x: (x0 + x1) / 2, y: at === 'bottom' ? y1 : at === 'top' ? y0 : (y0 + y1) / 2, s: x1 - x0 }
+}
+
+/** A place in an area, in its frame (across and down from the anchor, in area widths). */
+export type AreaPoint = { u: number; v: number }
+
+export function toAreaPoint(f: AreaFrame, x: number, y: number): AreaPoint {
+  return { u: (x - f.x) / f.s, v: (y - f.y) / f.s }
+}
+
+export function fromAreaPoint(f: AreaFrame, p: AreaPoint): { x: number; y: number } {
+  return { x: f.x + p.u * f.s, y: f.y + p.v * f.s }
+}
+
+/** Size of a spot close-up, and how near a counted mark must be to be "here", in area widths. */
+export const SPOT_CLOSE_UP = 0.3
+export const SPOT_NEAR = 0.06
+
+/** The close-up square around one place of an area, kept inside the photo. */
+export function spotBox(view: SpotWeekView, f: AreaFrame, p: AreaPoint): Box {
+  const { x, y } = fromAreaPoint(f, p)
+  const s = f.s * SPOT_CLOSE_UP
+  const W = view.photo.width ?? Infinity
+  const H = view.photo.height ?? Infinity
+  return { x: Math.min(Math.max(x - s / 2, 0), W - s), y: Math.min(Math.max(y - s / 2, 0), H - s), w: s, h: s }
+}
+
+/** The counted mark at a place of an area that week (the nearest within SPOT_NEAR), or null. */
+export function markAt(view: SpotWeekView, f: AreaFrame, p: AreaPoint): SpotWeekView['marks'][number] | null {
+  const { x, y } = fromAreaPoint(f, p)
+  let best: SpotWeekView['marks'][number] | null = null
+  let bestD = Infinity
+  for (const m of view.marks) {
+    const d = Math.hypot(m.x - x, m.y - y)
+    if (d <= f.s * SPOT_NEAR + m.r && d < bestD) {
+      best = m
+      bestD = d
+    }
+  }
+  return best
+}
+
+/** Where to start following: the biggest mark in the area that week, else the area's anchor. */
+export function startPoint(view: SpotWeekView, area: string, f: AreaFrame): AreaPoint {
+  const big = view.marks.filter((m) => m.zone === area).sort((a, b) => b.r - a.r)[0]
+  return big ? toAreaPoint(f, big.x, big.y) : { u: 0, v: 0 }
+}

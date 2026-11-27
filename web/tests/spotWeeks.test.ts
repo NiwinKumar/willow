@@ -65,3 +65,27 @@ test('count words', () => {
   assert.equal(countLine(1, 0), '1 blemish · 0 dark spots')
   assert.equal(countLine(53, null), '53 blemishes')
 })
+
+test('a place is found again from the area\'s steadiest edge, and the mark there with it', async () => {
+  const { areaFrame, toAreaPoint, fromAreaPoint, markAt, spotBox, startPoint } = await import('../src/lib/spotWeeks.ts')
+  // the forehead's top (hairline) moves between weeks; its bottom (the brows) and width stay
+  const wk1 = view('front', [{ name: 'forehead', polygon: [[100, 300], [500, 300], [500, 500], [100, 500]] }])
+  const wk2 = view('front', [{ name: 'forehead', polygon: [[120, 150], [520, 150], [520, 520], [120, 520]] }])
+  const f1 = areaFrame(wk1, 'forehead')!
+  const f2 = areaFrame(wk2, 'forehead')!
+  assert.deepEqual(f1, { x: 300, y: 500, s: 400 })
+  const p = toAreaPoint(f1, 260, 440) // 60 px above the brows
+  assert.deepEqual(fromAreaPoint(f2, p), { x: 280, y: 460 }) // still 60 px above them
+  wk2.marks = [
+    { kind: 'blemish', x: 284, y: 455, r: 6, zone: 'forehead' },
+    { kind: 'spot', x: 450, y: 300, r: 10, zone: 'forehead' },
+  ]
+  assert.equal(markAt(wk2, f2, p)?.kind, 'blemish')
+  assert.equal(markAt(wk2, f2, { u: -0.4, v: -0.1 }), null)
+  const s = spotBox(wk2, f2, p)
+  assert.ok(s.x <= 280 && s.x + s.w >= 280 && s.y <= 460 && s.y + s.h >= 460)
+  assert.deepEqual(startPoint(wk2, 'forehead', f2), toAreaPoint(f2, 450, 300)) // the biggest mark
+  // the chin is found from the lip (its top), the nose from its middle
+  const chin = view('front', [{ name: 'chin', polygon: [[0, 700], [200, 700], [200, 900], [0, 900]] }])
+  assert.deepEqual(areaFrame(chin, 'chin'), { x: 100, y: 700, s: 200 })
+})

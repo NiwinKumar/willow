@@ -7,7 +7,7 @@ import { useOwner, useSpotWeeks } from '../../data/hooks'
 import type { ViewName } from '../../data/types'
 import type { SpotWeek, SpotWeekView } from '../../lib/api'
 import { MOLE_NOTE } from '../../lib/spotLabels'
-import { AREA_LABEL, VIEW_LABEL, areaBox, areaCounts, areasOf, countLine, dayLabel, shownWeeks, viewOf, viewWithArea, viewsOf, type Box } from '../../lib/spotWeeks'
+import { AREA_LABEL, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areasOf, countLine, dayLabel, fromAreaPoint, markAt, shownWeeks, spotBox, startPoint, toAreaPoint, viewOf, viewWithArea, viewsOf, type AreaPoint, type Box } from '../../lib/spotWeeks'
 import { Crumb, Page, StatusCard } from './parts'
 
 const RING = { blemish: 'var(--willow-400)', spot: 'var(--aura-apricot)' } as const
@@ -24,10 +24,10 @@ export default function SpotsPage() {
   const q = useSpotWeeks()
   const weeks = useMemo(() => q.data?.weeks ?? [], [q.data])
   const [picked, setPicked] = useState<string[]>([])
-  const [comparing, setComparing] = useState(false)
+  const [comparing, setComparing] = useState(true) // opens on the last two check-ins side by side
   const [all, setAll] = useState(false)
   const [view, setView] = useState<ViewName>('front')
-  const [area, setArea] = useState<string | null>(null)
+  const [area, setArea] = useState<string | null | undefined>(undefined) // undefined: the forehead, until picked
 
   const crumb = <Crumb to="/progress" back="Progress" here="Spot diary" />
   if (!owner)
@@ -63,16 +63,18 @@ export default function SpotsPage() {
 
   // the latest check-in unless the person picked; with compare on, two weeks side by side (older first)
   const ids = weeks.map((w) => w.id)
-  const chosen = (picked.length ? picked : [ids[ids.length - 1]]).filter((id) => ids.includes(id))
+  const latest = comparing ? ids.slice(-2) : ids.slice(-1)
+  const chosen = (picked.length ? picked : latest).filter((id) => ids.includes(id))
   const selected = weeks.filter((w) => chosen.includes(w.id)).slice(0, comparing ? 2 : 1)
   const views = viewsOf(selected[selected.length - 1])
   const v = views.includes(view) ? view : (views[0] ?? 'front')
   const areas = areasOf(viewOf(selected[selected.length - 1], v))
+  const shownArea = area === undefined ? (areas.includes('forehead') ? 'forehead' : (areas[0] ?? null)) : area
 
   const pick = (id: string) => {
     if (!comparing) return setPicked([id])
     setPicked((cur) => {
-      const base = cur.length ? cur : [ids[ids.length - 1]]
+      const base = cur.length ? cur : latest
       if (base.includes(id)) return base.length > 1 ? base.filter((x) => x !== id) : base
       const next = [...base.slice(-1), id]
       return next.sort((a, b) => ids.indexOf(a) - ids.indexOf(b))
@@ -85,22 +87,22 @@ export default function SpotsPage() {
       {crumb}
       <div className="flex flex-col gap-1.5">
         <h1 className="m-0 font-serif text-[clamp(30px,3.4vw,44px)] leading-[1] font-normal tracking-[-0.01em]">Your spots, week by week</h1>
-        <p className="m-0 max-w-[640px] text-[15px] leading-[1.45] text-ink-2">Pick a check-in to see every blemish and dark spot on its photos, or two to compare them. Tap an area to follow it across your weeks.</p>
+        <p className="m-0 max-w-[640px] text-[15px] leading-[1.45] text-ink-2">Every blemish and dark spot Willow counted, ringed on your photos.</p>
       </div>
 
       <section aria-label="Check-ins" className="flex flex-col gap-3 rounded-[32px] bg-surface/80 p-[clamp(16px,2.4vw,24px)] squircle">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[13px] text-ink-2">{comparing ? 'Pick two check-ins to compare' : 'Pick a check-in'}</span>
+          <span className="text-[14px]">{comparing ? (picked.length ? 'Comparing two check-ins.' : 'Your last two check-ins, side by side.') : 'One check-in.'} <span className="text-ink-2">{comparing ? 'Tap any two dates to compare them.' : 'Tap a date to see it.'}</span></span>
           <button
             type="button"
             aria-pressed={comparing}
             onClick={() => {
               setComparing((c) => !c)
-              setPicked(selected.slice(-1).map((w) => w.id))
+              setPicked(comparing ? selected.slice(-1).map((w) => w.id) : [])
             }}
             className={`min-h-10 rounded-pill px-4 text-[13.5px] ${comparing ? 'bg-selected text-inverse' : 'bg-white shadow-[inset_0_0_0_1px_var(--line-subtle)]'}`}
           >
-            {comparing ? 'Comparing · done' : 'Compare two weeks'}
+            {comparing ? 'Show one check-in' : 'Compare two check-ins'}
           </button>
         </div>
         <div role="group" aria-label="Check-in dates" className="flex flex-wrap gap-2">
@@ -140,7 +142,7 @@ export default function SpotsPage() {
 
       <div className={`grid w-full gap-4 ${selected.length > 1 ? 'max-w-[980px] grid-cols-2' : 'max-w-[520px] grid-cols-1'}`}>
         {selected.map((w) => (
-          <WeekPhoto key={w.id} week={w} view={viewOf(w, v)} viewName={v} area={area} compact={selected.length > 1} />
+          <WeekPhoto key={w.id} week={w} view={viewOf(w, v)} viewName={v} area={shownArea} compact={selected.length > 1} />
         ))}
       </div>
       {selected.length > 1 ? <CompareLine a={selected[0]} b={selected[1]} view={v} /> : null}
@@ -150,14 +152,14 @@ export default function SpotsPage() {
           <span className="text-[13px] text-ink-2">Follow an area across your check-ins</span>
           <div className="flex flex-wrap gap-2">
             {areas.map((a) => (
-              <button key={a} type="button" aria-pressed={area === a} onClick={() => setArea((cur) => (cur === a ? null : a))} className={`min-h-10 rounded-pill px-3.5 text-[13.5px] ${area === a ? 'bg-selected text-inverse' : 'bg-white/80 shadow-[inset_0_0_0_1px_var(--line-subtle)]'}`}>
+              <button key={a} type="button" aria-pressed={shownArea === a} onClick={() => setArea(shownArea === a ? null : a)} className={`min-h-10 rounded-pill px-3.5 text-[13.5px] ${shownArea === a ? 'bg-selected text-inverse' : 'bg-white/80 shadow-[inset_0_0_0_1px_var(--line-subtle)]'}`}>
                 {AREA_LABEL[a]}
               </button>
             ))}
           </div>
         </section>
       ) : null}
-      {area ? <AreaTimeline weeks={weeks} area={area} prefer={v} current={selected[selected.length - 1]?.id} /> : null}
+      {shownArea ? <AreaTimeline key={shownArea} weeks={weeks} area={shownArea} prefer={v} current={selected[selected.length - 1]?.id} /> : null}
 
       <p className="max-w-[640px] text-[13px] leading-normal text-ink-2">
         Rings show what the engine counted: <span style={{ color: RING.blemish }}>●</span> blemishes, <span style={{ color: RING.spot }}>●</span> dark spots. Moles are never ringed or counted here. {MOLE_NOTE}
@@ -204,21 +206,36 @@ function CompareLine({ a, b, view }: { a: SpotWeek; b: SpotWeek; view: ViewName 
   )
 }
 
-/** A photo (or the `box` part of it) with its marks ringed, in photo pixels; an area's outline when given. */
-function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]' }: { view: SpotWeekView; area?: string | null; box?: Box | null; label: string; rounded?: string }) {
+/** A photo (or the `box` part of it) with its marks ringed, in photo pixels; an area's outline when given. `target`:
+ * a place to circle (the spot being followed); `onPick`: tap anywhere to pick a place (photo pixels). */
+function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]', target, onPick, dim }: { view: SpotWeekView; area?: string | null; box?: Box | null; label: string; rounded?: string; target?: { x: number; y: number; r: number } | null; onPick?: (x: number, y: number) => void; dim?: boolean }) {
   const W = view.photo.width ?? 1
   const H = view.photo.height ?? 1
   const b = box ?? { x: 0, y: 0, w: W, h: H }
   const roi = area ? view.rois.find((r) => r.name === area) : null
   const unit = Math.max(b.w, b.h) / 300 // stroke widths that read the same on a whole photo and a crop
+  const pick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!onPick) return
+    const svg = e.currentTarget
+    const m = svg.getScreenCTM()
+    if (!m) return
+    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse())
+    onPick(pt.x, pt.y)
+  }
   return (
     <div className={`relative overflow-hidden bg-sunken squircle ${rounded} ${box ? 'aspect-square' : 'aspect-[4/5]'}`}>
-      <svg viewBox={`${b.x} ${b.y} ${b.w} ${b.h}`} preserveAspectRatio="xMidYMid slice" role="img" aria-label={label} className="absolute inset-0 size-full">
+      <svg viewBox={`${b.x} ${b.y} ${b.w} ${b.h}`} preserveAspectRatio="xMidYMid slice" role="img" aria-label={label} onClick={pick} className={`absolute inset-0 size-full ${onPick ? 'cursor-crosshair' : ''}`}>
         <image href={view.photo.url} width={W} height={H} preserveAspectRatio="xMidYMid slice" />
         {roi ? <polygon points={roi.polygon.map((p) => p.join(',')).join(' ')} fill="none" stroke="#fff" strokeWidth={unit * 1.4} strokeLinejoin="round" opacity={0.9} /> : null}
         {view.marks.map((m, i) => (
-          <circle key={i} cx={m.x} cy={m.y} r={Math.max(m.r * 1.6, unit * 3)} fill="none" stroke={RING[m.kind]} strokeWidth={unit * 1.1} />
+          <circle key={i} cx={m.x} cy={m.y} r={Math.max(m.r * 1.6, unit * 3)} fill="none" stroke={RING[m.kind]} strokeWidth={unit * 1.1} opacity={dim ? 0.55 : 1} />
         ))}
+        {target ? (
+          <g>
+            <circle cx={target.x} cy={target.y} r={target.r} fill="none" stroke="#fff" strokeWidth={unit * 2.6} />
+            <circle cx={target.x} cy={target.y} r={target.r} fill="none" stroke="var(--text-primary)" strokeWidth={unit * 1.2} strokeDasharray={`${unit * 3} ${unit * 2}`} />
+          </g>
+        ) : null}
       </svg>
     </div>
   )
@@ -226,28 +243,43 @@ function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]' }: { v
 
 /**
  * One area across the check-ins: the same patch of skin from each week's photo (the area's outline follows the face,
- * so the crop does too), large for the week on the slider and as a strip below, with that area's counts from Progress.
+ * so the crop does too), large for the week on the slider and as a strip, with that area's counts from Progress.
+ * Tap a spot to follow that place: a close-up of it from every check-in, and whether a mark was counted there, so a
+ * spot that is fading, staying, or keeps coming back in the same place shows week by week. A place is followed by
+ * where it sits in the area (its share across and down), not by matching marks, so nothing is claimed to be "the
+ * same spot": the close-ups show it.
  */
 function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; area: string; prefer: ViewName; current: string | undefined }) {
   const rows = weeks
     .map((w) => {
       const view = viewWithArea(w, area, prefer)
-      return view ? { w, view, box: areaBox(view, area)!, counts: areaCounts(w, area) } : null
+      const frame = view && areaFrame(view, area)
+      return view && frame ? { w, view, box: areaBox(view, area)!, frame, counts: areaCounts(w, area) } : null
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
   const start = Math.max(0, rows.findIndex((r) => r.w.id === current))
   const [at, setAt] = useState<number | null>(null)
-  const i = Math.min(at ?? start, rows.length - 1)
+  const [point, setPoint] = useState<AreaPoint | null>(null)
+  const i = Math.min(at ?? start, Math.max(rows.length - 1, 0))
   if (!rows.length) return null
   const row = rows[i]
+  // the place followed: the person's pick, else the biggest mark in the area on the latest check-in shown
+  const latest = rows[Math.min(start, rows.length - 1)]
+  const p = point ?? startPoint(latest.view, area, latest.frame)
+  const near = (r: (typeof rows)[number]) => markAt(r.view, r.frame, p)
+  const ring = (r: (typeof rows)[number]) => ({ ...fromAreaPoint(r.frame, p), r: r.frame.s * SPOT_NEAR * 1.4 })
+  const marked = rows.filter((r) => near(r)).length
   return (
-    <section aria-label={`${AREA_LABEL[area]} across your check-ins`} className="flex flex-col gap-3 rounded-[32px] bg-surface/80 p-[clamp(16px,2.4vw,24px)] squircle">
+    <section aria-label={`${AREA_LABEL[area]} across your check-ins`} className="flex flex-col gap-4 rounded-[32px] bg-surface/80 p-[clamp(16px,2.4vw,24px)] squircle">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="m-0 text-[20px] font-normal">{AREA_LABEL[area]} across your check-ins</h2>
         <span className="text-[13px] text-ink-2">Counts for this area, as in Progress</span>
       </div>
       <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <MarkedPhoto view={row.view} area={area} box={row.box} label={`${AREA_LABEL[area]}, ${dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })}`} rounded="rounded-[24px]" />
+        <div className="flex flex-col gap-1.5">
+          <MarkedPhoto view={row.view} area={area} box={row.box} label={`${AREA_LABEL[area]}, ${dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })}. Tap a spot to follow it.`} rounded="rounded-[24px]" target={ring(row)} onPick={(x, y) => setPoint(toAreaPoint(row.frame, x, y))} dim />
+          <span className="text-[12.5px] text-ink-2">Tap any spot on this photo to follow it across your check-ins.</span>
+        </div>
         <div className="flex flex-col gap-3">
           <span className="text-[22px]">{dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })}</span>
           <span className="text-[16px]">{countLine(row.counts.blemishes, row.counts.darkSpots) || 'Not counted this week'}</span>
@@ -261,7 +293,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
           </span>
         </div>
       </div>
-      <ol aria-label="Every check-in" className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
+      <ol aria-label="The area at every check-in" className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
         {rows.map((r, k) => (
           <li key={r.w.id} className="w-[92px] shrink-0">
             <button type="button" onClick={() => setAt(k)} aria-pressed={k === i} className={`flex w-full flex-col gap-1 rounded-[18px] p-1 text-left ${k === i ? 'bg-selected text-inverse' : ''}`}>
@@ -272,6 +304,31 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
           </li>
         ))}
       </ol>
+
+      <div className="flex flex-col gap-2 border-t border-ink/10 pt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="m-0 text-[17px] font-normal">This spot, week by week</h3>
+          <span className="text-[13px] text-ink-2">A mark was counted here at {marked} of {rows.length} check-ins</span>
+        </div>
+        <ol aria-label="The spot at every check-in" className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
+          {rows.map((r, k) => {
+            const m = near(r)
+            return (
+              <li key={r.w.id} className="w-[104px] shrink-0">
+                <button type="button" onClick={() => setAt(k)} className="flex w-full flex-col gap-1 rounded-[16px] p-1 text-left">
+                  <MarkedPhoto view={r.view} box={spotBox(r.view, r.frame, p)} label={`The spot on ${dayLabel(r.w.created_at)}: ${m ? (m.kind === 'spot' ? 'a dark spot counted' : 'a blemish counted') : 'nothing counted'}`} rounded="rounded-[14px]" target={ring(r)} />
+                  <span className="px-1 text-[12px] leading-tight">{dayLabel(r.w.created_at)}</span>
+                  <span className="flex items-center gap-1 px-1 text-[11px] leading-tight text-ink-2">
+                    <span aria-hidden style={{ color: m ? RING[m.kind] : 'var(--line-strong, #bbb)' }}>{m ? '●' : '○'}</span>
+                    {m ? (m.kind === 'spot' ? 'Dark spot' : 'Blemish') : 'Nothing counted'}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+        <p className="m-0 text-[12.5px] leading-snug text-ink-2">The same place on your face each week, found from the area's outline. Whether it is the very same spot, the close-ups show; Willow does not decide that.</p>
+      </div>
     </section>
   )
 }
