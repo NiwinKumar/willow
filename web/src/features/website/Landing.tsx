@@ -262,7 +262,7 @@ function Footer() {
       <LiveStatus className="mt-12" />
       <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-line pt-5 text-[13px] text-ink-2">
         <span>© 2026 Willow · Cosmetic appearance tracking, not a medical device</span>
-        <span>Built on Firebase, Cloud Run, Firestore, BigQuery and Gemini on Vertex AI</span>
+        <span>Built on Firebase, Cloud Run, Firestore, BigQuery and Gemini on Google Cloud</span>
         <span>Compared with your own baseline, on any skin tone</span>
       </div>
       <div aria-hidden className="w-wordmark relative mx-[-1vw] mt-[clamp(12px,2vw,28px)] select-none pb-[.06em] text-center text-[clamp(120px,29vw,560px)] font-light leading-[.78] tracking-[-0.065em]">

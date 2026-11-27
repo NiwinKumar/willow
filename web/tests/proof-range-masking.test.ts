@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { brandAlias, brandOrder, buildMask, letters, maskText, namedOthers } from '../src/features/retail/masking.ts'
-import { coverage, coverageSentence, ItemFileError, matchRows, parseCsv, readItemFile, statusOf, stockCsv } from '../src/features/retail/range.ts'
+import { coverage, coverageSentence, homeScope, ItemFileError, matchRows, parseCsv, readItemFile, statusOf, stockCsv } from '../src/features/retail/range.ts'
 import type { ProductRow } from '../src/features/retail/types.ts'
 
 const p = (product_id: string, brand: string, product: string, over: Partial<ProductRow> = {}) => ({ product_id, brand, product, rate: 0.5, reason: undefined, users: 40, ...over }) as ProductRow
@@ -62,4 +62,14 @@ test('exports mask other brands and their products, never the viewer’s own nam
   assert.equal(maskText('Plum toner keeps skin Plumper', plum), 'Brand B toner keeps skin Plumper')
   // the retailer (names on): no mask
   assert.equal(maskText(csv, null), csv)
+})
+
+test('Home counts a brand’s own products: in the range when it lists them, else in the catalog (as its cards)', () => {
+  const rows = [p('a1', 'Derma Co', 'Sunscreen'), p('a2', 'Derma Co', 'Serum'), p('b1', 'Plum', 'Gel')]
+  const noDerma = new Set(['b1'])
+  assert.deepEqual(homeScope(rows, noDerma, 'Derma Co'), { rows: rows.slice(0, 2), scope: 'brand_catalog' })
+  assert.deepEqual(homeScope(rows, null, 'Derma Co').scope, 'brand_catalog')
+  assert.deepEqual(homeScope(rows, new Set(['a1', 'b1']), 'Derma Co'), { rows: [rows[0]], scope: 'brand_range' })
+  assert.deepEqual(homeScope(rows, noDerma, null), { rows: [rows[2]], scope: 'range' })
+  assert.deepEqual(homeScope(rows, null, null), { rows, scope: 'catalog' })
 })

@@ -10,8 +10,17 @@ from fastapi.testclient import TestClient
 from app import catalog, similar
 
 
-def _p(pid: str, category: str) -> dict:
-    return {"product_id": pid, "category": category, "brand": "B", "name": pid}
+def _p(pid: str, category: str, region: str = "GLOBAL") -> dict:
+    return {
+        "product_id": pid,
+        "category": category,
+        "brand": "B",
+        "name": pid,
+        "region": [region],
+        "stores": [],
+        "inci": [],
+        "key_actives": [],
+    }
 
 
 def _unit(*xs: float) -> list[float]:
@@ -21,7 +30,7 @@ def _unit(*xs: float) -> list[float]:
 
 PRODUCTS = (
     _p("serum_a", "serum"),
-    _p("serum_b", "serum"),
+    _p("serum_b", "serum", "IN"),  # sold in India only
     _p("toner_c", "toner"),
     _p("patch_d", "treatment"),
     _p("new_e", "serum"),  # added after the seed was built: no vector
@@ -55,6 +64,15 @@ def test_unlike_formulas_unknown_and_unembedded_products_get_nothing(tiny):
     assert len(similar.similar_products("serum_a", 1)) == 1
 
 
+def test_a_market_keeps_only_products_sold_there_or_everywhere(tiny):
+    def ids(market):
+        return [g["product"]["product_id"] for g in similar.similar_products("serum_a", 5, market)]
+
+    assert ids(None) == ["serum_b", "toner_c"]
+    assert ids("IN") == ["serum_b", "toner_c"]
+    assert ids("US") == ["toner_c"]  # serum_b is sold in India only; toner_c is GLOBAL
+
+
 def test_route_answers_items_and_404s_an_unknown_product(tiny):
     app = FastAPI()
     app.include_router(similar.router)
@@ -62,6 +80,8 @@ def test_route_answers_items_and_404s_an_unknown_product(tiny):
     res = c.get("/v1/catalog/serum_a/similar?k=1", headers={"X-Dev-Uid": "u1"})
     assert res.status_code == 200, res.text
     assert [i["product"]["product_id"] for i in res.json()["items"]] == ["serum_b"]
+    res = c.get("/v1/catalog/serum_a/similar?market=US", headers={"X-Dev-Uid": "u1"})
+    assert [i["product"]["product_id"] for i in res.json()["items"]] == ["toner_c"]
     assert c.get("/v1/catalog/no_such/similar", headers={"X-Dev-Uid": "u1"}).status_code == 404
 
 

@@ -100,7 +100,7 @@ export function notEligibleOrder(a: PromoEligibility, b: PromoEligibility): numb
 }
 
 /** A promote/resume failure in words, with the api's reasons when it sent them. */
-export type PromoError = { kind: 'not_eligible' | 'too_many' | 'ended' | 'unavailable' | 'auth' | 'rate' | 'other'; title: string; message: string; reasons: string[] }
+export type PromoError = { kind: 'not_eligible' | 'too_many' | 'already_running' | 'ended' | 'unavailable' | 'auth' | 'rate' | 'other'; title: string; message: string; reasons: string[] }
 export function promoError(e: unknown): PromoError {
   const err = e as { status?: number; code?: string | null; message?: string; detail?: Record<string, unknown> | null } | null
   const status = err?.status
@@ -108,6 +108,7 @@ export function promoError(e: unknown): PromoError {
   if (status === 422 && err?.code === 'not_eligible') return { kind: 'not_eligible', title: 'This campaign can’t run with these settings', message: err.message || 'The evidence does not cover it.', reasons }
   if (status === 429 && err?.code === 'too_many_active') return { kind: 'too_many', title: `${MAX_ACTIVE} campaigns are already running`, message: 'Pause or delete one of your running campaigns, then try again.', reasons }
   if (status === 429) return { kind: 'rate', title: 'Daily limit reached', message: err?.message || 'Too many changes today. Try again tomorrow.', reasons }
+  if (status === 409 && err?.code === 'already_running') return { kind: 'already_running', title: 'This product already has a running campaign', message: 'End it or wait for its result; two at once would share shoppers, so neither result would be clean.', reasons }
   if (status === 409) return { kind: 'ended', title: 'This campaign has ended', message: 'An ended campaign can’t be resumed. Create a new one for the same product.', reasons }
   if (status === 503) return { kind: 'unavailable', title: 'The evidence can’t be read right now', message: 'Eligibility is checked against the evidence on every change, so nothing was changed. Try again in a minute.', reasons }
   // Promoting needs an analyst (or admin) membership in the retailer or the product's brand organisation.

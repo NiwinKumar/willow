@@ -133,6 +133,19 @@ export function matchRows(items: ItemRow[], catalog: ProductRow[]): MatchedRow[]
 
 export type Coverage = Record<RangeStatus, number> & { total: number; matched: number }
 
+/**
+ * The products Home's KPI strip counts, in the scope its cards read. A retailer: the connected range, else the
+ * catalog. A brand: its own products in the connected range; when none of them are there (or no range is
+ * connected), its products in the catalog, which is what the brand's cards are built from.
+ */
+export type HomeScope = 'range' | 'catalog' | 'brand_range' | 'brand_catalog'
+export function homeScope<T extends Pick<ProductRow, 'product_id' | 'brand'>>(rows: T[], ids: Set<string> | null, brand: string | null): { rows: T[]; scope: HomeScope } {
+  if (!brand) return ids ? { rows: rows.filter((r) => ids.has(r.product_id)), scope: 'range' } : { rows, scope: 'catalog' }
+  const mine = rows.filter((r) => r.brand === brand)
+  const inRange = ids ? mine.filter((r) => ids.has(r.product_id)) : []
+  return inRange.length ? { rows: inRange, scope: 'brand_range' } : { rows: mine, scope: 'brand_catalog' }
+}
+
 export function coverage(rows: Pick<MatchedRow, 'status' | 'match'>[]): Coverage {
   const c = { measured: 0, collecting: 0, no_users: 0, not_measured: 0, unrecognised: 0, total: 0, matched: 0 }
   const seen = new Set<string>()

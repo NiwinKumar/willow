@@ -21,8 +21,9 @@ import { RoutineSheet } from './RoutineSheet'
 import { failureText, useRoutineWrites } from './writes'
 import { useChecks, type ProductCheck } from '../../lib/safety'
 import { strongActives } from './actives'
-import { CheckForMe, ProductChecked } from './checked'
+import { CheckForMe, CheckReasons, ProductChecked } from './checked'
 import { InAisleCheck } from './InAisleCheck'
+import { notAdvisedLine } from './names'
 import { StartSlowCard } from './StartSlowCard'
 import { TestSheet, TestThisButton, type TestTarget } from './TestSheet'
 
@@ -536,6 +537,11 @@ function RequestList({ requests, inRoutine, onPick }: { requests: ProductRequest
 function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveError, onSave }: { draft: Draft; when: When; setWhen: (w: When) => void; startedAt: string; setStartedAt: (d: string) => void; saving: boolean; saveError: string | null; onSave: () => void }) {
   const p = draft.product
   const field = 'min-h-[50px] rounded-[16px] bg-canvas px-3.5 text-[16px] text-ink outline-none'
+  // the product's check for this person (carried on a preset product, else read; cached from the search list)
+  const carried = (p as Product & { check?: ProductCheck | null }).check ?? undefined
+  const checks = useChecks(carried ? [] : [p.product_id])
+  const check = carried ?? checks.checks[p.product_id]
+  const warning = notAdvisedLine(check)
 
   return (
     <div className="flex flex-col gap-4">
@@ -549,6 +555,14 @@ function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveEr
         </span>
       </div>
       <p className="-mt-1 text-[13px] text-ink-2">{draft.source === 'label_scan' ? 'Matched from your photo. Ingredients, price and store links come from the catalog.' : 'Ingredients, price and store links come from the catalog.'}</p>
+      {check && warning ? (
+        <div className="flex flex-col gap-2">
+          <p role="note" className="m-0 text-[14px] leading-[1.45] text-ink">
+            {warning}
+          </p>
+          <CheckReasons check={check} profileComplete={checks.profileComplete} />
+        </div>
+      ) : null}
 
       {p.inci.length ? (
         <div className="flex flex-col gap-1.5">

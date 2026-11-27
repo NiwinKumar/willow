@@ -8,25 +8,24 @@ import { RollingNumber } from '../../components/willow/RollingNumber'
 import { refreshRoutine, useOwner } from '../../data/hooks'
 import type { Product } from '../../data/types'
 import { api, localDay } from '../../lib/api'
-import { fmtDate } from '../../lib/format'
+import { fmtDate, weeksAfter } from '../../lib/format'
 import { COMMISSION_NOTE, useStoreClick } from '../../lib/clicks'
 import { useChecks } from '../../lib/safety'
 import { useAuth } from '../../lib/useAuth'
 import { usePlan } from './draft'
-import { SLOT_WORDS, WHEN_WORDS, errorText, money, type PlanPick, type PlanWhen } from './planApi'
+import { SLOT_WORDS, WHEN_WORDS, errorText, money, priceIn, type PlanPick, type PlanWhen } from './planApi'
 import { card, cardStyle, primary, secondary, stagger } from './styles'
 import { Frame } from './ui'
 
-const DAY = 86_400_000
 /** The date `weeks` from today, as a short date ("12 Feb"). */
-const weeksFrom = (weeks: number) => fmtDate(new Date(Date.parse(`${localDay()}T12:00:00`) + weeks * 7 * DAY).toISOString().slice(0, 10))
+const weeksFrom = (weeks: number) => fmtDate(weeksAfter(localDay(), weeks))
 const slotsOf = (w: PlanWhen): ('am' | 'pm')[] => (w === 'both' ? ['am', 'pm'] : [w])
 
 /**
  * (g) The plan: the morning and evening order at a glance, each pick with its check, why, verdict date,
  * proof and two alternatives a tap away, the week-by-week start (one new active at a time), notes and the
- * total. "Add all" / "Start with the base only" write to the routine (POST /v1/routine, starting today;
- * products already in the routine are skipped), then the plan ends at `?next=` or Routine.
+ * total. "Add all" / "Start with the base only" write to the routine (POST /v1/routine, each pick starting
+ * on its plan day, today + start_week weeks; products already in the routine are skipped), then the plan ends at `?next=` or Routine.
  */
 export function PlanRoutineStep() {
   const { result, exit } = usePlan()
@@ -46,7 +45,10 @@ export function PlanRoutineStep() {
   if (!result) return null
 
   const currency = result.total.currency
-  const total = picks.reduce((s, p) => s + (p.product.price.currency === currency ? p.product.price.amount : 0), 0)
+  const total = picks.reduce((s, p) => {
+    const price = priceIn(p.product, currency)
+    return s + (price.currency === currency ? price.amount : 0)
+  }, 0)
   const base = picks.filter((p) => p.slot !== 'active')
 
   const add = async (which: 'all' | 'base') => {
@@ -56,10 +58,11 @@ export function PlanRoutineStep() {
       const token = await getIdToken()
       const { entries } = await api.routine(token)
       const have = new Set(entries.filter((e) => !e.ended_at && e.product_id).map((e) => e.product_id))
+      const today = localDay()
       let added = 0
       for (const p of which === 'all' ? picks : base) {
         if (have.has(p.product.product_id)) continue
-        await api.addRoutine(token, { product_id: p.product.product_id, slots: slotsOf(p.when), started_at: localDay(), source: 'catalog' })
+        await api.addRoutine(token, { product_id: p.product.product_id, slots: slotsOf(p.when), started_at: weeksAfter(today, p.start_week), source: 'catalog' })
         have.add(p.product.product_id)
         added++
       }
@@ -111,6 +114,7 @@ export function PlanRoutineStep() {
               <PickCard
                 key={`${i}-${p.product.product_id}`}
                 pick={p}
+                currency={currency}
                 i={i}
                 open={open === i}
                 onToggle={() => setOpen(open === i ? null : i)}
@@ -189,8 +193,9 @@ function Order({ picks }: { picks: PlanPick[] }) {
   )
 }
 
-function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComplete, swapped, onSwap, onRestore, original, onStore }: {
+function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComplete, swapped, onSwap, onRestore, original, onStore, currency }: {
   pick: PlanPick
+  currency: string
   i: number
   open: boolean
   onToggle: () => void
@@ -232,7 +237,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
           </span>
         </div>
         <span className="flex flex-none flex-col items-end gap-1.5">
-          <span className="text-[15px] tabular-nums">{money(p.price.amount, p.price.currency)}</span>
+          <span className="text-[15px] tabular-nums">{money(priceIn(p, currency).amount, priceIn(p, currency).currency)}</span>
           {pick.alternatives.length || pick.why.length > 1 || p.stores.length ? (
             <button type="button" aria-expanded={open} aria-controls={panel} onClick={onToggle} className="flex min-h-8 items-center gap-1 rounded-pill px-2 text-[12.5px] text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
               {open ? 'Less' : 'More'}
@@ -296,7 +301,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-[13.5px]">{a.name}</span>
                       <span className="truncate text-[12px] text-ink-2">
-                        {a.brand} · {money(a.price.amount, a.price.currency)}
+                        {a.brand} · {money(priceIn(a, currency).amount, priceIn(a, currency).currency)}
                       </span>
                     </span>
                     <CheckedChip check={checks[a.product_id]} short />

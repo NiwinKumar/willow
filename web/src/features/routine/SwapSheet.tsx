@@ -14,8 +14,10 @@ import { ProductChecked } from './checked'
 /** What "See a swap" was pressed on. */
 export type SwapTarget = { product_id: string; name: string }
 
-type Swap = { product: Product; why: string[]; check?: ProductCheck }
-type Raw = { product?: Product; why?: string | string[]; score?: number; check?: ProductCheck } & Partial<Product>
+/** `price`: the swap's price in the compared currency, the one its why quotes (api plan.swaps); null when not compared. */
+type Price = { amount: number; currency: string }
+type Swap = { product: Product; why: string[]; check?: ProductCheck; price?: Price | null }
+type Raw = { product?: Product; why?: string | string[]; score?: number; check?: ProductCheck; price?: Price | null } & Partial<Product>
 
 /** Tolerant of the list's wrapper ({items}, {swaps} or a bare array) and of items that are the product itself. */
 function parse(res: unknown): Swap[] {
@@ -24,7 +26,9 @@ function parse(res: unknown): Swap[] {
     .map((x): Swap | null => {
       const product = (x.product ?? (x.product_id ? x : null)) as Product | null
       const why = Array.isArray(x.why) ? x.why : x.why ? [x.why] : []
-      return product ? { product, why, check: x.check ?? (product as Product & { check?: ProductCheck }).check } : null
+      // a bare product's own `price` is its reference price, not a compared one
+      const price = x.product && x.price ? { amount: x.price.amount, currency: x.price.currency } : null
+      return product ? { product, why, check: x.check ?? (product as Product & { check?: ProductCheck }).check, price } : null
     })
     .filter((x): x is Swap => Boolean(x))
 }
@@ -47,7 +51,8 @@ function Swaps({ target, market, onView }: { target: SwapTarget; market: string 
   const qs = new URLSearchParams({ max: '6', ...(market ? { market } : {}) }).toString()
   const swaps = useQuery(['swaps', target.product_id, market], (t) => request<unknown>(t, `/v1/catalog/${encodeURIComponent(target.product_id)}/swaps?${qs}`).then(parse), { enabled: Boolean(uid), staleMs: 30 * 60_000 })
   // Optional: the embeddings neighbours (absent on older apis; a failure just hides the section).
-  const similar = useQuery(['similar', target.product_id], (t) => request<unknown>(t, `/v1/catalog/${encodeURIComponent(target.product_id)}/similar`).then(parse).catch(() => [] as Swap[]), { enabled: Boolean(uid), staleMs: 30 * 60_000 })
+  // Only products sold in the person's market (or everywhere), as the swaps above.
+  const similar = useQuery(['similar', target.product_id, market], (t) => request<unknown>(t, `/v1/catalog/${encodeURIComponent(target.product_id)}/similar${market ? `?market=${encodeURIComponent(market)}` : ''}`).then(parse).catch(() => [] as Swap[]), { enabled: Boolean(uid), staleMs: 30 * 60_000 })
   const [more, setMore] = useState(false)
   const shown = new Set((swaps.data ?? []).map((s) => s.product.product_id))
   const near = (similar.data ?? []).filter((s) => s.product.product_id !== target.product_id && !shown.has(s.product.product_id)).slice(0, more ? 6 : 3)
@@ -112,7 +117,8 @@ function SwapRow({ s, i, check, loading, onView }: { s: Swap; i: number; check: 
         <ProductChecked check={check} loading={loading} inDialog />
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1.5">
-        <span className="tnum text-[14px]">{fmtPrice(p.price)}</span>
+        {/* the price the why compares (the lowest checked price in that currency), else the reference price */}
+        <span className="tnum text-[14px]">{fmtPrice(s.price ?? p.price)}</span>
         <button type="button" onClick={() => onView(p)} className="hit44 min-h-8 rounded-pill bg-selected px-3 text-[12.5px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
           View
         </button>

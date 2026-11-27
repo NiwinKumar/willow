@@ -119,6 +119,8 @@ const productTo = (id: string, carry: string, hash = '') => `/retail/products/${
 const promoteTo = (id: string, carry: string) => `/retail/campaigns${carry}${q(carry)}new=${encodeURIComponent(id)}`
 const ref = (r: ProductRow) => ({ id: r.product_id, name: r.product, brand: r.brand, image_url: r.image_url, category: r.category })
 const liftInterval = (lo: number | null, hi: number | null) => (lo === null || hi === null ? null : `95% interval ${pts(lo)} to ${pts(hi)}`)
+/** The shelf cards' figure is results-vs-shelf share; their interval is the lift's, so it says so. */
+const shelfLiftInterval = (lo: number | null, hi: number | null) => (lo === null || hi === null ? null : `Lift over non-users, 95% interval ${pts(lo)} to ${pts(hi)}`)
 
 /** The cards for one organisation, most people first. Results are a separate lane. */
 export function composeCards(x: ComposeInput): DecisionCard[] {
@@ -212,7 +214,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
           figure: pts(s.gap),
           figureNote: 'results vs shelf',
           n: s.n,
-          interval: r ? liftInterval(r.lift_lo, r.lift_hi) : null,
+          interval: r ? shelfLiftInterval(r.lift_lo, r.lift_hi) : null,
           people: s.users,
           product: { id: s.product_id, name: s.product, brand: s.brand, image_url: s.image_url, category: '' },
           primary: { kind: 'accept', label: 'Add to range review' },
@@ -234,7 +236,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
           figure: `+${Math.round(s.gap * 100)} pts`,
           figureNote: 'results vs shelf',
           n: s.n,
-          interval: liftInterval(r.lift_lo, r.lift_hi),
+          interval: shelfLiftInterval(r.lift_lo, r.lift_hi),
           people: s.users,
           product: { id: s.product_id, name: s.product, brand: s.brand, image_url: s.image_url, category: '' },
           primary: { kind: 'accept', label: 'Give it more space' },

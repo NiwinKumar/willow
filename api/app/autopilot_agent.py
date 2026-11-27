@@ -524,6 +524,8 @@ class Episode:
                 return {"ok": False, "error": "Its product is not rated Proven, so it can't run."}
             if campaigns.active_count(self.store, self.uid) >= campaigns.MAX_ACTIVE:
                 return {"ok": False, "error": "3 campaigns are already running."}
+            if campaigns.live_on(self.store, self.uid, d["product_id"], exclude=campaign_id):
+                return {"ok": False, "error": campaigns.already_running().detail["message"]}
         if action == "extend":
             if change.get("days") not in DAYS:
                 return {"ok": False, "error": "Extend by 7, 14 or 30 days."}

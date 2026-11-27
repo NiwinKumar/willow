@@ -341,7 +341,7 @@ function MatchBar({ cov }: { cov: ReturnType<typeof coverage> }) {
         {parts.map((s) => (
           <span key={s} className="inline-flex items-center gap-1.5 tnum">
             <span aria-hidden className={`size-2 rounded-full ${tone[s]}`} />
-            {int(cov[s])} {STATUS_LABEL[s].toLowerCase()}
+            {int(cov[s])} {STATUS_LABEL[s].charAt(0).toLowerCase() + STATUS_LABEL[s].slice(1)}
           </span>
         ))}
       </span>

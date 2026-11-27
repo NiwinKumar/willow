@@ -56,6 +56,12 @@ def test_a_plan_has_the_base_one_active_and_a_funnel_that_narrows(client, fake):
     assert not [t for t in _texts(out) if "acne" in t.lower()]
 
 
+def test_the_profile_lists_typed_ingredients_as_left_out(client, fake):
+    body = {**US, "safety": {"avoid": ["fragrance"], "avoid_ingredients": ["Linalool"]}}
+    out = client.post("/v1/plan", json=body).json()
+    assert out["profile"]["avoid"] == ["Fragrance", "Linalool"]
+
+
 def test_pregnancy_leaves_retinoids_out_and_says_so(client, fake):
     body = {**US, "goals": ["lines"], "safety": {"life_stage": "pregnant"}}
     out = client.post("/v1/plan", json=body).json()

@@ -99,6 +99,13 @@ export function money(amount: number, currency: string): string {
   }
 }
 
+/** The lowest listed price in the plan's currency (reference or a store's), as the api's plan.price_in reads it;
+ * the reference price only when none is in that currency. Never converted. */
+export function priceIn(p: Product, currency: string): { amount: number; currency: string } {
+  const amounts = [p.price, ...p.stores.map((s) => s.price)].flatMap((x) => (x && x.currency === currency ? [x.amount] : []))
+  return amounts.length ? { amount: Math.min(...amounts), currency } : p.price
+}
+
 /** The last plan made on this device (so Routine can show "next from your plan" later). */
 const LAST = 'willow.plan.last'
 export function saveLastPlan(plan: PlanResponse, req: PlanRequest) {

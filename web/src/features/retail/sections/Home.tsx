@@ -12,7 +12,7 @@ import { useOrg } from '../org'
 import { useDecide, setRequests, withTransition } from '../orgData'
 import { ProductImage } from '../../routine/productUi'
 import { canAct, isNotMember, proofApi, proofError, ROLE_LABEL, type DecisionLogEntry, type EvidenceRequest } from '../proofApi'
-import { coverage, statusOf } from '../range'
+import { coverage, homeScope, statusOf } from '../range'
 import { rangeIds, useOnceFlag } from '../rangeStore'
 import { sectionPath, useRetailState } from '../state'
 import type { Insights, ProductRow } from '../types'
@@ -110,7 +110,8 @@ function Body({ d }: { d: Insights }) {
 
   // ── the KPI strip: one row, four figures
   const ids = rangeIds(range)
-  const inRange = ids ? rows.filter((r) => ids.has(r.product_id)) : brand ? rows.filter((r) => r.brand === brand) : rows
+  const { rows: inRange, scope } = homeScope(rows, ids, brand)
+  const from = range?.from ? `${range.from}’s` : 'the retailer’s'
   const cov = coverage(inRange.map((r) => ({ status: statusOf(r), match: r.product_id })))
   const proven = inRange.filter((r) => r.tier === 'proven').length
   const ownCampaigns = brand ? campaigns.filter((c) => c.brand === brand) : campaigns
@@ -145,7 +146,7 @@ function Body({ d }: { d: Insights }) {
       <KpiStrip
         label="Your range at a glance"
         items={[
-          { id: 'range', label: ids ? (range?.from ? `In ${range.from}’s range` : 'Products in your range') : brand ? `${brand} products` : 'Products in the catalog', value: int(cov.total), note: <Link to={`${sectionPath('range')}${carry}`} className="text-ink-2 no-underline hover:text-ink">{ids ? `from ${range?.filename}` : brand ? 'in the retailer’s range →' : 'Connect your range →'}</Link> },
+          { id: 'range', label: scope === 'range' ? (range?.from ? `In ${range.from}’s range` : 'Products in your range') : scope === 'catalog' ? 'Products in the catalog' : `${brand} products`, value: int(cov.total), note: <Link to={`${sectionPath('range')}${carry}`} className="text-ink-2 no-underline hover:text-ink">{scope === 'range' ? `from ${range?.filename}` : scope === 'catalog' ? 'Connect your range →' : scope === 'brand_range' ? `in ${from} range →` : ids ? `in the catalog; none are in ${from} range →` : 'in the catalog →'}</Link> },
           { id: 'measured', label: 'Measured', value: int(cov.measured), note: `${int(cov.collecting)} collecting · ${int(cov.no_users)} no users yet` },
           { id: 'proven', label: 'Proven', value: int(proven), note: cov.measured ? `of ${int(cov.measured)} measured` : 'none measured yet' },
           { id: 'campaigns', label: 'Campaigns running', value: int(running), note: `${ownCampaigns.filter((c) => c.stats.incrementality).length} with a measured lift` },
@@ -433,7 +434,7 @@ function ProgressItem({ vkey, kind, title, figure, n, meta, waiting, actions, su
       <p className="m-0 text-proof-label text-ink-2">{meta}</p>
       {waiting && !done ? (
         <p className="m-0 rounded-ctl bg-pf-bg2 px-2.5 py-1.5 text-proof-small text-ink-2">
-          <span className="font-medium text-ink">Waiting for</span> {waiting}
+          <span className="font-medium text-ink">Waiting for</span> {waiting.charAt(0).toLowerCase() + waiting.slice(1)}
         </p>
       ) : null}
       {actions ? <div className="flex flex-wrap gap-2 pt-1">{actions}</div> : null}

@@ -76,9 +76,10 @@ def create_campaign(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """Proven products only, goals within the evidence, a brand only its own products; at most
-    3 running per owner (429). 403 without an analyst membership of an org that owns the brand;
-    a campaign made under a demo membership is `demo` (shown to guests only)."""
+    """Proven products only, goals within the evidence, a brand only its own products; one live
+    campaign per product (409 already_running); at most 3 running per owner (429). 403 without
+    an analyst membership of an org that owns the brand; a campaign made under a demo membership
+    is `demo` (shown to guests only)."""
     product = catalog.by_id(body.product_id)
     if product is None:
         raise HTTPException(404, {"code": "not_found", "message": "product not found"})
@@ -96,6 +97,8 @@ def create_campaign(
         raise campaigns.unavailable() from exc
     if reasons:
         raise _not_eligible(reasons)
+    if campaigns.live_on(store, user.uid, product["product_id"], member.instance):
+        raise campaigns.already_running()
     if campaigns.active_count(store, user.uid) >= campaigns.MAX_ACTIVE:
         raise campaigns.too_many()
     limits.take(store, user.uid, "campaign_create")
@@ -163,6 +166,8 @@ def patch_campaign(
             raise campaigns.unavailable() from exc
         if reasons:
             raise _not_eligible(reasons)
+        if campaigns.live_on(store, user.uid, doc["product_id"], doc.get("instance"), cid):
+            raise campaigns.already_running()
         if campaigns.active_count(store, user.uid, exclude=cid) >= campaigns.MAX_ACTIVE:
             raise campaigns.too_many()
     fields = {"status": body.status, "updated_at": campaigns.now()}

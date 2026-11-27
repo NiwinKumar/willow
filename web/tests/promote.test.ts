@@ -54,6 +54,9 @@ test('api errors become words, with the reasons the api sent', () => {
   assert.equal(promoError({ status: 429, code: 'too_many_active', message: '' }).kind, 'too_many')
   assert.equal(promoError({ status: 429, code: 'rate_limited', message: '' }).kind, 'rate')
   assert.equal(promoError({ status: 409, code: 'ended', message: '' }).kind, 'ended')
+  const twice = promoError({ status: 409, code: 'already_running', message: 'This product already has a running campaign; end it or wait for its result.' })
+  assert.equal(twice.kind, 'already_running')
+  assert.equal(twice.title, 'This product already has a running campaign')
   assert.equal(promoError(new TypeError('fetch failed')).title, 'Couldn’t reach Willow')
 })
 

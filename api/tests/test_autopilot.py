@@ -128,6 +128,20 @@ def test_suggest_proposes_and_approval_starts_the_campaign(client, fake, sig):
     assert again.status_code == 409
 
 
+def test_approval_is_refused_when_the_product_already_has_a_live_campaign(client, fake, sig):
+    _rule(client)
+    props = [a for a in _run(client)["activity"] if a["kind"] == "proposed"]
+    prop = next(a for a in props if a["product_id"] == SERUM)
+    body = {"product_id": SERUM, "workspace": "retailer", "goals": ["dark_spots"], "days": 14}
+    assert client.post("/v1/retailer/campaigns", json=body).status_code == 201
+    res = client.post(f"/v1/retailer/autopilot/activity/{prop['id']}/approve")
+    assert res.status_code == 409
+    assert res.json()["detail"]["message"] == (
+        "This product already has a running campaign; end it or wait for its result."
+    )
+    assert len(fake.store.campaigns) == 1
+
+
 def test_a_second_check_the_same_day_adds_nothing(client, fake, sig):
     _rule(client)
     _run(client)

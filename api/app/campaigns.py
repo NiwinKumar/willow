@@ -187,6 +187,42 @@ def active_count(store: Store, uid: str, exclude: str | None = None) -> int:
     )
 
 
+def live_on(
+    store: Store,
+    uid: str,
+    product_id: str,
+    instance: str | None = None,
+    exclude: str | None = None,
+) -> bool:
+    """Whether this product already has a live campaign (active, running or scheduled) in the same
+    place: this owner's, or (`instance`) a real one of their Proof instance's team. Two at once
+    would share shoppers, so neither holdout comparison would be clean. Demo campaigns of other
+    guests never count: each guest sees only their own."""
+    at = now()
+    return any(
+        cid != exclude
+        and d.get("product_id") == product_id
+        and status_of(d, at) == "active"
+        and (
+            d.get("owner_uid") == uid
+            or (instance is not None and not is_demo(d) and d.get("instance") == instance)
+        )
+        for cid, d in store.campaigns_active()
+    )
+
+
+def already_running() -> HTTPException:
+    return HTTPException(
+        409,
+        {
+            "code": "already_running",
+            "message": (
+                "This product already has a running campaign; end it or wait for its result."
+            ),
+        },
+    )
+
+
 def too_many() -> HTTPException:
     return HTTPException(
         429,

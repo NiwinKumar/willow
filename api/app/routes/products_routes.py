@@ -101,6 +101,9 @@ def post_label_scan(
     return read
 
 
+MAX_START_AHEAD = timedelta(weeks=16)  # a routine entry's latest start date, from today
+
+
 class KeyActive(BaseModel):
     name: str = Field(max_length=80)
     pct: float | None = Field(default=None, ge=0, le=100)
@@ -123,10 +126,11 @@ class RoutineEntryIn(BaseModel):
 
     @field_validator("started_at")
     @classmethod
-    def _not_in_future(cls, v: date | None) -> date | None:
+    def _not_too_far_ahead(cls, v: date | None) -> date | None:
+        # A plan can schedule a product to start later (week 2, 4, 8...), up to MAX_START_AHEAD.
         # One day of slack: the person's "today" can be ahead of UTC.
-        if v is not None and v > datetime.now(UTC).date() + timedelta(days=1):
-            raise ValueError("the start date cannot be in the future")
+        if v is not None and v > datetime.now(UTC).date() + MAX_START_AHEAD + timedelta(days=1):
+            raise ValueError("the start date can be at most 16 weeks ahead")
         return v
 
 

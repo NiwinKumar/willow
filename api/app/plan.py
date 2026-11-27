@@ -487,6 +487,10 @@ def _profile_block(ctx: _Ctx) -> dict[str, Any]:
     avoid = [safety.AVOID_LABEL[a] for a in prof.get("avoid") or []]
     if ctx.no_fragrance and "Fragrance" not in avoid:
         avoid.insert(0, "Fragrance")
+    # the ingredients the person typed (past reactions), as they wrote them, after the families
+    for name in prof.get("avoid_ingredients") or []:
+        if name.lower() not in {a.lower() for a in avoid}:
+            avoid.append(name)
     stage = prof.get("life_stage")
     cautions = []
     if stage in ("pregnant", "trying", "breastfeeding"):

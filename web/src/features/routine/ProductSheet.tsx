@@ -196,7 +196,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
 
       <div className="flex flex-wrap gap-2 px-1">
         {inUse ? (
-          <span className="flex min-h-12 items-center rounded-pill bg-lime px-[18px] text-[14px]">✓ In your routine since {fmtDate(entry.started_at)}</span>
+          <span className="flex min-h-12 items-center rounded-pill bg-lime px-[18px] text-[14px]">✓ In your routine {entry.started_at.slice(0, 10) > localDay() ? 'from' : 'since'} {fmtDate(entry.started_at)}</span>
         ) : product && onAdd ? (
           <Button variant="ink" onClick={() => onAdd(product)}>
             Add to routine

@@ -382,6 +382,8 @@ def _start(
     reasons = campaigns.check(product, rdoc["workspace"], goals, skins)
     if reasons:
         return None, reasons
+    if campaigns.live_on(store, uid, product["product_id"]):
+        return None, [campaigns.already_running().detail["message"]]
     if campaigns.active_count(store, uid) >= campaigns.MAX_ACTIVE:
         return None, [f"{campaigns.MAX_ACTIVE} campaigns are already running."]
     a = rdoc["action"]
@@ -678,6 +680,7 @@ def _manage(
                 doc.get("paused_by_agent")
                 and ok
                 and campaigns.active_count(store, uid) < campaigns.MAX_ACTIVE
+                and not campaigns.live_on(store, uid, doc["product_id"], exclude=cid)
             ):
                 act(
                     "resume",
@@ -889,6 +892,8 @@ def approve(store: Store, uid: str, aid: str) -> dict[str, Any]:
         )
         if reasons:
             raise Refused(" ".join(reasons))
+        if campaigns.live_on(store, uid, cdoc["product_id"], cdoc.get("instance"), cid):
+            raise Refused(campaigns.already_running().detail["message"])
         if campaigns.active_count(store, uid, exclude=cid) >= campaigns.MAX_ACTIVE:
             raise Refused(f"{campaigns.MAX_ACTIVE} campaigns are already running.")
     _apply(store, cid, cdoc, prop["action"], prop, at)

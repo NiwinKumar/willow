@@ -7,7 +7,9 @@ while serving, and nothing about a person is involved. A same-category neighbour
 boost so a serum's neighbours are serums first. The score is formula likeness only: the web says
 "Similar formula" / "similar ingredient list", never "works the same".
 
-`GET /v1/catalog/{product_id}/similar?k=5` -> {"items": [{"product": {...}, "score": 0.93}]};
+`GET /v1/catalog/{product_id}/similar?k=5&market=US` ->
+{"items": [{"product": {...}, "score": 0.93}]}; with `market`, only products sold there (or
+GLOBAL) and suggestible there, as swaps (app/plan.py);
 the router is mounted by app/main.py (lead). Unknown product: 404; a product without a vector
 (added after the seed was built) or with nothing above MIN_SCORE: an empty list.
 """
@@ -19,7 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app import catalog
+from app import catalog, plan, regulatory
 from app.auth import AuthUser, current_user
 
 SEED = Path(__file__).resolve().parents[1] / "seed" / "catalog_embeddings.json"
@@ -47,8 +49,11 @@ def cosine(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b, strict=True))
 
 
-def similar_products(product_id: str, k: int = 5) -> list[dict[str, Any]]:
-    """Up to k other catalog products, most similar formula first, with the cosine as score."""
+def similar_products(
+    product_id: str, k: int = 5, market: regulatory.Market | None = None
+) -> list[dict[str, Any]]:
+    """Up to k other catalog products, most similar formula first, with the cosine as score.
+    `market`: only those sold and suggestible there (the swaps' rule, plan.swaps)."""
     vecs = vectors()
     me = catalog.by_id(product_id)
     mine = vecs.get(product_id)
@@ -58,6 +63,10 @@ def similar_products(product_id: str, k: int = 5) -> list[dict[str, Any]]:
     for other in catalog.products():
         pid = other["product_id"]
         if pid == product_id or pid not in vecs:
+            continue
+        if market and not (
+            plan.sold_in(other, market) and regulatory.is_suggestible(other, market)
+        ):
             continue
         score = cosine(mine, vecs[pid])
         if score < MIN_SCORE:
@@ -75,8 +84,9 @@ router = APIRouter(prefix="/v1", tags=["catalog"])
 def catalog_similar(
     product_id: str,
     k: int = Query(default=5, ge=1, le=MAX_K),
+    market: regulatory.Market | None = None,
     user: AuthUser = Depends(current_user),
 ) -> dict[str, Any]:
     if catalog.by_id(product_id) is None:
         raise HTTPException(404, {"code": "not_found", "message": "product not found"})
-    return {"items": similar_products(product_id, k)}
+    return {"items": similar_products(product_id, k, market)}
