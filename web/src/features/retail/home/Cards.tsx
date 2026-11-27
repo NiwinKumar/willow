@@ -83,7 +83,7 @@ export function BriefPanel({ brief, onClose }: { brief: Brief | null; onClose: (
   )
 }
 
-export function CardView({ c, index, canDecide, legacy, result = false, onDecide, onAsk, onBrief, lead = false }: { c: DecisionCard; index: number; canDecide: boolean; legacy: boolean; result?: boolean; onDecide: (status: 'accepted' | 'dismissed' | 'snoozed', reason?: string) => void; onAsk?: (q: string) => void; onBrief: BriefOpener; lead?: boolean }) {
+export function CardView({ c, index, canDecide, legacy, result = false, onDecide, onAsk, onBrief, lead = false, rail = false }: { c: DecisionCard; index: number; canDecide: boolean; legacy: boolean; result?: boolean; onDecide: (status: 'accepted' | 'dismissed' | 'snoozed', reason?: string) => void; onAsk?: (q: string) => void; onBrief: BriefOpener; lead?: boolean; rail?: boolean }) {
   const k = KIND_ICON[c.kind]
   const Icon = k.icon
   const ivTip = useTooltip(c.interval ?? '')
@@ -104,8 +104,9 @@ export function CardView({ c, index, canDecide, legacy, result = false, onDecide
           </Link>
         ) : null}
         <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="m-0 text-proof-body font-medium text-ink [text-wrap:pretty]">{c.title}</h3>
-          <p className="m-0 text-proof-small text-ink-2 [text-wrap:pretty]">{c.trigger}</p>
+          {/* In Needs you's fixed slots the words clamp (2 + 3 lines, the whole text on hover); the board shows all. */}
+          <h3 title={rail ? c.title : undefined} className={`m-0 text-proof-body font-medium text-ink [text-wrap:pretty] ${rail ? 'line-clamp-2' : ''}`}>{c.title}</h3>
+          <p title={rail ? c.trigger : undefined} className={`m-0 text-proof-small text-ink-2 [text-wrap:pretty] ${rail ? 'line-clamp-3' : ''}`}>{c.trigger}</p>
         </div>
       </div>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
