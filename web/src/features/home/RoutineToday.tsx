@@ -70,17 +70,20 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           <span className="text-caption text-ink-2">Tap a product when you use it</span>
         </div>
         {conflict ? (
-          <button type="button" onClick={onRoutine} title={conflict.title} aria-label={`Routine check: ${conflict.title}`} className="ml-auto flex min-h-11 items-center gap-1.5 text-[12px] text-ink-2 transition-colors hover:text-ink">
+          <button type="button" onClick={onRoutine} title={conflict.title} aria-label={`Routine check: ${conflict.title}`} className="flex min-h-11 items-center gap-1.5 text-left text-[12px] text-ink-2 transition-colors hover:text-ink sm:ml-auto">
             <span aria-hidden>△</span>
             {conflict.label}
           </button>
         ) : null}
       </div>
       {sample ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[18px] bg-[var(--synthetic-bg)] px-3.5 py-2 text-[12.5px] text-[var(--synthetic-fg)]" style={{ animation: 'wRise .5s .2s both' }}>
-          <span className="font-medium">Sample routine</span>
-          <span className="flex-1">Set up to show the routine check, not picked for your skin.</span>
-          <button type="button" onClick={() => navigate('/plan')} className="hit44 min-h-8 rounded-pill bg-selected px-3 text-[12.5px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-[18px] bg-[var(--synthetic-bg)] px-4 py-3 text-[12.5px] text-[var(--synthetic-fg)]" style={{ animation: 'wRise .5s .2s both' }}>
+          {/* Title over its sentence as one block, the button beside it (below it when there is no room). */}
+          <span className="flex min-w-0 flex-[1_1_180px] flex-col gap-0.5 text-left">
+            <span className="font-medium">Sample routine</span>
+            <span className="leading-[1.4] text-pretty">Set up to show the routine check, not picked for your skin.</span>
+          </span>
+          <button type="button" onClick={() => navigate('/plan')} className="hit44 min-h-9 shrink-0 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
             Build me a routine
           </button>
         </div>
