@@ -6,7 +6,7 @@ import pytest
 from app import config
 from app.facemap import canonical
 from app.landmarks import Face
-from app.pipeline_face import _area_outlines, _zone_labels
+from app.pipeline_face import _area_outlines, _drawn_zones, _zone_labels
 from app.roi import Box
 
 PX_PER_MM = 6.0
@@ -54,3 +54,20 @@ def test_no_mesh_on_the_skin_keeps_the_roi_patches():
         )
         == polys
     )
+
+
+def test_a_thin_wedge_where_two_zones_meet_is_inside_an_outline():
+    """Smoothing each zone on its own dropped a thin jaw wedge running into the chin; a mark on
+    it was counted but sat in no outline (side photo, Nov 27). It now joins the nearest area."""
+    face = Face(points=np.full((478, 2), -500.0), yaw=0.0, pitch=0.0, roll=0.0)  # eyes off-crop
+    jaw, chin = config.FACE_ZONES.index("right_jaw") + 1, config.FACE_ZONES.index("chin") + 1
+    label = np.zeros((200, 200), np.uint8)
+    label[20:180, 20:100] = jaw
+    label[20:180, 100:180] = chin
+    label[97:98, 100:150] = (
+        jaw  # a 1 px jaw wedge into the chin: the smoothing (r 1 px here) drops it
+    )
+    areas = _area_outlines(face, Box(0, 0, 200, 200), label, {})
+    zoned = _drawn_zones(label, areas, Box(0, 0, 200, 200))
+    assert zoned[97, 140] > 0  # the wedge is in an area
+    assert (zoned > 0).sum() > 0.97 * (label > 0).sum()

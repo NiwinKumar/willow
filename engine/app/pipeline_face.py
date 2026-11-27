@@ -17,6 +17,7 @@ from app.io import save_jpegs, save_png, save_preview
 from app.landmarks import (
     LEFT_BROW,
     LEFT_EYE,
+    LIPS,
     RIGHT_BROW,
     RIGHT_EYE,
     Face,
@@ -200,14 +201,6 @@ def _frame(path: str, overlays: bool = False) -> dict:
     red_ok = inside(red_rois)
     redness_a = float(np.mean([med(1, n) for n in red_rois])) if red_ok else None
     red_skin = np.logical_or.reduce([roi_skin.get(n, none) for n in red_rois])
-    t_map = time.perf_counter()
-    # the redness metric's own a* and skin, on the preview grid (drawn for the reference photo)
-    redness_map = (
-        to_preview(lab[..., 1], red_skin, srgb8.shape[:2], origin=(box.x, box.y))
-        if overlays and red_ok
-        else None
-    )
-    map_ms = (time.perf_counter() - t_map) * 1000
     l_map, red = lab[..., 0], lin[..., 0]  # one crop for every region: smoothed once
     even_rois = _rois(face, EVENNESS_ROIS)
     evenness = (
@@ -308,7 +301,10 @@ def _frame(path: str, overlays: bool = False) -> dict:
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
     # the face split into the app's "Areas": each zone is the face skin inside its drawn outline,
     # so what an area counts is exactly what the photo shows (_drawn_zones)
-    zone_label = _zone_labels(face, box, face_skin)
+    # the face mesh triangle under each face-skin pixel: zones, and which photo of a session
+    # measures that skin (_assign_views), both come from it
+    tri_map = _skin_triangles(face, box, face_skin)
+    zone_label = _labels_of(tri_map)
     areas = _area_outlines(face, box, zone_label, polys)
     zone_label = _drawn_zones(zone_label, areas, box)
     zone_values = _zone_colour(lab, red, zone_label, px_per_mm)
@@ -344,6 +340,14 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "glow": glow_extras,
         "lines": lines_extras,
     }
+    t_map = time.perf_counter()
+    # a* on the preview grid for the redness layer (drawn for the reference photos)
+    redness_map = (
+        to_preview(lab[..., 1], red_skin, srgb8.shape[:2], origin=(box.x, box.y))
+        if overlays and red_ok
+        else None
+    )
+    map_ms = (time.perf_counter() - t_map) * 1000
     return {
         "values": values,
         "extras": extras,
@@ -359,7 +363,15 @@ def _frame(path: str, overlays: bool = False) -> dict:
         # which zone each mark sits in, and each zone's skin (px): a session with side photos
         # takes each zone from the photo that faces it (_combine_views)
         "mark_zones": _mark_zones(zone_label, [*blemishes, *spots]),
-        "mark_depth_mm": _mark_depth_mm(face_skin, [*blemishes, *spots], face.px_per_mm),
+        "mark_depth_mm": _mark_depth_mm(
+            ~_side_edges(
+                face, box, face_skin, ear, zones.get("lower_face", np.zeros_like(face_skin))
+            )
+            if face.view != "front"
+            else face_skin,
+            [*blemishes, *spots],
+            face.px_per_mm,
+        ),
         "zone_px": (
             {n: int((zone_label == c).sum()) for c, n in enumerate(facemap.ZONES, start=1)}
             if zone_label is not None
@@ -373,7 +385,15 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "srgb8": srgb8,
         "regions": regions,
         "redness_map": redness_map,
+        # a side photo's own redness layer covers the skin it measures in its session, known only
+        # once the session's photos are in (_views): its a* is kept until then
+        "a_star": lab[..., 1].astype(np.float32) if overlays and face.view != "front" else None,
         "map_ms": map_ms,
+        # how squarely this photo sees each mesh triangle, the triangle under each face-skin
+        # pixel and under each mark's centre (crop pixels): _assign_views, _keeps
+        "facing": facemap.facing(face.points),
+        "tri_map": tri_map,
+        "mark_tris": _mark_tris(tri_map, [*blemishes, *spots]),
     }
 
 
@@ -483,8 +503,62 @@ SIDE_ZONES = {"right": {"right_cheek", "right_jaw"}, "left": {"left_cheek", "lef
 VIEW_CODE = {"front": 0.0, "right": 1.0, "left": 2.0}  # candidate feature `view` (numbers only)
 
 
+def _zone_codes(zones) -> list[int]:
+    return [facemap.ZONES.index(z) + 1 for z in zones]
+
+
+def _assign_views(front: list[dict], side_groups: dict[str, list[dict]]) -> None:
+    """A session with front and side photos: which photo measures each mesh triangle (each piece
+    of skin once a session), kept as f["owned"] (T,) on every photo of the view. A side photo
+    takes the cheek and jaw it faces, and the chin and around-mouth skin on its half of the face
+    wherever it sees it more squarely than the front photo, by SIDE_FACING_MARGIN (facemap.facing:
+    the angle in each photo, so it follows how far each person turned). A mark on the side of the
+    chin the front photo sees only at a slant was in no photo's area (Nov 27). The front takes
+    everything else. Without the face model the zone rule (_owns) applies instead."""
+    codes, halves = facemap.triangle_zones(), facemap.triangle_sides()
+    f0 = front[0].get("facing") if front else None
+    if codes is None or halves is None or f0 is None:
+        return
+    reach = np.isin(codes, _zone_codes(config.SIDE_REACH_ZONES))
+    taken = np.zeros(len(codes), bool)
+    for v, group in side_groups.items():
+        own = np.isin(codes, _zone_codes(SIDE_ZONES[v]))
+        fv = group[0].get("facing")
+        if fv is not None:
+            own |= reach & (halves == v) & (fv > f0 + config.SIDE_FACING_MARGIN) & ~taken
+        for f in group:
+            f["owned"] = own
+        taken |= own
+    for f in front:
+        f["owned"] = ~taken
+
+
+def _own_pixels(f: dict) -> np.ndarray | None:
+    """Per face-crop pixel: skin this photo measures in its session (_assign_views). None when
+    the photo has no ownership by triangle (no face model, or no side photos in the session)."""
+    own, tri = f.get("owned"), f.get("tri_map")
+    if own is None or tri is None:
+        return None
+    return np.where(tri >= 0, own[np.clip(tri, 0, None)], False)
+
+
+def _owned_zone_px(f: dict, sides: set[str]) -> dict[str, int]:
+    """Skin (px) per zone that this photo measures in its session."""
+    px, label = _own_pixels(f), f.get("zone_label")
+    if px is None or label is None:
+        mine = SIDE_ZONES.get(f["view"])
+        return {
+            z: n
+            for z, n in f["zone_px"].items()
+            if (z in mine if mine else _owns("front", z, sides))
+        }
+    counts = np.bincount(label[px & (label > 0)], minlength=len(facemap.ZONES) + 1)
+    return {z: int(counts[c]) for c, z in enumerate(facemap.ZONES, start=1) if counts[c]}
+
+
 def _owns(view: str, zone: str | None, sides: set[str]) -> bool:
-    """Whether a mark in `zone` found on a `view` photo is counted (each zone once a session)."""
+    """Whether a mark in `zone` found on a `view` photo is counted (each zone once a session):
+    the rule by zone, used without the face model (_assign_views)."""
     if view in SIDE_ZONES:
         return zone in SIDE_ZONES[view]
     taken = set().union(*(SIDE_ZONES[v] for v in sides)) if sides else set()
@@ -496,9 +570,14 @@ def _keeps(f: dict, sides: set[str]) -> list[bool]:
     must also sit SIDE_MARK_DEPTH_MM inside the face skin: at the jaw edge, hairline and lid
     corners a turned face throws shadows that read as marks."""
     side = f["view"] in SIDE_ZONES
+    own, tris = f.get("owned"), f.get("mark_tris")
+    if own is not None and tris is not None:  # by triangle (_assign_views)
+        mine = [bool(own[t]) if t >= 0 else not side for t in tris]
+    else:
+        mine = [_owns(f["view"], z, sides) for z in f["mark_zones"]]
     return [
-        _owns(f["view"], z, sides) and (not side or d >= config.SIDE_MARK_DEPTH_MM)
-        for z, d in zip(f["mark_zones"], f["mark_depth_mm"], strict=True)
+        ok and (not side or d >= config.SIDE_MARK_DEPTH_MM)
+        for ok, d in zip(mine, f["mark_depth_mm"], strict=True)
     ]
 
 
@@ -520,12 +599,7 @@ def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
         blem = sum(own[:n_b])
         kept = [s for s, ok in zip(f["spots"], own[n_b:], strict=True) if ok]
         spot_mm2 = sum(s.area_px for s in kept) / mm2
-        zones = SIDE_ZONES.get(f["view"])
-        skin = sum(
-            px
-            for z, px in f["zone_px"].items()
-            if (z in zones if zones else _owns("front", z, sides))
-        )
+        skin = sum(_owned_zone_px(f, sides).values())
         return blem, kept, spot_mm2, skin / mm2
 
     extra = [part(r) for r in side_refs.values()]
@@ -547,8 +621,8 @@ def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
 def _drawn_zones(
     label: np.ndarray | None, areas: dict[str, np.ndarray], box: Box
 ) -> np.ndarray | None:
-    """The zone map cut to the drawn "Areas" outlines: a face-skin pixel keeps its zone only if
-    it lies inside that zone's outline (photo pixels; under-eye patches are not zones). Skin the
+    """The zone map cut to the drawn "Areas" outlines: a face-skin pixel takes the zone whose
+    outline it lies inside (photo pixels; under-eye patches are not zones). Skin the
     outlines leave out (the eyelids under the brows, a stray piece of a zone) is in no area, so
     every area count, size and colour reading covers exactly what the photo shows."""
     if label is None:
@@ -558,7 +632,9 @@ def _drawn_zones(
         if name not in areas:
             continue
         inside = polygon_mask(label.shape, np.asarray(areas[name]) - [box.x, box.y])
-        out[inside & (label == code)] = code
+        # the area it is drawn in, whatever its triangle's zone: a strip smoothing gave to a
+        # neighbouring area (_area_outlines) is in that area, not in none
+        out[inside & (label > 0) & (out == 0)] = code
     return out
 
 
@@ -588,18 +664,16 @@ def _zone_colour(
 def _zone_marks(front: list[dict], side_refs: dict[str, dict]) -> None:
     """Blemish count and dark-spot area (% of the zone's skin) per face-map zone, for every
     front photo, from the same marks the session's totals count (confirmed by another photo,
-    each zone from the photo that measures it: _owned_marks, _combine_views). Zones with less
-    than ZONE_MIN_MM2 of skin are left out."""
+    each zone from the photo that measures it: _owned_marks, _combine_views; a zone split between
+    photos adds up). Zones with less than ZONE_MIN_MM2 of skin in all are left out."""
     sides = set(side_refs)
 
     def part(f: dict) -> dict[str, list[float]]:
         own = _owned_marks(f, sides)
         n_b, mm2 = len(f["blemishes"]), f["face"].px_per_mm ** 2
-        mine = SIDE_ZONES.get(f["view"])
         out = {
             z: [0.0, 0.0, px / mm2]  # blemishes, spot mm2, skin mm2
-            for z, px in f["zone_px"].items()
-            if (z in mine if mine else _owns("front", z, sides)) and px / mm2 >= config.ZONE_MIN_MM2
+            for z, px in _owned_zone_px(f, sides).items()
         }
         for i, (z, ok) in enumerate(zip(f["mark_zones"], own, strict=True)):
             if ok and z in out:
@@ -609,11 +683,16 @@ def _zone_marks(front: list[dict], side_refs: dict[str, dict]) -> None:
                     out[z][1] += f["spots"][i - n_b].area_px / mm2
         return out
 
+    def add(into: dict[str, list[float]], more: dict[str, list[float]]) -> dict[str, list[float]]:
+        for z, v in more.items():  # a zone split between photos (_assign_views) adds up
+            into[z] = [a + b for a, b in zip(into.get(z, [0.0, 0.0, 0.0]), v, strict=True)]
+        return into
+
     extra: dict[str, list[float]] = {}
     for r in side_refs.values():
-        extra |= part(r)
+        add(extra, part(r))
     for f in front:
-        zones = {**part(f), **extra}
+        zones = {z: v for z, v in add(part(f), extra).items() if v[2] >= config.ZONE_MIN_MM2}
         f.setdefault("zone_values", {})
         f["zone_values"]["blemishes"] = {z: v[0] for z, v in zones.items()}
         f["zone_values"]["pigment_spots"] = {z: 100.0 * v[1] / v[2] for z, v in zones.items()}
@@ -827,18 +906,58 @@ def _line_skin(lab: np.ndarray, face_area: np.ndarray, lower_face: np.ndarray) -
     return face_area & ~hair
 
 
+def _skin_triangles(face: Face, box: Box, face_skin: np.ndarray) -> np.ndarray | None:
+    """Per pixel of the face crop: the face mesh triangle it is in (-1 = not face skin); skin
+    past the mesh (hairline, jaw edge) takes its nearest triangle. None without the face model
+    or when no triangle reaches the skin."""
+    tri = facemap.triangle_map(face.points - [box.x, box.y], face_skin.shape)
+    if tri is None or not face_skin.any():
+        return None
+    covered = tri >= 0
+    if not covered.any():
+        return None
+    _, (iy, ix) = ndimage.distance_transform_edt(~covered, return_indices=True)
+    return np.where(face_skin, tri[iy, ix], -1).astype(np.int16)
+
+
+def _labels_of(tri_map: np.ndarray | None) -> np.ndarray | None:
+    """Per pixel: 1-based index into FACE_ZONES of its triangle (0 = not face skin)."""
+    codes = facemap.triangle_zones()
+    if tri_map is None or codes is None:
+        return None
+    return np.where(tri_map >= 0, codes[np.clip(tri_map, 0, None)], 0).astype(np.uint8)
+
+
 def _zone_labels(face: Face, box: Box, face_skin: np.ndarray) -> np.ndarray | None:
     """Per pixel of the face crop: 1-based index into FACE_ZONES (0 = not face skin), the whole
     face skin in the face map's zones (skin past the mesh joins its nearest zone). None without
     the face model or when no zone reaches the skin."""
-    zones = facemap.zone_map(face.points - [box.x, box.y], face_skin.shape)
-    if zones is None or not face_skin.any():
+    return _labels_of(_skin_triangles(face, box, face_skin))
+
+
+def _mark_tris(tri_map: np.ndarray | None, marks: list) -> list[int] | None:
+    """The mesh triangle under each mark's centre (crop pixels; -1 off the face skin)."""
+    if tri_map is None:
         return None
-    covered = zones > 0
-    if not covered.any():
-        return None
-    _, (iy, ix) = ndimage.distance_transform_edt(~covered, return_indices=True)
-    return np.where(face_skin, zones[iy, ix], 0).astype(np.uint8)
+    h, w = tri_map.shape
+    return [int(tri_map[min(max(int(m.y), 0), h - 1), min(max(int(m.x), 0), w - 1)]) for m in marks]
+
+
+def _side_edges(
+    face: Face, box: Box, face_skin: np.ndarray, ear: np.ndarray, lower: np.ndarray
+) -> np.ndarray:
+    """Side photos: the edges a mark must keep SIDE_MARK_DEPTH_MM away from, where a turned face
+    throws shadows that read as marks: the eyes, brows and lips, and the face's outer edge on the
+    ear side and above the nose (sideburn, ear, earrings, hairline). Not the holes the skin mask
+    has inside the face (dense inflamed acne it cut), nor the jawline on the nose side under the
+    nose: on Nov 27, across 11 weekly check-ins, the marks dropped there were real spots, among
+    them one on the side of the chin."""
+    filled = ndimage.binary_fill_holes(face_skin)
+    edges = ~filled & ~(lower & ~ear)
+    for idx in (RIGHT_EYE, LEFT_EYE, RIGHT_BROW, LEFT_BROW, LIPS):
+        pts = (face.points[idx] - [box.x, box.y]).astype(np.float32)
+        edges |= polygon_mask(face_skin.shape, cv2.convexHull(pts).reshape(-1, 2))
+    return edges
 
 
 def _mark_depth_mm(face_skin: np.ndarray, marks: list, px_per_mm: float) -> list[float]:
@@ -887,23 +1006,53 @@ def _area_outlines(
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     eps = config.AREA_OUTLINE_MM * face.px_per_mm
     min_px = config.AREA_MIN_MM2 * face.px_per_mm**2
-    out: dict[str, np.ndarray] = {}
-    # each zone is smoothed within its own box plus 2r + 1 px (an open then a close by r
-    # reaches no further, so the outline is the same as over the whole crop)
-    boxes = ndimage.find_objects(label, max_label=len(facemap.ZONES))
-    pad = 2 * r + 2
     h, w = label.shape
-    for code, name in enumerate(facemap.ZONES, start=1):
+    pad = 2 * r + 2
+
+    def window(lab: np.ndarray, code: int, boxes: list) -> tuple | None:
+        # each zone is worked on within its own box plus 2r + 1 px (an open then a close by r
+        # reaches no further, so the result is the same as over the whole crop)
         if boxes[code - 1] is None:
-            continue  # no skin in this zone
+            return None  # no skin in this zone
         ys, xs = boxes[code - 1]
         y0, x0 = max(ys.start - pad, 0), max(xs.start - pad, 0)
-        win = np.s_[y0 : min(ys.stop + pad, h), x0 : min(xs.stop + pad, w)]
-        # smoothed: zone edges follow the mesh's triangles and looked jagged
+        return np.s_[y0 : min(ys.stop + pad, h), x0 : min(xs.stop + pad, w)], (x0, y0)
+
+    # 1. each zone smoothed (zone edges follow the mesh's triangles and looked jagged), its main
+    # piece only. Smoothing each zone on its own drops thin strips where two zones meet (a jaw
+    # wedge running into the chin on a side photo, Nov 27), which then sat in no outline though
+    # its marks were counted: 2. every skin pixel left out joins the nearest smoothed zone.
+    smooth = np.zeros_like(label)
+    boxes = ndimage.find_objects(label, max_label=len(facemap.ZONES))
+    for code in range(1, len(facemap.ZONES) + 1):
+        got = window(label, code, boxes)
+        if got is None:
+            continue
+        win, _ = got
         mask = cv2.morphologyEx((label[win] == code).astype(np.uint8), cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        pieces, n = ndimage.label(mask)
+        if n == 0:
+            continue
+        main = pieces == (np.argmax(np.bincount(pieces.ravel())[1:]) + 1)
+        smooth[win][main & (smooth[win] == 0)] = code
+    left = (label > 0) & (smooth == 0)
+    if left.any() and (smooth > 0).any():
+        _, (iy, ix) = ndimage.distance_transform_edt(smooth == 0, return_indices=True)
+        smooth[left] = smooth[iy[left], ix[left]]
+
+    out: dict[str, np.ndarray] = {}
+    boxes = ndimage.find_objects(smooth, max_label=len(facemap.ZONES))
+    for code, name in enumerate(facemap.ZONES, start=1):
+        got = window(smooth, code, boxes)
+        if got is None:
+            continue
+        win, offset = got
         contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE, offset=(x0, y0)
+            (smooth[win] == code).astype(np.uint8),
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE,
+            offset=offset,
         )
         if not contours:
             continue
@@ -928,6 +1077,46 @@ def _areas(f: dict) -> dict[str, np.ndarray]:
     return f["areas"]
 
 
+def _view_skin(f: dict) -> np.ndarray | None:
+    """A side photo's face skin that it measures in its session: the skin its Areas outlines and
+    its redness layer cover. Without ownership by triangle (_own_pixels): the cheek and jaw it
+    faces. None without the face model."""
+    px, label = _own_pixels(f), f.get("zone_label")
+    if label is None:
+        return None
+    if px is None:
+        px = np.isin(label, _zone_codes(SIDE_ZONES.get(f["view"], ())))
+    return px & (label > 0)
+
+
+def _view_areas(f: dict, sides: set[str]) -> dict[str, np.ndarray]:
+    """The Areas outlines a view's photo draws: the zones it measures in its session, cut to the
+    skin it measures (a chin a side photo shares with the front shows its own part on each). The
+    under-eye patches go with the front."""
+    px = _own_pixels(f)
+    if px is None or f.get("zone_label") is None:
+        return {n: p for n, p in _areas(f).items() if _owns(f["view"], n, sides)}
+    label = np.where(px, f["zone_label"], 0).astype(np.uint8)
+    areas = _area_outlines(f["face"], f["box"], label, f["polygons"])
+    if f["view"] != "front":
+        areas = {n: p for n, p in areas.items() if not n.endswith("_under_eye")}
+    return areas
+
+
+def _view_redness_map(f: dict) -> dict | None:
+    """The redness layer's a* on the preview grid for a view's photo: a front photo, the redness
+    metric's skin (cheeks and nose); a side photo, the skin it measures (_view_skin), so redness
+    lower on the cheek, along the jaw and on the side of the chin is drawn, not only on the
+    cheekbone patch the metric reads (Nov 27). It moves no number."""
+    if f["view"] == "front" or f.get("a_star") is None:
+        return f.get("redness_map")
+    skin = _view_skin(f)
+    if skin is None or not skin.any():
+        return f.get("redness_map")
+    box = f["box"]
+    return to_preview(f["a_star"], skin, f["shape"][:2], origin=(box.x, box.y))
+
+
 def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list[dict]:
     """result.views: per view of the session (front, right, left), its reference photo (index,
     size, a preview and redness map when output_prefix is given) and the areas it measures. The
@@ -938,15 +1127,15 @@ def _views(refs: list[dict], sides: set[str], output_prefix: str | None) -> list
         preview = redness = None
         if output_prefix:
             preview = save_preview(f["srgb8"], output_prefix, name=f"views/{v}.jpg")
-            if f.get("redness_map") is not None:
-                rgba = redness_rgba(f["redness_map"], f["face"].px_per_mm)
+            red_map = _view_redness_map(f)
+            if red_map is not None:
+                rgba = redness_rgba(red_map, f["face"].px_per_mm)
                 if rgba is not None:
                     dest = f"{output_prefix.rstrip('/')}/overlays/redness_{v}.png"
                     redness = save_png(rgba, dest)
         rois = [
             {"name": n, "polygon": np.round(p, 1).tolist()}
-            for n, p in _areas(f).items()
-            if _owns(v, n, sides)  # the under-eye patches go with the front
+            for n, p in _view_areas(f, sides).items()
         ]
         out.append(
             {
@@ -1039,6 +1228,7 @@ def analyze_face(
         _count_confirmed(group)
     side_refs = {v: g[0] for v, g in side_groups.items()}
     if side_refs:
+        _assign_views(good, side_groups)
         _combine_views(good, side_refs)
     _zone_marks(good, side_refs)
 
@@ -1157,6 +1347,8 @@ def analyze_face(
     for f in frames:
         f.pop("srgb8", None)  # free the full-size photos
         f.pop("redness_map", None)
+        f.pop("a_star", None)
+        f.pop("tri_map", None)
     qs = [f["quality"] for f in frames]
     result = {
         "schema_version": "1.0",
