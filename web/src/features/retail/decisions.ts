@@ -127,7 +127,9 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
   const cards: DecisionCard[] = []
   const rowById = new Map(x.rows.map((r) => [r.product_id, r]))
   const mine = x.brand ? x.rows.filter((r) => r.brand === x.brand) : x.rows
-  const active = new Set(x.campaigns.filter((c) => c.status === 'active').map((c) => c.product_id))
+  // a sample campaign (simulated) never promotes a product: it only shows up as a result (12)
+  const live = x.campaigns.filter((c) => !c.sample)
+  const active = new Set(live.filter((c) => c.status === 'active').map((c) => c.product_id))
 
   if (x.mix === 'brand') {
     // 1 · Proven, not promoted
@@ -292,7 +294,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
   }
 
   // 4 · Evidence slipped (both): a live campaign or a saved claim on a product that no longer holds its tier
-  for (const c of x.campaigns) {
+  for (const c of live) {
     const r = rowById.get(c.product_id)
     if (c.status !== 'active' || !r || r.tier === 'proven' || (x.brand && r.brand !== x.brand)) continue
     cards.push({
@@ -446,7 +448,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
       kind: 'campaign_result',
       type: TYPE_LABEL.campaign_result,
       title: `${c.product ?? c.product_id}: campaign result ${c.status === 'ended' ? 'in' : 'so far'}`,
-      trigger: `Adoption ${pts(inc.lift)} against the randomised holdout: ${pct(inc.exposed.rate)} of ${int(inc.exposed.n)} who could see the card, ${pct(inc.holdout.rate)} of ${int(inc.holdout.n)} held out.`,
+      trigger: `${c.sample ? 'Sample campaign, simulated. ' : ''}Adoption ${pts(inc.lift)} against the randomised holdout: ${pct(inc.exposed.rate)} of ${int(inc.exposed.n)} who could see the card, ${pct(inc.holdout.rate)} of ${int(inc.holdout.n)} held out.`,
       figure: pts(inc.lift),
       figureNote: cleared ? 'interval above zero' : 'interval includes zero',
       n: inc.exposed.n + inc.holdout.n,

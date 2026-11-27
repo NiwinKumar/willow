@@ -201,7 +201,9 @@ def has_real_membership(store: Store, uid: str) -> bool:
 def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Doc:
     """'Try as' an org of a demo instance: a demo membership with the chosen role. Joining again
     changes the role and makes it the current org (active_at). A real membership is never
-    downgraded to a demo one."""
+    downgraded to a demo one. The first join of an org (no membership yet) also seeds that
+    person's sample campaigns for it (app/dev_seed.py), before the membership is written: if
+    seeding fails, the join fails and the next one seeds again (same ids, nothing doubled)."""
     inst = instance(instance_id)
     if inst is None:
         raise HTTPException(404, {"code": "not_found", "message": "No such Proof instance."})
@@ -218,6 +220,10 @@ def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Do
         )
     at = datetime.now(UTC)
     had = store.proof_member_get(instance_id, org_id, uid)
+    if had is None:
+        from app import dev_seed  # lazy: dev_seed -> campaigns -> proof_orgs
+
+        dev_seed.seed_demo_campaigns(store, uid, org_id)
     if had and not had.get("demo"):
         doc = {**had, "active_at": at}
     else:

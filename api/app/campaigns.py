@@ -180,10 +180,18 @@ def is_demo(doc: Doc) -> bool:
     return bool(doc.get("demo", True))
 
 
+def is_sample(doc: Doc) -> bool:
+    """A sample campaign (app/dev_seed.py): simulated history for the demo pages. Display only:
+    never served, never counted against MAX_ACTIVE, never blocks a product (live_on)."""
+    return bool(doc.get("sample"))
+
+
 def active_count(store: Store, uid: str, exclude: str | None = None) -> int:
     at = now()
     return sum(
-        1 for cid, d in store.campaigns_of(uid) if cid != exclude and status_of(d, at) == "active"
+        1
+        for cid, d in store.campaigns_of(uid)
+        if cid != exclude and not is_sample(d) and status_of(d, at) == "active"
     )
 
 
@@ -202,6 +210,7 @@ def live_on(
     return any(
         cid != exclude
         and d.get("product_id") == product_id
+        and not is_sample(d)
         and status_of(d, at) == "active"
         and (
             d.get("owner_uid") == uid
@@ -349,6 +358,7 @@ def view(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
         "workspace": doc["workspace"],
         "org_id": doc.get("org_id"),
         "demo": is_demo(doc),
+        "sample": is_sample(doc),
         "product_id": doc["product_id"],
         "goals": list(doc.get("goals") or []),
         "skin_types": list(doc.get("skin_types") or []),
@@ -438,7 +448,7 @@ def attribute_add(store: Store, uid: str, product_id: str) -> None:
     mid = member_id(uid)
     at = now()
     for cid, d in store.campaigns_active():
-        if d.get("product_id") != product_id or not running(d, at):
+        if d.get("product_id") != product_id or is_sample(d) or not running(d, at):
             continue
         m = store.campaign_member_get(cid, mid)
         if m is not None and not m.get("added"):
@@ -465,6 +475,7 @@ def sponsored(store: Store, uid: str, guest: bool = False) -> dict[str, Any] | N
         for cid, d in store.campaigns_active()
         if running(d, at)
         and (guest or not is_demo(d))
+        and not is_sample(d)
         and d.get("placement", "routine") == "routine"
         and d.get("product_id") not in owned
         and goals & set(d.get("goals") or [])

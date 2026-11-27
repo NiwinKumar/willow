@@ -91,11 +91,13 @@ def test_two_actives_never_clash(client, fake):
 def test_nothing_fits_names_the_step(client, fake):
     res = client.post("/v1/plan", json={**US, "budget": {"max_per_product": 1, "currency": "USD"}})
     assert res.status_code == 422
-    assert res.json()["detail"] == {
-        "code": "nothing_fits",
-        "message": "Nothing in the catalog fits a budget under $1; try a higher budget.",
-        "step": "budget",
-    }
+    detail = res.json()["detail"]
+    assert detail["code"] == "nothing_fits" and detail["step"] == "budget"
+    assert detail["message"] == "No cleanser in the catalog costs $1 or less."
+    # one tap away: the cheapest cleanser the answers allow, and the budget that unlocks it
+    assert (
+        detail["nearest"]["price"] > 1 and detail["nearest"]["budget"] >= detail["nearest"]["price"]
+    )
 
 
 def test_a_market_without_local_prices_plans_in_usd_and_says_so(client, fake):
@@ -141,3 +143,25 @@ def test_a_guest_starter_routine_is_marked_sample(client, fake):
         json={"product_id": "the-ordinary-niacinamide-10-zinc-1", "slots": ["am"]},
     ).json()
     assert mine["sample"] is False
+
+
+def test_a_price_range_with_no_cleanser_falls_back_instead_of_dead_ending(client, fake):
+    res = client.post("/v1/plan", json={**US, "tier": "premium"})
+    assert res.status_code == 200, res.json()
+    assert any("price range" in n for n in res.json()["notes"])
+
+
+def test_nothing_fits_says_what_ruled_products_out(client, fake):
+    safety_ = {**US.get("safety", {}), "avoid": ["fragrance"], "reactive": True}
+    body = {
+        **US,
+        "reactive": True,
+        "safety": safety_,
+        "budget": {"max_per_product": 13.5, "currency": "USD"},
+    }
+    res = client.post("/v1/plan", json=body)
+    assert res.status_code == 422
+    d = res.json()["detail"]
+    assert d["nearest"]["price"] > 13.5
+    if d["step"] == "flags":
+        assert "ruled out by your answers" in d["message"] and d["reasons"][0]["n"] >= 1

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import type { Campaign } from '../../../../lib/api'
 import { audienceText, ctrText, dateRange, HOLDOUT_MIN, timeLeft } from '../../promote'
 import { DataTable, int, LiftValue, ProductCell, useTooltip, type Column } from '../../ui'
-import { StatusBadge, type Confirm } from './CampaignCard'
+import { SampleBadge, StatusBadge, type Confirm } from './CampaignCard'
 import { useCampaignActions } from './useCampaignActions'
 
 /*
@@ -69,10 +69,11 @@ export function CampaignsTable({ campaigns, heading, toolbar, highlight, onOpen,
       cell: (c) => (
         <span className="flex items-center gap-2 whitespace-nowrap">
           <StatusBadge status={c.status} />
+          {c.sample ? <SampleBadge short /> : null}
           <span className="truncate text-proof-small text-ink-2">{c.status === 'ended' ? '' : timeLeft(c)}</span>
         </span>
       ),
-      csv: (c) => `${c.status} · ${timeLeft(c)}`,
+      csv: (c) => `${c.status} · ${timeLeft(c)}${c.sample ? ' · sample (simulated)' : ''}`,
     },
     {
       id: 'audience',

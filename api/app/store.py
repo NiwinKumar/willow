@@ -65,6 +65,9 @@ class Store(Protocol):
     def campaign_member_get(self, cid: str, member_id: str) -> Doc | None: ...
     def campaign_member_update(self, cid: str, member_id: str, fields: Doc) -> None: ...
     def campaign_members(self, cid: str) -> list[Doc]: ...
+    def campaign_seed(
+        self, cid: str, doc: Doc, days: list[Doc], members: list[tuple[str, Doc]]
+    ) -> None: ...
     # Shelf vs results (app/shelf.py): shelf/{uid}, the retailer's uploaded facings or stock.
     def shelf_get(self, uid: str) -> Doc | None: ...
     def shelf_set(self, uid: str, doc: Doc) -> None: ...
@@ -409,6 +412,22 @@ class FirestoreStore:
 
     def campaign_members(self, cid: str) -> list[Doc]:
         return [s.to_dict() for s in self._db().collection(f"campaigns/{cid}/members").stream()]
+
+    def campaign_seed(
+        self, cid: str, doc: Doc, days: list[Doc], members: list[tuple[str, Doc]]
+    ) -> None:
+        """A sample campaign (app/dev_seed.py) in batched writes: its daily rows and members
+        first, the campaign itself last, so a campaign never shows half written. Every write
+        is a set, so seeding again rewrites the same documents."""
+        db = self._db()
+        writes = [(db.document(f"campaigns/{cid}/daily/{d['day']}"), d) for d in days]
+        writes += [(db.document(f"campaigns/{cid}/members/{mid}"), m) for mid, m in members]
+        writes.append((db.document(f"campaigns/{cid}"), doc))
+        for start in range(0, len(writes), 450):  # a batch holds at most 500 writes
+            batch = db.batch()
+            for ref, data in writes[start : start + 450]:
+                batch.set(ref, data)
+            batch.commit()
 
     def shelf_get(self, uid: str) -> Doc | None:
         snap = self._db().document(f"shelf/{uid}").get()
@@ -845,6 +864,15 @@ class MemoryStore:
 
     def campaign_members(self, cid: str) -> list[Doc]:
         return [copy.deepcopy(d) for (c, _), d in self.campaign_member.items() if c == cid]
+
+    def campaign_seed(
+        self, cid: str, doc: Doc, days: list[Doc], members: list[tuple[str, Doc]]
+    ) -> None:
+        for d in days:
+            self.campaign_daily[(cid, d["day"])] = copy.deepcopy(d)
+        for mid, m in members:
+            self.campaign_member[(cid, mid)] = copy.deepcopy(m)
+        self.campaigns[cid] = copy.deepcopy(doc)
 
     def shelf_get(self, uid: str) -> Doc | None:
         return copy.deepcopy(self.shelf.get(uid))

@@ -245,7 +245,8 @@ class Episode:
     # -- state --------------------------------------------------------------------------------
 
     def _mine(self) -> list[tuple[str, Doc]]:
-        return self.store.campaigns_of(self.uid)
+        # sample campaigns (simulated, app/dev_seed.py) are never the agent's to read or act on
+        return [(c, d) for c, d in self.store.campaigns_of(self.uid) if not campaigns.is_sample(d)]
 
     def _rule_campaigns(self) -> list[tuple[str, Doc]]:
         return [(c, d) for c, d in self._mine() if d.get("rule_id") == self.rid]

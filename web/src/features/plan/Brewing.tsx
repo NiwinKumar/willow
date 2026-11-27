@@ -8,7 +8,9 @@ import { putSafety } from '../../lib/safety'
 import { useAuth } from '../../lib/useAuth'
 import { useReducedMotion } from '../../lib/useReducedMotion'
 import { usePlan } from './draft'
-import { errorText, postPlan, saveLastPlan, type FunnelStep, type PlanResponse } from './planApi'
+import { errorText, money, postPlan, saveLastPlan, type FunnelStep, type PlanResponse } from './planApi'
+
+type Nearest = { product_id: string; brand: string; name: string; price: number; currency: string; budget: number }
 import { card, cardStyle, primary, secondary } from './styles'
 import { Frame } from './ui'
 
@@ -28,12 +30,12 @@ const GOLDEN = Math.PI * (3 - Math.sqrt(5))
  * it. About four seconds, skippable; with reduced motion the counts are simply shown.
  */
 export function Brewing() {
-  const { request, draft, setResult, go } = usePlan()
+  const { request, draft, setResult, go, set } = usePlan()
   const { user, continueAsGuest, getIdToken } = useAuth()
   const { saveProfile, profile } = useData()
   const reduce = useReducedMotion()
   const [plan, setPlan] = useState<PlanResponse | null>(null)
-  const [error, setError] = useState<{ fits: boolean; text: string } | null>(null)
+  const [error, setError] = useState<{ fits: boolean; text: string; nearest?: Nearest | null; reasons?: { label: string; n: number }[] } | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [played, setPlayed] = useState(-1)
   const [skip, setSkip] = useState(false)
@@ -55,7 +57,10 @@ export function Brewing() {
       setPlan(res)
     } catch (e) {
       if (!live()) return
-      if (e instanceof ApiError && e.status === 422) setError({ fits: false, text: errorText(e, 'Nothing in the catalog fits all of these answers yet.') })
+      if (e instanceof ApiError && e.status === 422) {
+        const d = e.detail ?? {}
+        setError({ fits: false, text: errorText(e, 'Nothing in the catalog fits all of these answers yet.'), nearest: (d.nearest as Nearest | undefined) ?? null, reasons: (d.reasons as { label: string; n: number }[] | undefined) ?? [] })
+      }
       else setError({ fits: true, text: errorText(e, 'Willow could not build your routine just now. Check your connection and try again.') })
     }
   })
@@ -98,7 +103,13 @@ export function Brewing() {
       <Frame eyebrow={error.fits ? 'SOMETHING WENT WRONG' : 'NOTHING FITS YET'} title={error.fits ? 'Your routine is not ready' : 'Nothing fits all of that yet'}>
         <div className={`${card} flex animate-[wRise_.45s_var(--ease-standard)_both] flex-col gap-3 px-5 py-5`} style={cardStyle}>
           <p className="m-0 text-[15px] leading-[1.5]">{error.text}</p>
-          {!error.fits ? <p className="m-0 text-[13.5px] leading-[1.45] text-ink-2">A higher budget, a wider price range or another market usually opens it up. Your other answers stay as they are.</p> : null}
+          {!error.fits && error.nearest ? (
+            <p className="m-0 text-[13.5px] leading-[1.45] text-ink-2">
+              The nearest fit for your answers is {error.nearest.brand} {error.nearest.name} at {money(error.nearest.price, error.nearest.currency)}. Your other answers stay as they are.
+            </p>
+          ) : !error.fits ? (
+            <p className="m-0 text-[13.5px] leading-[1.45] text-ink-2">A higher budget or another market usually opens it up. Your other answers stay as they are.</p>
+          ) : null}
           <div className="flex flex-col gap-2 pt-1 sm:flex-row">
             {error.fits ? (
               <button type="button" className={`${primary} sm:flex-1`} onClick={retry}>
@@ -106,7 +117,19 @@ export function Brewing() {
               </button>
             ) : (
               <>
-                <button type="button" className={`${primary} sm:flex-1`} onClick={() => go('budget')}>
+                {error.nearest ? (
+                  <button
+                    type="button"
+                    className={`${primary} sm:flex-1`}
+                    onClick={() => {
+                      set({ budget: error.nearest!.budget })
+                      retry()
+                    }}
+                  >
+                    Use a {money(error.nearest.budget, error.nearest.currency)} budget
+                  </button>
+                ) : null}
+                <button type="button" className={`${error.nearest ? secondary : primary} sm:flex-1`} onClick={() => go('budget')}>
                   Change my budget
                 </button>
                 <button type="button" className={`${secondary} sm:flex-1`} onClick={() => go('care')}>

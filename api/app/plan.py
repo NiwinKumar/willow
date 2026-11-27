@@ -439,34 +439,86 @@ def _why(ctx: _Ctx, p: dict[str, Any], slot: str, goal: str | None) -> list[str]
     return [w for w in why if w]
 
 
+def _blockers(ctx: _Ctx, p: dict[str, Any]) -> list[str]:
+    """Why the person's answers rule this product out, in short words ("lists fragrance")."""
+    out: list[str] = []
+    c = ctx.check(p)
+    if c["status"] == "not_sold":
+        out.append("not sold as a cosmetic where you are")
+    for f in c.get("flags") or []:
+        if f.get("level") == "avoid":
+            t = f.get("title") or f.get("rule") or "flagged"
+            out.append(t[:1].lower() + t[1:])
+    if ctx.no_fragrance and safety.has_fragrance(p):
+        out.append("lists fragrance")
+    return list(dict.fromkeys(out))
+
+
+def _nearest(ctx: _Ctx, inslot: list[dict[str, Any]], slot: str) -> dict[str, Any] | None:
+    """The cheapest product for this slot that the person's answers allow, above the budget:
+    what one tap on "use a higher budget" would unlock."""
+    b = ctx.req.budget
+    ok = [
+        (amount, p)
+        for p in inslot
+        if ctx.in_market(p)
+        and ctx.unflagged(p)
+        and _skin_fits(p, ctx.req.skin_type)
+        and (amount := ctx.price(p)) is not None
+        and (b is None or amount > b.max_per_product)
+    ]
+    if not ok:
+        return None
+    amount, p = min(ok, key=lambda x: x[0])
+    return {
+        "product_id": p["product_id"],
+        "brand": p["brand"],
+        "name": p["name"],
+        "price": amount,
+        "currency": ctx.currency,
+        "budget": math.ceil(amount),
+    }
+
+
 def _nothing_fits(ctx: _Ctx, slot: str, pool: list[dict[str, Any]]) -> HTTPException:
     """Which step left this base slot empty, in words; `step` names it (market, price, budget,
-    tier, flags or fit)."""
+    flags or fit). `reasons` counts what ruled the budget's products out, and `nearest` is the
+    closest product the answers allow, so the screen can offer one tap instead of a dead end."""
     word = SLOT_WORD[slot]
     inslot = [p for p in pool if p["category"] == slot]
     market = [p for p in inslot if ctx.in_market(p)]
     b = ctx.req.budget
+    limit = _money(b.max_per_product, ctx.currency or b.currency) if b else ""
+    reasons: list[dict[str, Any]] = []
     if not market:
         where = MARKET_WORDS.get(ctx.market or "", "where you are")
         step, msg = "market", f"No {word} in the catalog is sold as a cosmetic in {where} yet."
     elif ctx.currency and not [p for p in market if ctx.price(p) is not None]:
         step, msg = "price", f"No {word} in the catalog has a checked price in {ctx.currency} yet."
     elif b and not [p for p in market if ctx.in_budget(p, with_tier=False)]:
-        limit = _money(b.max_per_product, ctx.currency or b.currency)
-        step, msg = (
-            "budget",
-            f"Nothing in the catalog fits a budget under {limit}; try a higher budget.",
-        )
-    elif not [p for p in market if ctx.in_budget(p)]:
-        step = "tier"
-        msg = f"No {word} in the catalog is in the {ctx.req.tier} price range; try any range."
-    elif not [p for p in market if ctx.in_budget(p) and ctx.unflagged(p)]:
+        step, msg = "budget", f"No {word} in the catalog costs {limit} or less."
+    elif not [p for p in market if ctx.in_budget(p, with_tier=False) and ctx.unflagged(p)]:
         step = "flags"
-        msg = f"Every {word} in your budget is flagged for your profile; try a higher budget."
+        counts: dict[str, int] = {}
+        for p in market:
+            if ctx.in_budget(p, with_tier=False):
+                for r in _blockers(ctx, p) or ["flagged for your answers"]:
+                    counts[r] = counts.get(r, 0) + 1
+        reasons = [{"label": k, "n": v} for k, v in sorted(counts.items(), key=lambda x: -x[1])]
+        said = ", ".join(f"{r['n']} {r['label']}" for r in reasons[:3])
+        where = f"under {limit}" if limit else "in your budget"
+        msg = f"Every {word} {where} is ruled out by your answers: {said}."
     else:
         step = "fit"
         msg = f"No {word} in your budget suits {SKIN_TITLE[ctx.req.skin_type].lower()} skin."
-    return HTTPException(422, {"code": "nothing_fits", "message": msg, "step": step})
+    detail: dict[str, Any] = {"code": "nothing_fits", "message": msg, "step": step}
+    if reasons:
+        detail["reasons"] = reasons
+    if step in ("budget", "flags", "fit"):
+        near = _nearest(ctx, inslot, slot)
+        if near:
+            detail["nearest"] = near
+    return HTTPException(422, detail)
 
 
 def _profile_block(ctx: _Ctx) -> dict[str, Any]:
@@ -551,6 +603,11 @@ def _build(ctx: _Ctx) -> dict[str, Any]:
         return bool(max_actives and goals and _active_ok(ctx, p) and _concern_hits(p, goals))
 
     fit = [p for p in unflagged if fits(p)]
+    # The price range is a preference, not a wall: a slot with nothing in that range takes the
+    # closest product from any range within the budget, and says so.
+    fit_any_range = [
+        p for p in market if ctx.in_budget(p, with_tier=False) and ctx.unflagged(p) and fits(p)
+    ]
     funnel = [
         {"id": "catalog", "label": "Products in the catalog", "n": len(everything)},
         {"id": "market", "label": "Sold where you are", "n": len(market)},
@@ -585,6 +642,16 @@ def _build(ctx: _Ctx) -> dict[str, Any]:
         ranked = sorted(
             (p for p in fit if p["category"] == slot), key=lambda p: _rank(ctx, p, goals)
         )
+        if not ranked and req.tier != "any":
+            ranked = sorted(
+                (p for p in fit_any_range if p["category"] == slot),
+                key=lambda p: _rank(ctx, p, goals),
+            )
+            if ranked:
+                notes_extra.append(
+                    f"No {SLOT_WORD[slot]} fits the {req.tier} range, so this one is from "
+                    "another price range within your budget."
+                )
         if not ranked:
             raise _nothing_fits(ctx, slot, everything)
         pick(slot, "am" if slot == "sunscreen" else "both", ranked, None, 0)
