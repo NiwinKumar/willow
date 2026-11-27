@@ -104,6 +104,8 @@ class Record(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     category: Category
     concerns: list[Concern] = Field(default_factory=list)
+    # How empty concerns were filled (scripts/fill_catalog_concerns.py); missing: researched.
+    concerns_source: Literal["brand_page", "name"] | None = None
     key_actives: list[KeyActive] = Field(default_factory=list)
     inci: list[str] = Field(default_factory=list)
     price: Price | None = None
@@ -167,7 +169,7 @@ def _dump(r: Record) -> dict[str, Any]:
     out = r.model_dump()
     if not out["notes"]:
         del out["notes"]
-    for k in ("image_url", "image_source"):
+    for k in ("image_url", "image_source", "concerns_source"):
         if out[k] is None:
             del out[k]
     return out

@@ -279,6 +279,18 @@ _ASKED_PERCENT = re.compile(r"\d+(?:[.,]\d+)?(?=\s*(?:%|percent))", re.IGNORECAS
 _UNSAFE_WORDS = re.compile(r"\bsafe(?:ly|st|r|ty)?\b", re.IGNORECASE)
 
 
+def _digit_names(insights: dict[str, Any]) -> set[str]:
+    """Product names (lower case, with and without the brand) that contain a digit."""
+    out: set[str] = set()
+    for key in ("products", "product_outcomes"):
+        rows = insights.get(key) or []
+        for p in rows.values() if isinstance(rows, dict) else rows:
+            name = str(p.get("product") or "")
+            if any(c.isdigit() for c in name):
+                out |= {name.lower(), f"{p.get('brand', '')} {name}".strip().lower()}
+    return out
+
+
 def problems(
     reply: Answer, insights: dict[str, Any], question: str, scope: Scope | None = None
 ) -> list[str]:
@@ -289,7 +301,12 @@ def problems(
     # A percent the question supplies may not come back, even when the same figure sits somewhere
     # in the data ("is it 95%?" must not be echoed as if it were the answer). Bare numbers in the
     # question (weeks, counts) stay allowed: "by week 8" is a legitimate thing to answer about.
-    asked = set().union(*(numbers.in_text(m) for m in _ASKED_PERCENT.findall(question)))
+    # A name in the question is not a figure it supplies: "Alpha Arbutin 2% Face Serum" must not
+    # stop the answer from naming that product.
+    asked_text = question.lower()
+    for name in sorted(_digit_names(insights), key=len, reverse=True):
+        asked_text = asked_text.replace(name, " ")
+    asked = set().union(*(numbers.in_text(m) for m in _ASKED_PERCENT.findall(asked_text)))
     allowed = (plain | pct) - asked
     found = []
     texts = [reply.answer, *reply.follow_ups, reply.chart.title if reply.chart else ""]
@@ -340,14 +357,55 @@ NAMES_HIDDEN = (
 )
 
 
-def ask(question: str, insights: dict[str, Any], scope: Scope | None = None) -> dict[str, Any]:
+HISTORY_TURNS = 2  # earlier turns of a conversation given as context to a follow-up
+
+
+def masked_text(text: str, scope: Scope) -> str:
+    """Free text (a question, an earlier answer) with other brands' names replaced by their
+    aliases, as in the aggregates; unchanged when names are allowed."""
+    pattern = _hidden_pattern(scope)
+    if pattern is None:
+        return text
+    return pattern.sub(lambda m: scope.hidden.get(m.group(0), m.group(0)), text)
+
+
+def history_block(history: list[tuple[str, str]] | None, scope: Scope) -> str:
+    """The last turns of the conversation (question and answer text only), so "and for dry
+    skin?" can be answered. Context, not data: the checks still take every number from INSIGHTS,
+    never from an earlier answer. In a masked scope other brands' names are masked here too."""
+    turns = (history or [])[-HISTORY_TURNS:]
+    if not turns:
+        return ""
+
+    def clean(text: str) -> str:
+        return masked_text(" ".join(text.split())[:900], scope)
+
+    lines = "\n".join(f"Q: {clean(q)}\nA: {clean(a)}" for q, a in turns)
+    return (
+        "EARLIER IN THIS CONVERSATION (context only, to resolve what the new question refers "
+        "to; quote numbers only from INSIGHTS, never from here):\n"
+        f"{lines}\n\n"
+    )
+
+
+def ask(
+    question: str,
+    insights: dict[str, Any],
+    scope: Scope | None = None,
+    history: list[tuple[str, str]] | None = None,
+) -> dict[str, Any]:
     scope = scope or Scope()
     # A masked scope: Gemini sees aliases only, and the checks (names, numbers, provenance) run
     # on the same masked aggregates.
     insights = mask(insights, scope)
+    # the question too: a competitor typed by a brand's team reads as its alias
+    question = masked_text(question, scope)
     data = view(insights)
     # Compact JSON: fewer input tokens, a faster answer.
-    prompt = f"INSIGHTS (JSON):\n{json.dumps(data, separators=(',', ':'))}\n\nQUESTION: {question}"
+    prompt = (
+        f"INSIGHTS (JSON):\n{json.dumps(data, separators=(',', ':'))}\n\n"
+        f"{history_block(history, scope)}QUESTION: {question}"
+    )
     found: list[str] = []
     for attempt in range(2):
         try:

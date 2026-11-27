@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app import limits, proof_ai, retail_intel, retailer, retailer_ask
+from app import brand_logos, limits, proof_ai, retail_intel, retailer, retailer_ask
 from app.auth import AuthUser, current_user
 from app.store import Store, get_store
 
@@ -157,8 +157,12 @@ def proof_brands(
     cohort: retailer.Cohort = Query("mixed", description="simulated | mixed | real"),
     range_: retailer.Range = Query("all", alias="range", description="30d | 90d | all"),
 ) -> dict[str, Any]:
-    """Every catalog brand: users, outcome rate with CI, continuation, share of routines."""
-    return _proof(retail_intel.brands_list, cohort, range_)
+    """Every catalog brand: users, outcome rate with CI, continuation, share of routines, and its
+    logo (app/brand_logos.py; null when none was found)."""
+    out = _proof(retail_intel.brands_list, cohort, range_)
+    # a copy: the cached view is shared between requests
+    rows = [{**r, "logo_url": brand_logos.logo_of(r.get("brand"))} for r in out["brands"]]
+    return {**out, "brands": rows}
 
 
 @router.get("/brands/{brand}")

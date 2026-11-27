@@ -16,6 +16,7 @@ research/finals/06 section 6.2: seeded organisations with real membership).
 """
 
 import json
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -26,11 +27,12 @@ from typing import Any
 
 from fastapi import Depends, HTTPException
 
-from app import catalog
+from app import brand_logos, catalog
 from app.auth import AuthUser, current_user
 from app.store import Doc, Store, get_store, iso
 
 SEED = Path(__file__).resolve().parent.parent / "seed" / "proof_instances.json"
+log = logging.getLogger("willow.proof_orgs")
 ROLES = ("viewer", "analyst", "admin")  # ascending: each role can do what the ones before can
 RANK = {r: i for i, r in enumerate(ROLES)}
 
@@ -88,6 +90,8 @@ def _seed() -> dict[str, Any]:
             "accent": inst["accent"],
             "domains": [d.lower() for d in inst["domains"]],
             "demo": bool(inst.get("demo")),
+            # a short line under the name, so the web can tell a demo catalog from a retailer
+            "label": inst.get("label"),
             "orgs": out,
         }
     return {"default": raw["default"], "instances": instances, "orgs": orgs}
@@ -122,12 +126,16 @@ def org_view(o: dict[str, Any]) -> dict[str, Any]:
         "brands": o["brands"],
         "all_brands": o["all_brands"],
         "verified": o["verified"],
+        # a brand org's own logo (app/brand_logos.py); a retailer has none seeded
+        "logo_url": brand_logos.logo_of(o["brands"][0])
+        if o["kind"] == "brand" and o["brands"]
+        else None,
     }
 
 
 def instance_view(inst: dict[str, Any]) -> dict[str, Any]:
     return {
-        "instance": {k: inst[k] for k in ("id", "name", "accent", "domains", "demo")},
+        "instance": {k: inst[k] for k in ("id", "name", "label", "accent", "domains", "demo")},
         "orgs": [org_view(o) for o in inst["orgs"]],
     }
 
@@ -201,9 +209,10 @@ def has_real_membership(store: Store, uid: str) -> bool:
 def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Doc:
     """'Try as' an org of a demo instance: a demo membership with the chosen role. Joining again
     changes the role and makes it the current org (active_at). A real membership is never
-    downgraded to a demo one. The first join of an org (no membership yet) also seeds that
-    person's sample campaigns for it (app/dev_seed.py), before the membership is written: if
-    seeding fails, the join fails and the next one seeds again (same ids, nothing doubled)."""
+    downgraded to a demo one. A join whose membership has no current sample portfolio (none yet,
+    or an older version) also seeds that person's sample campaigns for it (app/dev_seed.py).
+    Samples never fail a join: when the outcomes are unavailable the membership is saved without
+    the mark and `ensure_samples` tries again on the next GET /v1/proof/me."""
     inst = instance(instance_id)
     if inst is None:
         raise HTTPException(404, {"code": "not_found", "message": "No such Proof instance."})
@@ -220,8 +229,7 @@ def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Do
         )
     at = datetime.now(UTC)
     had = store.proof_member_get(instance_id, org_id, uid)
-    if not (had or {}).get("samples"):
-        _seed_samples(store, uid, org_id)
+    seeded = _seed_samples(store, uid, org_id) if needs_samples(had or {}) else True
     if had and not had.get("demo"):
         doc = {**had, "active_at": at}
     else:
@@ -234,29 +242,59 @@ def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Do
             "joined_at": (had or {}).get("joined_at") or at,
             "active_at": at,
         }
-    doc["samples"] = True
+    if seeded:
+        doc["samples"] = max(SAMPLES_VERSION, _mark(had or {}))
+    else:
+        doc.pop("samples", None)
     store.proof_member_set(instance_id, org_id, uid, doc)
     return doc
 
 
-def _seed_samples(store: Store, uid: str, org_id: str) -> None:
-    from app import dev_seed  # lazy: dev_seed -> campaigns -> proof_orgs
+# The sample portfolio's version, kept on the membership as `samples`. 1 (stored as `true`): the
+# first member-based samples; 2: built from the measured outcomes (dev_seed, Nov 27). A membership
+# below this version is re-seeded: its old samples are deleted first.
+SAMPLES_VERSION = 2
 
-    dev_seed.seed_demo_campaigns(store, uid, org_id)
+
+def _mark(m: Doc) -> int:
+    mark = m.get("samples")
+    return int(mark) if isinstance(mark, int | bool) else 0  # True (version 1) -> 1
+
+
+def needs_samples(m: Doc) -> bool:
+    return _mark(m) < SAMPLES_VERSION
+
+
+def _seed_samples(store: Store, uid: str, org_id: str) -> bool:
+    """Replace this person's sample campaigns for this org with the current portfolio. Only
+    campaigns marked `sample` with this owner and org are deleted, never a real or a non-sample
+    demo campaign. False (nothing marked) when the outcomes are unavailable."""
+    from app import campaigns, dev_seed  # lazy: dev_seed -> campaigns -> proof_orgs
+
+    for cid, d in store.campaigns_of(uid):
+        if campaigns.is_sample(d) and d.get("owner_uid") == uid and d.get("org_id") == org_id:
+            store.campaign_delete(cid)
+    try:
+        dev_seed.seed_demo_campaigns(store, uid, org_id)
+    except dev_seed.SamplesUnavailable as exc:
+        log.warning("sample campaigns unavailable for org %s: %s", org_id, exc)
+        return False
+    return True
 
 
 def ensure_samples(store: Store, uid: str, rows: list[Doc]) -> None:
-    """Memberships made before sample campaigns existed (or whose seeding never ran) get them the
-    next time the person opens Proof, so every account looks the same. Only demo memberships of
-    demo instances; marked `samples` once done, so it runs once per membership (seeding itself
-    never doubles a product)."""
+    """Memberships without the current sample portfolio (made before samples existed, an older
+    version, or a join whose seeding could not run) get it the next time the person opens Proof,
+    so every account looks the same. Only demo memberships of demo instances; marked with the
+    version once done, so it runs once per membership and version."""
     for m in rows:
         inst = instance(m.get("instance", ""))
-        if m.get("samples") or not m.get("demo") or not (inst and inst["demo"]):
+        if not needs_samples(m) or not m.get("demo") or not (inst and inst["demo"]):
             continue
-        _seed_samples(store, uid, m["org_id"])
-        store.proof_member_set(m["instance"], m["org_id"], uid, {**m, "samples": True})
-        m["samples"] = True
+        if not _seed_samples(store, uid, m["org_id"]):
+            continue  # tried again on the next visit
+        store.proof_member_set(m["instance"], m["org_id"], uid, {**m, "samples": SAMPLES_VERSION})
+        m["samples"] = SAMPLES_VERSION
 
 
 def forbidden(message: str) -> HTTPException:
