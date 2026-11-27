@@ -1,6 +1,6 @@
-"""Embed every catalog product's formula once, for "Similar formula" (app/similar.py).
+"""Embed full catalog products' formulas, for "Similar formula" (app/similar.py).
 
-    cd api && uv run python scripts/embed_catalog.py            # all products, writes the seed
+    cd api && uv run python scripts/embed_catalog.py            # full products, writes the seed
     cd api && uv run python scripts/embed_catalog.py --check    # which products are missing/stale
 
 The text embedded is the formula, not the marketing: category, key actives with their printed %,
@@ -81,12 +81,12 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="report missing or stale rows only")
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
-    products = catalog.products()
+    products = [product for product in catalog.products() if catalog.is_full(product)]
     texts = {p["product_id"]: formula_text(p) for p in products}
     old = json.loads(OUT.read_text()) if OUT.exists() else {"items": {}, "hashes": {}}
     stale = [pid for pid, t in texts.items() if old.get("hashes", {}).get(pid) != text_hash(t)]
     if args.check:
-        print(f"{len(products)} products, {len(stale)} missing or stale: {stale[:10]}")
+        print(f"{len(products)} full products, {len(stale)} missing or stale: {stale[:10]}")
         return 1 if stale else 0
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         vectors = dict(zip(texts, pool.map(embed, texts.values()), strict=True))
