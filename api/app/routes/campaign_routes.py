@@ -1,5 +1,6 @@
 """Proof-gated promotion: retailer campaigns and the consumer's sponsored card (app/campaigns.py).
-Sign-in required on every route (guest accounts included)."""
+Sign-in required on every route (guest accounts included). Creating a campaign also needs a Proof
+organisation membership (analyst or higher; app/proof_orgs.py)."""
 
 import re
 from typing import Any, Literal
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app import campaigns, catalog, limits
 from app.auth import AuthUser, current_user
 from app.routes.me_routes import Goal
+from app.settings import get_settings
 from app.store import Store, get_store, iso
 
 router = APIRouter(prefix="/v1", tags=["campaigns"])
@@ -32,6 +34,8 @@ class CampaignCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     product_id: str = Field(min_length=1, max_length=80)
     workspace: str = Field(min_length=1, max_length=80)  # 'retailer' or a catalog brand
+    # the Proof org it is created under (app/proof_orgs.py); null: the caller's fitting one
+    org_id: str | None = Field(default=None, min_length=1, max_length=80)
     goals: list[Goal] = Field(min_length=1, max_length=8)
     skin_types: list[SkinType] = Field(
         default_factory=list, max_length=5
@@ -72,8 +76,10 @@ def create_campaign(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """Proven products only, goals within the evidence, a brand only its own products; at most
-    3 running per owner (429)."""
+    """Proven products only, goals within the evidence, a brand only its own products; one live
+    campaign per product (409 already_running); at most 3 running per owner (429). 403 without
+    an analyst membership of an org that owns the brand; a campaign made under a demo membership
+    is `demo` (shown to guests only)."""
     product = catalog.by_id(body.product_id)
     if product is None:
         raise HTTPException(404, {"code": "not_found", "message": "product not found"})
@@ -82,12 +88,17 @@ def create_campaign(
             422,
             {"code": "bad_request", "message": "Unknown workspace.", "field": "workspace"},
         )
+    member = campaigns.authorize(store, user.uid, product, body.workspace, body.org_id)
+    # a brand org always promotes as its brand, whatever workspace the page was showing
+    workspace = product["brand"] if member.org["kind"] == "brand" else body.workspace
     try:
-        reasons = campaigns.check(product, body.workspace, list(body.goals), list(body.skin_types))
+        reasons = campaigns.check(product, workspace, list(body.goals), list(body.skin_types))
     except campaigns.Unavailable as exc:
         raise campaigns.unavailable() from exc
     if reasons:
         raise _not_eligible(reasons)
+    if campaigns.live_on(store, user.uid, product["product_id"], member.instance):
+        raise campaigns.already_running()
     if campaigns.active_count(store, user.uid) >= campaigns.MAX_ACTIVE:
         raise campaigns.too_many()
     limits.take(store, user.uid, "campaign_create")
@@ -95,11 +106,12 @@ def create_campaign(
         store,
         user.uid,
         product,
-        body.workspace,
+        workspace,
         list(body.goals),
         list(body.skin_types),
         body.days,
         body.holdout_pct,
+        member=member,
     )
     return campaigns.view(store, cid, doc)
 
@@ -154,6 +166,8 @@ def patch_campaign(
             raise campaigns.unavailable() from exc
         if reasons:
             raise _not_eligible(reasons)
+        if campaigns.live_on(store, user.uid, doc["product_id"], doc.get("instance"), cid):
+            raise campaigns.already_running()
         if campaigns.active_count(store, user.uid, exclude=cid) >= campaigns.MAX_ACTIVE:
             raise campaigns.too_many()
     fields = {"status": body.status, "updated_at": campaigns.now()}
@@ -177,8 +191,10 @@ def sponsored(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """At most one sponsored product for this person today, or null."""
-    return {"item": campaigns.sponsored(store, user.uid)}
+    """At most one sponsored product for this person today, or null. Guests (anonymous accounts;
+    everyone under AUTH_MODE=dev, as in demo_routes) may also see demo campaigns."""
+    guest = user.is_anonymous or get_settings().auth_mode == "dev"
+    return {"item": campaigns.sponsored(store, user.uid, guest=guest)}
 
 
 class SponsoredEvent(BaseModel):

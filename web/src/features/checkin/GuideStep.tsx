@@ -66,14 +66,14 @@ export function GuideStep(props: {
     <div className="relative mx-auto grid max-w-[1180px] animate-rise grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-4 px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <section
         aria-labelledby="ck-title"
-        className="relative flex min-h-[540px] flex-col justify-between gap-6 overflow-hidden rounded-xl p-[clamp(24px,4vw,40px)] text-inverse squircle"
+        className="relative flex min-h-[420px] flex-col justify-between gap-6 overflow-hidden rounded-[32px] p-[clamp(20px,4vw,40px)] text-inverse squircle sm:min-h-[540px] sm:rounded-xl"
         style={{ background: GUIDE_BG[kind], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -30px 60px rgba(255,255,255,.12), 0 40px 80px -40px rgba(60,20,90,.6)' }}
       >
         <div>
-          <span className="font-mono text-[12px] tracking-[.08em] opacity-90">
-            ■ {name.toUpperCase()} · {first ? (thin && baseline ? 'NEW BASELINE' : 'FIRST SESSION') : 'LATER SESSION'}
+          <span className="text-[14px] opacity-90">
+            {name} · {first ? (thin && baseline ? 'new baseline' : 'first session') : 'later session'}
           </span>
-          <h1 id="ck-title" tabIndex={-1} className="mt-[18px] mb-0 text-[clamp(30px,3.4vw,44px)] leading-[1.05] font-light tracking-[-0.02em] outline-none">
+          <h1 id="ck-title" tabIndex={-1} className="mt-3 mb-0 text-[clamp(28px,3.4vw,44px)] sm:mt-[18px] leading-[1.05] font-light tracking-[-0.02em] outline-none">
             {sides ? `${total} photos: ${total - 2} facing the camera, then each cheek.` : first ? `${n} photos today, then 3 each time after.` : `${n} photos, the same way as your baseline.`}
           </h1>
         </div>

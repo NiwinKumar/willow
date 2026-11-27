@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { api } from '../../lib/api'
+import { useOrgMaybe } from './org'
 import { fetchBrandList } from './productData'
 import { totalUsers } from './data'
 import { useRetailState } from './state'
@@ -29,7 +30,7 @@ const RetailCtx = createContext<Ctx | null>(null)
 const insightsCache = new Map<string, Promise<Insights>>()
 const brandsCache = new Map<string, Promise<BrandSummary[] | null>>()
 
-function fetchInsights(f: Filters, attempt: number): Promise<Insights> {
+export function fetchInsights(f: Filters, attempt = 0): Promise<Insights> {
   const key = `${f.cohort}|${f.range}|${attempt}`
   let p = insightsCache.get(key)
   if (!p) {
@@ -98,8 +99,10 @@ export function RetailDataProvider({ children }: { children: ReactNode }) {
     return [...brandsFromInsights(d)].map(([brand, products]) => ({ brand, slug: slugOf(brand), products: products || null, summary: null })).sort((a, b) => a.brand.localeCompare(b.brand))
   }, [list, d])
 
-  const slug = ws.kind === 'brand' ? ws.slug : null
-  const workspace = useMemo<Workspace>(() => (slug ? { kind: 'brand', slug, brand: brands.find((b) => b.slug === slug)?.brand ?? null } : { kind: 'retailer' }), [slug, brands])
+  // A brand organisation sees its own brand's workspace only (?as= is ignored); the retailer can view any brand.
+  const locked = useOrgMaybe()?.lockedBrand ?? null
+  const slug = locked ? slugOf(locked) : ws.kind === 'brand' ? ws.slug : null
+  const workspace = useMemo<Workspace>(() => (slug ? { kind: 'brand', slug, brand: locked ?? brands.find((b) => b.slug === slug)?.brand ?? null } : { kind: 'retailer' }), [slug, brands, locked])
 
   const value = useMemo<Ctx>(() => ({ insights, retry: () => setAttempt((a) => a + 1), brands, workspace, filters }), [insights, brands, workspace, filters])
   return <RetailCtx.Provider value={value}>{children}</RetailCtx.Provider>

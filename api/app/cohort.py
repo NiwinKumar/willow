@@ -2,6 +2,19 @@
 
 USERS simulated people, every row `is_synthetic = true`, fixed seed. What is simulated, stated
 plainly (the retailer page's "About this data" panel repeats it):
+- People and products: USERS people (30,000) using the 1,500 best-known catalog products in
+  api/seed/cohort_products.json (scripts/pick_cohort_products.py: the 48 products of the first
+  cohort, every full product with a measured concern, then index products of famous brands by
+  hero-product rank, balanced across categories and regions). Most products carry the
+  concerns their own page claims (catalog `concerns_source`); the ~200 cohort products still
+  without any are read from api/seed/cohort_concerns.json, inferred from the name and
+  category (concerns_of). Tests run a small cohort (conftest: 2,000 people over the first 48
+  products).
+- Region: a mix for a Singapore-based retailer (REGIONS: a third in Southeast Asia, then India,
+  Australia, Korea, Japan, Greater China, the US, UK, EU and the Gulf). Routines lean to products
+  sold where the person lives: a product's pick weight is REGION_PULL by its distance from the
+  person's region (app/regions.py: own region, then GLOBAL, then nearby regions), times a mild
+  fame weight that falls from 1 for the best known product to about 0.6 for the 1,500th.
 - Start: each person takes a baseline on a day in August, September or October 2026 (more in
   August), then a reading every week until today, unless they drop out. People whose first weekly
   reading is still in the future are not in the data yet.
@@ -13,10 +26,10 @@ plainly (the retailer page's "About this data" panel repeats it):
   of people. About 3 in 10 product uses stop at some week between 2 and 10.
 - Switching: about half the time a product use stops, the person starts a different catalog
   product in the same category for the same goal (any product in the category when it has no
-  other one for that goal, as for most sunscreens) 0 to 2 weeks later (it has its own effect, and
-  about 3 in 10 of these stop again 2 to 8 weeks after they start). Switchers lean strongly
-  toward category products that work for others and are popular: the choice is weighted by
-  ((1 + effect) * (1 + share of people already using it)) ** SWITCH_PULL.
+  other one for that goal) 0 to 2 weeks later (it has its own effect, and about 3 in 10 of these
+  stop again 2 to 8 weeks after they start). Switchers lean strongly toward category products
+  that work for others and are popular, and sold near them: the choice is weighted by
+  ((1 + effect) * (1 + share of people already using it)) ** SWITCH_PULL * region weight.
 - Product effect: a per-product drift towards the desired direction on the metrics its concerns
   map to (CATALOG_SPEC), growing to full size 6 weeks after the person starts it, between 0.2 and
   1.1 times the metric's MDC95; about 3 in 10 products have no effect. Effect sizes are invented:
@@ -28,11 +41,12 @@ plainly (the retailer page's "About this data" panel repeats it):
   centella, squalane) work better on dry and sensitive skin; strong retinoids and acids
   (retinol, retinal, glycolic acid, benzoyl peroxide, L-ascorbic acid, 1%+ salicylic acid) work
   less on sensitive skin; plus a small random spread per product and skin type (SKIN_EFFECT).
+  Index products have no actives listed, so only their concerns count here.
 - Noise: each weekly reading adds noise with the per-metric spread from the contract fixture, and
   the verdict is real_change only when |delta| exceeds the metric's MDC95, as in the product.
 - Skin type (oily, combination, dry, normal, sensitive; a fixed mix), skin-tone band and region
-  have no effect on which goals and products people pick; tone band and region have no effect on
-  outcomes.
+  have no effect on which goals people pick; tone band and region have no effect on outcomes
+  (region changes only which products people use).
 - 15% drop out between weeks 2 and 7.
 - Routine findings come from the app's own rule table (routine_check.rule_findings) on the
   products still in use: conflicts, a missing morning sunscreen, and duplicate actives.
@@ -42,16 +56,37 @@ import hashlib
 import json
 import math
 import random
+from bisect import bisect
 from datetime import UTC, date, datetime, timedelta
+from functools import lru_cache
+from itertools import accumulate
 from pathlib import Path
 from typing import Any
 
-from app import catalog, contract, routine_check
+from app import catalog, contract, regions, routine_check
 
 SEED = 7
-USERS = 2000
+USERS = 35000
+# How many of cohort_products.json the cohort uses (None: all). Tests set 48 (conftest).
+PRODUCT_LIMIT: int | None = None
 WEEKS = 8
-REGIONS = [("IN", 0.35), ("US", 0.2), ("UK", 0.1), ("KR", 0.1), ("SEA", 0.15), ("GCC", 0.1)]
+# Where people live: a mix for a Singapore-based retailer (app/regions.py region codes).
+REGIONS = [
+    ("SEA", 0.34),
+    ("IN", 0.12),
+    ("AU", 0.10),
+    ("KR", 0.08),
+    ("JP", 0.07),
+    ("CN", 0.07),
+    ("US", 0.07),
+    ("GCC", 0.06),
+    ("UK", 0.05),
+    ("EU", 0.04),
+]
+# Pick weight of a product by its distance from the person's region (regions.RANK: 0 own
+# region, 1 GLOBAL, then nearer to farther; FAR = no known region). Invented assumption.
+REGION_PULL = {0: 3.0, 1: 2.2, 2: 1.4, 3: 1.2, 4: 1.0}
+REGION_FAR = 0.8
 TONE_BANDS = ["very_light", "light", "intermediate", "tan", "brown", "dark"]
 # The profile's skin types (users/{uid}.profile.skin_type); a fixed mix. Skin type changes the
 # size of a product's effect (skin_effect), nothing else.
@@ -64,6 +99,8 @@ SKIN_EFFECT = {
     "strong": {"sensitive": 0.55, "dry": 0.85},
 }
 SKIN_SPREAD = (0.85, 1.15)  # random spread per product x skin type
+# Weekly drift of an effective product at full size, in units of the metric's MDC95 (invented).
+EFFECT_RANGE = (0.45, 1.2)
 SWITCH_SHARE = 0.5  # of stopped product uses, the share followed by another product
 # How strongly switchers lean toward category products that work for others and are popular
 # (an invented assumption): weight = ((1 + effect) * (1 + share already using it)) ** PULL.
@@ -140,7 +177,10 @@ UP_IS_GOOD = {"glow", "dark_circles"}
 TIERS = [("budget", 0, 700), ("mid", 700, 2000), ("premium", 2000, math.inf)]
 
 
-def tier(price: dict[str, Any]) -> str:
+def tier(price: dict[str, Any] | None) -> str | None:
+    """budget, mid or premium; None for a product with no checked price (an index product)."""
+    if not price:
+        return None
     amount = price["amount"] * (83 if price["currency"] == "USD" else 1)
     return next(name for name, lo, hi in TIERS if lo <= amount < hi)
 
@@ -159,8 +199,27 @@ def goals_of(ids: list[str] | None) -> list[str]:
     return out
 
 
+COHORT_CONCERNS = Path(__file__).resolve().parent.parent / "seed" / "cohort_concerns.json"
+
+
+@lru_cache
+def _inferred() -> dict[str, list[str]]:
+    return json.loads(COHORT_CONCERNS.read_text()) if COHORT_CONCERNS.exists() else {}
+
+
+def concerns_of(p: dict[str, Any]) -> list[str]:
+    """What Proof measures a product on: its catalog concerns, or for a product with none (an
+    index product of the cohort) the concerns inferred from its name (cohort_concerns.json)."""
+    return p["concerns"] or _inferred().get(p["product_id"], [])
+
+
 def product_goals(p: dict[str, Any]) -> list[str]:
-    return sorted({CONCERN_GOAL[c] for c in p["concerns"] if CONCERN_GOAL.get(c)})
+    return sorted({CONCERN_GOAL[c] for c in concerns_of(p) if CONCERN_GOAL.get(c)})
+
+
+def product_metrics(p: dict[str, Any]) -> list[str]:
+    """The metrics a product's concerns map to (empty: nothing Willow measures)."""
+    return sorted({m for c in concerns_of(p) for m in CONCERN_METRICS.get(c, [])})
 
 
 _OIL_ACTIVES = ("salicyl", "zinc", "kaolin", "bentonite", "benzoyl peroxide")
@@ -171,7 +230,7 @@ _STRONG_ACTIVES = ("retinol", "retinal", "glycolic acid", "benzoyl peroxide")
 def product_traits(p: dict[str, Any]) -> list[str]:
     """Which SKIN_EFFECT traits a catalog product has, from its concerns and key actives."""
     actives = [(a["name"].lower(), a.get("pct")) for a in p["key_actives"]]
-    concerns = set(p["concerns"])
+    concerns = set(concerns_of(p))
 
     def has(words: tuple[str, ...]) -> bool:
         return any(w in name for name, _ in actives for w in words)
@@ -281,7 +340,7 @@ def synthetic_feel(
     if end - started < 2 or r.random() >= FEEL_ANSWER:
         return none
     week = min(end, started + r.randint(2, 8))
-    targets = {m for c in p["concerns"] for m in CONCERN_METRICS.get(c, [])}
+    targets = set(product_metrics(p))
     seen = [w for m, w in improved_at.items() if m in targets and w > started]
     state = "measured" if any(w <= week for w in seen) else "later" if seen else "none"
     traits = product_traits(p)
@@ -305,25 +364,43 @@ def synthetic_feel(
     return {"feel": verdict, "feel_week": week - started, "feel_tags": tags}
 
 
-# The synthetic cohort was drawn over the catalog as it was on Oct 15 (48 products). Products added
-# later get no synthetic people: the same simulated people, routines and readings on every run, and
-# new products show only real data.
+# The products the synthetic cohort uses (scripts/pick_cohort_products.py), best known first; the
+# first 48 are the cohort's products of Oct 15. Other catalog products get no synthetic people: the
+# same simulated people, routines and readings on every run, and those products show only real
+# data.
 COHORT_PRODUCTS = Path(__file__).resolve().parent.parent / "seed" / "cohort_products.json"
 
 
+def cohort_product_ids() -> list[str]:
+    return json.loads(COHORT_PRODUCTS.read_text())[:PRODUCT_LIMIT]
+
+
 def cohort_products() -> list[dict[str, Any]]:
-    ids = json.loads(COHORT_PRODUCTS.read_text())
     by_id = {p["product_id"]: p for p in catalog.products()}
-    return [by_id[i] for i in ids if i in by_id]
+    return [by_id[i] for i in cohort_product_ids() if i in by_id]
+
+
+def _region_weight(p: dict[str, Any], region: str) -> float:
+    rank = regions.RANK[region]
+    near = min((rank[r] for r in regions.regions(p) if r in rank), default=regions.FAR)
+    return REGION_PULL.get(near, REGION_FAR)
+
+
+def _fame(i: int) -> float:
+    """A mild pick weight by position in cohort_products.json (best known first)."""
+    return 0.7 + 0.3 * math.exp(-i / 700)
 
 
 def generate(
-    today: date | datetime | None = None, *, switching: bool = True, skin_effects: bool = True
+    today: date | datetime | None = None,
+    *,
+    switching: bool = True,
+    skin_effects: bool = True,
 ) -> dict[str, list[dict[str, Any]]]:
     """Every table for `today` (default: now). The random draws do not depend on `today`: the
     same people exist on every run, and a later `today` only reveals more of their weeks.
-    `switching=False, skin_effects=False` gives the cohort as it was before those two
-    assumptions (Oct 15), draw for draw (a test holds it to that)."""
+    `switching=False, skin_effects=False` gives the cohort without those two assumptions, draw
+    for draw (a test holds the rest to that)."""
     now = (
         datetime.now(UTC)
         if today is None
@@ -333,19 +410,43 @@ def generate(
     )
     rng = random.Random(SEED)
     products = cohort_products()
+    pid_of = [p["product_id"] for p in products]
+    targets = {p["product_id"]: set(product_metrics(p)) for p in products}
+    pgoals = {p["product_id"]: product_goals(p) for p in products}
+    fame = {p["product_id"]: _fame(i) for i, p in enumerate(products)}
+    region_w = {
+        r: {p["product_id"]: _region_weight(p, r) * fame[p["product_id"]] for p in products}
+        for r, _ in REGIONS
+    }
     by_goal: dict[str, list[dict[str, Any]]] = {}
     for p in products:
-        for g in product_goals(p):
+        for g in pgoals[p["product_id"]]:
             by_goal.setdefault(g, []).append(p)
     sunscreens = [p for p in products if p["category"] == "sunscreen"]
+    by_cat: dict[str, list[dict[str, Any]]] = {}
+    for p in products:
+        by_cat.setdefault(p["category"], []).append(p)
+
+    # One cumulative weight list per (region, pool): a weighted draw is one rng.random() and a
+    # bisect, whatever the pool size.
+    def cum(pool: list[dict[str, Any]], region: str) -> list[float]:
+        return list(accumulate(region_w[region][q["product_id"]] for q in pool))
+
+    pools = {"*": products, "sun": sunscreens, **by_goal}
+    cums = {(r, k): cum(pool, r) for r, _ in REGIONS for k, pool in pools.items()}
+
+    def draw(key: str, region: str) -> dict[str, Any]:
+        cw = cums[(region, key)]
+        return pools[key][bisect(cw, rng.random() * cw[-1])]
+
     noise = _noise()
     effect: dict[str, float] = {}
     for p in products:  # weekly drift, in units of the metric's MDC95, at full size
-        effect[p["product_id"]] = 0.0 if rng.random() < 0.3 else rng.uniform(0.2, 1.1)
+        effect[p["product_id"]] = 0.0 if rng.random() < 0.3 else rng.uniform(*EFFECT_RANGE)
     goals_pool = [g for g in GOALS if g in by_goal]
     # New draws come from their own streams (SEED + n), so every draw above and in the loop below
-    # stays what it was before switching and skin effects existed: the same people, goals,
-    # routines, stops and noise.
+    # stays what it is without switching and skin effects: the same people, goals, routines,
+    # stops and noise.
     skin_rng = random.Random(SEED + 1)
     skin_mod = {
         (p["product_id"], s): (k * skin_rng.uniform(*SKIN_SPREAD)) if skin_effects else 1.0
@@ -355,6 +456,7 @@ def generate(
     switch_rng = random.Random(SEED + 2)
     using: dict[str, int] = dict.fromkeys(effect, 0)  # people so far with it in their routine
     seen = 0
+    pull = {pid: (1 + effect[pid]) ** SWITCH_PULL for pid in pid_of}
 
     def pick_goal(month: int, taken: list[str]) -> str:
         weights = MONTH_WEIGHTS[min(max(month, 8), 10)]
@@ -376,20 +478,20 @@ def generate(
         # One product per goal, then extras, then sunscreen; product_id -> (product, started_week)
         picks: dict[str, tuple[dict[str, Any], int]] = {}
         for g in goals:
-            p = rng.choice(by_goal[g])
+            p = draw(g, region)
             picks[p["product_id"]] = (p, 0)
         while len(picks) < rng.randint(2, 5):
-            p = rng.choice(products)
+            p = draw("*", region)
             picks.setdefault(p["product_id"], (p, 0))
         if sunscreens and rng.random() < 0.6:
-            s = rng.choice(sunscreens)
+            s = draw("sun", region)
             picks.setdefault(s["product_id"], (s, 0))
         # Goal adoption: one more goal (and a product for it) between weeks 3 and 7.
         added_week, added_goal = None, None
         if len(goals) < 3 and rng.random() < 0.25:
             added_week = rng.randint(3, 7)
             added_goal = pick_goal((start + timedelta(weeks=added_week)).month, goals)
-            p = rng.choice(by_goal[added_goal])
+            p = draw(added_goal, region)
             picks.setdefault(p["product_id"], (p, added_week))
         drop_week = rng.randint(2, 7) if rng.random() < 0.15 else None
         stop_draw = {pid: (rng.randint(2, 10) if rng.random() < 0.3 else None) for pid in picks}
@@ -417,23 +519,24 @@ def generate(
             p, started = picks[pid]
             if not switching or not go or w <= started:
                 continue
-            want = set(product_goals(p)) & set(all_goals) or set(product_goals(p))
+            want = set(pgoals[pid]) & set(all_goals) or set(pgoals[pid])
             free = [
                 q
-                for q in products
-                if q["category"] == p["category"]
-                and q["product_id"] not in picks
-                and q["product_id"] not in swaps
+                for q in by_cat[p["category"]]
+                if q["product_id"] not in picks and q["product_id"] not in swaps
             ]
-            # same goal; when the category has no other product for it (most sunscreens), any
-            options = [q for q in free if want & set(product_goals(q))] or free
+            # same goal; when the category has no other product for it, any
+            options = [q for q in free if want & set(pgoals[q["product_id"]])] or free
             if options:
-                # Switchers lean toward category products that work for others: weight =
-                # ((1 + effect) * (1 + share of people already using it)) ** SWITCH_PULL,
-                # picked with the `which` draw (so the number of draws stays fixed).
+                # Switchers lean toward category products that work for others, are popular and
+                # sold near them: weight = ((1 + effect) * (1 + share of people already using
+                # it)) ** SWITCH_PULL * region weight, picked with the `which` draw (so the
+                # number of draws stays fixed).
+                share = 1 / max(seen, 1)
                 weights = [
-                    ((1 + effect[o["product_id"]]) * (1 + using[o["product_id"]] / max(seen, 1)))
-                    ** SWITCH_PULL
+                    pull[o["product_id"]]
+                    * (1 + using[o["product_id"]] * share) ** SWITCH_PULL
+                    * region_w[region][o["product_id"]]
                     for o in options
                 ]
                 mark, q = which * sum(weights), options[-1]
@@ -492,7 +595,7 @@ def generate(
                     "product_id": pid,
                     "brand": p["brand"],
                     "category": p["category"],
-                    "concerns": p["concerns"],
+                    "concerns": concerns_of(p),
                     "tier": tier(p["price"]),
                     "started_week": started,
                     "stopped_week": stopped[pid],
@@ -501,6 +604,11 @@ def generate(
         for k in finding_kinds(entries):
             conflicts.append({"user_hash": uh, "is_synthetic": True, "kind": k})
 
+        # Per product: (started, stopped or None, effect size at full size, metrics it targets)
+        drivers = [
+            (started, stopped[pid], effect[pid] * skin_mod[(pid, skin)], targets[pid])
+            for pid, (_, started) in live.items()
+        ]
         # Weekly face sessions: metric deltas = drift from the products targeting it + noise.
         months: dict[str, dict[str, Any]] = {}
         first_ts = last_ts = None
@@ -508,18 +616,19 @@ def generate(
         for week in weeks:
             ts = start + timedelta(weeks=week, hours=hours[week - 1])
             now_goals = goals + ([added_goal] if added_week and week >= added_week else [])
+            stamp = ts.isoformat()
             for metric, (_, mdc) in noise.items():
                 drift = 0.0
-                for pid, (p, started) in live.items():
-                    if week <= started:
+                for started, stop, size, aims in drivers:
+                    if week <= started or metric not in aims:
                         continue
-                    end = stopped[pid] or week
-                    active_weeks = max(0, min(week, end) - started)
-                    if any(metric in CONCERN_METRICS.get(c, []) for c in p["concerns"]):
-                        size = effect[pid] * skin_mod[(pid, skin)]
-                        drift += size * mdc * min(active_weeks, 6) / 6
+                    active_weeks = max(0, min(week, stop or week) - started)
+                    drift += size * mdc * min(active_weeks, 6) / 6
                 sign = 1 if metric in UP_IS_GOOD else -1
                 delta = sign * drift + deltas[(week, metric)]
+                improved = (delta > 0) == (metric in UP_IS_GOOD) and abs(delta) > mdc
+                if improved:
+                    improved_at.setdefault(metric, week)
                 sessions.append(
                     {
                         "user_hash": uh,
@@ -529,17 +638,15 @@ def generate(
                         "skin_type": skin,
                         "goals": now_goals,
                         "site": "face_full",
-                        "session_ts": ts.isoformat(),
+                        "session_ts": stamp,
                         "weeks_since_baseline": week,
                         "metric_id": metric,
                         "delta": round(delta, 3),
                         "mdc95": round(mdc, 3),
                         "verdict": "real_change" if abs(delta) > mdc else "within_noise",
-                        "improved": (delta > 0) == (metric in UP_IS_GOOD) and abs(delta) > mdc,
+                        "improved": improved,
                     }
                 )
-                if sessions[-1]["improved"]:
-                    improved_at.setdefault(metric, week)
             m = months.setdefault(_month_key(ts), {"goals": [], "last_ts": ts})
             m["goals"] = sorted(set(m["goals"]) | set(now_goals))
             m["last_ts"] = ts

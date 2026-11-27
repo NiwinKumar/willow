@@ -87,7 +87,8 @@ export default function CheckInFlow() {
   // "Upload photos instead" in the sheet: each place opens the file picker instead of the camera.
   const uploadAll = walk && params.get('upload') === '1'
   const placeIndex = Math.max(0, places.indexOf(site as TrackPlace))
-  const [sent, setSent] = useState<Site[]>([])
+  // Places of a whole check-in already uploaded, with their session (step "sent" reads each one live).
+  const [sent, setSent] = useState<{ site: Site; id: string }[]>([])
   const [skipped, setSkipped] = useState<Site[]>([])
   const placeDone = useRef<((id: string) => void) | null>(null)
   // The baseline being topped up, once planned (topup.ts): its date for the copy. Null until then.
@@ -388,7 +389,7 @@ export default function CheckInFlow() {
           .then((t) => api.analyze(t, id))
           .then(data.upsert, () => void data.refresh())
         void data.refresh()
-        setSent((s) => [...s, site])
+        setSent((s) => [...s, { site, id }])
         toNext()
       }
     : null
@@ -486,7 +487,7 @@ export default function CheckInFlow() {
       <WillowLoader inline label="Opening your baseline" />
     )
   else if (inDemo || (capturing && (!known || !step))) content = <WillowLoader inline label="Loading your sessions" />
-  else if (step === 'sent') content = <SentStep sent={sent} skipped={skipped} onHome={close} />
+  else if (step === 'sent') content = <SentStep sent={sent} skipped={skipped} onHome={(nav.background as { pathname?: string } | undefined)?.pathname === '/home' ? close : () => exitTo('/home')} onView={(id) => exitTo(`/result/${id}?from=check-in`)} />
   else if (step === 'processing')
     content = (
       <ProcessingStep

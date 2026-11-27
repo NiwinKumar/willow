@@ -233,7 +233,7 @@ export default function SignIn() {
               <span className="flex items-center justify-between">
                 <label htmlFor="pw">Password</label>
                 {!up ? (
-                  <button type="button" onClick={() => void forgot()} disabled={pending !== null} className="min-h-8 text-[13px] text-ink underline">
+                  <button type="button" onClick={() => void forgot()} disabled={pending !== null} className="hit44 min-h-8 text-[13px] text-ink underline">
                     {pending === 'reset' ? 'Sending…' : 'Forgot password?'}
                   </button>
                 ) : null}

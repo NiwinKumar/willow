@@ -1,4 +1,4 @@
-import { ExternalLink, FlaskConical, Trash2 } from 'lucide-react'
+import { AlertCircle, ExternalLink, FlaskConical, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -12,10 +12,12 @@ import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner, useRoutine } from '../../data/hooks'
 import type { Product, RoutineEntry, RoutineSchedule, StorePrice } from '../../data/types'
 import { api, localDay } from '../../lib/api'
-import { CONCERN_LABEL } from '../../lib/catalog'
+import { CONCERN_LABEL, hasFullFacts, NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { outcomeFor, type Outcome } from '../../lib/outcome'
 import { useQuery } from '../../lib/query'
+import { COMMISSION_NOTE, useStoreClick, type ClickSurface } from '../../lib/clicks'
+import { useChecks, useEvidenceClock } from '../../lib/safety'
 import { useOutcomes } from '../../lib/useOutcomes'
 import { useProductTests, testDay } from './productTests'
 import { activeLabel, categoryOf, entryName, metaLine, OUTCOME_GLYPH, useOutcomeSessions } from './routineModel'
@@ -23,6 +25,11 @@ import { addDays, scheduleWords, usedOn, weekdayOf, WEEKDAYS } from './schedule'
 import { RoutineSheet } from './RoutineSheet'
 import { StartTest } from './StartTest'
 import { FeelCard } from './FeelCard'
+import { strongActives, verdictDue } from './actives'
+import { CheckForMe, CheckReasons } from './checked'
+import { FullFactsComing } from './FullFactsComing'
+import { ReactionSheet, type ReactionTarget } from './ReactionSheet'
+import { StartSlowCard } from './StartSlowCard'
 import { failureText, useRoutineWrites } from './writes'
 
 /** `focus: 'feel'` opens the sheet scrolled to "How does it feel?" (from the routine's quick check). */
@@ -47,15 +54,15 @@ const storePrice = (p: StorePrice) => `${fmtPrice(p)} · checked ${fmtDate(p.che
  * your readings did since you started it, the synthetic cohort, and where to buy. A routine entry also gets
  * its own controls: when you use it, stop using, remove.
  */
-export function ProductSheet({ target, onClose, onAdd }: { target: ProductTarget | null; onClose: () => void; onAdd?: (p: Product) => void }) {
+export function ProductSheet({ target, onClose, onAdd, surface = 'product_sheet' }: { target: ProductTarget | null; onClose: () => void; onAdd?: (p: Product) => void; /** Where store clicks are counted (the sponsored card opens this sheet too). */ surface?: ClickSurface }) {
   return (
     <RoutineSheet open={target !== null} onClose={onClose} kind="side" title="Product information">
-      {target ? <Body target={target} onClose={onClose} onAdd={onAdd} /> : null}
+      {target ? <Body target={target} onClose={onClose} onAdd={onAdd} surface={surface} /> : null}
     </RoutineSheet>
   )
 }
 
-function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () => void; onAdd?: (p: Product) => void }) {
+function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onClose: () => void; onAdd?: (p: Product) => void; surface: ClickSurface }) {
   const uid = useOwner()
   const shell = useMaybeShell()
   const routine = useRoutine()
@@ -72,6 +79,11 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   const [error, setError] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [reaction, setReaction] = useState<ReactionTarget | null>(null)
+  const clickStore = useStoreClick(surface)
+  const checks = useChecks(productId ? [productId] : [])
+  const check = productId ? checks.checks[productId] : undefined
+  const clock = useEvidenceClock()
   const tests = useProductTests()
   const navigate = useNavigate()
   const feelRef = useRef<HTMLElement>(null)
@@ -89,6 +101,8 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
   const concerns = product?.concerns ?? entry?.concerns ?? []
   const actives = product?.key_actives ?? entry?.key_actives ?? []
   const inci = product?.inci ?? entry?.inci ?? []
+  const strong = strongActives(actives)
+  const due = inUse ? verdictDue({ category, key_actives: actives, started_at: entry.started_at }, clock.data) : null
   const cohort = product ? outcomes?.byProduct[product.product_id] : undefined
   const outcome: Outcome | null = entry ? outcomeFor(entry, sessions) : null
   const image = { image_url: product?.image_url ?? entry?.image_url ?? null, image_source: product?.image_source ?? entry?.image_source ?? null }
@@ -156,18 +170,37 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
       <div className="flex flex-col gap-1.5 px-2 py-1.5">
         <span className="text-[14px] text-ink-2">{metaLine(brand, category, product?.size)}</span>
         <h3 className="text-[26px] leading-[1.1] font-normal tracking-[-0.02em]">{name}</h3>
-        {product ? (
+        {product?.price ? (
           <span className="text-[16px]">
             {fmtPrice(product.price)} <span className="text-[14px] text-ink-2">· catalog price, checked {fmtDate(product.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           </span>
+        ) : product ? (
+          <span className="text-[14px] text-ink-2">{NO_PRICE}</span>
         ) : (
           <span className="text-[14px] text-ink-2">Your own product · not in the catalog</span>
         )}
+        {due ? (
+          <span className="text-[13.5px] text-ink-2" style={{ animation: 'wRise .4s 120ms both' }}>
+            Verdict due {fmtDate(localDay(due.due), { day: 'numeric', month: 'long' })} · {due.row.grade === 'C' ? `a ${due.weeks}-week window for ${due.active.toLowerCase()}` : `trials of ${due.active.toLowerCase()} usually run ${due.weeks} weeks`}
+            {due.row.source?.url ? (
+              <>
+                {' · '}
+                <a href={due.row.source.url} target="_blank" rel="noopener noreferrer" className="hit44 underline underline-offset-2">
+                  {due.row.source.label}
+                  <span className="sr-only"> (opens in new tab)</span>
+                </a>
+              </>
+            ) : null}
+          </span>
+        ) : null}
       </div>
+
+      {product && !hasFullFacts(product) ? <FullFactsComing product={product} /> : null}
+      {check ? <CheckReasons check={check} profileComplete={checks.profileComplete} /> : productId ? <CheckForMe className="px-2" /> : null}
 
       <div className="flex flex-wrap gap-2 px-1">
         {inUse ? (
-          <span className="flex min-h-12 items-center rounded-pill bg-lime px-[18px] text-[14px]">✓ In your routine since {fmtDate(entry.started_at)}</span>
+          <span className="flex min-h-12 items-center rounded-pill bg-lime px-[18px] text-[14px]">✓ In your routine {entry.started_at.slice(0, 10) > localDay() ? 'from' : 'since'} {fmtDate(entry.started_at)}</span>
         ) : product && onAdd ? (
           <Button variant="ink" onClick={() => onAdd(product)}>
             Add to routine
@@ -184,7 +217,26 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
             Ask Wisp
           </Button>
         ) : null}
+        {productId || inUse ? (
+          <Button variant="ghost" icon={AlertCircle} onClick={() => setReaction({ product_id: productId ?? null, entry_id: entry?.id ?? null, name })}>
+            I had a reaction
+          </Button>
+        ) : null}
       </div>
+
+      {strong.length ? (
+        <details className="group card bg-sunken px-5 py-1">
+          <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 text-[14px]">
+            <span>How to start it · patch test, go slow, sunscreen</span>
+            <span aria-hidden className="text-ink-2 transition-[rotate] duration-300 ease-standard group-open:rotate-180">
+              ⌄
+            </span>
+          </summary>
+          <div className="pb-4">
+            <StartSlowCard compact name={name} actives={strong} />
+          </div>
+        </details>
+      ) : null}
 
       {inUse ? (
         <div className="card flex flex-col gap-3 bg-sunken px-5 py-4">
@@ -261,9 +313,10 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
         </div>
       ) : null}
 
-      {inUse ? (
+      {inUse || productId ? (
         <div className="card flex flex-col gap-3 bg-sunken px-5 py-4">
-          <span className="font-mono text-[12px] tracking-[.06em] text-ink-2">■ FOREARM TEST</span>
+          {/* Section titles in this sheet are one style (as "How does it feel?"), not mono eyebrows. */}
+          <h4 className="text-[17px] font-normal">Try it on one forearm first</h4>
           {ownTest ? (
             <>
               <span className="text-[15px]">
@@ -282,14 +335,14 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
               </Button>
             </>
           ) : testing ? (
-            <StartTest preset={{ entry_id: entry.id, name, fixedName: true }} onCancel={() => setTesting(false)} onStarted={onClose} />
+            <StartTest preset={inUse ? { entry_id: entry.id, name, fixedName: true } : { product_id: productId ?? undefined, name, fixedName: true }} onCancel={() => setTesting(false)} onStarted={onClose} />
           ) : (
             <>
               <span className="text-[14px] leading-[1.5] text-ink-2">
-                {running ? `A test of ${running.name} is running; end it before starting another.` : 'See what it does on one forearm square, against an untouched square on the other arm.'}
+                {running ? `A test of ${running.name} is running; end it before starting another.` : 'See what it does on one forearm square, against an untouched square on the other arm, before it goes on your face.'}
               </span>
               <Button variant="outline" size="sm" icon={FlaskConical} className="self-start" disabled={Boolean(running) || tests.status !== 'ready'} onClick={() => setTesting(true)}>
-                Start a forearm test with this product
+                Test this product
               </Button>
             </>
           )}
@@ -336,7 +389,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
 
       {inUse && outcome ? (
         <div className="card flex flex-col gap-1.5 bg-sunken px-5 py-4">
-          <span className="font-mono text-[12px] text-ink-2">■ YOUR READINGS SINCE START</span>
+          <h4 className="text-[17px] font-normal">Your readings since you started</h4>
           <span className="flex items-center gap-2 text-[15px]">
             <VerdictGlyph kind={OUTCOME_GLYPH[outcome.kind]} way={outcome.kind === 'real' ? outcome.way : undefined} />
             {outcome.text}
@@ -347,7 +400,11 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
 
       {product ? (
         <div className="flex flex-col gap-3 rounded-lg squircle bg-selected px-5 py-4 text-inverse">
-          <span className="font-mono text-[12px] tracking-[.06em] text-cta">{outcomes?.synthetic ? '■ SIMULATED COHORT · SYNTHETIC DATA' : '■ COHORT OUTCOMES'}</span>
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[17px] font-normal">Cohort outcomes</h4>
+            {/* simulated data is always labelled (DESIGN.md "Synthetic & demo data") */}
+            {outcomes?.synthetic ? <span className="rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.06em] text-[var(--synthetic-fg)]">SIMULATED · SYNTHETIC DATA</span> : null}
+          </span>
           {cohort ? (
             <>
               <span className="flex flex-wrap items-baseline gap-2.5">
@@ -355,7 +412,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
                 <span className="text-[14px] text-[#BDBAB4]">of {cohort.n} people</span>
               </span>
               <span aria-hidden className="block h-2.5 overflow-hidden rounded-[10px] bg-[#2A2A2A]">
-                <span className="block h-full rounded-[10px]" style={{ width: `${Math.round(cohort.rate * 100)}%`, background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink), var(--aura-coral))' }} />
+                <span className="block h-full origin-left rounded-[10px] motion-safe:animate-[wFill_.9s_var(--ease-standard)_.2s_both]" style={{ width: `${Math.round(cohort.rate * 100)}%`, background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink), var(--aura-coral))' }} />
               </span>
               <span className="text-[14px] leading-[1.5] text-[#E4E1DB]">
                 were still improved beyond photo noise at week 8 on what it targets.{cohort.weeks !== null ? ` The improvement typically began around week ${cohort.weeks}.` : ''}
@@ -371,7 +428,7 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
         <div className="flex flex-col gap-2">
           <span className="px-1.5 text-[14px] text-ink-2">Where to buy</span>
           {product.stores.map((s) => (
-            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`${s.store}${s.price ? `, ${storePrice(s.price)}` : ''}, opens in new tab`} className="card flex min-h-[54px] items-center justify-between gap-3 bg-sunken px-5 text-[15px] no-underline hover:bg-muted">
+            <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" onClick={() => clickStore(product.product_id, s.store)} onAuxClick={() => clickStore(product.product_id, s.store)} aria-label={`${s.store}${s.price ? `, ${storePrice(s.price)}` : ''}, opens in new tab`} className="card flex min-h-[54px] items-center justify-between gap-3 bg-sunken px-5 text-[15px] no-underline hover:bg-muted">
               <span>{s.store}</span>
               <span className="flex items-center gap-2.5">
                 {s.price ? (
@@ -385,11 +442,12 @@ function Body({ target, onClose, onAdd }: { target: ProductTarget; onClose: () =
             </a>
           ))}
           <span className="px-1.5 text-[12px] text-ink-2">
-            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed.' : 'Store links only: the price above is the catalog’s one checked price.'}{' '}
-            No commissions on store links. Suggestions are never paid for; a sponsored card is always labelled Sponsored and never changes your recommendations.
+            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed.' : product.price ? 'Store links only: the price above is the catalog’s one checked price.' : 'Store links only: no price has been checked yet.'}{' '}
+            {COMMISSION_NOTE} It never changes what Willow suggests; a sponsored card is always labelled Sponsored.
           </span>
         </div>
       ) : null}
+      <ReactionSheet target={reaction} onClose={() => setReaction(null)} />
     </div>
   )
 }

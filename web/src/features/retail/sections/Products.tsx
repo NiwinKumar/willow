@@ -7,11 +7,17 @@ import { useRetailData } from '../context'
 import { csvMeta, csvName } from '../data'
 import { feltText } from '../feel'
 import { useProducts } from '../productData'
-import { filterRows, hintOf, MAX_COMPARE, noDataReason, parseIds, TIER_ORDER, TIER_TABS, toggleId } from '../productModel'
-import { sectionPath, useRetailState } from '../state'
+import { filterRows, hintOf, MAX_COMPARE, noDataReason, PAGE_ROWS, parseIds, productsLead, promoHistory, promoNote, TIER_ORDER, TIER_TABS, toggleId, type Promo } from '../productModel'
+import { useCompetitorNames } from '../orgData'
+import { rangeIds, useRange } from '../rangeStore'
+import { purposeOf, sectionPath, useRetailState } from '../state'
+import { ProductsNav } from './ProductsNav'
 import type { Insights, ProductRow, ProofTier } from '../types'
 import { Bone, Button, DataTable, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, weeks, type Column, type Sort } from '../ui'
 import { FeltCell, HeadTip, RateInterval } from './productParts'
+import { ProductsLead } from './ProductsLead'
+import { useRememberedView } from './useRememberedView'
+import { useCampaigns } from '../pipeline'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
@@ -66,6 +72,8 @@ function ProductsSkeleton() {
 
 const SORTS = ['product', 'tier', 'rate', 'base', 'lift', 'n', 'category', 'weeks', 'cont8', 'share', 'felt', 'price'] as const
 const DEFAULT_SORT: Sort = { id: 'lift', dir: 'desc' }
+/** The view keys Products remembers between visits (search and the Compare picks are left out). */
+const VIEW_KEYS = ['tier', 'brand', 'category', 'goal', 'sort', 'scope'] as const
 const TIER_IDS = Object.keys(TIERS) as ProofTier[]
 const PRICE_ORDER = { budget: 0, mid: 1, premium: 2 } as const
 const cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`
@@ -77,12 +85,22 @@ function Body({ d }: { d: Insights }) {
   const { state, retry } = useProducts(filters)
   const all = useMemo(() => (state.status === 'ready' ? state.d.products : []), [state])
   const wk = d.cohort.weeks
+  useRememberedView('products', VIEW_KEYS)
+  const campaigns = useCampaigns()
+  // Every campaign this organisation ran, samples included: a finished one is history ("Promoted before"), never "not promoted".
+  const promo = useMemo(() => promoHistory(campaigns), [campaigns])
 
   const brandName = workspace.kind === 'brand' ? workspace.brand : null
-  const mine = brandName ? all.filter((r) => r.brand === brandName) : []
-  // A brand workspace opens on its own products (when it has any in the catalog); ?scope=all widens to everyone.
+  const { range } = useRange()
+  const ids = useMemo(() => rangeIds(range), [range])
+  const names = useCompetitorNames()
+  // "Your range": a brand's own products, or the retailer's connected item file. ?scope=all opens the whole
+  // catalog, except for a brand organisation whose retailer keeps competitor names off (then it is its range only).
+  const mine = useMemo(() => (brandName ? all.filter((r) => r.brand === brandName) : ids ? all.filter((r) => ids.has(r.product_id)) : []), [all, brandName, ids])
   const brandView = brandName && mine.length ? brandName : null
-  const yoursOnly = brandView !== null && param('scope') !== 'all'
+  const hasRange = mine.length > 0
+  const wholeAllowed = !names.anonymise
+  const yoursOnly = hasRange && (param('scope') !== 'all' || !wholeAllowed)
 
   const q = param('q') ?? ''
   const brand = brandView ? '' : (param('brand') ?? '')
@@ -94,6 +112,11 @@ function Body({ d }: { d: Insights }) {
     const [id, dir] = (param('sort') ?? '').split('.')
     return (SORTS as readonly string[]).includes(id) && (dir === 'asc' || dir === 'desc') ? { id, dir } : DEFAULT_SORT
   })()
+
+  // Tab counts follow every other filter, so each tab says how many rows it would show. Memoised: the table keeps
+  // its "Show more" page until the rows really change (a campaigns refetch must not fold it back).
+  const scoped = useMemo(() => filterRows(yoursOnly ? mine : all, { q, brand, category, goal }), [yoursOnly, mine, all, q, brand, category, goal])
+  const rows = useMemo(() => (tier ? scoped.filter((r) => r.tier === tier) : scoped), [scoped, tier])
 
   // Round-1 links (?product=<id> opened a quick look) now land on the product page.
   const legacy = param('product')
@@ -107,31 +130,32 @@ function Body({ d }: { d: Insights }) {
   const goalIds = new Set(all.flatMap((r) => r.goal_ids))
   const goals = GOALS.filter((g) => goalIds.has(g.id))
 
-  // Tab counts follow every other filter, so each tab says how many rows it would show.
-  const scoped = filterRows(all, { q, brand, category, goal, mineOf: yoursOnly ? brandView : null })
-  const rows = tier ? scoped.filter((r) => r.tier === tier) : scoped
   const count = (t: 'all' | ProofTier) => (t === 'all' ? scoped.length : scoped.filter((r) => r.tier === t).length)
   const filtered = Boolean(q || brand || category || goal)
   const clearFilters = () => setParam({ q: null, brand: null, category: null, goal: null, tier: null })
 
-  const pool = brandView ? mine : all
+  const pool = hasRange ? mine : all
   const proven = pool.filter((r) => r.tier === 'proven').length
-  const measured = all.filter((r) => r.rate !== null).length
+  const measured = pool.filter((r) => r.rate !== null).length
   const description = !measured ? (
-    `No product has ${MIN_GROUP} or more people at week ${wk} in this range yet.`
-  ) : brandView ? (
+    hasRange ? (
+      `None of your ${int(mine.length)} products has ${MIN_GROUP} or more people at week ${wk} yet; your range shows which are collecting.`
+    ) : (
+      `No product has ${MIN_GROUP} or more people at week ${wk} in this period yet.`
+    )
+  ) : hasRange ? (
     <>
       <strong>
-        {proven} of {mine.length}
+        {int(proven)} of {int(mine.length)}
       </strong>{' '}
-      of your {mine.length === 1 ? 'product is' : 'products are'} Proven.
+      {brandView ? 'of your' : 'products in your range'} {brandView ? (mine.length === 1 ? 'product is' : 'products are') : (proven === 1 ? 'is' : 'are')} Proven; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   ) : (
     <>
       <strong>
-        {proven} of {all.length}
+        {int(proven)} of {int(all.length)}
       </strong>{' '}
-      products are Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+      products are Proven; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 
@@ -172,8 +196,8 @@ function Body({ d }: { d: Insights }) {
       sortValue: (r) => r.product,
       firstDir: 'asc',
       // "Yours" only where it tells rows apart (All products in a brand workspace).
-      cell: (r) => <ProductCell p={r} tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} />,
-      csv: (r) => `${r.product} (${r.brand})`,
+      cell: (r) => <ProductCell p={{ ...r, brand: names.name(r.brand) }} logo tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} sub={<PromoNote p={promo.get(r.product_id)} />} />,
+      csv: (r) => `${r.product} (${names.name(r.brand)})`,
     },
     {
       id: 'tier',
@@ -187,8 +211,8 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'rate',
-      header: <HeadTip label="Visible change" tip={`Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`} />,
-      headerText: `Visible change by week ${wk} (%)`,
+      header: <HeadTip label="Users who changed" tip={`Share of the people using it who saw a visible change held to week ${wk}. Bar: 95% interval. Grey tick: people with the same goals not using it.`} />,
+      headerText: `Users with a visible change by week ${wk} (%)`,
       width: '196px',
       sortValue: (r) => r.rate,
       firstDir: 'desc',
@@ -197,18 +221,18 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'base',
-      header: <HeadTip label="Non-users" tip={`Share of people with the same goals who don’t use it and saw a visible change by week ${wk}.`} />,
-      headerText: `Non-users with a visible change by week ${wk} (%)`,
+      header: <HeadTip label="Same goals, not using it" tip={`The comparison group: people with the same goals who don’t use it, and the share of them who changed anyway by week ${wk}.`} />,
+      headerText: `Same goals, not using it: changed anyway by week ${wk} (%)`,
       align: 'right',
-      width: '104px',
+      width: '184px',
       sortValue: (r) => r.base_rate,
       cell: (r) => (r.rate === null ? none : r.base_rate === null ? <Suppressed short /> : <span className="tnum text-ink-2">{pct(r.base_rate)}</span>),
       csv: (r) => (r.base_rate === null ? '' : Math.round(r.base_rate * 100)),
     },
     {
       id: 'lift',
-      header: <HeadTip label="Lift" tip="Visible change among users minus non-users, in percentage points. Hover a value for its 95% interval." />,
-      headerText: 'Lift vs non-users (pts)',
+      header: <HeadTip label="Lift" tip="Users who changed minus people with the same goals not using it, in percentage points. Hover a value for its 95% interval." />,
+      headerText: 'Lift vs same goals, not using it (pts)',
       align: 'right',
       width: '88px',
       sortValue: (r) => r.lift,
@@ -217,7 +241,7 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'n',
-      header: <HeadTip label="People" tip={`People with ${wk} weeks of photos who used it: the n behind the rate.`} />,
+      header: <HeadTip label="People" tip={`People who used it and reached week ${wk} of photos: the n behind the rate.`} />,
       headerText: `People at week ${wk} (n)`,
       align: 'right',
       width: '88px',
@@ -297,11 +321,16 @@ function Body({ d }: { d: Insights }) {
     },
   ]
 
+  const csvName_ = csvName('products', res)
+  const csvMeta_ = csvMeta(res, [yoursOnly && (brandView ? `brand ${brandView}` : 'your range'), brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined)
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
+      <ProductsNav />
       <PageHeader
         title="Products"
         description={description}
+        purpose={purposeOf('products')}
         actions={
           <>
             {sel.length ? (
@@ -322,6 +351,8 @@ function Body({ d }: { d: Insights }) {
         }
       />
 
+      {measured ? <ProductsLead lead={productsLead(scoped, promo)} promo={promo} promoteTo={(id) => `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(id)}`} onTier={(t) => setParam({ tier: t })} /> : null}
+
       <div className="flex flex-col gap-4">
         <Tabs label="Status" panelId="products-table" value={tier || 'all'} onChange={(t) => setParam({ tier: t === 'all' ? null : t })} tabs={TIER_TABS.map((t) => ({ ...t, count: count(t.id) }))} />
 
@@ -331,6 +362,8 @@ function Body({ d }: { d: Insights }) {
             columns={columns}
             columnsKey="products"
             rows={rows}
+            pageSize={PAGE_ROWS}
+            csv={{ name: csvName_, meta: csvMeta_ }}
             rowKey={(r) => r.product_id}
             onRowClick={(r) => navigate(`${sectionPath('products', r.product_id)}${carry}`)}
             rowLabel={(r) => `${r.product}, ${r.brand}, ${TIERS[r.tier].label}: open product page`}
@@ -338,8 +371,7 @@ function Body({ d }: { d: Insights }) {
             onSortChange={(s) => setParam({ sort: s && !(s.id === DEFAULT_SORT.id && s.dir === DEFAULT_SORT.dir) ? `${s.id}.${s.dir}` : null })}
             defaultSort={DEFAULT_SORT}
             maxHeight="max(440px, calc(100dvh - 330px))"
-            minWidth={880}
-            csv={{ name: csvName('products', res), meta: csvMeta(res, [yoursOnly && `brand ${brandView}`, brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined) }}
+            minWidth={1060}
             empty={
               <span className="flex flex-col items-center gap-3">
                 No product matches these filters.
@@ -356,19 +388,20 @@ function Body({ d }: { d: Insights }) {
                     Clear
                   </Button>
                 ) : null}
-                {brandView ? (
+                {hasRange && wholeAllowed ? (
                   <Segmented
-                    label="Whose products"
+                    label="Which products"
                     value={yoursOnly ? 'yours' : 'all'}
                     onChange={(v) => setParam({ scope: v === 'all' ? 'all' : null })}
                     options={[
-                      { value: 'yours', label: 'Your products' },
-                      { value: 'all', label: 'All products' },
+                      { value: 'yours', label: brandView ? 'Your products' : 'Your range' },
+                      { value: 'all', label: 'Whole catalog' },
                     ]}
                   />
-                ) : (
-                  <Select label="Brand" hideLabel value={brand} onChange={(v) => setParam({ brand: v })} options={[{ value: '', label: 'All brands' }, ...brands.map((b) => ({ value: b, label: b }))]} />
-                )}
+                ) : null}
+                {!brandView && (!hasRange || !yoursOnly) ? (
+                  <Select label="Brand" hideLabel value={brand} onChange={(v) => setParam({ brand: v })} options={[{ value: '', label: 'All brands' }, ...brands.map((b) => ({ value: b, label: names.name(b) }))]} />
+                ) : null}
                 <Select label="Category" hideLabel value={category} onChange={(v) => setParam({ category: v })} options={[{ value: '', label: 'All categories' }, ...categories.map(([value, label]) => ({ value, label }))]} />
                 <Select label="Goal" hideLabel value={goal} onChange={(v) => setParam({ goal: v })} options={[{ value: '', label: 'All goals' }, ...goals.map((g) => ({ value: g.id, label: g.label }))]} />
               </>
@@ -377,5 +410,17 @@ function Body({ d }: { d: Insights }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** The promotion note in a product row: running in leaf, paused and finished (history, with its adoption lift) in grey. */
+function PromoNote({ p }: { p: Promo | undefined }) {
+  const note = promoNote(p)
+  if (!note || !p) return null
+  return (
+    <span className={`inline-flex items-center gap-1 ${p.state === 'running' ? 'text-proof-leaf' : 'text-ink-2'}`}>
+      <span aria-hidden className="text-ink-3">·</span>
+      {note}
+    </span>
   )
 }

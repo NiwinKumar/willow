@@ -37,6 +37,24 @@ SYSTEM_RULES = (
 )
 
 
+# Explicit safety settings on every call (Nov 27; before this the platform defaults applied, which
+# are not written down per model). BLOCK_ONLY_HIGH: skincare talk names acids, peels, burns and
+# stinging, and a stricter level risks blocking an ordinary routine question. A blocked answer
+# comes back without text, fails the schema and takes the caller's usual fallback, so nothing new
+# reaches a person. Image categories and jailbreak are left to the defaults (not every model
+# accepts them).
+SAFETY_THRESHOLD = types.HarmBlockThreshold.BLOCK_ONLY_HIGH
+SAFETY_SETTINGS = [
+    types.SafetySetting(category=category, threshold=SAFETY_THRESHOLD)
+    for category in (
+        types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+        types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    )
+]
+
+
 class GeminiError(Exception):
     """Gemini failed twice or could not be reached; callers fall back."""
 
@@ -79,8 +97,11 @@ def models() -> list[str]:
 
 
 def config_for(model: str, config: types.GenerateContentConfig) -> types.GenerateContentConfig:
-    """`config` for `model`: the fallback model runs without a thinking level (with LOW it takes
-    about 6 s instead of about 1.3 s, Nov 2)."""
+    """`config` for `model`: the safety settings when the caller set none (the tool-calling turns
+    build their own config), and the fallback model runs without a thinking level (with LOW it
+    takes about 6 s instead of about 1.3 s, Nov 2)."""
+    if config is not None and config.safety_settings is None:
+        config = config.model_copy(update={"safety_settings": SAFETY_SETTINGS})
     if model == get_settings().gemini_model or config is None or config.thinking_config is None:
         return config
     return config.model_copy(update={"thinking_config": None})
@@ -203,6 +224,7 @@ def generate_json[T: BaseModel](
         response_schema=schema,
         thinking_config=types.ThinkingConfig(thinking_level=thinking),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        safety_settings=SAFETY_SETTINGS,
     )
 
     def ask(attempt: int, model: str) -> tuple[T, str]:

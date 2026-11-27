@@ -23,7 +23,7 @@
 
 <p align="center">
   <img alt="Built on Google Cloud" src="https://img.shields.io/badge/Google%20Cloud-us--central1-4285F4?logo=googlecloud&logoColor=white&style=flat-square" />
-  <img alt="Gemini on Vertex AI" src="https://img.shields.io/badge/Gemini-Vertex%20AI-8E75B2?logo=googlegemini&logoColor=white&style=flat-square" />
+  <img alt="Gemini on Gemini Enterprise Agent Platform" src="https://img.shields.io/badge/Gemini-Enterprise%20Agent%20Platform-8E75B2?logo=googlegemini&logoColor=white&style=flat-square" />
   <img alt="Firebase" src="https://img.shields.io/badge/Firebase-Hosting%20%2B%20Auth-FFCA28?logo=firebase&logoColor=black&style=flat-square" />
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-lightgrey?style=flat-square" /></a>
 </p>
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/readme/landing.webp" alt="Willow's landing page with its four ways in: Explore Mei's journey, Explore a brand's journey, Open the Willow app and Open Willow Proof" width="100%" />
+  <img src="docs/img/readme/landing.webp" alt="Willow's landing page with its four ways in: Explore Mei's journey, Explore a brand's journey, Open the Willow app and Open Proof by Willow" width="100%" />
 </p>
 
 > Cosmetic appearance tracking. Not a medical device and not a diagnosis.
@@ -42,7 +42,7 @@
 
 ## Try it in four minutes
 
-No sign-in needed. Every path runs on the live system: the measurement engine on Cloud Run, Gemini on Vertex AI, Firestore and BigQuery.
+No sign-in needed. Every path runs on the live system: the measurement engine on Cloud Run, Gemini on Gemini Enterprise Agent Platform (formerly Vertex AI), Firestore and BigQuery.
 
 | Way in | What you'll see |
 |---|---|
@@ -53,7 +53,7 @@ No sign-in needed. Every path runs on the live system: the measurement engine on
 
 The landing page also runs [sample photos through the real pipeline](https://meetwillow.web.app/judge) in a guest account of your own, or starts your own baseline.
 
-**About Mei.** Mei is 26, lives in Singapore and has acne along her cheeks, jaw and chin. Her photos are generated and show no real person, so there is no consent question and nobody's skin is on display. Every number in her story was measured from those photos by Willow's live engine and explained by Gemini, exactly as for anyone. Every surface that shows her says she is simulated.
+**About Mei.** Mei is 26, lives in Singapore and has blemish-prone skin, with breakouts along her cheeks, jaw and chin around her cycle. Her photos are generated and show no real person, so there is no consent question and nobody's skin is on display. Every number in her story was measured from those photos by Willow's live engine and explained by Gemini, exactly as for anyone. Every surface that shows her says she is simulated.
 
 <p align="center">
   <img src="docs/img/readme/journey.webp" alt="The last slide of Mei's journey, 'Eight weeks later': blemishes and tone evenness improved beyond her normal range; redness, dark spots and shine stayed within it. Her baseline and latest photos sit side by side; Mei is simulated and her photos are generated." width="88%" />
@@ -145,7 +145,7 @@ Retailers see sales. Proof shows **outcomes**: which products produce a measured
 
 ## Gemini: many jobs, never a measurement
 
-Model `gemini-3.8-flash` on Vertex AI. Each job has a schema, a validator and a fallback that is not Gemini.
+Model `gemini-3.8-flash` on Gemini Enterprise Agent Platform (formerly Vertex AI). Each job has a schema, a validator and a fallback that is not Gemini.
 
 | Job | Where | How it is kept honest |
 |---|---|---|
@@ -164,7 +164,7 @@ Daily caps per person and across everyone keep cost bounded (`api/app/limits.py`
 
 ## Architecture on Google Cloud
 
-Everything runs in **us-central1**, except Gemini, which Vertex AI serves from its global endpoint for Gemini 3.x models.
+Everything runs in **us-central1**, except Gemini, which Gemini Enterprise Agent Platform (formerly Vertex AI) serves from its global endpoint for Gemini 3.x models.
 
 ```mermaid
 flowchart LR
@@ -174,7 +174,7 @@ flowchart LR
   A -->|"ID token, private"| E["willow-engine<br/>Cloud Run · computer vision"]
   E --> S
   A --> F[("Firestore<br/>sessions, baselines, routines, consent")]
-  A -->|"schema JSON + validators"| G["Gemini<br/>Vertex AI"]
+  A -->|"schema JSON + validators"| G["Gemini<br/>Agent Platform"]
   A -->|"opted-in, hashed outcomes"| B[("BigQuery<br/>willow_insights")]
   B --> L["Data Studio report"]
   C["Cloud Scheduler"] -->|"OIDC"| A
@@ -187,7 +187,7 @@ flowchart LR
 | **Cloud Run** ×2 | `willow-api` (FastAPI: sessions, signed uploads, Gemini, catalog, Proof) and `willow-engine` (private: RAW decoding and measurement, called only with an ID token) |
 | **Firestore** | Sessions, baselines, routines, consent, campaigns, usage limits. Client rules are deny-all; only the api reads and writes |
 | **Cloud Storage** | Photos via V4 signed URLs, deleted after 30 days by a lifecycle rule |
-| **Vertex AI (Gemini)** | Every job in the table above |
+| **Gemini Enterprise Agent Platform (formerly Vertex AI)** | Every job in the table above |
 | **BigQuery** | Outcome tables for Proof and *Ask anything* |
 | **Cloud Scheduler** | Check-in reminders (Web Push) |
 

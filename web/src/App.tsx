@@ -17,11 +17,13 @@ const AppShell = lazy(() => import('./components/shell/AppShell').then((m) => ({
 const SignIn = lazy(() => import('./features/website/SignIn'))
 const Welcome = lazy(() => import('./features/website/Welcome'))
 const Judge = lazy(() => import('./features/website/Judge'))
+const Plan = lazy(() => import('./features/plan/Plan'))
 const Journey = lazy(() => import('./features/journey/Journey'))
 const BrandJourney = lazy(() => import('./features/journey/BrandJourney'))
 const CheckInReplay = lazy(() => import('./features/journey/CheckInReplay'))
 const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
 const Terms = lazy(() => import('./features/website/Terms'))
+const Checks = lazy(() => import('./features/website/Checks'))
 const Retail = lazy(() => import('./features/retail/Retail'))
 const Home = lazy(() => import('./features/home/Home'))
 const Progress = lazy(() => import('./features/progress/Progress'))
@@ -57,9 +59,12 @@ export default function App() {
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/welcome/:step" element={<Welcome />} />
             <Route path="/judge" element={<Judge />} />
+            <Route path="/plan" element={<Plan />} />
+            <Route path="/plan/:step" element={<Plan />} />
             <Route path="/journey" element={<Journey />} />
             <Route path="/journey/brand" element={<BrandJourney />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/checks" element={<Checks />} />
             {/* The assistant avatar in every state (not linked; for checking the motion). */}
             <Route path="/lab/avatar" element={<AvatarLab />} />
             <Route path="/retail/*" element={<Retail />} />
@@ -148,7 +153,9 @@ function NotFound() {
 const TITLES: [RegExp, string][] = [
   [/^\/science/, 'Science and limits'],
   [/^\/judge/, 'Judge tour'],
+  [/^\/plan/, 'Build my routine'],
   [/^\/terms/, 'Terms and privacy'],
+  [/^\/checks/, 'How we check products'],
   [/^\/signin/, 'Sign in'],
   [/^\/welcome/, 'Getting started'],
   [/^\/home/, 'Home'],

@@ -21,6 +21,14 @@ const ADVISOR_QUESTION = 'Is my routine OK together, and which sunscreen under �
 const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven']
 const BACKDROP = 'radial-gradient(45% 45% at 10% 10%, rgba(122,92,255,.45), transparent 70%), radial-gradient(40% 45% at 90% 85%, rgba(255,178,122,.5), transparent 70%), var(--bg-canvas)'
 
+/** The legal position in four lines (research/finals/04-legal-regulatory.md §7a); the full table is on /terms#safe. */
+const SAFE: [string, string][] = [
+  ['Wellness, not a medical device', 'Intended only for cosmetic appearance tracking, in the words Singapore’s HSA gives wellness products. No condition is named, no severity graded, no mole assessed.'],
+  ['Cosmetics only, never medicines', 'Suggestions come from over-the-counter cosmetics sold in your market. Prescription and pharmacy actives are never suggested, and nothing says to start or stop a prescribed treatment.'],
+  ['Safety rules in code, not Gemini', 'Pregnancy, sensitivities, reactions and ingredient flags come from a sourced rule table. A reported reaction gets fixed “stop and see a doctor” wording.'],
+  ['Adults, separate consents, 30-day photos', '18+ only. Photos, AI processing and sharing are asked for separately. Photos are deleted after 30 days and face data is never used to recognise anyone.'],
+]
+
 const HONEST = [
   ['Numbers come from computer vision only.', 'Gemini never measures, scores skin, guesses age or tone, or diagnoses.'],
   ['Every Gemini answer is structured JSON checked against a schema.', 'A reply that does not fit is retried, then replaced by a plain template.'],
@@ -162,7 +170,7 @@ export default function Judge() {
       tag: 'ACTUAL PROCESSING',
       body: sample
         ? `${sample.title}: ${sample.note}. ${sample.credit}. The photos are copied into your account and go through the real upload, quality checks and measurement.`
-        : 'Sample photos of a consenting team member go through the real upload, quality checks and measurement.',
+        : 'Hosted sample photos go through the real upload, quality checks and measurement.',
       cta: 'Run it',
       disabled: !ready ? needsGuest : samples.state === 'loading' ? 'Loading the samples' : !sample ? 'Sample photos are not available right now' : undefined,
       act: () => sample && go('run', `/check-in?${new URLSearchParams({ site: sample.site, mode: sample.capture_mode, sample: sample.id })}`),
@@ -173,10 +181,10 @@ export default function Judge() {
       tag: journey.state === 'unavailable' ? 'SIMULATED JOURNEY · UNAVAILABLE' : 'SIMULATED JOURNEY · READ-ONLY',
       body:
         journey.state === 'ready'
-          ? `A simulated person (generated photos), measured by the live engine: baseline, normal range, a flare-up, what improved and what did not. ${journeyLine(journey)}.`
+          ? `A simulated person (generated photos), measured by the live engine: baseline, normal range, a rough week, what improved and what did not. ${journeyLine(journey)}.`
           : journey.state === 'loading'
             ? 'Checking the journey…'
-            : `${journeyUnavailableLine(journey)} The sample run in stop 01 shows the same pipeline on real photos.`,
+            : `${journeyUnavailableLine(journey)} The sample run in stop 01 shows the same pipeline on her week-one photos.`,
       cta: 'Open the journey',
       disabled: journey.state === 'ready' ? undefined : journey.state === 'loading' ? 'Checking' : 'Unavailable',
       act: () => go('proof', JOURNEY_PATH),
@@ -250,7 +258,7 @@ export default function Judge() {
             ) : null}
           </div>
           <div aria-label="Service status" className="flex flex-[2_1_460px] flex-wrap items-center gap-2 rounded-[30px] px-4 py-3.5" style={{ background: 'rgba(250,250,248,.8)' }}>
-            <span className="px-1.5 font-mono text-[11px] text-ink-2">■ SERVICE</span>
+            <span className="px-1.5 text-[13px] text-ink-2">Service</span>
             {status.status ? (
               services.map((s) => (
                 <span key={s.key} className="flex items-center gap-2 rounded-pill bg-white px-3 py-2 text-[13px]">
@@ -320,7 +328,6 @@ export default function Judge() {
 
         <section aria-labelledby="honest" className="glass mt-2 grid gap-6 rounded-[36px] p-[clamp(20px,3vw,32px)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <div className="flex flex-col items-start gap-3">
-            <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ HOW GEMINI IS KEPT HONEST</span>
             <h2 id="honest" className="m-0 font-serif text-[clamp(28px,3vw,40px)] font-normal leading-[1.05]">
               Measured by code, explained by Gemini, checked again.
             </h2>
@@ -330,6 +337,25 @@ export default function Judge() {
           </div>
           <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2">
             {HONEST.map(([t, d]) => (
+              <li key={t} className="flex flex-col gap-1">
+                <span className="text-[15px]">{t}</span>
+                <span className="text-[13px] leading-[1.45] text-ink-2">{d}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="safe" className="glass grid gap-6 rounded-[36px] p-[clamp(20px,3vw,32px)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <div className="flex flex-col items-start gap-3">
+            <h2 id="safe" className="m-0 font-serif text-[clamp(28px,3vw,40px)] font-normal leading-[1.05]">
+              A cosmetic tracker, never a doctor.
+            </h2>
+            <Link to="/terms#safe" className="mt-1 inline-flex min-h-11 items-center rounded-pill bg-white/70 px-4 text-[14px] text-ink no-underline transition-colors duration-200 hover:bg-white">
+              We do / we never do, in the terms →
+            </Link>
+          </div>
+          <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2">
+            {SAFE.map(([t, d]) => (
               <li key={t} className="flex flex-col gap-1">
                 <span className="text-[15px]">{t}</span>
                 <span className="text-[13px] leading-[1.45] text-ink-2">{d}</span>

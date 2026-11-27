@@ -23,9 +23,13 @@ class ProductRequestIn(BaseModel):
     brand: str = Field(default="", max_length=80)
     name: str = Field(default="", max_length=120)
     photo: RequestPhoto | None = None
+    # a catalog product known only by name (an index product): ask for its full facts
+    product_id: str | None = Field(default=None, max_length=120)
 
     @model_validator(mode="after")
     def _something(self) -> "ProductRequestIn":
+        if self.product_id:
+            return self
         if not self.photo and not (self.brand.strip() and self.name.strip()):
             raise ValueError("send the brand and name, or a photo of the product")
         return self
@@ -48,16 +52,31 @@ def create_request(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """Queue a product for Willow to check and add. A product the catalog already has is not
-    queued: 409 `in_catalog` carries it, so the app can offer it instead."""
-    found = catalog.match(body.brand, body.name)
-    if found and found[1] >= 0.85:
+    """Queue a product for Willow to check and add. A product the catalog already has in full is
+    not queued: 409 `in_catalog` carries it, so the app can offer it instead. A product it knows
+    only by name (an index product, by `product_id` or by brand and name) is queued as a request
+    for its full facts (`kind: "facts"`); asking again while that is pending answers the same
+    request and costs nothing."""
+    if body.product_id:
+        found = catalog.by_id(body.product_id)
+        if found is None:
+            raise HTTPException(404, {"code": "not_found", "message": "product not found"})
+    else:
+        found = product_requests.in_catalog(body.brand, body.name)
+    facts_for = found if found is not None and not catalog.is_full(found) else None
+    if facts_for is not None:
+        key = product_requests.key_of(facts_for["brand"], facts_for["name"])
+        mine = product_requests.pending_of(store, user.uid, key)
+        if mine is not None and not body.photo:
+            wish = store.product_wish_get(key) or {}
+            return product_requests.view(*mine, wish.get("count"))
+    elif found is not None:
         raise HTTPException(
             409,
             {
                 "code": "in_catalog",
-                "message": "That product is already in the catalog.",
-                "product": found[0],
+                "message": f"It's in the catalog: {found['name']}",
+                "product": found,
             },
         )
     photo = None
@@ -69,7 +88,9 @@ def create_request(
                 422, {"code": "bad_image", "message": "That photo could not be read. Try another."}
             ) from exc
     limits.take(store, user.uid, "product_request")
-    rid, doc, wish = product_requests.create(store, user.uid, body.brand, body.name, photo)
+    rid, doc, wish = product_requests.create(
+        store, user.uid, body.brand, body.name, photo, facts_for=facts_for
+    )
     return product_requests.view(rid, doc, wish.get("count"))
 
 

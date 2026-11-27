@@ -120,7 +120,7 @@ function Hero({ grow }: { grow: boolean }) {
           <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Judges, start here: the quickest look. Her eight weeks play by themselves, then use the app yourself. Mei is simulated." />
           <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
           <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
-          <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
+          <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Proof by Willow" tag="live app" sub="For brands: which products measurably work, for whom" />
         </nav>
       </div>
     </section>
@@ -195,7 +195,7 @@ function Try() {
         <WayIn to={JOURNEY_PATH} onWarm={warmJourney} tone="violet" icon={PlayCircle} title="Explore Mei’s journey" tag="judge experience" sub="Her eight weeks, narrated, with the app in between" />
         <WayIn to={BRAND_JOURNEY_PATH} tone="leaf" icon={Building2} title="Explore a brand’s journey" tag="judge experience" sub="How a skincare brand uses Proof, played for you" />
         <WayIn onClick={app.open} tone="coral" icon={Smartphone} title="Open the Willow app" tag="live app" sub={app.signedIn ? 'Your own account' : app.guest ? 'Your guest account on this browser' : 'Sign in, or look around as a guest'} />
-        <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Willow Proof" tag="live app" sub="For brands: which products measurably work, for whom" />
+        <WayIn to={PROOF_PATH} tone="sky" icon={BarChart3} title="Open Proof by Willow" tag="live app" sub="For brands: which products measurably work, for whom" />
       </nav>
     </section>
   )
@@ -262,7 +262,7 @@ function Footer() {
       <LiveStatus className="mt-12" />
       <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-line pt-5 text-[13px] text-ink-2">
         <span>© 2026 Willow · Cosmetic appearance tracking, not a medical device</span>
-        <span>Built on Firebase, Cloud Run, Firestore, BigQuery and Gemini on Vertex AI</span>
+        <span>Built on Firebase, Cloud Run, Firestore, BigQuery and Gemini on Google Cloud</span>
         <span>Compared with your own baseline, on any skin tone</span>
       </div>
       <div aria-hidden className="w-wordmark relative mx-[-1vw] mt-[clamp(12px,2vw,28px)] select-none pb-[.06em] text-center text-[clamp(120px,29vw,560px)] font-light leading-[.78] tracking-[-0.065em]">

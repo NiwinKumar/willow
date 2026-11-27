@@ -1,0 +1,685 @@
+{
+ "107-beauty-micro-drizzle-hydro-toner": [
+  "redness_sensitivity"
+ ],
+ "111skin-hyaluronic-acid-aqua-booster": [
+  "dullness"
+ ],
+ "abib-mild-acidic-ph-sheet-mask-heartleaf-fit": [
+  "redness_sensitivity"
+ ],
+ "abib-pdrn-retinal-eye-patch-glow-jelly": [
+  "uneven_tone",
+  "dullness",
+  "fine_lines"
+ ],
+ "abib-red-effect-serum-1-05-pump": [
+  "dullness"
+ ],
+ "aesop-parsley-seed-cleansing-masque": [
+  "texture_pores"
+ ],
+ "anessa-perfect-uv-sunscreen-skincare-milk": [
+  "dark_spots_pigmentation"
+ ],
+ "anua-pdrn-hyaluronic-acid-100-moisturizing-cream": [
+  "redness_sensitivity"
+ ],
+ "anua-peach-70-niacin-serum": [
+  "dullness"
+ ],
+ "arencia-holy-hyssop-serum-12": [
+  "dullness"
+ ],
+ "attenir-skin-clear-cleansing-oil-aroma-type": [
+  "acne_blemishes"
+ ],
+ "axis-y-vegan-collagen-eye-serum": [
+  "fine_lines",
+  "dark_circles"
+ ],
+ "bcl-kansosan-medical-moisture-cleansing-whip-wash": [
+  "texture_pores"
+ ],
+ "beauty-of-joseon-glow-deep-serum": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "beauty-of-joseon-relief-sun-rice-probiotics-spf-50-pa-most-loved-korean-sunscreen": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "beauty-of-joseon-revive-eye-serum": [
+  "dark_circles"
+ ],
+ "bifesta-uruochi-cleansing-makeup-remover-sheet-bright-up": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "biore-make-up-remover-cleasing-oil": [
+  "texture_pores"
+ ],
+ "biore-makeup-remover-perfect-oil": [
+  "texture_pores"
+ ],
+ "biore-mild-cleansing-liquid": [
+  "texture_pores"
+ ],
+ "biore-skincare-rich-moisturising-face-wash": [
+  "texture_pores"
+ ],
+ "biore-skincare-scrub-in-cleanser-face-wash": [
+  "texture_pores"
+ ],
+ "biore-uv-perfect-milk-cool-spf50-daily-sunscreen": [
+  "dark_spots_pigmentation"
+ ],
+ "biore-uv-perfect-milk-moisture-spf-50-sunscreen": [
+  "dark_spots_pigmentation"
+ ],
+ "black-friday-i-m-from-mugwort-essence": [
+  "redness_sensitivity"
+ ],
+ "caudalie-invisible-high-protection-stick-spf50": [
+  "dark_spots_pigmentation"
+ ],
+ "caudalie-very-high-protection-lightweight-cream-spf50": [
+  "dark_spots_pigmentation"
+ ],
+ "celimax-the-vita-a-retinal-shot-tightening-booster": [
+  "fine_lines"
+ ],
+ "cell-fusion-c-toning-c-vita-shot-ampoule": [
+  "dullness"
+ ],
+ "centellian24-madeca-cream-time-reverse": [
+  "redness_sensitivity"
+ ],
+ "centellian24-madeca-daily-repair-toner": [
+  "redness_sensitivity"
+ ],
+ "cerave-facial-lotion": [
+  "redness_sensitivity"
+ ],
+ "cerave-sa-smoothing-cleanser": [
+  "texture_pores"
+ ],
+ "cetaphil-gentle-skin-cleanser-1l": [
+  "redness_sensitivity"
+ ],
+ "clinelle-caviar-gold-eye-serum": [
+  "dark_circles"
+ ],
+ "clinelle-uv-defense-spf50": [
+  "dark_spots_pigmentation"
+ ],
+ "clinelle-whitenup-serum": [
+  "dark_spots_pigmentation"
+ ],
+ "clinique-take-the-day-off-cleansing-balm-makeup-remover": [
+  "texture_pores"
+ ],
+ "clinique-take-the-day-off-makeup-remover": [
+  "texture_pores"
+ ],
+ "clinique-take-the-day-off-micellar-cleansing-towelettes": [
+  "texture_pores"
+ ],
+ "cosrx-advanced-snail-mucin-power-gel-cleanser": [
+  "texture_pores"
+ ],
+ "cosrx-full-fit-propolis-light-cream": [
+  "redness_sensitivity"
+ ],
+ "cosrx-galactomyces-95-tone-balancing-essence": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "cosrx-hydrium-green-tea-aqua-soothing-gel-cream": [
+  "redness_sensitivity"
+ ],
+ "cosrx-hydrium-moisture-power-enriched-cream": [
+  "redness_sensitivity"
+ ],
+ "cosrx-hydrium-triple-hyaluronic-moisturizing-cleanser": [
+  "texture_pores"
+ ],
+ "cosrx-low-ph-good-night-soft-peeling-gel": [
+  "texture_pores"
+ ],
+ "cosrx-pure-fit-cica-serum": [
+  "redness_sensitivity"
+ ],
+ "cosrx-salicylic-acid-daily-gentle-facial-cleanser": [
+  "acne_blemishes",
+  "redness_sensitivity"
+ ],
+ "cosrx-the-6-peptide-skin-booster-serum": [
+  "fine_lines"
+ ],
+ "cow-brand-no-additive-cleansing-milk": [
+  "texture_pores"
+ ],
+ "d-program-essence-in-cleansing-foam": [
+  "texture_pores"
+ ],
+ "d-program-essence-in-cleansing-oil": [
+  "texture_pores"
+ ],
+ "demaf-here-oh-my-first-serum": [
+  "dullness"
+ ],
+ "demarrer-tna-whitening-lotion": [
+  "dark_spots_pigmentation"
+ ],
+ "dot-and-key-10-vitamin-c-e-super-bright-face-serum-with-5-niacinamide-and-blood-orange": [
+  "dark_spots_pigmentation",
+  "uneven_tone",
+  "dullness"
+ ],
+ "dot-and-key-dragon-fruit-bounce-gel-sunscreen-spf-50-pa-with-new-age-uv-filters": [
+  "fine_lines"
+ ],
+ "dot-and-key-strawberry-dew-melt-in-a-flash-cleansing-balm-with-fruit-enzymes-and-vitamins": [
+  "texture_pores"
+ ],
+ "dot-and-key-strawberry-dew-tinted-sunscreen-in-vivo-tested-spf-50-pa-for-daily-wear-01-porcelain": [
+  "dark_spots_pigmentation"
+ ],
+ "dot-and-key-vitamin-c-e-super-bright-sunscreen-spf-50-pa-in-vivo-tested": [
+  "dark_spots_pigmentation",
+  "uneven_tone",
+  "dullness"
+ ],
+ "elemis-pro-collagen-marine-mask": [
+  "fine_lines"
+ ],
+ "eltamd-uv-aox-mist-broad-spectrum-spf-40-spray": [
+  "dark_spots_pigmentation"
+ ],
+ "eltamd-uv-clear-broad-spectrum-spf-46-facial-sunscreen": [
+  "acne_blemishes"
+ ],
+ "eltamd-uv-daily-broad-spectrum-spf-40-facial-moisturizer": [
+  "dark_spots_pigmentation"
+ ],
+ "eltamd-uv-pure-spf-47-kids-sunscreen-broad-spectrum": [
+  "redness_sensitivity"
+ ],
+ "eminence-organic-skin-care-calm-skin-arnica-booster-serum": [
+  "redness_sensitivity"
+ ],
+ "eminence-organic-skin-care-camellia-glow-solid-face-oil": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "eminence-organic-skin-care-mangosteen-daily-resurfacing-concentrate": [
+  "texture_pores"
+ ],
+ "eminence-organic-skin-care-pumpkin-latte-hydration-masque": [
+  "texture_pores"
+ ],
+ "eminence-organic-skin-care-snow-mushroom-reishi-masque": [
+  "texture_pores"
+ ],
+ "estee-lauder-perfectly-clean-multiaction-foam-cleanser-and-purifying-mask": [
+  "acne_blemishes"
+ ],
+ "eversoft-organic-avocado-rice-bran-facial-cleanser": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "eyenlip-peptide-multi-care-cream-toner": [
+  "fine_lines"
+ ],
+ "fancl-deep-clear-cleansing-powder": [
+  "acne_blemishes"
+ ],
+ "follain-eye-cream": [
+  "dark_circles"
+ ],
+ "foxtale-ceramide-moisturizer": [
+  "redness_sensitivity"
+ ],
+ "fresh-dermlab-by-fresh-lumi-rejucare-gel-cleanser-gentle-face-wash": [
+  "redness_sensitivity"
+ ],
+ "fresh-soy-face-cleanser": [
+  "texture_pores"
+ ],
+ "good-molecules-caffeine-energizing-hydrogel-eye-patches-60ct-2-pack": [
+  "dark_circles"
+ ],
+ "good-molecules-moisturizing-rich-sunscreen-spf-30": [
+  "dark_spots_pigmentation"
+ ],
+ "good-molecules-yerba-mate-wake-up-eye-gel": [
+  "dark_circles"
+ ],
+ "goodal-green-tangerine-vita-c-e-txa-serum": [
+  "dullness"
+ ],
+ "hada-labo-deep-whitening-kotojyun-mask-1s": [
+  "dark_spots_pigmentation"
+ ],
+ "hada-labo-hydra-whitening-face-wash": [
+  "dark_spots_pigmentation"
+ ],
+ "hada-labo-hydrating-cleansing-oil": [
+  "texture_pores"
+ ],
+ "hada-labo-hydrating-cleansing-oil-makeup-remover": [
+  "texture_pores"
+ ],
+ "hada-labo-instant-hydrating-kotojyun-mask-1s": [
+  "texture_pores"
+ ],
+ "hada-labo-moisturizing-face-wash": [
+  "texture_pores"
+ ],
+ "himalaya-herbals-purifying-neem-face-wash": [
+  "acne_blemishes"
+ ],
+ "hydrinity-renewing-ha-serum": [
+  "fine_lines"
+ ],
+ "id-placosmetics-id-exo-v-booster-ampoule": [
+  "dullness"
+ ],
+ "is-clinical-extreme-protect-spf-40": [
+  "dark_spots_pigmentation"
+ ],
+ "isntree-green-tea-fresh-serum": [
+  "dullness"
+ ],
+ "iunik-beta-glucan-power-moisture-serum": [
+  "dullness"
+ ],
+ "kisocare-azelaic-acid-cream-15": [
+  "acne_blemishes"
+ ],
+ "kisocare-azelaic-acid-cream-20": [
+  "acne_blemishes"
+ ],
+ "kisocare-vitamin-c-35-serum": [
+  "dark_spots_pigmentation",
+  "uneven_tone",
+  "dullness"
+ ],
+ "kose-cosmeport-softymo-speedy-cleansing-oil": [
+  "texture_pores"
+ ],
+ "kumano-cosme-reihaku-hatomugi-the-facial-whip": [
+  "texture_pores"
+ ],
+ "la-roche-posay-anthelios-uvmune-400-invisible-fluid-non-perfumed-suncream-spf50": [
+  "dark_spots_pigmentation"
+ ],
+ "la-roche-posay-effaclar-foaming-gel-cleanser": [
+  "texture_pores"
+ ],
+ "la-roche-posay-hyalu-b5-pure-hyaluronic-acid-serum": [
+  "redness_sensitivity"
+ ],
+ "la-roche-posay-hyalu-b5-serum": [
+  "dullness"
+ ],
+ "la-roche-posay-mela-b3-serum": [
+  "dullness"
+ ],
+ "la-roche-posay-physiological-micellar-solution": [
+  "texture_pores"
+ ],
+ "la-roche-posay-toleriane-dermo-cleanser": [
+  "texture_pores"
+ ],
+ "la-roche-posay-toleriane-double-repair-face-moisturizer": [
+  "redness_sensitivity"
+ ],
+ "la-roche-posay-toleriane-double-repair-face-moisturizer-uv-spf-30": [
+  "dark_spots_pigmentation"
+ ],
+ "lakme-9to5-double-duty-moisturizer-primer": [
+  "redness_sensitivity"
+ ],
+ "lakme-cc-tinted-serum-with-2-hyaluronic-acid": [
+  "dullness"
+ ],
+ "lululun-face-mask-strawberry-7-s": [
+  "texture_pores"
+ ],
+ "ma-nyo-galac-whitening-vita-toner": [
+  "dark_spots_pigmentation"
+ ],
+ "marini-skinsolutions-hyla3d-face-mask": [
+  "texture_pores"
+ ],
+ "matsukiyo-w-m-aaa-moist-intensive-lotion": [
+  "redness_sensitivity"
+ ],
+ "medi-peel-phyto-ex-pdrn-lifting-shot-serum": [
+  "fine_lines"
+ ],
+ "medi-peel-phyto-ex-pdrn-micro-shot-powder-cleanser": [
+  "texture_pores"
+ ],
+ "medicube-collagen-night-wrapping-mask": [
+  "fine_lines"
+ ],
+ "medicube-kojic-acid-turmeric-peel-shot": [
+  "texture_pores",
+  "dark_spots_pigmentation"
+ ],
+ "medicube-pdrn-pink-collagen-gel-mask": [
+  "fine_lines"
+ ],
+ "medicube-pdrn-pink-collagen-toning-gel-toner-pad": [
+  "fine_lines"
+ ],
+ "medicube-pdrn-pink-peptide-serum": [
+  "fine_lines"
+ ],
+ "medicube-red-toner": [
+  "redness_sensitivity"
+ ],
+ "medicube-ultra-light-pdrn-pink-peptide-serum": [
+  "fine_lines"
+ ],
+ "minimalist-spf-60-sunscreen": [
+  "dark_spots_pigmentation"
+ ],
+ "miseoul-water-drop-essence-gel": [
+  "dullness"
+ ],
+ "missha-all-around-safe-block-essence-sun-milk-ex-spf50-pa": [
+  "dark_spots_pigmentation"
+ ],
+ "missha-all-around-safe-block-waterproof-sun-milk-spf50-pa": [
+  "dark_spots_pigmentation"
+ ],
+ "mizumi-enzyme-reju-facial-cleanser-collagen": [
+  "texture_pores",
+  "fine_lines"
+ ],
+ "mizumi-extra-mild-facial-cleanser": [
+  "texture_pores"
+ ],
+ "mizumi-smooth-cleansing-water": [
+  "texture_pores"
+ ],
+ "most-popular-kiku-masamune-sake-brewing-booster-essence-lotion": [
+  "dullness"
+ ],
+ "most-popular-rejuran-dual-effect-ampoule": [
+  "dullness"
+ ],
+ "murad-soothing-seaweed-infusion-mask-tonic-water": [
+  "redness_sensitivity"
+ ],
+ "nameraka-honpo-smooth-cleansing-face-wash-large": [
+  "texture_pores"
+ ],
+ "naruko-narcissus-repairing-mask-1-s": [
+  "texture_pores"
+ ],
+ "naruko-raw-job-s-tears-mask-1-s": [
+  "texture_pores"
+ ],
+ "naruko-rose-botanic-ha-aqua-cubic-mask-1-s": [
+  "texture_pores"
+ ],
+ "nature-republic-super-aqua-max-watery-toner": [
+  "redness_sensitivity"
+ ],
+ "neostrata-matrix-support-spf-30": [
+  "dark_spots_pigmentation"
+ ],
+ "neutrogena-alcohol-free-toner": [
+  "redness_sensitivity"
+ ],
+ "neutrogena-deep-clean-cleansing-lotion": [
+  "texture_pores"
+ ],
+ "neutrogena-hydro-boost-water-gel-facial-cleanser": [
+  "texture_pores"
+ ],
+ "neutrogena-ultra-gentle-alcohol-free-toner": [
+  "redness_sensitivity"
+ ],
+ "neutrogena-ultra-sheer-dry-touch-sunscreen-spf50-pa": [
+  "dark_spots_pigmentation"
+ ],
+ "new-madeca21-teca-toning-toner": [
+  "redness_sensitivity"
+ ],
+ "nice-quick-botanical-hot-cleansing-gel": [
+  "texture_pores"
+ ],
+ "nivea-cream": [
+  "redness_sensitivity"
+ ],
+ "nivea-nivea-luminous630-skin-glow-serum": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "nivea-sun-protect-water-gel-spf50-pa-pump-type": [
+  "dark_spots_pigmentation"
+ ],
+ "nu-formula-serum-rebarrier-ai-recovery": [
+  "dullness"
+ ],
+ "numbuzin-no-5-glutathione-vitamin-boosting-essential-toner": [
+  "dark_spots_pigmentation"
+ ],
+ "numbuzin-no-9-nad-retinol-volumetox-eye-cream": [
+  "fine_lines",
+  "dark_circles"
+ ],
+ "obagi-hydrate-facial-moisturizer": [
+  "redness_sensitivity"
+ ],
+ "obagi-nu-cil-eyelash-enhancing-serum": [
+  "dark_circles"
+ ],
+ "obagi-physical-defense-tinted-broad-spectrum-spf-50": [
+  "dark_spots_pigmentation"
+ ],
+ "olay-regenerist-revitalising-cream-cleanser": [
+  "texture_pores"
+ ],
+ "olay-total-effect-7in1-normal-spf15-cream": [
+  "dark_spots_pigmentation"
+ ],
+ "olay-total-effects-7in1-night-cream": [
+  "redness_sensitivity"
+ ],
+ "olay-total-effects-foaming-cleanser": [
+  "texture_pores"
+ ],
+ "olay-total-effects-gentle-cream-spf-15": [
+  "redness_sensitivity"
+ ],
+ "olay-total-effects-normal-cream-spf-15": [
+  "dark_spots_pigmentation"
+ ],
+ "orbis-cleansing-liquid": [
+  "texture_pores"
+ ],
+ "p-calm-pdrn-caffeine-blue-capsule-11-serum": [
+  "dullness"
+ ],
+ "plantnery-tea-tree-first-cleansing-water": [
+  "acne_blemishes"
+ ],
+ "pond-s-bright-miracle-ultimate-clarity-night-cream-niasorcinol": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "purito-seoul-mighty-bamboo-panthenol-cream": [
+  "redness_sensitivity"
+ ],
+ "rejuran-advanced-intensive-scar-treatment-mask": [
+  "texture_pores"
+ ],
+ "rejuran-turnover-ampoule-jumbo": [
+  "dullness"
+ ],
+ "rice-force-premium-perfect-lotion": [
+  "redness_sensitivity"
+ ],
+ "rms-beauty-suncoverup-super-tint-broad-spectrum-spf-50-sunscreen": [
+  "dark_spots_pigmentation"
+ ],
+ "rohto-mentholatum-hada-labo-goku-jyun-sh-4-in-1-hydrating-toner-pad": [
+  "redness_sensitivity"
+ ],
+ "rosette-cleansing-milk": [
+  "texture_pores"
+ ],
+ "round-lab-1025-dokdo-cleansing-oil": [
+  "texture_pores"
+ ],
+ "round-lab-birch-juice-moisturizing-soothing-gel": [
+  "redness_sensitivity"
+ ],
+ "round-lab-birch-juice-moisturizing-sunscreen": [
+  "dark_spots_pigmentation"
+ ],
+ "round-lab-soybean-nourishing-cream": [
+  "redness_sensitivity"
+ ],
+ "senka-perfect-whip-beauty-foam-facial-cleanser": [
+  "texture_pores"
+ ],
+ "senka-perfect-whip-collagen-in-beauty-foam-facial-cleanser": [
+  "fine_lines"
+ ],
+ "shiseido-clarifying-cleansing-foam": [
+  "acne_blemishes"
+ ],
+ "shiseido-complete-cleansing-microfoam": [
+  "texture_pores"
+ ],
+ "shiseido-deep-cleansing-foam": [
+  "texture_pores"
+ ],
+ "shiseido-elixir-the-serum-aa": [
+  "dullness"
+ ],
+ "shiseido-future-solution-regenerating-cream-soft": [
+  "redness_sensitivity"
+ ],
+ "shiseido-future-solution-total-regenerating-cream": [
+  "redness_sensitivity"
+ ],
+ "shiseido-ultimune-power-infusing-oil": [
+  "dullness"
+ ],
+ "shiseido-vital-perfection-intensive-sculptdefine-serum": [
+  "dullness"
+ ],
+ "simple-kind-to-skin-hydrating-light-moisturiser": [
+  "redness_sensitivity"
+ ],
+ "simple-micellar-cleansing-water": [
+  "texture_pores"
+ ],
+ "simply-bye-eye-eye-bag-hydro-gel-eye-mask-2s": [
+  "dark_circles"
+ ],
+ "skin-aqua-uv-super-moisture-gel-strongest-gold-uv-sunscreen-unscented": [
+  "dark_spots_pigmentation"
+ ],
+ "skin1004-madagascar-centella-ampoule-foam": [
+  "redness_sensitivity"
+ ],
+ "skin1004-madagascar-centella-hyalu-cica-silky-fit-sun-stick": [
+  "redness_sensitivity"
+ ],
+ "skin1004-madagascar-centella-toning-toner": [
+  "redness_sensitivity"
+ ],
+ "skinceuticals-ha-intensifier-multi-glycan-multi-dimensional-volumizing-serum": [
+  "dullness"
+ ],
+ "skinceuticals-hydrating-b5-hyaluronic-acid-gel-serum": [
+  "dullness"
+ ],
+ "skinmedica-total-defense-repair-spf-34": [
+  "dark_spots_pigmentation"
+ ],
+ "skintific-panthenol-gentle-gel-cleanser": [
+  "redness_sensitivity"
+ ],
+ "sofina-beaute-high-moisturizing-lotion": [
+  "redness_sensitivity"
+ ],
+ "softymo-speedy-cleansing-oil": [
+  "texture_pores"
+ ],
+ "some-by-mi-aha-bha-pha-30-days-miracle-cream": [
+  "acne_blemishes",
+  "texture_pores"
+ ],
+ "srichand-phyto-camellia-pdrn-bright-glowing-essence": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "sukin-foaming-facial-cleanser-pump-signature": [
+  "texture_pores"
+ ],
+ "supershades-glow-collagen-ampoule-pads": [
+  "uneven_tone",
+  "dullness",
+  "fine_lines"
+ ],
+ "tirtir-matcha-skin-toner": [
+  "redness_sensitivity"
+ ],
+ "tizo-am-replenish-lightly-tinted-spf-40": [
+  "dark_spots_pigmentation"
+ ],
+ "tocobo-cotton-soft-sun-stick": [
+  "dark_spots_pigmentation"
+ ],
+ "torriden-dive-in-hyaluronic-acid-toner": [
+  "redness_sensitivity"
+ ],
+ "transino-melano-signal-essence-jumbo": [
+  "dullness"
+ ],
+ "trending-new-po-dl-chestnut-peptide-bubble-serum": [
+  "fine_lines"
+ ],
+ "trending-new-sam-u-pdrn-real-glowing-fitting-toner": [
+  "uneven_tone",
+  "dullness"
+ ],
+ "trending-new-sam-u-ph-sensitive-toner": [
+  "redness_sensitivity"
+ ],
+ "trending-new-tonymoly-nad-peptide-reverse-toner": [
+  "fine_lines"
+ ],
+ "trending-new-zeroid-intensive-cream-toner": [
+  "redness_sensitivity"
+ ],
+ "ttvv-serum": [
+  "dullness"
+ ],
+ "wardah-lightening-face-toner": [
+  "redness_sensitivity"
+ ],
+ "water360-by-watsons-mineral-spring-rich-moist-essence-toner": [
+  "redness_sensitivity"
+ ],
+ "wellderma-sapphire-collagen-impact-hydro-toner": [
+  "fine_lines"
+ ],
+ "wonder-bath-ph-balancing-pha-cleansing-foam": [
+  "texture_pores"
+ ],
+ "za-true-white-ex-essence-lotion": [
+  "redness_sensitivity"
+ ]
+}

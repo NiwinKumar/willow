@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 /**
  * The settings page's two building blocks: a Group (a small heading over one card) and a Row (the setting's
@@ -31,4 +31,52 @@ export function Row({ label, hint, children, stack = false, id }: { label: React
 /** A toggle in a group: the same padding as a Row. */
 export function ToggleRow({ children }: { children: ReactNode }) {
   return <div className="py-2.5">{children}</div>
+}
+
+/**
+ * Wide screens only (≥1180px): the page's groups as a short index in the empty gutter beside the column, so a
+ * long settings page is one click from any group. The current group (the one under the header line) is marked by
+ * an ink bar that slides between names.
+ * Four tests: one click to any of the seven groups on a page ~2,400px tall; plain group names, nothing to learn;
+ * sits in the gutter where nothing else is, still while reading; the page's own type and ink.
+ */
+export function GroupIndex({ groups }: { groups: { id: string; title: string }[] }) {
+  const [current, setCurrent] = useState<string | undefined>(groups[0]?.id)
+  useEffect(() => {
+    const els = groups.map((g) => document.getElementById(g.id)).filter((x): x is HTMLElement => Boolean(x))
+    const pick = () => {
+      // the last group whose top has passed a line a third of the way down the window
+      const line = window.innerHeight / 3
+      let id: string | undefined = els[0]?.id
+      for (const el of els) if (el.getBoundingClientRect().top <= line) id = el.id
+      // at the very end the last (short) group is current even if its top never reaches the line
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) id = els.at(-1)?.id
+      setCurrent(id)
+    }
+    pick()
+    window.addEventListener('scroll', pick, { passive: true })
+    window.addEventListener('resize', pick)
+    return () => {
+      window.removeEventListener('scroll', pick)
+      window.removeEventListener('resize', pick)
+    }
+  }, [groups])
+  const at = Math.max(0, groups.findIndex((g) => g.id === current))
+  const go = (id: string) => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }
+  return (
+    <nav aria-label="Settings groups" className="absolute top-[72px] bottom-0 left-full hidden w-[200px] pl-8 xl:block">
+      <div className="sticky top-24 flex flex-col">
+        <span aria-hidden className="absolute top-0 left-0 h-9 w-[2px] rounded-pill bg-ink transition-transform duration-300 ease-standard" style={{ transform: `translateY(${at * 36}px)` }} />
+        {groups.map((g) => (
+          <button key={g.id} type="button" onClick={() => go(g.id)} aria-current={g.id === current ? 'true' : undefined} className={`flex h-9 items-center pl-4 text-left text-[13px] transition-colors duration-200 ${g.id === current ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}>
+            {g.title}
+          </button>
+        ))}
+        <span aria-hidden className="absolute top-0 left-0 -z-10 h-full w-[2px] rounded-pill bg-ink/10" />
+      </div>
+    </nav>
+  )
 }

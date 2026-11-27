@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 import { Sheet } from '../../components/ui/Sheet'
 import type { RoutineEntry } from '../../data/types'
+import { localDay } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { ProductImage } from './productUi'
 import { entryName, imageOf, metaLine, slotWords } from './routineModel'
@@ -20,7 +21,7 @@ export function RoutineHistory({ open, onClose, current, stopped, onOpen }: { op
       <div className="flex flex-col gap-5">
         <Group title="In your routine" count={current.length} empty="Nothing in your routine right now.">
           {[...current].sort(byStart).map((e) => (
-            <Row key={e.id} e={e} onOpen={onOpen} when={`${slotWords(e.slots)} · since ${fmtDate(e.started_at)}${e.schedule && e.schedule.kind !== 'daily' ? ` · ${scheduleWords(e.schedule, !e.slots.includes('am')).toLowerCase()}` : ''}`} />
+            <Row key={e.id} e={e} onOpen={onOpen} when={`${slotWords(e.slots)} · ${e.started_at.slice(0, 10) > localDay() ? 'from' : 'since'} ${fmtDate(e.started_at)}${e.schedule && e.schedule.kind !== 'daily' ? ` · ${scheduleWords(e.schedule, !e.slots.includes('am')).toLowerCase()}` : ''}`} />
           ))}
         </Group>
         <Group title="Stopped" count={stopped.length} empty="Nothing stopped yet. A product you stop using will be listed here.">

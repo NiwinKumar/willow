@@ -2,7 +2,7 @@ import base64
 import csv
 import importlib.util
 import json
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -255,12 +255,25 @@ def test_failed_scans_are_refunded_and_bad_photos_are_a_clear_error(client, fake
     assert fake.store.usage_incr("u_test", day, "label_scan", 0) == 0
 
 
-def test_a_future_start_date_is_refused(client, fake):
-    res = client.post(
-        "/v1/routine",
-        json={"custom_name": "Serum", "slots": ["pm"], "started_at": "2099-01-01"},
+def test_a_start_date_up_to_16_weeks_ahead_is_kept(client, fake):
+    """A plan's later picks (week 2, 4, 8...) start on their own day; further ahead is refused."""
+    today = datetime.now(UTC).date()
+
+    def add(start):
+        body = {"custom_name": "Serum", "slots": ["pm"], "started_at": start.isoformat()}
+        return client.post("/v1/routine", json=body)
+
+    later = add(today + timedelta(weeks=2))
+    assert (
+        later.status_code == 200
+        and later.json()["started_at"] == (today + timedelta(weeks=2)).isoformat()
     )
-    assert res.status_code == 422
+    assert add(today + timedelta(weeks=16)).status_code == 200
+    assert add(today + timedelta(weeks=16, days=2)).status_code == 422
+    assert add(date(2099, 1, 1)).status_code == 422
+    # a product that starts later can't be ticked before its day
+    eid = later.json()["id"]
+    assert client.put(f"/v1/routine/log/{today.isoformat()}/{eid}/pm").status_code == 409
 
 
 def test_browsing_the_catalog_lists_every_currency(client, fake):

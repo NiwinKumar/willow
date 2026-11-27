@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { cellFill, goalTrends, ownForGoal, parseMode } from '../src/features/retail/sections/customers/model.ts'
+import { cellFill, goalTrends, ownForGoal, parseMode, unmetSpan } from '../src/features/retail/sections/customers/model.ts'
 
 test('goal trends are shares of each month’s people, compared over the last two months', () => {
   const t = goalTrends({
@@ -46,4 +46,13 @@ test('matrix modes and fills keep suppressed groups apart from zero', () => {
   assert.equal(cellFill('unmet', cell, 200), null)
   assert.match(cellFill('people', { ...cell, users: 160 }, 200) ?? '', / 24%,/)
   assert.equal(cellFill('people', { ...cell, users: null }, 200), null)
+})
+
+test('the unmet ramp spans the matrix’s own range, so the worst-served group is the strongest', () => {
+  const c = (unmet: number | null) => ({ skin: 'oily', goal: 'lines', users: 40, unmet, best: null, runner_up: null })
+  const span = unmetSpan([c(0.4), c(0.9), c(null), c(0.6)])
+  assert.deepEqual(span, { lo: 0.4, hi: 0.9 })
+  assert.match(cellFill('unmet', c(0.9), 200, span!) ?? '', / 60%,/)
+  assert.match(cellFill('unmet', c(0.4), 200, span!) ?? '', / 4%,/)
+  assert.equal(unmetSpan([c(0.5)]), null)
 })

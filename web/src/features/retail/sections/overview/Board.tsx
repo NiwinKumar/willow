@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { useCompetitorNames } from '../../orgData'
 import { sectionPath, useRetailState } from '../../state'
 import type { BrandSummary, Insights, ProductRow, Products } from '../../types'
 import { cohortKind, int, MIN_GROUP, pct, pts, SkeletonPanel } from '../../ui'
@@ -76,6 +77,7 @@ const STACK: { id: string; label: string; tone: StackTone; match: (r: ProductRow
 
 export function WidgetBoard({ d, all, rows, brand, summary, spotlight }: { d: Insights; all: Products | null; rows: ProductRow[]; brand: string | null; summary: BrandSummary | null; spotlight: ReactNode }) {
   const { carry } = useRetailState()
+  const names = useCompetitorNames()
   if (!all) return <SkeletonPanel height={560} />
   const kind = cohortKind(d.cohort)
   const people = d.cohort.synthetic + d.cohort.real
@@ -99,10 +101,12 @@ export function WidgetBoard({ d, all, rows, brand, summary, spotlight }: { d: In
   const cont = contOf(d, all, rows, brand, summary)
 
   /* ── brands (list) ── */
-  const brands = d.brands.slice(0, 5)
+  const brands = d.brands.slice(0, 5).map((b) => ({ ...b, brand: names.name(b.brand) }))
 
   /* ── catalog by proof  ── */
-  const segments: StackSegment[] = STACK.map((s) => ({ id: s.id, label: s.label, value: rows.filter(s.match).length, display: String(rows.filter(s.match).length), tone: s.tone })).filter((s) => s.value > 0)
+  // Products nobody uses yet are left out of this tile (they live on the Range page as "In range, no users yet").
+  const used = rows.filter((r) => !STACK.find((s) => s.id === 'unused')!.match(r))
+  const segments: StackSegment[] = STACK.filter((s) => s.id !== 'unused').map((s) => ({ id: s.id, label: s.label, value: used.filter(s.match).length, display: String(used.filter(s.match).length), tone: s.tone })).filter((s) => s.value > 0)
 
   /* ── dots: no visible change yet (market) or the brand's own rate (brand) ── */
   const unmet = d.tiles.find((t) => t.label.startsWith('Unmet'))
@@ -135,10 +139,10 @@ export function WidgetBoard({ d, all, rows, brand, summary, spotlight }: { d: In
         {segments.length ? (
           <div className="flex min-w-0">
             <PillStack
-              title={brand ? 'Your products by proof level' : 'Products by proof level'}
+              title={brand ? 'Your products in use, by proof level' : 'Products in use, by proof level'}
               segments={segments}
               defaultId="proven"
-              caption={(s) => `${s.label} · ${pct(s.value / rows.length)} of ${rows.length} products`}
+              caption={(s) => `${s.label} · ${pct(s.value / used.length)} of ${used.length} products people use`}
               ariaLabel={`Products by proof level: ${segments.map((s) => `${s.label} ${s.display}`).join(', ')}`}
             />
           </div>

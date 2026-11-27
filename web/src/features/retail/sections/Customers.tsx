@@ -1,13 +1,15 @@
+import { ArrowRight } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { useRetailData } from '../context'
-import { useRetailState } from '../state'
+import { purposeOf, useRetailState } from '../state'
 import type { Insights, Products, ProductRow, Segments } from '../types'
-import { Bone, ErrorState, int, MIN_GROUP, PageHeader, pct, SkeletonPanel } from '../ui'
+import { Bone, Button, ErrorState, int, MIN_GROUP, PageHeader, pct, SkeletonPanel } from '../ui'
 import { topUnmet } from '../ui/insight'
 import { fetchProducts } from '../productData'
 import { useSegments, useView } from '../useView'
+import { Fit } from './customers/Fit'
 import { Conflicts, Gaps, WhatPeopleWant } from './customers/Demand'
 import { MatrixPanel } from './customers/Matrix'
 import { cellKey, ownForGoal, parseMode } from './customers/model'
@@ -66,10 +68,23 @@ function Page({ d }: { d: Insights }) {
   const cell = s && openCell ? (s.cells.find((c) => cellKey(c) === openCell) ?? null) : null
   const skinRow = s ? (s.by_skin.find((b) => b.skin === param('skin')) ?? null) : null
   const goalId = param('goal')
+  const worst = s ? (topUnmet(s, 1)[0] ?? null) : null
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Customers" description={<Finding s={s} d={d} mine={mine} products={products} />} />
+      <PageHeader
+        title="Customers"
+        description={<Finding s={s} d={d} mine={mine} products={products} />}
+        purpose={purposeOf('customers')}
+        actions={
+          worst ? (
+            // The finding's next step: the products that work (or don't) for that group, in its panel.
+            <Button kind="primary" onClick={() => setParam({ cell: cellKey(worst), skin: null }, { push: true })}>
+              What works for them <ArrowRight size={14} strokeWidth={1.7} aria-hidden />
+            </Button>
+          ) : null
+        }
+      />
       <section id="unmet" aria-label="Skin type by goal">
         {seg.status === 'loading' ? (
           <div role="status" aria-label="Loading skin types" aria-busy="true">
@@ -101,6 +116,9 @@ function Page({ d }: { d: Insights }) {
         </section>
       </div>
       <Gaps d={d} />
+      <section id="fit">
+        <Fit />
+      </section>
       {s ? (
         <>
           <CellPanel cell={cell} s={s} catalog={products} mine={mine} onClose={() => setParam({ cell: null })} />
