@@ -712,3 +712,25 @@ def test_autopilot_signals_match_eligibility_and_the_rising_goal_card(monkeypatc
         assert card["link"]["id"] in sig["rising"]
         assert sig["rising"][card["link"]["id"]]["to"] == card["value"]
     assert all(c["unmet"] is not None and 0 <= c["unmet"] <= 1 for c in sig["unmet"])
+
+
+def test_overlap_memo_never_returns_a_count_for_a_different_set():
+    from app import retail_intel
+
+    f = retail_intel.Facts.__new__(retail_intel.Facts)
+    f.memo = {}
+    a = frozenset({"u1", "u2", "u3"})
+    b = frozenset({"u1", "u2"})
+    assert f.overlap(a, b) == 2
+    # a different set that happens to share an id key must be recounted, not served the old 2
+    key = ("overlap", *sorted(id(x) for x in (a, b)))
+    other = frozenset({"u9"})
+    f.memo[key] = ((other, b), 2)
+    assert f.overlap(a, b) == 2 and f.memo[key][0] == (a, b)
+
+
+def test_lift_interval_never_fails_on_impossible_counts():
+    from app import retail_intel
+
+    lift, lo, hi = retail_intel.lift_ci(5, 10, 12, 10)  # more wins than people in the base
+    assert lo <= lift <= hi

@@ -180,12 +180,20 @@ class Facts:
         return self.memo[key]
 
     def overlap(self, *sets: frozenset[str]) -> int:
-        """Size of the intersection of memoised sets, memoised (sets are compared by id)."""
+        """Size of the intersection of these sets, memoised. The key is the sets' ids, so the
+        entry keeps the sets themselves and is used only when every one is the same object: a
+        temporary set freed and its id reused by another set must never get the old count
+        (that returned more wins than people and crashed the lift interval, Nov 28)."""
         key = ("overlap", *sorted(id(x) for x in sets))
-        if key not in self.memo:
-            smallest, *rest = sorted(sets, key=len)
-            self.memo[key] = sum(1 for uh in smallest if all(uh in x for x in rest))
-        return self.memo[key]
+        hit = self.memo.get(key)
+        if hit is not None:
+            kept, count = hit
+            if len(kept) == len(sets) and all(any(a is b for b in kept) for a in sets):
+                return count
+        smallest, *rest = sorted(sets, key=len)
+        count = sum(1 for uh in smallest if all(uh in x for x in rest))
+        self.memo[key] = (tuple(sets), count)
+        return count
 
     @property
     def category_users(self) -> dict[str, set[str]]:
@@ -267,7 +275,8 @@ def build_facts(
 
 def lift_ci(k1: int, n1: int, k2: int, n2: int) -> tuple[float, float, float]:
     """(lift, lo, hi): difference of two proportions with a normal-approximation 95% CI."""
-    p1, p2 = k1 / n1, k2 / n2
+    # proportions stay in [0, 1] so the variance can never go negative
+    p1, p2 = min(max(k1 / n1, 0.0), 1.0), min(max(k2 / n2, 0.0), 1.0)
     se = math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
     d = p1 - p2
     return _r2(d), _r2(d - Z * se), _r2(d + Z * se)
