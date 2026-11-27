@@ -89,3 +89,27 @@ def test_a_brand_org_gets_only_its_brand_and_switching_never_duplicates():
     assert SUN not in {r["product_id"] for r in by_org["northside"]}
     products = [r["product_id"] for r in rows]
     assert len(products) == len(set(products)) == 3 + 3 + 2
+
+
+def test_a_membership_from_before_samples_gets_them_when_proof_opens(fake):
+    from datetime import UTC, datetime
+
+    # a membership written before sample campaigns existed: no `samples` mark, no campaigns
+    at = datetime.now(UTC)
+    old = {
+        "instance": "northside",
+        "org_id": "northside",
+        "uid": "old_judge",
+        "role": "admin",
+        "demo": True,
+        "joined_at": at,
+        "active_at": at,
+    }
+    fake.store.proof_member_set("northside", "northside", "old_judge", old)
+    c = _as("old_judge")
+    assert _campaigns(c) == []
+    assert c.get("/v1/proof/me", params={"instance": "northside"}).status_code == 200
+    first = _campaigns(c)
+    assert len(first) == 3 and all(k["sample"] for k in first)
+    c.get("/v1/proof/me", params={"instance": "northside"})  # opening Proof again adds nothing
+    assert len(_campaigns(c)) == 3

@@ -220,10 +220,8 @@ def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Do
         )
     at = datetime.now(UTC)
     had = store.proof_member_get(instance_id, org_id, uid)
-    if had is None:
-        from app import dev_seed  # lazy: dev_seed -> campaigns -> proof_orgs
-
-        dev_seed.seed_demo_campaigns(store, uid, org_id)
+    if not (had or {}).get("samples"):
+        _seed_samples(store, uid, org_id)
     if had and not had.get("demo"):
         doc = {**had, "active_at": at}
     else:
@@ -236,8 +234,29 @@ def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Do
             "joined_at": (had or {}).get("joined_at") or at,
             "active_at": at,
         }
+    doc["samples"] = True
     store.proof_member_set(instance_id, org_id, uid, doc)
     return doc
+
+
+def _seed_samples(store: Store, uid: str, org_id: str) -> None:
+    from app import dev_seed  # lazy: dev_seed -> campaigns -> proof_orgs
+
+    dev_seed.seed_demo_campaigns(store, uid, org_id)
+
+
+def ensure_samples(store: Store, uid: str, rows: list[Doc]) -> None:
+    """Memberships made before sample campaigns existed (or whose seeding never ran) get them the
+    next time the person opens Proof, so every account looks the same. Only demo memberships of
+    demo instances; marked `samples` once done, so it runs once per membership (seeding itself
+    never doubles a product)."""
+    for m in rows:
+        inst = instance(m.get("instance", ""))
+        if m.get("samples") or not m.get("demo") or not (inst and inst["demo"]):
+            continue
+        _seed_samples(store, uid, m["org_id"])
+        store.proof_member_set(m["instance"], m["org_id"], uid, {**m, "samples": True})
+        m["samples"] = True
 
 
 def forbidden(message: str) -> HTTPException:
