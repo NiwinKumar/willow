@@ -1,12 +1,12 @@
 import './retail.css'
 
-import { Check, ChevronDown, ChevronsUpDown, LogOut, Monitor, Moon, MoreHorizontal, Search, ShieldCheck, Sun } from 'lucide-react'
+import { ArrowLeftRight, Check, ChevronDown, ChevronsUpDown, LogOut, Monitor, Moon, MoreHorizontal, Search, ShieldCheck, Sun } from 'lucide-react'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { ErrorBoundary } from '../../components/ErrorBoundary'
-import { AskAggregates } from './AskAggregates'
+import { AskPanel } from './AskAggregates'
 import { ProofMark } from './brand'
 import { useAuth } from '../../lib/useAuth'
 import { fetchInsights, RetailDataProvider, useRetailData } from './context'
@@ -16,11 +16,11 @@ import { buildMask, maskText } from './masking'
 import { InstanceName, OrgProvider, useOrg } from './org'
 import { useCompetitorNames } from './orgData'
 import { useProducts } from './productData'
-import { ROLE_LABEL, verifiedText } from './proofApi'
+import { isFallbackInstance, ROLE_LABEL, verifiedText } from './proofApi'
 import { ADVANCED, COHORTS, LEGACY_PATHS, RANGES, SECTIONS, sectionPath, useRetailState } from './state'
 import type { Insights, Range } from './types'
 import { setExportFilter } from './ui/format'
-import { cohortKind, Combobox, int, Menu, MenuDivider, MenuItem, MenuLabel, Segmented, SidePanel, SkeletonHeader, SkeletonKpis, SkeletonTable, useTooltip } from './ui'
+import { BrandLogo, cohortKind, Combobox, type ComboOption, int, Menu, MenuDivider, MenuItem, MenuLabel, Segmented, SkeletonHeader, SkeletonKpis, SkeletonTable, useTooltip } from './ui'
 
 /*
  * Willow Proof (docs/RETAIL_BRAND.md, docs/RETAILER_INSIGHTS.md "App structure"): the business app at
@@ -197,7 +197,7 @@ function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) =
         <div className="mx-auto w-full max-w-[1200px]">
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<SectionFallback />}>
-              <div key={page.id} className="animate-[proofPage_.2s_var(--ease-standard)_both]">
+              <div key={`${org?.id ?? ''}|${page.id}`} className="animate-[proofPage_.2s_var(--ease-standard)_both]">
                 <Routes>
                   <Route index element={<Home />} />
                   <Route path="board" element={<Overview />} />
@@ -221,9 +221,16 @@ function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) =
         </div>
       </main>
 
-      <SidePanel open={askOpen} onClose={() => setParam({ ask: null })} title="Ask" subtitle={`Answers from the same data as the screen · ${RANGES.find((r) => r.value === filters.range)?.label} · ${COHORTS.find((c) => c.value === filters.cohort)?.label}`} width={480} labelledBy="proof-ask-title">
-        <AskAggregates d={d} filters={filters} scope={`${org?.id ?? ''}|${workspace.kind === 'brand' ? workspace.slug : 'retailer'}`} focusBrand={workspace.kind === 'brand' ? (workspace.brand ?? null) : null} />
-      </SidePanel>
+      <AskPanel
+        open={askOpen}
+        onClose={() => setParam({ ask: null, q: null })}
+        d={d}
+        filters={filters}
+        scope={`${org?.id ?? ''}|${workspace.kind === 'brand' ? workspace.slug : 'retailer'}`}
+        focusBrand={workspace.kind === 'brand' ? (workspace.brand ?? null) : null}
+        prefill={askOpen ? param('q') : null}
+        onPrefillUsed={() => setParam({ q: null })}
+      />
     </>
   )
 }
@@ -252,21 +259,16 @@ function SectionFallback() {
 
 /* ───────────────────────────── top bar ───────────────────────────── */
 
-function Avatar({ name, retailer = false }: { name: string; retailer?: boolean }) {
-  return (
-    <span aria-hidden className={`grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${retailer ? 'bg-ink text-inverse' : 'bg-gradient-to-br from-proof-leaf to-proof-leaf-hi text-[#0A0A0A]'}`}>
-      {retailer ? 'R' : name.slice(0, 1).toUpperCase()}
-    </span>
-  )
-}
-
 /**
- * Top-left: the organisation you are in (name, kind, verified basis on hover, your role). Its menu is the account
- * menu: who is signed in, "Try as" another organisation of a demo instance, sign out.
+ * Top-left: the organisation you are in, led by its logo (name, kind and your role under it; verified basis on
+ * hover). Its menu is the account menu: who is signed in and where, your organisations, "Explore as another
+ * organisation" on a demo instance (the Choose screen, with search and logos), sign out.
  */
 function OrgSwitcher() {
   const { instance, org, role, orgs, memberships, switchOrg, signOut } = useOrg()
   const { user } = useAuth()
+  const { carry } = useRetailState()
+  const navigate = useNavigate()
   const basis = org ? verifiedText(org) : null
   const tip = useTooltip(basis ?? '')
   if (!instance || !org) return null
@@ -281,47 +283,73 @@ function OrgSwitcher() {
       toast.error('Couldn’t switch. Try again.')
     }
   }
+  // Yours first (memberships), then the retailer of a demo instance; the other 400-odd brands live on the Choose screen.
+  const mine = orgs.filter((o) => memberships.some((m) => m.org_id === o.id))
+  const house = instance.demo ? orgs.filter((o) => o.kind === 'retailer' && !mine.includes(o)) : []
+  const kindWord = (o: { kind: string }) => (o.kind === 'brand' ? 'Brand' : 'Retailer')
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Menu
         label={`Organisation: ${org.name}. Account menu`}
-        width={300}
-        triggerClass="hit44 flex h-9 min-w-0 items-center gap-2 rounded-ctl border border-transparent bg-transparent px-1.5 text-left hover:bg-pf-hover"
+        width={320}
+        className="min-w-0"
+        triggerClass="hit44 group flex h-10 min-w-0 max-w-full items-center gap-2.5 rounded-ctl border border-transparent bg-transparent pl-1 pr-1.5 text-left transition-colors hover:bg-pf-hover"
         trigger={
           <>
-            <Avatar name={org.name} retailer={org.kind === 'retailer'} />
-            <span className="flex min-w-0 flex-col leading-[15px]">
-              <span className="truncate text-proof-small font-medium text-ink">{org.name}</span>
+            <span key={org.id} className="inline-flex animate-[proofSwap_.24s_var(--ease-standard)_both]">
+              <BrandLogo brand={org.name} src={org.logo_url} kind={org.kind} size={28} />
+            </span>
+            <span key={`n-${org.id}`} className="flex min-w-0 flex-col leading-[16px] animate-[proofSwap_.24s_var(--ease-standard)_both]">
+              <span className="max-w-[200px] truncate text-proof-small font-semibold text-ink">{org.name}</span>
               <span className="hidden truncate text-[11px] text-ink-2 sm:block">
-                {org.kind === 'brand' ? 'Brand' : 'Retailer'}
+                {kindWord(org)}
                 {role ? ` · ${ROLE_LABEL[role]}` : ''}
               </span>
             </span>
-            <ChevronsUpDown size={14} strokeWidth={1.6} aria-hidden className="shrink-0 text-ink-2" />
+            <ChevronsUpDown size={14} strokeWidth={1.6} aria-hidden className="shrink-0 text-ink-2 transition-colors group-hover:text-ink" />
           </>
         }
       >
         {(close) => (
           <>
-            <div className="flex flex-col gap-0.5 px-3 pb-2 pt-2">
-              <span className="text-proof-small font-medium text-ink">{who}</span>
-              <span className="text-proof-label text-ink-2">
-                <InstanceName instance={instance} short /> {instance.domains[0] ? `· ${instance.domains[0]}` : ''}
+            <div className="flex items-center gap-3 px-3 pb-2.5 pt-2.5">
+              <BrandLogo brand={org.name} src={org.logo_url} kind={org.kind} size={36} />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-proof-body font-medium text-ink">{org.name}</span>
+                <span className="truncate text-proof-label text-ink-2">
+                  {kindWord(org)}
+                  {role ? ` · ${ROLE_LABEL[role]}` : ''} · {who}
+                </span>
               </span>
             </div>
+            {!isFallbackInstance(instance) || instance.label ? (
+              <span className="mx-3 mb-2 truncate rounded-ctl bg-pf-bg2 px-2.5 py-1.5 text-proof-label text-ink-2">
+                {isFallbackInstance(instance) ? instance.label : <><InstanceName instance={instance} short /> {instance.domains[0] ? `· ${instance.domains[0]}` : instance.label ? `· ${instance.label}` : ''}</>}
+              </span>
+            ) : null}
             <MenuDivider />
-            <MenuLabel>{instance.demo ? 'Try as (demo)' : 'Your organisations'}</MenuLabel>
-            {orgs
-              .filter((o) => instance.demo || memberships.some((m) => m.org_id === o.id))
-              .map((o) => {
-                const m = memberships.find((x) => x.org_id === o.id)
-                return (
-                  <MenuItem key={o.id} current={o.id === org.id} onClick={() => void go(o.id, close)} sub={`${o.kind === 'brand' ? 'Brand' : 'Retailer'}${m ? ` · ${ROLE_LABEL[m.role]}` : instance.demo ? ' · joins as a demo member' : ''}`}>
-                    <span className="min-w-0 flex-1 truncate">{o.name}</span>
-                    {o.id === org.id ? <Check size={14} strokeWidth={1.8} aria-hidden className="text-proof-leaf" /> : null}
-                  </MenuItem>
-                )
-              })}
+            <MenuLabel>{mine.length > 1 ? 'Your organisations' : 'Your organisation'}</MenuLabel>
+            {[...mine, ...house].map((o) => {
+              const m = memberships.find((x) => x.org_id === o.id)
+              return (
+                <MenuItem key={o.id} current={o.id === org.id} onClick={() => void go(o.id, close)} sub={`${kindWord(o)}${m ? ` · ${ROLE_LABEL[m.role]}` : instance.demo ? ' · joins as a demo member' : ''}`}>
+                  <BrandLogo brand={o.name} src={o.logo_url} kind={o.kind} size={20} />
+                  <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                  {o.id === org.id ? <Check size={14} strokeWidth={1.8} aria-hidden className="text-proof-leaf" /> : null}
+                </MenuItem>
+              )
+            })}
+            {instance.demo ? (
+              <MenuItem
+                onClick={() => {
+                  close()
+                  navigate(`/retail${carry}${carry ? '&' : '?'}choose=1`)
+                }}
+                sub={`Any of ${int(orgs.filter((o) => o.kind === 'brand').length)} brands, or the retailer (demo)`}
+              >
+                <ArrowLeftRight size={14} strokeWidth={1.7} aria-hidden className="text-ink-2" /> Explore as another organisation…
+              </MenuItem>
+            ) : null}
             <MenuDivider />
             <MenuItem
               onClick={() => {
@@ -336,9 +364,9 @@ function OrgSwitcher() {
       </Menu>
       {basis ? (
         <>
-          <span {...tip.trigger} tabIndex={0} className="hidden cursor-help lg:inline-flex">
+          <span {...tip.trigger} tabIndex={0} aria-label={basis} className="hidden cursor-help rounded-pill lg:inline-flex">
             <span className="inline-flex h-6 items-center gap-1 rounded-pill bg-proof-leaf-soft px-2 text-proof-label font-medium text-proof-leaf">
-              <ShieldCheck size={12} strokeWidth={1.9} aria-hidden /> {org.kind === 'brand' ? 'Verified brand' : 'Verified'}
+              <ShieldCheck size={12} strokeWidth={1.9} aria-hidden /> Verified
             </span>
           </span>
           {tip.node}
@@ -357,19 +385,19 @@ function Workspace() {
   const { setWorkspace } = useRetailState()
   const { org, lockedBrand, instance } = useOrg()
   if (lockedBrand) return null
-  const options = [
-    { value: 'retailer', label: 'All brands', hint: org ? 'Your whole range' : 'Retailer', group: org ? org.name : 'Retailer' },
-    ...brands.map((b) => ({ value: `brand:${b.slug}`, label: b.brand, hint: b.products ? `${b.products} products` : undefined, group: 'View as a brand' })),
+  const options: ComboOption[] = [
+    { value: 'retailer', label: 'Whole range', hint: 'every brand', group: org ? org.name : 'Retailer', icon: <BrandLogo brand={org?.name ?? 'Retailer'} src={org?.logo_url} kind="retailer" size={18} /> },
+    ...brands.map((b) => ({ value: `brand:${b.slug}`, label: b.brand, hint: b.products ? `${b.products} products` : undefined, group: 'View as a brand', icon: <BrandLogo brand={b.brand} size={18} /> })),
   ]
   const value = workspace.kind === 'brand' ? `brand:${workspace.slug}` : 'retailer'
   if (workspace.kind === 'brand' && !options.some((o) => o.value === value)) options.push({ value, label: workspace.slug, hint: undefined, group: 'View as a brand' })
-  const name = workspace.kind === 'brand' ? (workspace.brand ?? workspace.slug) : 'All brands'
+  const name = workspace.kind === 'brand' ? (workspace.brand ?? workspace.slug) : (org?.name ?? 'Retailer')
   return (
     <Combobox
       label={org ? 'Viewing' : 'Workspace'}
       value={value}
       options={options}
-      prefix={org ? null : <Avatar name={name} retailer={workspace.kind === 'retailer'} />}
+      prefix={<><span className="hidden text-proof-small text-ink-2 xl:inline">{org ? 'Viewing' : ''}</span><BrandLogo brand={name} src={workspace.kind === 'retailer' ? org?.logo_url : undefined} kind={workspace.kind === 'retailer' ? 'retailer' : 'brand'} size={20} /></>}
       onChange={(v) => setWorkspace(v.startsWith('brand:') ? { kind: 'brand', slug: v.slice(6) } : { kind: 'retailer' })}
       width={300}
       footer={
@@ -496,15 +524,15 @@ function TopBar({ d, loading, theme, onTheme, onAsk }: { d: Insights | null; loa
         <ProofMark size={26} />
         <span className="hidden items-baseline gap-1.5 text-[15px] tracking-[-0.01em] md:inline-flex">
           <span className="font-semibold">Proof</span>
-          <span className="text-ink-2">by Willow</span>
+          <span className="hidden text-ink-2 xl:inline">by Willow</span>
         </span>
       </Link>
-      {instance && org ? (
+      {instance && org && !isFallbackInstance(instance) ? (
         <>
           <span aria-hidden className="mx-0.5 hidden text-[20px] font-light text-line-strong lg:inline">
             /
           </span>
-          <span className="hidden lg:inline-flex">
+          <span className="hidden text-ink-2 lg:inline-flex [&_span]:!font-normal [&_span]:!text-ink-2">
             <InstanceName instance={instance} short />
           </span>
         </>

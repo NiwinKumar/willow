@@ -6,11 +6,28 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
  * control that opened it. It slides in from the right and leaves the same way (spatial consistency); under
  * reduced motion it only fades. `onClose` runs for Esc, the scrim and the close button.
  */
-export function SidePanel({ open, onClose, title, subtitle, children, footer, width = 440, labelledBy }: { open: boolean; onClose: () => void; title: ReactNode; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; width?: number; labelledBy?: string }) {
+/** `flush`: the body has no padding (a chat with its own sticky toolbar and composer). */
+export function SidePanel({ open, onClose, title, subtitle, children, footer, width = 440, labelledBy, flush = false }: { open: boolean; onClose: () => void; title: ReactNode; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; width?: number; labelledBy?: string; flush?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const [leaving, setLeaving] = useState(false)
   const titleId = labelledBy ?? 'side-panel-title'
+  // Phones: with the on-screen keyboard open the panel fits the visible viewport, so a composer or field at its
+  // foot stays above the keyboard (iOS keeps 100dvh under it).
+  const [vv, setVv] = useState<{ h: number; top: number } | null>(null)
+  useEffect(() => {
+    const v = window.visualViewport
+    if (!open || !v) return
+    const on = () => setVv(v.height < window.innerHeight - 80 ? { h: Math.round(v.height), top: Math.round(v.offsetTop) } : null)
+    on()
+    v.addEventListener('resize', on)
+    v.addEventListener('scroll', on)
+    return () => {
+      v.removeEventListener('resize', on)
+      v.removeEventListener('scroll', on)
+      setVv(null)
+    }
+  }, [open])
 
   useEffect(() => {
     const d = ref.current
@@ -21,6 +38,8 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer, wi
       if (!d.open) {
         opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
         d.showModal()
+        // The panel's own first field (`data-autofocus`, e.g. Ask's question box) rather than the close button.
+        d.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true })
       }
       return
     }
@@ -48,12 +67,12 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer, wi
         if (e.target === ref.current) onClose()
       }}
       className={`m-0 ml-auto h-dvh max-h-none max-w-[100vw] overflow-hidden border-0 border-l border-line bg-surface p-0 text-ink shadow-modal backdrop:bg-black/50 ${leaving ? 'animate-[proofOut_.18s_var(--ease-exit)_both]' : 'animate-[proofIn_.32s_var(--ease-spring)_both]'}`}
-      style={{ width: `min(${width}px, 100vw)` }}
+      style={{ width: `min(${width}px, 100vw)`, ...(vv ? { height: vv.h, marginTop: vv.top } : {}) }}
     >
       {open || leaving ? (
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3.5">
-            <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <h2 id={titleId} className="m-0 text-proof-h text-ink">
                 {title}
               </h2>
@@ -63,8 +82,8 @@ export function SidePanel({ open, onClose, title, subtitle, children, footer, wi
               <X size={16} strokeWidth={1.6} aria-hidden />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
-          {footer ? <div className="border-t border-line px-5 py-3">{footer}</div> : null}
+          <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${flush ? '' : 'px-5 py-4'}`}>{children}</div>
+          {footer ? <div className="border-t border-line px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">{footer}</div> : null}
         </div>
       ) : null}
     </dialog>

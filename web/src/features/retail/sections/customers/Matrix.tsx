@@ -5,11 +5,11 @@ import { csvMeta, csvName } from '../../data'
 import type { Insights, Segments } from '../../types'
 import { int, MIN_GROUP, Panel, pct, Segmented, ToolButton, useTooltip } from '../../ui'
 import { downloadCsv } from '../../ui/format'
-import { cellFill, cellKey, MATRIX_MODES, type MatrixMode, type SegCell } from './model'
+import { cellFill, cellKey, MATRIX_MODES, unmetSpan, type MatrixMode, type SegCell } from './model'
 
 /*
  * The hero of Customers: skin type × goal. One matrix, three readings (Segmented): the share with no visible
- * change by week 8 (gray → amber), the people who chose the goal (gray), or the best product in the group (in a
+ * change by week 8 (gray → amber over the matrix's own range, so the worst-served groups stand out), the people who chose the goal (gray), or the best product in the group (in a
  * brand workspace, the brand's own wins in leaf). Suppressed groups are hatched and say "n<10", never 0.
  */
 
@@ -22,6 +22,7 @@ const DESCRIPTION: Record<MatrixMode, string> = {
 export function MatrixPanel({ s, d, mode, onMode, openKey, onOpen, goalId, skinId, mine }: { s: Segments; d: Insights; mode: MatrixMode; onMode: (m: MatrixMode) => void; openKey: string | null; onOpen: (c: SegCell) => void; goalId: string | null; skinId: string | null; mine: string | null }) {
   const byKey = new Map(s.cells.map((c) => [cellKey(c), c]))
   const maxUsers = Math.max(1, ...s.cells.map((c) => c.users ?? 0))
+  const span = unmetSpan(s.cells) ?? undefined
   const csv = () =>
     downloadCsv(
       csvName('customers-skin-by-goal', d),
@@ -87,14 +88,14 @@ export function MatrixPanel({ s, d, mode, onMode, openKey, onOpen, goalId, skinI
                   </th>
                   {s.goals.map((g) => {
                     const c = byKey.get(`${t.id}.${g.id}`)
-                    return c ? <MatrixCell key={g.id} c={c} mode={mode} maxUsers={maxUsers} where={`${t.label} skin, ${g.label}`} selected={openKey === cellKey(c)} mine={mine} onOpen={() => onOpen(c)} /> : <td key={g.id} />
+                    return c ? <MatrixCell key={g.id} c={c} mode={mode} maxUsers={maxUsers} span={span} where={`${t.label} skin, ${g.label}`} selected={openKey === cellKey(c)} mine={mine} onOpen={() => onOpen(c)} /> : <td key={g.id} />
                   })}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <Legend mode={mode} maxUsers={maxUsers} mine={mine} />
+        <Legend mode={mode} maxUsers={maxUsers} mine={mine} span={span} />
       </div>
     </Panel>
   )
@@ -104,7 +105,7 @@ function pickLine(p: SegCell['best']) {
   return p ? `${p.product} (${p.brand}): ${pct(p.rate)} of ${int(p.n)}` : null
 }
 
-function MatrixCell({ c, mode, maxUsers, where, selected, mine, onOpen }: { c: SegCell; mode: MatrixMode; maxUsers: number; where: string; selected: boolean; mine: string | null; onOpen: () => void }) {
+function MatrixCell({ c, mode, maxUsers, span, where, selected, mine, onOpen }: { c: SegCell; mode: MatrixMode; maxUsers: number; span?: { lo: number; hi: number }; where: string; selected: boolean; mine: string | null; onOpen: () => void }) {
   const best = pickLine(c.best)
   const tip = useTooltip(
     c.users === null ? null : (
@@ -127,7 +128,7 @@ function MatrixCell({ c, mode, maxUsers, where, selected, mine, onOpen }: { c: S
       </td>
     )
 
-  const fill = cellFill(mode, c, maxUsers)
+  const fill = cellFill(mode, c, maxUsers, span)
   const own = mode === 'best' && mine !== null && c.best?.brand === mine
   let main: ReactNode
   let sub: ReactNode
@@ -158,10 +159,10 @@ function MatrixCell({ c, mode, maxUsers, where, selected, mine, onOpen }: { c: S
   )
 }
 
-function Legend({ mode, maxUsers, mine }: { mode: MatrixMode; maxUsers: number; mine: string | null }) {
+function Legend({ mode, maxUsers, mine, span }: { mode: MatrixMode; maxUsers: number; mine: string | null; span?: { lo: number; hi: number } }) {
   const ramp =
     mode === 'unmet'
-      ? { from: '0%', to: '100%', what: 'No visible change by week 8', grad: 'linear-gradient(90deg, var(--bg-sunken), color-mix(in srgb, var(--pf-amber-fill) 60%, var(--bg-sunken)))' }
+      ? { from: pct(span?.lo ?? 0), to: pct(span?.hi ?? 1), what: 'No visible change by week 8', grad: 'linear-gradient(90deg, color-mix(in srgb, var(--pf-amber-fill) 4%, var(--bg-sunken)), color-mix(in srgb, var(--pf-amber-fill) 60%, var(--bg-sunken)))' }
       : mode === 'people'
         ? { from: '0', to: int(maxUsers), what: 'People', grad: 'linear-gradient(90deg, var(--bg-sunken), color-mix(in srgb, var(--text-primary) 30%, var(--bg-sunken)))' }
         : null

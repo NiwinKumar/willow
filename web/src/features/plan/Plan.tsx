@@ -124,7 +124,7 @@ export default function Plan() {
     <PlanContext.Provider value={state}>
       <div className="relative flex h-dvh flex-col overflow-hidden">
         <SoftBackdrop background={BACKDROP} />
-        <header className="relative z-10 flex items-center justify-between gap-3 px-[clamp(14px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
+        <header className="relative z-10 flex items-center justify-between gap-3 px-[clamp(16px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
           <Back step={step} go={go} exit={exit} />
           <Progress step={step} />
           <Link to={exit} className="flex min-h-11 items-center rounded-pill bg-white/55 px-3.5 text-[13.5px] text-ink no-underline backdrop-blur-[12px] transition-colors hover:bg-white/85">

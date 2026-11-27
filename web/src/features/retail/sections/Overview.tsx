@@ -76,9 +76,9 @@ function Body({ d }: { d: Insights }) {
     rows.length ? (
       <>
         <strong>
-          {proven} of {rows.length}
+          {int(proven)} of {int(rows.length)}
         </strong>{' '}
-        of your {rows.length === 1 ? 'product is' : 'products are'} Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+        of your {rows.length === 1 ? 'product is' : 'products are'} Proven; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
       </>
     ) : (
       <>No {brand} product is in the catalog for this filter.</>
@@ -86,9 +86,9 @@ function Body({ d }: { d: Insights }) {
   ) : (
     <>
       <strong>
-        {proven} of {rows.length}
+        {int(proven)} of {int(rows.length)}
       </strong>{' '}
-      products are Proven across {new Set(rows.map((r) => r.brand)).size} brands; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+      products are Proven across {new Set(rows.map((r) => r.brand)).size} brands; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 

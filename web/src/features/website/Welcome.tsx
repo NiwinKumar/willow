@@ -53,7 +53,7 @@ export default function Welcome() {
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden">
       <SoftBackdrop background={BACKDROP} />
-      <header className="relative flex items-center justify-between gap-3 px-[clamp(14px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
+      <header className="relative flex items-center justify-between gap-3 px-[clamp(16px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
         <BackButton step={step} search={search} />
         <Stepper current={STEP_INDEX[step]} />
         <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
@@ -123,7 +123,7 @@ function Stepper({ current }: { current: number }) {
  */
 function StepFrame({ eyebrow, title, sub, aside, children, actions, wide }: { eyebrow: string; title: string; sub?: ReactNode; aside?: ReactNode; children: ReactNode; actions: ReactNode; wide?: boolean }) {
   return (
-    <main className={`relative mx-auto flex min-h-0 w-full flex-1 animate-[wRiseLg_.5s_cubic-bezier(.2,.7,.2,1)_both] flex-col px-[clamp(14px,3vw,32px)] sm:justify-center sm:pb-[2vh] ${wide ? 'max-w-[1040px]' : 'max-w-[760px]'}`}>
+    <main className={`relative mx-auto flex min-h-0 w-full flex-1 animate-[wRiseLg_.5s_cubic-bezier(.2,.7,.2,1)_both] flex-col px-[clamp(16px,3vw,32px)] sm:justify-center sm:pb-[2vh] ${wide ? 'max-w-[1040px]' : 'max-w-[760px]'}`}>
       <div className="flex items-end justify-between gap-4 pt-[clamp(10px,2.4vh,28px)] pb-[clamp(8px,1.8vh,16px)] sm:pt-0">
         <div className="min-w-0">
           <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {eyebrow}</span>
@@ -423,7 +423,7 @@ function Places() {
   )
 }
 
-const pill = (on: boolean) => `min-h-9 rounded-pill px-3.5 text-[14px] text-ink transition-colors ${on ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,.08)]' : 'bg-transparent'}`
+const pill = (on: boolean) => `hit44 min-h-9 rounded-pill px-3.5 text-[14px] text-ink transition-colors ${on ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,.08)]' : 'bg-transparent'}`
 const track = 'flex flex-wrap gap-0.5 rounded-[22px] bg-muted p-1'
 
 function Field({ title, note, children }: { title: string; note: string; children: ReactNode }) {

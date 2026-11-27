@@ -142,7 +142,7 @@ export default function Routine() {
             {sample && tab === 'routine' ? <span className="rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.04em] text-[var(--synthetic-fg)]">SAMPLE ROUTINE</span> : null}
           </span>
         </div>
-        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
+        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="hit44 order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
           Add product
           <span aria-hidden className="grid size-7 place-items-center rounded-full bg-white text-[18px] leading-none text-ink">
             +

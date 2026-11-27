@@ -1,5 +1,5 @@
-import { Columns3 } from 'lucide-react'
-import { useMemo } from 'react'
+import { Columns3, Download } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 
 import { GOALS } from '../../../lib/metrics'
@@ -7,14 +7,17 @@ import { useRetailData } from '../context'
 import { csvMeta, csvName } from '../data'
 import { feltText } from '../feel'
 import { useProducts } from '../productData'
-import { filterRows, hintOf, MAX_COMPARE, noDataReason, parseIds, TIER_ORDER, TIER_TABS, toggleId } from '../productModel'
+import { filterRows, hintOf, MAX_COMPARE, noDataReason, PAGE_ROWS, parseIds, productsLead, sortRows, TIER_ORDER, TIER_TABS, toggleId } from '../productModel'
 import { useCompetitorNames } from '../orgData'
 import { rangeIds, useRange } from '../rangeStore'
 import { purposeOf, sectionPath, useRetailState } from '../state'
 import { ProductsNav } from './ProductsNav'
 import type { Insights, ProductRow, ProofTier } from '../types'
-import { Bone, Button, DataTable, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, weeks, type Column, type Sort } from '../ui'
+import { Bone, Button, DataTable, downloadCsv, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, ToolButton, weeks, type Column, type Sort } from '../ui'
 import { FeltCell, HeadTip, RateInterval } from './productParts'
+import { ProductsLead } from './ProductsLead'
+import { useRememberedView } from './useRememberedView'
+import { useCampaigns } from '../pipeline'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
@@ -69,6 +72,8 @@ function ProductsSkeleton() {
 
 const SORTS = ['product', 'tier', 'rate', 'base', 'lift', 'n', 'category', 'weeks', 'cont8', 'share', 'felt', 'price'] as const
 const DEFAULT_SORT: Sort = { id: 'lift', dir: 'desc' }
+/** The view keys Products remembers between visits (search and the Compare picks are left out). */
+const VIEW_KEYS = ['tier', 'brand', 'category', 'goal', 'sort', 'scope'] as const
 const TIER_IDS = Object.keys(TIERS) as ProofTier[]
 const PRICE_ORDER = { budget: 0, mid: 1, premium: 2 } as const
 const cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`
@@ -80,6 +85,13 @@ function Body({ d }: { d: Insights }) {
   const { state, retry } = useProducts(filters)
   const all = useMemo(() => (state.status === 'ready' ? state.d.products : []), [state])
   const wk = d.cohort.weeks
+  useRememberedView('products', VIEW_KEYS)
+  const campaigns = useCampaigns()
+  const running = useMemo(() => new Set(campaigns.filter((c) => c.status === 'active').map((c) => c.product_id)), [campaigns])
+  // Long tables draw PAGE_ROWS at a time (3,000+ rows took ~0.7 s to draw at once); any view change starts over.
+  const viewKey = ['tier', 'q', 'brand', 'category', 'goal', 'sort', 'scope'].map((k) => param(k) ?? '').join('|')
+  const [page, setPage] = useState({ key: viewKey, n: PAGE_ROWS })
+  const shown = page.key === viewKey ? page.n : PAGE_ROWS
 
   const brandName = workspace.kind === 'brand' ? workspace.brand : null
   const { range } = useRange()
@@ -129,23 +141,23 @@ function Body({ d }: { d: Insights }) {
   const measured = pool.filter((r) => r.rate !== null).length
   const description = !measured ? (
     hasRange ? (
-      `None of your ${mine.length} products has ${MIN_GROUP} or more people at week ${wk} yet; your range shows which are collecting.`
+      `None of your ${int(mine.length)} products has ${MIN_GROUP} or more people at week ${wk} yet; your range shows which are collecting.`
     ) : (
       `No product has ${MIN_GROUP} or more people at week ${wk} in this period yet.`
     )
   ) : hasRange ? (
     <>
       <strong>
-        {proven} of {mine.length}
+        {int(proven)} of {int(mine.length)}
       </strong>{' '}
-      {brandView ? 'of your' : 'products in your range'} {brandView ? (mine.length === 1 ? 'product is' : 'products are') : (proven === 1 ? 'is' : 'are')} Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+      {brandView ? 'of your' : 'products in your range'} {brandView ? (mine.length === 1 ? 'product is' : 'products are') : (proven === 1 ? 'is' : 'are')} Proven; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   ) : (
     <>
       <strong>
-        {proven} of {all.length}
+        {int(proven)} of {int(all.length)}
       </strong>{' '}
-      products are Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+      products are Proven; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 
@@ -311,6 +323,20 @@ function Body({ d }: { d: Insights }) {
     },
   ]
 
+  // Sorted here (the table's own order) so a page is the top of the whole list, not of a slice.
+  const sortCol = columns.find((c) => c.id === sort.id)
+  const ordered = sortRows(rows, sortCol?.sortValue, sort.dir)
+  const paged = ordered.slice(0, shown)
+  const csvName_ = csvName('products', res)
+  const csvMeta_ = csvMeta(res, [yoursOnly && (brandView ? `brand ${brandView}` : 'your range'), brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined)
+  // Every row in view, not only the drawn page; the columns the viewer shows (the table's Columns menu choice).
+  const exportAll = () => {
+    const off = hiddenCols('products', columns)
+    const cols = columns.filter((c) => !c.noCsv && (!c.optional || !off.has(c.id)))
+    const text = (c: Column<ProductRow>) => c.headerText ?? (typeof c.header === 'string' ? c.header : c.id)
+    downloadCsv(csvName_, csvMeta_, cols.map(text), ordered.map((r) => cols.map((c) => (c.csv ? c.csv(r) : (c.sortValue?.(r) ?? '')))))
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <ProductsNav />
@@ -338,6 +364,8 @@ function Body({ d }: { d: Insights }) {
         }
       />
 
+      {measured ? <ProductsLead lead={productsLead(scoped, running)} promoteTo={(id) => `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(id)}`} onTier={(t) => setParam({ tier: t })} /> : null}
+
       <div className="flex flex-col gap-4">
         <Tabs label="Status" panelId="products-table" value={tier || 'all'} onChange={(t) => setParam({ tier: t === 'all' ? null : t })} tabs={TIER_TABS.map((t) => ({ ...t, count: count(t.id) }))} />
 
@@ -346,7 +374,7 @@ function Body({ d }: { d: Insights }) {
             caption="Products"
             columns={columns}
             columnsKey="products"
-            rows={rows}
+            rows={paged}
             rowKey={(r) => r.product_id}
             onRowClick={(r) => navigate(`${sectionPath('products', r.product_id)}${carry}`)}
             rowLabel={(r) => `${r.product}, ${r.brand}, ${TIERS[r.tier].label}: open product page`}
@@ -355,7 +383,6 @@ function Body({ d }: { d: Insights }) {
             defaultSort={DEFAULT_SORT}
             maxHeight="max(440px, calc(100dvh - 330px))"
             minWidth={880}
-            csv={{ name: csvName('products', res), meta: csvMeta(res, [yoursOnly && (brandView ? `brand ${brandView}` : 'your range'), brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined) }}
             empty={
               <span className="flex flex-col items-center gap-3">
                 No product matches these filters.
@@ -388,11 +415,43 @@ function Body({ d }: { d: Insights }) {
                 ) : null}
                 <Select label="Category" hideLabel value={category} onChange={(v) => setParam({ category: v })} options={[{ value: '', label: 'All categories' }, ...categories.map(([value, label]) => ({ value, label }))]} />
                 <Select label="Goal" hideLabel value={goal} onChange={(v) => setParam({ goal: v })} options={[{ value: '', label: 'All goals' }, ...goals.map((g) => ({ value: g.id, label: g.label }))]} />
+                <ToolButton onClick={exportAll} label={`Export all ${int(ordered.length)} products in view as CSV`} disabled={!ordered.length}>
+                  <Download size={15} strokeWidth={1.6} aria-hidden />
+                  Export
+                </ToolButton>
               </>
             }
           />
+          {ordered.length > shown ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-pf-bg2 px-5 py-3 text-proof-small text-ink-2">
+              <span className="tnum" aria-live="polite">
+                Showing {int(shown)} of {int(ordered.length)}
+              </span>
+              <span className="flex gap-2">
+                <Button size="sm" onClick={() => setPage({ key: viewKey, n: shown + PAGE_ROWS })}>
+                  Show {int(Math.min(PAGE_ROWS, ordered.length - shown))} more
+                </Button>
+                {ordered.length - shown > PAGE_ROWS ? (
+                  <Button size="sm" kind="ghost" onClick={() => setPage({ key: viewKey, n: ordered.length })} title="Drawing every row can take a moment">
+                    Show all
+                  </Button>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
   )
+}
+
+/** The Columns menu's choice for a table (the kit stores it under willow.proof.cols.<key>), or each column's default. */
+function hiddenCols<T>(key: string, cols: Column<T>[]): Set<string> {
+  try {
+    const v = window.localStorage.getItem(`willow.proof.cols.${key}`)
+    if (v) return new Set(JSON.parse(v) as string[])
+  } catch {
+    /* storage blocked: defaults */
+  }
+  return new Set(cols.filter((c) => c.hidden).map((c) => c.id))
 }

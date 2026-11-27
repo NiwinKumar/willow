@@ -114,7 +114,7 @@ function Body({ catalog, current, brand, canUpload }: { catalog: ProductRow[]; c
 
   const connectWholeCatalog = async () => {
     await save({ filename: 'The whole Willow catalog', at: new Date().toISOString(), source: 'catalog', rows: catalog.map((p, i) => ({ line: i + 2, gtin: '', productId: p.product_id, brand: p.brand, name: p.product, category: p.category_label, price: '', facings: '', match: p.product_id, status: statusOf(p) })) })
-    toast(`Range set to the whole catalog · ${catalog.length} products`)
+    toast(`Range set to the whole catalog · ${int(catalog.length)} products`)
   }
 
   const clearRange = async () => {
@@ -292,6 +292,7 @@ function Body({ catalog, current, brand, canUpload }: { catalog: ProductRow[]; c
         <div id="range-table" role="tabpanel" className="overflow-hidden rounded-card border border-line bg-surface">
           <DataTable
             caption="Your range"
+            pageSize={100}
             columns={columns}
             columnsKey="range"
             rows={shown}

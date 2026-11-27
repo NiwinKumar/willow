@@ -179,7 +179,7 @@ export function GoalsStep() {
               style={{ ...stagger(i, 20, 35), background: look.bg, color: look.fg, boxShadow: on ? 'inset 0 0 0 2px #121212, inset 0 0 30px 4px rgba(255,255,255,.35)' : 'inset 0 0 30px 4px rgba(255,255,255,.35), 0 18px 40px -32px rgba(0,0,0,.45)' }}
             >
               <span className="flex items-start justify-between gap-1.5">
-                <span className="truncate text-[12px] leading-[1.25] opacity-80">{GOAL_NOTE[g.id]}</span>
+                <span className="line-clamp-2 min-w-0 text-[12px] leading-[1.25] opacity-80">{GOAL_NOTE[g.id]}</span>
                 <Tick on={on} n={on ? at + 1 : undefined} light />
               </span>
               <span className="text-[clamp(16px,2.2vh,20px)] leading-[1.1] tracking-[-0.01em]">{g.label}</span>
@@ -283,6 +283,7 @@ export function BudgetStep() {
           <output htmlFor="plan-budget" className="font-dot text-[clamp(40px,7vh,64px)] leading-[.9] font-extrabold tabular-nums">
             {money(draft.budget, cur)}
           </output>
+          {/* A 44px touch box drawn as the 8px track (padding, content-box background) that takes 8px of layout. */}
           <input
             id="plan-budget"
             type="range"
@@ -292,8 +293,8 @@ export function BudgetStep() {
             value={Math.min(Math.max(draft.budget, range.min), range.max)}
             onChange={(e) => set({ budget: Number(e.target.value) })}
             aria-valuetext={`${money(draft.budget, cur)} per product`}
-            className="h-2 w-full cursor-pointer appearance-auto rounded-pill accent-[var(--action-selected)]"
-            style={{ background: `linear-gradient(90deg, var(--action-selected) ${pct}%, rgba(18,18,18,.12) ${pct}%)` }}
+            className="relative -my-[18px] h-11 w-full cursor-pointer appearance-auto rounded-pill bg-clip-content py-[18px] accent-[var(--action-selected)]"
+            style={{ backgroundImage: `linear-gradient(90deg, var(--action-selected) ${pct}%, rgba(18,18,18,.12) ${pct}%)` }}
           />
           <span className="flex justify-between font-mono text-[10.5px] text-ink-2">
             <span>{money(range.min, cur)}</span>

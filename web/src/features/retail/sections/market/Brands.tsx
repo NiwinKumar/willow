@@ -7,7 +7,7 @@ import { csvMeta, csvName } from '../../data'
 import { useCompetitorNames } from '../../orgData'
 import { useRetailState } from '../../state'
 import type { BrandDetail, BrandSummary, Insights } from '../../types'
-import { Button, DataTable, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, Panel, pct, PositioningChart, ShareBar, SidePanel, slugOf, Stat, Suppressed, type Column } from '../../ui'
+import { BrandLogo, Button, DataTable, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, Panel, pct, PositioningChart, ShareBar, SidePanel, slugOf, Stat, Suppressed, type Column } from '../../ui'
 import { brandLeaders, brandRank, niceDomain } from '../../ui/insight'
 import { fetchBrandList } from '../../productData'
 import { useView } from '../../useView'
@@ -74,7 +74,12 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
   const selected = brands.find((b) => slugOf(b.brand) === param('brand')) ?? null
 
   const columns: Column<BrandSummary>[] = [
-    { id: 'brand', header: 'Brand', rowHeader: true, width: '26%', sortValue: (r) => r.brand, cell: (r) => <span className="block truncate text-ink">{r.brand}</span> },
+    { id: 'brand', header: 'Brand', rowHeader: true, width: '26%', sortValue: (r) => r.brand, cell: (r) => (
+        <span className="flex min-w-0 items-center gap-2.5">
+          <BrandLogo brand={r.brand} src={(r as { logo_url?: string | null }).logo_url} size={24} />
+          <span className="block truncate text-ink">{r.brand}</span>
+        </span>
+      ) },
     {
       id: 'rate',
       header: 'Visible change',
@@ -119,6 +124,7 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
         <Panel flush className="xl:col-span-7" footnote={note}>
           <DataTable
             caption="Brands ranked by visible change"
+            pageSize={100}
             heading={<h2 className="m-0 text-proof-h text-ink">Brands</h2>}
             columns={columns}
             rows={brands}
