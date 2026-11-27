@@ -257,6 +257,31 @@ Service: Cloud Run `willow-api`, public, every route except `/healthz` requires 
 ```
 Validator: every number in `summary` must appear in the metrics JSON sent to Gemini; otherwise regenerate once, then fall back to a template.
 
+### 3b. Safety, routine builder, reactions, clicks, Proof organisations (added Nov 27, finals build)
+Code: `api/app/routes/plan_routes.py`, `api/app/routes/proof_routes.py`, `api/app/similar.py`. Every number, flag and plan is computed in code; Gemini is not called by any endpoint in this section.
+
+| Endpoint | Request | Response |
+|---|---|---|
+| `PUT /v1/me/profile` (extended) | `safety: {adult, life_stage: none\|pregnant\|breastfeeding\|trying, reactive, avoid: [fragrance\|essential_oils\|drying_alcohol\|lanolin\|nut_oils\|mi_preservatives], avoid_products: [id], rx_treatment, market: US\|IN\|SG\|UK\|EU}` (whole object replaced) | `profile.safety` (also in `GET /v1/me`) |
+| `POST /v1/safety/check` | `{product_ids: [≤80], safety?}` | `{profile_complete, checks: {id: {status: clear\|check\|avoid\|not_sold, flags: [{rule, level, title, detail, source: {label, url}, grade: A\|B\|C}], regulatory: {class: cosmetic\|otc_drug\|pharmacy\|rx, market}}}}`; catalog search items carry the same `check` when the caller has a safety profile |
+| `GET /v1/evidence-clock` | – | `{actives: {name: {first_look_weeks, verdict_weeks, source, grade}}, default}` |
+| `POST /v1/plan` | `{skin_type, reactive, goals[≤3], budget: {max_per_product, currency}, tier, steps: 3\|4\|5, market, safety}` | `{profile: {title, traits, focus, avoid, cautions}, funnel: [{id, label, n}], picks: [{slot, when, goal, product, why[], check, start_week, verdict_week, evidence, proof: {tier, n, simulated}\|null, alternatives[]}], schedule: [{week, text}], notes[], total, currency_note?}`; 422 `{message, step}` when nothing fits |
+| `POST /v1/me/reactions`, `GET /v1/me/reactions` | `{product_id, entry_id?, signs[], strength: mild\|strong, since_days}` | `{reaction, outcome: {level: urgent\|stop\|mild, title, steps[], report}}`; non-mild adds the product to `safety.avoid_products` |
+| `POST /v1/clicks` | `{product_id, store, surface: product_sheet\|wisp\|plan\|sponsored}` | 204 |
+| `GET /v1/retailer/clicks?days=` | – (public, aggregate) | counts per product and store; under 10 shown as `"<10"` |
+| `GET /v1/catalog/{id}/swaps?market=&max=` | – | same category and key active (±50% strength), cosmetic class, with `why` and `check`; prices compared in one currency only |
+| `GET /v1/catalog/{id}/similar?k=` | – | `{items: [{product, score}]}` from `api/seed/catalog_embeddings.json` (gemini-embedding-2, 256 dims, precomputed); no `check` (call safety/check) |
+| `GET /v1/proof/instance?host=&slug=` | – | `{instance: {id, name, accent, domains, demo}, orgs: [{id, name, kind: retailer\|brand, brands, verified}]}`; unknown host → `willow` |
+| `GET /v1/proof/me?instance=`, `POST /v1/proof/join` | join: `{instance, org_id, role: admin\|analyst\|viewer}` (demo instances) | `{memberships: [{org_id, role, demo}], current}` |
+| `GET /v1/proof/orgs/{org}/members`, `POST …/invites` | invite: `{email, role}` (admin; pending row, no email sent) | members with `uid_hint`, invites with `email_hint` |
+| `GET/PUT /v1/proof/orgs/{org}/settings` | `{policy: {competitor_names}}` (admin) | `{policy: {competitor_names, min_group}, plan}` |
+| `GET /v1/proof/orgs/{org}/decisions`, `PUT …/decisions/{key}` | `{status: open\|accepted\|dismissed\|snoozed\|done, reason?, snapshot?: {title, figure?, n?}}` (analyst+) | `{items: {key: {status, reason, updated_at, by_role}}, log: [...]}` |
+| `POST/GET /v1/proof/orgs/{org}/requests`, `PATCH …/requests/{id}` | `{to_org, product_id, message, snapshot}`; patch `{status: answered\|declined, reply}` | `{inbox, outbox}` |
+| `GET/POST /v1/proof/orgs/{org}/claims`, `PATCH …/claims/{id}`, `GET …/claims/{id}/export` | `{product_id, text, statements, cohort}`; patch `{status: draft\|approved}` | claims carry cohort, n, window, method, caveat, `exportable`; export 403 unless real-only evidence |
+| `GET /v1/proof/research` | – | methodology facts from code constants: tier thresholds, noise rule, min group, holdout share, cohort counts, `data_from`/`data_to`, metric dictionary, consent basis, what brands see / never see |
+
+Campaign rules (`POST /v1/retailer/campaigns`, AutoCampaign rules and approvals): an analyst+ membership of the retailer org or of the brand org that owns the product's brand, else 403 `not_a_member`; a brand org promotes only its own brands. Campaigns carry `org_id` and `demo`; demo campaigns are served only to guest accounts.
+
 ## 4. Firestore data model (Niwin owns)
 
 ```
@@ -332,6 +357,23 @@ campaigns/{campaign_id}/members/{sha256(uid)[:32]}
   (queries: owner_uid ==, status == : single-field, automatic indexes; no composite index)
 ```
 Security rules: users read/write only their own `users/{uid}/**`; `products` read-only for signed-in users; demo users read-only.
+
+Added Nov 27 (finals build):
+```
+users/{uid}.profile.safety      {adult, life_stage, reactive, avoid[], avoid_products[], rx_treatment, market}
+users/{uid}.reactions[]         last 50: {id, product_id, entry_id?, signs[], strength, since_days, level, created_at}
+users/{uid}/routine/{entry}     + sample: true on the guest starter routine
+store_clicks/{auto}             {product_id, store, surface, day, at}  (no uid)
+proof_members/{instance}__{org}__{uid}   {instance, org_id, uid, role, demo, joined_at, active_at}
+proof_invites/{org}__{sha256(email)[:24]} {org_id, email_hash, email_hint, role, status: pending, demo, created_at}
+proof_orgs/{org}                {policy: {competitor_names}, updated_at}
+proof_orgs/{org}/decisions/{key} {status, reason, updated_at, by_role}
+proof_decision_log/{id}         {org_id, key, status, reason, at, by_role, demo, snapshot}  (append-only)
+proof_requests/{id}             {instance, from_org, to_org, product_id, message, snapshot, status, reply, demo, ...}
+proof_claims/{id}               {org_id, product_id, text, statements, cohort, n, window, method, caveat, exportable, status, demo, ...}
+campaigns/{id}                  + org_id, demo
+```
+Instances and organisations are seeded in `api/seed/proof_instances.json`, not stored. All queries are single-field (no composite index).
 
 ## 5. BigQuery (Niwin owns)
 Dataset `willow_insights` (us-central1). Tables: `sessions_flat` (one row per session x metric, pseudonymous user hash, region, skin-tone band, skin type, goals), `users_flat` (one row per person: goals, skin type, started_at, first/last reading, last week), `goals_monthly` (person x month with a reading: the goals that month), `routine_flat` (started/stopped week; + `feel`, `feel_week`, `feel_tags[]`: the latest self-reported answer, Oct 17), `routine_conflicts` (rule-table findings incl. `duplicate_active`, `none` when clear), `products` (+ goals). Loaded by `api/scripts/export_bq.py` (WRITE_TRUNCATE, idempotent) from Firestore (opted-in people only: `users/{uid}.consent.aggregate_insights_opt_in`; goals and skin type from `users/{uid}.profile`) + the synthetic cohort generator (`is_synthetic = true` on every synthetic row; shown on every chart). Goals are the app's 8 goal ids; older rows with catalog concerns are mapped to them on read.
