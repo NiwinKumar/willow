@@ -101,6 +101,10 @@ own measurements, check their routine and find products from Willow's facts-only
   never repeat it back in full.
 - search_catalog returns products sold where the person shops first (sold_here true); prefer
   those, and say so when you suggest one that is not sold there.
+- search_catalog's not_checked (and any product with ingredient_list "not in Willow yet") are
+  products Willow knows only by name, check status unknown: when the person names one, you may
+  talk about it, but say plainly its ingredient list isn't in Willow yet, so it hasn't been
+  checked for them; they can scan the label. Never suggest one and never call it fine for them.
 - Never recommend, name or comment on the dose of a prescription medicine (tretinoin,
   hydroquinone, steroid creams, antibiotics, anything taken by mouth): say to ask a doctor or
   pharmacist. Never write acne, treat, cure or heal; say blemishes or breakouts.
@@ -223,8 +227,13 @@ PHOTO_REFUSAL = (
 )
 
 
+# What Wisp is told about an index product (its ingredient list is not in Willow yet).
+NOT_IN_WILLOW = "not in Willow yet: never suggest it; say its ingredient list isn't in Willow yet"
+
+
 def _compact(p: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[str, Any]:
     check = safety.check(p, profile)
+    extra = {} if catalog.is_full(p) else {"ingredient_list": NOT_IN_WILLOW}
     return {
         "product_id": p["product_id"],
         "brand": p["brand"],
@@ -237,6 +246,7 @@ def _compact(p: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[s
         "price": p["price"],
         "size": p["size"],
         "stores": [s["store"] for s in p["stores"]],
+        **extra,
     }
 
 
@@ -350,13 +360,19 @@ def _outcomes(ids: list[str]) -> dict[str, Any]:
 
 
 def suggestible(p: dict[str, Any], profile: dict[str, Any] | None) -> bool:
-    """Wisp may suggest it: a cosmetic (or sunscreen) where the person is, not a never-suggest
-    ingredient, not "avoid" or "not sold" for their profile (app/regulatory.py, app/safety.py)."""
+    """Wisp may suggest it: a full catalog product (its ingredient list is in Willow), a cosmetic
+    (or sunscreen) where the person is, not a never-suggest ingredient, not "avoid" or "not sold"
+    for their profile (app/regulatory.py, app/safety.py)."""
     market = (profile or {}).get("market")
-    return regulatory.is_suggestible(p, market) and safety.check(p, profile)["status"] not in (
-        "avoid",
-        "not_sold",
+    return (
+        catalog.is_full(p)
+        and regulatory.is_suggestible(p, market)
+        and safety.check(p, profile)["status"] not in ("avoid", "not_sold")
     )
+
+
+# Index products a name search also returns (to talk about, never to suggest).
+MAX_NOT_CHECKED = 3
 
 
 def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[str, Any]:
@@ -364,26 +380,30 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
     if name == "search_catalog":
         # search is where suggestions come from: only products Willow may suggest to this person
         market = (profile or {}).get("market")
-        found = [
-            p
-            for p in catalog.search_all(
-                q=args.get("query"),
-                concern=args.get("concern"),
-                category=args.get("category"),
-                max_price=args.get("max_price"),
-                currency=args.get("currency"),
-                exclude_ingredients=args.get("exclude_ingredients"),
-            )
-            if suggestible(p, profile)
-        ]
+        every = catalog.search_all(
+            q=args.get("query"),
+            concern=args.get("concern"),
+            category=args.get("category"),
+            max_price=args.get("max_price"),
+            currency=args.get("currency"),
+            exclude_ingredients=args.get("exclude_ingredients"),
+        )
+        found = [p for p in every if suggestible(p, profile)]
         # sold where the person shops (or everywhere) first; the search's own order within each
         found = sorted(found, key=lambda p: not plan.sold_in(p, market))[:6]
-        return {
+        out: dict[str, Any] = {
             "products": [
                 {**_compact(p, profile), "sold_here": plan.sold_in(p, market)} for p in found
             ],
             "measured_outcomes": _outcomes([p["product_id"] for p in found]),
         }
+        # A product the person named may be one Willow knows only by name: Wisp may find it and
+        # talk about it, saying its ingredient list isn't in Willow yet, but never suggest it.
+        if args.get("query"):
+            named = [p for p in every if not catalog.is_full(p)][:MAX_NOT_CHECKED]
+            if named:
+                out["not_checked"] = [_compact(p, profile) for p in named]
+        return out
     if name == "compare_products":
         # what the person asked about, flags and all (never a suggestion by itself)
         found = [catalog.by_id(i) for i in (args.get("product_ids") or [])[:4]]
@@ -508,7 +528,9 @@ def chat(
             out = run_tool(call.name, args, store, uid)
             tool_outputs.append({"tool": call.name, "args": args, "result": out})
             retrieval.append(_retrieval_line(call.name, args, out))
-            product_ids |= {p["product_id"] for p in out.get("products", [])}
+            product_ids |= {
+                p["product_id"] for p in [*out.get("products", []), *out.get("not_checked", [])]
+            }
             parts.append(types.Part.from_function_response(name=call.name, response=out))
         contents.append(types.Content(role="user", parts=parts))
         # One round of tools (Gemini asks for several at once when it needs them): another

@@ -13,6 +13,7 @@ const LOOK: Record<CheckStatus, { fg: string; bg: string }> = {
   check: { fg: 'var(--state-caution-fg)', bg: 'var(--state-caution-bg)' },
   avoid: { fg: 'var(--state-avoid-fg)', bg: 'var(--state-avoid-bg)' },
   not_sold: { fg: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
+  unknown: { fg: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
 }
 
 const GRADES: { g: Grade; text: string }[] = [
@@ -127,7 +128,7 @@ export default function Checks() {
             ))}
           </div>
           <p className="m-0 text-[14.5px] leading-[1.55] text-[#2A2926]">
-            The best a product can get is “No flags for you”, never “safe”. Labels can be incomplete: products labelled for other markets may list only “parfum”, so a name missing from a label is “not listed”, never “free from”.
+            The best a product can get is “No flags for you”, never “safe”. Labels can be incomplete: products labelled for other markets may list only “parfum”, so a name missing from a label is “not listed”, never “free from”. A product Willow knows only by name, without its ingredient list yet, is “Not checked yet”: scan its label to check it.
           </p>
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[13.5px]">
             {GRADES.map((g) => (

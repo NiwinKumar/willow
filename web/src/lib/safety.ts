@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 
 import { ApiError, request, retailerGet } from './api'
+import type { CheckStatus } from './checkWords'
 import { useQuery } from './query'
 import { useAuth } from './useAuth'
 
@@ -113,21 +114,15 @@ export function useSafety() {
 
 // ---------------------------------------------------------------- checks
 
-export type CheckStatus = 'clear' | 'check' | 'avoid' | 'not_sold'
+export { CHECK_WORDS, noFlagsText, type CheckStatus } from './checkWords'
 export type Grade = 'A' | 'B' | 'C'
 export type SourceRef = { label: string; url: string | null }
 export type SafetyFlag = { rule: string; level: 'check' | 'avoid'; title: string; detail: string; source: SourceRef | null; grade: Grade | null }
 export type RegulatoryClass = 'cosmetic' | 'otc_drug' | 'pharmacy' | 'rx'
-export type ProductCheck = { status: CheckStatus; flags: SafetyFlag[]; regulatory: { class: RegulatoryClass; market: string } | null }
+/** `unknown`: no ingredient list in Willow (an index product); `explanation` then says so, and `regulatory` is
+ * null unless its name or actives show it is not a plain cosmetic. */
+export type ProductCheck = { status: CheckStatus; flags: SafetyFlag[]; regulatory: { class: RegulatoryClass; market: string | null } | null; explanation?: string | null }
 export type SafetyCheckResponse = { profile_complete: boolean; checks: Record<string, ProductCheck> }
-
-/** The words for each status (build spec): never "safe". Glyph and words always travel together. */
-export const CHECK_WORDS: Record<CheckStatus, { label: string; short: string; glyph: string }> = {
-  clear: { label: 'No flags for you', short: 'No flags', glyph: '✓' },
-  check: { label: 'Check this', short: 'Check this', glyph: '!' },
-  avoid: { label: 'Not advised for you', short: 'Not advised', glyph: '⊘' },
-  not_sold: { label: 'Not sold as a cosmetic in your market', short: 'Not a cosmetic here', glyph: '—' },
-}
 
 export const REGULATORY_WORDS: Record<RegulatoryClass, string> = {
   cosmetic: 'Sold as a cosmetic',
@@ -327,6 +322,8 @@ export type RoutinePreview = {
   gaps: { need: string; why: string; suggestion: string }[]
   already_use: { active: string; products: string[] }[]
   note: string
+  /** false: the product's ingredient list is not in Willow yet, so finding no clash means nothing (older builds omit it). */
+  checked?: boolean
 }
 
 /** POST /v1/routine/check/preview: what adding this product would newly bring to the routine (rules only, nothing saved). */

@@ -11,7 +11,8 @@ boost so a serum's neighbours are serums first. The score is formula likeness on
 {"items": [{"product": {...}, "score": 0.93}]}; with `market`, only products sold there (or
 GLOBAL) and suggestible there, as swaps (app/plan.py);
 the router is mounted by app/main.py (lead). Unknown product: 404; a product without a vector
-(added after the seed was built) or with nothing above MIN_SCORE: an empty list.
+(added after the seed was built) or with nothing above MIN_SCORE: an empty list. Only full
+catalog products are neighbours (an index product has no ingredient list to compare or check).
 """
 
 import json
@@ -62,8 +63,8 @@ def similar_products(
     ranked = []
     for other in catalog.products():
         pid = other["product_id"]
-        if pid == product_id or pid not in vecs:
-            continue
+        if pid == product_id or pid not in vecs or not catalog.is_full(other):
+            continue  # a neighbour is shown as an option: only products with their label
         if market and not (
             plan.sold_in(other, market) and regulatory.is_suggestible(other, market)
         ):

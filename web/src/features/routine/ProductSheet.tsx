@@ -12,7 +12,7 @@ import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner, useRoutine } from '../../data/hooks'
 import type { Product, RoutineEntry, RoutineSchedule, StorePrice } from '../../data/types'
 import { api, localDay } from '../../lib/api'
-import { CONCERN_LABEL } from '../../lib/catalog'
+import { CONCERN_LABEL, hasFullFacts, NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { outcomeFor, type Outcome } from '../../lib/outcome'
 import { useQuery } from '../../lib/query'
@@ -27,6 +27,7 @@ import { StartTest } from './StartTest'
 import { FeelCard } from './FeelCard'
 import { strongActives, verdictDue } from './actives'
 import { CheckForMe, CheckReasons } from './checked'
+import { FullFactsComing } from './FullFactsComing'
 import { ReactionSheet, type ReactionTarget } from './ReactionSheet'
 import { StartSlowCard } from './StartSlowCard'
 import { failureText, useRoutineWrites } from './writes'
@@ -169,10 +170,12 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
       <div className="flex flex-col gap-1.5 px-2 py-1.5">
         <span className="text-[14px] text-ink-2">{metaLine(brand, category, product?.size)}</span>
         <h3 className="text-[26px] leading-[1.1] font-normal tracking-[-0.02em]">{name}</h3>
-        {product ? (
+        {product?.price ? (
           <span className="text-[16px]">
             {fmtPrice(product.price)} <span className="text-[14px] text-ink-2">· catalog price, checked {fmtDate(product.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           </span>
+        ) : product ? (
+          <span className="text-[14px] text-ink-2">{NO_PRICE}</span>
         ) : (
           <span className="text-[14px] text-ink-2">Your own product · not in the catalog</span>
         )}
@@ -192,6 +195,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
         ) : null}
       </div>
 
+      {product && !hasFullFacts(product) ? <FullFactsComing product={product} /> : null}
       {check ? <CheckReasons check={check} profileComplete={checks.profileComplete} /> : productId ? <CheckForMe className="px-2" /> : null}
 
       <div className="flex flex-wrap gap-2 px-1">
@@ -433,7 +437,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
             </a>
           ))}
           <span className="px-1.5 text-[12px] text-ink-2">
-            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed.' : 'Store links only: the price above is the catalog’s one checked price.'}{' '}
+            {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed.' : product.price ? 'Store links only: the price above is the catalog’s one checked price.' : 'Store links only: no price has been checked yet.'}{' '}
             {COMMISSION_NOTE} It never changes what Willow suggests; a sponsored card is always labelled Sponsored.
           </span>
         </div>

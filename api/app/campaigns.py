@@ -122,6 +122,9 @@ def check(
     ([] = it can). Skin types must be among the eligible ones; [] means all of those."""
     elig = eligibility_of(product["product_id"])
     reasons: list[str] = []
+    if not catalog.is_full(product):
+        # a sponsored card is a suggestion, and a suggestion has to be checked
+        reasons.append("Only products with their full ingredient list in Willow can be promoted.")
     if not elig or not elig.get("eligible") or elig.get("tier") != "proven":
         reasons.append("Only products rated Proven can be promoted.")
         reasons += [r for r in (elig or {}).get("reasons") or [] if r not in reasons]
@@ -496,7 +499,8 @@ def sponsored(store: Store, uid: str, guest: bool = False) -> dict[str, Any] | N
             e.get("eligible")
             and e.get("tier") == "proven"
             and skin in targets
-            and catalog.by_id(pid)
+            and (p := catalog.by_id(pid))
+            and catalog.is_full(p)
         ):
             eligible.append((cid, d))
     day = at.date().isoformat()

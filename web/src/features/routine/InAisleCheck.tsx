@@ -8,7 +8,8 @@ import { CheckForMe, ProductChecked } from './checked'
 /**
  * In-aisle check (research 05 §5 #11): a pack photo matched a catalog product, so before buying it the person
  * sees three lines: its flags for them, what it would newly clash with in their routine
- * (POST /v1/routine/check/preview, fixed rules, nothing saved), and the key actives they already use.
+ * (POST /v1/routine/check/preview, fixed rules, nothing saved), and the key actives they already use. A product
+ * whose ingredient list Willow does not have yet (an index product) says it was not checked, on each line.
  */
 export function InAisleCheck({ product, slots }: { product: Product; slots?: ('am' | 'pm')[] }) {
   const { getIdToken } = useAuth()
@@ -40,6 +41,7 @@ export function InAisleCheck({ product, slots }: { product: Product; slots?: ('a
           <span className="flex flex-col gap-1">
             <ProductChecked check={check} loading={checks.status === 'loading'} profileComplete={checks.profileComplete} inDialog short={false} />
             {check?.flags.length ? <span className="text-[13px] leading-[1.4] text-ink-2">{check.flags.map((f) => f.title).join(' · ')}</span> : null}
+            {check?.status === 'unknown' && check.explanation ? <span className="text-[13px] leading-[1.4] text-ink-2">{check.explanation}</span> : null}
           </span>
         )}
       </Line>
@@ -50,6 +52,8 @@ export function InAisleCheck({ product, slots }: { product: Product; slots?: ('a
           <span className="text-[13.5px] text-ink-2">Couldn’t check your routine just now.</span>
         ) : p.data.in_routine ? (
           <span className="text-[13.5px]">It’s already in your routine.</span>
+        ) : p.data.checked === false ? (
+          <span className="text-[13.5px] text-ink-2">Not checked yet: its ingredient list isn’t in Willow, so clashes can’t be checked.</span>
         ) : clashLines.length ? (
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {clashLines.map((c, i) => (
@@ -79,7 +83,7 @@ export function InAisleCheck({ product, slots }: { product: Product; slots?: ('a
             ))}
           </span>
         ) : (
-          <span className="text-[13.5px] text-ink-2">{p.data && !p.data.in_routine ? 'None of its key actives are in your routine.' : '—'}</span>
+          <span className="text-[13.5px] text-ink-2">{p.data && p.data.checked === false && !p.data.in_routine ? 'Its key actives aren’t in Willow yet.' : p.data && !p.data.in_routine ? 'None of its key actives are in your routine.' : '—'}</span>
         )}
       </Line>
     </ul>

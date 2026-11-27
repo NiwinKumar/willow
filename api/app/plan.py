@@ -5,8 +5,9 @@ step by step (the funnel the app draws), picks one product per slot, says why in
 and lays out when to start each one and when to judge it (the evidence clock, from
 `seed/evidence_clock.json`).
 
-Rules a pick must pass: sold where the person is, a cosmetic or sunscreen there
-(regulatory.is_suggestible), a price in the budget's currency within the budget (nothing is
+Rules a pick must pass: a full catalog product (its ingredient list is in Willow, so it can be
+checked; index products are never suggested), sold where the person is, a cosmetic or sunscreen
+there (regulatory.is_suggestible), a price in the budget's currency within the budget (nothing is
 converted), not "avoid" or "not sold" for this profile, fragrance-free when the skin reacts
 easily or fragrance is on the avoid list. Actives must have no flag at all. Ties go to the proof
 tier (Proven, then Promising, when outcome data is available), then concern match, then price.
@@ -201,7 +202,8 @@ def sold_in(product: dict[str, Any], market: str | None) -> bool:
 def price_in(product: dict[str, Any], currency: str) -> float | None:
     """The lowest checked price in this currency (the reference price or a store's), never
     converted from another currency."""
-    amounts = [product["price"]["amount"]] if product["price"]["currency"] == currency else []
+    ref = product.get("price")  # null on an index product whose price was not checked
+    amounts = [ref["amount"]] if ref and ref["currency"] == currency else []
     amounts += [
         s["price"]["amount"]
         for s in product.get("stores") or []
@@ -329,7 +331,7 @@ class _Ctx:
         if self.currency and self.currency != FALLBACK_CURRENCY:
             priced = sum(
                 1
-                for p in catalog.products()
+                for p in self.full()
                 if self.in_market(p) and price_in(p, self.currency) is not None
             )
             if usd or priced < MIN_PRICED:
@@ -351,6 +353,11 @@ class _Ctx:
 
     def in_market(self, p: dict[str, Any]) -> bool:
         return sold_in(p, self.market) and regulatory.is_suggestible(p, self.market)
+
+    @staticmethod
+    def full() -> list[dict[str, Any]]:
+        """The products a plan may suggest: those with their ingredient list in Willow."""
+        return [p for p in catalog.products() if catalog.is_full(p)]
 
     def in_budget(self, p: dict[str, Any], with_tier: bool = True) -> bool:
         b = self.req.budget
@@ -587,7 +594,7 @@ def build(req: PlanRequest, profile: dict[str, Any] | None) -> dict[str, Any]:
 def _build(ctx: _Ctx) -> dict[str, Any]:
     req = ctx.req
     goals = list(req.goals)
-    everything = list(catalog.products())
+    everything = ctx.full()
     market = [p for p in everything if ctx.in_market(p)]
     budget = [p for p in market if ctx.in_budget(p)]
     unflagged = [p for p in budget if ctx.unflagged(p)]
@@ -609,7 +616,7 @@ def _build(ctx: _Ctx) -> dict[str, Any]:
         p for p in market if ctx.in_budget(p, with_tier=False) and ctx.unflagged(p) and fits(p)
     ]
     funnel = [
-        {"id": "catalog", "label": "Products in the catalog", "n": len(everything)},
+        {"id": "catalog", "label": "Products with a full ingredient list", "n": len(everything)},
         {"id": "market", "label": "Sold where you are", "n": len(market)},
         {"id": "budget", "label": "Within your budget", "n": len(budget)},
         {"id": "flags", "label": "Not ruled out by your profile", "n": len(unflagged)},
@@ -797,11 +804,14 @@ def swaps(
         return []
     main = actives[0]
     key, pct = _active_key(main["name"]), main.get("pct")
-    currency = DEFAULT_CURRENCY.get(market or "") or product["price"]["currency"]
-    base = price_in(product, currency)
+    own = product.get("price")
+    currency = DEFAULT_CURRENCY.get(market or "") or (own["currency"] if own else None)
+    base = price_in(product, currency) if currency else None
     found = []
     for p in catalog.products():
         if p["product_id"] == product["product_id"] or p["category"] != product["category"]:
+            continue
+        if not catalog.is_full(p):  # a swap is a suggestion: it needs its ingredient list
             continue
         if not (sold_in(p, market) and regulatory.is_suggestible(p, market)):
             continue
@@ -815,7 +825,7 @@ def swaps(
         check = safety.check(p, profile, market) if profile else None
         if check and check["status"] in ("avoid", "not_sold"):
             continue
-        amount = price_in(p, currency)
+        amount = price_in(p, currency) if currency else None
         strength = f" {_pct_words(same.get('pct'))}" if same.get("pct") is not None else ""
         why = f"Same active ({same['name'].lower()}{strength})"
         compared = None
