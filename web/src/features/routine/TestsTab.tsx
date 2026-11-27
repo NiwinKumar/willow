@@ -113,6 +113,9 @@ export function ProductTests({ current, tests, treated, controls }: { current: R
           ) : (
             <>
               <span className="text-[clamp(22px,2.4vw,28px)] leading-[1.15] tracking-[-0.01em] text-pretty">Test a product on one forearm square</span>
+              <span className="max-w-[460px] text-[14px] leading-[1.45] text-pretty" style={{ animation: 'wRise .5s 120ms both' }}>
+                It shows whether a product changes your skin, measured against untouched skin on your other arm, before it goes on your face.
+              </span>
               <ol className="flex max-w-[460px] flex-1 flex-col justify-between gap-3 text-[14px] leading-[1.45]">
                 {['Choose what to test, and for how long.', 'Use it on a small square on one forearm. Leave the same square on the other forearm untouched.', `Photograph both arms together before the first use, then every few days. Willow gives a verdict after day ${VERDICT_AFTER_DAYS}.`].map((s, i) => (
                   <li key={s} className="flex gap-3">

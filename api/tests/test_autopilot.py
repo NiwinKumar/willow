@@ -66,7 +66,14 @@ def sig(monkeypatch: pytest.MonkeyPatch):
     return state
 
 
+def _join(client) -> None:
+    """Rules start campaigns: the caller "Tries as" the willow retailer org first."""
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
+
+
 def _rule(client, **over):
+    _join(client)
     body = {
         "name": "Dark-spot serums",
         "workspace": "retailer",
@@ -119,6 +126,20 @@ def test_suggest_proposes_and_approval_starts_the_campaign(client, fake, sig):
     assert camp["holdout_pct"] == 0.2 and camp["days"] == 14 and camp["skin_types"] == []
     again = client.post(f"/v1/retailer/autopilot/activity/{first['id']}/approve")
     assert again.status_code == 409
+
+
+def test_approval_is_refused_when_the_product_already_has_a_live_campaign(client, fake, sig):
+    _rule(client)
+    props = [a for a in _run(client)["activity"] if a["kind"] == "proposed"]
+    prop = next(a for a in props if a["product_id"] == SERUM)
+    body = {"product_id": SERUM, "workspace": "retailer", "goals": ["dark_spots"], "days": 14}
+    assert client.post("/v1/retailer/campaigns", json=body).status_code == 201
+    res = client.post(f"/v1/retailer/autopilot/activity/{prop['id']}/approve")
+    assert res.status_code == 409
+    assert res.json()["detail"]["message"] == (
+        "This product already has a running campaign; end it or wait for its result."
+    )
+    assert len(fake.store.campaigns) == 1
 
 
 def test_a_second_check_the_same_day_adds_nothing(client, fake, sig):
@@ -329,6 +350,7 @@ def test_rules_are_private_and_deleting_one_closes_its_proposals(client, fake, s
     rule = _rule(client)
     out = _run(client)
     other = TestClient(app, headers={"X-Dev-Uid": "someone_else"})
+    _join(other)  # a member too, so what's tested is privacy, not the membership door
     assert other.get("/v1/retailer/autopilot").json() == {"rules": [], "activity": []}
     assert (
         other.patch(
@@ -425,3 +447,20 @@ def test_approving_past_the_rule_limit_is_refused(client, fake, sig):
     assert client.post(f"/v1/retailer/autopilot/activity/{props[0]['id']}/approve").is_success
     res = client.post(f"/v1/retailer/autopilot/activity/{props[1]['id']}/approve")
     assert res.status_code == 409 and "1 of its 1 at a time" in res.json()["detail"]["message"]
+
+
+def test_rules_need_a_proof_membership(fake, sig):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    stranger = TestClient(app, headers={"X-Dev-Uid": "no_org_yet"})
+    body = {
+        "name": "Dark-spot serums",
+        "workspace": "retailer",
+        "level": "suggest",
+        "scope": {"category": "serum"},
+        "trigger": {"kind": "proven", "goals": ["dark_spots"]},
+    }
+    res = stranger.post("/v1/retailer/autopilot/rules", json=body)
+    assert res.status_code == 403 and res.json()["detail"]["code"] == "not_a_member"

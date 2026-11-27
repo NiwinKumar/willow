@@ -8,7 +8,10 @@ import { csvMeta, csvName } from '../data'
 import { feltText } from '../feel'
 import { useProducts } from '../productData'
 import { filterRows, hintOf, MAX_COMPARE, noDataReason, parseIds, TIER_ORDER, TIER_TABS, toggleId } from '../productModel'
-import { sectionPath, useRetailState } from '../state'
+import { useCompetitorNames } from '../orgData'
+import { rangeIds, useRange } from '../rangeStore'
+import { purposeOf, sectionPath, useRetailState } from '../state'
+import { ProductsNav } from './ProductsNav'
 import type { Insights, ProductRow, ProofTier } from '../types'
 import { Bone, Button, DataTable, ErrorState, int, LiftValue, MIN_GROUP, PageHeader, pct, ProductCell, ProofTierChip, SearchField, Segmented, Select, Suppressed, Tabs, TIERS, weeks, type Column, type Sort } from '../ui'
 import { FeltCell, HeadTip, RateInterval } from './productParts'
@@ -79,10 +82,16 @@ function Body({ d }: { d: Insights }) {
   const wk = d.cohort.weeks
 
   const brandName = workspace.kind === 'brand' ? workspace.brand : null
-  const mine = brandName ? all.filter((r) => r.brand === brandName) : []
-  // A brand workspace opens on its own products (when it has any in the catalog); ?scope=all widens to everyone.
+  const { range } = useRange()
+  const ids = rangeIds(range)
+  const names = useCompetitorNames()
+  // "Your range": a brand's own products, or the retailer's connected item file. ?scope=all opens the whole
+  // catalog, except for a brand organisation whose retailer keeps competitor names off (then it is its range only).
+  const mine = brandName ? all.filter((r) => r.brand === brandName) : ids ? all.filter((r) => ids.has(r.product_id)) : []
   const brandView = brandName && mine.length ? brandName : null
-  const yoursOnly = brandView !== null && param('scope') !== 'all'
+  const hasRange = mine.length > 0
+  const wholeAllowed = !names.anonymise
+  const yoursOnly = hasRange && (param('scope') !== 'all' || !wholeAllowed)
 
   const q = param('q') ?? ''
   const brand = brandView ? '' : (param('brand') ?? '')
@@ -108,23 +117,28 @@ function Body({ d }: { d: Insights }) {
   const goals = GOALS.filter((g) => goalIds.has(g.id))
 
   // Tab counts follow every other filter, so each tab says how many rows it would show.
-  const scoped = filterRows(all, { q, brand, category, goal, mineOf: yoursOnly ? brandView : null })
+  const pool0 = yoursOnly ? mine : all
+  const scoped = filterRows(pool0, { q, brand, category, goal })
   const rows = tier ? scoped.filter((r) => r.tier === tier) : scoped
   const count = (t: 'all' | ProofTier) => (t === 'all' ? scoped.length : scoped.filter((r) => r.tier === t).length)
   const filtered = Boolean(q || brand || category || goal)
   const clearFilters = () => setParam({ q: null, brand: null, category: null, goal: null, tier: null })
 
-  const pool = brandView ? mine : all
+  const pool = hasRange ? mine : all
   const proven = pool.filter((r) => r.tier === 'proven').length
-  const measured = all.filter((r) => r.rate !== null).length
+  const measured = pool.filter((r) => r.rate !== null).length
   const description = !measured ? (
-    `No product has ${MIN_GROUP} or more people at week ${wk} in this range yet.`
-  ) : brandView ? (
+    hasRange ? (
+      `None of your ${mine.length} products has ${MIN_GROUP} or more people at week ${wk} yet; your range shows which are collecting.`
+    ) : (
+      `No product has ${MIN_GROUP} or more people at week ${wk} in this period yet.`
+    )
+  ) : hasRange ? (
     <>
       <strong>
         {proven} of {mine.length}
       </strong>{' '}
-      of your {mine.length === 1 ? 'product is' : 'products are'} Proven.
+      {brandView ? 'of your' : 'products in your range'} {brandView ? (mine.length === 1 ? 'product is' : 'products are') : (proven === 1 ? 'is' : 'are')} Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   ) : (
     <>
@@ -172,8 +186,8 @@ function Body({ d }: { d: Insights }) {
       sortValue: (r) => r.product,
       firstDir: 'asc',
       // "Yours" only where it tells rows apart (All products in a brand workspace).
-      cell: (r) => <ProductCell p={r} tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} />,
-      csv: (r) => `${r.product} (${r.brand})`,
+      cell: (r) => <ProductCell p={{ ...r, brand: names.name(r.brand) }} tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} />,
+      csv: (r) => `${r.product} (${names.name(r.brand)})`,
     },
     {
       id: 'tier',
@@ -298,10 +312,12 @@ function Body({ d }: { d: Insights }) {
   ]
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
+      <ProductsNav />
       <PageHeader
         title="Products"
         description={description}
+        purpose={purposeOf('products')}
         actions={
           <>
             {sel.length ? (
@@ -339,7 +355,7 @@ function Body({ d }: { d: Insights }) {
             defaultSort={DEFAULT_SORT}
             maxHeight="max(440px, calc(100dvh - 330px))"
             minWidth={880}
-            csv={{ name: csvName('products', res), meta: csvMeta(res, [yoursOnly && `brand ${brandView}`, brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined) }}
+            csv={{ name: csvName('products', res), meta: csvMeta(res, [yoursOnly && (brandView ? `brand ${brandView}` : 'your range'), brand && `brand ${brand}`, category && `category ${category}`, goal && `goal ${goal}`, tier && `status ${TIERS[tier].label}`, q && `search "${q}"`].filter(Boolean).join(' · ') || undefined) }}
             empty={
               <span className="flex flex-col items-center gap-3">
                 No product matches these filters.
@@ -356,19 +372,20 @@ function Body({ d }: { d: Insights }) {
                     Clear
                   </Button>
                 ) : null}
-                {brandView ? (
+                {hasRange && wholeAllowed ? (
                   <Segmented
-                    label="Whose products"
+                    label="Which products"
                     value={yoursOnly ? 'yours' : 'all'}
                     onChange={(v) => setParam({ scope: v === 'all' ? 'all' : null })}
                     options={[
-                      { value: 'yours', label: 'Your products' },
-                      { value: 'all', label: 'All products' },
+                      { value: 'yours', label: brandView ? 'Your products' : 'Your range' },
+                      { value: 'all', label: 'Whole catalog' },
                     ]}
                   />
-                ) : (
-                  <Select label="Brand" hideLabel value={brand} onChange={(v) => setParam({ brand: v })} options={[{ value: '', label: 'All brands' }, ...brands.map((b) => ({ value: b, label: b }))]} />
-                )}
+                ) : null}
+                {!brandView && (!hasRange || !yoursOnly) ? (
+                  <Select label="Brand" hideLabel value={brand} onChange={(v) => setParam({ brand: v })} options={[{ value: '', label: 'All brands' }, ...brands.map((b) => ({ value: b, label: names.name(b) }))]} />
+                ) : null}
                 <Select label="Category" hideLabel value={category} onChange={(v) => setParam({ category: v })} options={[{ value: '', label: 'All categories' }, ...categories.map(([value, label]) => ({ value, label }))]} />
                 <Select label="Goal" hideLabel value={goal} onChange={(v) => setParam({ goal: v })} options={[{ value: '', label: 'All goals' }, ...goals.map((g) => ({ value: g.id, label: g.label }))]} />
               </>

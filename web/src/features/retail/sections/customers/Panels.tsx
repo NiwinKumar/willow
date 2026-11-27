@@ -77,7 +77,7 @@ export function CellPanel({ cell, s, catalog, mine, onClose }: { cell: SegCell |
               {own.length === 0 ? (
                 <div className="flex flex-col items-start gap-2 rounded-ctl border border-dashed border-line-strong px-3 py-3">
                   <Badge tone="amber">No product</Badge>
-                  <p className="m-0 text-proof-body text-ink-2">{mine} has no catalogue product for {goal.toLowerCase()}.</p>
+                  <p className="m-0 text-proof-body text-ink-2">{mine} has no catalog product for {goal.toLowerCase()}.</p>
                 </div>
               ) : (
                 <ul className="m-0 flex list-none flex-col gap-2 p-0">

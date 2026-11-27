@@ -140,7 +140,10 @@ UP_IS_GOOD = {"glow", "dark_circles"}
 TIERS = [("budget", 0, 700), ("mid", 700, 2000), ("premium", 2000, math.inf)]
 
 
-def tier(price: dict[str, Any]) -> str:
+def tier(price: dict[str, Any] | None) -> str | None:
+    """budget, mid or premium; None for a product with no checked price (an index product)."""
+    if not price:
+        return None
     amount = price["amount"] * (83 if price["currency"] == "USD" else 1)
     return next(name for name, lo, hi in TIERS if lo <= amount < hi)
 

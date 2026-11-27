@@ -1,0 +1,233 @@
+{
+ "version": "2026-11-27",
+ "about": "How long before a first look and a verdict on a product, by its main active. Weeks count from the day the product starts. A skin cycle of about 28 days is a rounded figure; it explains why nothing is judged in a week, but the trial lengths set the verdict.",
+ "actives": {
+  "niacinamide": {
+   "match": [
+    "niacinamide"
+   ],
+   "first_look_weeks": 4,
+   "verdict_weeks": 8,
+   "source": {
+    "label": "Hakozaki et al., Br J Dermatol 2002: niacinamide and pigment (8-week trial)",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/12100180/"
+   },
+   "grade": "B"
+  },
+  "retinol": {
+   "match": [
+    "retinol",
+    "retinyl palmitate",
+    "retinyl retinoate",
+    "hydroxypinacolone retinoate"
+   ],
+   "first_look_weeks": 12,
+   "verdict_weeks": 24,
+   "source": {
+    "label": "Kafi et al., Arch Dermatol 2007: retinol 0.4% over 24 weeks",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/17515510/"
+   },
+   "grade": "B"
+  },
+  "retinal": {
+   "match": [
+    "retinal",
+    "retinaldehyde"
+   ],
+   "first_look_weeks": 12,
+   "verdict_weeks": 24,
+   "source": {
+    "label": "DermNet: topical retinoids (may take 12 weeks to show)",
+    "url": "https://dermnetnz.org/topics/topical-retinoids"
+   },
+   "grade": "B"
+  },
+  "vitamin_c": {
+   "match": [
+    "ascorbic acid",
+    "ascorbyl glucoside",
+    "3-o-ethyl ascorbic acid",
+    "ethyl ascorbic acid",
+    "magnesium ascorbyl phosphate",
+    "sodium ascorbyl phosphate",
+    "ascorbyl tetraisopalmitate",
+    "tetrahexyldecyl ascorbate",
+    "disodium ascorbyl sulfate",
+    "vitamin c"
+   ],
+   "first_look_weeks": 8,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C",
+   "note": "Trials of vitamin C for dark spots commonly run 12 weeks or more."
+  },
+  "azelaic_acid": {
+   "match": [
+    "azelaic acid"
+   ],
+   "first_look_weeks": 6,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "American Academy of Dermatology: why your skin may not be clearing yet",
+    "url": "https://www.aad.org/public/diseases/acne/DIY/wont-clear"
+   },
+   "grade": "B"
+  },
+  "salicylic_acid": {
+   "match": [
+    "salicylic acid",
+    "betaine salicylate",
+    "capryloyl salicylic acid"
+   ],
+   "first_look_weeks": 6,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "American Academy of Dermatology: why your skin may not be clearing yet",
+    "url": "https://www.aad.org/public/diseases/acne/DIY/wont-clear"
+   },
+   "grade": "B"
+  },
+  "benzoyl_peroxide": {
+   "match": [
+    "benzoyl peroxide"
+   ],
+   "first_look_weeks": 6,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "American Academy of Dermatology: why your skin may not be clearing yet",
+    "url": "https://www.aad.org/public/diseases/acne/DIY/wont-clear"
+   },
+   "grade": "B"
+  },
+  "aha": {
+   "match": [
+    "glycolic acid",
+    "lactic acid",
+    "mandelic acid"
+   ],
+   "first_look_weeks": 4,
+   "verdict_weeks": 8,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C"
+  },
+  "ceramides": {
+   "match": [
+    "ceramide"
+   ],
+   "first_look_weeks": 2,
+   "verdict_weeks": 4,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C",
+   "note": "Barrier and comfort ingredients are felt in days; their readings settle within a month."
+  },
+  "hyaluronic_acid": {
+   "match": [
+    "hyaluronic acid",
+    "sodium hyaluronate",
+    "hyaluronate"
+   ],
+   "first_look_weeks": 2,
+   "verdict_weeks": 4,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C",
+   "note": "Hydration is felt in days; readings settle within a month."
+  },
+  "centella": {
+   "match": [
+    "centella asiatica",
+    "madecassoside",
+    "asiaticoside",
+    "cica"
+   ],
+   "first_look_weeks": 4,
+   "verdict_weeks": 8,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C"
+  },
+  "alpha_arbutin": {
+   "match": [
+    "alpha arbutin",
+    "alpha-arbutin",
+    "arbutin"
+   ],
+   "first_look_weeks": 8,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C"
+  },
+  "tranexamic_acid": {
+   "match": [
+    "tranexamic acid"
+   ],
+   "first_look_weeks": 8,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C"
+  },
+  "kojic_acid": {
+   "match": [
+    "kojic acid",
+    "kojic dipalmitate"
+   ],
+   "first_look_weeks": 8,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C"
+  },
+  "peptides": {
+   "match": [
+    "peptide",
+    "palmitoyl tripeptide",
+    "palmitoyl tetrapeptide",
+    "acetyl hexapeptide",
+    "oligopeptide"
+   ],
+   "first_look_weeks": 8,
+   "verdict_weeks": 12,
+   "source": {
+    "label": "Convention: no trial source checked for this active",
+    "url": null
+   },
+   "grade": "C"
+  }
+ },
+ "default": {
+  "first_look_weeks": 4,
+  "verdict_weeks": 8,
+  "source": {
+   "label": "Convention: no trial source checked for this active",
+   "url": null
+  },
+  "grade": "C"
+ },
+ "basics": {
+  "cleanser": null,
+  "moisturizer": null,
+  "sunscreen": null
+ },
+ "basics_note": "Cleanser, moisturiser and sunscreen are the base of a routine: they have no verdict date."
+}

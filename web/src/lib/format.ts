@@ -26,6 +26,14 @@ export function daysBetween(a: string, b: string): number {
 }
 
 /** "1 photo", "3 photos" (the plural defaults to one + s). */
+/** The calendar day (YYYY-MM-DD) `weeks` whole weeks after `day`: a plan pick's start day (today + its start
+ * week), so the routine's "FROM <date>" and "Verdict due" match the plan. */
+export function weeksAfter(day: string, weeks: number): string {
+  const d = new Date(`${day.slice(0, 10)}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 7 * weeks)
+  return d.toISOString().slice(0, 10)
+}
+
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
@@ -34,7 +42,9 @@ export function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
 }
 
-export function fmtPrice(price: { amount: number; currency: string }): string {
+/** A price in its own currency; '' for no price (an index product nobody has priced yet). */
+export function fmtPrice(price: { amount: number; currency: string } | null | undefined): string {
+  if (!price) return ''
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: price.currency, maximumFractionDigits: price.amount % 1 ? 2 : 0 }).format(price.amount)
   } catch {

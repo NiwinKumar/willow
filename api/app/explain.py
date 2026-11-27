@@ -188,9 +188,17 @@ def template(result: dict[str, Any], first_reading: bool = True) -> dict[str, An
 
 # --- Gemini explanation (GEMINI_SPEC.md section 2) -------------------------------------------
 
+# Words Willow never writes about a person (cosmetic language only). "Treated" stays allowed (the
+# forearm test's treated square), as does "treatment" as a catalog category; "treat", "treats",
+# "treating" and "treatment for" do not. Severity words count only next to what they would grade.
 BANNED = re.compile(
     r"\b(diagnos\w*|rosacea|eczema|psoriasis|melasma|dermatitis|melanoma|cancer|disease|"
-    r"whiten\w*|fairer|fairness|lighter skin|skin age|flaw\w*)\b",
+    r"whiten\w*|fairer|fairness|lighter skin|skin age|flaw\w*|"
+    r"acne|pimples?|treat|treats|treating|treatments? (?:for|of)|cur(?:e|es|ed|ing)|"
+    r"heal(?:s|ed|ing)?|therap\w*|medicat\w*|prescri\w*|antibiotic\w*|steroid\w*|infect\w*|"
+    r"(?:anti-?)?fungal|hormonal|symptom\w*|clinical\w*|remed(?:y|ies)|anti-?inflammatory|"
+    r"anti-?bacterial|(?:mild|moderate|severe)(?:ly)? (?:acne|breakouts?|blemishes|redness|"
+    r"inflammation|irritation|condition|case|form|scarring|pigmentation|hyperpigmentation))\b",
     re.I,
 )
 CHANGE_WORDS = re.compile(r"\b(real change|improv\w*|worse\w*|better)\b", re.I)
@@ -199,6 +207,29 @@ CHANGE_WORDS = re.compile(r"\b(real change|improv\w*|worse\w*|better)\b", re.I)
 # does not count. "Improved", "better" and "worse" always count.
 NEGATION = re.compile(r"\b(?:cannot|can't|can not|could not|not|no|without|too early)\b", re.I)
 REAL = re.compile(r"\breal(?:\s+change)?\b", re.I)
+
+
+# Words that say a reading moved one way: for a metric with no real change (a first reading,
+# within the usual range, or no band yet) they would describe noise as a result.
+MOVED_WORDS = re.compile(
+    r"\b(calmer|clearer|brighter|smoother|softer|fainter|fewer|more even|less visible|"
+    r"less (?:shine|glow|redness)|reduc\w*|increas\w*|decreas\w*|improv\w*|better|worse\w*)\b",
+    re.I,
+)
+
+
+SCALE = re.compile(r"\bmeans?\b", re.I)
+
+
+def _says_it_moved(text: str) -> bool:
+    """Direction words outside a negation ("no calmer than at your start" is a hedge)."""
+    for clause in re.split(r"[.!?;:,()]", text):
+        if SCALE.search(clause):
+            continue  # "lower values mean calmer skin" explains the scale
+        neg = NEGATION.search(clause)
+        if MOVED_WORDS.search(clause[: neg.start()] if neg else clause):
+            return True
+    return False
 
 
 def _claims_change(text: str) -> bool:
@@ -483,7 +514,11 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             r"\b(improv\w*|better)\b", item.summary, re.I
         ):
             found.append(f"improvement claimed for a change the other way: {item.summary}")
-    if not any(v == "real_change" for v in verdicts.values()) and _claims_change(exp.headline):
+        elif verdicts[item.metric_id] != "real_change" and _says_it_moved(item.summary):
+            found.append(f"direction words for {item.metric_id} ({verdicts[item.metric_id]})")
+    if not any(v == "real_change" for v in verdicts.values()) and (
+        _claims_change(exp.headline) or _says_it_moved(exp.headline)
+    ):
         found.append("change language in headline")
     return found
 

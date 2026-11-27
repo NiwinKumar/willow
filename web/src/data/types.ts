@@ -222,8 +222,10 @@ export type Product = {
   category: string
   concerns: string[]
   key_actives: { name: string; pct: number | null }[]
+  /** Empty on an index product: its ingredient list is not in Willow yet. */
   inci: string[]
-  price: { amount: number; currency: string }
+  /** The catalog's one checked reference price; null when nobody has checked one (index products). */
+  price: { amount: number; currency: string } | null
   size: string
   region: string[]
   stores: { store: string; url: string; region: string; price?: StorePrice | null }[]
@@ -233,6 +235,11 @@ export type Product = {
   image_url?: string | null
   /** The page that image appears on, for the credit line. */
   image_source?: string | null
+  /** "full": ingredient list, actives and price checked by hand; "index": known by name only, so never
+   * suggested and its check is "Not checked yet". Missing (older api builds) means full. */
+  detail?: 'full' | 'index'
+  /** What was checked for this record, and any caveat (catalog research notes). */
+  notes?: string
 }
 
 /** A price read off one store's page on the day `checked` (YYYY-MM-DD); null when it was not found. Never estimated. */

@@ -1,7 +1,7 @@
 import { baselineFor } from '../data/live'
 import type { MetricId, RoutineEntry, Session, Site } from '../data/types'
 import { CONCERN_METRICS } from './catalog'
-import { parseDate } from './format'
+import { fmtDate, parseDate } from './format'
 import { CLOSE_UPS, METRIC_META, fmtSigned, fmtValue, unitOf } from './metrics'
 import { VERDICT_WORDS, changeTitle, changeWay, type ChangeWay } from './verdict'
 
@@ -50,7 +50,8 @@ export function outcomeFor(entry: RoutineEntry, sessions: Session[]): Outcome {
   const afterOn = (site: Site) => measured.filter((s) => s.site === site && !s.is_baseline && new Date(s.created_at) >= start)
   const checkIns = Math.max(...pairs.map((p) => afterOn(p.site).length))
   if (checkIns < 2 || weeks < 2) {
-    const since = weeks === 0 ? 'Started this week.' : `Started ${weeks} week${weeks === 1 ? '' : 's'} ago.`
+    // a plan can schedule a product to start later (its start date is ahead)
+    const since = start.getTime() > Date.now() ? `Starts ${fmtDate(entry.started_at)}.` : weeks === 0 ? 'Started this week.' : `Started ${weeks} week${weeks === 1 ? '' : 's'} ago.`
     const need = checkIns < 2 ? `Willow needs at least two check-ins after the start date (${checkIns} so far).` : 'Most changes take at least two weeks to show.'
     return { kind: 'early', text: VERDICT_WORDS.notEnough.label, detail: `${since} ${need}` }
   }
