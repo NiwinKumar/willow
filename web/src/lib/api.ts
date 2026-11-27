@@ -363,10 +363,12 @@ export const api = {
   deleteMe: (token: string) => request<void>(token, '/v1/me', { method: 'DELETE' }, LONG_TIMEOUT_MS),
   /** The account as the api knows it: uid, the consent and the profile on record (each null before any). */
   me: (token: string) => request<{ uid: string; consent: { version: string; accepted_at: string; aggregate_insights_opt_in: boolean } | null; profile: Profile | null }>(token, '/v1/me'),
-  /** `concern` may be several: products made for every one of them. `total` counts every match (past `limit`). */
-  catalogSearch: (token: string, params: { q?: string; concern?: string | string[]; category?: string; max_price?: number; currency?: string; limit?: number }) => {
+  /** `concern` may be several: products made for every one of them. `total` counts every match (past `limit`).
+   * Nearest to where the person shops first: their saved market, else `market` (the browser's guess); the answer's
+   * `market` is the one used (api app/regions.py). */
+  catalogSearch: (token: string, params: { q?: string; concern?: string | string[]; category?: string; max_price?: number; currency?: string; limit?: number; market?: string }) => {
     const qs = new URLSearchParams(Object.entries(params).flatMap(([k, v]) => (v === undefined || v === '' ? [] : Array.isArray(v) ? v.map((x) => [k, x]) : [[k, String(v)]])))
-    return request<{ products: Product[]; total?: number; catalog_size?: number }>(token, `/v1/catalog/search?${qs}`)
+    return request<{ products: Product[]; total?: number; catalog_size?: number; market?: string | null }>(token, `/v1/catalog/search?${qs}`)
   },
   productRequests: (token: string) => request<{ requests: ProductRequest[] }>(token, '/v1/product-requests'),
   /** 409 `in_catalog` (detail.product) when the catalog already has it. */

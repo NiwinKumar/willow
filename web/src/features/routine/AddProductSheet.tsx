@@ -10,6 +10,7 @@ import type { Product } from '../../data/types'
 import { ApiError, api, localDay, type ProductRequest } from '../../lib/api'
 import { CONCERN_LABEL, categoryLabel, hasFullFacts } from '../../lib/catalog'
 import { fmtPrice, plural } from '../../lib/format'
+import { marketFromLocale, marketOf, priceFor } from '../../lib/market'
 import { packImage } from '../../lib/image'
 import { setQueryData } from '../../lib/query'
 import { sampleLabelFile } from '../../lib/sampleLabel'
@@ -159,19 +160,20 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onTest, onRequest
   const [category, setCategory] = useState(initial.category ?? '')
   // several concerns: products made for all of them
   const [concerns, setConcerns] = useState<string[]>([])
-  const [answer, setAnswer] = useState<{ key: string; status: 'ready' | 'error'; products: Product[]; total: number; size: number | null } | null>(null)
+  const [answer, setAnswer] = useState<{ key: string; status: 'ready' | 'error'; products: Product[]; total: number; size: number | null; market?: string | null } | null>(null)
   const [retry, setRetry] = useState(0)
   const seq = useRef(0)
   const q = query.trim()
 
-  // Debounced, latest query wins. An empty query lists the catalog (alphabetical by brand: no ranking).
+  // Debounced, latest query wins. An empty query lists the catalog nearest to where the person shops first (their saved
+  // market, else the browser's guess), then by brand; a query lists the best matches first, nearest among equals.
   const key = JSON.stringify([q, category, concerns, retry])
   useEffect(() => {
     const mine = ++seq.current
     const t = window.setTimeout(async () => {
       try {
-        const res = await api.catalogSearch(await getIdToken(), { q: q.slice(0, 100) || undefined, category: category || undefined, concern: concerns, limit: 200 })
-        if (mine === seq.current) setAnswer({ key, status: 'ready', products: res.products, total: res.total ?? res.products.length, size: res.catalog_size ?? null })
+        const res = await api.catalogSearch(await getIdToken(), { q: q.slice(0, 100) || undefined, category: category || undefined, concern: concerns, limit: 200, market: marketFromLocale() })
+        if (mine === seq.current) setAnswer({ key, status: 'ready', products: res.products, total: res.total ?? res.products.length, size: res.catalog_size ?? null, market: res.market })
       } catch {
         if (mine === seq.current) setAnswer((s) => ({ key, status: 'error', products: s?.products ?? [], total: s?.total ?? 0, size: s?.size ?? null }))
       }
@@ -186,6 +188,8 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onTest, onRequest
   const carried = (p: Product) => (p as Product & { check?: ProductCheck | null }).check ?? undefined
   const checks = useChecks(listed.slice(0, 80).filter((p) => !carried(p)).map((p) => p.product_id))
 
+  // Prices in the person's currency when a store lists one (never converted), else the catalog's reference price.
+  const currency = answer?.market ? marketOf(answer.market).currency : null
   const n = state.products.length
   const total = answer?.total ?? n
   const filtered = Boolean(q || category || concerns.length)
@@ -281,7 +285,7 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onTest, onRequest
                   </span>
                 </button>
                 <span className="flex shrink-0 flex-col items-end justify-between gap-2 py-3 pr-3">
-                  <span className="text-right text-[14px] whitespace-nowrap">{has ? '✓ In routine' : fmtPrice(p.price)}</span>
+                  <span className="text-right text-[14px] whitespace-nowrap">{has ? '✓ In routine' : fmtPrice(priceFor(p, currency))}</span>
                   <TestThisButton onClick={() => onTest(p)} label="Test it" name={p.name} />
                 </span>
               </li>

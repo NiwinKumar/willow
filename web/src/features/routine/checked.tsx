@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { CheckedChip } from '../../components/willow/CheckedChip'
-import { CHECK_WORDS, LABELS_NOTE, noFlagsText, REGULATORY_WORDS, useSafety, type CheckStatus, type ProductCheck } from '../../lib/safety'
+import { CHECK_WORDS, LABELS_NOTE, noFlagsText, marketWords, REGULATORY_WORDS, useSafety, type CheckStatus, type ProductCheck } from '../../lib/safety'
 import { useOwner } from '../../data/hooks'
 import { SafetySheet } from '../you/SafetyForm'
 import { Link } from 'react-router-dom'
@@ -81,7 +81,7 @@ export function CheckReasons({ check, profileComplete }: { check: ProductCheck; 
         <span className="text-[13px] leading-[1.45] text-ink-2">{noFlagsText(check)}</span>
       )}
       <span className="text-[12px] leading-[1.45] text-ink-2">
-        {check.regulatory ? `${REGULATORY_WORDS[check.regulatory.class]}${check.regulatory.market ? ` in ${check.regulatory.market === 'UK' || check.regulatory.market === 'US' ? `the ${check.regulatory.market}` : check.regulatory.market}` : ''}. ` : ''}
+        {check.regulatory ? `${REGULATORY_WORDS[check.regulatory.class]}${check.regulatory.market ? ` in ${marketWords(check.regulatory.market)}` : ''}. ` : ''}
         {check.status === 'unknown' ? 'Checks use the ingredient list, by fixed rules from published sources, not by AI.' : `${profileComplete === false ? 'Checked against part of your profile. ' : ''}${LABELS_NOTE} Checked by fixed rules from published sources, not by AI.`}{' '}
         <Link to="/checks" className="text-ink underline underline-offset-2">
           How we check

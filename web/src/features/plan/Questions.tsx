@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { GOALS, type GoalId } from '../../lib/metrics'
-import { AVOID_OPTIONS, LIFE_STAGES, MARKETS, marketOf, type AvoidId, type LifeStage, type Market } from '../../lib/safety'
+import { AVOID_OPTIONS, LIFE_STAGES, MARKETS, budgetCurrency, marketOf, type AvoidId, type LifeStage, type Market } from '../../lib/safety'
 import { PLAN_MAX_GOALS, usePlan } from './draft'
 import { GOAL_LOOK, GOAL_NOTE } from './looks'
 import { BUDGET_RANGE, money, type PlanSkin, type StepCount, type Tier } from './planApi'
@@ -198,7 +198,7 @@ export function CareStep() {
   const toggleAvoid = (id: AvoidId) => set({ avoid: draft.avoid.includes(id) ? draft.avoid.filter((a) => a !== id) : [...draft.avoid, id] })
   const setMarket = (m: Market) => {
     // A new market brings its own currency, so the budget starts again from that currency's usual value.
-    if (m !== draft.market) set({ market: m, budget: BUDGET_RANGE[marketOf(m).currency]?.start ?? draft.budget })
+    if (m !== draft.market) set({ market: m, budget: BUDGET_RANGE[budgetCurrency(m)]?.start ?? draft.budget })
   }
   return (
     <Frame
@@ -259,14 +259,15 @@ const SIZES: { n: StepCount; label: string; line: string }[] = [
 export function BudgetStep() {
   const { draft, set, go } = usePlan()
   const m = marketOf(draft.market)
-  const range = BUDGET_RANGE[m.currency] ?? BUDGET_RANGE.USD
+  const cur = budgetCurrency(draft.market)
+  const range = BUDGET_RANGE[cur] ?? BUDGET_RANGE.USD
   const pct = ((draft.budget - range.min) / (range.max - range.min)) * 100
   return (
     <Frame
       wide
       eyebrow="QUESTION 4 · BUDGET AND RANGE"
       title="What fits your budget?"
-      sub={`Prices in ${m.currency}, as listed for ${m.label}. Willow never converts a price.`}
+      sub={cur === m.currency ? `Prices in ${cur}, as listed for ${m.label}. Willow never converts a price.` : `Prices in ${cur}: Willow doesn't have enough ${m.currency} prices for ${m.label} yet, and never converts a price.`}
       actions={
         <button type="button" onClick={() => go('brewing')} className={primary}>
           Build my routine {arrow}
@@ -280,7 +281,7 @@ export function BudgetStep() {
             <span className="text-[12.5px] text-ink-2">Each, not in total</span>
           </label>
           <output htmlFor="plan-budget" className="font-dot text-[clamp(40px,7vh,64px)] leading-[.9] font-extrabold tabular-nums">
-            {money(draft.budget, m.currency)}
+            {money(draft.budget, cur)}
           </output>
           <input
             id="plan-budget"
@@ -290,13 +291,13 @@ export function BudgetStep() {
             step={range.step}
             value={Math.min(Math.max(draft.budget, range.min), range.max)}
             onChange={(e) => set({ budget: Number(e.target.value) })}
-            aria-valuetext={`${money(draft.budget, m.currency)} per product`}
+            aria-valuetext={`${money(draft.budget, cur)} per product`}
             className="h-2 w-full cursor-pointer appearance-auto rounded-pill accent-[var(--action-selected)]"
             style={{ background: `linear-gradient(90deg, var(--action-selected) ${pct}%, rgba(18,18,18,.12) ${pct}%)` }}
           />
           <span className="flex justify-between font-mono text-[10.5px] text-ink-2">
-            <span>{money(range.min, m.currency)}</span>
-            <span>{money(range.max, m.currency)}</span>
+            <span>{money(range.min, cur)}</span>
+            <span>{money(range.max, cur)}</span>
           </span>
           <div className="flex flex-col gap-1.5 border-t border-ink/[.07] pt-3">
             <span className="text-[14px]">Price range</span>

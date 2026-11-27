@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 
 import { ApiError, request, retailerGet } from './api'
 import type { CheckStatus } from './checkWords'
+import type { Market } from './market'
 import { useQuery } from './query'
 import { useAuth } from './useAuth'
 
@@ -17,7 +18,6 @@ import { useAuth } from './useAuth'
 
 export type LifeStage = 'none' | 'pregnant' | 'breastfeeding' | 'trying'
 export type AvoidId = 'fragrance' | 'essential_oils' | 'drying_alcohol' | 'lanolin' | 'nut_oils' | 'mi_preservatives'
-export type Market = 'US' | 'IN' | 'SG' | 'UK' | 'EU'
 
 export type SafetyProfile = {
   /** Confirmed 18 or older; null = never asked (consent from before the age question). */
@@ -56,41 +56,8 @@ export const AVOID_OPTIONS: { id: AvoidId; label: string; hint: string }[] = [
   { id: 'mi_preservatives', label: 'MI preservatives', hint: 'Methylisothiazolinone and its relatives' },
 ]
 
-export const MARKETS: { id: Market; label: string; currency: string; symbol: string }[] = [
-  { id: 'US', label: 'United States', currency: 'USD', symbol: '$' },
-  { id: 'IN', label: 'India', currency: 'INR', symbol: '₹' },
-  { id: 'SG', label: 'Singapore', currency: 'SGD', symbol: 'S$' },
-  { id: 'UK', label: 'United Kingdom', currency: 'GBP', symbol: '£' },
-  { id: 'EU', label: 'European Union', currency: 'EUR', symbol: '€' },
-]
-export const marketOf = (id: Market) => MARKETS.find((m) => m.id === id) ?? MARKETS[0]
-
-const EU = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'])
-
-/** The market this browser most likely shops in: its language region, else its time zone; the US when neither says. */
-export function marketFromLocale(): Market {
-  const fromRegion = (r: string | undefined): Market | null => {
-    if (!r) return null
-    const R = r.toUpperCase()
-    if (R === 'US' || R === 'IN' || R === 'SG') return R
-    if (R === 'GB' || R === 'UK') return 'UK'
-    return EU.has(R) ? 'EU' : null
-  }
-  try {
-    for (const lang of navigator.languages ?? [navigator.language]) {
-      const m = fromRegion(lang.split(/[-_]/)[1])
-      if (m) return m
-    }
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
-    if (tz === 'Asia/Kolkata' || tz === 'Asia/Calcutta') return 'IN'
-    if (tz === 'Asia/Singapore') return 'SG'
-    if (tz === 'Europe/London') return 'UK'
-    if (tz.startsWith('Europe/')) return 'EU'
-  } catch {
-    /* no locale information */
-  }
-  return 'US'
-}
+// Markets live in ./market (no imports, so node tests can load them).
+export { MARKETS, budgetCurrency, loadPricedCurrencies, marketFromLocale, marketOf, marketWords, type Market } from './market'
 
 /** Read the safety profile from GET /v1/me (null when none is saved yet, or the api predates it). */
 export async function fetchSafety(token: string): Promise<SafetyProfile | null> {

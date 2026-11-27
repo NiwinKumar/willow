@@ -102,10 +102,11 @@ def test_nothing_fits_names_the_step(client, fake):
 
 
 def test_a_market_without_local_prices_plans_in_usd_and_says_so(client, fake):
-    body = {**US, "market": "UK", "budget": {"max_per_product": 30, "currency": "GBP"}}
+    # EU: a handful of EUR prices (the UK has had enough GBP prices since the Nov 27 catalog update)
+    body = {**US, "market": "EU", "budget": {"max_per_product": 30, "currency": "EUR"}}
     out = client.post("/v1/plan", json=body).json()
     assert out["currency_note"] == plan.CURRENCY_NOTE and out["total"]["currency"] == "USD"
-    assert all(plan.sold_in(k["product"], "UK") for k in out["picks"])
+    assert all(plan.sold_in(k["product"], "EU") for k in out["picks"])
 
 
 def test_outcome_tiers_break_ties_and_are_labelled_simulated(client, fake, monkeypatch):

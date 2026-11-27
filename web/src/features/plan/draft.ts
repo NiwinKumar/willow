@@ -6,7 +6,7 @@ import { createContext, useContext } from 'react'
 
 import { cleanGoals, type GoalId } from '../../lib/metrics'
 import { BUDGET_RANGE, type PlanRequest, type PlanResponse, type PlanSkin, type StepCount, type Tier } from './planApi'
-import { marketFromLocale, marketOf, type AvoidId, type LifeStage, type Market, type SafetyProfile } from '../../lib/safety'
+import { budgetCurrency, marketFromLocale, type AvoidId, type LifeStage, type Market, type SafetyProfile } from '../../lib/safety'
 
 export type Draft = {
   skin_type: PlanSkin | null
@@ -48,7 +48,7 @@ export function defaultDraft(seed: { skin_type?: string | null; goals?: string[]
     note: seed.safety?.note ?? null,
     rx_treatment: seed.safety?.rx_treatment ?? false,
     market,
-    budget: BUDGET_RANGE[marketOf(market).currency]?.start ?? 25,
+    budget: BUDGET_RANGE[budgetCurrency(market)]?.start ?? 25,
     tier: 'any',
     steps: 4,
   }
@@ -97,7 +97,7 @@ export function requestOf(d: Draft, base: SafetyProfile, adult: boolean | null):
     skin_type: d.skin_type,
     reactive: d.reactive,
     goals: d.goals,
-    budget: { max_per_product: d.budget, currency: marketOf(d.market).currency },
+    budget: { max_per_product: d.budget, currency: budgetCurrency(d.market) },
     tier: d.tier,
     steps: d.steps,
     market: d.market,

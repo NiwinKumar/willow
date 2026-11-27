@@ -398,6 +398,27 @@ def test_rotation_is_deterministic_per_person_and_day(client, fake):
     assert len(days) > 1  # and the same person rotates across days
 
 
+def test_several_eligible_the_nearest_product_to_the_shopper_is_shown(client, fake):
+    # PROVEN is sold in the US; PROVEN_2 and PROVEN_3 in India only (app/regions.py)
+    owners = [_as(f"brand{i}") for i in range(3)]
+    for c, pid in zip(owners, (PROVEN, PROVEN_2, PROVEN_3), strict=True):
+        assert _create(c, pid=pid).status_code == 201
+    us = {
+        _shopper(f"us{i}", safety={"market": "US"})
+        .get("/v1/sponsored")
+        .json()["item"]["product_id"]
+        for i in range(8)
+    }
+    assert us == {PROVEN}
+    india = {
+        _shopper(f"in{i}", safety={"market": "IN"})
+        .get("/v1/sponsored")
+        .json()["item"]["product_id"]
+        for i in range(12)
+    }
+    assert len(india) > 1  # all three sold there: the rotation as before
+
+
 # -- events and stats ----------------------------------------------------------------------------
 
 

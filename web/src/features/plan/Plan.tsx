@@ -8,7 +8,8 @@ import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } 
 import { useData, useActivateData } from '../../data/useData'
 import { adultConfirmed } from '../../lib/consent'
 import { nextPath } from '../../lib/prefs'
-import { EMPTY_SAFETY, marketOf, useSafety } from '../../lib/safety'
+import { API_URL } from '../../lib/api'
+import { EMPTY_SAFETY, budgetCurrency, loadPricedCurrencies, useSafety } from '../../lib/safety'
 import { useReducedMotion } from '../../lib/useReducedMotion'
 import { SoftBackdrop } from '../website/Decor'
 import { hasConsent } from '../website/entry'
@@ -49,6 +50,21 @@ export default function Plan() {
   // This tab's answers when there are some, else a fresh start from the profile.
   const [fromTab] = useState(readDraft)
   const [draft, setDraft] = useState<Draft>(() => fromTab ?? defaultDraft({ skin_type: profile.skin_type, goals: profile.goals }))
+  // Which currency each market is priced in (its own, or USD where local prices are few): once
+  // known, a budget outside that currency's range starts again from its usual value.
+  useEffect(() => {
+    let alive = true
+    void loadPricedCurrencies(API_URL).then(() => {
+      if (!alive) return
+      setDraft((d) => {
+        const r = BUDGET_RANGE[budgetCurrency(d.market)]
+        return r && (d.budget < r.min || d.budget > r.max) ? { ...d, budget: r.start } : d
+      })
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
   const set = useCallback((patch: Partial<Draft>) => {
     setDraft((d) => {
       const next = { ...d, ...patch }
@@ -64,7 +80,7 @@ export default function Plan() {
     const s = safety.data
     if (s) {
       const market = s.market ?? draft.market
-      setDraft({ ...draft, reactive: s.reactive ?? draft.reactive, life_stage: s.life_stage ?? draft.life_stage, avoid: s.avoid.length ? s.avoid : draft.avoid, avoid_ingredients: s.avoid_ingredients.length ? s.avoid_ingredients : draft.avoid_ingredients, note: s.note ?? draft.note, rx_treatment: s.rx_treatment ?? draft.rx_treatment, market, budget: market === draft.market ? draft.budget : (BUDGET_RANGE[marketOf(market).currency]?.start ?? draft.budget) })
+      setDraft({ ...draft, reactive: s.reactive ?? draft.reactive, life_stage: s.life_stage ?? draft.life_stage, avoid: s.avoid.length ? s.avoid : draft.avoid, avoid_ingredients: s.avoid_ingredients.length ? s.avoid_ingredients : draft.avoid_ingredients, note: s.note ?? draft.note, rx_treatment: s.rx_treatment ?? draft.rx_treatment, market, budget: market === draft.market ? draft.budget : (BUDGET_RANGE[budgetCurrency(market)]?.start ?? draft.budget) })
     }
   }
 

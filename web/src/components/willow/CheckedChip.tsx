@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
 
-import { CHECK_WORDS, LABELS_NOTE, noFlagsText, REGULATORY_WORDS, type CheckStatus, type ProductCheck } from '../../lib/safety'
+import { CHECK_WORDS, LABELS_NOTE, marketWords, noFlagsText, REGULATORY_WORDS, type CheckStatus, type ProductCheck } from '../../lib/safety'
 import { Link } from 'react-router-dom'
 
 /** Status colours from the routine-check state tokens; the meaning is always in the glyph and the words too. */
@@ -13,7 +13,6 @@ const LOOK: Record<CheckStatus, { fg: string; bg: string }> = {
 }
 
 const POP_W = 300
-const MARKET_NAME: Record<string, string> = { IN: 'India', SG: 'Singapore' }
 
 /**
  * A product's check for this person, as a compact chip: glyph + words ("No flags for you", "Check this",
@@ -192,7 +191,7 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
               {check.regulatory ? (
                 <p className="m-0 mt-2.5 text-[12px] text-ink-2">
                   {REGULATORY_WORDS[check.regulatory.class]}
-                  {check.regulatory.market ? ` in ${check.regulatory.market === 'UK' || check.regulatory.market === 'US' || check.regulatory.market === 'EU' ? `the ${check.regulatory.market}` : MARKET_NAME[check.regulatory.market] ?? check.regulatory.market}` : ''}.
+                  {check.regulatory.market ? ` in ${marketWords(check.regulatory.market)}` : ''}.
                 </p>
               ) : null}
               {profileComplete === false && check.status !== 'unknown' ? <p className="m-0 mt-1.5 text-[12px] text-ink-2">Checked against part of your profile. Answer the questions in Build a routine for a full check.</p> : null}

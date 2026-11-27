@@ -9,7 +9,7 @@ boost so a serum's neighbours are serums first. The score is formula likeness on
 
 `GET /v1/catalog/{product_id}/similar?k=5&market=US` ->
 {"items": [{"product": {...}, "score": 0.93}]}; with `market`, only products sold there (or
-GLOBAL) and suggestible there, as swaps (app/plan.py);
+GLOBAL) and suggestible there, as swaps (app/plan.py); nearest to the person first (app/regions.py);
 the router is mounted by app/main.py (lead). Unknown product: 404; a product without a vector
 (added after the seed was built) or with nothing above MIN_SCORE: an empty list. Only full
 catalog products are neighbours (an index product has no ingredient list to compare or check).
@@ -22,8 +22,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app import catalog, plan, regulatory
+from app import catalog, plan, regions, regulatory, safety
 from app.auth import AuthUser, current_user
+from app.store import Store, get_store
 
 SEED = Path(__file__).resolve().parents[1] / "seed" / "catalog_embeddings.json"
 # Added to the cosine of a same-category product for ranking only (the score shown is the
@@ -51,10 +52,15 @@ def cosine(a: list[float], b: list[float]) -> float:
 
 
 def similar_products(
-    product_id: str, k: int = 5, market: regulatory.Market | None = None
+    product_id: str,
+    k: int = 5,
+    market: regulatory.Market | None = None,
+    near: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Up to k other catalog products, most similar formula first, with the cosine as score.
+    """Up to k other catalog products, the nearest to where the person shops first (`near`, else
+    `market`; app/regions.py), then most similar formula, with the cosine as score.
     `market`: only those sold and suggestible there (the swaps' rule, plan.swaps)."""
+    near = near or market
     vecs = vectors()
     me = catalog.by_id(product_id)
     mine = vecs.get(product_id)
@@ -73,9 +79,9 @@ def similar_products(
         if score < MIN_SCORE:
             continue
         boost = SAME_CATEGORY_BOOST if other["category"] == me["category"] else 0.0
-        ranked.append((score + boost, score, pid, other))
-    ranked.sort(key=lambda r: (-r[0], r[2]))
-    return [{"product": p, "score": round(score, 3)} for _, score, _, p in ranked[:k]]
+        ranked.append((regions.distance(other, near), score + boost, score, pid, other))
+    ranked.sort(key=lambda r: (r[0], -r[1], r[3]))
+    return [{"product": p, "score": round(score, 3)} for _, _, score, _, p in ranked[:k]]
 
 
 router = APIRouter(prefix="/v1", tags=["catalog"])
@@ -87,7 +93,11 @@ def catalog_similar(
     k: int = Query(default=5, ge=1, le=MAX_K),
     market: regulatory.Market | None = None,
     user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
 ) -> dict[str, Any]:
+    """`market` filters (as before); the order is nearest first for `market`, else the person's
+    saved market."""
     if catalog.by_id(product_id) is None:
         raise HTTPException(404, {"code": "not_found", "message": "product not found"})
-    return {"items": similar_products(product_id, k, market)}
+    near = market or (safety.profile_of(store.user_get(user.uid)) or {}).get("market")
+    return {"items": similar_products(product_id, k, market, near)}

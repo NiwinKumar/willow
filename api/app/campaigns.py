@@ -18,7 +18,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from app import catalog, cohort, proof_orgs
+from app import catalog, cohort, proof_orgs, regions
 from app.retailer import GOAL_LABEL, SKIN_LABEL
 from app.store import Doc, Store, iso
 
@@ -506,9 +506,15 @@ def sponsored(store: Store, uid: str, guest: bool = False) -> dict[str, Any] | N
     day = at.date().isoformat()
     # The first campaign in today's rotation whose randomised group for this person is
     # `exposed`; a holdout member gets no card for that campaign (the next one is tried).
-    chosen = next(
-        (c for c in rotation(uid, day, eligible) if join(store, *c, uid, day) == "exposed"), None
-    )
+    # Several eligible: those for products nearest to where the person shops are tried first
+    # (app/regions.py), each distance in its own rotation.
+    market = (profile.get("safety") or {}).get("market")
+    near: dict[int, list[tuple[str, Doc]]] = {}
+    for c in eligible:
+        product = catalog.by_id(c[1]["product_id"]) or {}
+        near.setdefault(regions.distance(product, market), []).append(c)
+    tried = [c for d in sorted(near) for c in rotation(uid, day, near[d])]
+    chosen = next((c for c in tried if join(store, *c, uid, day) == "exposed"), None)
     if chosen is None:
         return None
     cid, d = chosen

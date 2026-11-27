@@ -28,6 +28,7 @@ from app import (
     gemini,
     numbers,
     plan,
+    regions,
     regulatory,
     routine_check,
     routine_log,
@@ -387,10 +388,11 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
             max_price=args.get("max_price"),
             currency=args.get("currency"),
             exclude_ingredients=args.get("exclude_ingredients"),
+            market=market,
         )
         found = [p for p in every if suggestible(p, profile)]
-        # sold where the person shops (or everywhere) first; the search's own order within each
-        found = sorted(found, key=lambda p: not plan.sold_in(p, market))[:6]
+        # nearest to where the person shops first (app/regions.py); the search's order within
+        found = regions.nearest_first(found, market)[:6]
         out: dict[str, Any] = {
             "products": [
                 {**_compact(p, profile), "sold_here": plan.sold_in(p, market)} for p in found
