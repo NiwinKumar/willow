@@ -37,7 +37,8 @@ def test_a_plan_has_the_base_one_active_and_a_funnel_that_narrows(client, fake):
     out = res.json()
     assert [k["slot"] for k in out["picks"]] == ["cleanser", "moisturizer", "sunscreen", "active"]
     ns = [f["n"] for f in out["funnel"]]
-    assert ns[0] == len(catalog.products()) and ns == sorted(ns, reverse=True) and ns[-1] > 0
+    assert ns[0] == sum(catalog.is_full(p) for p in catalog.products())
+    assert ns == sorted(ns, reverse=True) and ns[-1] > 0
     for k in out["picks"]:
         p = k["product"]
         price = plan.price_in(p, "USD")

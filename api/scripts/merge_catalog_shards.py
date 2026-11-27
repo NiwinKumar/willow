@@ -18,7 +18,10 @@ seed/catalog.csv from it (the sheet view stays the same data).
 import argparse
 import csv
 import json
+import re
 import sys
+import unicodedata
+from collections import Counter
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
@@ -170,6 +173,43 @@ def _dump(r: Record) -> dict[str, Any]:
     return out
 
 
+def _filled(r: dict[str, Any]) -> tuple[int, int, int, int, int]:
+    return (
+        r.get("detail") == "full",
+        bool(r.get("inci")),
+        bool(r.get("price")),
+        bool(r.get("image_url")),
+        sum(1 for st in r.get("stores") or [] if st.get("price")),
+    )
+
+
+def _better(new: dict[str, Any], old: dict[str, Any]) -> bool:
+    return _filled(new) > _filled(old)
+
+
+def _brand_slug(name: str) -> str:
+    text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+
+
+def canonical_brands(
+    existing: list[dict[str, Any]], shards: list[tuple[str, Any]]
+) -> dict[str, str]:
+    """One spelling per brand ("NIVEA" and "Nivea" are one brand; Proof makes one organisation per
+    brand). The catalog's existing spelling wins; otherwise the most used spelling, and on a tie
+    the one that is not all capitals."""
+    seen: dict[str, Counter] = {}
+    for _, data in shards:
+        for r in data if isinstance(data, list) else []:
+            if isinstance(r, dict) and isinstance(r.get("brand"), str) and r["brand"].strip():
+                seen.setdefault(_brand_slug(r["brand"]), Counter())[r["brand"].strip()] += 1
+    canon = {_brand_slug(p["brand"]): p["brand"] for p in existing}
+    for slug, names in seen.items():
+        if slug not in canon:
+            canon[slug] = max(names, key=lambda n: (names[n], not n.isupper(), n != n.lower()))
+    return canon
+
+
 def merge(
     existing: list[dict[str, Any]], shards: list[tuple[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -177,7 +217,10 @@ def merge(
     name and its parsed JSON (or the error text when it did not parse)."""
     ids = {p["product_id"] for p in existing}
     names = {name_key(p["brand"], p["name"]): p["product_id"] for p in existing}
+    old_ids = set(ids)
+    canon = canonical_brands(existing, shards)
     accepted: list[dict[str, Any]] = []
+    where: dict[str, int] = {}  # product_id of a new record -> its index in `accepted`
     report = []
     for shard, data in shards:
         row: dict[str, Any] = {"shard": shard, "accepted": 0, "full": 0, "index": 0, "rejected": []}
@@ -191,22 +234,36 @@ def merge(
             if not isinstance(raw, dict):
                 row["rejected"].append({"record": label, "reason": "not an object"})
                 continue
+            if isinstance(raw.get("brand"), str):
+                raw = {**raw, "brand": canon.get(_brand_slug(raw["brand"]), raw["brand"].strip())}
             try:
                 rec = Record.model_validate(raw)
             except ValidationError as exc:
                 row["rejected"].append({"record": label, "reason": _reason(exc)})
                 continue
-            if rec.product_id in ids:
-                row["rejected"].append({"record": label, "reason": "duplicate product_id"})
-                continue
             key = name_key(rec.brand, rec.name)
-            if key in names:
-                row["rejected"].append(
-                    {"record": label, "reason": f"same brand and name as {names[key]}"}
-                )
+            twin = rec.product_id if rec.product_id in ids else names.get(key)
+            if twin is not None:
+                # The same product twice in the new shards: keep the better record (full facts
+                # over index, then the one with more filled in). Never replace an existing product.
+                if (
+                    twin not in old_ids
+                    and twin in where
+                    and _better(_dump(rec), accepted[where[twin]])
+                ):
+                    accepted[where[twin]] = {**_dump(rec), "product_id": twin}
+                    row["replaced"] = row.get("replaced", 0) + 1
+                else:
+                    reason = (
+                        "duplicate product_id"
+                        if rec.product_id in ids
+                        else f"same brand and name as {twin}"
+                    )
+                    row["rejected"].append({"record": label, "reason": reason})
                 continue
             ids.add(rec.product_id)
             names[key] = rec.product_id
+            where[rec.product_id] = len(accepted)
             accepted.append(_dump(rec))
             row["accepted"] += 1
             row[rec.detail] += 1

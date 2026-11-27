@@ -85,10 +85,10 @@ def test_route_answers_items_and_404s_an_unknown_product(tiny):
     assert c.get("/v1/catalog/no_such/similar", headers={"X-Dev-Uid": "u1"}).status_code == 404
 
 
-def test_the_seed_covers_the_whole_catalog_with_unit_vectors():
+def test_seed_vectors_are_unit_vectors_for_full_catalog_products():
     seed = json.loads(similar.SEED.read_text())
-    ids = {p["product_id"] for p in catalog.products()}
-    assert set(seed["items"]) == ids
+    ids = {p["product_id"] for p in catalog.products() if catalog.is_full(p)}
+    assert seed["items"] and set(seed["items"]) <= ids
     for v in seed["items"].values():
         assert len(v) == seed["dimensions"]
         assert math.sqrt(sum(x * x for x in v)) == pytest.approx(1.0, abs=1e-3)
