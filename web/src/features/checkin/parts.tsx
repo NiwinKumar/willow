@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
 
-/** "■ NEW SESSION · 15 OCT" in Geist Mono caps (CAP eyebrows are 12px, .08em). */
+/**
+ * The step's context line ("Place 1 of 2 · Front camera", "New session · 28 Nov"). Polish pass: no longer a mono
+ * ■ CAPS eyebrow (the owner's direction is fewer eyebrows); a quiet sentence-case line that reads as context.
+ */
 export function MonoEyebrow({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <span className={`font-mono text-[12px] tracking-[.08em] text-ink-2 uppercase ${className}`}>■ {children}</span>
+  return <span className={`text-[13.5px] leading-[1.35] text-ink-2 ${className}`}>{children}</span>
 }
 
 /** Instrument Serif page title of the capture steps. */

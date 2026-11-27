@@ -158,6 +158,11 @@ test('campaign insight words the verdict only when it is measured', async () => 
   assert.match(campaignInsight(g(0.15, 0.05, 0.25)).detail, /25 in 100 .* against 10 in 100/)
   assert.equal(campaignInsight(g(0.05, -0.04, 0.14)).tone, 'wait')
   assert.equal(campaignInsight(g(-0.1, -0.2, -0.01)).tone, 'neutral')
+  // An ended campaign's verdict is final: past tense, and no "too early".
+  assert.equal(campaignInsight({ ...g(0.15, 0.05, 0.25), status: 'ended' }).headline, 'The card made people add this product.')
+  const flat = campaignInsight({ ...g(0.05, -0.04, 0.14), status: 'ended' })
+  assert.equal(flat.tone, 'neutral')
+  assert.doesNotMatch(flat.headline, /early/)
   assert.deepEqual(cumulativeDays([{ day: 'a', impressions: 5, clicks: 1, adds: 0 }, { day: 'b', impressions: 7, clicks: 2, adds: 1 }]).map((d) => d.values), [[5, 1, 0], [12, 3, 1]])
   assert.equal(ownRecordInsight({ rate: null, base_rate: 0.3, n: 40 }), null)
   assert.match(ownRecordInsight({ rate: 0.64, base_rate: 0.29, n: 67 })!, /^64 in 100 of its users .* 29 in 100 non-users/)

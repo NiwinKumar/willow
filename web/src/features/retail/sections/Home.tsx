@@ -1,52 +1,50 @@
-import { CheckCircle2, History, Mail } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { History, Mail } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { agoText } from '../autopilot'
-import { useRetailData } from '../context'
 import { kindOfKey, laneOf, type DecisionCard } from '../decisions'
-import { campaignTotals, demandTrends, pooledRate, portfolio, risingGoal, weekBrief } from '../home/dashboard'
+import { Board, type Lane, type LaneId } from '../home/Board'
 import { AnswerItem, BriefPanel, CardView, LiveCampaign, ProgressItem, type Brief } from '../home/Cards'
+import { campaignTotals, changeText, demandTrends, pooledRate, portfolio, risingGoal, weekBrief } from '../home/dashboard'
 import { GuideChip, GuidePanel, useGuide } from '../home/Guide'
+import { ProofPanel } from '../home/ProofPanel'
 import { campaignsFor, DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, type Tile } from '../home/Pulse'
+import { NeedsYou, type Update } from '../home/Rail'
 import { DecisionLog, Requests } from '../home/Requests'
 import { useHomeCards } from '../homeData'
 import { useOrg } from '../org'
 import { useDecide } from '../orgData'
-import { spotlightOf } from '../productModel'
 import { canAct, ROLE_LABEL, type DecisionLogEntry } from '../proofApi'
-import { homeScope, statusOf } from '../range'
+import { homeScope } from '../range'
 import { rangeIds } from '../rangeStore'
 import { sectionPath, useRetailState } from '../state'
-import type { Insights, ProductRow } from '../types'
-import { Bone, BrandLogo, Button, int, pct, pts, SidePanel, SkeletonPanel } from '../ui'
-import { topUnmet } from '../ui/insight'
-import { Spotlight } from './Overview'
+import type { Insights } from '../types'
+import { Bone, Button, IconButton, int, pct, pts, SidePanel, SkeletonPanel } from '../ui'
 import { InsightsGate } from './shared'
 
 /*
- * Home: the organisation's dashboard, decision first (research/finals/06 §6.4; owner feedback Nov 27).
+ * Home: the organisation's dashboard (research/finals/06 §6.4; owner feedback Nov 27 and Nov 28).
  *
- * The person came to learn what needs them and how their products are doing. Top to bottom:
- * 1. The organisation (logo, name) and "This week for CeraVe": two or three sentences written in code from the
- *    figures below (never Gemini), so the page can be read in one line.
- * 2. "What needs you today": the top three decisions as full cards, each with one primary action (filled) and a
- *    quiet secondary; Ask about this on each. The first card is raised. Nothing to decide → a calm done state.
- * 3. The KPI band, per role. Brand: products measured, Proof score (share Proven, ring), visible change vs the
- *    market (delta), campaigns (best lift, reach, daily sparkline). Retailer: range coverage, Proof score, the
- *    least-served group, campaigns. Each tile opens the section behind it.
- * 4. Two panels that earn their place: what people come for by month (a brand's own goals lead), and the
- *    campaign funnel (reach → clicks → adds → lift vs holdout).
- * 5. The lanes: more to decide, in progress, results. Then evidence requests and (brands) the strongest proof.
- * One click away: Weekly digest, Decision log (side panel), a brief (side panel to read, copy or save), Ask.
- * The first-run guide folds into a header chip once two of its four steps are done.
+ * The person came to learn how their products are doing and what needs them. The top bar already says who they
+ * are (logo, name, role), so Home has no title block of its own. Two columns, then sections:
  *
- * Four tests (new: brief line, priority strip, KPI marks, demand and funnel panels, Ask about this, brief panel)
- * are in each file's header (home/*.tsx); the brief line passes all four: it states only the data's numbers (1),
- * plain sentences (2), sits where the description was (3), kit type (4).
+ *   ┌──────────────── information (3/4) ────────────────┬── Needs you (1/4) ──┐
+ *   │ This week: 2-3 sentences from the figures (code)  │ top 3 decisions     │
+ *   │ KPI band, per role (4 tiles, each opens a section)│ (full cards)        │
+ *   │ How your products compare (users vs same goals)   │ Latest: requests,   │
+ *   │ What people come for  │  Campaign funnel          │ answers, results    │
+ *   └───────────────────────────────────────────────────┴─────────────────────┘
+ *   Decisions: the rest, one lane at a time (More to decide · In progress · Results)
+ *   Evidence requests
+ *
+ * Phones stack it as: This week, KPIs, Needs you, then the panels. One click away: Weekly digest, Decision
+ * log (side panel), a brief (side panel), Ask. The first-run guide folds into a chip once two steps are done.
+ * Four tests for each part are in its own file's header (home/*.tsx).
  */
 
 const PRIORITY = 3
+const LATEST = 4
 
 export default function Home() {
   return (
@@ -58,27 +56,19 @@ export default function Home() {
 
 function HomeSkeleton() {
   return (
-    <div className="flex flex-col gap-8">
-      <div aria-hidden className="flex items-start gap-4">
-        <Bone className="size-10 shrink-0 rounded-[10px]" />
-        <div className="flex flex-1 flex-col gap-2">
-          <Bone className="h-7 w-56" />
-          <Bone className="h-4 w-[min(620px,90%)]" />
+    <div aria-hidden className="grid grid-cols-1 gap-x-6 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <Bone className="h-4 w-[min(640px,92%)]" />
+          <Bone className="h-4 w-[min(460px,70%)]" />
         </div>
+        <SkeletonPanel height={116} />
+        <SkeletonPanel height={300} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SkeletonPanel height={208} />
-        <SkeletonPanel height={208} />
-        <SkeletonPanel height={208} />
-      </div>
-      <SkeletonPanel height={116} />
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-7">
-          <SkeletonPanel height={300} />
-        </div>
-        <div className="lg:col-span-5">
-          <SkeletonPanel height={300} />
-        </div>
+      <div className="flex flex-col gap-3">
+        <Bone className="h-5 w-24" />
+        <SkeletonPanel height={196} />
+        <SkeletonPanel height={196} />
       </div>
     </div>
   )
@@ -87,12 +77,11 @@ function HomeSkeleton() {
 function Body({ d }: { d: Insights }) {
   const { carry, param, setParam } = useRetailState()
   const { org, role, orgs } = useOrg()
-  const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, segments } = useHomeCards(d)
+  const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards } = useHomeCards(d)
   const decide = useDecide()
-  const [showAll, setShowAll] = useState(false)
   const [brief, setBrief] = useState<Brief | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
-  const { brands } = useRetailData()
+  const board = useRef<HTMLElement>(null)
 
   const items = decisions.data?.items ?? {}
   const decide_ = cards.filter((c) => c.lane === 'decide' && laneOf(items[c.key]) === 'decide')
@@ -111,7 +100,6 @@ function Body({ d }: { d: Insights }) {
   const resultsN = resultCards.length + answered.length + done.length
   const priority = decide_.slice(0, PRIORITY)
   const rest = decide_.slice(PRIORITY)
-  const restShown = showAll ? rest : rest.slice(0, 4)
   const loadingCards = prodState.status === 'loading' || (mix === 'retailer' && shelf.status === 'loading' && !shelf.data)
   const canDecide = canAct(role) || !org
 
@@ -132,23 +120,24 @@ function Body({ d }: { d: Insights }) {
   const camp = campaignTotals(own)
   const focusGoals = useMemo(() => new Set(brand ? rows.filter((r) => r.brand === brand).flatMap((r) => r.goal_ids) : []), [rows, brand])
   const demand = useMemo(() => demandTrends(d.needs_by_month, focusGoals), [d.needs_by_month, focusGoals])
-  const unmet = segments.status === 'ready' && segments.data ? (topUnmet(segments.data, 1)[0] ?? null) : null
+  const people = d.needs_by_month?.people ?? []
+  const peopleChange = people.length > 1 && people.at(-2) ? ((people.at(-1) ?? 0) - (people.at(-2) ?? 0)) / (people.at(-2) ?? 1) : null
   const name = org?.kind === 'brand' ? (brand ?? org.name) : (org?.name ?? brand ?? 'Your range')
   const sentences = weekBrief({ mix, name: mix === 'brand' ? (brand ?? name) : name, p, rate, market, rising: risingGoal(demand.rows), camp })
 
   const guide = useGuide({ mix, rangeConnected: Boolean(range) || mix === 'brand', decided: Object.keys(items).length > 0, campaigns: campaigns.length > 0 })
   const ask = (q: string) => setParam({ ask: '1', q }, { push: true })
   const promoteTo = `${sectionPath('campaigns')}${carry}`
-  const brandSummary = brand ? (brands.find((b) => b.brand === brand)?.summary ?? null) : null
 
   const proofScore = p.measured ? p.proven / p.measured : null
+  // Campaigns as activity (live, run, reach per day); the lift itself is the funnel's last step, said once there.
   const campaignTile: Tile = camp.count
     ? {
         id: 'campaigns',
-        label: camp.best ? 'Best campaign lift' : 'Campaigns',
-        value: camp.best ? pts(camp.best.lift).replace(' pts', '') : int(camp.count),
-        unit: camp.best ? 'pts vs holdout' : camp.live ? `${int(camp.live)} live` : 'run',
-        note: `${camp.best?.sample ? 'Sample campaign · ' : ''}${int(camp.reach)} people reached · ${int(camp.adds)} adds`,
+        label: 'Campaigns',
+        value: int(camp.live),
+        unit: `live of ${int(camp.count)}`,
+        note: `${int(camp.reach)} people reached`,
         mark: camp.daily.length > 1 ? marks.spark(camp.daily.map((x) => x.impressions), `Impressions per day over ${camp.daily.length} days, latest ${int(camp.daily.at(-1)?.impressions)}`) : undefined,
         to: promoteTo,
       }
@@ -157,185 +146,154 @@ function Body({ d }: { d: Insights }) {
     mix === 'brand'
       ? [
           { id: 'measured', label: 'Products measured', value: int(p.measured), unit: `of ${int(p.total)}`, note: portfolioNote(p), mark: marks.meter(p.total ? p.measured / p.total : null, `${p.measured} of ${p.total} products measured`), to: `${sectionPath('products')}${carry}` },
-          { id: 'proven', label: 'Proof score', value: int(p.proven), unit: p.proven === 1 ? 'Proven' : 'Proven', note: p.measured ? `of ${int(p.measured)} measured${p.promising ? ` · ${int(p.promising)} Promising` : ''}` : 'Nothing measured yet', mark: marks.ring(proofScore, `Proof score: ${p.proven} of ${p.measured} measured products are Proven`), to: `${sectionPath('products')}${carry}` },
+          { id: 'proven', label: 'Proven', value: int(p.proven), unit: `of ${int(p.measured)} measured`, note: p.measured ? (p.promising ? `${int(p.promising)} Promising, close behind` : 'None Promising') : 'Nothing measured yet', mark: marks.ring(proofScore, `${p.proven} of ${p.measured} measured products are Proven`), to: `${sectionPath('products')}${carry}` },
           {
             id: 'rate',
             label: 'Visible change',
             value: rate ? pct(rate.rate) : '—',
-            unit: rate ? `n=${int(rate.n)}` : undefined,
-            note: market ? `Market ${pct(market.rate)} over ${int(market.products)} products` : 'No measured products yet',
-            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name}: pooled over ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against every measured product in the catalog (n=${int(market.n)}).` } : null,
+            unit: rate ? `of ${int(rate.n)}` : undefined,
+            note: market ? `Market: ${pct(market.rate)}` : 'No measured products yet',
+            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name} against the market: ${pct(rate.rate)} of ${int(rate.n)} people using ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against ${pct(market.rate)} of ${int(market.n)} across every measured product.` } : null,
             to: `${sectionPath('market')}${carry}`,
           },
           campaignTile,
         ]
       : [
-          { id: 'coverage', label: scope === 'range' ? 'Range measured' : 'Catalog measured', value: p.total ? pct(p.measured / p.total) : '—', note: `${int(p.measured)} of ${int(p.total)} ${scope === 'range' ? 'in your range' : 'in the catalog'} · ${portfolioNote(p)}`, mark: marks.meter(p.total ? p.measured / p.total : null, `${p.measured} of ${p.total} products measured`), to: `${sectionPath('range')}${carry}` },
-          { id: 'proven', label: 'Proof score', value: int(p.proven), unit: 'Proven', note: p.measured ? `of ${int(p.measured)} measured${p.promising ? ` · ${int(p.promising)} Promising` : ''}` : 'Nothing measured yet', mark: marks.ring(proofScore, `Proof score: ${p.proven} of ${p.measured} measured products are Proven`), to: `${sectionPath('products')}${carry}` },
-          unmet
-            ? { id: 'unmet', label: 'Least-served group', value: pct(unmet.unmet), unit: 'no change yet', note: `${unmet.skinLabel} skin · ${unmet.goalLabel.toLowerCase()} · n=${int(unmet.users)}`, to: `${sectionPath('customers')}${carry}` }
-            : { id: 'people', label: 'People measured', value: int(d.needs_by_month?.people.at(-1) ?? null), unit: 'this month', note: 'with a reading', mark: d.needs_by_month ? marks.spark(d.needs_by_month.people, 'People with a reading per month', 'ink') : undefined, to: `${sectionPath('customers')}${carry}` },
+          { id: 'coverage', label: scope === 'range' ? 'Range measured' : 'Catalog measured', value: int(p.measured), unit: `of ${int(p.total)}`, note: `${p.total ? pct(p.measured / p.total) : '—'} · ${portfolioNote(p)}`, mark: marks.meter(p.total ? p.measured / p.total : null, `${p.measured} of ${p.total} products measured`), to: `${sectionPath('range')}${carry}` },
+          { id: 'proven', label: 'Proven', value: int(p.proven), unit: `of ${int(p.measured)} measured`, note: p.measured ? (p.promising ? `${int(p.promising)} Promising, close behind` : 'None Promising') : 'Nothing measured yet', mark: marks.ring(proofScore, `${p.proven} of ${p.measured} measured products are Proven`), to: `${sectionPath('products')}${carry}` },
+          // People, not the least-served group: that group is already a decision card in Needs you.
+          { id: 'people', label: 'People measured', value: int(d.needs_by_month?.people.at(-1) ?? null), unit: 'this month', note: d.needs_by_month && d.needs_by_month.people.length > 1 ? `${changeText(peopleChange)} on the month before` : 'with a reading', mark: d.needs_by_month ? marks.spark(d.needs_by_month.people, `People with a reading per month: ${d.needs_by_month.people.map((n) => int(n)).join(', ')}`, 'ink') : undefined, to: `${sectionPath('customers')}${carry}` },
           campaignTile,
         ]
 
+  // ── the board's lanes (below the dashboard) and the rail's "Latest" (pointers into them)
+  const cardOf = (c: DecisionCard, i: number, o: { lead?: boolean; result?: boolean } = {}) => (
+    <CardView key={c.key} c={c} index={i} lead={o.lead} result={o.result} canDecide={canDecide} legacy={!org} onAsk={o.result ? undefined : ask} onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, o.result && status === 'accepted' ? 'done' : status, { reason, snapshot: snapshotOf(c) })} />
+  )
+  const progressItems = [
+    ...accepted.map(([key, v]) => {
+      const card = cards.find((c) => c.key === key)
+      const snap = logByKey.get(key)?.snapshot
+      return (
+        <ProgressItem
+          key={key}
+          vkey={key}
+          kind={kindOfKey(key)}
+          title={card?.title ?? snap?.title ?? key}
+          figure={card ? `${card.figure} ${card.figureNote}` : (snap?.figure ?? '')}
+          n={card?.n ?? snap?.n ?? null}
+          meta={`Accepted ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`}
+          waiting={card?.waiting ?? 'Its follow-up measurement'}
+          actions={
+            canAct(role) ? (
+              <>
+                <Button size="sm" onClick={() => void decide(key, 'done', { snapshot: card ? snapshotOf(card) : (snap ?? undefined) })}>
+                  Mark done
+                </Button>
+                <Button size="sm" kind="ghost" onClick={() => void decide(key, 'open')}>
+                  Reopen
+                </Button>
+              </>
+            ) : null
+          }
+        />
+      )
+    }),
+    ...live.map((c) => <LiveCampaign key={c.id} c={c} carry={carry} />),
+    ...sentOpen.map((r) => <ProgressItem key={r.id} vkey={`rq-${r.id}`} kind="over_shelved" title={`Asked ${r.to_name ?? orgName(orgs, r.to_org)} for evidence`} figure={r.snapshot?.figure ?? ''} n={r.snapshot?.n ?? null} meta={`Sent ${agoText(r.created_at)}`} waiting="The brand’s answer" sub={r.product ?? r.snapshot?.title} />),
+  ]
+  const resultItems = [
+    ...resultCards.map((c, i) => cardOf(c, i, { result: true })),
+    ...answered.map((r) => <AnswerItem key={r.id} r={r} from={r.to_name ?? orgName(orgs, r.to_org)} />),
+    ...done.map(([key, v]) => {
+      const snap = logByKey.get(key)?.snapshot
+      return <ProgressItem key={key} vkey={key} kind={kindOfKey(key)} title={snap?.title ?? key} figure={snap?.figure ?? ''} n={snap?.n ?? null} meta={`Done ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`} done />
+    }),
+  ]
+  const lanes: Lane[] = [
+    { id: 'decide', label: 'More to decide', count: rest.length, items: rest.map((c, i) => cardOf(c, i)), empty: priority.length ? 'Everything waiting for you is in Needs you, above.' : 'Nothing waits for a decision.' },
+    { id: 'progress', label: 'In progress', count: inProgressN, items: progressItems, empty: 'Accept a card and it waits here for its measurement.' },
+    { id: 'results', label: 'Results', count: resultsN, items: resultItems, empty: 'Campaign results and brands’ answers land here, with their intervals.' },
+  ]
+  const laneParam = param('lane') as LaneId | null
+  const lane: LaneId = laneParam && lanes.some((l) => l.id === laneParam) ? laneParam : (lanes.find((l) => l.items.length)?.id ?? 'decide')
+  const openLane = (l: LaneId) => {
+    setParam({ lane: l })
+    requestAnimationFrame(() => board.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }))
+  }
+
+  const toRequests = () => document.getElementById('requests-h')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const updates: Update[] = [
+    ...inbox.filter((r) => r.status === 'open').map((r): Update => ({ key: `in-${r.id}`, kind: 'request', text: <><span className="font-medium">{r.from_name ?? orgName(orgs, r.from_org)}</span> asked for evidence on {r.product ?? r.product_id}</>, meta: `Waiting for your answer · ${agoText(r.created_at)}`, onClick: toRequests })),
+    ...answered.map((r): Update => ({ key: `ans-${r.id}`, kind: 'answer', text: <><span className="font-medium">{r.to_name ?? orgName(orgs, r.to_org)}</span> {r.status === 'answered' ? 'answered' : 'declined'} on {r.product ?? r.product_id}</>, meta: agoText(r.updated_at ?? r.created_at), to: `/retail/products/${encodeURIComponent(r.product_id)}${carry}` })),
+    ...resultCards.map((c): Update => ({ key: `res-${c.key}`, kind: 'result', text: <><span className="font-medium">{c.product?.name ?? c.title}</span>: {c.figure} adoption against the holdout</>, meta: c.figureNote === 'interval above zero' ? 'Campaign result · clear: interval above zero' : 'Campaign result · not yet clear: interval includes zero', to: c.secondary?.kind === 'link' ? c.secondary.to : undefined, onClick: () => openLane('results') })),
+    ...live.map((c): Update => ({ key: `live-${c.id}`, kind: 'live', text: <><span className="font-medium">{c.product ?? c.product_id}</span>: campaign live, {int(c.stats.reach ?? c.stats.impressions)} reached</>, meta: 'Lift once each group has 10 people', to: `${sectionPath('campaigns', c.id)}${carry}` })),
+  ]
+
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        <div className="flex min-w-0 items-start gap-4">
-          {org ? <BrandLogo brand={name} src={org.kind === 'brand' ? org.logo_url : org.logo_url} kind={org.kind} size={44} className="mt-0.5" /> : null}
-          <div className="flex min-w-0 max-w-[700px] flex-col gap-1.5">
-            <h1 className="m-0 flex flex-wrap items-baseline gap-x-2.5 text-proof-title text-ink [text-wrap:balance]">
-              {name}
-              <span className="text-proof-body font-normal text-ink-2">This week</span>
-            </h1>
+    <div className="flex flex-col gap-10">
+      {!guide.hidden && !guide.compact ? <GuidePanel g={guide} /> : null}
+
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:grid-rows-[auto_auto_auto_1fr] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col gap-3 lg:col-start-1">
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
             {loadingCards ? (
-              <span aria-hidden className="flex flex-col gap-1.5 pt-1">
-                <Bone className="h-4 w-[min(620px,90%)]" />
-                <Bone className="h-4 w-[min(420px,70%)]" />
+              <span aria-hidden className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
+                <Bone className="h-4 w-[min(640px,92%)]" />
+                <Bone className="h-4 w-[min(460px,70%)]" />
               </span>
             ) : (
-              <p key={sentences.join('')} className="m-0 text-proof-answer text-ink-2 [text-wrap:pretty] animate-[wFadeIn_.3s_ease_both]">
+              <p key={sentences.join('')} className="m-0 min-w-[min(100%,440px)] max-w-[68ch] flex-1 text-proof-answer text-ink-2 [text-wrap:pretty] animate-[wFadeIn_.3s_ease_both]">
                 {sentences.map((s, i) => (
-                  <span key={i} className={i === 0 ? 'text-ink' : ''}>
+                  <span key={i} className={i === 0 ? 'font-medium text-ink' : ''}>
                     {s}{' '}
                   </span>
                 ))}
               </p>
             )}
+            {!guide.hidden && guide.compact ? <GuideChip g={guide} open={guideOpen} onToggle={() => setGuideOpen((o) => !o)} /> : null}
           </div>
+          {!guide.hidden && guide.compact && guideOpen ? <GuidePanel g={guide} onClose={() => setGuideOpen(false)} /> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {!guide.hidden && guide.compact ? <GuideChip g={guide} open={guideOpen} onToggle={() => setGuideOpen((o) => !o)} /> : null}
-          {org ? (
-            <>
-              <Button kind="ghost" to={`${sectionPath('digest')}${carry}`} label="Weekly digest" title="Weekly digest">
-                <Mail size={15} strokeWidth={1.6} aria-hidden /> <span className="hidden sm:inline">Weekly digest</span>
-              </Button>
-              <Button kind="ghost" onClick={() => setParam({ log: '1' }, { push: true })} label="Decision log" title="Decision log">
-                <History size={15} strokeWidth={1.6} aria-hidden /> <span className="hidden sm:inline">Decision log</span>
-              </Button>
-            </>
-          ) : null}
+
+        <div className="lg:col-start-1">{loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}</div>
+
+        <NeedsYou
+          className="lg:col-start-2 lg:row-span-4 lg:row-start-1"
+          count={decide_.length}
+          loading={loadingCards}
+          empty={!priority.length}
+          cards={mix === 'brand' && !rows.some((r) => r.brand === brand) ? <NoProducts brand={brand} /> : priority.map((c, i) => cardOf(c, i, { lead: i === 0 }))}
+          updates={updates.slice(0, LATEST)}
+          updatesTotal={updates.length}
+          onAllUpdates={() => openLane('results')}
+          actions={
+            org ? (
+              <>
+                <IconButton to={`${sectionPath('digest')}${carry}`} label="Weekly digest">
+                  <Mail size={15} strokeWidth={1.6} aria-hidden />
+                </IconButton>
+                <IconButton onClick={() => setParam({ log: '1' }, { push: true })} label="Decision log">
+                  <History size={15} strokeWidth={1.6} aria-hidden />
+                </IconButton>
+              </>
+            ) : null
+          }
+        />
+
+        <ProofPanel className="lg:col-start-1" rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
+
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:col-start-1 xl:grid-cols-12">
+          <DemandPanel className="xl:col-span-7" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
+          <FunnelPanel className="xl:col-span-5" t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
         </div>
-      </header>
-
-      {!guide.hidden && (!guide.compact || guideOpen) ? <GuidePanel g={guide} onClose={guide.compact ? () => setGuideOpen(false) : undefined} /> : null}
-
-      <section aria-labelledby="today-h" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 id="today-h" className="m-0 text-proof-h text-ink">
-            What needs you today
-          </h2>
-          <span className="text-proof-small text-ink-2 tnum">
-            <span className="font-medium text-ink">{int(decide_.length)} to decide</span> · {int(inProgressN)} in progress · {int(resultsN)} {resultsN === 1 ? 'result' : 'results'}
-          </span>
-        </div>
-        {loadingCards ? (
-          <div className="grid gap-4 lg:grid-cols-3">
-            <SkeletonPanel height={208} />
-            <SkeletonPanel height={208} />
-            <SkeletonPanel height={208} />
-          </div>
-        ) : priority.length ? (
-          <div className={`grid items-stretch gap-4 ${priority.length === 1 ? 'lg:grid-cols-2' : priority.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
-            {priority.map((c, i) => (
-              <CardView key={c.key} c={c} index={i} lead={i === 0} canDecide={canDecide} legacy={!org} onAsk={ask} onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, status, { reason, snapshot: snapshotOf(c) })} />
-            ))}
-          </div>
-        ) : mix === 'brand' && !rows.some((r) => r.brand === brand) ? (
-          <NoProducts brand={brand} />
-        ) : (
-          <div className="flex items-center gap-3 rounded-card border border-line bg-surface px-5 py-4 animate-[proofPage_.24s_var(--ease-standard)_both]">
-            <CheckCircle2 size={18} strokeWidth={1.8} aria-hidden className="shrink-0 text-proof-leaf" />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-proof-body font-medium text-ink">Nothing needs a decision today</span>
-              <span className="text-proof-small text-ink-2">New cards appear when the data moves: a product nears Proven, a campaign’s lift comes in, demand shifts.</span>
-            </span>
-            <Link to={`${sectionPath('products')}${carry}`} className="ml-auto hidden shrink-0 text-proof-small font-medium text-ink no-underline hover:underline sm:inline">
-              Review products →
-            </Link>
-          </div>
-        )}
-      </section>
-
-      {loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}
-
-      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-12">
-        <DemandPanel className="lg:col-span-7" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
-        <FunnelPanel className="lg:col-span-5" t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
       </div>
 
-      <div className={`grid grid-cols-1 items-start gap-6 ${rest.length ? 'lg:grid-cols-3' : 'md:grid-cols-2'}`}>
-        {rest.length ? (
-        <Lane title="More to decide" count={rest.length} empty={null}>
-          {restShown.map((c, i) => (
-            <CardView key={c.key} c={c} index={i} canDecide={canDecide} legacy={!org} onAsk={ask} onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, status, { reason, snapshot: snapshotOf(c) })} />
-          ))}
-          {rest.length > 4 ? (
-            <button type="button" onClick={() => setShowAll((v) => !v)} className="hit44 self-start rounded-ctl border-0 bg-transparent px-2 py-1 text-proof-small text-ink-2 hover:bg-pf-hover hover:text-ink">
-              {showAll ? 'Show fewer' : `Show ${rest.length - 4} more`}
-            </button>
-          ) : null}
-        </Lane>
-        ) : null}
+      <Board ref={board} lanes={lanes} lane={lane} onLane={(l) => setParam({ lane: l })} />
 
-        <Lane title="In progress" count={inProgressN} empty="Accept a card and it waits here for its measurement.">
-          {accepted.map(([key, v]) => {
-            const card = cards.find((c) => c.key === key)
-            const snap = logByKey.get(key)?.snapshot
-            return (
-              <ProgressItem
-                key={key}
-                vkey={key}
-                kind={kindOfKey(key)}
-                title={card?.title ?? snap?.title ?? key}
-                figure={card ? `${card.figure} ${card.figureNote}` : (snap?.figure ?? '')}
-                n={card?.n ?? snap?.n ?? null}
-                meta={`Accepted ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`}
-                waiting={card?.waiting ?? 'Its follow-up measurement'}
-                actions={
-                  canAct(role) ? (
-                    <>
-                      <Button size="sm" onClick={() => void decide(key, 'done', { snapshot: card ? snapshotOf(card) : (snap ?? undefined) })}>
-                        Mark done
-                      </Button>
-                      <Button size="sm" kind="ghost" onClick={() => void decide(key, 'open')}>
-                        Reopen
-                      </Button>
-                    </>
-                  ) : null
-                }
-              />
-            )
-          })}
-          {live.map((c) => (
-            <LiveCampaign key={c.id} c={c} carry={carry} />
-          ))}
-          {sentOpen.map((r) => (
-            <ProgressItem key={r.id} vkey={`rq-${r.id}`} kind="over_shelved" title={`Asked ${r.to_name ?? orgName(orgs, r.to_org)} for evidence`} figure={r.snapshot?.figure ?? ''} n={r.snapshot?.n ?? null} meta={`Sent ${agoText(r.created_at)}`} waiting="The brand’s answer" sub={r.product ?? r.snapshot?.title} />
-          ))}
-        </Lane>
+      {org ? <Requests inbox={inbox} outbox={outbox} loading={requests.status === 'loading'} /> : null}
 
-        <Lane title="Results" count={resultsN} empty="Campaign results and brands’ answers land here, with their intervals.">
-          {resultCards.map((c, i) => (
-            <CardView key={c.key} c={c} index={i} canDecide={canDecide} legacy={!org} result onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, status === 'accepted' ? 'done' : status, { reason, snapshot: snapshotOf(c) })} />
-          ))}
-          {answered.map((r) => (
-            <AnswerItem key={r.id} r={r} from={r.to_name ?? orgName(orgs, r.to_org)} />
-          ))}
-          {done.map(([key, v]) => {
-            const snap = logByKey.get(key)?.snapshot
-            return <ProgressItem key={key} vkey={key} kind={kindOfKey(key)} title={snap?.title ?? key} figure={snap?.figure ?? ''} n={snap?.n ?? null} meta={`Done ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`} done />
-          })}
-        </Lane>
-      </div>
-
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
-        {org ? <Requests className={mix === 'brand' ? 'lg:col-span-5' : 'lg:col-span-12'} inbox={inbox} outbox={outbox} loading={requests.status === 'loading'} /> : null}
-        {mix === 'brand' ? <BrandSpotlight rows={rows} brand={brand} weeks={d.cohort.weeks} summaryRate={brandSummary?.rate ?? null} className={org ? 'lg:col-span-7' : 'lg:col-span-12'} /> : null}
-      </div>
-
-      <p className="m-0 text-proof-small text-ink-2">
+      <p className="m-0 border-t border-line pt-4 text-proof-small text-ink-2">
         {d.cohort.real ? 'Mixed' : 'Simulated'} cohort: every card and figure here is composed from it and labelled as such wherever it is exported.
       </p>
 
@@ -349,20 +307,6 @@ function Body({ d }: { d: Insights }) {
 
 const orgName = (orgs: { id: string; name: string }[], id: string) => orgs.find((o) => o.id === id)?.name ?? id
 
-function Lane({ title, count, empty, children }: { title: string; count: number; empty: ReactNode; children: ReactNode }) {
-  const kids = Array.isArray(children) ? children.flat().filter(Boolean) : children
-  const isEmpty = Array.isArray(kids) ? kids.length === 0 : !kids
-  return (
-    <section aria-label={title} className="flex min-w-0 flex-col gap-3">
-      <h2 className="m-0 flex items-center gap-2 text-proof-h text-ink">
-        {title}
-        <span className="rounded-pill bg-sunken px-2 text-proof-label text-ink-2 tnum">{count}</span>
-      </h2>
-      {isEmpty && count === 0 ? empty ? <div className="rounded-card border border-dashed border-line px-4 py-5 text-proof-small text-ink-2">{empty}</div> : null : children}
-    </section>
-  )
-}
-
 function NoProducts({ brand }: { brand: string | null }) {
   const { carry } = useRetailState()
   return (
@@ -373,46 +317,5 @@ function NoProducts({ brand }: { brand: string | null }) {
         Open your range →
       </Link>
     </div>
-  )
-}
-
-function BrandSpotlight({ rows, brand, weeks, className, summaryRate }: { rows: ProductRow[]; brand: string | null; weeks: number; className?: string; summaryRate: number | null }) {
-  const { carry } = useRetailState()
-  const mine = brand ? rows.filter((r) => r.brand === brand) : rows
-  const spot = spotlightOf(mine)
-  if (spot)
-    return (
-      <div className={className}>
-        <Spotlight row={spot} weeksN={weeks} mine />
-      </div>
-    )
-  // An empty brand workspace gets the next useful step, not "nothing is Proven".
-  const collecting = mine.filter((r) => statusOf(r) === 'collecting').length
-  const unused = mine.filter((r) => statusOf(r) === 'no_users').length
-  const nearest = mine.filter((r) => r.rate !== null).sort((a, b) => (b.n ?? 0) - (a.n ?? 0))[0]
-  return (
-    <section className={`flex flex-col gap-3 rounded-card border border-line bg-surface p-5 ${className ?? ''}`}>
-      <h2 className="m-0 text-proof-h text-ink">Your next step to Proven</h2>
-      <p className="m-0 text-proof-body text-ink-2 [text-wrap:pretty]">
-        {mine.length
-          ? `${mine.length} ${mine.length === 1 ? 'product is' : 'products are'} in the catalog; ${collecting} ${collecting === 1 ? 'is' : 'are'} collecting people and ${unused} ${unused === 1 ? 'has' : 'have'} no users yet. A product gets a Proof tier once 10 people reach week ${weeks}.`
-          : 'None of your products is in the catalog yet.'}
-      </p>
-      {nearest ? (
-        <Link to={`/retail/products/${encodeURIComponent(nearest.product_id)}${carry}`} className="flex items-center gap-3 rounded-ctl border border-line px-3 py-2.5 no-underline transition-colors hover:bg-pf-hover">
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-proof-body font-medium text-ink">{nearest.product}</span>
-            <span className="text-proof-small text-ink-2 tnum">
-              {pct(nearest.rate)} visible change · n={int(nearest.n)}
-              {summaryRate !== null ? ` · brand ${pct(summaryRate)}` : ''}
-            </span>
-          </span>
-          <span className="shrink-0 text-proof-small text-ink-2">{nearest.tier_label ?? 'Measured'} →</span>
-        </Link>
-      ) : null}
-      <Link to={`${sectionPath('products')}${carry}`} className="self-start text-proof-small font-medium text-ink no-underline hover:underline">
-        See where each product stands →
-      </Link>
-    </section>
   )
 }

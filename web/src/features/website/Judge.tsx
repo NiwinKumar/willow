@@ -258,7 +258,7 @@ export default function Judge() {
             ) : null}
           </div>
           <div aria-label="Service status" className="flex flex-[2_1_460px] flex-wrap items-center gap-2 rounded-[30px] px-4 py-3.5" style={{ background: 'rgba(250,250,248,.8)' }}>
-            <span className="px-1.5 font-mono text-[11px] text-ink-2">■ SERVICE</span>
+            <span className="px-1.5 text-[13px] text-ink-2">Service</span>
             {status.status ? (
               services.map((s) => (
                 <span key={s.key} className="flex items-center gap-2 rounded-pill bg-white px-3 py-2 text-[13px]">
@@ -328,7 +328,6 @@ export default function Judge() {
 
         <section aria-labelledby="honest" className="glass mt-2 grid gap-6 rounded-[36px] p-[clamp(20px,3vw,32px)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <div className="flex flex-col items-start gap-3">
-            <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ HOW GEMINI IS KEPT HONEST</span>
             <h2 id="honest" className="m-0 font-serif text-[clamp(28px,3vw,40px)] font-normal leading-[1.05]">
               Measured by code, explained by Gemini, checked again.
             </h2>
@@ -348,7 +347,6 @@ export default function Judge() {
 
         <section aria-labelledby="safe" className="glass grid gap-6 rounded-[36px] p-[clamp(20px,3vw,32px)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <div className="flex flex-col items-start gap-3">
-            <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ HOW WILLOW STAYS SAFE AND LEGAL</span>
             <h2 id="safe" className="m-0 font-serif text-[clamp(28px,3vw,40px)] font-normal leading-[1.05]">
               A cosmetic tracker, never a doctor.
             </h2>

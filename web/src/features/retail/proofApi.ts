@@ -218,5 +218,5 @@ export const isFallbackInstance = (i: { id: string; label?: string | null } | nu
 export function fallbackSuggestions(kind: 'brand' | 'retailer', brand: string | null): string[] {
   if (kind === 'brand' && brand)
     return [`Which ${brand} products show the most visible change, and for whom?`, `How does ${brand} compare with the market on visible change?`, `Which ${brand} products are closest to Proven?`, `Where is demand growing for the goals ${brand} targets?`]
-  return ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How do outcomes compare with non-users?', 'Which products do people say are working, and is it measured?']
+  return ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How much more often do users change than people with the same goals who don’t use it?', 'Which products do people say are working, and is it measured?']
 }

@@ -62,15 +62,37 @@ test('a running campaign takes "Proven, not promoted" away; a saved claim takes 
   assert.deepEqual(keys, [])
 })
 
-test('a sample campaign (simulated) only ever shows as a result, labelled; it never promotes or slips', () => {
+test('a sample campaign (simulated) shows as a labelled result and never slips', () => {
   const inc = { exposed: { n: 260, added: 44, rate: 0.17 }, holdout: { n: 66, added: 9, rate: 0.14 }, lift: 0.03, lift_lo: -0.07, lift_hi: 0.13 }
   const done = { ...campaign('s1', 'mine', 'ended'), sample: true, stats: { reach: 260, impressions: 900, adds: 44, incrementality: inc } } as unknown as Campaign
   const running = { ...campaign('s2', 'mine', 'active'), sample: true } as unknown as Campaign
   const cards = composeCards(base({ rows: [row('mine', 'Acme', { tier: 'unclear' })], campaigns: [done, running] }))
   assert.deepEqual(cards.map((c) => c.key).filter((k) => /campaign|promoted/.test(k)), ['campaign_result--s1'])
   assert.match(cards.find((c) => c.kind === 'campaign_result')!.trigger, /^Sample campaign, simulated\. Adoption/)
-  // a running sample leaves "Proven, not promoted" in place
-  assert.ok(kinds(base({ rows: [row('mine', 'Acme')], campaigns: [running] })).includes('proven_not_promoted--mine'))
+})
+
+test('promotion is one rule for every campaign, sample or not: running, promoted once, or never', () => {
+  const inc = { exposed: { n: 260, added: 44, rate: 0.17 }, holdout: { n: 66, added: 9, rate: 0.01 }, lift: 0.16, lift_lo: 0.1, lift_hi: 0.2 }
+  const rows = [row('mine', 'Acme')]
+  // running (a sample counts): no "Proven, not promoted", and no "No campaign is running" anywhere
+  const running = { ...campaign('s2', 'mine', 'active'), sample: true } as unknown as Campaign
+  assert.ok(!kinds(base({ rows, campaigns: [running] })).includes('proven_not_promoted--mine'))
+  // promoted once with a measured lift: only the result card, which offers to run it again
+  const measured = { ...campaign('s1', 'mine', 'ended'), sample: true, product: 'Mine serum', stats: { reach: 260, impressions: 900, adds: 44, incrementality: inc } } as unknown as Campaign
+  const cards = composeCards(base({ rows, campaigns: [measured] }))
+  assert.ok(!cards.some((c) => c.kind === 'proven_not_promoted'))
+  const result = cards.find((c) => c.kind === 'campaign_result')!
+  assert.match(result.title, /promoted once: \+16 pts adoption\. Run it again\?/)
+  assert.equal(result.primary.label, 'Run it again')
+  // ended before a lift: the card says so and offers to promote again
+  const ended = campaign('c3', 'mine', 'ended')
+  const again = composeCards(base({ rows, campaigns: [ended] })).find((c) => c.kind === 'proven_not_promoted')!
+  assert.match(again.title, /campaign has ended/)
+  assert.equal(again.primary.label, 'Promote again')
+  // never promoted: the comparison group is named in plain words, and the gap is the figure
+  const never = composeCards(base({ rows })).find((c) => c.kind === 'proven_not_promoted')!
+  assert.match(never.trigger, /30% of people with the same goals who don’t use it changed anyway: a \+30 pts gap\. It has never had a campaign\./)
+  assert.doesNotMatch(never.trigger + never.figureNote, /non-users/)
 })
 
 test('4 · evidence slipped: a live campaign or a saved claim on a product below its tier', () => {

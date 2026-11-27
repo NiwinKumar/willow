@@ -191,7 +191,7 @@ export function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: numb
           </div>
           <div className="min-w-0 md:col-span-6">
             {x && x.curve.users.some((v) => v !== null) ? (
-              <CurveChart title={`${row.product}: share with a visible change by week`} weeks={x.curve.weeks} height={96} series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal' }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : [])]} />
+              <CurveChart title={`${row.product}: share with a visible change by week`} weeks={x.curve.weeks} height={96} series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal' }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Not using it', values: x.curve.base, tone: 'muted' as const }] : [])]} />
             ) : (
               <Bone className="h-[96px] w-full" />
             )}

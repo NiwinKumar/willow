@@ -70,11 +70,11 @@ export function Page({ label, children }: { label: string; children: ReactNode }
 }
 
 /** A calm status card (still measuring, did not finish, no sessions) with one action. */
-export function StatusCard({ eyebrow, title, body, action, busy }: { eyebrow: string; title: string; body: ReactNode; action?: ReactNode; busy?: boolean }) {
+export function StatusCard({ place, title, body, action, busy }: { place?: string; title: string; body: ReactNode; action?: ReactNode; busy?: boolean }) {
   return (
     <section aria-busy={busy || undefined} className="relative grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-7 overflow-hidden rounded-[44px] bg-surface p-[clamp(28px,5vw,64px)] squircle">
       <div className="flex flex-col gap-4">
-        <span className="font-mono text-[12px] text-ink-2">■ {eyebrow}</span>
+        {place ? <span className="text-[13px] text-ink-2">{place}</span> : null}
         <span className="text-[clamp(28px,3.4vw,44px)] leading-[1.1] tracking-[-0.02em]">{title}</span>
         <div className="max-w-[460px] leading-[1.55] text-ink-2">{body}</div>
         {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
@@ -98,7 +98,6 @@ export function TomorrowSheet({ open, onClose }: { open: boolean; onClose: () =>
     <Sheet open={open} onClose={onClose} title="Same time tomorrow?" hideTitle variant="modal" size="sm">
       <div className="relative flex flex-col gap-[18px]">
         <span aria-hidden className="pointer-events-none absolute -top-[90px] -right-[80px] size-[220px] animate-[wBreathe_6s_ease-in-out_infinite] rounded-full opacity-75 blur-[18px]" style={{ background: 'radial-gradient(circle at 40% 40%, var(--aura-apricot), var(--aura-coral) 45%, transparent 70%)' }} />
-        <span className="relative font-mono text-[11px] tracking-[.08em] text-ink-2">■ AFTER YOUR FACE PHOTO</span>
         <h2 className="relative m-0 font-serif text-[clamp(28px,3.9vw,36px)] leading-[.95] font-normal">Same time tomorrow?</h2>
         <p className="relative m-0 text-[16px] leading-[1.55] text-ink-2">Each check-in is compared with your baseline, so tomorrow’s photo works best taken the same way:</p>
         <ol className="relative m-0 flex list-none flex-col gap-2 p-0">

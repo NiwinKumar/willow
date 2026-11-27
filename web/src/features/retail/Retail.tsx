@@ -480,7 +480,7 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
         <ChevronDown size={14} strokeWidth={1.6} aria-hidden className="hidden text-ink-2 sm:block" />
       </button>
       {open ? (
-        <div role="dialog" aria-label="Data scope" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-[320px] max-w-[calc(100vw-32px)] flex-col gap-4 rounded-card border border-line bg-surface p-4 shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[proofDrop_.14s_var(--ease-standard)_both]">
+        <div role="dialog" aria-label="Data scope" className="absolute right-0 top-[calc(100%+6px)] z-[60] flex w-[320px] max-w-[calc(100vw-32px)] flex-col gap-4 rounded-card border border-line bg-surface p-4 origin-top-right shadow-[0_0_0_1px_var(--line-subtle),0_16px_24px_-8px_rgba(0,0,0,.14)] animate-[proofDrop_.16s_var(--ease-standard)_both]">
           {to ? (
             <p className="m-0 flex items-center justify-between gap-2 text-proof-small">
               <span className="font-medium text-ink">{to.label}</span>
@@ -595,7 +595,6 @@ function SectionTabs() {
       >
         {(close) => (
           <>
-            <MenuLabel>Advanced</MenuLabel>
             {ADVANCED.map((a) => (
               <MenuItem
                 key={a.id}

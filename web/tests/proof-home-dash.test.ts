@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { campaignTotals, changeText, demandTrends, monthShort, pooledRate, portfolio, risingGoal, weekBrief } from '../src/features/retail/home/dashboard.ts'
+import { campaignTotals, changeText, demandTrends, monthShort, pooledRate, portfolio, proofRows, risingGoal, weekBrief } from '../src/features/retail/home/dashboard.ts'
 import { hueOf, monogramOf } from '../src/features/retail/ui/brandMark.ts'
 
 type Row = Parameters<typeof portfolio>[0][number] & { n: number | null }
@@ -80,7 +80,17 @@ test('the weekly brief states only the figures it is given, in plain sentences',
   const r = weekBrief({ mix: 'retailer', name: 'Northside', p: { ...p, measured: 1, proven: 1 }, rate: null, market: null, rising: demandTrends(nbm).rows[0], camp: { live: 1, best: { lift: 0.13, lo: 0.1, hi: 0.16, product: 'Glow Serum', n: 300, sample: true } } })
   assert.equal(r[0], '1 of 21 products is measured; 1 is Proven.')
   assert.equal(r[1], 'Best campaign lift: +13 pts against its holdout, for Glow Serum (a sample campaign, simulated).')
+  // demand that rose comes first; the campaign's lift (already a tile) only when demand is flat
+  const up = { goal: 'Redness', goalId: 'redness', counts: [100, 120], latest: 120, prev: 100, change: 0.2, focus: true }
+  assert.equal(weekBrief({ mix: 'retailer', name: 'Northside', p: { ...p, measured: 1, proven: 1 }, rate: null, market: null, rising: up, camp: { live: 1, best: { lift: 0.13, lo: 0.1, hi: 0.16, product: 'Glow Serum', n: 300, sample: true } } })[1], 'Demand for redness grew 20% last month, to 120 people.')
   assert.equal(weekBrief({ mix: 'brand', name: 'X', p: { ...p, total: 0, measured: 0 }, rate: null, market: null, rising: null, camp: { live: 0, best: null } })[0], 'None of X’s products is in the catalog yet.')
+})
+
+test('the comparison panel lists measured products with a comparison group, Proven first, widest gap first', () => {
+  const r = (id: string, tier: string, lift_lo: number | null, extra: object = {}) => ({ id, rate: 0.7, base_rate: 0.3, lift: 0.4, lift_lo, n: 40, tier, ...extra }) as unknown as Parameters<typeof proofRows>[0][number] & { id: string }
+  const out = proofRows([r('weak', 'unclear', -0.1), r('close', 'promising', 0.01), r('narrow', 'proven', 0.3, { lift: 0.2 }), r('wide', 'proven', 0.1, { lift: 0.5 }), r('nobase', 'proven', 0.4, { base_rate: null }), r('few', 'too_few', null, { rate: null })], 3)
+  assert.deepEqual(out.rows.map((x) => (x as { id: string }).id), ['wide', 'narrow', 'close'])
+  assert.equal(out.count, 4)
 })
 
 test('monograms read the brand and keep one hue per name', () => {

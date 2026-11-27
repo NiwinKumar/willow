@@ -105,7 +105,8 @@ export function ChooseOrg({ view, memberships, onPick, onSignOut, onCancel, lock
     const prev = shown[i - 1]
     if (searching) return i === 0 ? <GroupHead>{`${shown.length} ${shown.length === 1 ? 'match' : 'matches'}`}</GroupHead> : null
     if (r.group !== prev?.group) {
-      const label = r.group === 'mine' ? 'Your organisations' : r.group === 'retailer' ? 'The retailer' : `Brands · ${brandCount}`
+      // Every brand seat is the same (Analyst: prove, claim and promote): said once here, not on 400 rows.
+      const label = r.group === 'mine' ? 'Your organisations' : r.group === 'retailer' ? 'The retailer' : `Brands · ${brandCount} · you join as ${ROLE_LABEL.analyst} to ${VERBS.brand.toLowerCase()}`
       return (
         <>
           <GroupHead>{label}</GroupHead>
@@ -127,7 +128,7 @@ export function ChooseOrg({ view, memberships, onPick, onSignOut, onCancel, lock
         </div>
         <p className="m-0 max-w-[64ch] text-proof-body text-ink [text-wrap:pretty]">Proof shows which skincare products are linked to a measured, held change in people’s own photos, against people with the same goals who don’t use them.</p>
         <p className="m-0 max-w-[64ch] text-proof-small text-ink-2 [text-wrap:pretty]">
-          Pick a seat: the retailer runs its range, a brand proves and promotes its own products. You join with a demo role and land on that organisation’s Home. Switch any time from the account menu.
+          Pick a seat: the retailer runs its range; a brand proves and promotes its own products. You land on that organisation’s Home and can switch any time from the account menu.
         </p>
       </div>
 
@@ -175,7 +176,7 @@ export function ChooseOrg({ view, memberships, onPick, onSignOut, onCancel, lock
               shown.map((r, i) => (
                 <div key={r.org.id} role="presentation">
                   {heading(r, i)}
-                  <OrgRow id={`${base}-r-${i}`} r={r} active={i === active} busy={busy === r.org.id} disabled={busy !== null} onHover={() => setActive(i)} onPick={() => void pick(r.org.id)} big={r.group !== 'brands' && !searching} />
+                  <OrgRow id={`${base}-r-${i}`} r={r} active={i === active} busy={busy === r.org.id} disabled={busy !== null} onHover={() => setActive(i)} onPick={() => void pick(r.org.id)} big={r.group !== 'brands' && !searching} searching={searching} />
                 </div>
               ))
             )}
@@ -221,10 +222,11 @@ function LetterHead({ letter }: { letter: string }) {
   )
 }
 
-function OrgRow({ id, r, active, busy, disabled, onHover, onPick, big }: { id: string; r: Row; active: boolean; busy: boolean; disabled: boolean; onHover: () => void; onPick: () => void; big: boolean }) {
+function OrgRow({ id, r, active, busy, disabled, onHover, onPick, big, searching }: { id: string; r: Row; active: boolean; busy: boolean; disabled: boolean; onHover: () => void; onPick: () => void; big: boolean; searching: boolean }) {
   const o = r.org
   const basis = verifiedText(o)
-  const sub = r.joined ? `${o.kind === 'brand' ? 'Brand' : 'Retailer'} · you’re ${ROLE_LABEL[r.role]}` : `${ROLE_LABEL[r.role]} · ${VERBS[o.kind]}`
+  // A brand row is its name and logo; the seat it gives is in the group heading. Joined and retailer rows say theirs.
+  const sub = r.joined ? `${o.kind === 'brand' ? 'Brand' : 'Retailer'} · you’re ${ROLE_LABEL[r.role]}` : o.kind === 'retailer' ? `${ROLE_LABEL[r.role]} · ${VERBS.retailer}` : searching ? `Brand · join as ${ROLE_LABEL[r.role]}` : null
   return (
     <div
       id={id}
@@ -234,7 +236,7 @@ function OrgRow({ id, r, active, busy, disabled, onHover, onPick, big }: { id: s
       onPointerMove={onHover}
       onPointerDown={(e) => e.preventDefault()}
       onClick={() => !disabled && onPick()}
-      className={`group mx-1.5 flex cursor-pointer items-center gap-3 rounded-ctl px-2.5 transition-colors duration-100 ${big ? 'py-2.5' : 'py-1.5'} ${active ? 'bg-pf-hover' : ''} ${disabled && !busy ? 'opacity-60' : ''} active:scale-[.995]`}
+      className={`group mx-1.5 flex min-h-11 cursor-pointer items-center gap-3 rounded-ctl px-2.5 transition-colors duration-100 ${big ? 'py-2.5' : 'py-1.5'} ${active ? 'bg-pf-hover' : ''} ${disabled && !busy ? 'opacity-60' : ''} active:scale-[.995]`}
     >
       <BrandLogo brand={o.name} src={o.logo_url} kind={o.kind} size={big ? 36 : 28} />
       <span className="flex min-w-0 flex-1 flex-col">
@@ -246,7 +248,7 @@ function OrgRow({ id, r, active, busy, disabled, onHover, onPick, big }: { id: s
             </span>
           ) : null}
         </span>
-        <span className="truncate text-proof-small text-ink-2">{sub}</span>
+        {sub ? <span className="truncate text-proof-small text-ink-2">{sub}</span> : null}
       </span>
       <span className={`flex shrink-0 items-center gap-1 text-proof-small font-medium transition-[opacity,translate] duration-150 ${busy ? 'text-ink opacity-100' : active ? 'translate-x-0 text-ink opacity-100' : '-translate-x-1 text-ink-2 opacity-0 group-hover:opacity-100'}`}>
         {busy ? 'Joining…' : r.joined ? 'Open' : 'Join'}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { retailerBrand } from '../../../../lib/api'
@@ -7,9 +7,9 @@ import { csvMeta, csvName } from '../../data'
 import { useCompetitorNames } from '../../orgData'
 import { useRetailState } from '../../state'
 import type { BrandDetail, BrandSummary, Insights } from '../../types'
-import { BrandLogo, Button, DataTable, EmptyState, ErrorState, EvidenceBar, int, interval, MIN_GROUP, Panel, pct, PositioningChart, ShareBar, SidePanel, slugOf, Stat, Suppressed, type Column } from '../../ui'
+import { BrandLogo, Button, DataTable, EmptyState, ErrorState, EvidenceBar, HeadTip, int, interval, MIN_GROUP, Panel, pct, PositioningChart, ShareBar, SidePanel, slugOf, Stat, Suppressed, type Column } from '../../ui'
 import { brandLeaders, brandRank, niceDomain } from '../../ui/insight'
-import { fetchBrandList } from '../../productData'
+import { fetchBrandList, useProducts } from '../../productData'
 import { useView } from '../../useView'
 import { HeroBone, MarketFrame, PanelBone } from './Frame'
 import { byGap, NOTE, type VsRow } from './model'
@@ -72,6 +72,22 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
     return ['brand', 'products', 'users', 'rate', 'cont8', 'share', 'n'].includes(id) && (dir === 'asc' || dir === 'desc') ? { id, dir: dir as 'asc' | 'desc' } : null
   })()
   const selected = brands.find((b) => slugOf(b.brand) === param('brand')) ?? null
+  // Proven products per brand (the products list, same request and cache as Products): a rate alone has no
+  // comparison group; a Proven product beat people with the same goals not using it.
+  const { filters } = useRetailData()
+  const { state: prod } = useProducts(filters)
+  const proven = useMemo(() => {
+    if (prod.status !== 'ready') return null
+    const m = new Map<string, { proven: number; measured: number }>()
+    for (const p of prod.d.products) {
+      if (p.rate === null) continue
+      const v = m.get(p.brand) ?? { proven: 0, measured: 0 }
+      v.measured++
+      if (p.tier === 'proven') v.proven++
+      m.set(p.brand, v)
+    }
+    return m
+  }, [prod])
 
   const columns: Column<BrandSummary>[] = [
     { id: 'brand', header: 'Brand', rowHeader: true, width: '26%', sortValue: (r) => r.brand, cell: (r) => (
@@ -82,8 +98,8 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
       ) },
     {
       id: 'rate',
-      header: 'Visible change',
-      headerText: 'Visible change by week 8 (%)',
+      header: <HeadTip label="Users who changed" tip="Share of the people using any of its products who saw a visible change by week 8. Bar: 95% interval. Brands are compared with each other under one method." />,
+      headerText: 'Users with a visible change by week 8 (%)',
       sortValue: (r) => r.rate,
       firstDir: 'desc',
       cell: (r) =>
@@ -97,16 +113,44 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
         ),
       csv: (r) => (r.rate === null ? 'suppressed' : Math.round(r.rate * 100)),
     },
+    {
+      id: 'proven',
+      header: <HeadTip label="Proven" tip="Its products that are Proven (30+ people, a lift over people with the same goals not using it that stays above zero), of its measured products." />,
+      headerText: 'Proven products (of measured)',
+      align: 'right',
+      width: '96px',
+      sortValue: (r) => proven?.get(r.brand)?.proven ?? null,
+      firstDir: 'desc',
+      cell: (r) => {
+        const v = proven?.get(r.brand)
+        return v ? (
+          <span className="tnum">
+            <span className={v.proven ? 'text-ink' : 'text-ink-2'}>{v.proven}</span>
+            <span className="text-ink-2"> of {v.measured}</span>
+          </span>
+        ) : (
+          <span className="text-ink-3">—</span>
+        )
+      },
+      csv: (r) => (proven?.get(r.brand) ? `${proven.get(r.brand)!.proven} of ${proven.get(r.brand)!.measured}` : ''),
+    },
     { id: 'users', header: 'People', headerText: 'People using any of its products', align: 'right', width: '80px', sortValue: (r) => r.users, firstDir: 'desc', cell: (r) => (r.users === null ? <Suppressed short /> : <span className="tnum">{int(r.users)}</span>), csv: (r) => r.users ?? 'suppressed' },
-    { id: 'cont8', header: 'Still using', headerText: 'Still using at week 8 (%)', align: 'right', width: '92px', sortValue: (r) => r.cont8, firstDir: 'desc', cell: (r) => (r.cont8 === null ? <Suppressed short /> : <span className="tnum">{pct(r.cont8)}</span>), csv: (r) => (r.cont8 === null ? 'suppressed' : Math.round(r.cont8 * 100)), optional: true },
-    { id: 'share', header: 'Routines', headerText: 'Share of routines (%)', align: 'right', width: '88px', sortValue: (r) => r.routine_share, firstDir: 'desc', cell: (r) => (r.routine_share === null ? <Suppressed short /> : <span className="tnum">{pct(r.routine_share)}</span>), csv: (r) => (r.routine_share === null ? 'suppressed' : Math.round(r.routine_share * 100)), optional: true },
+    { id: 'cont8', header: 'Still using', headerText: 'Still using at week 8 (%)', align: 'right', width: '112px', sortValue: (r) => r.cont8, firstDir: 'desc', cell: (r) => (r.cont8 === null ? <Suppressed short /> : <span className="tnum">{pct(r.cont8)}</span>), csv: (r) => (r.cont8 === null ? 'suppressed' : Math.round(r.cont8 * 100)), optional: true },
+    { id: 'share', header: 'Routines', headerText: 'Share of routines (%)', align: 'right', width: '88px', sortValue: (r) => r.routine_share, firstDir: 'desc', cell: (r) => (r.routine_share === null ? <Suppressed short /> : <span className="tnum">{r.routine_share === 0 && r.users ? 'under 1%' : pct(r.routine_share)}</span>), csv: (r) => (r.routine_share === null ? 'suppressed' : Math.round(r.routine_share * 100)), optional: true, hidden: true },
     { id: 'products', header: 'Products', headerText: 'Catalogue products', align: 'right', width: '84px', sortValue: (r) => r.products, firstDir: 'desc', cell: (r) => <span className="tnum text-ink-2">{r.products}</span>, optional: true, hidden: true },
     { id: 'n', header: 'n at wk 8', headerText: 'People with 8 weeks of readings', align: 'right', width: '88px', sortValue: (r) => r.n, firstDir: 'desc', cell: (r) => (r.n === null ? <Suppressed short /> : <span className="tnum text-ink-2">{int(r.n)}</span>), csv: (r) => r.n ?? 'suppressed', optional: true, hidden: true },
     { id: 'ci', header: '95% interval', headerText: 'Visible change 95% interval', align: 'right', width: '100px', cell: (r) => <span className="tnum text-ink-2">{interval(r.lo, r.hi) ?? '—'}</span>, csv: (r) => interval(r.lo, r.hi) ?? '', optional: true, hidden: true },
   ]
 
+  // The brand with the most Proven products: the comparison-group answer the rate ranking can't give.
+  const most = proven ? [...proven.entries()].sort((a, b) => b[1].proven - a[1].proven || a[1].measured - b[1].measured)[0] : undefined
   const description = leader ? (
     <>
+      {most && most[1].proven > 1 ? (
+        <>
+          <strong>{most[0]}</strong> has the most Proven products ({most[1].proven} of {most[1].measured} measured).{' '}
+        </>
+      ) : null}
       <strong>{leader.brand}</strong> leads on visible change ({pct(leader.rate)}, n={int(leader.n)});{' '}
       {tied.length === 0 ? 'no other brand’s interval reaches it.' : (
         <>
@@ -124,7 +168,7 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
         <Panel flush className="xl:col-span-7" footnote={note}>
           <DataTable
             caption="Brands ranked by visible change"
-            pageSize={100}
+            pageSize={25}
             heading={<h2 className="m-0 text-proof-h text-ink">Brands</h2>}
             columns={columns}
             rows={brands}

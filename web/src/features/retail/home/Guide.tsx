@@ -28,7 +28,7 @@ export function useGuide({ mix, rangeConnected, decided, campaigns }: { mix: 're
     },
     {
       title: 'See what works',
-      body: 'Every product’s visible change against non-users with the same goals, with n and interval.',
+      body: 'How often each product’s users see a visible change, against people with the same goals who don’t use it.',
       items: [{ label: 'Open a product’s proof', done: visited, to: `${sectionPath('products')}${carry}` }],
     },
     {

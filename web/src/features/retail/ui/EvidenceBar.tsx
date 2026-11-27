@@ -2,10 +2,10 @@ import { int, interval, pct, SUPPRESSED } from './format'
 
 /**
  * A visible-change rate on a 0–`max` track: ember dot at the rate (ember = visible change), its 95% interval as a
- * whisker, a tick at the base rate (non-users), and the n. Null rate: a hatched track and "Fewer than 10
+ * whisker, a tick at the base rate (people with the same goals not using it), and the n. Null rate: a hatched track and "Fewer than 10
  * people". `baseLabel` names the tick ("market" on Competitors). The visible n keeps the denominator next to every rate; the accessible name says it all in words.
  */
-export function EvidenceBar({ rate, lo, hi, base, n, max = 1, showN = true, className = '', baseLabel = 'non-users' }: { rate: number | null; lo?: number | null; hi?: number | null; base?: number | null; n?: number | null; max?: number; showN?: boolean; className?: string; baseLabel?: string }) {
+export function EvidenceBar({ rate, lo, hi, base, n, max = 1, showN = true, className = '', baseLabel = 'same goals, not using it' }: { rate: number | null; lo?: number | null; hi?: number | null; base?: number | null; n?: number | null; max?: number; showN?: boolean; className?: string; baseLabel?: string }) {
   if (rate === null) {
     return (
       <span className={`flex items-center gap-2.5 ${className}`}>

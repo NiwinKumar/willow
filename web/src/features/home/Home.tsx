@@ -140,13 +140,14 @@ function HomeBody() {
   // A pores-and-texture goal is measured up close: a setup row for the cheek close-up unless Home already reads it.
   const closeUpWanted = goals.includes('pores_texture') && read.site !== 'cheek_macro'
   const tracked = withArms(placesOf(data.profile), !demo && Boolean(tests.running))
-  const dueNow = !demo && checkin && due && (due.kind === 'due' || due.kind === 'late')
-  const placeChips = demo ? ['Face'] : [...tracked.map((p) => SITE_SHORT[p]), ...(dueNow ? ['Due'] : [])]
+  // The hero already says when a check-in is due; the lead card's chips name the places only.
+  const placeChips = demo ? ['Face'] : tracked.map((p) => SITE_SHORT[p])
   const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
   const todayLine = `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}, about ${minutesFor(tracked)} min`
   const lead = leadFor({ read, goals, demo, checkIn, openResult, placeChips, todayLine })
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), tonightLine(activeIn(entries, 'pm')))
-  const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
+  // The schedule chip, unless a hero line already says when the next check-in is.
+  const heroNext = demo || read.todayKind === 'done' ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
   // Routine effect: how each product's target measurement moved since it started (lib/effect.ts).
   const outcomeSessions = useOutcomeSessions()
@@ -344,17 +345,17 @@ function leadFor({
   if (demo) {
     const s = read.lead
     if (!s) return { title: 'Demo journey', sub: 'This journey has no measured check-in to show.', aura: 'violet', note: 'Check-ins are available in your own account' }
-    return { ...doneLead(s, goals, `LATEST CHECK-IN · ${shortDay(s.created_at).toUpperCase()}`), cta: { label: 'See result', onClick: () => openResult(s) }, note: 'Check-ins are available in your own account' }
+    return { ...doneLead(s, goals, `Latest check-in · ${shortDay(s.created_at)}`), cta: { label: 'See result', onClick: () => openResult(s) }, note: 'Check-ins are available in your own account' }
   }
   const t = read.todaySession
   if (t) {
-    const site = SITE_SHORT[t.site].toUpperCase()
+    const site = SITE_SHORT[t.site]
     const again = { label: 'Check in again', onClick: checkIn }
     switch (read.todayKind) {
       case 'measuring': {
         const up = t.status === 'uploading'
         return {
-          eyebrow: `MEASURING · ${site}`,
+          eyebrow: `${site} · ${clock(t.created_at)}`,
           title: up ? 'Uploading your photos' : 'Measuring your photos',
           sub: up ? 'Keep the check-in open until the photos are up.' : 'Correcting colour and measuring. You can leave; the result lands here.',
           steps: [
@@ -379,7 +380,7 @@ function leadFor({
           aura: 'grey',
         }
       case 'done':
-        return { ...doneLead(t, goals, `CHECKED IN TODAY · ${t.site === read.site ? '' : `${site} · `}${clock(t.created_at)}`), cta: { label: 'See result', onClick: () => openResult(t) } }
+        return { ...doneLead(t, goals, `Checked in today · ${t.site === read.site ? '' : `${site} · `}${clock(t.created_at)}`), cta: { label: 'See result', onClick: () => openResult(t) } }
       default:
         break
     }
@@ -387,14 +388,14 @@ function leadFor({
   const f = read.baselineFrames ?? 0
   switch (read.person) {
     case 'new':
-      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
+      return { title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
     case 'noBand': {
       // Photos kept (under 30 days): add the missing ones to this same baseline (design: "Add 2 photos").
       const need = topUpNeed(read.baseline)
       if (need > 0 && read.baseline) {
         const b = read.baseline
         return {
-          eyebrow: `BASELINE · ${f} OF ${BAND_FRAMES} USABLE PHOTOS`,
+          eyebrow: `Started ${shortDay(b.created_at)}`,
           title: `Finish your ${SITE_SHORT[read.site].toLowerCase()} baseline`,
           sub: `${need === 1 ? 'One more photo gives' : `${countWord(need)} more photos give`} Willow your normal range. Until then results read “Not enough data yet”. Same light as ${shortDay(b.created_at)}.`,
           big: `${f}/${BAND_FRAMES}`,
@@ -407,7 +408,7 @@ function leadFor({
         }
       }
       return {
-        eyebrow: `BASELINE · ${plural(f, 'USABLE PHOTO', 'USABLE PHOTOS')}`,
+        eyebrow: read.baseline ? `Baseline · ${shortDay(read.baseline.created_at)}` : undefined,
         title: 'Your baseline has no normal range yet',
         sub: `A normal range needs ${BAND_FRAMES} usable photos; this one has ${f}. Take a check-in with ${BAND_FRAMES} or more, then make it your baseline from its result.`,
         big: `${f}/${BAND_FRAMES}`,
@@ -421,7 +422,7 @@ function leadFor({
     }
     case 'gap':
       return {
-        eyebrow: read.last ? `LAST CHECK-IN ${shortDay(read.last.created_at).toUpperCase()}` : undefined,
+        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
         title: 'Welcome back',
         sub: 'Your baseline still holds. One check-in picks up where you left off.',
         big: read.last ? String(daysSince(read.last.created_at)) : undefined,
@@ -432,7 +433,7 @@ function leadFor({
       }
     default:
       return {
-        eyebrow: read.last ? `LAST CHECK-IN ${shortDay(read.last.created_at).toUpperCase()}` : undefined,
+        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
         title: 'Your check-in',
         sub: `${cap(todayLine)}. Same window light as last time keeps results comparable.`,
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
@@ -449,7 +450,7 @@ function doneLead(s: Session, goals: string[], eyebrow: string): Lead {
   if (s.is_baseline) {
     const f = s.baseline_ref?.frames ?? s.result?.frames_used ?? 0
     const band = s.baseline_ref?.has_noise_band ?? f >= BAND_FRAMES
-    return { eyebrow: eyebrow.replace('CHECKED IN', 'BASELINE SET'), title: 'Baseline set', sub: band ? 'Your normal range is ready. The next check-in shows what changed.' : `It has ${plural(f, 'usable photo', 'usable photos')}; a normal range needs ${BAND_FRAMES}.`, big: String(f), bigLabel: f === 1 ? 'usable photo' : 'usable photos', aura: 'violet' }
+    return { eyebrow: eyebrow.replace('Checked in', 'Baseline set'), title: 'Baseline set', sub: band ? 'Your normal range is ready. The next check-in shows what changed.' : `It has ${plural(f, 'usable photo', 'usable photos')}; a normal range needs ${BAND_FRAMES}.`, big: String(f), bigLabel: f === 1 ? 'usable photo' : 'usable photos', aura: 'violet' }
   }
   const { changed, normal, kinds } = splitVerdicts(s, goals)
   const notEnough = [...kinds.values()].filter((k) => k === 'notEnough').length
@@ -506,7 +507,11 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean, due: Due |
     case 'rejected':
       return [{ g: '—', t: "Today's photos couldn't be measured." }, ...others, { g: '→', t: 'Another check-in by a window can still count today.' }].slice(0, 3)
     case 'done':
-      return fromLead.slice(0, 3)
+      // The lead card shows what today's check-in found; the hero says it is done and what comes next (no repeat).
+      return [
+        { g: '✓', t: 'Today’s check-in is done.' },
+        { g: '→', t: due && due.kind === 'done' ? `Next one ${fmtDay(due.next)}, by the same window light.` : 'Next time, the same window light keeps results comparable.' },
+      ]
     default:
       break
   }
@@ -525,11 +530,8 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean, due: Due |
         : { g: '→', t: `A check-in with ${BAND_FRAMES} or more photos can become your baseline.` },
       { g: '○', t: 'Your skin is only ever compared with itself.' },
     ]
-  if (read.person === 'gap')
-    return [
-      { g: '○', t: 'Welcome back. Your baseline still holds.' },
-      { g: '→', t: 'One check-in today picks the trend back up.' },
-    ]
+  // Back after a gap: the lead card says "Welcome back"; the hero recalls what the last check-in showed.
+  if (read.person === 'gap') return [...(fromLead.length ? fromLead.slice(0, 2) : [{ g: '○', t: 'Your baseline still holds.' }]), { g: '→', t: 'One check-in today picks the trend back up.' }]
   // On a day the schedule doesn't ask for a check-in, say when the next one is.
   const nextLine = due && due.kind === 'upcoming' ? `Next check-in ${fmtDay(due.next)}, by the same window light.` : 'Check in today, by the same window light.'
   return [...fromLead.slice(0, 2), { g: '→', t: nextLine }]

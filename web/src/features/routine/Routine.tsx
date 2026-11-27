@@ -134,25 +134,29 @@ export default function Routine() {
 
   return (
     <main className="relative mx-auto flex max-w-[1320px] flex-col gap-3 px-[clamp(16px,4vw,40px)] pt-2">
+      {/* Header. Phone: large title and one compact meta line, the Add button in thumb size beside it, the three
+          tabs as one full-width segmented row, then Build and History as two equal pills. Laptop: one row. */}
       <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-[clamp(4px,1vw,12px)] sm:items-end">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h1 className="font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">{TITLE[tab]}</h1>
-          <span className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:gap-1.5">
+          <h1 key={tab} className="font-serif text-[clamp(34px,3vw,40px)] leading-[.95] font-normal motion-safe:animate-[wRise_.3s_var(--ease-standard)_both]">{TITLE[tab]}</h1>
+          <span className="text-[13px] leading-[1.4] text-pretty text-ink-2 sm:text-[14px]">
             {tab === 'tests' ? 'One product at a time, on a small square of one forearm.' : tab === 'verdict' ? 'Each product against your own readings and its usual trial length.' : meta}
-            {sample && tab === 'routine' ? <span className="rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.04em] text-[var(--synthetic-fg)]">SAMPLE ROUTINE</span> : null}
           </span>
         </div>
-        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="hit44 order-2 flex min-h-9 items-center gap-2 rounded-pill bg-selected pr-1 pl-4 text-[14px] text-inverse transition-transform hover:-translate-y-0.5 sm:order-3">
-          Add product
-          <span aria-hidden className="grid size-7 place-items-center rounded-full bg-white text-[18px] leading-none text-ink">
+        <button type="button" onClick={() => setAdd({ mode: 'search' })} className="hit44 order-2 flex min-h-11 items-center gap-2 rounded-pill bg-selected pr-1.5 pl-4 text-[14px] text-inverse transition-[translate,scale] duration-200 ease-standard hover:-translate-y-0.5 active:scale-[.97] sm:order-3 sm:min-h-9 sm:pr-1">
+          <span>
+            Add<span className="hidden sm:inline"> product</span>
+          </span>
+          <span aria-hidden className="grid size-8 place-items-center rounded-full bg-white text-[18px] leading-none text-ink sm:size-7">
             +
           </span>
         </button>
-        <div className="order-3 flex basis-full flex-wrap items-center gap-2 xl:order-2 xl:basis-auto">
+        <div className="order-3 flex basis-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:order-2 xl:basis-auto">
           <SegmentedControl
             frosted
             label="Routine or product tests"
             size="sm"
+            className="w-full sm:w-auto"
             value={tab}
             onChange={setTab}
             options={[
@@ -161,30 +165,36 @@ export default function Routine() {
               { value: 'tests', label: tests.running ? 'Tests · running' : testCount ? `Tests · ${testCount}` : 'Tests' },
             ]}
           />
-          <button type="button" onClick={() => navigate('/plan')} className="hit44 glass-pill flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-colors hover:bg-white/80">
-            <ListChecks size={15} strokeWidth={1.7} aria-hidden />
-            Build me a routine
-          </button>
-          <button type="button" onClick={() => setHistory(true)} className="hit44 glass-pill flex min-h-9 items-center gap-1.5 rounded-pill px-3.5 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-colors hover:bg-white/80">
-            <History size={15} strokeWidth={1.7} aria-hidden />
-            History{stopped.length ? <span className="font-mono text-[11px] text-ink-2">{stopped.length}</span> : null}
-          </button>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <button type="button" onClick={() => navigate('/plan')} className="hit44 glass-pill flex min-h-11 items-center justify-center gap-1.5 rounded-pill px-3.5 text-[13.5px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-[background-color,scale] duration-200 ease-standard hover:bg-white/80 active:scale-[.97] sm:min-h-9 sm:text-[13px]">
+              <ListChecks size={15} strokeWidth={1.7} aria-hidden />
+              Build me a routine
+            </button>
+            <button type="button" onClick={() => setHistory(true)} className="hit44 glass-pill flex min-h-11 items-center justify-center gap-1.5 rounded-pill px-3.5 text-[13.5px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)] transition-[background-color,scale] duration-200 ease-standard hover:bg-white/80 active:scale-[.97] sm:min-h-9 sm:text-[13px]">
+              <History size={15} strokeWidth={1.7} aria-hidden />
+              History{stopped.length ? <span className="font-mono text-[11px] text-ink-2">{stopped.length}</span> : null}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Asks that need an answer come first, above the check. */}
       {attention && sample && tab === 'routine' ? (
-        <section aria-label="Sample routine" className="card flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5" style={{ animation: 'wRise .5s both' }}>
-          <span className="flex min-w-0 flex-[1_1_280px] flex-col gap-0.5">
-            <span className="text-[16px]">This is a sample routine</span>
-            <span className="text-[13px] leading-[1.45] text-ink-2">It was set up to show how the routine check works, not picked for your skin. Replace it with what you use, or let Willow build one around your skin, budget and answers.</span>
+        <section aria-label="Sample routine" className="card flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5" style={{ animation: 'wRise .5s var(--ease-standard) both' }}>
+          <span className="flex min-w-0 flex-[1_1_280px] flex-col gap-1">
+            <span className="flex items-center gap-2 text-[16px]">
+              {/* the synthetic-data hatch, as on every simulated surface: this routine was not picked for you */}
+              <span aria-hidden className="size-3 shrink-0 rounded-[3px] bg-[var(--synthetic-bg)] bg-[repeating-linear-gradient(45deg,rgba(18,18,18,.12)_0_2px,transparent_2px_4px)]" />
+              This is a sample routine
+            </span>
+            <span className="text-[13px] leading-[1.45] text-pretty text-ink-2">Set up to show how the routine check works, not picked for your skin. Replace it with what you use, or let Willow build one around your skin, budget and answers.</span>
           </span>
-          <span className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => navigate('/plan')} className="min-h-10 rounded-pill bg-selected px-4 text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
-              Build me a routine
+          <span className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+            <button type="button" onClick={() => navigate('/plan')} className="min-h-11 rounded-pill bg-selected px-4 text-[14px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97] sm:min-h-10">
+              Build me one
             </button>
-            <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-10 rounded-pill bg-white px-4 text-[14px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color,scale] duration-200 ease-standard hover:bg-sunken active:scale-[.97]">
-              Replace with my own
+            <button type="button" onClick={() => setAdd({ mode: 'search' })} className="min-h-11 rounded-pill bg-white px-4 text-[14px] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-[background-color,scale] duration-200 ease-standard hover:bg-sunken active:scale-[.97] sm:min-h-10">
+              Add my own
             </button>
           </span>
         </section>
@@ -199,7 +209,7 @@ export default function Routine() {
 
       {attention && !showTests && !showVerdict && current.length ? (
         <div className="@container">
-          <div className="grid items-stretch gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_360px]">
             <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} />
             <div className="flex min-w-0 flex-col gap-3 empty:hidden [&>section]:flex-1">
               {suggested.any ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : <TestStrip read={testRead} onStart={() => setTab('tests')} />}
@@ -291,7 +301,7 @@ export default function Routine() {
         </div>
       ) : (
         <div className="@container flex flex-col gap-3">
-          <div className="grid items-stretch gap-3 @min-[620px]:grid-cols-2 @min-[1020px]:has-[.side>*]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-3 @min-[620px]:grid-cols-2 @min-[1020px]:has-[.side>*]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
             {(['am', 'pm'] as const).map((slot) => (
               <SlotCard
                 key={slot}

@@ -105,7 +105,7 @@ function Body({ d }: { d: Products }) {
   const exportCsv = () => {
     const scope = FILTERS.filter((f) => q.filters[f.id].length).map((f) => `${f.label}: ${q.filters[f.id].map((v) => options[f.id].find((o) => o.value === v)?.label ?? v).join(' / ')}`)
     const unit = measure.kind === 'rate' ? ' (%)' : measure.kind === 'points' ? ' (pts)' : ''
-    const header = [group.label, `${measure.label}${unit}`, ...(single && (q.measure === 'rate' || q.measure === 'lift') ? ['95% low', '95% high'] : []), ...(q.measure === 'rate' ? ['Non-users (%)'] : []), 'People (n)', 'Products']
+    const header = [group.label, `${measure.label}${unit}`, ...(single && (q.measure === 'rate' || q.measure === 'lift') ? ['95% low', '95% high'] : []), ...(q.measure === 'rate' ? ['Same goal, not using it (%)'] : []), 'People (n)', 'Products']
     const rows = groups.map((g) => [g.label, csvValue(measure.kind, g.value), ...(single && (q.measure === 'rate' || q.measure === 'lift') ? [csvValue(measure.kind, g.lo), csvValue(measure.kind, g.hi)] : []), ...(q.measure === 'rate' ? [csvValue('rate', g.base)] : []), g.n, g.products])
     const note = [`Explore: ${title}`, ...scope, `products with ${q.min}+ people`, single ? '' : q.measure === 'n' ? 'groups sum their products' : 'groups are people-weighted averages of their products'].filter(Boolean).join('; ')
     downloadCsv(csvName(`explore-${q.measure}-by-${q.group}`, d), csvMeta(d, note), header, rows)
@@ -118,7 +118,7 @@ function Body({ d }: { d: Products }) {
         {measure.label}: {fmt.value(g.value)}
       </span>
       {interval(g.lo, g.hi) ? <span className="tnum">95% interval {measure.kind === 'points' ? `${pts(g.lo)} to ${pts(g.hi)}` : interval(g.lo, g.hi)}</span> : null}
-      {g.base !== null ? <span className="tnum">Non-users with the same goal: {pct(g.base)}</span> : null}
+      {g.base !== null ? <span className="tnum">Same goal, not using it: {pct(g.base)} changed anyway</span> : null}
       <span className="tnum">
         n = {int(g.n)}
         {single ? '' : ` across ${g.products} ${g.products === 1 ? 'product' : 'products'}`}
@@ -252,7 +252,7 @@ function Legend({ own, base, whisker }: { own: string | null; base: boolean; whi
       {base ? (
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden className="h-3 w-0.5 rounded-full bg-ink-2" />
-          Non-users with the same goal
+          Same goal, not using it (changed anyway)
         </span>
       ) : null}
       {whisker ? (

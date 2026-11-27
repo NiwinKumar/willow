@@ -226,10 +226,39 @@ export function categorySpot(rows: { rate: number | null; is_self?: boolean }[])
   return { self, median, delta: r2(self - median), others: s, min: Math.min(self, s[0]), max: Math.max(self, s[s.length - 1]) }
 }
 
+/**
+ * Where a product stands on promotion, from this organisation's campaigns (sample ones included: a sample that ran
+ * is history the page must not hide). `running`: active; `paused`; `ended`: the latest finished one, with its
+ * adoption lift against the randomised holdout when it was measured. Absent: never promoted.
+ */
+export type Promo = { state: 'running' | 'paused' | 'ended'; lift: number | null; campaignId: string; sample: boolean }
+
+export function promoHistory(campaigns: { id: string; product_id: string; status: 'active' | 'paused' | 'ended'; created_at: string; sample?: boolean; stats: { incrementality: { lift: number } | null } }[]): Map<string, Promo> {
+  const rank = { running: 3, paused: 2, ended: 1 } as const
+  const m = new Map<string, Promo & { at: string }>()
+  for (const c of campaigns) {
+    const state = c.status === 'active' ? 'running' : c.status
+    const v = { state, lift: c.stats.incrementality?.lift ?? null, campaignId: c.id, sample: Boolean(c.sample), at: c.created_at } as Promo & { at: string }
+    const cur = m.get(c.product_id)
+    if (!cur || rank[state] > rank[cur.state] || (rank[state] === rank[cur.state] && c.created_at > cur.at)) m.set(c.product_id, v)
+  }
+  return new Map([...m].map(([k, { at: _at, ...v }]) => [k, v]))
+}
+
+/** The promotion note a product row carries: "Campaign running", "Campaign paused", "Promoted before, +8 pts adoption" (the finished campaign's lift against its holdout). */
+export function promoNote(p: Promo | undefined): string | null {
+  if (!p) return null
+  if (p.state === 'running') return 'Campaign running'
+  if (p.state === 'paused') return 'Campaign paused'
+  return p.lift !== null ? `Promoted before, ${pts(p.lift)} adoption` : 'Promoted before'
+}
+
 /** The Products page's lead: what to act on in the rows in view. */
 export type ProductsLead = {
-  /** Proven with no campaign running, strongest lower bound first. */
+  /** Proven with no campaign running or paused, strongest lower bound first. Some may have run one before. */
   toPromote: ProductRow[]
+  /** Of toPromote, how many ran a campaign before (finished; offer "run again", never "never promoted"). */
+  ranBefore: number
   /** Proven in total (to tell "all promoted" from "none Proven"). */
   proven: number
   /** Promising, closest to Proven first (the api's to_proven; unknown last). */
@@ -238,26 +267,13 @@ export type ProductsLead = {
   unclear: ProductRow[]
 }
 
-export function productsLead(rows: ProductRow[], running: ReadonlySet<string>): ProductsLead {
+export function productsLead(rows: ProductRow[], promo: ReadonlyMap<string, Pick<Promo, 'state'>>): ProductsLead {
   const proven = rows.filter((r) => r.tier === 'proven')
-  const toPromote = proven.filter((r) => !running.has(r.product_id)).sort((a, b) => (b.lift_lo ?? -1) - (a.lift_lo ?? -1) || (b.n ?? 0) - (a.n ?? 0))
+  const toPromote = proven.filter((r) => (promo.get(r.product_id)?.state ?? 'ended') === 'ended').sort((a, b) => (b.lift_lo ?? -1) - (a.lift_lo ?? -1) || (b.n ?? 0) - (a.n ?? 0))
+  const ranBefore = toPromote.filter((r) => promo.has(r.product_id)).length
   const close = rows.filter((r) => r.tier === 'promising').sort((a, b) => (a.to_proven ?? 1e9) - (b.to_proven ?? 1e9) || (b.lift ?? 0) - (a.lift ?? 0))
   const unclear = rows.filter((r) => r.tier === 'unclear').sort((a, b) => (b.users ?? 0) - (a.users ?? 0))
-  return { toPromote, proven: proven.length, close, unclear }
-}
-
-/** Sort rows by one value, nulls last in both directions (the same order as the kit's DataTable). */
-export function sortRows<T>(rows: T[], get: ((r: T) => number | string | null) | undefined, dir: 'asc' | 'desc'): T[] {
-  if (!get) return rows
-  const k = dir === 'asc' ? 1 : -1
-  return [...rows].sort((a, b) => {
-    const x = get(a)
-    const y = get(b)
-    if (x === null && y === null) return 0
-    if (x === null) return 1
-    if (y === null) return -1
-    return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * k
-  })
+  return { toPromote, ranBefore, proven: proven.length, close, unclear }
 }
 
 /** Rows drawn per step on long tables: enough to scan, small enough to open without a stall. */

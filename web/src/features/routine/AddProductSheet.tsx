@@ -1,4 +1,4 @@
-import { Camera, Search, X } from 'lucide-react'
+import { Camera, ChevronDown, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Button } from '../../components/ui/Button'
@@ -213,12 +213,6 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onTest, onRequest
           />
         </label>
       </div>
-      <div className="flex items-baseline gap-2 text-[14px]">
-        <span>Search the catalog</span>
-        <span className="text-ink-2 tabular-nums" aria-live="polite">
-          {count}
-        </span>
-      </div>
       <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label="Filter by concern (pick any)">
         {category ? (
           <Chip tone="ink" onToggle={() => setCategory('')} selected>
@@ -238,7 +232,13 @@ function CatalogSearch({ switcher, initial, inRoutine, onPick, onTest, onRequest
         ) : null}
       </div>
       {concerns.length > 1 ? <span className="-mt-1 text-[13px] text-ink-2">Showing products made for all {concerns.length}.</span> : null}
-      <CheckForMe />
+      {/* One quiet line: how many products (the switcher and the field already say "search"), and the profile ask. */}
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 text-[13px]">
+        <span className="text-ink-2 tabular-nums" aria-live="polite">
+          {count === 'Searching…' ? <span className="motion-safe:animate-[wBlink_1.2s_ease-in-out_infinite]">{count}</span> : count}
+        </span>
+        <CheckForMe />
+      </div>
 
       {state.status === 'loading' && n === 0 ? (
         <div aria-busy aria-label="Searching" className="flex flex-col gap-2">
@@ -532,22 +532,33 @@ function RequestList({ requests, inRoutine, onPick }: { requests: ProductRequest
 
 function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveError, onSave }: { draft: Draft; when: When; setWhen: (w: When) => void; startedAt: string; setStartedAt: (d: string) => void; saving: boolean; saveError: string | null; onSave: () => void }) {
   const p = draft.product
-  const field = 'min-h-[50px] rounded-[16px] bg-canvas px-3.5 text-[16px] text-ink outline-none'
   // the product's check for this person (carried on a preset product, else read; cached from the search list)
   const carried = (p as Product & { check?: ProductCheck | null }).check ?? undefined
   const checks = useChecks(carried ? [] : [p.product_id])
   const check = carried ?? checks.checks[p.product_id]
   const warning = notAdvisedLine(check)
 
+  // Order follows the job: which product (with its key actives), any warning, then the two answers this step
+  // asks for (when, since when) and Save. The full ingredient list is reference, so it folds away under Save.
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3.5 rounded-[24px] bg-sunken p-3">
+      <div className="flex items-center gap-3.5 rounded-[24px] bg-sunken p-3" style={{ animation: 'wRise .35s var(--ease-standard) both' }}>
         <ProductImage product={p} size={56} decorative />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="truncate text-[13px] text-ink-2">
             {p.brand} · {categoryLabel(p.category)}
           </span>
-          <span className="text-[17px] leading-snug">{p.name}</span>
+          <span className="text-[17px] leading-snug text-pretty">{p.name}</span>
+          {p.key_actives.length ? (
+            <span className="flex flex-wrap gap-1 pt-0.5">
+              <span className="sr-only">Key actives: </span>
+              {p.key_actives.map((a) => (
+                <span key={a.name} className="rounded-pill bg-lime px-2.5 py-0.5 text-[12.5px]">
+                  {activeLabel(a)}
+                </span>
+              ))}
+            </span>
+          ) : null}
         </span>
       </div>
       <p className="-mt-1 text-[13px] text-ink-2">
@@ -566,64 +577,44 @@ function Confirm({ draft, when, setWhen, startedAt, setStartedAt, saving, saveEr
         </div>
       ) : null}
 
-      {p.inci.length ? (
+      <div className="flex flex-wrap items-end gap-3.5" style={{ animation: 'wRise .35s var(--ease-standard) 60ms both' }}>
         <div className="flex flex-col gap-1.5">
-          <span className="text-[14px] text-ink-2">Ingredients</span>
-          <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-[16px] bg-canvas p-3">
+          <span className="text-[14px] text-ink-2">When you use it</span>
+          <SegmentedControl label="When you use it" options={WHEN} value={when} onChange={setWhen} />
+        </div>
+        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
+          Start date
+          <input type="date" value={startedAt} max={localDay()} onChange={(e) => setStartedAt(e.target.value)} className="h-11 rounded-pill bg-canvas px-4 text-[16px] text-ink outline-none" />
+        </label>
+      </div>
+      <p className="-mt-1 text-[13px] text-ink-2">The start date is what lines this product up with your readings.</p>
+
+      {saveError ? (
+        <p role="alert" className="rounded-[18px] bg-avoid-bg px-4 py-3 text-[14px] text-avoid" style={{ animation: 'wRise .3s var(--ease-standard) both' }}>
+          {saveError}
+        </p>
+      ) : null}
+      <button type="button" onClick={onSave} disabled={saving} aria-busy={saving} className="min-h-[54px] rounded-[24px] bg-selected text-[16px] text-inverse transition-[scale,opacity] duration-200 ease-standard active:scale-[.985] disabled:opacity-70">
+        {saving ? 'Saving…' : 'Save to routine'}
+      </button>
+
+      {p.inci.length ? (
+        <details className="group rounded-[18px] bg-sunken">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-[14px] [&::-webkit-details-marker]:hidden">
+            <span>
+              All ingredients <span className="font-mono text-[12px] text-ink-2">{p.inci.length}</span>
+            </span>
+            <ChevronDown size={16} strokeWidth={1.8} aria-hidden className="text-ink-2 transition-transform duration-200 ease-standard group-open:rotate-180" />
+          </summary>
+          <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto px-3 pb-3 group-open:animate-[wRise_.3s_var(--ease-standard)_both]">
             {p.inci.map((ing, i) => (
               <span key={`${ing}-${i}`} className="rounded-pill bg-white px-2.5 py-1 text-[13px]">
                 {ing}
               </span>
             ))}
           </div>
-        </div>
+        </details>
       ) : null}
-      {p.key_actives.length ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[14px] text-ink-2">Key actives</span>
-          {p.key_actives.map((a) => (
-            <span key={a.name} className="rounded-pill bg-lime px-3 py-1 text-[13px]">
-              {activeLabel(a)}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-end gap-3.5">
-        <div className="flex flex-col gap-1.5">
-          <span id="when-label" className="text-[14px] text-ink-2">
-            When you use it
-          </span>
-          <div role="radiogroup" aria-labelledby="when-label" className="flex gap-[3px] rounded-pill bg-canvas p-[5px]">
-            {WHEN.map((w) => (
-              <button
-                key={w.value}
-                type="button"
-                role="radio"
-                aria-checked={when === w.value}
-                onClick={() => setWhen(w.value)}
-                className={`min-h-11 rounded-pill px-[18px] text-[15px] transition-colors ${when === w.value ? 'bg-selected text-inverse' : 'text-ink'}`}
-              >
-                {w.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <label className="flex flex-col gap-1.5 text-[14px] text-ink-2">
-          Start date
-          <input type="date" value={startedAt} max={localDay()} onChange={(e) => setStartedAt(e.target.value)} className={`${field} min-h-[54px]`} />
-        </label>
-      </div>
-      <p className="-mt-1 text-[13px] text-ink-2">The start date is what lines this product up with your readings.</p>
-
-      {saveError ? (
-        <p role="alert" className="rounded-[18px] bg-avoid-bg px-4 py-3 text-[14px] text-avoid">
-          {saveError}
-        </p>
-      ) : null}
-      <button type="button" onClick={onSave} disabled={saving} aria-busy={saving} className="min-h-[58px] rounded-[24px] bg-selected text-[16px] text-inverse">
-        {saving ? 'Saving…' : 'Save to routine'}
-      </button>
     </div>
   )
 }

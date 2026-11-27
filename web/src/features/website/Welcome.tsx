@@ -92,7 +92,24 @@ function Stepper({ current }: { current: number }) {
     if (ol && li && ol.scrollWidth > ol.clientWidth) ol.scrollLeft = li.offsetLeft - (ol.clientWidth - li.offsetWidth) / 2
   }, [current])
   return (
-    <ol ref={list} aria-label="Setup progress" className="no-scrollbar m-0 flex max-w-full list-none items-start overflow-x-auto px-0.5 py-1 [mask-image:linear-gradient(90deg,#000_80%,transparent)] sm:[mask-image:none]">
+    <>
+    {/* Phones: one slim bar of seven segments and the step's name, instead of seven circles squeezed sideways. */}
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:hidden" role="group" aria-label={`Step ${current + 1} of ${STEPS.length}: ${STEPS[current]}`}>
+      <span aria-hidden className="flex gap-1">
+        {STEPS.map((label, i) => (
+          <span key={label} className="relative h-1 flex-1 overflow-hidden rounded-pill bg-ink/12">
+            <span className="absolute inset-0 origin-left rounded-pill bg-selected transition-transform duration-500 ease-standard" style={{ transform: `scaleX(${i <= current ? 1 : 0})`, transitionDelay: i === current ? '120ms' : '0ms' }} />
+          </span>
+        ))}
+      </span>
+      <span aria-hidden className="flex items-baseline justify-between text-[12.5px]">
+        <span key={current} className="motion-safe:animate-[wRise_.35s_var(--ease-standard)_both]">{STEPS[current]}</span>
+        <span className="font-mono text-[11px] text-ink-2 tabular-nums">
+          {current + 1}/{STEPS.length}
+        </span>
+      </span>
+    </div>
+    <ol ref={list} aria-label="Setup progress" className="no-scrollbar m-0 hidden max-w-full list-none items-start overflow-x-auto px-0.5 py-1 sm:flex">
       {STEPS.map((label, i) => {
         const st = i < current ? 'done' : i === current ? 'on' : 'up'
         return (
@@ -114,6 +131,7 @@ function Stepper({ current }: { current: number }) {
         )
       })}
     </ol>
+    </>
   )
 }
 
@@ -121,14 +139,14 @@ function Stepper({ current }: { current: number }) {
  * One onboarding step: eyebrow, serif title (h1 on a phone, greeting size on a laptop), the content (which
  * scrolls inside itself only when it has to) and the action bar, always in view.
  */
-function StepFrame({ eyebrow, title, sub, aside, children, actions, wide }: { eyebrow: string; title: string; sub?: ReactNode; aside?: ReactNode; children: ReactNode; actions: ReactNode; wide?: boolean }) {
+function StepFrame({ title, sub, keepSub, aside, children, actions, wide }: { title: string; sub?: ReactNode; /** shown on short screens too (the consent version) */ keepSub?: boolean; aside?: ReactNode; children: ReactNode; actions: ReactNode; wide?: boolean }) {
   return (
     <main className={`relative mx-auto flex min-h-0 w-full flex-1 animate-[wRiseLg_.5s_cubic-bezier(.2,.7,.2,1)_both] flex-col px-[clamp(16px,3vw,32px)] sm:justify-center sm:pb-[2vh] ${wide ? 'max-w-[1040px]' : 'max-w-[760px]'}`}>
       <div className="flex items-end justify-between gap-4 pt-[clamp(10px,2.4vh,28px)] pb-[clamp(8px,1.8vh,16px)] sm:pt-0">
         <div className="min-w-0">
-          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {eyebrow}</span>
-          <h1 className="mt-1.5 mb-0 font-serif text-h1 font-normal sm:text-greeting [@media(max-height:700px)]:text-[28px]">{title}</h1>
-          {sub ? <p className="mt-1 mb-0 text-[14px] leading-[1.4] text-ink-2 [@media(max-height:700px)]:hidden">{sub}</p> : null}
+          {/* No eyebrow: the stepper names the step; what an eyebrow said (choose up to three…) is in the sub line. */}
+          <h1 className="mb-0 font-serif text-[clamp(30px,8.4vw,34px)] leading-[1.05] font-normal text-balance sm:text-greeting [@media(max-height:700px)]:text-[28px]">{title}</h1>
+          {sub ? <p className={`mt-1 mb-0 text-[14px] leading-[1.4] text-ink-2 text-pretty ${keepSub ? '' : '[@media(max-height:700px)]:hidden'}`}>{sub}</p> : null}
         </div>
         {aside}
       </div>
@@ -182,14 +200,14 @@ const CONSENT_ITEMS = [
 /** One consent choice: its own unticked box, a title and a line saying what it covers. */
 function Choice({ checked, onChange, title, note, tag }: { checked: boolean; onChange: (v: boolean) => void; title: string; note: string; tag: string }) {
   return (
-    <label className={`flex cursor-pointer items-start gap-3 rounded-[16px] px-2.5 py-2 transition-colors duration-200 [@media(max-height:700px)]:py-1.5 ${checked ? 'bg-white/70' : 'hover:bg-white/40'}`}>
+    <label className={`flex cursor-pointer items-start gap-3 rounded-[16px] px-2.5 py-2 transition-colors duration-200 sm:[@media(max-height:700px)]:py-1.5 ${checked ? 'bg-white/70' : 'hover:bg-white/40'}`}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="m-0 mt-px size-5 flex-none accent-[var(--action-selected)]" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-[14px] leading-[1.35]">
           {title}
           <span className="font-mono text-[9.5px] tracking-[.08em] text-ink-2">{tag}</span>
         </span>
-        <span className="text-[12.5px] leading-[1.35] text-ink-2 [@media(max-height:760px)]:line-clamp-1">{note}</span>
+        <span className="text-[12.5px] leading-[1.35] text-ink-2 sm:[@media(max-height:760px)]:line-clamp-1">{note}</span>
       </span>
     </label>
   )
@@ -224,7 +242,6 @@ function Consent() {
   if (minor)
     return (
       <StepFrame
-        eyebrow="WILLOW IS FOR ADULTS"
         title="Thanks for telling us"
         actions={
           <>
@@ -244,26 +261,34 @@ function Consent() {
       </StepFrame>
     )
 
+  // The age check and the three choices. On a phone they scroll with the items above them, so a short screen
+  // reads every item in full; on a laptop they sit in the action bar, always in view.
+  const choices = (
+    <div className={`${card} flex flex-col gap-0.5 px-2 py-2 sm:px-3`} style={cardStyle}>
+      <div className="flex items-center justify-between gap-2 border-b border-ink/[.07] px-2.5 pt-1 pb-2">
+        <label className="flex cursor-pointer items-center gap-3 text-[14px]">
+          <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="m-0 size-5 flex-none accent-[var(--action-selected)]" />
+          I’m 18 or older
+        </label>
+        <button type="button" onClick={() => setMinor(true)} className="min-h-9 rounded-pill px-2.5 text-[13px] text-ink-2 underline underline-offset-2 hover:text-ink">
+          I’m under 18
+        </button>
+      </div>
+      <Choice checked={photos} onChange={setPhotos} tag="REQUIRED" title="Photos and measurements" note="Kept privately in the US for 30 days; skin appearance is measured from them." />
+      <Choice checked={ai} onChange={setAi} tag="REQUIRED" title="AI processing with Gemini" note="Close-ups, label photos and measurements go to Google’s Gemini to explain results." />
+      <Choice checked={share} onChange={setShare} tag="OPTIONAL" title="Share aggregate results with brands and retailers" note="Numbers only, never photos or your name; groups under 10 hidden. Brands and retailers pay for these insights." />
+    </div>
+  )
+
   return (
     <StepFrame
-      eyebrow={`CONSENT · VERSION ${fmtDate(CONSENT_VERSION, { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}`}
       title="Before your first photo"
+      sub={`Consent version ${fmtDate(CONSENT_VERSION, { day: 'numeric', month: 'short', year: 'numeric' })}`}
+      keepSub
       actions={
         <>
-          <div className={`${card} flex flex-col gap-0.5 px-2 py-2 sm:px-3`} style={cardStyle}>
-            <div className="flex items-center justify-between gap-2 border-b border-ink/[.07] px-2.5 pt-1 pb-2">
-              <label className="flex cursor-pointer items-center gap-3 text-[14px]">
-                <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="m-0 size-5 flex-none accent-[var(--action-selected)]" />
-                I’m 18 or older
-              </label>
-              <button type="button" onClick={() => setMinor(true)} className="min-h-9 rounded-pill px-2.5 text-[13px] text-ink-2 underline underline-offset-2 hover:text-ink">
-                I’m under 18
-              </button>
-            </div>
-            <Choice checked={photos} onChange={setPhotos} tag="REQUIRED" title="Photos and measurements" note="Kept privately in the US for 30 days; skin appearance is measured from them." />
-            <Choice checked={ai} onChange={setAi} tag="REQUIRED" title="AI processing with Gemini" note="Close-ups, label photos and measurements go to Google’s Gemini to explain results." />
-            <Choice checked={share} onChange={setShare} tag="OPTIONAL" title="Share aggregate results with brands and retailers" note="Numbers only, never photos or your name; groups under 10 hidden. Brands and retailers pay for these insights." />
-          </div>
+          {/* laptops: the choices stay in view under the items; phones: they scroll with the items (below) */}
+          <div className="hidden sm:block">{choices}</div>
           <button type="button" onClick={accept} disabled={!ready} className={`${primary} disabled:opacity-60`}>
             {ready ? 'Agree and continue' : !adult ? 'Confirm you’re 18 or older to continue' : 'Tick both required choices to continue'}
           </button>
@@ -273,11 +298,11 @@ function Consent() {
       <div className={`${card} overflow-hidden`} style={cardStyle}>
         {CONSENT_ITEMS.map((c, i) => (
           <div key={c.title} className="border-b border-ink/[.07] last:border-b-0">
-            <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`consent-${i}`} className="flex w-full items-center gap-3.5 px-4 py-[clamp(7px,1.1vh,12px)] text-left text-ink sm:px-5 [@media(max-height:760px)]:py-1.5">
-              <span aria-hidden className="size-8 flex-none rounded-[11px] [@media(max-height:760px)]:size-6 [@media(max-height:760px)]:rounded-[9px]" style={{ background: c.swatch, boxShadow: 'inset 0 0 10px 2px rgba(255,255,255,.6)' }} />
+            <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`consent-${i}`} className="flex w-full items-center gap-3.5 px-4 py-[clamp(7px,1.1vh,12px)] text-left text-ink sm:px-5 sm:[@media(max-height:760px)]:py-1.5">
+              <span aria-hidden className="size-8 flex-none rounded-[11px] sm:[@media(max-height:760px)]:size-6 sm:[@media(max-height:760px)]:rounded-[9px]" style={{ background: c.swatch, boxShadow: 'inset 0 0 10px 2px rgba(255,255,255,.6)' }} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-[15px]">{c.title}</span>
-                <span className={`text-[13px] leading-[1.35] text-ink-2 ${open === i || 'full' in c ? '' : 'line-clamp-1 [@media(max-height:760px)]:hidden'}`}>{c.summary}</span>
+                <span className={`text-[13px] leading-[1.35] text-ink-2 ${open === i || 'full' in c ? '' : 'line-clamp-1 sm:[@media(max-height:760px)]:hidden'}`}>{c.summary}</span>
               </span>
               <span aria-hidden className="text-[20px] text-ink-2">
                 {open === i ? '−' : '+'}
@@ -298,6 +323,7 @@ function Consent() {
           .
         </p>
       </div>
+      <div className="mt-3 sm:hidden">{choices}</div>
     </StepFrame>
   )
 }
@@ -342,9 +368,8 @@ function Goals() {
   return (
     <StepFrame
       wide
-      eyebrow={`CHOOSE UP TO ${GOAL_WORD.toUpperCase()}`}
       title="What would you like to track?"
-      sub="Goals set the order of your report. Every measurement is still shown."
+      sub={`Choose up to ${GOAL_WORD}. Goals set the order of your report; every measurement is still shown.`}
       aside={
         <span className="font-dot text-[clamp(28px,4vh,40px)] leading-none font-extrabold" role="status" aria-label={`${picked.length} of ${MAX_GOALS} goals chosen`}>
           {picked.length}/{MAX_GOALS}
@@ -406,9 +431,8 @@ function Places() {
   return (
     <StepFrame
       wide
-      eyebrow="CHOOSE ONE OR MORE"
       title="Where should Willow look?"
-      sub="Every check-in covers these places, one after another. You can change them in You."
+      sub="Choose one or more. Every check-in covers them, one after another; you can change them in You."
       actions={
         <button type="button" onClick={next} className={primary}>
           Continue <span aria-hidden>→</span>
@@ -469,9 +493,8 @@ function About() {
 
   return (
     <StepFrame
-      eyebrow="WHEN AND HOW YOU CHECK IN"
       title="A little about you"
-      sub="All of this can be changed later in You."
+      sub="When and how you check in. All of it can be changed later in You."
       actions={
         <>
           {error ? (
@@ -505,11 +528,12 @@ function About() {
           </div>
         </Field>
         <Field title="Your check-in days" note="Optional · once a week is enough">
-          <div role="group" aria-label="Check-in days" className={`${track} self-start`}>
+          {/* seven equal columns on a phone (no lone Sunday on a second line); a row of pills on a laptop */}
+          <div role="group" aria-label="Check-in days" className="grid grid-cols-7 gap-0.5 self-stretch rounded-[22px] bg-muted p-1 sm:flex sm:flex-wrap sm:self-start">
             {WEEKDAYS.map((d, i) => {
               const on = days.includes(i)
               return (
-                <button key={d} type="button" aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())} className={`${pill(on)} min-w-[40px] px-2`}>
+                <button key={d} type="button" aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())} className={`${pill(on)} min-w-0 px-0 sm:min-w-[40px] sm:px-2`}>
                   {d}
                 </button>
               )
@@ -540,7 +564,6 @@ function RoutineChoice() {
   return (
     <StepFrame
       wide
-      eyebrow="YOUR ROUTINE"
       title="Do you already use skincare?"
       sub="Willow measures your skin either way. A routine lets it say which product did what."
       actions={
@@ -610,8 +633,8 @@ function Wisp() {
 
   return (
     <StepFrame
-      eyebrow="YOUR ASSISTANT"
       title="Meet Wisp"
+      sub="Your skincare assistant, a tap away on every screen."
       actions={
         <>
           {error ? (
