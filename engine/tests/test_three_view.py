@@ -11,6 +11,7 @@ from test_face import FakeFace
 from app.pipeline_face import (
     _combine_views,
     _keeps,
+    _map_skin,
     _mark_depth_mm,
     _owns,
     _shares,
@@ -26,6 +27,24 @@ def test_each_zone_is_owned_by_one_view():
     assert not _owns("right", "left_cheek", both) and not _owns("right", "nose", both)
     assert _owns("front", "left_cheek", {"right"})  # no left photo: the front measures it
     assert _owns("front", None, both)  # unzoned marks stay with the front
+
+
+def test_side_redness_layer_covers_the_facing_cheek_and_jaw():
+    from app import facemap
+
+    code = {z: facemap.ZONES.index(z) + 1 for z in ("right_cheek", "right_jaw", "nose", "chin")}
+    label = np.zeros((4, 4), np.uint8)
+    label[0, :] = code["right_cheek"]
+    label[1, :] = code["right_jaw"]
+    label[2, :] = code["nose"]
+    label[3, :] = code["chin"]
+    patch = np.zeros((4, 4), bool)
+    patch[0, :2] = True  # the redness metric's small cheek patch
+    side = _map_skin("right", patch, label)
+    assert side[:2].all() and not side[2:].any()  # cheek and jaw, not the front's nose or chin
+    assert _map_skin("front", patch, label) is patch  # front: the metric's own skin
+    assert _map_skin("right", patch, None) is patch  # no face map: the patch, as before
+    assert _map_skin("left", patch, label) is patch  # no left-cheek skin found: the patch
 
 
 def _frame(view, zones, depths, spot_px, zone_px, px_per_mm=10.0, spot_dl=None):

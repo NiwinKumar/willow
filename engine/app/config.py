@@ -316,8 +316,9 @@ CV_THREADS = int(os.environ.get("ENGINE_CV_THREADS", "2"))  # cv2.setNumThreads 
 
 # Redness overlay (overlays/redness.png, engine 0.3.4): where the camera sees more red than
 # this person's own skin median, on the skin the redness metric measures (face: cheeks and
-# nose; cheek close-up: its skin). Descriptive only: it moves no number. Drawn at the size of
-# preview.jpg, pixel for pixel. The ramp runs from the skin's own median a* (clear) to its
+# nose; cheek close-up: its skin), and on a session's side photo the cheek and jaw it faces
+# (Nov 27). Descriptive only: it moves no number. Drawn at the size of preview.jpg, pixel for
+# pixel. The ramp runs from the skin's own median a* (clear) to its
 # OVERLAY_HIGH_PCT percentile, but over at least OVERLAY_MIN_SPAN_A a* units, so an even
 # face's camera noise is not stretched into a full-strength map.
 OVERLAY_SMOOTH_MM = 1.0  # Gaussian sigma: pores and grain out, a 3 mm red patch stays

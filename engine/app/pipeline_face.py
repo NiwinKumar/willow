@@ -200,14 +200,6 @@ def _frame(path: str, overlays: bool = False) -> dict:
     red_ok = inside(red_rois)
     redness_a = float(np.mean([med(1, n) for n in red_rois])) if red_ok else None
     red_skin = np.logical_or.reduce([roi_skin.get(n, none) for n in red_rois])
-    t_map = time.perf_counter()
-    # the redness metric's own a* and skin, on the preview grid (drawn for the reference photo)
-    redness_map = (
-        to_preview(lab[..., 1], red_skin, srgb8.shape[:2], origin=(box.x, box.y))
-        if overlays and red_ok
-        else None
-    )
-    map_ms = (time.perf_counter() - t_map) * 1000
     l_map, red = lab[..., 0], lin[..., 0]  # one crop for every region: smoothed once
     even_rois = _rois(face, EVENNESS_ROIS)
     evenness = (
@@ -344,6 +336,19 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "glow": glow_extras,
         "lines": lines_extras,
     }
+    t_map = time.perf_counter()
+    # a* on the preview grid for the redness layer (drawn for the reference photos)
+    redness_map = (
+        to_preview(
+            lab[..., 1],
+            _map_skin(face.view, red_skin, zone_label),
+            srgb8.shape[:2],
+            origin=(box.x, box.y),
+        )
+        if overlays and red_ok
+        else None
+    )
+    map_ms = (time.perf_counter() - t_map) * 1000
     return {
         "values": values,
         "extras": extras,
@@ -481,6 +486,19 @@ def _count_confirmed(good: list[dict]) -> None:
 # from the front. A side with no photo of its own is measured on the front.
 SIDE_ZONES = {"right": {"right_cheek", "right_jaw"}, "left": {"left_cheek", "left_jaw"}}
 VIEW_CODE = {"front": 0.0, "right": 1.0, "left": 2.0}  # candidate feature `view` (numbers only)
+
+
+def _map_skin(view: str, red_skin: np.ndarray, zone_label: np.ndarray | None) -> np.ndarray:
+    """The skin the redness layer is drawn on. A front photo: the redness metric's own skin
+    (cheeks and nose). A side photo: the cheek and jaw it faces, the skin its "Areas" outline
+    shows; the cheek patch alone sat on the cheekbone, so redness lower on the cheek and along
+    the jaw was never drawn (Nov 27). Moves no number: with a front photo in the session,
+    redness is read from the front."""
+    if view not in SIDE_ZONES or zone_label is None:
+        return red_skin
+    codes = [facemap.ZONES.index(z) + 1 for z in SIDE_ZONES[view]]
+    side = np.isin(zone_label, codes)
+    return side if side.any() else red_skin
 
 
 def _owns(view: str, zone: str | None, sides: set[str]) -> bool:
