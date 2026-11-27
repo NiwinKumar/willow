@@ -6,13 +6,13 @@ import type { ReactNode } from 'react'
  */
 
 /** One step: eyebrow, serif title, the content (scrolls inside only when it must) and the action bar. */
-export function Frame({ eyebrow, title, sub, aside, children, actions, wide }: { eyebrow: string; title: ReactNode; sub?: ReactNode; aside?: ReactNode; children: ReactNode; actions?: ReactNode; wide?: boolean }) {
+export function Frame({ eyebrow, title, sub, aside, children, actions, wide }: { eyebrow?: string; title: ReactNode; sub?: ReactNode; aside?: ReactNode; children: ReactNode; actions?: ReactNode; wide?: boolean }) {
   return (
     <div className={`relative mx-auto flex h-full min-h-0 w-full flex-col px-[clamp(16px,3vw,32px)] sm:justify-center sm:pb-[2vh] ${wide ? 'max-w-[1040px]' : 'max-w-[760px]'}`}>
       <div className="flex items-end justify-between gap-4 pt-[clamp(10px,2.4vh,28px)] pb-[clamp(8px,1.8vh,16px)] sm:pt-0">
         <div className="min-w-0">
-          <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {eyebrow}</span>
-          <h1 className="mt-1.5 mb-0 font-serif text-h1 font-normal sm:text-greeting [@media(max-height:700px)]:text-[28px]">{title}</h1>
+          {eyebrow ? <span className="mb-1.5 block font-mono text-[11px] tracking-[.08em] text-ink-2">■ {eyebrow}</span> : null}
+          <h1 className="mb-0 font-serif text-h1 font-normal sm:text-greeting [@media(max-height:700px)]:text-[28px]">{title}</h1>
           {sub ? <p className="mt-1 mb-0 text-[14px] leading-[1.4] text-ink-2 [@media(max-height:640px)]:hidden">{sub}</p> : null}
         </div>
         {aside}

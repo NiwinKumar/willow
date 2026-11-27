@@ -159,8 +159,9 @@ function Progress({ step }: { step: StepId }) {
   const at = STEP_IDS.indexOf(step)
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-      <span key={step} className="animate-[wWord_.35s_both] font-mono text-[10.5px] tracking-[.08em] text-ink-2" aria-live="polite">
-        {STAGE_NAME[step].toUpperCase()}
+      {/* the bar says where you are; the stage name is for screen readers only */}
+      <span className="sr-only" aria-live="polite">
+        {STAGE_NAME[step]}
       </span>
       <ol aria-label={`Build a routine: ${STAGE_NAME[step]}`} className="m-0 flex w-full max-w-[300px] list-none gap-1 p-0">
         {STEP_IDS.map((id, i) => (
