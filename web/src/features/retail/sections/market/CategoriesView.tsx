@@ -9,7 +9,7 @@ import { fetchBrandList, useProducts } from '../../productData'
 import { TIER_ORDER } from '../../productModel'
 import { sectionPath, useRetailState } from '../../state'
 import type { ProductRow } from '../../types'
-import { Button, DataTable, EmptyState, EvidenceBar, int, LiftValue, MIN_GROUP, Panel, pct, ProductCell, ProofTierChip, pts, RateCell, Segmented, Suppressed, TIERS, useTooltip, type Column } from '../../ui'
+import { Button, DataTable, EmptyState, EvidenceBar, HeadTip, int, LiftValue, MIN_GROUP, Panel, pct, ProductCell, ProofTierChip, pts, RateCell, Segmented, Suppressed, TIERS, useTooltip, type Column } from '../../ui'
 import { useView } from '../../useView'
 import { YoursTag } from '../shared'
 import { MarketFrame, PanelBone } from './Frame'
@@ -59,7 +59,7 @@ export function CategoriesView({ d }: { d: Insights }) {
     ) : (
       <>
         In {cat.label.toLowerCase()} for {top.goal.toLowerCase()}, <strong>{pct(top.rate)}</strong> of {int(top.n)} people saw a visible change by week {top.weeks.at(-1)}
-        {top.base ? <>, against {pct(top.base.rate)} of non-users with the goal</> : null}.
+        {top.base ? <>; {pct(top.base.rate)} of people with the goal not using {cat.label.toLowerCase()} changed anyway</> : null}.
       </>
     )
 
@@ -70,10 +70,10 @@ export function CategoriesView({ d }: { d: Insights }) {
         <Segmented label="Product type" value={cat.category} onChange={(c) => setParam({ category: c, goal: null })} options={cats.map((c) => ({ value: c.category, label: c.label }))} />
       </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 xl:items-start">
-        <Panel title="Visible change by goal" id="flows-h" description={<FlowLegend />} className="xl:col-span-7" footnote={`Share of ${cat.label.toLowerCase()} users with the goal whose visible change (held to week ${top.weeks.at(-1)}) had begun by each week; non-users are people with the goal not using the category, at week ${top.weeks.at(-1)}.`}>
+        <Panel title="Visible change by goal" id="flows-h" description={<FlowLegend cat={cat.label.toLowerCase()} />} className="xl:col-span-7" footnote={`Bars: share of ${cat.label.toLowerCase()} users with the goal whose visible change (held to week ${top.weeks.at(-1)}) had begun by each week. Dashed line: people with the same goal not using any ${cat.label.toLowerCase()}, at week ${top.weeks.at(-1)}.`}>
           <ul className="-mx-3 my-0 grid list-none grid-cols-1 gap-x-2 gap-y-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
             {flows.map((f) => (
-              <FlowCell key={f.goal_id} f={f} on={f.goal_id === param('goal')} />
+              <FlowCell key={f.goal_id} f={f} on={f.goal_id === param('goal')} cat={cat.label.toLowerCase()} />
             ))}
           </ul>
         </Panel>
@@ -86,7 +86,7 @@ export function CategoriesView({ d }: { d: Insights }) {
   )
 }
 
-function FlowLegend() {
+function FlowLegend({ cat }: { cat: string }) {
   return (
     <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
       <span className="inline-flex items-center gap-1.5">
@@ -95,14 +95,14 @@ function FlowLegend() {
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className="inline-block w-4 border-t-2 border-dashed border-ink-2" />
-        Non-users at week 8
+        Same goal, not using {cat}, week 8
       </span>
     </span>
   )
 }
 
 /** One goal: bars for weeks 2, 4 and 8 (users) on a shared 0–100% scale; dashed: non-users at week 8. */
-function FlowCell({ f, on }: { f: Flow; on: boolean }) {
+function FlowCell({ f, on, cat }: { f: Flow; on: boolean; cat: string }) {
   const last = f.weeks.length - 1
   const bars = f.weeks.map((w, i) => ({ w, v: f.n ? f.changed[i] / f.n : 0 }))
   const lift = f.base ? f.rate - f.base.rate : null
@@ -134,12 +134,20 @@ function FlowCell({ f, on }: { f: Flow; on: boolean }) {
         </div>
         <figcaption className="sr-only">
           {f.goal}, {int(f.n)} people: {bars.map((b) => `${pct(b.v)} by week ${b.w}`).join(', ')}
-          {f.base ? `; non-users ${pct(f.base.rate)} of ${int(f.base.n)}` : `; non-users: fewer than ${MIN_GROUP}`}.
+          {f.base ? `; people with the goal not using ${cat}: ${pct(f.base.rate)} of ${int(f.base.n)}` : `; people not using ${cat}: fewer than ${MIN_GROUP}`}.
         </figcaption>
       </figure>
-      <div className="flex items-baseline justify-between gap-2 border-t border-line pt-2 text-proof-small">
-        <span className="text-ink-2">{f.base ? <>Non-users {pct(f.base.rate)}</> : <>Non-users</>}</span>
-        {lift === null ? <Suppressed short /> : <span className={`tnum ${Math.round(lift * 100) > 0 ? 'text-proof-leaf' : 'text-ink-2'}`}>{pts(lift)}</span>}
+      <div className="flex items-start justify-between gap-2 border-t border-line pt-2 text-proof-small">
+        <span className="min-w-0 text-ink-2 [text-wrap:pretty]">
+          {f.base ? (
+            <>
+              Not using {cat}: <span className="font-medium text-ink tnum">{pct(f.base.rate)}</span> changed anyway
+            </>
+          ) : (
+            <>Not using {cat}: fewer than {MIN_GROUP}</>
+          )}
+        </span>
+        {lift === null ? <Suppressed short /> : <span title="Lift: users minus people with the goal not using it" className={`shrink-0 tnum ${Math.round(lift * 100) > 0 ? 'text-proof-leaf' : 'text-ink-2'}`}>{pts(lift)}</span>}
       </div>
     </li>
   )
@@ -209,26 +217,27 @@ function TopProducts({ cat, d, mine }: { cat: Category; d: Insights; mine: strin
     )
   const all = state.d.products.filter((r) => r.category === cat.category)
   const rows = [...all]
-    .sort((a, b) => TIER_ORDER[b.tier] - TIER_ORDER[a.tier] || (b.rate ?? -1) - (a.rate ?? -1) || (b.n ?? 0) - (a.n ?? 0))
+    // Top = the most extra change over not using it (lift), within status: many products reach 100% on their own users.
+    .sort((a, b) => TIER_ORDER[b.tier] - TIER_ORDER[a.tier] || (b.lift ?? -1) - (a.lift ?? -1) || (b.n ?? 0) - (a.n ?? 0))
     .slice(0, TOP)
     .map((r) => (names.anonymise && r.brand !== names.own ? { ...r, product: productAlias(names.name(r.brand)), brand: names.name(r.brand), image_url: null } : r))
   const allHref = `${sectionPath('products')}${carry ? `${carry}&` : '?'}category=${encodeURIComponent(cat.category)}`
   const cols: Column<ProductRow>[] = [
-    { id: 'product', header: 'Product', rowHeader: true, cell: (r) => <ProductCell p={r} size={28} tag={mine === r.brand ? <YoursTag /> : null} />, csv: (r) => `${r.product} (${r.brand})` },
-    { id: 'tier', header: 'Proof', headerText: 'Proof status', width: '150px', cell: (r) => <ProofTierChip tier={r.tier} size="sm" />, csv: (r) => TIERS[r.tier].label },
-    { id: 'rate', header: 'Visible change', headerText: 'Visible change by week 8 (%)', align: 'right', width: '140px', cell: (r) => (r.rate === null ? <span className="text-proof-small text-ink-2">{r.reason === 'not_measured' ? 'Not measured' : r.reason === 'unused' ? 'No users yet' : `n<${MIN_GROUP}`}</span> : <RateCell rate={r.rate} n={r.n} lo={r.rate_lo} hi={r.rate_hi} />), csv: (r) => (r.rate === null ? (r.reason ?? 'suppressed') : Math.round(r.rate * 100)) },
-    { id: 'lift', header: 'vs non-users', headerText: 'Lift vs non-users (pts)', align: 'right', width: '110px', cell: (r) => (r.rate === null ? <span className="text-ink-3">—</span> : <LiftValue lift={r.lift} lo={r.lift_lo} hi={r.lift_hi} />), csv: (r) => (r.lift === null ? '' : Math.round(r.lift * 100)) },
+    { id: 'product', header: 'Product', rowHeader: true, cell: (r) => <ProductCell p={r} size={28} logo tag={mine === r.brand ? <YoursTag /> : null} />, csv: (r) => `${r.product} (${r.brand})` },
+    { id: 'tier', header: 'Status', headerText: 'Proof status', width: '150px', cell: (r) => <ProofTierChip tier={r.tier} size="sm" />, csv: (r) => TIERS[r.tier].label },
+    { id: 'rate', header: 'Users who changed', headerText: 'Users with a visible change by week 8 (%)', align: 'right', width: '140px', cell: (r) => (r.rate === null ? <span className="text-proof-small text-ink-2">{r.reason === 'not_measured' ? 'Not measured' : r.reason === 'unused' ? 'No users yet' : `n<${MIN_GROUP}`}</span> : <RateCell rate={r.rate} n={r.n} lo={r.rate_lo} hi={r.rate_hi} />), csv: (r) => (r.rate === null ? (r.reason ?? 'suppressed') : Math.round(r.rate * 100)) },
+    { id: 'lift', header: <HeadTip label="Lift" tip="Users who changed minus people with the same goals not using it, in points. Hover a value for its 95% interval." />, headerText: 'Lift vs same goals, not using it (pts)', align: 'right', width: '110px', cell: (r) => (r.rate === null ? <span className="text-ink-3">—</span> : <LiftValue lift={r.lift} lo={r.lift_lo} hi={r.lift_hi} />), csv: (r) => (r.lift === null ? '' : Math.round(r.lift * 100)) },
     { id: 'cont8', header: 'Still using', headerText: 'Still using at week 8 (%)', align: 'right', width: '96px', cell: (r) => (r.rate === null ? <span className="text-ink-3">—</span> : r.cont8 === null ? <Suppressed short /> : <span className="tnum">{pct(r.cont8)}</span>), csv: (r) => (r.rate === null ? '' : r.cont8 === null ? 'suppressed' : Math.round(r.cont8 * 100)) },
   ]
   return (
     <Panel flush>
       <DataTable
-        caption={`Top ${rows.length} ${cat.label.toLowerCase()} by Proof status and visible change`}
+        caption={`Top ${rows.length} ${cat.label.toLowerCase()} by Proof status and lift`}
         heading={<h2 className="m-0 text-proof-h text-ink">Top products in {cat.label.toLowerCase()}</h2>}
         toolbar={
           all.length > rows.length ? (
             <Button kind="ghost" to={allHref}>
-              All {all.length} in Products
+              All {int(all.length)} in Products
               <ArrowRight size={14} strokeWidth={1.6} aria-hidden />
             </Button>
           ) : null

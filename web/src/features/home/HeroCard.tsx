@@ -13,7 +13,6 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
   const [now] = useState(() => new Date())
   const hr = now.getHours()
   const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening'
-  const date = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase()
   return (
     <section
       aria-label="Today"
@@ -31,8 +30,7 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
         className="absolute inset-0 -z-10 opacity-55 mix-blend-overlay"
         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E\")" }}
       />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="font-mono text-[11px] tracking-[.08em]">■ {date}</span>
+      <div className="flex min-h-8 flex-wrap items-center justify-end gap-3">
         {/* The check-in schedule: "Check-in due today", "2 days late", "Next check-in Sat 17 Oct". */}
         {next ? <span className="rounded-pill bg-white/55 px-3 py-1.5 text-[12.5px] backdrop-blur-[10px]">{next}</span> : null}
       </div>

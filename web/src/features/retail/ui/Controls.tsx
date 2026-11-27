@@ -1,6 +1,8 @@
 import { ChevronDown, Search } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 
+import { int } from './format'
+
 /**
  * Text tabs with an underline indicator (docs/DESIGN.md Tabs): role tablist/tab, roving tabindex, ←/→/Home/End.
  * `panelId` links each tab to the panel it controls. `count` adds a quiet number after the label.
@@ -27,8 +29,32 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
     if (left < row.scrollLeft) row.scrollLeft = left
     else if (left + tab.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = left + tab.offsetWidth - row.clientWidth
   }, [value])
+  // The underline slides to the chosen tab (measured, so labels of any width work); it appears in place first.
+  const bar = useRef<HTMLSpanElement>(null)
+  const placed = useRef(false)
+  useLayoutEffect(() => {
+    const row = ref.current
+    const tab = row?.querySelector<HTMLElement>(`[data-tab="${value}"]`)
+    const el = bar.current
+    if (!row || !tab || !el) return
+    const place = () => {
+      el.style.transform = `translateX(${tab.offsetLeft}px)`
+      el.style.width = `${tab.offsetWidth}px`
+    }
+    if (!placed.current) {
+      el.style.transition = 'none'
+      place()
+      void el.offsetWidth
+      el.style.transition = ''
+      placed.current = true
+    } else place()
+    const ro = new ResizeObserver(place)
+    ro.observe(tab)
+    return () => ro.disconnect()
+  }, [value, tabs.length])
   return (
-    <div ref={ref} role="tablist" aria-label={label} onKeyDown={move} className="no-scrollbar flex max-w-full gap-6 overflow-x-auto border-b border-line">
+    <div ref={ref} role="tablist" aria-label={label} onKeyDown={move} className="no-scrollbar relative flex max-w-full gap-6 overflow-x-auto border-b border-line">
+      <span ref={bar} aria-hidden className="pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-ink transition-[transform,width] duration-200 ease-[var(--ease-standard)] motion-reduce:transition-none" />
       {tabs.map((t) => {
         const on = t.id === value
         return (
@@ -41,10 +67,10 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, panelId }
             aria-controls={panelId}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(t.id)}
-            className={`relative -mb-px flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap border-0 border-b-2 bg-transparent px-0.5 text-proof-body transition-colors duration-150 ${on ? 'border-ink text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}
+            className={`relative flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap border-0 bg-transparent px-0.5 text-proof-body transition-colors duration-150 ${on ? 'text-ink' : 'text-ink-2 hover:text-ink'}`}
           >
             {t.label}
-            {t.count !== undefined && t.count !== null ? <span className="rounded-pill bg-sunken px-1.5 text-proof-label text-ink-2 tnum">{t.count}</span> : null}
+            {t.count !== undefined && t.count !== null ? <span className="rounded-pill bg-sunken px-1.5 text-proof-label text-ink-2 tnum">{int(t.count)}</span> : null}
           </button>
         )
       })}

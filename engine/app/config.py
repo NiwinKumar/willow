@@ -63,6 +63,7 @@ MIN_SD = {
     "texture": 0.05,  # index
 }
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
+ZONE_MIN_MM2 = 50.0  # a face-map zone needs this much skin in a photo for a by-zone reading
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
@@ -315,8 +316,9 @@ CV_THREADS = int(os.environ.get("ENGINE_CV_THREADS", "2"))  # cv2.setNumThreads 
 
 # Redness overlay (overlays/redness.png, engine 0.3.4): where the camera sees more red than
 # this person's own skin median, on the skin the redness metric measures (face: cheeks and
-# nose; cheek close-up: its skin). Descriptive only: it moves no number. Drawn at the size of
-# preview.jpg, pixel for pixel. The ramp runs from the skin's own median a* (clear) to its
+# nose; cheek close-up: its skin), and on a session's side photo the cheek and jaw it faces
+# (Nov 27). Descriptive only: it moves no number. Drawn at the size of preview.jpg, pixel for
+# pixel. The ramp runs from the skin's own median a* (clear) to its
 # OVERLAY_HIGH_PCT percentile, but over at least OVERLAY_MIN_SPAN_A a* units, so an even
 # face's camera noise is not stretched into a full-strength map.
 OVERLAY_SMOOTH_MM = 1.0  # Gaussian sigma: pores and grain out, a 3 mm red patch stays
@@ -436,7 +438,16 @@ FACE_ZONES = (
     "left_jaw",
 )
 FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as forehead
+NOSE_BRIDGE_WIDTH_FRAC = 0.8  # the nose zone's bridge: this share of the inner eye corners' spread
 MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
+# A session with side photos (pipeline_face._assign_views): a side photo also measures the chin
+# and around-mouth skin on its half of the face wherever it sees that skin more squarely than the
+# front photo (facemap.facing, about the cosine of the angle to the camera) by this margin. On
+# the Nov 27 check-in (cheek photos turned ~50 degrees) that is 12 of the 22 chin triangles on
+# each side and about 25 of the 99 around the mouth: the side of the chin, which the front sees
+# at a slant and where a mark was in no photo's area.
+SIDE_REACH_ZONES = ("chin", "around_mouth")
+SIDE_FACING_MARGIN = 0.1
 FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
 FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)
 AREA_OUTLINE_MM = 1.0  # result.rois zone outlines simplified to this (fewer points, same shape)

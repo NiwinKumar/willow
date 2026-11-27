@@ -68,7 +68,6 @@ export function SkinStep() {
   return (
     <Frame
       wide
-      eyebrow="QUESTION 1 · YOUR SKIN"
       title="How does your skin usually feel?"
       sub="By early afternoon, on a normal day, without much on it."
       actions={
@@ -87,7 +86,7 @@ export function SkinStep() {
               role="radio"
               aria-checked={on}
               onClick={() => set({ skin_type: s.id })}
-              className="w-lift-sm relative flex h-[clamp(132px,22vh,200px)] flex-col justify-between overflow-hidden rounded-[24px] p-3 text-left transition-[box-shadow,transform] duration-300 ease-standard active:scale-[.97] sm:p-3.5"
+              className="w-lift-sm relative flex h-[clamp(132px,22vh,200px)] flex-col justify-between overflow-hidden rounded-[24px] px-4 pt-3 pb-5 text-left transition-[box-shadow,transform] duration-300 ease-standard active:scale-[.97] sm:px-5 sm:pt-4 sm:pb-6"
               style={{ ...stagger(i), background: s.bg, color: s.fg, boxShadow: on ? 'inset 0 0 0 2px #121212, inset 0 0 30px 4px rgba(255,255,255,.35)' : 'inset 0 0 30px 4px rgba(255,255,255,.35), 0 18px 40px -32px rgba(0,0,0,.45)' }}
             >
               <span className="flex items-start justify-between">
@@ -142,7 +141,6 @@ export function GoalsStep() {
   return (
     <Frame
       wide
-      eyebrow={`QUESTION 2 · CHOOSE UP TO ${PLAN_MAX_GOALS}`}
       title="What would you like to change?"
       sub="Your first choice leads: it picks the plan's first active. The others shape the rest."
       aside={
@@ -175,11 +173,11 @@ export function GoalsStep() {
               onClick={() => toggle(g.id)}
               aria-pressed={on}
               aria-label={`${g.label}${on ? `, choice ${at + 1}` : ''}`}
-              className="w-lift-sm relative flex h-[clamp(76px,13vh,128px)] flex-col justify-between rounded-[24px] p-3 text-left transition-[box-shadow,transform] duration-300 ease-standard active:scale-[.97] sm:p-3.5"
+              className="w-lift-sm relative flex h-[clamp(76px,13vh,128px)] flex-col justify-between rounded-[24px] px-4 pt-3 pb-4 text-left transition-[box-shadow,transform] duration-300 ease-standard active:scale-[.97] sm:px-5 sm:pt-3.5 sm:pb-5"
               style={{ ...stagger(i, 20, 35), background: look.bg, color: look.fg, boxShadow: on ? 'inset 0 0 0 2px #121212, inset 0 0 30px 4px rgba(255,255,255,.35)' : 'inset 0 0 30px 4px rgba(255,255,255,.35), 0 18px 40px -32px rgba(0,0,0,.45)' }}
             >
               <span className="flex items-start justify-between gap-1.5">
-                <span className="truncate text-[12px] leading-[1.25] opacity-80">{GOAL_NOTE[g.id]}</span>
+                <span className="line-clamp-2 min-w-0 text-[12px] leading-[1.25] opacity-80">{GOAL_NOTE[g.id]}</span>
                 <Tick on={on} n={on ? at + 1 : undefined} light />
               </span>
               <span className="text-[clamp(16px,2.2vh,20px)] leading-[1.1] tracking-[-0.01em]">{g.label}</span>
@@ -202,7 +200,6 @@ export function CareStep() {
   }
   return (
     <Frame
-      eyebrow="QUESTION 3 · GOOD TO KNOW"
       title="A few things to leave out"
       sub="Each answer removes products, never adds them. Kept private to your account."
       actions={
@@ -265,7 +262,6 @@ export function BudgetStep() {
   return (
     <Frame
       wide
-      eyebrow="QUESTION 4 · BUDGET AND RANGE"
       title="What fits your budget?"
       sub={cur === m.currency ? `Prices in ${cur}, as listed for ${m.label}. Willow never converts a price.` : `Prices in ${cur}: Willow doesn't have enough ${m.currency} prices for ${m.label} yet, and never converts a price.`}
       actions={
@@ -283,6 +279,7 @@ export function BudgetStep() {
           <output htmlFor="plan-budget" className="font-dot text-[clamp(40px,7vh,64px)] leading-[.9] font-extrabold tabular-nums">
             {money(draft.budget, cur)}
           </output>
+          {/* A 44px touch box drawn as the 8px track (padding, content-box background) that takes 8px of layout. */}
           <input
             id="plan-budget"
             type="range"
@@ -292,8 +289,8 @@ export function BudgetStep() {
             value={Math.min(Math.max(draft.budget, range.min), range.max)}
             onChange={(e) => set({ budget: Number(e.target.value) })}
             aria-valuetext={`${money(draft.budget, cur)} per product`}
-            className="h-2 w-full cursor-pointer appearance-auto rounded-pill accent-[var(--action-selected)]"
-            style={{ background: `linear-gradient(90deg, var(--action-selected) ${pct}%, rgba(18,18,18,.12) ${pct}%)` }}
+            className="relative -my-[18px] h-11 w-full cursor-pointer appearance-auto rounded-pill bg-clip-content py-[18px] accent-[var(--action-selected)]"
+            style={{ backgroundImage: `linear-gradient(90deg, var(--action-selected) ${pct}%, rgba(18,18,18,.12) ${pct}%)` }}
           />
           <span className="flex justify-between font-mono text-[10.5px] text-ink-2">
             <span>{money(range.min, cur)}</span>

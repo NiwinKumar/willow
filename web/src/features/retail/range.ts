@@ -1,4 +1,5 @@
 import type { ProductRow } from './types'
+import { int } from './ui/format.ts'
 
 /*
  * "Connect your range" (research/finals/06 §6.3), the pure parts: read a retailer's item file (CSV), match each
@@ -162,10 +163,10 @@ export function coverage(rows: Pick<MatchedRow, 'status' | 'match'>[]): Coverage
   return c
 }
 
-/** "152 products in range: 43 measured, 21 collecting, 88 with no users yet." */
+/** "3,227 products in range: 1,495 measured, 21 collecting, 88 with no users yet." (thousands separated) */
 export function coverageSentence(c: Coverage): string {
-  const parts = [`${c.measured} measured`, c.collecting ? `${c.collecting} collecting` : null, c.no_users ? `${c.no_users} with no users yet` : null, c.not_measured ? `${c.not_measured} not measurable by photo` : null, c.unrecognised ? `${c.unrecognised} not recognised` : null].filter(Boolean)
-  return `${c.total} ${c.total === 1 ? 'product' : 'products'} in range: ${parts.join(', ')}.`
+  const parts = [`${int(c.measured)} measured`, c.collecting ? `${int(c.collecting)} collecting` : null, c.no_users ? `${int(c.no_users)} with no users yet` : null, c.not_measured ? `${int(c.not_measured)} not measurable by photo` : null, c.unrecognised ? `${int(c.unrecognised)} not recognised` : null].filter(Boolean)
+  return `${int(c.total)} ${c.total === 1 ? 'product' : 'products'} in range: ${parts.join(', ')}.`
 }
 
 const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)

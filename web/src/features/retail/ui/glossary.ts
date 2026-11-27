@@ -8,15 +8,15 @@ export const GLOSSARY = {
   },
   proof_tier: {
     term: 'Proof tier',
-    text: 'Proven: 30+ people and the lift’s 95% interval is above zero. Promising: 10+ people and a positive lift, but fewer than 30 people or an interval that still includes zero. No clear effect yet: no lift over non-users. Not enough data: fewer than 10 people.',
+    text: 'Proven: 30+ people and the lift’s 95% interval is above zero. Promising: 10+ people and a positive lift, but fewer than 30 people or an interval that still includes zero. No clear effect yet: users change about as often as people with the same goals not using it. Not enough data: fewer than 10 people.',
   },
   lift: {
     term: 'Lift',
     text: 'The product’s visible-change rate minus the rate of people with the same goal who don’t use it, in percentage points. An association, not proof of cause: people chose their own products.',
   },
   base_rate: {
-    term: 'Non-users',
-    text: 'People with an overlapping goal and 8 weeks of readings who don’t use the product. Shown only when there are 10 or more of them.',
+    term: 'Same goals, not using it',
+    text: 'The comparison group: people with an overlapping goal and 8 weeks of readings who don’t use the product. Some of them change anyway (other products, season, habits), so a product is judged by the gap between its users and them. Shown only when there are 10 or more of them.',
   },
   interval: {
     term: '95% interval',

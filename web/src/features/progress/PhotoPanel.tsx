@@ -84,7 +84,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
   const spotsHere = siteHasSpots(session.site)
   const expired = !session.preview && photoExpired(session)
   const missing = expired ? 'Photos are deleted 30 days after upload. The measurements stay.' : 'No photo preview for this check-in. The numbers are measured from your photos.'
-  const caption = `YOUR PHOTO · ${fmtDate(session.created_at).toUpperCase()}`
+  const caption = `Your photo · ${fmtDate(session.created_at)}`
 
   const rednessUrl = (sv ? sv.redness_url : own?.overlay_urls?.redness) ?? null
   const crops = own?.crop_urls ?? {}
@@ -156,7 +156,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
           ) : null}
         </div>
         {/* What photo this is, on the card under the photo (over it, it covered the face). */}
-        <span className="px-2 pb-0.5 font-mono text-[11px] tracking-[.06em] text-ink-2">{caption}</span>
+        <span className="px-2 pb-0.5 text-[12.5px] text-ink-2">{caption}</span>
         {openRegion ? <RegionCard region={openRegion} onOpen={onOpenMetric} onClose={() => setRegion(null)} /> : null}
         {canCompare ? (
           // Pinned to the card's foot, so the photo card and the spots column end on one line.
@@ -184,7 +184,7 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
             <div className="flex flex-wrap items-baseline justify-between gap-2.5">
               <h3 className="m-0 text-[24px] font-normal">Detected spots</h3>
               <span className="font-dot text-[30px] font-extrabold text-lime" aria-label={`${skin.length} skin ${skin.length === 1 ? 'finding' : 'findings'}`}>
-                {String(skin.length).padStart(2, '0')}
+                {skin.length}
               </span>
             </div>
             <p className="m-0 text-[14px] leading-[1.45] text-white/75">
@@ -220,9 +220,9 @@ export const PhotoPanel = forwardRef<HTMLElement, Props>(function PhotoPanel({ s
                 {groups.map((g) => (
                   <div key={g.v} role={multi ? 'group' : undefined} aria-label={multi ? `${GROUP_LABEL[g.v]}: ${g.items.length} ${g.items.length === 1 ? 'spot' : 'spots'}` : undefined} className="flex flex-col gap-1">
                     {multi ? (
-                      <span aria-hidden className="flex items-baseline justify-between px-3 pt-2.5 pb-0.5 font-mono text-[11px] tracking-[.06em] text-white/60">
-                        {GROUP_LABEL[g.v].toUpperCase()}
-                        <span>{String(g.items.length).padStart(2, '0')}</span>
+                      <span aria-hidden className="flex items-baseline justify-between px-3 pt-2.5 pb-0.5 text-[12.5px] text-white/65">
+                        {GROUP_LABEL[g.v]}
+                        <span className="font-mono tnum">{g.items.length}</span>
                       </span>
                     ) : null}
                     {multi && !g.items.length ? <span className="px-3 pb-1 text-[13px] text-white/60">No spots found on this photo.</span> : null}

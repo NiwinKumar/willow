@@ -98,8 +98,7 @@ export default function Checks() {
 
       <main className="relative mx-auto flex w-full max-w-[820px] animate-[wRiseLg_.6s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-5 pb-12">
         <div className="px-1 pt-[clamp(20px,4vw,40px)] pb-2">
-          <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ HOW WE CHECK PRODUCTS</span>
-          <h1 className="mt-3.5 mb-0 font-serif text-[clamp(40px,5.6vw,68px)] leading-[.98] font-normal tracking-[-0.01em]">What we flag, what we don’t, and why</h1>
+          <h1 className="mb-0 font-serif text-[clamp(40px,5.6vw,68px)] leading-[.98] font-normal tracking-[-0.01em]">What we flag, what we don’t, and why</h1>
           <p className="mt-4 mb-0 max-w-[640px] text-[17px] leading-[1.5] text-[#3E3C38]">Every product’s ingredient list is checked against what you told Willow, with fixed rules from published sources. AI never adds or removes a flag.</p>
         </div>
 

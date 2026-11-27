@@ -151,13 +151,13 @@ export default function ProductTest() {
     test && td ? (
       <section aria-label="Test plan" className="flex flex-wrap items-center gap-x-8 gap-y-4 rounded-[36px] p-[clamp(20px,3vw,28px)] text-willow-900 squircle" style={{ background: 'radial-gradient(120% 140% at 0% 0%, #B8E986 0%, transparent 55%), radial-gradient(120% 140% at 100% 100%, #4FB866 0%, transparent 60%), #DDF3C9' }}>
         <div className="flex flex-[1_1_300px] flex-col gap-2">
-          <span className="font-mono text-[12px] tracking-[.08em]">■ ON YOUR FOREARM · SINCE {fmtDate(test.started_at).toUpperCase()}</span>
           <span className="text-[clamp(20px,2.2vw,26px)] tracking-[-0.01em]">{test.name}</span>
+          <span className="-mt-1 text-[13px] opacity-80">On your forearm since {fmtDate(test.started_at)}</span>
           <span className="text-[14px] leading-[1.45]">{td.ready ? (td.complete ? 'The plan is complete. Keep photographing to follow it further, or end the test.' : 'Past day 14: each check-in below gets a verdict.') : `Too early for a verdict: Willow gives one after day ${VERDICT_AFTER_DAYS}. Keep photographing both arms together every few days.`}</span>
           <span className="flex flex-wrap items-center gap-2 pt-1">
             <label className="flex items-center gap-2 text-[13px]">
               Length
-              <select value={test.length_days} disabled={lengthBusy} onChange={(e) => void setLength(Number(e.target.value))} className="min-h-11 rounded-pill bg-white/70 px-3 text-[14px] text-ink">
+              <select value={test.length_days} disabled={lengthBusy} onChange={(e) => void setLength(Number(e.target.value))} className="min-h-11 rounded-pill bg-white/70 px-3 text-[16px] text-ink sm:text-[14px]">
                 {Array.from({ length: (MAX_TEST_DAYS - MIN_TEST_DAYS) / 7 + 1 }, (_, i) => MIN_TEST_DAYS + i * 7).map((d) => (
                   <option key={d} value={d}>
                     {d} days
@@ -296,11 +296,11 @@ export default function ProductTest() {
     <Page label="Product test">
       {crumb}
       <div className="flex flex-wrap items-end justify-between gap-3 pt-[clamp(8px,2vw,24px)] pb-2">
-        <div className="flex flex-col gap-2.5">
-          <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">
-            ■ {test ? test.name.toUpperCase() : 'TREATED VS CONTROL'} · {td ? `DAY ${td.day} OF ${td.of}` : `DAY ${dayN}`} · {look.short}
-          </span>
+        <div className="flex flex-col gap-2">
           <h1 className="m-0 font-serif text-[clamp(31px,3vw,44px)] leading-[.9] font-normal">Treated arm vs control arm</h1>
+          <span className="text-[14px] text-ink-2">
+            {test ? test.name : 'Product test'} · {td ? `day ${td.day} of ${td.of}` : `day ${dayN}`} · {look.name}
+          </span>
         </div>
         <div className="flex flex-wrap justify-end gap-1.5">
           {hasRedness ? (

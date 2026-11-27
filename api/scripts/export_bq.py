@@ -122,11 +122,9 @@ def product_rows() -> list[dict]:
             "brand": p["brand"],
             "name": p["name"],
             "category": p["category"],
-            "concerns": p["concerns"],
+            "concerns": cohort.concerns_of(p),
             "goals": cohort.product_goals(p),
-            "target_metrics": sorted(
-                {m for c in p["concerns"] for m in cohort.CONCERN_METRICS.get(c, [])}
-            ),
+            "target_metrics": cohort.product_metrics(p),
             "price_amount": float(p["price"]["amount"]) if p.get("price") else None,
             "price_currency": p["price"]["currency"] if p.get("price") else None,
             "tier": cohort.tier(p["price"]),
@@ -249,7 +247,7 @@ def real_rows(store) -> dict[str, list[dict]]:
                     "product_id": p["product_id"],
                     "brand": p["brand"],
                     "category": p["category"],
-                    "concerns": p["concerns"],
+                    "concerns": cohort.concerns_of(p),
                     "tier": cohort.tier(p["price"]),
                     "started_week": max(0, (began.date() - start.date()).days // 7) if began else 0,
                     "stopped_week": max(0, (ended.date() - start.date()).days // 7)

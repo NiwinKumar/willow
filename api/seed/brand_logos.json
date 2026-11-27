@@ -1,0 +1,1202 @@
+{
+  "111SKIN": {
+    "logo_url": "https://111skin.com/cdn/shop/files/FAVICON.jpg?crop=center&height=180&v=1666788919&width=180",
+    "source": "https://111skin.com/en-row",
+    "kind": "icon"
+  },
+  "AESTURA": {
+    "logo_url": "https://int.aestura.com/cdn/shop/files/e61b53a6476c20f2e4f6acc41eecd0f3.png?v=1742529375&width=180",
+    "source": "https://int.aestura.com/",
+    "kind": "icon"
+  },
+  "ALBION": {
+    "logo_url": "https://www.albion-cosmetics.com/src/region/common/pc/common/apple-touch-icon.png",
+    "source": "https://www.albion-cosmetics.com/global",
+    "kind": "touch-icon"
+  },
+  "APLB": {
+    "logo_url": "https://www.aplbskincare.com/wp-content/uploads/2026/08/0CnUll2UUlK_WkMFdtJAqQ@2k.png",
+    "source": "https://www.aplbskincare.com/",
+    "kind": "touch-icon"
+  },
+  "Acnestar": {
+    "logo_url": "https://www.acnestar.com/assets/img/favicon.png",
+    "source": "https://acnestar.com/",
+    "kind": "icon"
+  },
+  "Aesop": {
+    "logo_url": "https://sa.aesop.com/cdn/shop/files/Aesop_App_Logo_512x512_25e34dc1-05cd-4a7b-a851-b1be6cf701af.png?crop=center&height=180&v=1788946198&width=180",
+    "source": "https://sa.aesop.com/",
+    "kind": "icon"
+  },
+  "Ahaglow": {
+    "logo_url": "https://assets.ahaglow.com/Logo_SVG_9e397409e2_f379537246.svg",
+    "source": "https://ahaglow.com/",
+    "kind": "org-logo"
+  },
+  "Alastin": {
+    "logo_url": "https://alastin.com/cdn/shop/files/Alastin_Favicon_32x32.png?v=1738177346",
+    "source": "https://alastin.com/",
+    "kind": "icon"
+  },
+  "Allie": {
+    "logo_url": "https://allie.in/lovable-uploads/1c911846-500d-4749-84a2-9f64b4dbbe96.png",
+    "source": "https://allie.in/",
+    "kind": "icon"
+  },
+  "Allies of Skin": {
+    "logo_url": "https://alliesofskinskincare.com/images/alliesofskinskincare.com/images/branding/aos-dots-logo-black-2x-5badc359-150f-45a0-a0c8-6738e660f561.png",
+    "source": "https://alliesofskinskincare.com/",
+    "kind": "icon"
+  },
+  "Alpha-H": {
+    "logo_url": "https://us.alpha-h.com/cdn/shop/files/Favicon_32x32.webp?v=1692841436",
+    "source": "https://us.alpha-h.com/",
+    "kind": "icon"
+  },
+  "Aman": {
+    "logo_url": "https://www.aman.com/themes/custom/aman/assets/dist/media/favicons/apple-touch-icon.png",
+    "source": "https://www.aman.com/",
+    "kind": "touch-icon"
+  },
+  "Anessa": {
+    "logo_url": "https://anessaskincare.com/wp-content/uploads/2026/10/anessa-site-favicon-300x300.png",
+    "source": "https://anessaskincare.com/",
+    "kind": "touch-icon"
+  },
+  "Antipodes": {
+    "logo_url": "https://uk.antipodesnature.com/favicon.png",
+    "source": "https://uk.antipodesnature.com/",
+    "kind": "icon"
+  },
+  "Anua": {
+    "logo_url": "https://anua.com/cdn/shop/files/160X160_ANUA.jpg?v=1738611476&width=180",
+    "source": "https://anua.com/",
+    "kind": "touch-icon"
+  },
+  "Aqualogica": {
+    "logo_url": "https://aqualogica.in/cdn/shop/files/fav-icon.png?crop=center&height=180&v=1701957181&width=180",
+    "source": "https://aqualogica.in/",
+    "kind": "touch-icon"
+  },
+  "Arencia": {
+    "logo_url": "https://arencia.jp/cdn/shop/files/fb6cb1c2e585f1803161e42c06cb2338_fc4f9c79-827c-4a4e-8ea9-ef7bce8a556c.png?crop=center&height=180&v=1733299878&width=180",
+    "source": "https://arencia.jp/",
+    "kind": "icon"
+  },
+  "Augustinus Bader": {
+    "logo_url": "https://augustinusbader.com/cdn/shop/files/AB-favicon_1.png?crop=center&height=180&v=1789479333&width=180",
+    "source": "https://augustinusbader.com/en-uk",
+    "kind": "touch-icon"
+  },
+  "Auravedic": {
+    "logo_url": "https://auravedic.com/cdn/shop/files/Favicon_4.png?v=1671710003&width=180",
+    "source": "https://auravedic.com/",
+    "kind": "touch-icon"
+  },
+  "Avène": {
+    "logo_url": "https://www.avene.com.au/assets/themes/new_avene/images/apple-touch-icon.png",
+    "source": "https://www.avene.com.au/",
+    "kind": "touch-icon"
+  },
+  "Axis-Y": {
+    "logo_url": "https://www.axis-y.com/cdn/shop/files/dd301f3fa3b7be26f8d7e513873e834f.png?crop=center&height=180&v=1775210660&width=180",
+    "source": "https://www.axis-y.com/",
+    "kind": "icon"
+  },
+  "BANILA CO": {
+    "logo_url": "https://banilausa.com/cdn/shop/files/Banila_Favicon.png?crop=center&height=180&v=1613696324&width=180",
+    "source": "https://banilausa.com/",
+    "kind": "icon"
+  },
+  "BIODANCE": {
+    "logo_url": "https://biodance.com/cdn/shop/files/1cf1cb3d4de40b90cce550b7c44dccf8_32x32.png?v=1724308632",
+    "source": "https://biodance.com/",
+    "kind": "icon"
+  },
+  "BYOMA": {
+    "logo_url": "https://byoma.com/cdn/shop/files/favicon.png?crop=center&height=180&v=1724667164&width=180",
+    "source": "https://byoma.com/",
+    "kind": "icon"
+  },
+  "Belo": {
+    "logo_url": "https://www.beloskincare.com/cdn/shop/files/Belo_color_f608018e-5aa4-48ea-9a3f-773546f6df7c.jpg?v=1765494366&width=180",
+    "source": "https://www.beloskincare.com/",
+    "kind": "org-logo"
+  },
+  "Bioderma": {
+    "logo_url": "https://www.bioderma.com.au/themes/custom/bioderma_theme/apple-touch-icon.png",
+    "source": "https://www.bioderma.com.au/",
+    "kind": "touch-icon"
+  },
+  "Bioelements": {
+    "logo_url": "https://static.wixstatic.com/media/4bdd27_dfe0ca3d6a654603b8de84406c3d7ba5%7Emv2.png/v1/fill/w_180%2Ch_180%2Clg_1%2Cusm_0.66_1.00_0.01/4bdd27_dfe0ca3d6a654603b8de84406c3d7ba5%7Emv2.png",
+    "source": "https://www.bioelements.com.au/",
+    "kind": "touch-icon"
+  },
+  "Bonjout": {
+    "logo_url": "https://www.bonjoutbeauty.com/cdn/shop/files/Favicon40px-02_32x32.png?v=1677188793",
+    "source": "https://www.bonjoutbeauty.com/",
+    "kind": "icon"
+  },
+  "Brow Code": {
+    "logo_url": "https://browcode.com/cdn/shop/t/16/assets/favicon.png?v=181066158713550597781690235024",
+    "source": "https://browcode.com/",
+    "kind": "icon"
+  },
+  "By Terry": {
+    "logo_url": "https://www.byterry.com/cdn/shop/files/bt-favicon_633e049d-c72f-4832-96e4-7c204825a3f6.png?crop=center&height=180&v=1749733202&width=180",
+    "source": "https://www.byterry.com/",
+    "kind": "icon"
+  },
+  "COSRX": {
+    "logo_url": "https://www.cosrx.com/cdn/shop/files/2_8fb22a57-55f6-4130-8683-29b321768c3c.png?crop=center&height=180&v=1725424736&width=180",
+    "source": "https://www.cosrx.com/",
+    "kind": "icon"
+  },
+  "Caudalie": {
+    "logo_url": "https://en.caudalie.com/icons/favicon/fav-ico-caudalie-site/apple-touch-icon.png",
+    "source": "https://en.caudalie.com/",
+    "kind": "touch-icon"
+  },
+  "Celimax": {
+    "logo_url": "https://celimax.us/cdn/shop/files/celimax_logo.png?v=1737874304&width=180",
+    "source": "https://celimax.us/",
+    "kind": "org-logo"
+  },
+  "Cell Fusion C": {
+    "logo_url": "https://cellfusionc.com/cdn/shop/files/symbol.png?crop=center&height=180&v=1768893196&width=180",
+    "source": "https://cellfusionc.com/",
+    "kind": "icon"
+  },
+  "Celladix": {
+    "logo_url": "https://celladix.jp/cdn/shop/files/celladix_favicon.webp?crop=center&height=180&v=1776678557&width=180",
+    "source": "https://celladix.jp/",
+    "kind": "icon"
+  },
+  "Centellian24": {
+    "logo_url": "https://centellian24.com/cdn/shop/files/Centellian24_Favicon.png?crop=center&height=180&v=1732524440&width=180",
+    "source": "https://centellian24.com/",
+    "kind": "icon"
+  },
+  "CeraVe": {
+    "logo_url": "https://www.cerave.com/-/media/project/loreal/brand-sites/cerave/shared/baseline/cerave-logo-top.svg?rev=-1?w=0&hash=41C378B722C95406A0BEFDC141405349",
+    "source": "https://www.cerave.com/",
+    "kind": "org-logo"
+  },
+  "Cetaphil": {
+    "logo_url": "https://www.cetaphil.com.sg/on/demandware.static/Sites-Galderma-SG-Site/-/default/dw92cc6659/images/favicons/apple-touch-icon.png",
+    "source": "https://www.cetaphil.com.sg/",
+    "kind": "touch-icon"
+  },
+  "Chantecaille": {
+    "logo_url": "https://chantecaille.com/cdn/shop/files/Screen_Shot_2017-07-24_at_5.26.32_PM_256x256_1.png?crop=center&height=180&v=1663677422&width=180",
+    "source": "https://chantecaille.com/",
+    "kind": "icon"
+  },
+  "Clarins": {
+    "logo_url": "https://www.clarins.in/on/demandware.static/Sites-clarinsin-Site/-/default/dw0ccf029f/images/apple-touch-icon-precomposed.png",
+    "source": "https://www.clarins.in",
+    "kind": "touch-icon"
+  },
+  "Clinelle": {
+    "logo_url": "https://clinelle.com/cdn/shop/files/Clinelle-Favicon.jpg?crop=center&height=180&v=1620095491&width=180",
+    "source": "https://clinelle.com/",
+    "kind": "icon"
+  },
+  "Clinique": {
+    "logo_url": "https://www.clinique.com/cdn/shop/files/Clinique_Favicon.png?crop=center&height=180&v=1790010255&width=180",
+    "source": "https://www.clinique.com/",
+    "kind": "icon"
+  },
+  "Clé de Peau Beauté": {
+    "logo_url": "https://www.cledepeaubeaute.co.uk/cdn/shop/files/logo-sticky_96x96.svg?v=1751639409",
+    "source": "https://www.cledepeaubeaute.co.uk/",
+    "kind": "icon"
+  },
+  "Colorescience": {
+    "logo_url": "https://www.colorescience.com/cdn/shop/files/favicon-64x64png.png?crop=center&height=180&v=1613530188&width=180",
+    "source": "https://www.colorescience.com/",
+    "kind": "icon"
+  },
+  "Conscious Chemist": {
+    "logo_url": "https://consciouschemist.com/cdn/shop/files/Website_Favicon-23_1.png?crop=center&height=180&v=1728652160&width=180",
+    "source": "https://consciouschemist.com/",
+    "kind": "icon"
+  },
+  "Cos De BAHA": {
+    "logo_url": "https://www.cosdebaha.com/cdn/shop/files/logo_cosdebaha__dark_243x93_21e3d030-24d6-4bf6-8b1a-75319cdc93f1.png?v=1613691430&width=180",
+    "source": "https://www.cosdebaha.com/",
+    "kind": "org-logo"
+  },
+  "Cosmetics 27": {
+    "logo_url": "https://www.cosmetics27.com/cdn/shop/files/Favicon.svg?crop=center&height=180&v=1784316825&width=180",
+    "source": "https://www.cosmetics27.com/en",
+    "kind": "icon"
+  },
+  "Cultured": {
+    "logo_url": "https://culturedbeauty.com/cdn/shop/files/SmLipsome_Mark_RGB_DeepSea.png?crop=center&height=180&v=1716758888&width=180",
+    "source": "https://culturedbeauty.com/",
+    "kind": "icon"
+  },
+  "Curél": {
+    "logo_url": "https://cdn.shopify.com/oxygen-v2/45636/42508/89456/5071798/assets/favicon-B4BXkXTm.svg",
+    "source": "https://us.curel.com/",
+    "kind": "icon"
+  },
+  "DHC": {
+    "logo_url": "https://www.dhccare.com/cdn/shop/files/favicon.png?crop=center&height=180&v=1740573031&width=180",
+    "source": "https://www.dhccare.com/",
+    "kind": "icon"
+  },
+  "Dear, Klairs": {
+    "logo_url": "https://www.klairs.com/cdn/shop/files/2025_DK_Logotype_3e388d3f-3761-4e32-8e57-fe85ecdaa548.png?crop=center&height=180&v=1770850976&width=180",
+    "source": "https://www.klairs.com/",
+    "kind": "icon"
+  },
+  "Deconstruct": {
+    "logo_url": "https://thedeconstruct.in/cdn/shop/files/Deconstruct_Favicon_6248188f-e6cc-49ed-aa43-e01e5ad2644e.png?crop=center&height=180&v=1677494250&width=180",
+    "source": "https://thedeconstruct.in/",
+    "kind": "icon"
+  },
+  "Demaf": {
+    "logo_url": "https://demaf.global/cdn/shop/files/demaf-favicon-512.png?crop=center&height=180&v=1792050410&width=180",
+    "source": "https://demaf.global/",
+    "kind": "icon"
+  },
+  "Dermacy": {
+    "logo_url": "https://dermacy.in/cdn/shop/files/Dermacy-Icon-2.jpg?v=1754464392&width=180",
+    "source": "https://dermacy.in/",
+    "kind": "icon"
+  },
+  "Dermalogica": {
+    "logo_url": "https://www.dermalogica.com/cdn/shop/files/dermalogica-logo.png?v=1738634106&width=180",
+    "source": "https://www.dermalogica.com/",
+    "kind": "org-logo"
+  },
+  "Dermatouch": {
+    "logo_url": "https://dermatouch.com/cdn/shop/files/Derma_favicon.png?crop=center&height=180&v=1678875962&width=180",
+    "source": "https://dermatouch.com/",
+    "kind": "icon"
+  },
+  "Deyga": {
+    "logo_url": "https://deyga.in/cdn/shop/files/Deyga_Favicon.png?crop=center&height=180&v=1754394713&width=180",
+    "source": "https://deyga.in/",
+    "kind": "icon"
+  },
+  "Dot & Key": {
+    "logo_url": "https://www.dotandkey.com/cdn/shop/files/d_and_k_and_logo_1.png?crop=center&height=180&v=1614724809&width=180",
+    "source": "https://www.dotandkey.com/",
+    "kind": "icon"
+  },
+  "Dr. Dennis Gross": {
+    "logo_url": "https://www.drdennisgross.com/on/demandware.static/Sites-ddg_us-Site/-/default/dw4f01f74f/images/icons/logo.png",
+    "source": "https://www.drdennisgross.com/",
+    "kind": "org-logo"
+  },
+  "Dr. Diamond's Metacine": {
+    "logo_url": "https://drdiamondsmetacine.com/cdn/shop/files/DDM_DDM_Lettermark_White_2.png?crop=center&height=180&v=1785751526&width=180",
+    "source": "https://drdiamondsmetacine.com/",
+    "kind": "icon"
+  },
+  "Dr. Few Skincare": {
+    "logo_url": "https://www.drfewskincare.com/cdn/shop/t/36/assets/apple-touch-icon.png?v=39782159039818069391785171785",
+    "source": "https://www.drfewskincare.com/",
+    "kind": "touch-icon"
+  },
+  "Dr. Lara Devgan": {
+    "logo_url": "https://drlaradevgan.com/cdn/shop/files/AB_LD_Favicon_16x16_crop_center.png?v=1613727087",
+    "source": "https://drlaradevgan.com/",
+    "kind": "icon"
+  },
+  "Dr. Sheth's": {
+    "logo_url": "https://www.drsheths.com/cdn/shop/files/width-1000px.png?v=1690449385&width=180",
+    "source": "https://www.drsheths.com/",
+    "kind": "org-logo"
+  },
+  "Dr.Melaxin": {
+    "logo_url": "https://drmelaxin.us/cdn/shop/files/7df6923bfa1fe207aba235d6ccbe586c_32x32.png?v=1702537029",
+    "source": "https://drmelaxin.us/",
+    "kind": "icon"
+  },
+  "Drunk Elephant": {
+    "logo_url": "https://www.drunkelephant.com/on/demandware.static/Sites-drunkelephant_us-Site/-/default/dwc1de21e1/images/Group_33.svg",
+    "source": "https://www.drunkelephant.com/",
+    "kind": "org-logo"
+  },
+  "ELEMIS": {
+    "logo_url": "https://cdn.sanity.io/images/48qycdt8/production/52fbeb13b12ce08c53a13ae32aca3bc1ed4cb314-2425x2500.png",
+    "source": "https://elemis.com/uk",
+    "kind": "org-logo"
+  },
+  "EQQUALBERRY": {
+    "logo_url": "https://eqqualberrybeauty.com/images/eqqualberrybeauty.com/images/branding/eqb-pavicon-04.png",
+    "source": "https://eqqualberrybeauty.com/",
+    "kind": "icon"
+  },
+  "ETUDE": {
+    "logo_url": "https://int.etude.com/wp-content/uploads/2023/04/etude2023-apple-180x180-1.png",
+    "source": "https://int.etude.com/",
+    "kind": "touch-icon"
+  },
+  "Earth Rhythm": {
+    "logo_url": "https://earthrhythm.com/cdn/shop/files/favicon.png?crop=center&height=180&v=1740389943&width=180",
+    "source": "https://earthrhythm.com/",
+    "kind": "icon"
+  },
+  "Ella Baché": {
+    "logo_url": "https://cdn.shopify.com/s/files/1/2999/1646/files/Ella_Bache_Logo_Navy_45976256-92eb-4d54-ba8f-a22288b161a1.jpg",
+    "source": "https://www.ellabache.com.au/",
+    "kind": "org-logo"
+  },
+  "EltaMD": {
+    "logo_url": "https://eltamd.com/cdn/shop/files/ELTAMD-LOGO-Favicon_ff054972-c4b9-47a0-add8-81ff2460d6c0.png?crop=center&height=180&v=1789387921&width=180",
+    "source": "https://eltamd.com/",
+    "kind": "icon"
+  },
+  "Embryolisse": {
+    "logo_url": "https://embryolisse.co.uk/wp-content/uploads/2023/12/icon-uk.png",
+    "source": "https://embryolisse.co.uk/",
+    "kind": "touch-icon"
+  },
+  "Emma Lewisham": {
+    "logo_url": "https://emmalewisham.com/cdn/shop/files/EL-Favicon-new.png?crop=center&height=180&v=1737005353&width=180",
+    "source": "https://emmalewisham.com/",
+    "kind": "icon"
+  },
+  "Epionce": {
+    "logo_url": "https://www.epionce.com/wp-content/uploads/2019/07/cropped-2019_7_25_Epionce_Favicon-180x180.png",
+    "source": "https://www.epionce.com/",
+    "kind": "touch-icon"
+  },
+  "FANCL": {
+    "logo_url": "https://fancl.com/cdn/shop/files/favicon-32x32.png?crop=center&height=180&v=1702080549&width=180",
+    "source": "https://fancl.com/",
+    "kind": "icon"
+  },
+  "FUCA": {
+    "logo_url": "https://fucaorganic.com/cdn/shop/files/circle_sticker_1.png?crop=center&height=180&v=1724400613&width=180",
+    "source": "https://fucaorganic.com/",
+    "kind": "icon"
+  },
+  "FaceGym": {
+    "logo_url": "https://facegym.com/cdn/shop/t/171/assets/NewProject.png?v=87000894266373440051770902391",
+    "source": "https://facegym.com/",
+    "kind": "icon"
+  },
+  "Farmacy": {
+    "logo_url": "https://farmacy.com/cdn/shop/files/fm-favicon.png?crop=center&height=180&v=1793898893&width=180",
+    "source": "https://farmacy.com/",
+    "kind": "icon"
+  },
+  "First Aid Beauty": {
+    "logo_url": "https://www.firstaidbeauty.com/cdn/shop/files/Group_1_copy.png?crop=center&height=180&v=1751985606&width=180",
+    "source": "https://www.firstaidbeauty.com/",
+    "kind": "icon"
+  },
+  "Fixderma": {
+    "logo_url": "https://www.fixderma.com/cdn/shop/files/favicon_32x32.png?v=1614144822",
+    "source": "https://www.fixderma.com/",
+    "kind": "icon"
+  },
+  "Foxtale": {
+    "logo_url": "https://foxtale.in/favicon-96x96.png",
+    "source": "https://foxtale.in/",
+    "kind": "icon"
+  },
+  "Garnier": {
+    "logo_url": "https://www.garnier.com.sg/-/media/project/loreal/brand-sites/garnier/apac/my/ico/newgarnierlogoupdate_favicon_32x32.png?rev=ea61205c64594af7ae56b28aba37b542",
+    "source": "https://www.garnier.com.sg/",
+    "kind": "icon"
+  },
+  "Glad2Glow": {
+    "logo_url": "https://glad2glow.com/cdn/shop/files/10_f31581d3-588b-4938-94b5-0639ef65e338.jpg?v=1770863856&width=180",
+    "source": "https://glad2glow.com/",
+    "kind": "touch-icon"
+  },
+  "Glossier": {
+    "logo_url": "https://www.glossier.com/cdn/shop/files/favicon-light_180x180.webp?v=1681821719",
+    "source": "https://www.glossier.com/en-in",
+    "kind": "touch-icon"
+  },
+  "Glow Recipe": {
+    "logo_url": "https://www.glowrecipe.com/cdn/shop/files/glow_1_32x32.svg?v=1788997907",
+    "source": "https://www.glowrecipe.com/",
+    "kind": "icon"
+  },
+  "Go-To": {
+    "logo_url": "https://gotoskincare.com/cdn/shop/t/1268/assets/favicon-go-to-apple-touch-icon.png?v=148869317161558993821795396934",
+    "source": "https://gotoskincare.com/",
+    "kind": "touch-icon"
+  },
+  "Goldfaden MD": {
+    "logo_url": "https://goldfadenmd.com/cdn/shop/files/favicon.png?crop=center&height=180&v=1613665076&width=180",
+    "source": "https://goldfadenmd.com/",
+    "kind": "icon"
+  },
+  "Good Molecules": {
+    "logo_url": "https://dy6g3i6a1660s.cloudfront.net/h7NWAOBw7xxsymoeiyDrcgDIAMg/orig.png",
+    "source": "https://www.goodmolecules.com/",
+    "kind": "touch-icon"
+  },
+  "Guerlain": {
+    "logo_url": "https://www.guerlain.com/on/demandware.static/Sites-Guerlain_INT-Site/-/default/dw7bf9fa3f/images/guerlain.svg",
+    "source": "https://www.guerlain.com/int/en-int",
+    "kind": "org-logo"
+  },
+  "Haruharu Wonder": {
+    "logo_url": "https://haruharuwonder.com/cdn/shop/files/favicon.png?crop=center&height=180&v=1725860816&width=180",
+    "source": "https://haruharuwonder.com/",
+    "kind": "icon"
+  },
+  "Heliocare": {
+    "logo_url": "https://heliocare.com/wp-content/uploads/2016/10/HelioCare-Sun-Yellow.png",
+    "source": "https://heliocare.com/",
+    "kind": "touch-icon"
+  },
+  "Herbar": {
+    "logo_url": "https://cdn.prod.website-files.com/60bd24a587bb6e7fa6dd6ef9/6767d684815e8f0173727c58_icon256circle.png",
+    "source": "https://www.herbar.co.uk/",
+    "kind": "touch-icon"
+  },
+  "Himalaya": {
+    "logo_url": "https://himalayawellness.in/cdn/shop/files/image_2.png?v=1792939920&width=180",
+    "source": "https://himalayawellness.in/",
+    "kind": "org-logo"
+  },
+  "Holika Holika": {
+    "logo_url": "https://holikaholika.com/cdn/shop/files/2d6582bb4923af89dd90e4bee7f2ec25.jpg?crop=center&height=180&v=1737592020&width=180",
+    "source": "https://holikaholika.com/",
+    "kind": "icon"
+  },
+  "Horace": {
+    "logo_url": "https://horace.com/static/version1795691017/frontend/Horace/hrc/fr_FR/images/favicon/apple-touch-icon.webp",
+    "source": "https://horace.com/",
+    "kind": "touch-icon"
+  },
+  "House of Hur": {
+    "logo_url": "https://houseofhur.com/cdn/shop/files/New-Logo-pink_e41a6691-dd44-4c52-a200-53738a95def3.png?crop=center&height=180&v=1736493889&width=180",
+    "source": "https://houseofhur.com/",
+    "kind": "icon"
+  },
+  "Hydrinity": {
+    "logo_url": "https://www.hydrinity.com/cdn/shop/files/favicon.png?v=1762794163&width=180",
+    "source": "https://www.hydrinity.com/",
+    "kind": "touch-icon"
+  },
+  "HydroPeptide": {
+    "logo_url": "https://hydropeptide.com/cdn/shop/files/HydroPeptide-favicon_180x180.progressive.png.jpg?v=1724873811",
+    "source": "https://hydropeptide.com/",
+    "kind": "touch-icon"
+  },
+  "ILIA Beauty": {
+    "logo_url": "https://iliabeauty.com/cdn/shop/files/ILIA_favicon.jpg?crop=center&height=180&v=1753300854&width=180",
+    "source": "https://iliabeauty.com/",
+    "kind": "icon"
+  },
+  "Indie Lee": {
+    "logo_url": "https://indielee.com/cdn/shop/files/2026_Indie_Lee_Logo_Montserrat_black-transparent-512px_Shopify_Default.png?v=1773336774&width=180",
+    "source": "https://indielee.com/",
+    "kind": "org-logo"
+  },
+  "Isntree": {
+    "logo_url": "https://www.isntreebeauty.com/wp-content/uploads/2026/08/Xjb-kYbEWA-TOrIN_xWWEg@2k.png",
+    "source": "https://www.isntreebeauty.com/",
+    "kind": "touch-icon"
+  },
+  "JMSolution": {
+    "logo_url": "https://jmsolution.co/cdn/shop/files/logo.png?v=1716354375&width=180",
+    "source": "https://jmsolution.co/",
+    "kind": "org-logo"
+  },
+  "Josh Rosebrook": {
+    "logo_url": "https://joshrosebrook.com/cdn/shop/files/fav_113fdd2d-8ba1-42ac-8867-381d97332569.png?crop=center&height=180&v=1651467354&width=180",
+    "source": "https://joshrosebrook.com/",
+    "kind": "icon"
+  },
+  "Juicy Chemistry": {
+    "logo_url": "https://juicychemistry.com/cdn/shop/files/favicon_1.svg?v=1725692468&width=180",
+    "source": "https://juicychemistry.com/",
+    "kind": "touch-icon"
+  },
+  "Jumiso": {
+    "logo_url": "https://jumiso.us/cdn/shop/files/New_LOGO_d9d6dec3-f2fc-4c90-948e-2c9b370021f7.png?v=1747124737&width=180",
+    "source": "https://jumiso.us/",
+    "kind": "org-logo"
+  },
+  "Just Herbs": {
+    "logo_url": "https://www.justherbs.in/cdn/shop/files/favicon_f63ed02f-e433-44b5-a2e1-52ace9477bda.webp?v=1764751585&width=180",
+    "source": "https://www.justherbs.in/",
+    "kind": "touch-icon"
+  },
+  "Kate Somerville": {
+    "logo_url": "https://www.katesomerville.com/cdn/shop/files/new-logo_32x32.jpg?v=1696964173",
+    "source": "https://www.katesomerville.com/",
+    "kind": "icon"
+  },
+  "Kiehl's": {
+    "logo_url": "https://www.kiehls.in/cdn/shop/files/download.png?v=1770185664&width=180",
+    "source": "https://www.kiehls.in/",
+    "kind": "org-logo"
+  },
+  "Kisocare": {
+    "logo_url": "https://kisocare.com/cdn/shop/files/logo_87276765-094a-4b73-bebb-d44d8d0fe899.jpg?crop=center&height=180&v=1691487885&width=180",
+    "source": "https://kisocare.com/",
+    "kind": "icon"
+  },
+  "Korres": {
+    "logo_url": "https://www.korres.com/cdn/shop/files/KORRES_Web_Logo_735750ed-2c98-490f-92bd-c513397e553a.svg?v=1744968261&width=180",
+    "source": "https://www.korres.com/",
+    "kind": "org-logo"
+  },
+  "Kosas": {
+    "logo_url": "https://kosas.com/cdn/shop/files/icon_180x180.png?v=1613704526",
+    "source": "https://kosas.com/",
+    "kind": "touch-icon"
+  },
+  "L'Oréal Paris": {
+    "logo_url": "https://www.lorealparis.co.in/frontend/static/favicon/apple-touch-icon.png",
+    "source": "https://www.lorealparis.co.in/",
+    "kind": "touch-icon"
+  },
+  "LANEIGE": {
+    "logo_url": "https://us.laneige.com/cdn/shop/files/LN24_Flavicon-200x200.png?crop=center&height=180&v=1714577129&width=180",
+    "source": "https://us.laneige.com/",
+    "kind": "touch-icon"
+  },
+  "LOOPS": {
+    "logo_url": "https://www.loopsbeauty.com/cdn/shop/files/fav-icon.png?crop=center&height=180&v=1683819522&width=180",
+    "source": "https://www.loopsbeauty.com/",
+    "kind": "icon"
+  },
+  "La Prairie": {
+    "logo_url": "https://www.laprairie.com/cdn/shop/files/favicon-192x192.png?crop=center&height=180&v=1756133411&width=180",
+    "source": "https://www.laprairie.com/en-int",
+    "kind": "icon"
+  },
+  "La Roche-Posay": {
+    "logo_url": "https://www.laroche-posay.co.in/-/media/project/loreal/brand-sites/lrp/shared/baseline/identity/lrp_logo/logo.png",
+    "source": "https://www.laroche-posay.co.in/",
+    "kind": "org-logo"
+  },
+  "Lakmē": {
+    "logo_url": "https://www.lakmeindia.com/cdn/shop/files/logo-48by48_08383e84-7b75-4837-9d93-cf6675c64937_96x.jpg?v=1738842965",
+    "source": "https://www.lakmeindia.com/",
+    "kind": "icon"
+  },
+  "Lancome": {
+    "logo_url": "https://www.lancome.com.au/on/demandware.static/Sites-lancome-au-ng-Site/-/default/dw136bab4b/images/app/homescreen192.png",
+    "source": "https://www.lancome.com.au/",
+    "kind": "touch-icon"
+  },
+  "Lanolips": {
+    "logo_url": "https://lanolips.com/cdn/shop/files/lanolips-favicon.png?crop=center&height=180&v=1750033830&width=180",
+    "source": "https://lanolips.com/",
+    "kind": "icon"
+  },
+  "MECCA COSMETICA": {
+    "logo_url": "https://meccacosmetica.com/cdn/shop/files/Favicon_512w.png?crop=center&height=180&v=1685094653&width=180",
+    "source": "https://meccacosmetica.com/",
+    "kind": "icon"
+  },
+  "MEDI-PEEL": {
+    "logo_url": "https://medipeel.com.au/cdn/shop/files/medipeel_logo_338c5f01-4a61-4477-b0a1-2c3fe3e88898.png?v=1718782729&width=180",
+    "source": "https://medipeel.com.au/",
+    "kind": "org-logo"
+  },
+  "MUTHA": {
+    "logo_url": "https://www.mutha.com/cdn/shop/files/favicon.avif?crop=center&height=180&v=1776462580&width=180",
+    "source": "https://www.mutha.com/",
+    "kind": "icon"
+  },
+  "Mamaearth": {
+    "logo_url": "https://mamaearth.in/cdn/shop/files/cropped-Favicon-2-150x150.png?crop=center&height=180&v=1772930334&width=180",
+    "source": "https://mamaearth.in/",
+    "kind": "touch-icon"
+  },
+  "Marie Veronique": {
+    "logo_url": "https://www.marieveronique.com/cdn/shop/files/mv_228x228.png?v=1775759246",
+    "source": "https://www.marieveronique.com/",
+    "kind": "touch-icon"
+  },
+  "Marini SkinSolutions": {
+    "logo_url": "https://mariniskinsolutions.com/cdn/shop/files/MSS26_Shopify_Logos_Main.png",
+    "source": "https://mariniskinsolutions.com/",
+    "kind": "org-logo"
+  },
+  "Mario Badescu": {
+    "logo_url": "https://www.mariobadescu.com/cdn/shop/files/Logo_Evergreen.png?v=1736792433&width=180",
+    "source": "https://www.mariobadescu.com/",
+    "kind": "org-logo"
+  },
+  "Maya Chia": {
+    "logo_url": "https://mayachia.com/cdn/shop/files/Favicon_32x32_f4f8b39b-3192-446b-9416-7cf1a3a3f769_32x32.png?v=1659095677",
+    "source": "https://mayachia.com/",
+    "kind": "icon"
+  },
+  "Medicube": {
+    "logo_url": "https://medicube.us/cdn/shop/files/25ME_global.svg?v=1745386759&width=180",
+    "source": "https://medicube.us/",
+    "kind": "org-logo"
+  },
+  "Medik8": {
+    "logo_url": "https://scdn.speedsize.com/fd01c063-4aa1-453d-b317-e8f709b2bfe7/www.medik8.com/cdn/shop/t/1293/assets/logo.png?v=20852127142504936671791805226",
+    "source": "https://www.medik8.com/",
+    "kind": "org-logo"
+  },
+  "Mentholatum": {
+    "logo_url": "https://www.mentholatum.co.uk/sites/mentholatum/images/favicons/apple-touch-icon.png",
+    "source": "https://www.mentholatum.co.uk/",
+    "kind": "touch-icon"
+  },
+  "Merci Handy": {
+    "logo_url": "https://www.mercihandy.com/cdn/shop/files/favicon_merci_handy_32x32.png?v=1614730171",
+    "source": "https://www.mercihandy.com/",
+    "kind": "icon"
+  },
+  "Mimétique": {
+    "logo_url": "https://mimetique.com/cdn/shop/files/Cellule-Animee-GIF-Low.gif?crop=center&height=180&v=1744886926&width=180",
+    "source": "https://mimetique.com/en",
+    "kind": "touch-icon"
+  },
+  "Minimalist": {
+    "logo_url": "https://scdn.speedsize.com/56385b25-4e17-4a9a-9bec-c421c18686fb/https://beminimalist.co/cdn/shop/files/Minimalist_Favicon.png?crop=center&height=180&v=1643556521&width=180",
+    "source": "https://beminimalist.co/",
+    "kind": "icon"
+  },
+  "Muji": {
+    "logo_url": "https://www.muji.us/cdn/shop/files/favicon-32x32_32x32.png?v=1619457624",
+    "source": "https://www.muji.us/",
+    "kind": "icon"
+  },
+  "Murad": {
+    "logo_url": "https://www.murad.com.au/cdn/shop/files/M_ICON_1.png?crop=center&height=180&v=1722319058&width=180",
+    "source": "https://www.murad.com.au/",
+    "kind": "icon"
+  },
+  "M·A·C Cosmetics": {
+    "logo_url": "https://www.maccosmetics.com/cdn/shop/files/MAC_logo_1_8458b9aa-0ac8-4631-b3e1-9d96cad96df5.png?format=webp&v=1786964565&width=180",
+    "source": "https://www.maccosmetics.com/",
+    "kind": "org-logo"
+  },
+  "NARD": {
+    "logo_url": "https://www.nard.co/assets/images/apple-touch-icon.png?v=e1369403",
+    "source": "https://www.nard.co/",
+    "kind": "touch-icon"
+  },
+  "Naked Sundays": {
+    "logo_url": "https://nakedsundays.com/cdn/shop/files/NakedSundays-Logo_MultiColor_1997x_57e3136b-d440-4bf0-9327-3aa38f9acbb1.png?crop=center&height=180&v=1765205482&width=180",
+    "source": "https://nakedsundays.com/",
+    "kind": "icon"
+  },
+  "Nature Republic": {
+    "logo_url": "https://naturerepublic.us/cdn/shop/files/nature_republic_renewal_logo_79x.svg?v=1693971952",
+    "source": "https://naturerepublic.us/",
+    "kind": "org-logo"
+  },
+  "Neocutis": {
+    "logo_url": "https://www.neocutis.com/wp-content/uploads/2019/01/cropped-neo-favicon-1-1-180x180.png",
+    "source": "https://www.neocutis.com/",
+    "kind": "touch-icon"
+  },
+  "Neostrata": {
+    "logo_url": "https://www.neostrata.com/cdn/shop/files/NEOSTRATA_LOGO_TAGLINE_K_RGB.svg?v=1774284287&width=180",
+    "source": "https://www.neostrata.com/",
+    "kind": "org-logo"
+  },
+  "Neutrogena": {
+    "logo_url": "https://images.ctfassets.net/3zfcttr0ztpr/6tUl8rLVln9RPBMajmeqfv/35a0cd2b60bb2b6297afeb4d21911a59/NTG_LOGO_1.svg",
+    "source": "https://www.neutrogena.com/",
+    "kind": "org-logo"
+  },
+  "Nivea": {
+    "logo_url": "https://assets.beiersdorf.com/-/media/images/0/7/8/b/992a450b87ff4af6b86a8150f2eb22d9-original.svg?ctx=AU",
+    "source": "https://www.nivea.com.au/",
+    "kind": "touch-icon"
+  },
+  "NuFACE": {
+    "logo_url": "https://www.mynuface.com/cdn/shop/files/Profile_Picture_N4.png?crop=center&height=180&v=1777936372&width=180",
+    "source": "https://www.mynuface.com/",
+    "kind": "icon"
+  },
+  "NutriGlow": {
+    "logo_url": "https://www.nutriglowcosmetics.com/wp-content/uploads/2021/04/favicon.png",
+    "source": "https://www.nutriglowcosmetics.com/",
+    "kind": "org-logo"
+  },
+  "Obagi": {
+    "logo_url": "https://www.obagi.com/cdn/shop/files/Obagi_SITE_Favicon_Mobile_Authority_Blue_O_16x16_d7faab6a-b4b3-4256-915d-c4b81c81c057.jpg?crop=center&height=180&v=1744236620&width=180",
+    "source": "https://www.obagi.com/",
+    "kind": "icon"
+  },
+  "Olay": {
+    "logo_url": "https://www.olay.com/cdn/shop/files/favicon.jpg?v=1779268602&width=180",
+    "source": "https://www.olay.com/",
+    "kind": "touch-icon"
+  },
+  "Omorovicza": {
+    "logo_url": "https://www.omorovicza.com/cdn/shop/files/194x194.png?crop=center&height=180&v=1705049277&width=180",
+    "source": "https://www.omorovicza.com/",
+    "kind": "icon"
+  },
+  "One Love Organics": {
+    "logo_url": "https://www.oneloveorganics.com/cdn/shop/files/OneLoveOrganics_Logo_1.svg?v=1781857925&width=180",
+    "source": "https://www.oneloveorganics.com/",
+    "kind": "org-logo"
+  },
+  "P.Calm": {
+    "logo_url": "https://pcalm.us/cdn/shop/files/56191d97dfa3a873f327f77718f5c65f.png?v=1737006312&width=180",
+    "source": "https://pcalm.us/",
+    "kind": "org-logo"
+  },
+  "PCA Skin": {
+    "logo_url": "https://pcaskin.com/cdn/shop/files/LOGO.png?v=1775834349&width=180",
+    "source": "https://pcaskin.com/",
+    "kind": "org-logo"
+  },
+  "PUREDERM": {
+    "logo_url": "https://purederm.com.au/wp-content/uploads/2020/05/cropped-ads478-180x180.jpg",
+    "source": "https://purederm.com.au/",
+    "kind": "touch-icon"
+  },
+  "Patchology": {
+    "logo_url": "https://patchology.co.uk/cdn/shop/files/180x180-patchology-favicon-800x800.png?crop=center&height=180&v=1749574636&width=180",
+    "source": "https://patchology.co.uk/",
+    "kind": "touch-icon"
+  },
+  "Paula's Choice": {
+    "logo_url": "https://www.paulaschoice.in/cdn/shop/files/PC_Circle_32x32.png?v=1773136962",
+    "source": "https://www.paulaschoice.in/",
+    "kind": "icon"
+  },
+  "Peter Thomas Roth": {
+    "logo_url": "https://www.peterthomasroth.com/cdn/shop/files/favicon-ptr.jpg?crop=center&height=180&v=1727807131&width=180",
+    "source": "https://www.peterthomasroth.com/",
+    "kind": "icon"
+  },
+  "Petitfee": {
+    "logo_url": "https://petitfee.com/web/upload/category/logo/v2_72d3f1def7c3359fb5aa29558fbfada6_W63lSJclAj_top.jpg",
+    "source": "https://petitfee.com/",
+    "kind": "org-logo"
+  },
+  "Pilgrim": {
+    "logo_url": "https://discoverpilgrim.com/cdn/shop/files/Favicon-Pilgrim-Logo-96x96px.png?v=1750880481&width=180",
+    "source": "https://discoverpilgrim.com/",
+    "kind": "icon"
+  },
+  "Plum": {
+    "logo_url": "https://plumgoodness.com/cdn/shop/files/favicon_grande_white_bg_8f6dd5e5-51b3-48a1-8fbf-2191212d0e68.png?v=1723453080&width=180",
+    "source": "https://plumgoodness.com/",
+    "kind": "icon"
+  },
+  "Polite Society": {
+    "logo_url": "https://politesociety.com/cdn/shop/files/Burgundy_PS_Logo.png?v=1784847251&width=180",
+    "source": "https://politesociety.com/",
+    "kind": "org-logo"
+  },
+  "Pond's": {
+    "logo_url": "https://ponds.in/cdn/shop/files/favicon_0b27200b-5241-49a5-8840-8b9fb327476d_32x32.png?v=1717746537",
+    "source": "https://ponds.in/",
+    "kind": "icon"
+  },
+  "Pretty skin": {
+    "logo_url": "https://prettyskin.jp/cdn/shop/files/PS_Fav_icon_3adcacd7-026e-4f29-bf61-cfc704f26dcf.png?crop=center&height=180&v=1774309441&width=180",
+    "source": "https://prettyskin.jp/",
+    "kind": "icon"
+  },
+  "QMS Medicosmetics": {
+    "logo_url": "https://www.qmsmedicosmetics.com/cdn/shop/files/QMS_Medicosmetics_Favicon.png?crop=center&height=180&v=1733241228&width=180",
+    "source": "https://www.qmsmedicosmetics.com/",
+    "kind": "icon"
+  },
+  "Quench Botanics": {
+    "logo_url": "https://www.quenchbotanics.com/cdn/shop/files/favicon-Quench.png?v=1732540618&width=180",
+    "source": "https://www.quenchbotanics.com/",
+    "kind": "touch-icon"
+  },
+  "REJURAN": {
+    "logo_url": "https://www.rejuran.com.au/cdn/shop/files/Untitled_design_1.png?v=1728534821&width=180",
+    "source": "https://www.rejuran.com.au/",
+    "kind": "touch-icon"
+  },
+  "REOME": {
+    "logo_url": "https://reome.com/cdn/shop/t/56/assets/favicon32.png?v=172836210120317966061776930397",
+    "source": "https://reome.com/",
+    "kind": "icon"
+  },
+  "RMS Beauty": {
+    "logo_url": "https://www.rmsbeauty.com/cdn/shop/files/FAVICON-RMS_4d59e491-c03d-4864-8977-c41252ae36af.png?v=1651056536&width=180",
+    "source": "https://www.rmsbeauty.com/",
+    "kind": "touch-icon"
+  },
+  "Re'equil": {
+    "logo_url": "https://www.reequil.com/cdn/shop/files/Frame_427319077.png?crop=center&height=180&v=1786081713&width=180",
+    "source": "https://www.reequil.com/",
+    "kind": "icon"
+  },
+  "Replenix": {
+    "logo_url": "https://replenix.com/cdn/shop/files/Replenix_Favicon_Green_Leaf_1_1_32x32.png?v=1615226395",
+    "source": "https://replenix.com/",
+    "kind": "icon"
+  },
+  "Revision Skincare": {
+    "logo_url": "https://revisionskincare.com/cdn/shop/files/RS-Only-03_1.png?crop=center&height=180&v=1768932202&width=180",
+    "source": "https://revisionskincare.com/",
+    "kind": "icon"
+  },
+  "Roc Skincare": {
+    "logo_url": "https://www.rocskincare.com/cdn/shop/files/RoC_Pantone-RGB_Gold-Seal-Top_CP_EN_Logo_300dpi_Dgtl.png?crop=center&height=180&v=1750084613&width=180",
+    "source": "https://www.rocskincare.com/",
+    "kind": "icon"
+  },
+  "Rosette": {
+    "logo_url": "https://rosette.jp/Contents/ImagesPkg/common/favicon/apple-touch-icon.png",
+    "source": "https://rosette.jp/",
+    "kind": "touch-icon"
+  },
+  "Round Lab": {
+    "logo_url": "https://roundlab.com/cdn/shop/files/favicon-32x32.png?crop=center&height=180&v=1772847677&width=180",
+    "source": "https://roundlab.com/en-ca",
+    "kind": "icon"
+  },
+  "Rovectin": {
+    "logo_url": "https://rovectin.com/cdn/shop/files/favicon_94e679f6-e63e-4425-9d93-5954670afcec.png?crop=center&height=180&v=1758173935&width=180",
+    "source": "https://rovectin.com/",
+    "kind": "icon"
+  },
+  "SK-II": {
+    "logo_url": "https://www.sk-ii.com/cdn/shop/files/favicon-ezgif.com-gif-maker.png?v=1776766137&width=180",
+    "source": "https://www.sk-ii.com/",
+    "kind": "touch-icon"
+  },
+  "SKIN1004": {
+    "logo_url": "https://www.skin1004.com/cdn/shop/files/KakaoTalk_Photo_2025-05-13-17-03-08.png?crop=center&height=180&v=1747130104&width=180",
+    "source": "https://www.skin1004.com/",
+    "kind": "icon"
+  },
+  "Sanfe": {
+    "logo_url": "https://sanfe.in/cdn/shop/files/WhatsApp_Image_2025-07-04_at_4.10.54_PM_32x32.jpg?v=1752670567",
+    "source": "https://sanfe.in/",
+    "kind": "icon"
+  },
+  "Sesderma": {
+    "logo_url": "https://www.sesderma.com/on/demandware.static/Sites-Sesderma_World-Site/-/default/dw076f3815/images/favicon.ico",
+    "source": "https://www.sesderma.com/int_en/home",
+    "kind": "touch-icon"
+  },
+  "Shiseido": {
+    "logo_url": "https://www.shiseido.com/on/demandware.static/Sites-shiseido_us-Site/-/default/dw2c200e55/images/shiseido-logo-white.svg",
+    "source": "https://www.shiseido.com/us/en/",
+    "kind": "org-logo"
+  },
+  "Shu Uemura": {
+    "logo_url": "https://www.shuuemura-usa.com/ssr-assets/shuuemura/favicon.svg",
+    "source": "https://www.shuuemura-usa.com/",
+    "kind": "icon"
+  },
+  "SkinCeuticals": {
+    "logo_url": "https://www.skinceuticals.com.au/on/demandware.static/Sites-skinceuticals-au-ng-Site/-/default/dwd1c1f3ac/images/app/homescreen72.png",
+    "source": "https://www.skinceuticals.com.au/",
+    "kind": "touch-icon"
+  },
+  "Skinstitut": {
+    "logo_url": "https://skinstitut.com/cdn/shop/files/skinstitutFavicon_32x32.jpg?v=1643849927",
+    "source": "https://skinstitut.com/",
+    "kind": "icon"
+  },
+  "Skintific": {
+    "logo_url": "https://skintific.com/cdn/shop/files/skt-logo.jpg?v=1769598162&width=180",
+    "source": "https://skintific.com/",
+    "kind": "touch-icon"
+  },
+  "Sodashi": {
+    "logo_url": "https://sodashi.com.au/cdn/shop/files/Serum_21_Launch_Post_1_month_28.png?crop=center&height=180&v=1696828965&width=180",
+    "source": "https://sodashi.com.au/",
+    "kind": "icon"
+  },
+  "Some By Mi": {
+    "logo_url": "https://somebymiskincare.com/wp-content/uploads/2026/09/cropped-d534e431-4c27-4ebc-a6fe-9e29eed64ee8-180x180.png",
+    "source": "https://somebymiskincare.com/",
+    "kind": "touch-icon"
+  },
+  "StriVectin": {
+    "logo_url": "https://strivectin.com/cdn/shop/files/favicon2x.jpg?crop=center&height=180&v=1749832686&width=180",
+    "source": "https://strivectin.com/",
+    "kind": "icon"
+  },
+  "Sulwhasoo": {
+    "logo_url": "https://us.sulwhasoo.com/cdn/shop/files/Favicon.png?crop=center&height=180&v=1678219496&width=180",
+    "source": "https://us.sulwhasoo.com/",
+    "kind": "touch-icon"
+  },
+  "Sunday Riley": {
+    "logo_url": "https://sundayriley.com/cdn/shop/files/sr-favicon-2022-sun-re-upload.png?crop=center&height=180&v=1659460558&width=180",
+    "source": "https://sundayriley.com/",
+    "kind": "icon"
+  },
+  "Sungboon Editor": {
+    "logo_url": "https://sungbooneditor.com/cdn/shop/files/Untitled-2.png?v=1755702592&width=180",
+    "source": "https://sungbooneditor.com/",
+    "kind": "touch-icon"
+  },
+  "Suntegrity": {
+    "logo_url": "https://cdn11.bigcommerce.com/s-am9d0rx4/product_images/favicon.png",
+    "source": "https://www.suntegrityskincare.com/",
+    "kind": "icon"
+  },
+  "Susanne Kaufmann": {
+    "logo_url": "https://www.susannekaufmann.com/cdn/shop/t/639/assets/favicon_small.png?v=137657592152291198431795524251",
+    "source": "https://www.susannekaufmann.com/",
+    "kind": "icon"
+  },
+  "TIRTIR": {
+    "logo_url": "https://tirtir.global/cdn/shop/files/Untitled_design_8.png?crop=center&height=180&v=1763013094&width=180",
+    "source": "https://tirtir.global/",
+    "kind": "icon"
+  },
+  "TOCOBO": {
+    "logo_url": "https://tocobo.us/cdn/shop/files/favicon_32x32.jpg?v=1640654220",
+    "source": "https://tocobo.us/",
+    "kind": "icon"
+  },
+  "TULA": {
+    "logo_url": "https://tula.com/cdn/shop/files/tula-new-favicon.svg?crop=center&height=180&v=1736290578&width=180",
+    "source": "https://tula.com/",
+    "kind": "icon"
+  },
+  "Talika": {
+    "logo_url": "https://talika.com/cdn/shop/files/favicon_32x32.png?v=1776435637",
+    "source": "https://talika.com/",
+    "kind": "icon"
+  },
+  "Tammy Fender": {
+    "logo_url": "https://www.tammyfender.com/cdn/shop/files/tf-favicon_32x32.png?v=1613521194",
+    "source": "https://www.tammyfender.com/",
+    "kind": "icon"
+  },
+  "Tata Harper": {
+    "logo_url": "https://tataharperskincare.com/cdn/shop/files/THS_Favicon.png?crop=center&height=180&v=1760525871&width=180",
+    "source": "https://tataharperskincare.com/",
+    "kind": "icon"
+  },
+  "Tatcha": {
+    "logo_url": "https://tatcha.com/cdn/shop/files/favicon-180-2025.png?v=1765353692&width=180",
+    "source": "https://tatcha.com/",
+    "kind": "touch-icon"
+  },
+  "Thank You Farmer": {
+    "logo_url": "https://thankyoufarmer.co.uk/cdn/shop/files/Thank_You_Farmer_logo_eb57076e-e480-4970-9fa6-4b3ff100ce2d.png?crop=center&height=180&v=1688672787&width=180",
+    "source": "https://thankyoufarmer.co.uk/",
+    "kind": "icon"
+  },
+  "The Beauty Chef": {
+    "logo_url": "https://thebeautychef.com/cdn/shop/files/favicon_new_32x32.png?v=1614364339",
+    "source": "https://thebeautychef.com/",
+    "kind": "icon"
+  },
+  "The Derma Co": {
+    "logo_url": "https://thedermaco.com/cdn/shop/files/tdc_favicon.png?crop=center&height=180&v=1755071730&width=180",
+    "source": "https://thedermaco.com/",
+    "kind": "touch-icon"
+  },
+  "The Face Shop": {
+    "logo_url": "https://thefaceshop.in/cdn/shop/files/TFS-Favicon1_7b5f1464-a2dd-46f6-8861-ef9e8c34265b.png?crop=center&height=180&v=1719566588&width=180",
+    "source": "https://thefaceshop.in/",
+    "kind": "icon"
+  },
+  "The Formularx": {
+    "logo_url": "https://theformularx.com/cdn/shop/files/Favicon_-_The_Formularx_Logo.webp?crop=center&height=180&v=1747399667&width=180",
+    "source": "https://theformularx.com/",
+    "kind": "icon"
+  },
+  "The INKEY List": {
+    "logo_url": "https://uk.theinkeylist.com/cdn/shop/t/1435/assets/favicon.png?v=73311054548540031411795617652",
+    "source": "https://uk.theinkeylist.com/",
+    "kind": "icon"
+  },
+  "The Ordinary": {
+    "logo_url": "https://theordinary.com/on/demandware.static/Sites-deciem-global-Site/-/default/dwbd7c49ca/images/favicons/favicon-theordinary-apple-touch-icon.png",
+    "source": "https://theordinary.com/en-in",
+    "kind": "touch-icon"
+  },
+  "The Outset": {
+    "logo_url": "https://theoutset.com/cdn/shop/files/apple-touch-icon_180x180.png?v=1682912893",
+    "source": "https://theoutset.com/",
+    "kind": "touch-icon"
+  },
+  "This Works": {
+    "logo_url": "https://www.thisworks.com/cdn/shop/files/THISWORKS_FAVICON_144x.png?v=1615321403-144x144.png",
+    "source": "https://www.thisworks.com/",
+    "kind": "touch-icon"
+  },
+  "Three Ships": {
+    "logo_url": "https://www.threeshipsbeauty.com/cdn/shop/files/FAVICON_32x32.png?v=1726200515",
+    "source": "https://www.threeshipsbeauty.com/",
+    "kind": "icon"
+  },
+  "Tom Ford": {
+    "logo_url": "https://www.tomfordbeauty.com/cdn/shop/files/TF_Logo.svg?v=1756924083&width=180",
+    "source": "https://www.tomfordbeauty.com/",
+    "kind": "org-logo"
+  },
+  "Torriden": {
+    "logo_url": "https://tapita.io/pb/pub/media/spb/usr/8739/wysiwyg/92016443758/logo-112x.png",
+    "source": "https://torriden.us/",
+    "kind": "org-logo"
+  },
+  "Tower 28": {
+    "logo_url": "https://www.tower28beauty.com/cdn/shop/files/logo--clear-space.svg?v=1689771808&width=180",
+    "source": "https://www.tower28beauty.com/",
+    "kind": "org-logo"
+  },
+  "UV Doux": {
+    "logo_url": "https://static.wixstatic.com/media/b0449c_0a9d6a3470504564b8991a2a4d4e6e89%7Emv2.png/v1/fill/w_180%2Ch_180%2Clg_1%2Cusm_0.66_1.00_0.01/b0449c_0a9d6a3470504564b8991a2a4d4e6e89%7Emv2.png",
+    "source": "https://www.uvdoux.com/",
+    "kind": "touch-icon"
+  },
+  "Ultra Violette": {
+    "logo_url": "https://ultraviolette.com.au/cdn/shop/t/318/assets/apple-touch-icon.png?v=34055212983479192961792529076",
+    "source": "https://ultraviolette.com.au/",
+    "kind": "touch-icon"
+  },
+  "Ultrasun": {
+    "logo_url": "https://www.ultrasun.com/wp-content/uploads/2026/03/cropped-ultrasun-favicon-180x180.png",
+    "source": "https://www.ultrasun.com/",
+    "kind": "touch-icon"
+  },
+  "VERSO": {
+    "logo_url": "https://versoskincare.com/cdn/shop/files/svgexport-2_2_3adaecb5-dbda-4d97-ac9c-a7d2406b1ec3.svg?v=1773656371&width=180",
+    "source": "https://versoskincare.com/",
+    "kind": "org-logo"
+  },
+  "VIOLETTE_FR": {
+    "logo_url": "https://www.violettefr.com/cdn/shop/files/violette_fr_favicon.webp?crop=center&height=180&v=1685610790&width=180",
+    "source": "https://www.violettefr.com/",
+    "kind": "icon"
+  },
+  "VT Cosmetics": {
+    "logo_url": "https://vtcosmetics.jp/web/upload/category/logo/076fb158890a924fd56d23b690cd3cc2_7ihhxZPEmH_11_top.jpg",
+    "source": "https://vtcosmetics.jp/",
+    "kind": "org-logo"
+  },
+  "Vichy": {
+    "logo_url": "https://www.vichy.com.au/-/media/project/loreal/brand-sites/vchy/shared/baseline/emails/logovichy2x.png",
+    "source": "https://www.vichy.com.au/",
+    "kind": "org-logo"
+  },
+  "Victoria Beckham Beauty": {
+    "logo_url": "https://victoriabeckhambeauty.com/cdn/shop/files/Slice_2735275b-5b46-4fea-85c9-d28bd08257c2.png?crop=center&height=180&v=1733518880&width=180",
+    "source": "https://victoriabeckhambeauty.com/",
+    "kind": "icon"
+  },
+  "Vilvah": {
+    "logo_url": "https://www.vilvahstore.com/cdn/shop/files/Favicon_5de465c8-3536-4903-9655-94890a245f11.png?v=1691664172&width=180",
+    "source": "https://www.vilvahstore.com/",
+    "kind": "touch-icon"
+  },
+  "WOW Skin Science": {
+    "logo_url": "https://wowskinscience.com/apple-touch-icon.png",
+    "source": "https://wowskinscience.com/",
+    "kind": "touch-icon"
+  },
+  "Weleda": {
+    "logo_url": "https://www.weleda.com/icons/apple-touch-icon.png",
+    "source": "https://www.weleda.com/international",
+    "kind": "touch-icon"
+  },
+  "Westman Atelier": {
+    "logo_url": "https://www.westman-atelier.com/cdn/shop/files/Westman_Atelier_Heart_Favicon_whitebg_2_a720d27d-9796-4966-82a5-d8d9538d9786_32x32.png?v=1721937999",
+    "source": "https://www.westman-atelier.com/",
+    "kind": "icon"
+  },
+  "WishCare": {
+    "logo_url": "https://www.mywishcare.com/cdn/shop/files/transparent-02_1.png?v=1770721901&width=180",
+    "source": "https://www.mywishcare.com/",
+    "kind": "touch-icon"
+  },
+  "ZO Skin Health": {
+    "logo_url": "https://zoskinhealth.in/wp-content/uploads/2026/07/cropped-ZO_Icon_Black-copy-180x180.png",
+    "source": "https://zoskinhealth.in/",
+    "kind": "touch-icon"
+  },
+  "bareMinerals": {
+    "logo_url": "https://www.bareminerals.com/cdn/shop/files/bareMinerals_favicon-png.png?crop=center&height=180&v=1677791337&width=180",
+    "source": "https://www.bareminerals.com/",
+    "kind": "icon"
+  },
+  "belif": {
+    "logo_url": "https://www.belifindia.in/cdn/shop/files/a7eda660-96ce-4f53-a540-4fef837e5b0f-removebg-preview_32x32.png?v=1719566455",
+    "source": "https://www.belifindia.in/",
+    "kind": "icon"
+  },
+  "iS Clinical": {
+    "logo_url": "https://www.isclinical.com/cdn/shop/files/Favicon.png?crop=center&height=180&v=1758145867&width=180",
+    "source": "https://www.isclinical.com/",
+    "kind": "icon"
+  },
+  "iUNIK": {
+    "logo_url": "https://www.iunik.com/cdn/shop/files/a7fabb21727da845c0d56c1d15bc4633.w4883.h4883._RO2440_1_0_0_0_0_0_0_0_0_15_FMpng.png?crop=center&height=180&v=1750994532&width=180",
+    "source": "https://www.iunik.com/",
+    "kind": "icon"
+  },
+  "indē wild": {
+    "logo_url": "https://india.indewild.com/cdn/shop/files/IW_WEB_FAVICON_64X64_256x256_7d14513e-447d-4f0e-b251-1bcae608c9c6.png?crop=center&height=180&v=1753771301&width=180",
+    "source": "https://india.indewild.com/",
+    "kind": "icon"
+  },
+  "innisfree": {
+    "logo_url": "https://us.innisfree.com/cdn/shop/files/Favicon_76d6ca6b-87d9-48c7-ad79-41bbf07edc9a.png?crop=center&height=180&v=1768500059&width=180",
+    "source": "https://us.innisfree.com/",
+    "kind": "touch-icon"
+  },
+  "kit:": {
+    "logo_url": "https://kit.com/apple-touch-icon.png",
+    "source": "https://kit.com/",
+    "kind": "touch-icon"
+  },
+  "mCaffeine": {
+    "logo_url": "https://www.mcaffeine.com/cdn/shop/files/Updated_Wolf_Icon_for_the_Brand_Story_Panel_32x32_e944c66e-4ab1-4dfc-8427-98b4cb1f77a0.png?crop=center&height=180&v=1682611125&width=180",
+    "source": "https://www.mcaffeine.com/",
+    "kind": "icon"
+  },
+  "ma:nyo": {
+    "logo_url": "https://manyo.us/cdn/shop/files/256_256_32x32.jpg?v=1793067195",
+    "source": "https://manyo.us/",
+    "kind": "icon"
+  },
+  "mixsoon": {
+    "logo_url": "https://mixsoon.us/cdn/shop/files/final_favicon.jpg?crop=center&height=180&v=1758682108&width=180",
+    "source": "https://mixsoon.us/",
+    "kind": "icon"
+  },
+  "sans [ceuticals]": {
+    "logo_url": "https://sansceuticals.com/cdn/shop/files/favicon.png?crop=center&height=180&v=1752792737&width=180",
+    "source": "https://sansceuticals.com/",
+    "kind": "icon"
+  },
+  "Florasis": {
+    "logo_url": "https://florasis.com/cdn/shop/files/favion_96x_5ad9e6d2-059a-4f08-8915-029ff483c581.webp?v=1656682539&width=180",
+    "source": "https://florasis.com/",
+    "kind": "touch-icon"
+  },
+  "PO:DL": {
+    "logo_url": "https://www.podl.global/cdn/shop/files/fv.png?crop=center&height=180&v=1773149815&width=180",
+    "source": "https://www.podl.global/",
+    "kind": "icon"
+  },
+  "Madeca21": {
+    "logo_url": "https://madeca21.com/cdn/shop/files/madeca21_favicon.png?v=1750317881&width=180",
+    "source": "https://madeca21.com/",
+    "kind": "icon"
+  },
+  "TONYMOLY": {
+    "logo_url": "https://d214w0arlvd25g.cloudfront.net/favicon/apple-icon-180x180.png",
+    "source": "https://tonymoly.com/",
+    "kind": "touch-icon"
+  },
+  "Hada Labo": {
+    "logo_url": "https://cdn.prod.website-files.com/649d1886bde1d143d5d8f18a/64b601aaad9df4dad143e5a2_hada-labo-webclip-256.png",
+    "source": "https://www.hadalabo.com.au/",
+    "kind": "touch-icon"
+  }
+}

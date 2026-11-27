@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef, useState } from 'react'
+
 import { smoothPath } from './chartMath'
 
 /**
@@ -38,5 +40,35 @@ export function TrendChart({ points, baseline, band, width = 190, height = 56, s
       <circle cx={first.x} cy={first.y} r={3} fill="var(--surface, #fff)" stroke={stroke} strokeWidth={1.75} />
       <circle cx={last.x} cy={last.y} r={4} fill={stroke} />
     </svg>
+  )
+}
+
+/**
+ * TrendChart at the size of its container (measured, so dots stay round and strokes stay 2.5px), with the
+ * first and last dates under it so the x axis says what span it covers. `fill`: the chart also takes the
+ * container's free height (at least `height`), for rows that stretch to line up with their neighbours.
+ */
+export function FluidTrend({ height = 44, fill, dates, ...rest }: Omit<Parameters<typeof TrendChart>[0], 'width' | 'height'> & { height?: number; fill?: boolean; dates?: [string, string] }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: height })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setBox({ w: Math.round(e.contentRect.width), h: Math.max(height, Math.min(120, Math.round(e.contentRect.height))) }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [height])
+  return (
+    <div className={`flex w-full min-w-0 flex-col gap-1 ${fill ? 'flex-1' : ''}`}>
+      <div ref={ref} className={fill ? 'min-h-0 flex-1' : ''} style={{ minHeight: height, height: fill ? undefined : height }}>
+        {box.w > 40 ? <TrendChart {...rest} width={box.w} height={fill ? box.h : height} /> : null}
+      </div>
+      {dates ? (
+        <div aria-hidden className="flex justify-between font-mono text-[10.5px] text-ink-2 tnum">
+          <span>{dates[0]}</span>
+          <span>{dates[1]}</span>
+        </div>
+      ) : null}
+    </div>
   )
 }

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app import (
     advisor,
+    brand_logos,
     campaigns,
     catalog,
     feel,
@@ -73,6 +74,14 @@ def catalog_search(
         "catalog_size": len(catalog.products()),
         "market": market,
     }
+
+
+# Declared before /catalog/{product_id}, which would otherwise take "brand-logos" as an id.
+@router.get("/catalog/brand-logos")
+def catalog_brand_logos() -> dict[str, Any]:
+    """Each catalog brand's own logo, linked from its site (app/brand_logos.py); public. A brand
+    missing from `logos` has none: show its initials."""
+    return {"logos": brand_logos.logos()}
 
 
 @router.get("/catalog/{product_id}")
