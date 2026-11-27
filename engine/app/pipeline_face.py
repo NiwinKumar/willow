@@ -621,8 +621,8 @@ def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
 def _drawn_zones(
     label: np.ndarray | None, areas: dict[str, np.ndarray], box: Box
 ) -> np.ndarray | None:
-    """The zone map cut to the drawn "Areas" outlines: a face-skin pixel keeps its zone only if
-    it lies inside that zone's outline (photo pixels; under-eye patches are not zones). Skin the
+    """The zone map cut to the drawn "Areas" outlines: a face-skin pixel takes the zone whose
+    outline it lies inside (photo pixels; under-eye patches are not zones). Skin the
     outlines leave out (the eyelids under the brows, a stray piece of a zone) is in no area, so
     every area count, size and colour reading covers exactly what the photo shows."""
     if label is None:
@@ -632,7 +632,9 @@ def _drawn_zones(
         if name not in areas:
             continue
         inside = polygon_mask(label.shape, np.asarray(areas[name]) - [box.x, box.y])
-        out[inside & (label == code)] = code
+        # the area it is drawn in, whatever its triangle's zone: a strip smoothing gave to a
+        # neighbouring area (_area_outlines) is in that area, not in none
+        out[inside & (label > 0) & (out == 0)] = code
     return out
 
 
@@ -1004,23 +1006,53 @@ def _area_outlines(
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     eps = config.AREA_OUTLINE_MM * face.px_per_mm
     min_px = config.AREA_MIN_MM2 * face.px_per_mm**2
-    out: dict[str, np.ndarray] = {}
-    # each zone is smoothed within its own box plus 2r + 1 px (an open then a close by r
-    # reaches no further, so the outline is the same as over the whole crop)
-    boxes = ndimage.find_objects(label, max_label=len(facemap.ZONES))
-    pad = 2 * r + 2
     h, w = label.shape
-    for code, name in enumerate(facemap.ZONES, start=1):
+    pad = 2 * r + 2
+
+    def window(lab: np.ndarray, code: int, boxes: list) -> tuple | None:
+        # each zone is worked on within its own box plus 2r + 1 px (an open then a close by r
+        # reaches no further, so the result is the same as over the whole crop)
         if boxes[code - 1] is None:
-            continue  # no skin in this zone
+            return None  # no skin in this zone
         ys, xs = boxes[code - 1]
         y0, x0 = max(ys.start - pad, 0), max(xs.start - pad, 0)
-        win = np.s_[y0 : min(ys.stop + pad, h), x0 : min(xs.stop + pad, w)]
-        # smoothed: zone edges follow the mesh's triangles and looked jagged
+        return np.s_[y0 : min(ys.stop + pad, h), x0 : min(xs.stop + pad, w)], (x0, y0)
+
+    # 1. each zone smoothed (zone edges follow the mesh's triangles and looked jagged), its main
+    # piece only. Smoothing each zone on its own drops thin strips where two zones meet (a jaw
+    # wedge running into the chin on a side photo, Nov 27), which then sat in no outline though
+    # its marks were counted: 2. every skin pixel left out joins the nearest smoothed zone.
+    smooth = np.zeros_like(label)
+    boxes = ndimage.find_objects(label, max_label=len(facemap.ZONES))
+    for code in range(1, len(facemap.ZONES) + 1):
+        got = window(label, code, boxes)
+        if got is None:
+            continue
+        win, _ = got
         mask = cv2.morphologyEx((label[win] == code).astype(np.uint8), cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        pieces, n = ndimage.label(mask)
+        if n == 0:
+            continue
+        main = pieces == (np.argmax(np.bincount(pieces.ravel())[1:]) + 1)
+        smooth[win][main & (smooth[win] == 0)] = code
+    left = (label > 0) & (smooth == 0)
+    if left.any() and (smooth > 0).any():
+        _, (iy, ix) = ndimage.distance_transform_edt(smooth == 0, return_indices=True)
+        smooth[left] = smooth[iy[left], ix[left]]
+
+    out: dict[str, np.ndarray] = {}
+    boxes = ndimage.find_objects(smooth, max_label=len(facemap.ZONES))
+    for code, name in enumerate(facemap.ZONES, start=1):
+        got = window(smooth, code, boxes)
+        if got is None:
+            continue
+        win, offset = got
         contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE, offset=(x0, y0)
+            (smooth[win] == code).astype(np.uint8),
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE,
+            offset=offset,
         )
         if not contours:
             continue
