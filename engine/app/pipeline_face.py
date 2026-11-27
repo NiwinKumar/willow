@@ -31,7 +31,7 @@ from app.landmarks import (
     skin_colour,
 )
 from app.metrics.blemish import find_blemishes
-from app.metrics.evenness import tone_evenness
+from app.metrics.evenness import melanin_index, tone_evenness
 from app.metrics.glow import glow
 from app.metrics.lines import lines
 from app.metrics.pigment import find_spots, pigment_spots
@@ -60,6 +60,8 @@ METRIC_INFO = {  # id -> (group, label, unit), docs/CONTRACT.md 2.5
 ALWAYS_INDICATIVE = {"blemishes", "shine", "glow", "lines"}  # docs/CONTRACT.md 2.5
 EVENNESS_ROIS = ("forehead", "right_cheek", "left_cheek", "nose", "chin")
 REDNESS_ROIS = ("right_cheek", "left_cheek", "nose")
+# metrics that also report each face-map zone (extras.by_zone; docs/METRICS.md "Readings by area")
+ZONE_METRICS = ("redness", "tone_evenness", "blemishes", "pigment_spots", "dark_circles")
 
 
 def _bbox(polygons: list[np.ndarray], shape: tuple[int, int]) -> Box:
@@ -304,6 +306,19 @@ def _frame(path: str, overlays: bool = False) -> dict:
         [*blemishes, *big],
     )
     spots_pct, spot_extras = pigment_spots(spots, int(face_skin.sum()))
+    # the face split into the app's "Areas": each zone is the face skin inside its drawn outline,
+    # so what an area counts is exactly what the photo shows (_drawn_zones)
+    zone_label = _zone_labels(face, box, face_skin)
+    areas = _area_outlines(face, box, zone_label, polys)
+    zone_label = _drawn_zones(zone_label, areas, box)
+    zone_values = _zone_colour(lab, red, zone_label, px_per_mm)
+    zone_values["dark_circles"] = {
+        f"{side}_under_eye": med(0, f"{side}_under_eye") - med(0, f"{side}_cheek")
+        for side in ("right", "left")
+        if f"{side}_under_eye" in roi_skin
+        and f"{side}_cheek" in roi_skin
+        and roi_skin[f"{side}_under_eye"].sum() >= config.UNDER_EYE_MIN_MM2 * px_per_mm**2
+    }
 
     values = {
         "tone_ita": ita_degrees(l_star, b_star) if tone_ok else None,
@@ -329,15 +344,17 @@ def _frame(path: str, overlays: bool = False) -> dict:
         "glow": glow_extras,
         "lines": lines_extras,
     }
-    zone_label = _zone_labels(face, box, face_skin)
     return {
         "values": values,
         "extras": extras,
+        # per face-map zone, this photo's reading of the colour metrics (marks: _zone_marks)
+        "zone_values": zone_values,
         "quality": quality,
         "face": face,
         "view": face.view,
         "polygons": polys,
-        # the "Areas" outlines are drawn for the reference photos only: worked out on demand (_areas)
+        # the "Areas" outlines drawn on the photo, and the zone of every face-skin pixel inside them
+        "areas": areas,
         "zone_label": zone_label,
         # which zone each mark sits in, and each zone's skin (px): a session with side photos
         # takes each zone from the photo that faces it (_combine_views)
@@ -525,6 +542,102 @@ def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
             **f["extras"]["pigment_spots"],
             **pigment_spots(kept, 1)[1],
         }
+
+
+def _drawn_zones(
+    label: np.ndarray | None, areas: dict[str, np.ndarray], box: Box
+) -> np.ndarray | None:
+    """The zone map cut to the drawn "Areas" outlines: a face-skin pixel keeps its zone only if
+    it lies inside that zone's outline (photo pixels; under-eye patches are not zones). Skin the
+    outlines leave out (the eyelids under the brows, a stray piece of a zone) is in no area, so
+    every area count, size and colour reading covers exactly what the photo shows."""
+    if label is None:
+        return None
+    out = np.zeros_like(label)
+    for code, name in enumerate(facemap.ZONES, start=1):
+        if name not in areas:
+            continue
+        inside = polygon_mask(label.shape, np.asarray(areas[name]) - [box.x, box.y])
+        out[inside & (label == code)] = code
+    return out
+
+
+def _zone_colour(
+    lab: np.ndarray, red: np.ndarray, zone_label: np.ndarray | None, px_per_mm: float
+) -> dict[str, dict[str, float]]:
+    """One photo's colour readings per area (docs/METRICS.md "Readings by area"), on the face
+    skin inside each drawn area (_drawn_zones): redness = the area's median a*, tone_evenness =
+    the within-area part of the evenness metric (SD of the ~1 mm smoothed melanin proxy). Areas
+    with less than ZONE_MIN_MM2 of skin in this photo are left out. Skin tone is never split."""
+    if zone_label is None:
+        return {"redness": {}, "tone_evenness": {}}
+    least = config.ZONE_MIN_MM2 * px_per_mm**2
+    masks = {z: zone_label == c for c, z in enumerate(facemap.ZONES, start=1)}
+    here = {z: m for z, m in masks.items() if m.sum() >= least}
+    if not here:
+        return {"redness": {}, "tone_evenness": {}}
+    mi = ndimage.gaussian_filter(
+        melanin_index(red), sigma=max(config.EVENNESS_SMOOTH_MM * px_per_mm, 0.5)
+    )
+    return {
+        "redness": {z: float(np.median(lab[..., 1][m])) for z, m in here.items()},
+        "tone_evenness": {z: float(np.std(mi[m])) for z, m in here.items()},
+    }
+
+
+def _zone_marks(front: list[dict], side_refs: dict[str, dict]) -> None:
+    """Blemish count and dark-spot area (% of the zone's skin) per face-map zone, for every
+    front photo, from the same marks the session's totals count (confirmed by another photo,
+    each zone from the photo that measures it: _owned_marks, _combine_views). Zones with less
+    than ZONE_MIN_MM2 of skin are left out."""
+    sides = set(side_refs)
+
+    def part(f: dict) -> dict[str, list[float]]:
+        own = _owned_marks(f, sides)
+        n_b, mm2 = len(f["blemishes"]), f["face"].px_per_mm ** 2
+        mine = SIDE_ZONES.get(f["view"])
+        out = {
+            z: [0.0, 0.0, px / mm2]  # blemishes, spot mm2, skin mm2
+            for z, px in f["zone_px"].items()
+            if (z in mine if mine else _owns("front", z, sides)) and px / mm2 >= config.ZONE_MIN_MM2
+        }
+        for i, (z, ok) in enumerate(zip(f["mark_zones"], own, strict=True)):
+            if ok and z in out:
+                if i < n_b:
+                    out[z][0] += 1
+                else:
+                    out[z][1] += f["spots"][i - n_b].area_px / mm2
+        return out
+
+    extra: dict[str, list[float]] = {}
+    for r in side_refs.values():
+        extra |= part(r)
+    for f in front:
+        zones = {**part(f), **extra}
+        f.setdefault("zone_values", {})
+        f["zone_values"]["blemishes"] = {z: v[0] for z, v in zones.items()}
+        f["zone_values"]["pigment_spots"] = {z: 100.0 * v[1] / v[2] for z, v in zones.items()}
+
+
+def _by_zone(metric_id: str, have: list[dict]) -> dict[str, dict]:
+    """Each zone's session reading for one metric: mean over the photos that measured it, the
+    photo-to-photo SD and its own noise band (mdc95, the metric's MIN_SD floor), and how many
+    photos it rests on. The api compares a zone with the same zone of the baseline session."""
+    per_zone: dict[str, list[float]] = {}
+    for f in have:
+        for z, v in ((f.get("zone_values") or {}).get(metric_id) or {}).items():
+            if v is not None and np.isfinite(v):
+                per_zone.setdefault(z, []).append(float(v))
+    out = {}
+    for z, vals in per_zone.items():
+        s = summarize(vals, None, config.MIN_SD.get(metric_id, 0.0))
+        out[z] = {
+            "value": s["value"],
+            "within_session_sd": s["within_session_sd"],
+            "mdc95": s["mdc95"],
+            "n": len(vals),
+        }
+    return out
 
 
 def _candidates(
@@ -810,7 +923,7 @@ def _area_outlines(
 
 def _areas(f: dict) -> dict[str, np.ndarray]:
     """A photo's area outlines (_area_outlines), worked out once, only for the photos drawn."""
-    if "areas" not in f:
+    if "areas" not in f:  # frames from before _frame drew them
         f["areas"] = _area_outlines(f["face"], f["box"], f["zone_label"], f["polygons"])
     return f["areas"]
 
@@ -927,6 +1040,7 @@ def analyze_face(
     side_refs = {v: g[0] for v, g in side_groups.items()}
     if side_refs:
         _combine_views(good, side_refs)
+    _zone_marks(good, side_refs)
 
     metrics = []
     _session_lines(good)
@@ -945,6 +1059,8 @@ def analyze_face(
             if metric_id == "lines":  # the lists _mean_extras drops (_session_lines)
                 for k in ("top_zones", "skipped_for_expression"):
                     extras[k] = have[0]["extras"]["lines"].get(k, [])
+            if metric_id in ZONE_METRICS and (zones := _by_zone(metric_id, have)):
+                extras["by_zone"] = zones
         else:
             summary = {
                 "value": None,

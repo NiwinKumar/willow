@@ -63,6 +63,7 @@ MIN_SD = {
     "texture": 0.05,  # index
 }
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
+ZONE_MIN_MM2 = 50.0  # a face-map zone needs this much skin in a photo for a by-zone reading
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading
 
 # Face (docs/CONTRACT.md 2.3 pose gates; docs/METRICS.md pipeline steps 5-6)
@@ -436,6 +437,7 @@ FACE_ZONES = (
     "left_jaw",
 )
 FOREHEAD_ZONE_BELOW_BROW_MM = 8.0  # the strip between the brows counts as forehead
+NOSE_BRIDGE_WIDTH_FRAC = 0.8  # the nose zone's bridge: this share of the inner eye corners' spread
 MOUTH_ZONE_MARGIN_MM = 5.0  # around_mouth / chin reach this far past the mouth corners and lip
 FACEMAP_MAX_OUTSIDE_MM = 5.0  # a mark off the mesh edge (hairline, jaw) by more: no position
 FACEMAP_MAX_SCALE = 2.0  # a mark's mm-per-px at most this times the face's median (edge-on skin)
