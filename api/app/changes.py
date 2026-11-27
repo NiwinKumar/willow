@@ -297,12 +297,17 @@ def patterns_in(sessions: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
     check-ins where it was noted against the answered ones where it was not. A pattern needs
     MIN_EACH on each side, a gap of the means beyond the reading's normal range (its mdc95 on the
     latest check-in), and at least MIN_SHARE of the noted check-ins beyond the others' median the
-    same way. Counts only compare with check-ins taken the same way (with or without cheeks)."""
+    same way. Counts only compare with check-ins taken the same way (with or without cheeks).
+
+    Without a pattern, a noted kind of change is `same` when at least one reading had enough
+    check-ins on both sides and showed no clear difference (a real finding, said plainly), else
+    `learning` (not enough check-ins yet; the app lists these without numbers)."""
     rows = _comparable(sessions)
-    patterns, building = [], []
+    patterns, same, learning = [], [], []
     for group, metric_ids in WATCH.items():
         noted_n = sum(1 for _, d in rows if group in (groups_of(d) or set()))
         found_any = False
+        compared: list[str] = []  # readings with enough check-ins on both sides
         for metric_id in metric_ids:
             cheeks = None
             if metric_id in baselines.CONFIRMED_COUNTS and rows:
@@ -318,6 +323,7 @@ def patterns_in(sessions: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
                 (tagged if group in (groups_of(d) or set()) else others).append(r)
             if len(tagged) < MIN_EACH or len(others) < MIN_EACH or not band:
                 continue
+            compared.append(_label(rows, metric_id))
             gap = mean(v for v, _, _ in tagged) - mean(v for v, _, _ in others)
             if abs(gap) <= band:
                 continue
@@ -347,13 +353,25 @@ def patterns_in(sessions: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
                     ),
                 }
             )
-        if not found_any and noted_n:
-            need = max(0, MIN_EACH - noted_n)
-            building.append(
-                {"group": group, "about": GROUP_WORDS[group], "noted": noted_n, "need": need}
+        if found_any or not noted_n:
+            continue
+        if compared:
+            readings = _and([m.lower() for m in compared])
+            same.append(
+                {
+                    "group": group,
+                    "about": GROUP_WORDS[group],
+                    "text": f"No clear difference in your {readings} on check-ins where you "
+                    f"noted {GROUP_WORDS[group]}.",
+                }
             )
-    others_n = len(rows)
-    return {"answered": others_n, "patterns": patterns, "building": building}
+        else:
+            learning.append({"group": group, "about": GROUP_WORDS[group]})
+    return {"answered": len(rows), "patterns": patterns, "same": same, "learning": learning}
+
+
+def _and(words: list[str]) -> str:
+    return words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"
 
 
 def sentence(label: str, about: str, higher: bool, same: int, of: int, areas: list[str]) -> str:

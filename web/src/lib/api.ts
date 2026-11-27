@@ -135,7 +135,10 @@ export type ChangesRead = {
 export type ChangePatterns = {
   answered: number
   patterns: { group: string; about: string; metric_id: string; metric: string; higher: boolean; way: string | null; noted: number; same_way: number; others: number; areas: string[]; text: string }[]
-  building: { group: string; about: string; noted: number; need: number }[]
+  /** Enough check-ins on both sides and no clear difference (a finding, worded by the api). */
+  same: { group: string; about: string; text: string }[]
+  /** Noted, but not enough check-ins yet to compare: listed without numbers. */
+  learning: { group: string; about: string }[]
 }
 
 /** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */

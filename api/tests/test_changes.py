@@ -208,9 +208,9 @@ def test_a_pattern_needs_three_weeks_each_side_beyond_the_normal_range():
         "Blemishes were higher on 3 of the 3 check-ins where you noted your period"
     )
     assert "caus" not in p["text"]
-    # stress and sun were noted once: still building, never a pattern
-    building = {b["group"]: b for b in got["building"]}
-    assert building["stress"]["need"] == 2 and building["sun"]["need"] == 2
+    # stress and sun were noted once: still learning (no numbers), never a pattern
+    assert {b["group"] for b in got["learning"]} == {"stress", "sun"}
+    assert got["same"] == []
 
 
 def test_no_pattern_inside_the_normal_range_or_without_enough_weeks():
@@ -226,7 +226,17 @@ def test_no_pattern_inside_the_normal_range_or_without_enough_weeks():
             (22, [], 3),
         ],
     )
-    assert changes.find(store, UID)["patterns"] == []
+    got = changes.find(store, UID)
+    assert got["patterns"] == []
+    # enough check-ins on both sides and no difference: said plainly, as a finding
+    assert got["same"] == [
+        {
+            "group": "sleep",
+            "about": "poor sleep",
+            "text": "No clear difference in your blemishes on check-ins where you noted "
+            "poor sleep.",
+        }
+    ]
     store2 = MemoryStore()
     _weeks(store2, [(40, ["period"], 3), (20, [], 3), (41, ["period"], 3), (21, [], 3)])
     assert changes.find(store2, UID)["patterns"] == []
