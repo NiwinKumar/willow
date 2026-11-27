@@ -1,4 +1,5 @@
 import { BandBar } from '../../components/charts'
+import { DotNumber } from '../../components/willow/DotNumber'
 import { InfoTip } from '../../components/willow/InfoTip'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
@@ -22,7 +23,7 @@ function Pill({ metric, session, size = 'md' }: { metric: Metric; session: Sessi
 }
 
 /** Day-detail tile: the reading with its change beside it, a track with a round marker, the change in words, and an info button (what it measures). With `onOpen` it is a button that opens the metric's detail. */
-export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 }: { metric: Metric; session: Session; band: number | null; place?: string; onOpen?: () => void; delay?: number }) {
+export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0, className = '' }: { metric: Metric; session: Session; band: number | null; place?: string; onOpen?: () => void; delay?: number; className?: string }) {
   const look = METRIC_LOOK[m.id]
   const none = m.value === null
   const unit = unitOf(m).trim()
@@ -35,7 +36,7 @@ export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 
   // The whole tile opens the detail (a button under the content); the info button sits on top, top right.
   return (
     <div
-      className={`group relative flex min-h-[230px] animate-[wRise_.5s_both] flex-col justify-between gap-3.5 rounded-[36px] p-[22px] text-left shadow-[inset_0_0_40px_rgba(255,255,255,.3),0_30px_60px_-46px_rgba(0,0,0,.5)] squircle has-[[data-tip-open]]:z-30 ${onOpen ? 'transition-transform duration-300 ease-standard hover:-translate-y-0.5 has-[>button:active]:scale-[.98]' : ''}`}
+      className={`group relative flex animate-[wRise_.5s_both] flex-col justify-between gap-3 rounded-[30px] p-[18px] @min-[460px]:min-h-[230px] @min-[460px]:gap-3.5 @min-[460px]:rounded-[36px] @min-[460px]:p-[22px] text-left shadow-[inset_0_0_40px_rgba(255,255,255,.3),0_30px_60px_-46px_rgba(0,0,0,.5)] squircle has-[[data-tip-open]]:z-30 ${className} ${onOpen ? 'transition-transform duration-300 ease-standard hover:-translate-y-0.5 has-[>button:active]:scale-[.98]' : ''}`}
       style={{ background: none ? EMPTY_CARD.bg : look.bg, color: none ? EMPTY_CARD.fg : look.fg, animationDelay: `${delay}ms` }}
     >
       {onOpen ? (
@@ -55,7 +56,7 @@ export function MetricTile({ metric: m, session, band, place, onOpen, delay = 0 
         <Pill metric={m} session={session} size="sm" />
       </div>
       <div className="pointer-events-none relative flex items-baseline gap-1.5">
-        <span className="font-dot text-[clamp(31px,2.99vw,39px)] leading-[.9] font-extrabold tnum">{none ? '—' : fmtReading(m.value, m)}</span>
+        <DotNumber text={none ? '—' : fmtReading(m.value, m)} className="text-[clamp(31px,2.99vw,39px)] leading-[.9] font-extrabold tnum" />
         {!none && unit ? <span className="text-[15px]">{unit}</span> : null}
         {/* The change since the reading compared with, beside the value: "+12.2" up, "−2.1" down. */}
         {change ? <span className="ml-1.5 text-[16px] tnum opacity-80">{change}</span> : null}

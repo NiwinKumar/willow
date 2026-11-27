@@ -12,15 +12,13 @@ import { MonoEyebrow, SerifTitle } from './parts'
 export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: { site: Site; mode: CaptureMode; sessionsOf: (s: Site) => Session[]; known: boolean; onSite: (s: Site) => void; onContinue: () => void }) {
   const n = known ? neededFor(sessionsOf(site), mode) : null
   const first = n === 5
-  const [today] = useState(() => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase())
+  const [today] = useState(() => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }))
   return (
     <div className="relative mx-auto flex max-w-[1180px] animate-rise flex-col gap-[22px] px-[clamp(16px,4vw,40px)] pt-[clamp(12px,3vw,32px)] pb-20">
       <div className="flex flex-wrap items-end justify-between gap-5">
-        <div>
+        <div className="flex flex-col gap-2">
+          <SerifTitle id="ck-title">What are you photographing?</SerifTitle>
           <MonoEyebrow>New session · {today}</MonoEyebrow>
-          <div className="mt-3">
-            <SerifTitle id="ck-title">What are you photographing?</SerifTitle>
-          </div>
         </div>
       </div>
 
@@ -34,17 +32,17 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: 
               type="button"
               aria-pressed={on}
               onClick={() => onSite(s)}
-              className="relative flex h-[270px] flex-col justify-between rounded-[36px] p-[22px] text-left transition-[translate] duration-[350ms] ease-standard hover:-translate-y-1"
+              className="relative flex min-h-[132px] flex-col justify-between gap-3 rounded-[28px] p-[18px] text-left transition-[translate,scale] duration-[350ms] ease-standard hover:-translate-y-1 active:scale-[.985] sm:h-[270px] sm:rounded-[36px] sm:p-[22px]"
               style={{ background: SITE_CARD[s].bg, color: SITE_CARD[s].fg, boxShadow: `${on ? '0 0 0 2.5px var(--text-primary)' : '0 0 0 0 transparent'}, inset 0 0 40px 6px rgba(255,255,255,.35), 0 24px 50px -36px rgba(0,0,0,.45)` }}
             >
               <span className="flex items-start justify-between gap-2">
-                <span className="rounded-pill bg-white/50 px-2.5 py-1.5 font-mono text-[11px] tracking-[.06em]">{MEASURED_SITES.includes(s) ? 'MEASURED' : 'SAVED · NOT MEASURED YET'}</span>
+                <span className="rounded-pill bg-white/50 px-2.5 py-1 text-[12px]">{MEASURED_SITES.includes(s) ? 'Measured' : 'Saved · not measured yet'}</span>
                 <span aria-hidden className={`grid size-[30px] flex-none place-items-center rounded-full text-[14px] text-inverse transition-[background] ${on ? 'bg-selected' : 'bg-white/45'}`}>
-                  {on ? '✓' : ''}
+                  {on ? <span className="motion-safe:animate-[wDotIn_.25s_var(--ease-standard)_both]">✓</span> : ''}
                 </span>
               </span>
               <span className="flex flex-col gap-1.5">
-                <span className="text-[24px] tracking-[-0.02em]">{SITE_NAME[s]}</span>
+                <span className="text-[22px] tracking-[-0.02em] sm:text-[24px]">{SITE_NAME[s]}</span>
                 <span className="text-[14px] leading-[1.35] opacity-85">{SITE_MEASURES[s]}</span>
                 <span className="font-mono text-[12px] opacity-85">{line}</span>
               </span>
@@ -54,17 +52,17 @@ export function SiteStep({ site, mode, sessionsOf, known, onSite, onContinue }: 
       </div>
       <p className="m-0 px-1 text-[13px] text-ink-2">Testing a product? Set both forearm baselines before you start using it: the control arm separates the product from shared drift.</p>
 
-      <div className="flex flex-wrap items-center justify-between gap-3.5 rounded-lg bg-surface/85 px-5 py-[18px]">
+      <div className="sticky bottom-[max(12px,env(safe-area-inset-bottom))] z-[2] flex flex-wrap items-center justify-between gap-3.5 rounded-lg bg-surface/90 px-4 py-3.5 shadow-[0_24px_50px_-24px_rgba(0,0,0,.35)] backdrop-blur-[16px] sm:static sm:bg-surface/85 sm:px-5 sm:py-[18px] sm:shadow-none sm:backdrop-blur-none">
         <span className="flex items-center gap-3.5">
-          <span className="font-dot text-[44px] leading-none">{n === null ? '··' : pad2(n)}</span>
+          <span className="font-dot text-[36px] leading-none sm:text-[44px]">{n === null ? '··' : pad2(n)}</span>
           <span className="flex flex-col gap-0.5">
-            <span className="text-[17px]">{n === null ? 'Checking your baselines…' : first ? `First session · ${n} photos for a baseline` : `Later session · ${n} photos`}</span>
+            <span className="text-[15px] sm:text-[17px]">{n === null ? 'Checking your baselines…' : first ? `First session · ${n} photos for a baseline` : `Later session · ${n} photos`}</span>
             <span className="text-[14px] text-ink-2">
               {SITE_NAME[site]}
             </span>
           </span>
         </span>
-        <button type="button" disabled={n === null} onClick={onContinue} className="min-h-[58px] rounded-pill bg-selected px-[30px] text-[17px] text-inverse transition-[translate] duration-200 hover:translate-x-[3px]">
+        <button type="button" disabled={n === null} onClick={onContinue} className="min-h-[52px] w-full rounded-pill bg-selected px-[30px] text-[16px] text-inverse transition-[translate,scale] duration-200 hover:translate-x-[3px] active:scale-[.98] sm:min-h-[58px] sm:w-auto sm:text-[17px]">
           Continue <span aria-hidden>→</span>
         </button>
       </div>

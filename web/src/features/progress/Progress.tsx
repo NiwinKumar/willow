@@ -19,7 +19,7 @@ import { DayDetail } from './DayDetail'
 import { routineMarkers } from './markers'
 import { DAY_BG, DAY_RANK, DAY_WORDS, bandText, chartable, currentBaseline, dayOf, dayStatus, usedFrames, type DayStatus } from './model'
 import { MetricSwitcher, Page } from './parts'
-import { metricSeries } from './series'
+import { metricSeries, type MetricSeries } from './series'
 import { routineNotes, sessionNotes, type Note } from './timeline'
 
 // The places charted here; the forearms are a product test (/test) and only show in the calendar.
@@ -45,6 +45,7 @@ export default function Progress() {
   const shell = useShell()
   const routine = useRoutine()
   const today = localDay()
+  // A check-in left while measuring says so here when its result lands.
 
   // Every check-in of every place, oldest first.
   const all = useMemo(() => SITE_ORDER.flatMap((p) => data.series(p)?.sessions ?? []).sort((a, b) => a.created_at.localeCompare(b.created_at)), [data])
@@ -150,6 +151,7 @@ export default function Progress() {
   const label = track?.label ?? ''
   const sample = metric ? (series?.sessions.map((s) => s.result?.metrics.find((m) => m.id === metric)).find(Boolean) ?? null) : null
   const unit = sample ? unitOf(sample).trim() : ''
+  const read = series ? readOf(series, unit) : null
 
   // ---- notes ----
   const multi = new Set(all.map((s) => s.site)).size > 1
@@ -210,6 +212,20 @@ export default function Progress() {
                 if (t) setQuery({ metric: t.metric, site: t.site })
               }}
             />
+            {read ? (
+              // The chart's answer in one line: how far the latest reading is from the baseline, and whether that
+              // is beyond the normal range. Four tests: the number the chart is for, said first (1); plain words
+              // and a unit (2); above the plot, never over it (3); Outfit light like the app's other big numbers,
+              // ember only for "beyond", as everywhere (4).
+              <div key={`${track?.site}.${metric}`} className="flex animate-[wRise_.45s_both] flex-wrap items-end gap-x-4 gap-y-1" aria-live="polite">
+                <span className={`text-[clamp(36px,3.4vw,48px)] leading-[.9] font-light tracking-[-0.03em] tnum ${read.beyond ? 'text-signal' : ''}`}>{read.delta}</span>
+                <span className="pb-1 text-[14px] leading-[1.35] text-white/75">
+                  {read.from} → {read.to} since your baseline, {read.since}
+                  <br />
+                  {read.band === null ? 'No normal range yet' : read.beyond ? `Beyond your normal range (${read.band})` : `Within your normal range (${read.band})`}
+                </span>
+              </div>
+            ) : null}
             {series && series.points.some((p) => p.value !== null) && metric ? (
               <TimelineChart
                 points={series.points}
@@ -219,29 +235,43 @@ export default function Progress() {
                 format={series.format}
                 unit={unit}
                 glow
+                bandLabel={false}
                 caption={`${metric ? METRIC_META[metric].label : label} by check-in${track ? `, ${SITE_LABEL[track.site].toLowerCase()}` : ''}`}
                 summary={`${label} across ${series.points.length} check-ins${series.band !== null && sample ? `, normal range ${bandText(sample, series.band)} around the baseline` : ', no normal range yet'}.`}
               />
             ) : (
               <p className="m-0 py-16 text-center text-[15px] text-white/70">No check-ins with readings yet.</p>
             )}
-            <div className="flex flex-wrap gap-4 text-[13px] text-white/70">
-              <span className="flex items-center gap-2">
-                <span aria-hidden className="h-2 w-[18px] rounded-[8px]" style={{ background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink))' }} />
-                Normal range around baseline
-              </span>
+            {/* The key lists only what this chart draws. */}
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] text-white/70">
+              {series?.band !== null && series?.band !== undefined ? (
+                <span className="flex items-center gap-2">
+                  <span aria-hidden className="h-2 w-[18px] rounded-[8px]" style={{ background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink))' }} />
+                  Normal range{read?.band ? ` ${read.band}` : ''}
+                </span>
+              ) : null}
               <span className="flex items-center gap-2">
                 <span aria-hidden className="size-2.5 rounded-full bg-lime" />
                 Baseline
               </span>
-              <span className="flex items-center gap-2">
-                <span aria-hidden className="w-3.5 border-t-2 border-dashed border-lime" />
-                Routine change
-              </span>
-              <span className="flex items-center gap-2">
-                <span aria-hidden className="size-2.5 rounded-full border border-dashed border-white/60" />
-                No reading
-              </span>
+              {read?.anyBeyond ? (
+                <span className="flex items-center gap-2">
+                  <span aria-hidden className="size-2.5 rounded-full bg-signal" />
+                  Beyond your normal range
+                </span>
+              ) : null}
+              {markers.length ? (
+                <span className="flex items-center gap-2">
+                  <span aria-hidden className="w-3.5 border-t-2 border-dashed border-lime" />
+                  Routine change
+                </span>
+              ) : null}
+              {series?.points.some((p) => p.value === null) ? (
+                <span className="flex items-center gap-2">
+                  <span aria-hidden className="size-2.5 rounded-full border border-dashed border-white/60" />
+                  No reading
+                </span>
+              ) : null}
             </div>
           </section>
         </div>
@@ -254,6 +284,34 @@ export default function Progress() {
       </div>
     </Page>
   )
+}
+
+/**
+ * The chart's headline: the latest reading against the baseline ("−1.0 pts", 3.1 → 2.1 % since 16 Oct) and whether
+ * that is beyond the normal range. Neutral words (a difference, never better/worse); null without both readings.
+ */
+function readOf(series: MetricSeries, unit: string) {
+  const { points, baseIndex, band, format, sessions } = series
+  if (baseIndex === null) return null
+  const baseV = points[baseIndex]?.value
+  let li = points.length - 1
+  while (li > baseIndex && points[li].value === null) li--
+  const lastV = points[li]?.value
+  if (baseV == null || lastV == null || li <= baseIndex) return null
+  const d = lastV - baseV
+  const dUnit = unit === '%' ? ' pts' : unit === '°' ? '°' : unit ? ` ${unit}` : ''
+  const shown = format(Math.abs(d))
+  const sign = Number(shown) === 0 ? '' : d < 0 ? '−' : '+'
+  const u = unit === '°' ? '°' : unit ? ` ${unit}` : ''
+  return {
+    delta: `${sign}${shown}${dUnit}`,
+    from: points[baseIndex].text ?? format(baseV),
+    to: `${points[li].text ?? format(lastV)}${u}`,
+    since: fmtDate(sessions[baseIndex].created_at),
+    beyond: band !== null && Math.abs(d) > band,
+    anyBeyond: band !== null && points.some((p) => p.value !== null && Math.abs(p.value - baseV) > band),
+    band: band !== null ? `±${format(band)}${dUnit}` : null,
+  }
 }
 
 /** Routine starts placed between the check-ins around them; products started the same day share one marker. */
@@ -275,7 +333,7 @@ function BaselinesCard({ places, onCheckIn }: { places: { site: Site; mode: Capt
       className="relative flex flex-col gap-[18px] overflow-hidden rounded-[44px] p-[clamp(22px,3vw,32px)] text-ink squircle"
       style={{ background: 'radial-gradient(70% 90% at 92% 100%, #C8E62E 0%, var(--signal-baseline) 30%, rgba(220,242,75,.25) 60%, transparent 80%), #F3F5E6', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.6), inset 0 0 70px rgba(255,255,255,.4), 0 30px 70px -50px rgba(140,170,20,.6)' }}
     >
-      <span className="font-mono text-[11px] tracking-[.08em] text-ink-2">■ {rows.length > 1 ? 'YOUR BASELINES' : 'YOUR BASELINE'}</span>
+      <h2 className="m-0 text-h3 font-normal">{rows.length > 1 ? 'Your baselines' : 'Your baseline'}</h2>
       {set.length ? (
         <>
           <ul className="m-0 flex list-none flex-col p-0">
@@ -296,11 +354,11 @@ function BaselinesCard({ places, onCheckIn }: { places: { site: Site; mode: Capt
               </li>
             ))}
           </ul>
-          <p className="m-0 max-w-[460px] text-[15px] leading-normal">
-            Every later reading of a place is compared with that place’s baseline. A change counts only when it goes beyond your normal photo-to-photo range.
-            {thin ? ' A baseline with fewer than 3 usable photos has no normal range yet: changes are shown, never called real.' : ''}
+          <p className="m-0 max-w-[460px] text-[14.5px] leading-[1.5]">
+            Every later check-in is compared with this day. A change counts only when it goes beyond your normal photo-to-photo range.
+            {thin ? ' With fewer than 3 usable photos there is no normal range yet: changes are shown, never called real.' : ''}
           </p>
-          <span className="text-[13px] text-ink-2">To change a baseline, open another day.</span>
+          <span className="mt-auto text-[13px] text-ink-2">To use another day as your baseline, open that day.</span>
         </>
       ) : (
         <>
@@ -321,7 +379,7 @@ function NotesCard({ notes }: { notes: Note[] }) {
   return (
     <section aria-label="Notes and routine changes" className="flex flex-col gap-1.5 rounded-[44px] bg-surface/70 p-[clamp(22px,3vw,32px)] squircle">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <span className="font-mono text-[12px] text-ink-2">■ NOTES AND ROUTINE CHANGES</span>
+        <h2 className="m-0 text-h3 font-normal">Notes and routine changes</h2>
         {notes.length > 8 ? (
           <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="min-h-11 rounded-pill bg-selected px-4 text-[13px] text-inverse transition-[background] duration-300 hover:bg-[#2a2a2a]">
             {all ? 'Show the latest 8' : `Show all ${notes.length}`}

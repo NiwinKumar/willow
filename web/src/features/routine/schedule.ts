@@ -1,6 +1,6 @@
 /**
  * Routine schedules (api/app/schedule.py): every day, every other day from an anchor day, or chosen
- * weekdays. All on the person's own calendar days. Used for "TONIGHT" / "RESTS ☾", the routine-today
+ * weekdays. All on the person's own calendar days. Used for "Tonight" / "Rests today ☾", the routine-today
  * counts (a resting product is never a missed one) and the "Alternate nights" fix.
  */
 import type { RoutineEntry, RoutineSchedule } from '../../data/types'
@@ -31,11 +31,12 @@ export function usedOn(s: RoutineSchedule | null | undefined, day: string = loca
 /** Does this product rest today (its schedule skips the day)? */
 export const restsOn = (e: Pick<RoutineEntry, 'schedule'>, day: string = localDay()) => !usedOn(e.schedule, day)
 
-/** The design's small note under a product: "TONIGHT" / "TODAY" on a use day of a non-daily schedule, "RESTS ☾" on a rest day. */
+/** The design's small note under a product: "Tonight" / "Today" on a use day of a non-daily schedule, "Rests today ☾" on a rest day. */
 export function dayNote(e: Pick<RoutineEntry, 'schedule'>, slot: 'am' | 'pm', day: string = localDay()): string | null {
   if (isEveryDay(e.schedule)) return null
-  if (restsOn(e, day)) return 'RESTS ☾'
-  return slot === 'pm' ? 'TONIGHT' : 'TODAY'
+  // sentence case (polish pass: no mono caps labels); Home's routine and the Routine slots both show it
+  if (restsOn(e, day)) return 'Rests today ☾'
+  return slot === 'pm' ? 'Tonight' : 'Today'
 }
 
 /** "Every day", "Every other night", "Mon, Wed, Fri". `night`: the product is evening-only. */

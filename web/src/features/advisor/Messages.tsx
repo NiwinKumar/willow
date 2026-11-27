@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import type { MetricId, Product } from '../../data/types'
 import type { AdvisorReply, AnswerBlock } from '../../lib/api'
+import { NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice, plural } from '../../lib/format'
 import { SITE_LABEL } from '../../lib/metrics'
 import { ProductImage } from '../routine/productUi'
@@ -14,6 +15,11 @@ import { Markup, type MarkupLinks } from './markup'
 import { plainText } from './markupParse'
 import { WispMark } from './Wisp'
 import { Widget, type WidgetLinks } from './widgets'
+import { COMMISSION_NOTE, useStoreClick } from '../../lib/clicks'
+import { useChecks, type ProductCheck } from '../../lib/safety'
+import { CheckedChip } from '../../components/willow/CheckedChip'
+import { ReactionEscalation } from './ReactionEscalation'
+import { mentionsReaction } from '../../lib/reactions'
 
 /** "gemini-3.8-flash" -> "Gemini 3.8 Flash" for the info popover. */
 const modelName = (id: string) => id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -32,7 +38,7 @@ function Stamp({ at, align }: { at: string; align: 'left' | 'right' }) {
 export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessage, { role: 'user' }> }) {
   return (
     <div className="group flex flex-col items-end gap-1">
-      {m.context ? <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {m.context.toUpperCase()}</span> : null}
+      {m.context ? <span className="text-[12px] text-ink-2">From {m.context}</span> : null}
       <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
         {m.photos?.length ? (
           <span className="flex flex-wrap justify-end gap-1.5">
@@ -41,8 +47,8 @@ export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessa
             ))}
           </span>
         ) : m.photoCount ? (
-          <span className="font-mono text-[10px] tracking-[.06em] text-inverse/70">
-            ■ {m.photoCount} PRODUCT PHOTO{m.photoCount === 1 ? '' : 'S'} · NOT KEPT
+          <span className="text-[12px] text-inverse/70">
+            {m.photoCount} product photo{m.photoCount === 1 ? '' : 's'} · not kept
           </span>
         ) : null}
         <span>{m.text}</span>
@@ -83,7 +89,7 @@ function HowMade({ r }: { r: AdvisorReply }) {
       </button>
       {open ? (
         <span role="tooltip" className="absolute right-0 bottom-full z-10 mb-1.5 flex w-[280px] flex-col gap-1.5 rounded-[18px] bg-surface/95 p-3.5 text-left text-[12px] leading-[1.45] text-[#3E3C38] shadow-[0_24px_50px_-20px_rgba(0,0,0,.35),inset_0_0_0_1px_rgba(18,18,18,.06)] backdrop-blur-[18px]" style={{ animation: 'wRise .2s both' }}>
-          <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ HOW THIS ANSWER WAS MADE</span>
+          <span className="text-[13px] text-ink">How this answer was made</span>
           {lines.map((x) => (
             <span key={x}>✓ {x}</span>
           ))}
@@ -142,8 +148,12 @@ function copyText(blocks: AnswerBlock[], name: (id: string) => string | null): s
 }
 
 // Memoised: while an answer appears only the answer being revealed redraws.
-export const Answer = memo(function Answer({ m, last, busy, capped, actions }: { m: Extract<ChatMessage, { role: 'willow' }>; last: boolean; busy: boolean; capped: boolean; actions: AnswerActions }) {
+export const Answer = memo(function Answer({ m, last, busy, capped, actions, question }: { m: Extract<ChatMessage, { role: 'willow' }>; last: boolean; busy: boolean; capped: boolean; actions: AnswerActions; /** The question this answers (reaction answers carry the fixed escalation words). */ question?: string }) {
   const r = m.reply
+  const checks = useChecks(r.products.map((p) => p.product_id))
+  const clickStore = useStoreClick('wisp')
+  // The api may flag it (`escalation`); else the question's own words.
+  const reaction = Boolean((r as AdvisorReply & { escalation?: unknown }).escalation) || mentionsReaction(question)
   const revealing = m.shown < m.blocks.length
   const byId = new Map(r.products.map((p) => [p.product_id, p]))
   const productName = (id: string) => byId.get(id)?.name ?? null
@@ -171,14 +181,16 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
               ) : b.type === 'products' ? (
                 <div className="flex flex-col gap-2">
                   {b.product_ids.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p)).map((p) => (
-                    <ProductCard key={p.product_id} p={p} onOpen={() => actions.onProduct(p)} />
+                    <ProductCard key={p.product_id} p={p} check={checks.checks[p.product_id]} loading={checks.status === 'loading'} profileComplete={checks.profileComplete} onStore={(store) => clickStore(p.product_id, store)} onOpen={() => actions.onProduct(p)} />
                   ))}
+                  {b.product_ids.some((id) => byId.get(id)?.stores.length) ? <span className="px-1 text-[11.5px] text-ink-2">{COMMISSION_NOTE}</span> : null}
                 </div>
               ) : (
                 <TextBlock b={b} links={links} />
               )}
             </div>
           ))}
+          {!revealing && reaction ? <ReactionEscalation /> : null}
           {revealing ? <span aria-hidden className="h-3 w-16 rounded-full advShimmer" /> : null}
           {!revealing ? (
             <span className="-mr-1.5 flex items-center justify-end gap-0.5">
@@ -218,7 +230,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions }: {
 })
 
 /** A product the advisor named (from reply.products: real catalog listings). Stores are links, with the price read off each store's page when the catalog has one. */
-function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
+function ProductCard({ p, check, loading, profileComplete, onStore, onOpen }: { p: Product; check: ProductCheck | undefined; loading: boolean; profileComplete: boolean | null; onStore: (store: string) => void; onOpen: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2.5 rounded-[17px] bg-sunken p-3" style={{ animation: 'wRise .45s both' }}>
       <button type="button" onClick={onOpen} aria-label={`Product details: ${p.name}`} className="shrink-0 rounded-full transition-transform hover:scale-105">
@@ -228,9 +240,10 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
         <span className="text-[12px] text-ink-2">{metaLine(p.brand, p.category, p.size)}</span>
         <span className="text-[13px]">{p.name}</span>
         <span className="text-[12px] text-ink-2">
-          {fmtPrice(p.price)} · price checked {fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}
+          {p.price ? `${fmtPrice(p.price)} · price checked ${fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}` : NO_PRICE}
         </span>
       </button>
+      <CheckedChip check={check} loading={loading} profileComplete={profileComplete} short />
       {p.stores.length ? (
         <span className="flex flex-wrap gap-1.5">
           {p.stores.map((s) => (
@@ -239,6 +252,8 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
               href={s.url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => onStore(s.store)}
+              onAuxClick={() => onStore(s.store)}
               title={s.price ? `Price on the store's page, checked ${fmtDate(s.price.checked)}` : undefined}
               aria-label={`${s.store}${s.price ? `, ${fmtPrice(s.price)}, checked ${fmtDate(s.price.checked)}` : ''}, opens in new tab`}
               className="hit44 inline-flex min-h-9 items-center gap-1 rounded-pill bg-white px-2.5 text-[12px] no-underline"

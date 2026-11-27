@@ -18,7 +18,7 @@ export function VoiceToggle() {
     )
   const on = voice === 'on'
   return (
-    <button type="button" role="switch" aria-checked={on} aria-label="Narration" onClick={() => setVoice(!on)} className="flex min-h-11 items-center gap-1.5 rounded-pill px-2 sm:px-3 text-[13px] text-ink-2 hover:bg-ink/5">
+    <button type="button" role="switch" aria-checked={on} aria-label="Narration" onClick={() => setVoice(!on)} className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-pill px-2 sm:px-3 text-[13px] text-ink-2 hover:bg-ink/5">
       {on ? <Volume2 size={17} strokeWidth={1.6} /> : <VolumeX size={17} strokeWidth={1.6} />}
       <span className="hidden sm:inline">Narration</span>
     </button>

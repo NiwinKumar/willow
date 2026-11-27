@@ -1,51 +1,54 @@
 import { csvMeta, csvName } from '../../data'
 import type { Insights, Segments } from '../../types'
-import { DataTable, int, MIN_GROUP, Panel, pct, ProductCell, RateCell, ShareBar, Suppressed, type Column } from '../../ui'
-import { rateInterval } from '../../ui/insight'
+import { DataTable, HeadTip, int, MIN_GROUP, Panel, pct, ProductCell, RateCell, ShareBar, Suppressed, type Column } from '../../ui'
+import { rateInterval, topUnmet } from '../../ui/insight'
 import { YoursTag } from '../shared'
 
 /*
- * Skin types (by_skin): one row each, with its people, its three most-chosen goals as share bars, and its top
- * product by lift. A row opens the skin type's drawer (`skin` in the URL) with every top product.
+ * Skin types (by_skin): one row each, with its people, the goal it is least served on (the matrix's worst cell in
+ * its row) and the product that works best for it (top by lift). A row opens the skin type's drawer (`skin` in the URL) with every top product.
  */
 
 type SkinRow = Segments['by_skin'][number]
 
 export function SkinTypes({ s, d, selected, onOpen, mine }: { s: Segments; d: Insights; selected: string | null; onOpen: (skin: string) => void; mine: string | null }) {
+  const unmet = topUnmet(s, Infinity)
+  const worstOf = (skin: string) => unmet.find((c) => c.skin === skin) ?? null
   const columns: Column<SkinRow>[] = [
     { id: 'skin', header: 'Skin type', rowHeader: true, width: '15%', sortValue: (r) => r.label, cell: (r) => <span className="font-medium text-ink">{r.label}</span> },
     { id: 'people', header: 'People', align: 'right', width: '10%', sortValue: (r) => r.users, cell: (r) => (r.users === null ? <Suppressed short /> : <span className="tnum">{int(r.users)}</span>), csv: (r) => r.users ?? 'suppressed' },
     {
-      id: 'goals',
-      header: 'Top goals',
-      headerText: 'Top goals (share of the skin type)',
-      width: '40%',
+      // Every skin type's three most-chosen goals were the same three at ~30% each: no information. The goal each
+      // skin type is least served on tells a buyer what to source for it.
+      id: 'gap',
+      header: <HeadTip label="Least served goal" tip="The goal where the largest share of people with this skin type saw no visible change by week 8 (groups of 10+ people)." />,
+      headerText: 'Least served goal (share with no visible change by week 8)',
+      width: '34%',
+      sortValue: (r) => worstOf(r.skin)?.unmet ?? null,
       cell: (r) => {
-        if (!r.top_goals.length) return <span className="text-proof-small text-ink-2">No goal with {MIN_GROUP}+ people</span>
-        const max = Math.max(0.01, ...r.top_goals.map((g) => g.share))
+        const w = worstOf(r.skin)
+        if (!w) return <span className="text-proof-small text-ink-2">No goal with {MIN_GROUP}+ people</span>
         return (
-          <span className="grid grid-cols-3 gap-4 pr-2">
-            {r.top_goals.slice(0, 3).map((g) => (
-              // The share sits by its bar, so the goal's name gets the cell's whole width.
-              <span key={g.goal_id} className="flex min-w-0 flex-col gap-1">
-                <span className="truncate text-proof-label text-ink">{g.label}</span>
-                <span className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1">
-                    <ShareBar value={g.share} max={max} />
-                  </span>
-                  <span className="shrink-0 text-proof-label text-ink-2 tnum">{pct(g.share)}</span>
-                </span>
-              </span>
-            ))}
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="min-w-0 flex-1 truncate text-ink">{w.goalLabel}</span>
+            <span className="w-24 shrink-0">
+              <ShareBar value={w.unmet} max={1} />
+            </span>
+            <span className="w-[120px] shrink-0 text-right text-proof-small text-ink-2 tnum">
+              <span className="font-medium text-ink">{pct(w.unmet)}</span> no change
+            </span>
           </span>
         )
       },
-      csv: (r) => r.top_goals.map((g) => `${g.label} ${Math.round(g.share * 100)}%`).join('; '),
+      csv: (r) => {
+        const w = worstOf(r.skin)
+        return w ? `${w.goalLabel} ${Math.round(w.unmet * 100)}% no visible change of ${w.users}` : ''
+      },
     },
     {
       id: 'top',
-      header: 'Top product',
-      headerText: 'Top product by lift (brand)',
+      header: <HeadTip label="Works best for them" tip="The product with the largest lift for this skin type: the share of its users with this skin type who saw a visible change by week 8, and n." />,
+      headerText: 'Product that works best for them, by lift (brand)',
       width: '35%',
       cell: (r) => {
         const p = r.top_products[0]
@@ -53,7 +56,7 @@ export function SkinTypes({ s, d, selected, onOpen, mine }: { s: Segments; d: In
         const ci = rateInterval(p.rate, p.n)
         return (
           <span className="flex min-w-0 items-center justify-between gap-3">
-            <ProductCell p={{ product: p.product, brand: p.brand, category: '', image_url: p.image_url }} size={28} tag={mine === p.brand ? <YoursTag /> : undefined} />
+            <ProductCell p={{ product: p.product, brand: p.brand, category: '', image_url: p.image_url }} size={28} logo tag={mine === p.brand ? <YoursTag /> : undefined} />
             <RateCell rate={p.rate} n={p.n} lo={ci?.lo} hi={ci?.hi} />
           </span>
         )

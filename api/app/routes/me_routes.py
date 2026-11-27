@@ -11,6 +11,7 @@ from app import baselines, campaigns, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
+from app.safety import SafetyProfile
 from app.store import Store, get_store, iso
 
 router = APIRouter(prefix="/v1", tags=["timeline", "baselines", "me"])
@@ -167,6 +168,8 @@ def delete_me(
     store.shelf_delete(user.uid)  # a retailer's shelf upload (app/shelf.py)
     storage.delete_prefix(f"uploads/{user.uid}/")
     storage.delete_prefix(f"results/{user.uid}/")
+    # product-request pack photos (app/product_requests.py), as the Terms say
+    storage.delete_prefix(f"requests/{user.uid}/")
     return Response(status_code=204)
 
 
@@ -233,6 +236,7 @@ PROFILE_FIELDS = (
     "checkin",
     "hide_sponsored",
     "track",
+    "safety",
 )
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -294,6 +298,9 @@ class ProfileUpdate(BaseModel):
     hide_sponsored: bool | None = None
     # the places every check-in covers, in capture order (null = the app's default)
     track: list[TrackPlace] | None = Field(default=None, min_length=1, max_length=5)
+    # what the person chose to tell Willow for product checks (app/safety.py); sent whole, it
+    # replaces the saved one; null clears it
+    safety: SafetyProfile | None = None
 
     @field_validator("track")
     @classmethod
@@ -322,6 +329,9 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
         "checkin": p.get("checkin"),
         "hide_sponsored": bool(p.get("hide_sponsored")),
         "track": list(p["track"]) if p.get("track") else None,
+        "safety": SafetyProfile.model_validate(p["safety"]).model_dump()
+        if p.get("safety")
+        else None,
     }
     out["updated_at"] = iso(p.get("updated_at"))
     return out

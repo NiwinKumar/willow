@@ -7,10 +7,12 @@ import { useRetailData } from '../context'
 import { csvMeta } from '../data'
 import { useProductDetails, useProducts, type Load } from '../productData'
 import { hintOf, leaderOf, MAX_COMPARE, noDataReason, parseIds, segInterval } from '../productModel'
-import { sectionPath, useRetailState } from '../state'
+import { purposeOf, sectionPath, useRetailState } from '../state'
 import type { Insights, ProductDetail as Detail, ProductRow, Seg } from '../types'
 import { Bone, Combobox, CurveChart, downloadCsv, EmptyState, int, interval, LiftValue, PageHeader, Panel, pct, ProofTierChip, pts, Suppressed, ToolButton, useTooltip, weeks, type CsvValue } from '../ui'
 import { HeadTip, RateInterval } from './productParts'
+import { NamesHidden } from './NamesHidden'
+import { useCompetitorNames } from '../orgData'
 import { InsightsGate, YoursTag } from './shared'
 
 /*
@@ -66,6 +68,17 @@ function Body({ d }: { d: Insights }) {
   const states = useProductDetails(ids, filters)
   const list = useProducts(filters).state
   const rows = list.status === 'ready' ? list.d.products : []
+  const names = useCompetitorNames()
+  // A brand organisation under the retailer's naming policy compares its own products only: a hand-typed or
+  // old link that names another brand's product shows the policy state, not that product's figures.
+  const brandOfId = (id: string, i: number): string | null => {
+    const r = rows.find((x) => x.product_id === id)
+    if (r) return r.brand
+    const st = states[i]
+    return st?.status === 'ready' ? st.d.product.brand : null
+  }
+  const foreign = names.anonymise ? ids.filter((id, i) => { const b = brandOfId(id, i); return b !== null && b !== names.own }) : []
+  const pending = names.anonymise && ids.some((id, i) => brandOfId(id, i) === null && states[i]?.status === 'loading')
   const setIds = (next: string[]) => setParam({ ids: next.join(',') || null })
   const xs = states.filter((s): s is Ready => s.status === 'ready').map((s) => s.d)
   const missing = ids.filter((_, i) => states[i]?.status === 'missing' || states[i]?.status === 'failed')
@@ -88,7 +101,7 @@ function Body({ d }: { d: Insights }) {
         width={380}
         disabled={ids.length >= MAX_COMPARE || !rows.length}
         options={rows
-          .filter((r) => !ids.includes(r.product_id))
+          .filter((r) => !ids.includes(r.product_id) && (!names.anonymise || r.brand === names.own))
           .sort((a, b) => a.category_label.localeCompare(b.category_label) || a.product.localeCompare(b.product))
           .map((r) => ({ value: r.product_id, label: `${r.product} · ${r.brand}`, hint: r.rate === null ? 'No data' : pct(r.rate), group: r.category_label }))}
         onChange={(v) => setIds([...ids, v])}
@@ -96,12 +109,22 @@ function Body({ d }: { d: Insights }) {
     </div>
   )
 
+  if (pending && !foreign.length) return <CompareSkeleton />
+  if (foreign.length) {
+    return (
+      <div className="flex flex-col gap-6">
+        {back}
+        <NamesHidden what="Comparing with another brand’s product" />
+      </div>
+    )
+  }
+
   if (ids.length < 2) {
     return (
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-3">
           {back}
-          <PageHeader title="Compare" description="Pick two or three products to see their outcomes side by side." />
+          <PageHeader title="Compare" description="Pick two or three products to see their outcomes side by side." purpose={purposeOf('compare')} />
         </div>
         <EmptyState title={ids.length ? 'Add one more product' : 'Pick two or three products'} body="Tick rows on Products, or search the catalog here." secondary={{ label: 'Go to Products', to: backHref }}>
           <div className="mt-1">{picker}</div>
@@ -118,7 +141,7 @@ function Body({ d }: { d: Insights }) {
       [`People at week ${wk} (n)`, (x) => x.product.n],
       [`Visible change by week ${wk} (%)`, (x) => (x.product.rate === null ? (noDataReason(x.product) ?? '') : Math.round(x.product.rate * 100))],
       ['Visible change 95% interval', (x) => interval(x.product.rate_lo, x.product.rate_hi) ?? ''],
-      ['Non-users (%)', (x) => (x.product.base_rate === null ? '' : Math.round(x.product.base_rate * 100))],
+      ['Same goals, not using it: changed anyway (%)', (x) => (x.product.base_rate === null ? '' : Math.round(x.product.base_rate * 100))],
       ['Lift (pts)', (x) => (x.product.lift === null ? '' : Math.round(x.product.lift * 100))],
       ['Lift 95% interval (pts)', (x) => (x.product.lift_lo === null || x.product.lift_hi === null ? '' : `${Math.round(x.product.lift_lo * 100)} to ${Math.round(x.product.lift_hi * 100)}`)],
       ['Weeks to first change (median)', (x) => x.product.weeks],
@@ -142,6 +165,16 @@ function Body({ d }: { d: Insights }) {
     return (
       <>
         <strong>{a.product}</strong> leads on visible change, {pct(a.rate)} against {pct(b.rate)}. {clear ? 'The 95% intervals don’t overlap.' : 'The 95% intervals overlap, so the gap may be chance.'}
+        {/* A higher rate can come from users who'd have changed anyway: say so when the lift ranks them the other way. */}
+        {(() => {
+          const byLift = m.filter((x) => x.product.lift !== null).sort((p, q) => q.product.lift! - p.product.lift!)[0]?.product
+          return byLift && byLift.product_id !== a.product_id && byLift.lift !== null ? (
+            <>
+              {' '}
+              Against people with the same goals not using it, <strong>{byLift.product}</strong> adds more: {pts(byLift.lift)} against {pts(a.lift)}.
+            </>
+          ) : null
+        })()}
       </>
     )
   })()
@@ -151,14 +184,14 @@ function Body({ d }: { d: Insights }) {
     {
       id: 'rate',
       label: 'Visible change',
-      tip: `Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`,
+      tip: `Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Grey tick: people with the same goals not using it.`,
       value: (p) => p.rate,
       better: 'high',
       cell: (p, lead) => (p.rate === null ? <span className="text-proof-small text-ink-2">{noDataReason(p)}</span> : <RateInterval rate={p.rate} lo={p.rate_lo} hi={p.rate_hi} base={p.base_rate} n={p.n} weeks={wk} strong={lead} wide />),
     },
     {
       id: 'base',
-      label: 'Non-users',
+      label: 'Same goals, not using it',
       tip: `Share of people with the same goals who don’t use it and saw a visible change by week ${wk}.`,
       value: (p) => p.base_rate,
       cell: (p) => (p.rate === null ? none : p.base_rate === null ? <Suppressed short /> : <span className="tnum text-ink-2">{pct(p.base_rate)}</span>),
@@ -166,7 +199,7 @@ function Body({ d }: { d: Insights }) {
     {
       id: 'lift',
       label: 'Lift',
-      tip: 'Visible change among users minus non-users, in percentage points. Hover a value for its 95% interval.',
+      tip: 'Users who changed minus people with the same goals not using it, in percentage points. Hover a value for its 95% interval.',
       value: (p) => p.lift,
       better: 'high',
       cell: (p) => (p.rate === null ? none : <LiftValue lift={p.lift} lo={p.lift_lo} hi={p.lift_hi} />),
@@ -216,7 +249,7 @@ function Body({ d }: { d: Insights }) {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         {back}
-        <PageHeader title="Compare" description={answer} />
+        <PageHeader title="Compare" description={answer} purpose={purposeOf('compare')} />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -413,7 +446,7 @@ const unmeasured = (s: { status: string; d?: Detail } | undefined) => s?.status 
 function SegRate({ seg, unmeasured = false }: { seg: Seg | undefined; unmeasured?: boolean }) {
   const ci = seg ? segInterval(seg) : null
   const ok = seg && !seg.suppressed && seg.rate !== null
-  const tip = useTooltip(ok ? `${pct(seg.rate)} of ${int(seg.n)} people${ci ? ` · 95% interval ${interval(ci.lo, ci.hi)}` : ''}${seg.base_rate !== null ? ` · non-users ${pct(seg.base_rate)} (${pts(seg.rate! - seg.base_rate)})` : ''}` : '')
+  const tip = useTooltip(ok ? `${pct(seg.rate)} of ${int(seg.n)} people${ci ? ` · 95% interval ${interval(ci.lo, ci.hi)}` : ''}${seg.base_rate !== null ? ` · same group not using it ${pct(seg.base_rate)} (${pts(seg.rate! - seg.base_rate)})` : ''}` : '')
   if (unmeasured) return <span className="text-ink-3">—</span>
   if (!ok) return <Suppressed short />
   return (

@@ -260,8 +260,39 @@ def allowed_endpoint(endpoint: str) -> bool:
     return any(host == h or (h.startswith(".") and host.endswith(h)) for h in PUSH_HOSTS)
 
 
-def payload(kind: str) -> dict[str, str]:
-    """What the notification says. Calm, no numbers, no measurement."""
+# The places a check-in covers, as the push names them (web lib/track.ts, model SITE_MEASURES).
+PLACE_WORDS = {
+    "cheek_macro": "cheek close-up",
+    "nose_macro": "nose close-up",
+    "face_full": "face",
+}
+OWN_PLACES = tuple(PLACE_WORDS)
+# Goals only the face photo measures put the face on by default (web lib/track.ts defaultTrack).
+FACE_GOALS = ("lines", "under_eye", "oil_glow")
+
+
+def places_of(profile: Doc | None, test_running: bool = False) -> list[str]:
+    """What the next check-in covers: the places the person tracks (the app's default when they
+    never chose), plus the arms while a product test runs. In capture order."""
+    profile = profile or {}
+    saved = [p for p in OWN_PLACES if p in (profile.get("track") or [])]
+    if not saved:
+        goals = profile.get("goals") or []
+        saved = (
+            ["cheek_macro", "face_full"] if any(g in FACE_GOALS for g in goals) else ["cheek_macro"]
+        )
+    return saved + (["arms"] if test_running else [])
+
+
+def _place_words(places: list[str]) -> str:
+    words = [PLACE_WORDS.get(p, "both arms" if p == "arms" else p) for p in places]
+    words = [f"your {w}" if i == 0 else w for i, w in enumerate(words)]
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def payload(kind: str, places: list[str] | None = None) -> dict[str, str]:
+    """What the notification says. Calm, no numbers, no measurement. `places`: what the
+    check-in covers (places_of); none given, the photos are not named."""
     if kind == "test":
         return {
             "title": "Willow reminders are on",
@@ -269,9 +300,14 @@ def payload(kind: str) -> dict[str, str]:
             "url": "/home",
             "tag": "willow-test",
         }
+    body = (
+        f"Time for {_place_words(places)}, by the same window light so results stay comparable."
+        if places
+        else "A few photos by the same window light keeps results comparable."
+    )
     return {
         "title": "Check-in day",
-        "body": "A few face photos by the same window light keeps results comparable.",
+        "body": body,
         "url": "/home",
         "tag": "willow-checkin",
     }

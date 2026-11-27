@@ -34,7 +34,7 @@ export function RateCell({ rate, n, lo, hi, k, showN = true }: { rate: number | 
 }
 
 /**
- * A difference against non-users in points with a true minus sign (+17 pts, −4 pts); its 95% interval on hover
+ * A difference against people with the same goals not using it, in points with a true minus sign (+17 pts, −4 pts); its 95% interval on hover
  * or focus. A lift at or below zero is drawn secondary, never red. Null → an em dash that says why to readers.
  */
 export function LiftValue({ lift, lo, hi }: { lift: number | null | undefined; lo?: number | null; hi?: number | null }) {
@@ -44,7 +44,7 @@ export function LiftValue({ lift, lo, hi }: { lift: number | null | undefined; l
     return (
       <span className="text-proof-body text-ink-2">
         <span aria-hidden>—</span>
-        <span className="sr-only">No comparison: fewer than {MIN_GROUP} non-users</span>
+        <span className="sr-only">No comparison: fewer than {MIN_GROUP} people with the same goals not using it</span>
       </span>
     )
   return (

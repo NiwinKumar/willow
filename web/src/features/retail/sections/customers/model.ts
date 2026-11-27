@@ -65,9 +65,23 @@ export function ownForGoal<P extends Pick<ProductRow, 'brand' | 'goal_ids' | 'ra
     .sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || (b.n ?? 0) - (a.n ?? 0))
 }
 
-/** The cell's fill for the matrix: unmet on a gray-to-amber ramp, people on a gray ramp; null = hatched. */
-export function cellFill(mode: MatrixMode, c: SegCell, maxUsers: number): string | null {
-  if (mode === 'unmet') return c.unmet === null ? null : `color-mix(in srgb, var(--pf-amber-fill) ${Math.round(c.unmet * 60)}%, var(--bg-sunken))`
+/**
+ * The cell's fill for the matrix: unmet on a gray-to-amber ramp, people on a gray ramp; null = hatched. The unmet
+ * ramp spans the matrix's own range (`span`, lowest to highest unmet share) so the worst-served groups stand out
+ * instead of every cell reading amber when most groups sit between 40% and 90%; without a span it is 0-100%.
+ */
+export function cellFill(mode: MatrixMode, c: SegCell, maxUsers: number, span?: { lo: number; hi: number }): string | null {
+  if (mode === 'unmet') {
+    if (c.unmet === null) return null
+    const t = span && span.hi > span.lo ? (c.unmet - span.lo) / (span.hi - span.lo) : c.unmet
+    return `color-mix(in srgb, var(--pf-amber-fill) ${Math.round(4 + Math.max(0, Math.min(1, t)) * 56)}%, var(--bg-sunken))`
+  }
   if (mode === 'people') return c.users === null ? null : `color-mix(in srgb, var(--text-primary) ${Math.round((c.users / (maxUsers || 1)) * 30)}%, var(--bg-sunken))`
   return 'var(--bg-sunken)'
+}
+
+/** The lowest and highest unmet share among the groups with one (null when fewer than two). */
+export function unmetSpan(cells: Pick<SegCell, 'unmet'>[]): { lo: number; hi: number } | null {
+  const v = cells.flatMap((c) => (c.unmet === null ? [] : [c.unmet]))
+  return v.length >= 2 ? { lo: Math.min(...v), hi: Math.max(...v) } : null
 }

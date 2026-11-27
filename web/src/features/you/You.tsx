@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -22,7 +22,8 @@ import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
 import { ReminderRows } from './Reminders'
-import { Group, Row, ToggleRow } from './settings'
+import { SafetyRows } from './SafetyRows'
+import { Group, GroupIndex, Row, ToggleRow } from './settings'
 import { chip, outline } from './settingsClasses'
 
 /**
@@ -34,13 +35,30 @@ import { chip, outline } from './settingsClasses'
 export default function You() {
   const data = useData()
   const demo = data.mode === 'demo'
+  const groups = useMemo(
+    () =>
+      [
+        { id: 'account', title: 'Account' },
+        { id: 'tracking', title: 'What Willow tracks' },
+        ...(demo ? [] : [{ id: 'checks', title: 'Product checks' }, { id: 'checkins', title: 'Check-ins' }, { id: 'privacy', title: 'Privacy' }]),
+        { id: 'setup', title: 'Photo setup and help' },
+        ...(demo ? [] : [{ id: 'delete', title: 'Delete my data' }]),
+      ],
+    [demo],
+  )
   return (
     <main className="relative mx-auto flex w-full max-w-[760px] flex-col gap-6" style={{ padding: '8px clamp(16px,4vw,40px) 32px' }}>
-      <h1 className="m-0 font-serif text-[clamp(30px,3vw,40px)] leading-[.95] font-normal">You</h1>
+      <h1 className="m-0 font-serif text-[clamp(34px,3vw,40px)] leading-[.95] font-normal">You</h1>
+      <GroupIndex groups={groups} />
       <Group id="account" title="Account">{demo ? <DemoRow /> : <AccountRows />}</Group>
       <Group id="tracking" title="What Willow tracks">
         <GoalsRows demo={demo} />
       </Group>
+      {demo ? null : (
+        <Group id="checks" title="Product checks">
+          <SafetyRows />
+        </Group>
+      )}
       {demo ? null : (
         <Group id="checkins" title="Check-ins">
           <CheckinRows />
@@ -295,18 +313,19 @@ function CheckinRows() {
     <>
       <Row stack label="Check-in days" hint={`${days.length ? `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} at ${time}. ` : ''}Once a week is enough; the same day and time keeps photos comparable. Times are in ${tz}${saved && saved.tz !== browserTz() ? `; this browser is in ${browserTz()}, and the next change uses it` : ''}.`}>
         <div className="flex flex-wrap items-center gap-1.5">
-          <div role="group" aria-label="Check-in days" className="flex flex-wrap gap-1.5">
+          {/* a phone gets seven equal columns (the week on one line); a laptop a row of chips */}
+          <div role="group" aria-label="Check-in days" className="grid w-full grid-cols-7 gap-1 sm:flex sm:w-auto sm:flex-wrap sm:gap-1.5">
             {WEEKDAYS.map((d, i) => {
               const on = days.includes(i)
               const next = on ? days.filter((x) => x !== i) : [...days, i]
               return (
-                <button key={d} type="button" aria-pressed={on} onClick={() => void save(next, time, next.length ? 'Check-in days saved' : 'Check-in days cleared')} className={`${chip(on)} min-w-[52px]`}>
+                <button key={d} type="button" aria-pressed={on} onClick={() => void save(next, time, next.length ? 'Check-in days saved' : 'Check-in days cleared')} className={`${chip(on)} min-w-0 px-0 sm:min-w-[52px] sm:px-3.5`}>
                   {d}
                 </button>
               )
             })}
           </div>
-          <label className="ml-1 flex items-center gap-2 text-[14px] text-ink-2">
+          <label className="mt-1 flex items-center gap-2 text-[14px] text-ink-2 sm:mt-0 sm:ml-1">
             at
             <input
               type="time"
@@ -315,7 +334,7 @@ function CheckinRows() {
               onBlur={() => {
                 if (days.length && /^\d{2}:\d{2}$/.test(time) && time !== saved?.time) void save(days, time, `Check-in time: ${time}`)
               }}
-              className="min-h-10 rounded-pill bg-white px-3.5 text-[15px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)]"
+              className="min-h-11 rounded-pill bg-white px-3.5 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)] sm:min-h-10 sm:text-[15px]"
             />
           </label>
         </div>

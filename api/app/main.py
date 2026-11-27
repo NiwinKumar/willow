@@ -13,9 +13,11 @@ from app.routes.autopilot_routes import router as autopilot_router
 from app.routes.campaign_routes import router as campaign_router
 from app.routes.demo_routes import router as demo_router
 from app.routes.me_routes import router as me_router
+from app.routes.plan_routes import router as plan_router
 from app.routes.product_requests_routes import router as product_requests_router
 from app.routes.product_tests_routes import router as product_tests_router
 from app.routes.products_routes import router as products_router
+from app.routes.proof_routes import router as proof_router
 from app.routes.reminders_routes import router as reminders_router
 from app.routes.retailer_routes import router as retailer_router
 from app.routes.sessions_routes import router as sessions_router
@@ -23,6 +25,7 @@ from app.routes.shelf_routes import router as shelf_router
 from app.routes.survey_routes import router as survey_router
 from app.routes.waitlist_routes import router as waitlist_router
 from app.settings import get_settings
+from app.similar import router as similar_router
 
 settings = get_settings()
 
@@ -35,12 +38,16 @@ if not logging.getLogger().handlers:
 
 @app.on_event("startup")
 def _dev_seed() -> None:
-    """DEV_STORE=memory (with AUTH_MODE=dev): three demo campaigns with history, in memory only."""
+    """DEV_STORE=memory (with AUTH_MODE=dev): the sample campaign portfolio with history, in
+    memory only (needs the BigQuery rows; skipped without them)."""
     if settings.auth_mode == "dev" and settings.dev_store == "memory":
         from app import dev_seed
         from app.store import get_store
 
-        dev_seed.seed_demo_campaigns(get_store())
+        try:
+            dev_seed.seed_demo_campaigns(get_store())
+        except dev_seed.SamplesUnavailable as exc:  # no BigQuery rows: start without samples
+            log.warning("dev sample campaigns skipped: %s", exc)
 
 
 @app.on_event("startup")
@@ -109,6 +116,9 @@ app.include_router(autopilot_router)
 app.include_router(product_requests_router)
 app.include_router(survey_router)
 app.include_router(waitlist_router)
+app.include_router(plan_router)
+app.include_router(proof_router)
+app.include_router(similar_router)
 if storage.dev_uploads_enabled():
     from app.routes.dev_routes import router as dev_router
 

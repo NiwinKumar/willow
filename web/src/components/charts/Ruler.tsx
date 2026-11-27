@@ -36,14 +36,23 @@ export function HeroRuler({ ratio, label }: { ratio: number | null; label: strin
 export function BandBar({ ratio, hasBand, hasValue, variant = 'card' }: { ratio: number | null; hasBand: boolean; hasValue: boolean; variant?: 'card' | 'tile' }) {
   const pos = bandPosition(hasBand ? ratio : null)
   if (variant === 'tile')
+    // The scale says what it is: lower on the left, the baseline in the middle, higher on the right; the light
+    // block is the normal range. The marker slides out from the baseline on first view.
     return (
-      <span aria-hidden className="relative block h-1.5 rounded-[6px] bg-ink/12">
-        <span className="absolute inset-y-0 left-[35%] w-[30%] rounded-[6px] bg-white/75" style={{ opacity: hasBand ? 1 : 0 }} />
-        <span className="absolute -top-[3px] left-1/2 h-3 w-[1.5px] bg-ink/40" />
-        <span
-          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-selected shadow-[0_0_0_3px_rgba(255,255,255,.8)] transition-[left] duration-[600ms] ease-standard"
-          style={{ left: `${pos}%`, opacity: hasValue ? 1 : 0 }}
-        />
+      <span aria-hidden className="flex flex-col gap-1.5">
+        <span className="relative block h-1.5 rounded-[6px] bg-ink/12">
+          <span className="absolute inset-y-0 left-[35%] w-[30%] rounded-[6px] bg-white/75" style={{ opacity: hasBand ? 1 : 0 }} />
+          <span className="absolute -top-[3px] left-1/2 h-3 w-[1.5px] bg-ink/40" />
+          <span
+            className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 animate-[wFromCentre_.8s_.35s_var(--ease-standard)_both] rounded-full bg-selected shadow-[0_0_0_3px_rgba(255,255,255,.8)] transition-[left] duration-[600ms] ease-standard"
+            style={{ left: `${pos}%`, opacity: hasValue ? 1 : 0 }}
+          />
+        </span>
+        <span className="relative flex justify-between text-[10.5px] leading-none opacity-70">
+          <span>Lower</span>
+          <span className="absolute left-1/2 -translate-x-1/2">{hasBand ? 'Baseline' : ''}</span>
+          <span>Higher</span>
+        </span>
       </span>
     )
   return (

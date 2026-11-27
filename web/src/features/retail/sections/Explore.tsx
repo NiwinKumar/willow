@@ -5,9 +5,11 @@ import { toast } from 'sonner'
 
 import { GOALS } from '../../../lib/metrics'
 import { useRetailData } from '../context'
+import { useCompetitorNames } from '../orgData'
+import { NamesHidden } from './NamesHidden'
 import { csvMeta, csvName, TIER_LABEL } from '../data'
 import { fetchProducts } from '../productData'
-import { sectionPath, useRetailState } from '../state'
+import { purposeOf, sectionPath, useRetailState } from '../state'
 import type { Products, ProofTier } from '../types'
 import { Bone, Button, DataTable, downloadCsv, EmptyState, ErrorState, int, interval, PageHeader, Panel, pct, pts, SkeletonHeader, SkeletonPanel, TIERS, weeks, type Column, type CsvValue } from '../ui'
 import { useView } from '../useView'
@@ -42,6 +44,9 @@ const FORMATS: Record<MeasureKind, BarFormat> = {
 const csvValue = (kind: MeasureKind, v: number | null): CsvValue => (v === null ? '' : kind === 'rate' || kind === 'points' ? Math.round(v * 100) : kind === 'weeks' ? Math.round(v * 10) / 10 : v)
 
 export default function Explore() {
+  // A brand organisation whose retailer keeps competitor names off can't cut the whole catalog by brand.
+  const names = useCompetitorNames()
+  if (names.anonymise) return <NamesHidden what="Explore across every brand" />
   // The same "not enough data" answer as every other section when the filter has too few people.
   return <InsightsGate skeleton={<ExploreSkeleton />}>{() => <Loaded />}</InsightsGate>
 }
@@ -100,7 +105,7 @@ function Body({ d }: { d: Products }) {
   const exportCsv = () => {
     const scope = FILTERS.filter((f) => q.filters[f.id].length).map((f) => `${f.label}: ${q.filters[f.id].map((v) => options[f.id].find((o) => o.value === v)?.label ?? v).join(' / ')}`)
     const unit = measure.kind === 'rate' ? ' (%)' : measure.kind === 'points' ? ' (pts)' : ''
-    const header = [group.label, `${measure.label}${unit}`, ...(single && (q.measure === 'rate' || q.measure === 'lift') ? ['95% low', '95% high'] : []), ...(q.measure === 'rate' ? ['Non-users (%)'] : []), 'People (n)', 'Products']
+    const header = [group.label, `${measure.label}${unit}`, ...(single && (q.measure === 'rate' || q.measure === 'lift') ? ['95% low', '95% high'] : []), ...(q.measure === 'rate' ? ['Same goal, not using it (%)'] : []), 'People (n)', 'Products']
     const rows = groups.map((g) => [g.label, csvValue(measure.kind, g.value), ...(single && (q.measure === 'rate' || q.measure === 'lift') ? [csvValue(measure.kind, g.lo), csvValue(measure.kind, g.hi)] : []), ...(q.measure === 'rate' ? [csvValue('rate', g.base)] : []), g.n, g.products])
     const note = [`Explore: ${title}`, ...scope, `products with ${q.min}+ people`, single ? '' : q.measure === 'n' ? 'groups sum their products' : 'groups are people-weighted averages of their products'].filter(Boolean).join('; ')
     downloadCsv(csvName(`explore-${q.measure}-by-${q.group}`, d), csvMeta(d, note), header, rows)
@@ -113,7 +118,7 @@ function Body({ d }: { d: Products }) {
         {measure.label}: {fmt.value(g.value)}
       </span>
       {interval(g.lo, g.hi) ? <span className="tnum">95% interval {measure.kind === 'points' ? `${pts(g.lo)} to ${pts(g.hi)}` : interval(g.lo, g.hi)}</span> : null}
-      {g.base !== null ? <span className="tnum">Non-users with the same goal: {pct(g.base)}</span> : null}
+      {g.base !== null ? <span className="tnum">Same goal, not using it: {pct(g.base)} changed anyway</span> : null}
       <span className="tnum">
         n = {int(g.n)}
         {single ? '' : ` across ${g.products} ${g.products === 1 ? 'product' : 'products'}`}
@@ -153,6 +158,7 @@ function Body({ d }: { d: Products }) {
       <PageHeader
         title="Explore"
         description="Pick a measure, group it and filter it. Every view is a link you can share."
+        purpose={purposeOf('explore')}
         actions={
           <>
             <Button onClick={copyLink}>
@@ -200,7 +206,7 @@ function Body({ d }: { d: Products }) {
                 id="explore-chart"
                 meta={
                   <span className="text-proof-small text-ink-2 tnum">
-                    {groups.length < total ? `${groups.length} of ${total} ${group.plural}` : `${total} ${total === 1 ? group.label.toLowerCase() : group.plural}`}
+                    {groups.length < total ? `${int(groups.length)} of ${int(total)} ${group.plural}` : `${int(total)} ${total === 1 ? group.label.toLowerCase() : group.plural}`}
                   </span>
                 }
                 description={description}
@@ -246,7 +252,7 @@ function Legend({ own, base, whisker }: { own: string | null; base: boolean; whi
       {base ? (
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden className="h-3 w-0.5 rounded-full bg-ink-2" />
-          Non-users with the same goal
+          Same goal, not using it (changed anyway)
         </span>
       ) : null}
       {whisker ? (

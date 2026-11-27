@@ -17,7 +17,7 @@ import { verdictCounts } from '../../lib/verdict'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
-import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment } from './chatStore'
+import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
 import { useComposing, WispMark, wispState } from './Wisp'
 
@@ -102,7 +102,7 @@ function ContextChip() {
       </button>
       {open ? (
         <div className="absolute top-full right-0 mt-2 flex w-[260px] flex-col gap-3 rounded-[24px] bg-surface/95 p-4 shadow-[0_24px_50px_-20px_rgba(0,0,0,.35),inset_0_0_0_1px_rgba(18,18,18,.05)] backdrop-blur-[18px]" style={{ animation: 'wRise .25s both' }}>
-          <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">■ ANSWERS USE</span>
+          <span className="text-[13px] text-ink">Answers use</span>
           <ContextRows dots={dots} latest={latest} products={products} />
           <span className="flex flex-col gap-1 border-t border-ink/[.07] pt-2.5 text-[13px] text-[#3E3C38]">
             <UsageDots />
@@ -299,11 +299,11 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
             </div>
           )}
           <div aria-live="polite" className={`flex flex-col gap-3 ${column}`}>
-            {chat.messages.map((m) =>
+            {chat.messages.map((m, i) =>
               m.role === 'user' ? (
                 <UserBubble key={m.id} m={m} />
               ) : m.role === 'willow' ? (
-                <Answer key={m.id} m={m} last={m === lastAnswer && m === last} busy={busy} capped={capped} actions={actions} />
+                <Answer key={m.id} m={m} last={m === lastAnswer && m === last} busy={busy} capped={capped} actions={actions} question={questionBefore(chat.messages, i)} />
               ) : m.role === 'error' ? (
                 <ErrorBubble key={m.id} m={m} busy={busy} />
               ) : m.role === 'standard' ? (
@@ -356,7 +356,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
         <Composer busy={busy} thinking={chat.phase === 'thinking'} capped={capped} />
       </div>
 
-      <ProductSheet target={product ? { product } : null} onClose={() => setProduct(null)} onAdd={onAdd} />
+      <ProductSheet target={product ? { product } : null} surface="wisp" onClose={() => setProduct(null)} onAdd={onAdd} />
     </div>
   )
 }
@@ -438,6 +438,7 @@ async function toAttachment(file: File): Promise<Attachment> {
 
 function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean; capped: boolean }) {
   const [draft, setDraft] = useState('')
+  const phone = useMediaQuery('(max-width: 639px)')
   const [listening, setListening] = useState(false)
   const [attach, setAttach] = useState<Attachment[]>([])
   const [reading, setReading] = useState(false)
@@ -567,7 +568,7 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           disabled={capped}
           maxLength={1000}
           aria-describedby="ask-keys"
-          placeholder={listening ? 'Listening… speak your question' : capped ? `Daily limit reached · resets at ${resetTime()}` : thinking ? 'Waiting for the answer…' : 'Ask about a result, product or ingredient'}
+          placeholder={listening ? 'Listening… speak your question' : capped ? `Daily limit reached · resets at ${resetTime()}` : thinking ? 'Waiting for the answer…' : phone ? 'Ask Wisp anything' : 'Ask about a result, product or ingredient'}
           className="max-h-[160px] min-h-[46px] min-w-0 flex-1 resize-none bg-transparent px-2 py-[13px] text-[16px] leading-[20px] outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap sm:text-[14px]"
         />
         <span id="ask-keys" className="sr-only">
@@ -611,4 +612,13 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
 function EmptyWisp() {
   const composing = useComposing()
   return <WispMark size={112} state={composing ? 'listening' : 'idle'} />
+}
+
+/** The person's question an answer replies to: the nearest user message before it. */
+function questionBefore(messages: ChatMessage[], i: number): string | undefined {
+  for (let j = i - 1; j >= 0; j--) {
+    const m = messages[j]
+    if (m.role === 'user') return m.text
+  }
+  return undefined
 }

@@ -67,7 +67,8 @@ export function Calendar({
   const dim = new Date(y, m, 0).getDate()
   const monthName = first.toLocaleDateString('en-GB', { month: 'long' })
   const week = compact ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-  const cell = 'aspect-[4/3] min-h-[42px] rounded-[clamp(12px,1.6vw,18px)] p-[clamp(5px,.9vw,9px)] flex flex-col justify-between text-left'
+  // w-full: a grid item with an aspect ratio does not stretch; at its 42px floor it would be 56px wide and spill out of a phone's columns.
+  const cell = 'aspect-[4/3] min-h-[42px] w-full min-w-0 rounded-[clamp(12px,1.6vw,18px)] p-[clamp(5px,.9vw,9px)] flex flex-col justify-between text-left'
   // Days that open are real buttons that answer the finger: a 2px lift on hover, a 0.96 press, 150ms. The
   // entrance holds only `backwards` so its end state does not pin `scale` and the press can still play.
   // Reduced motion keeps the press as a dim instead of movement. Plain days stay flat, hairline-outlined spans.
@@ -82,14 +83,15 @@ export function Calendar({
   )
   return (
     <div className="flex flex-col gap-3.5">
-      <div className="flex items-center justify-between gap-3">
+      {/* A phone is too narrow for "September 2026" and the controls on one line: the controls wrap below. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 items-baseline gap-3">
           <h2 aria-live="polite" className="m-0 font-serif text-[clamp(36px,4vw,52px)] leading-none font-normal">
             {monthName}
           </h2>
           <span className="font-dot text-[22px] font-extrabold text-ink-2">{y}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5">
           {legend ? (
             <div className="relative" onMouseEnter={() => setKeyOpen(true)} onMouseLeave={() => setKeyOpen(false)}>
               <button

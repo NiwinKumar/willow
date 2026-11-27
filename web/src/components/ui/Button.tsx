@@ -5,7 +5,7 @@ import { Link, type LinkProps } from 'react-router-dom'
 
 /**
  * Pill buttons (docs/DESIGN.md "Button"): primary = yellow CTA (one per view), ink = black, glass = frosted,
- * ghost = text only. md 44px, lg 52px. Loading keeps the width and label, swaps the icon for a spinner.
+ * ghost = text only. md 44px, lg 52px; sm draws 36px with a 44px touch area (hit44). Loading keeps the width and label, swaps the icon for a spinner.
  */
 export type ButtonVariant = 'primary' | 'ink' | 'glass' | 'ghost' | 'outline'
 type Common = { variant?: ButtonVariant; size?: 'sm' | 'md' | 'lg'; icon?: LucideIcon; trailing?: ReactNode; loading?: boolean; full?: boolean; children: ReactNode }
@@ -17,7 +17,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'bg-transparent text-ink hover:underline underline-offset-4',
   outline: 'bg-transparent text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] hover:bg-ink/5',
 }
-const SIZE = { sm: 'min-h-9 px-4 text-[13px]', md: 'min-h-11 px-[22px] text-[15px]', lg: 'min-h-[52px] px-6 text-[15px]' }
+const SIZE = { sm: 'hit44 min-h-9 px-4 text-[13px]', md: 'min-h-11 px-[22px] text-[15px]', lg: 'min-h-[52px] px-6 text-[15px]' }
 
 export function buttonClass({ variant = 'ink', size = 'md', full }: Pick<Common, 'variant' | 'size' | 'full'>) {
   return `inline-flex items-center justify-center gap-2 rounded-pill font-medium transition-[background,filter,scale,box-shadow] duration-200 active:scale-[.97] disabled:opacity-55 ${VARIANT[variant]} ${SIZE[size]} ${full ? 'w-full' : ''}`

@@ -9,7 +9,11 @@ stores take four column triples store_N_name, store_N_url, store_N_region. image
 brand's own product image, linked (never copied); image_source is the page it is shown on.
 Each store's own price (read off that store's page for the same size) sits in the trailing
 columns store_N_price_amount, store_N_price_currency, store_N_price_checked; all three empty
-means no verified price (null).
+means no verified price (null). Then `detail` ("full" or "index"; empty is "full") and `notes`
+(Nov 27), then `concerns_source` (Nov 28: "brand_page" or "name" when the concerns were filled by
+scripts/fill_catalog_concerns.py; empty when researched). An index product may leave
+price_amount/price_currency, inci and key_actives empty; a full product needs an ingredient list
+and a price.
 """
 
 import csv
@@ -24,7 +28,7 @@ from pydantic import ValidationError  # noqa: E402
 from app.catalog import CATALOG_PATH, CATEGORIES, CONCERNS, StorePrice  # noqa: E402
 
 SEP = " | "
-REGIONS = {"IN", "US", "UK", "EU", "KR", "SEA", "GCC", "GLOBAL"}
+REGIONS = {"IN", "US", "UK", "EU", "KR", "JP", "CN", "AU", "SEA", "GCC", "GLOBAL"}
 STORE_SLOTS = 4
 COLUMNS = [
     "product_id",
@@ -46,6 +50,8 @@ COLUMNS = [
 # Appended after the original columns so an older sheet still lines up.
 PRICE_FIELDS = ("price_amount", "price_currency", "price_checked")
 COLUMNS += [f"store_{i}_{f}" for i in range(1, STORE_SLOTS + 1) for f in PRICE_FIELDS]
+COLUMNS += ["detail", "notes"]  # Nov 27: full and index products
+COLUMNS += ["concerns_source"]  # Nov 28: brand_page or name (filled), empty (researched)
 
 
 def _split(cell: str) -> list[str]:
@@ -76,6 +82,12 @@ def validate(p: dict) -> list[str]:
         problems.append("image_url")
     if p.get("image_url") and not (p.get("image_source") or "").startswith("https://"):
         problems.append("image_source (the page the image is shown on)")
+    if p.get("concerns_source") not in (None, "brand_page", "name"):
+        problems.append(f"concerns_source {p.get('concerns_source')!r}")
+    if p.get("detail", "full") not in ("full", "index"):
+        problems.append(f"detail {p.get('detail')!r}")
+    elif p.get("detail", "full") == "full" and not (p.get("inci") and p.get("price")):
+        problems.append("a full product needs its ingredient list and a price")
     return problems
 
 
@@ -113,7 +125,9 @@ def from_row(row: dict[str, str]) -> dict:
         "concerns": _split(row["concerns"]),
         "key_actives": actives,
         "inci": _split(row["inci"]),
-        "price": {"amount": float(row["price_amount"]), "currency": row["price_currency"].strip()},
+        "price": {"amount": float(row["price_amount"]), "currency": row["price_currency"].strip()}
+        if (row.get("price_amount") or "").strip()
+        else None,
         "size": row["size"].strip(),
         "region": _split(row["region"]),
         "stores": stores,
@@ -121,6 +135,13 @@ def from_row(row: dict[str, str]) -> dict:
         "image_source": (row.get("image_source") or "").strip() or None,
         "source_url": row["source_url"].strip(),
         "last_verified": row["last_verified"].strip(),
+        "detail": (row.get("detail") or "").strip() or "full",
+        **({"notes": row["notes"].strip()} if (row.get("notes") or "").strip() else {}),
+        **(
+            {"concerns_source": row["concerns_source"].strip()}
+            if (row.get("concerns_source") or "").strip()
+            else {}
+        ),
     }
 
 
@@ -137,14 +158,17 @@ def to_row(p: dict) -> dict[str, str]:
         "concerns": SEP.join(p["concerns"]),
         "key_actives": SEP.join(f"{a['name']}:{_pct(a['pct'])}" for a in p["key_actives"]),
         "inci": SEP.join(p["inci"]),
-        "price_amount": f"{p['price']['amount']:g}",
-        "price_currency": p["price"]["currency"],
+        "price_amount": f"{p['price']['amount']:g}" if p.get("price") else "",
+        "price_currency": p["price"]["currency"] if p.get("price") else "",
         "size": p["size"],
         "region": SEP.join(p["region"]),
         "source_url": p["source_url"],
         "last_verified": p["last_verified"],
         "image_url": p.get("image_url") or "",
         "image_source": p.get("image_source") or "",
+        "detail": p.get("detail") or "",
+        "notes": p.get("notes") or "",
+        "concerns_source": p.get("concerns_source") or "",
     }
     for i in range(1, STORE_SLOTS + 1):
         s = p["stores"][i - 1] if i <= len(p["stores"]) else {"store": "", "url": "", "region": ""}

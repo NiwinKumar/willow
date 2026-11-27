@@ -1,7 +1,10 @@
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
-export type ComboOption = { value: string; label: string; hint?: string; group?: string }
+import { useClampToViewport } from './useClamp'
+
+/** `icon`: a small leading mark (a BrandLogo) drawn before the label in the list. */
+export type ComboOption = { value: string; label: string; hint?: string; group?: string; icon?: ReactNode }
 
 /**
  * A searchable picker (the "Viewing as" workspace switch): a button shows the current choice; opening it shows
@@ -16,10 +19,12 @@ export function Combobox({ label, value, options, onChange, prefix, footer, widt
   const pop = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const base = useId()
+  const clamp = useClampToViewport(pop, open)
   const current = options.find((o) => o.value === value)
   const shown = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    return s ? options.filter((o) => o.label.toLowerCase().includes(s)) : options
+    const fold = (t: string) => t.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const s = fold(q.trim())
+    return s ? options.filter((o) => fold(o.label).includes(s)) : options
   }, [options, q])
 
   const close = (refocus = true) => {
@@ -82,7 +87,7 @@ export function Combobox({ label, value, options, onChange, prefix, footer, widt
         <ChevronsUpDown size={14} strokeWidth={1.6} aria-hidden className="shrink-0 text-ink-2" />
       </button>
       {open ? (
-        <div ref={pop} className="absolute left-0 top-[calc(100%+6px)] z-[60] flex max-h-[min(440px,70dvh)] flex-col overflow-hidden rounded-card border border-line bg-surface shadow-[0_0_0_1px_var(--line-subtle),0_4px_8px_-4px_rgba(0,0,0,.06),0_16px_24px_-8px_rgba(0,0,0,.12)] animate-[wFadeIn_.12s_ease_both]" style={{ width: `min(${width}px, calc(100vw - 32px))` }}>
+        <div ref={pop} className="absolute left-0 top-[calc(100%+6px)] z-[60] flex max-h-[min(440px,70dvh)] flex-col overflow-hidden rounded-card border border-line bg-surface shadow-[0_0_0_1px_var(--line-subtle),0_4px_8px_-4px_rgba(0,0,0,.06),0_16px_24px_-8px_rgba(0,0,0,.12)] animate-[wFadeIn_.12s_ease_both]" style={{ width: `min(${width}px, calc(100vw - 32px))`, ...clamp }}>
           <input
             ref={input}
             role="combobox"
@@ -116,6 +121,7 @@ export function Combobox({ label, value, options, onChange, prefix, footer, widt
                     className={`flex h-9 cursor-pointer items-center gap-2 rounded-ctl px-2.5 text-proof-body ${i === active ? 'bg-pf-hover text-ink' : 'text-ink'}`}
                   >
                     <span className="grid w-3.5 shrink-0 place-items-center text-proof-leaf">{o.value === value ? <Check size={14} strokeWidth={2} aria-hidden /> : null}</span>
+                    {o.icon}
                     <span className="min-w-0 flex-1 truncate">{o.label}</span>
                     {o.hint ? <span className="shrink-0 text-proof-label text-ink-2 tnum">{o.hint}</span> : null}
                   </div>

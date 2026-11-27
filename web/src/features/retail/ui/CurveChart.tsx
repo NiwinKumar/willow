@@ -4,7 +4,7 @@ import { pct } from './format'
 
 export type CurveSeries = {
   id: string
-  /** Direct label at the line's end ("Users", "Non-users"). */
+  /** Direct label at the line's end ("Using it", "Same goals, not using it"). */
   label: string
   values: (number | null)[]
   /** signal = ember (a visible-change share); muted = grey dashed (the comparison). One accent per chart. */
