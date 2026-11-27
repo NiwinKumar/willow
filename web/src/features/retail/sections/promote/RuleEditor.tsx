@@ -5,7 +5,12 @@ import { toast } from 'sonner'
 import { api, ApiError, type AutoRule, type RuleBody } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/useAuth'
 import { ruleSentence, TEMPLATES } from '../../autopilot'
+import { isNotMember } from '../../proofApi'
 import { Button, SidePanel } from '../../ui'
+import { NotMemberNote } from './NotMember'
+
+/** The error marker for the api's 403 not_a_member (shown as NotMemberNote, not as text). */
+const NOT_MEMBER = '__not_a_member__'
 
 /*
  * The AutoCampaign rule editor (side panel), plain language only: tap a template or describe the rule in your
@@ -58,7 +63,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
       setSource(out.source ?? null)
       return r
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Couldn’t read that rule. Check the connection and try again.')
+      setError(isNotMember(e) ? NOT_MEMBER : e instanceof ApiError ? e.message : 'Couldn’t read that rule. Check the connection and try again.')
       return null
     } finally {
       setBusy(null)
@@ -76,7 +81,7 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
       onSaved(saved)
       toast(editing ? `Rule saved · ${saved.name}` : `Rule on · ${saved.name}`)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Couldn’t save the rule. Check the connection and try again.')
+      setError(isNotMember(e) ? NOT_MEMBER : e instanceof ApiError ? e.message : 'Couldn’t save the rule. Check the connection and try again.')
     } finally {
       setBusy(null)
     }
@@ -98,7 +103,9 @@ export function RuleEditor({ open, onClose, workspace, editing, template = null,
               <span className="text-proof-small text-ink">{ruleSentence(rule)}</span>
             </div>
           ) : null}
-          {error ? (
+          {error === NOT_MEMBER ? (
+            <NotMemberNote compact />
+          ) : error ? (
             <p role="alert" className="m-0 rounded-ctl border border-pf-red/40 bg-pf-red-soft px-3 py-2 text-proof-small text-ink">
               {error}
             </p>

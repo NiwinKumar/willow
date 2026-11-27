@@ -1,3 +1,4 @@
+import { DotNumber } from '../../components/willow/DotNumber'
 import { ArrowCircle } from './parts'
 
 /** The design's lead-card auras (Willow App.dc.html appVals AURA), plus a quiet grey for checks that didn't finish. */
@@ -22,6 +23,7 @@ const AURA = {
 
 export type LeadStep = { t: string; state: 'done' | 'current' | 'todo' }
 export type Lead = {
+  /** A quiet context line over the card ("Last check-in · 25 Nov"), sentence case. */
   eyebrow?: string
   title: string
   sub: string
@@ -84,7 +86,8 @@ export function LeadCard({ lead }: { lead: Lead }) {
     >
       <span aria-hidden className="pointer-events-none absolute -top-[50px] -right-[50px] size-[220px] animate-[wBreathe_6s_ease-in-out_infinite] rounded-full blur-[8px]" style={{ background: 'radial-gradient(circle, rgba(255,255,255,.75), rgba(255,255,255,0) 68%)' }} />
       <div className="relative flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[11px] tracking-[.08em]">{lead.eyebrow ? `■ ${lead.eyebrow}` : ''}</span>
+        {/* Context in plain words (when, which place), not a caps label: the title below is what leads. */}
+        <span className="text-[13px] leading-[1.3] text-ink/80">{lead.eyebrow ?? ''}</span>
         {lead.chips?.length ? (
           <span className="flex flex-wrap gap-[5px]">
             {lead.chips.map((c) => (
@@ -99,7 +102,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
         {lead.steps ? <ScanField /> : null}
         {lead.big ? (
           <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-            <span className="font-dot text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]">{lead.big}</span>
+            <DotNumber text={lead.big} className="text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]" />
             {lead.bigLabel ? <span className="max-w-[140px] pb-1 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
           </div>
         ) : null}

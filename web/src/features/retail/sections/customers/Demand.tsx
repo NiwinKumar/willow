@@ -18,7 +18,7 @@ export function WhatPeopleWant({ d, goalId, className = '' }: { d: Insights; goa
   const max = Math.max(1, ...rows.map((r) => r.n))
   const months = d.needs_by_month?.months ?? []
   return (
-    <Panel title="What people want" id="demand-h" description="People per goal (up to 5 each), and the share with a visible change so far." className={className}>
+    <Panel title="What people want" id="demand-h" description="How many people chose each goal (a person can pick up to 5), and the share of them with a visible change so far." className={className}>
       {rows.length === 0 ? (
         <EmptyState compact title="No goal has enough people yet" body={`No goal has ${MIN_GROUP} or more people in this filter.`} />
       ) : (
@@ -165,7 +165,8 @@ export function Gaps({ d }: { d: Insights }) {
       id: 'action',
       header: 'What to do',
       width: '38%',
-      cell: (r) => <span className={`block truncate pl-4 ${r.flag ? 'text-ink' : 'text-ink-2'}`} title={r.g.action}>{r.g.action}</span>,
+      // Only a gap needs words; "Covered in every tier." on most rows buried the one that matters.
+      cell: (r) => (r.flag ? <span className="block truncate pl-4 text-ink" title={r.g.action}>{r.g.action}</span> : <span className="block pl-4 text-proof-small text-ink-2">Covered</span>),
       csv: (r) => r.g.action,
     },
   ]
@@ -177,7 +178,7 @@ export function Gaps({ d }: { d: Insights }) {
           heading={
             <span className="flex flex-col gap-0.5">
               <h2 className="m-0 text-proof-h text-ink">Assortment gaps</h2>
-              <span className="text-proof-small text-ink-2">Visible-change rate by week 8 among users of each price tier’s products for the goal.</span>
+              <span className="text-proof-small text-ink-2">Share of people with a visible change by week 8, among users of each price tier’s products for the goal. A gap: a tier with no option or only one, or under 35% change in every tier.</span>
             </span>
           }
           columns={columns}
@@ -185,7 +186,7 @@ export function Gaps({ d }: { d: Insights }) {
           rowKey={(r) => r.g.goal}
           csv={{ name: csvName('assortment-gaps', d), meta: csvMeta(d) }}
           minWidth={760}
-          empty="No goal has products in the catalogue yet."
+          empty="No goal has products in the catalog yet."
         />
       </Panel>
     </section>
@@ -209,8 +210,8 @@ export function Conflicts({ d, className = '' }: { d: Insights; className?: stri
               <span className="flex items-baseline justify-between gap-3">
                 <span className="min-w-0 text-proof-body text-ink">{c.pair}</span>
                 <span className="shrink-0 text-proof-small text-ink tnum">
-                  {pct(c.share)}
-                  {c.n ? <span className="text-ink-2"> · {int(c.n)}</span> : null}
+                  {c.n && c.share < 0.005 ? 'under 1%' : pct(c.share)}
+                  {c.n ? <span className="text-ink-2"> · {int(c.n)} routines</span> : null}
                 </span>
               </span>
               <ShareBar value={c.share} max={max} />

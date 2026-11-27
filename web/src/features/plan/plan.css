@@ -1,0 +1,32 @@
+/* The routine builder's own motion (features/plan). Shared keyframes live in src/index.css. */
+@keyframes wPlanScan {
+  from { top: -20%; opacity: 0 }
+  20% { opacity: 1 }
+  to { top: 100%; opacity: 0 }
+}
+/* The skin profile card arrives like a card laid on a table: a little tilt, then flat. */
+@keyframes wPlanCard {
+  from { opacity: 0; transform: perspective(900px) rotateX(14deg) translateY(28px) scale(.96); filter: blur(6px) }
+  to { opacity: 1; transform: none; filter: blur(0) }
+}
+/* One light sweep across the card once it lands. */
+@keyframes wPlanSheen {
+  from { translate: -120% 0 }
+  to { translate: 220% 0 }
+}
+/* A timeline's line grows down from its first step. */
+@keyframes wPlanGrow {
+  from { transform: scaleY(0) }
+  to { transform: scaleY(1) }
+}
+/* The routine-saved garden (Celebration.tsx): the mound rises, stems grow, leaves unfold, buds open, petals lift. */
+@keyframes wMound { from { transform: scaleY(0); opacity: 0 } to { transform: scaleY(1); opacity: 1 } }
+@keyframes wStem { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+@keyframes wLeaf { from { transform: scale(0); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+@keyframes wBloom { from { transform: scale(0); opacity: 0 } 60% { opacity: 1 } to { transform: scale(1); opacity: 1 } }
+@keyframes wPetal {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.4) }
+  20% { opacity: 1 }
+  100% { opacity: 0; transform: translate(var(--px), var(--py)) rotate(var(--pr)) scale(1) }
+}
+@keyframes wCelebrateOut { to { opacity: 0 } }

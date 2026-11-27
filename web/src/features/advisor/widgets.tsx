@@ -10,6 +10,7 @@ import { Sparkline } from '../../components/charts/Sparkline'
 import { activeIn, useRoutine, useRoutineLog } from '../../data/hooks'
 import type { MetricId, Product, Session, Site } from '../../data/types'
 import { useData } from '../../data/useData'
+import { NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, fmtValue, unitOf } from '../../lib/metrics'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, verdictCounts, wordsFor, type VerdictKind } from '../../lib/verdict'
@@ -31,7 +32,7 @@ function Frame({ title, link, onLink, children }: { title: string; link: string;
   return (
     <div className="flex flex-col gap-2.5 rounded-[22px] bg-sunken/80 p-3.5" style={{ animation: 'wRise .45s both' }}>
       <span className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {title.toUpperCase()}</span>
+        <span className="text-[12.5px] text-ink-2">{title}</span>
         <button type="button" onClick={onLink} className="hit44 inline-flex items-center gap-1 rounded-pill bg-white px-2.5 py-1 text-[12px] transition-colors hover:bg-ink/5">
           {link} <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden />
         </button>
@@ -174,7 +175,7 @@ function ProductWidget({ productId, links }: { productId: string; links: WidgetL
           <span className="text-[12px] text-ink-2">{metaLine(p.brand, p.category, p.size)}</span>
           <span className="text-[14px]">{p.name}</span>
           <span className="text-[12px] text-ink-2">
-            {fmtPrice(p.price)} · checked {fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}
+            {p.price ? `${fmtPrice(p.price)} · checked ${fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}` : NO_PRICE}
           </span>
         </span>
       </span>

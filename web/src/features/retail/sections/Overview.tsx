@@ -8,10 +8,13 @@ import { useAuth } from '../../../lib/useAuth'
 import { openProposals } from '../autopilot'
 import { useRetailData } from '../context'
 import { DATA_STUDIO } from '../data'
+import { useDataTo } from '../freshness'
+import { useClaimCounts } from '../orgData'
 import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipeline'
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail, useProducts } from '../productData'
-import { sectionPath, useRetailState } from '../state'
+import { spotlightOf } from '../productModel'
+import { purposeOf, RANGES, sectionPath, useRetailState } from '../state'
 import type { Brief, BriefCard, Insights, ProductRow } from '../types'
 import { Badge, Bone, Button, cohortKind, CurveChart, EmptyState, ErrorState, int, MIN_GROUP, PageHeader, Panel, pct, pts, SkeletonKpis, SkeletonPanel, TierDot, ToolButton } from '../ui'
 import { briefHref, cardFigure } from '../ui/insight'
@@ -47,14 +50,6 @@ export default function Overview() {
   )
 }
 
-/** The spotlight: highest lift lower bound among Proven rows, else the Promising row closest to Proven. */
-function spotlightOf(rows: ProductRow[]): ProductRow | null {
-  const proven = rows.filter((r) => r.tier === 'proven' && r.lift_lo !== null).sort((a, b) => (b.lift_lo ?? 0) - (a.lift_lo ?? 0))
-  if (proven[0]) return proven[0]
-  const promising = rows.filter((r) => r.tier === 'promising').sort((a, b) => (a.to_proven ?? 1e9) - (b.to_proven ?? 1e9) || (b.lift ?? 0) - (a.lift ?? 0))
-  return promising[0] ?? null
-}
-
 function Body({ d }: { d: Insights }) {
   const { workspace, filters, brands } = useRetailData()
   const { carry } = useRetailState()
@@ -81,9 +76,9 @@ function Body({ d }: { d: Insights }) {
     rows.length ? (
       <>
         <strong>
-          {proven} of {rows.length}
+          {int(proven)} of {int(rows.length)}
         </strong>{' '}
-        of your {rows.length === 1 ? 'product is' : 'products are'} Proven; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+        of your {rows.length === 1 ? 'product is' : 'products are'} Proven; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
       </>
     ) : (
       <>No {brand} product is in the catalog for this filter.</>
@@ -91,17 +86,18 @@ function Body({ d }: { d: Insights }) {
   ) : (
     <>
       <strong>
-        {proven} of {rows.length}
+        {int(proven)} of {int(rows.length)}
       </strong>{' '}
-      products are Proven across {new Set(rows.map((r) => r.brand)).size} brands; {measured} {measured === 1 ? 'has' : 'have'} a measured outcome.
+      products are Proven across {new Set(rows.map((r) => r.brand)).size} brands; {int(measured)} {measured === 1 ? 'has' : 'have'} a measured outcome.
     </>
   )
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title={brand ?? 'Overview'}
+        title={brand ? `${brand} · overview` : 'Overview board'}
         description={description}
+        purpose={purposeOf('board')}
         actions={
           <>
             <Button to={`${sectionPath('products')}${carry}`}>All products</Button>
@@ -130,7 +126,7 @@ function Body({ d }: { d: Insights }) {
 
 /* ───────────────────────────── spotlight ───────────────────────────── */
 
-function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; mine: boolean }) {
+export function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; mine: boolean }) {
   const { filters } = useRetailData()
   const { carry } = useRetailState()
   const detail = useProductDetail(row.product_id, filters)
@@ -139,7 +135,8 @@ function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; min
   const productTo = `${sectionPath('products', row.product_id)}${carry}`
   const promoteTo = `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(row.product_id)}`
   const eligible = x ? x.eligibility.eligible : row.tier === 'proven'
-  const steps = pipelineSteps({ p: row, weeksN, statements: x ? x.evidence.length : null, eligible, campaign, promoteTo })
+  const saved = useClaimCounts(row.product_id)
+  const steps = pipelineSteps({ p: row, weeksN, statements: x ? x.evidence.length : null, eligible, campaign, promoteTo, saved, claimsTo: `${productTo}${carry ? '&' : '?'}claim=listing#claims-h` })
   return (
     <section aria-labelledby="spot-h" className="flex w-full min-w-0 flex-col overflow-hidden rounded-card border border-line bg-surface">
       <div className="flex min-w-0 flex-col gap-3 p-4">
@@ -194,7 +191,7 @@ function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; min
           </div>
           <div className="min-w-0 md:col-span-6">
             {x && x.curve.users.some((v) => v !== null) ? (
-              <CurveChart title={`${row.product}: share with a visible change by week`} weeks={x.curve.weeks} height={96} series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal' }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Non-users', values: x.curve.base, tone: 'muted' as const }] : [])]} />
+              <CurveChart title={`${row.product}: share with a visible change by week`} weeks={x.curve.weeks} height={96} series={[{ id: 'users', label: 'Users', values: x.curve.users, tone: 'signal' }, ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Not using it', values: x.curve.base, tone: 'muted' as const }] : [])]} />
             ) : (
               <Bone className="h-[96px] w-full" />
             )}
@@ -210,12 +207,14 @@ function Spotlight({ row, weeksN, mine }: { row: ProductRow; weeksN: number; min
 
 function NoSpotlight({ brand }: { brand: string | null }) {
   const { carry } = useRetailState()
+  // An empty brand workspace gets its next step: where its products stand and how n grows.
   return (
     <EmptyState
       icon={<Sparkles size={18} strokeWidth={1.6} />}
-      title={brand ? `No ${brand} product is Proven or Promising yet` : 'No product is Proven or Promising yet'}
-      body={`A product becomes Proven when ${MIN_GROUP * 3}+ people used it for 8 weeks and its lift over non-users stays above zero across its 95% interval.`}
-      action={{ label: 'See every product', to: `${sectionPath('products')}${carry}` }}
+      title={brand ? `Next for ${brand}: grow the number of people measured` : 'Next: grow the number of people measured'}
+      body={`A product gets a Proof tier once 10 people reach week 8, and is Proven at ${MIN_GROUP * 3}+ with a lift over non-users above zero across its 95% interval. Your range shows which products are collecting and which have no users yet.`}
+      action={{ label: 'Open your range', to: `${sectionPath('range')}${carry}` }}
+      secondary={{ label: 'See every product', to: `${sectionPath('products')}${carry}` }}
     />
   )
 }
@@ -233,7 +232,8 @@ const KIND: Record<BriefCard['kind'], { icon: LucideIcon; tone: string; label: s
 type BriefState = { key: string; status: 'loading' | 'ready' | 'failed'; brief: Brief | null }
 
 function BriefPanel({ brand, className }: { brand: string | null; className?: string }) {
-  const { filters } = useRetailData()
+  const { filters, insights } = useRetailData()
+  const to = useDataTo(insights.status === 'ready' || insights.status === 'empty' ? insights.d : null)
   const [attempt, setAttempt] = useState(0)
   const key = `${filters.cohort}|${filters.range}|${brand ?? ''}|${attempt}`
   const [res, setRes] = useState<BriefState>({ key: '', status: 'loading', brief: null })
@@ -271,8 +271,9 @@ function BriefPanel({ brand, className }: { brand: string | null; className?: st
   const summary = state.brief?.summary
   return (
     <Panel
-      title="This week’s brief"
+      title="What stands out"
       id="brief-h"
+      meta={<span className="text-proof-small text-ink-2">{RANGES.find((r) => r.value === filters.range)?.label}{to ? ` · ${to.label.toLowerCase()}` : ''}</span>}
       className={className}
       flush
       description={
@@ -465,7 +466,7 @@ function About({ d }: { d: Insights }) {
       v:
         kind === 'real'
           ? `${d.cohort.real} real people who opted in to anonymised sharing. Small, so many groups fall below the threshold.`
-          : `${int(d.cohort.synthetic)} simulated people${d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ''}, who started in August, September or October with one to three goals, a routine of real catalogue products and a reading every week up to today; ${Math.round(d.cohort.dropout * 100)}% stopped early. Fixed seed (${d.cohort.seed}), so the numbers are reproducible.`,
+          : `${int(d.cohort.synthetic)} simulated people${d.cohort.real ? ` and ${d.cohort.real} real people who opted in` : ''}, who started in August, September or October with one to three goals, a routine of real catalog products and a reading every week up to today; ${Math.round(d.cohort.dropout * 100)}% stopped early. Fixed seed (${d.cohort.seed}), so the numbers are reproducible.`,
     },
     { k: 'Visible change', v: `A person counts when a goal measure is still beyond their own photo noise band at the week-${d.cohort.weeks} reading, in the desired direction. One lucky reading earlier does not count.` },
     { k: 'Small groups', v: `Any group with fewer than ${MIN_GROUP} people is withheld by the api, so also in charts, tables, exports and answers.` },

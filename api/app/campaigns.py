@@ -18,7 +18,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from app import catalog, cohort
+from app import catalog, cohort, proof_orgs, regions
 from app.retailer import GOAL_LABEL, SKIN_LABEL
 from app.store import Doc, Store, iso
 
@@ -122,6 +122,9 @@ def check(
     ([] = it can). Skin types must be among the eligible ones; [] means all of those."""
     elig = eligibility_of(product["product_id"])
     reasons: list[str] = []
+    if not catalog.is_full(product):
+        # a sponsored card is a suggestion, and a suggestion has to be checked
+        reasons.append("Only products with their full ingredient list in Willow can be promoted.")
     if not elig or not elig.get("eligible") or elig.get("tier") != "proven":
         reasons.append("Only products rated Proven can be promoted.")
         reasons += [r for r in (elig or {}).get("reasons") or [] if r not in reasons]
@@ -141,10 +144,94 @@ def check(
     return reasons
 
 
+def authorize(
+    store: Store, uid: str, product: dict[str, Any], workspace: str, org_id: str | None = None
+) -> proof_orgs.Member:
+    """Who may create a campaign (Proof by Willow organisations, app/proof_orgs.py): a member
+    with the analyst role or higher of the retailer org, or of the brand org that owns the
+    product's brand. `org_id` picks the membership; without it, the one that fits the workspace
+    (a brand workspace prefers its brand org), a real membership before a demo one. 403 for
+    anyone without such a membership, anonymous guests included."""
+    rows = [
+        m
+        for d in proof_orgs.memberships(store, uid)
+        if (m := proof_orgs.membership(store, uid, d["org_id"])) and m.at_least("analyst")
+    ]
+    if org_id is not None:
+        rows = [m for m in rows if m.org_id == org_id]
+    if not rows:
+        raise proof_orgs.forbidden(
+            "Creating a campaign needs the analyst role in an organisation. Choose one with "
+            "Try as first."
+        )
+    mine = [m for m in rows if proof_orgs.owns_brand(m.org, product["brand"])]
+    if not mine:
+        raise proof_orgs.forbidden(
+            "A brand organisation can only promote its own brand's products."
+        )
+
+    def fit(m: proof_orgs.Member) -> tuple[int, int]:
+        wants_brand = workspace != "retailer"
+        return (int((m.org["kind"] == "brand") != wants_brand), int(m.demo))
+
+    return min(mine, key=fit)
+
+
+def is_demo(doc: Doc) -> bool:
+    """A campaign made under a demo membership. One made before organisations existed (no
+    `demo` field) came through the open door and counts as demo too: never shown to real users."""
+    return bool(doc.get("demo", True))
+
+
+def is_sample(doc: Doc) -> bool:
+    """A sample campaign (app/dev_seed.py): simulated history for the demo pages. Display only:
+    never served, never counted against MAX_ACTIVE, never blocks a product (live_on)."""
+    return bool(doc.get("sample"))
+
+
 def active_count(store: Store, uid: str, exclude: str | None = None) -> int:
     at = now()
     return sum(
-        1 for cid, d in store.campaigns_of(uid) if cid != exclude and status_of(d, at) == "active"
+        1
+        for cid, d in store.campaigns_of(uid)
+        if cid != exclude and not is_sample(d) and status_of(d, at) == "active"
+    )
+
+
+def live_on(
+    store: Store,
+    uid: str,
+    product_id: str,
+    instance: str | None = None,
+    exclude: str | None = None,
+) -> bool:
+    """Whether this product already has a live campaign (active, running or scheduled) in the same
+    place: this owner's, or (`instance`) a real one of their Proof instance's team. Two at once
+    would share shoppers, so neither holdout comparison would be clean. Demo campaigns of other
+    guests never count: each guest sees only their own."""
+    at = now()
+    return any(
+        cid != exclude
+        and d.get("product_id") == product_id
+        and not is_sample(d)
+        and status_of(d, at) == "active"
+        and (
+            d.get("owner_uid") == uid
+            or (instance is not None and not is_demo(d) and d.get("instance") == instance)
+        )
+        for cid, d in store.campaigns_active()
+    )
+
+
+def already_running() -> HTTPException:
+    return HTTPException(
+        409,
+        {
+            "code": "already_running",
+            "message": (
+                "This product already has a running campaign; end it or wait for its result."
+            ),
+        },
     )
 
 
@@ -167,11 +254,19 @@ def create(
     skin_types: list[str],
     days: int,
     holdout_pct: float | None = None,
+    *,
+    member: proof_orgs.Member | None = None,
 ) -> tuple[str, Doc]:
+    """`member`: the membership it was created under (authorize). Without one (an AutoCampaign
+    rule starting it) the campaign is demo unless its owner has a real membership."""
     at = now()
+    demo = member.demo if member else not proof_orgs.has_real_membership(store, uid)
     doc: Doc = {
         "owner_uid": uid,
         "workspace": workspace,
+        "org_id": member.org_id if member else None,
+        "instance": member.instance if member else None,
+        "demo": demo,
         "product_id": product["product_id"],
         "goals": goals,
         "skin_types": skin_types,
@@ -216,15 +311,24 @@ def stats(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
             for k in totals:
                 totals[k] += int(d.get(k) or 0)
     imp = totals["impressions"]
-    members = store.campaign_members(cid)
+    tally = doc.get("tally") if is_sample(doc) else None
+    if tally:  # a sample campaign (app/dev_seed.py) stores its group counts, not its people
+        reach = int(tally["reach"])
+        inc = incrementality_of(
+            {g: (int(tally[g]["n"]), int(tally[g]["added"])) for g in ("exposed", "holdout")}
+        )
+    else:
+        members = store.campaign_members(cid)
+        reach = sum(1 for m in members if m.get("seen"))
+        inc = incrementality(members)
     return {
-        "reach": sum(1 for m in members if m.get("seen")),
+        "reach": reach,
         "impressions": imp,
         "clicks": totals["clicks"],
         "adds": totals["adds"],
         "ctr": round(totals["clicks"] / imp, 3) if imp else None,
         "daily": daily,
-        "incrementality": incrementality(members),
+        "incrementality": inc,
         "incrementality_note": INCREMENTALITY_NOTE,
     }
 
@@ -239,15 +343,21 @@ def incrementality(members: list[Doc]) -> dict[str, Any] | None:
     more, the count and rate are shown as every retail rate is (a rate of n >= 10). Lift CI: the
     difference of two proportions +- 1.96 * sqrt(p1(1-p1)/n1 + p2(1-p2)/n2), to 2 dp."""
     groups = {g: [m for m in members if m.get("group") == g] for g in ("exposed", "holdout")}
-    if any(len(ms) < MIN_GROUP for ms in groups.values()):
+    return incrementality_of(
+        {g: (len(ms), sum(1 for m in ms if m.get("added"))) for g, ms in groups.items()}
+    )
+
+
+def incrementality_of(counts: dict[str, tuple[int, int]]) -> dict[str, Any] | None:
+    """incrementality() from {group: (people, added)} counts."""
+    if any(n < MIN_GROUP for n, _ in counts.values()):
         return None
     out: dict[str, Any] = {}
     p: dict[str, float] = {}
-    for g, ms in groups.items():
-        added = sum(1 for m in ms if m.get("added"))
-        p[g] = added / len(ms)
-        out[g] = {"n": len(ms), "added": added, "rate": _rate(added, len(ms))}
-    n1, n2 = len(groups["exposed"]), len(groups["holdout"])
+    for g, (n, added) in counts.items():
+        p[g] = added / n
+        out[g] = {"n": n, "added": added, "rate": _rate(added, n)}
+    n1, n2 = counts["exposed"][0], counts["holdout"][0]
     diff = p["exposed"] - p["holdout"]
     half = 1.96 * math.sqrt(
         p["exposed"] * (1 - p["exposed"]) / n1 + p["holdout"] * (1 - p["holdout"]) / n2
@@ -264,6 +374,9 @@ def view(store: Store, cid: str, doc: Doc) -> dict[str, Any]:
     return {
         "id": cid,
         "workspace": doc["workspace"],
+        "org_id": doc.get("org_id"),
+        "demo": is_demo(doc),
+        "sample": is_sample(doc),
         "product_id": doc["product_id"],
         "goals": list(doc.get("goals") or []),
         "skin_types": list(doc.get("skin_types") or []),
@@ -353,7 +466,7 @@ def attribute_add(store: Store, uid: str, product_id: str) -> None:
     mid = member_id(uid)
     at = now()
     for cid, d in store.campaigns_active():
-        if d.get("product_id") != product_id or not running(d, at):
+        if d.get("product_id") != product_id or is_sample(d) or not running(d, at):
             continue
         m = store.campaign_member_get(cid, mid)
         if m is not None and not m.get("added"):
@@ -362,9 +475,10 @@ def attribute_add(store: Store, uid: str, product_id: str) -> None:
             )
 
 
-def sponsored(store: Store, uid: str) -> dict[str, Any] | None:
+def sponsored(store: Store, uid: str, guest: bool = False) -> dict[str, Any] | None:
     """The one sponsored card for this person today, or None (hidden, no goals, nothing that
-    matches, or the evidence unavailable: no card rather than an unproven one)."""
+    matches, or the evidence unavailable: no card rather than an unproven one). Demo campaigns
+    (is_demo) reach guests only (`guest`: an anonymous account), never a real signed-in user."""
     profile = (store.user_get(uid) or {}).get("profile") or {}
     if profile.get("hide_sponsored"):
         return None
@@ -378,6 +492,8 @@ def sponsored(store: Store, uid: str) -> dict[str, Any] | None:
         (cid, d)
         for cid, d in store.campaigns_active()
         if running(d, at)
+        and (guest or not is_demo(d))
+        and not is_sample(d)
         and d.get("placement", "routine") == "routine"
         and d.get("product_id") not in owned
         and goals & set(d.get("goals") or [])
@@ -398,15 +514,22 @@ def sponsored(store: Store, uid: str) -> dict[str, Any] | None:
             e.get("eligible")
             and e.get("tier") == "proven"
             and skin in targets
-            and catalog.by_id(pid)
+            and (p := catalog.by_id(pid))
+            and catalog.is_full(p)
         ):
             eligible.append((cid, d))
     day = at.date().isoformat()
     # The first campaign in today's rotation whose randomised group for this person is
     # `exposed`; a holdout member gets no card for that campaign (the next one is tried).
-    chosen = next(
-        (c for c in rotation(uid, day, eligible) if join(store, *c, uid, day) == "exposed"), None
-    )
+    # Several eligible: those for products nearest to where the person shops are tried first
+    # (app/regions.py), each distance in its own rotation.
+    market = (profile.get("safety") or {}).get("market")
+    near: dict[int, list[tuple[str, Doc]]] = {}
+    for c in eligible:
+        product = catalog.by_id(c[1]["product_id"]) or {}
+        near.setdefault(regions.distance(product, market), []).append(c)
+    tried = [c for d in sorted(near) for c in rotation(uid, day, near[d])]
+    chosen = next((c for c in tried if join(store, *c, uid, day) == "exposed"), None)
     if chosen is None:
         return None
     cid, d = chosen

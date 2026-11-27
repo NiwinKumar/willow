@@ -140,18 +140,18 @@ const STEPS: Step[] = [
     body: 'Each check-in is explained in plain words. Wisp answers from your own measurements and routine, the routine check flags clashing actives and duplicates, and a label photo is read for its ingredients. Every number Gemini writes is checked against the data, and an answer with a new number is rejected.',
     fixes: ['guess'],
     cloud: [
-      ['Gemini on Vertex AI', 'structured answers checked against a schema, function calling over a facts-only catalog, and reading label photos'],
+      ['Gemini on Google Cloud', 'structured answers checked against a schema, function calling over a facts-only catalog, and reading label photos'],
       ['Cloud Scheduler', 'check-in reminders, so a routine actually gets measured'],
     ],
   },
   {
     title: 'Prove it to the business',
     line: 'Outcomes, not just sales.',
-    body: 'Measured change is pooled by product, skin type and goal, across every brand on the shelf. Willow Proof shows what works for whom, drafts claims only from measured results, and measures each campaign against a holdout. In the demo, Proof runs on a labelled synthetic cohort.',
+    body: 'Measured change is pooled by product, skin type and goal, across every brand on the shelf. Proof by Willow shows what works for whom, drafts claims only from measured results, and measures each campaign against a holdout. In the demo, Proof runs on a labelled synthetic cohort.',
     fixes: ['blind'],
     cloud: [
       ['BigQuery', 'the outcome tables behind every Proof chart'],
-      ['Gemini on Vertex AI', 'answers a retailer’s questions from BigQuery aggregates and reads campaign rules written in plain words'],
+      ['Gemini on Google Cloud', 'answers a retailer’s questions from BigQuery aggregates and reads campaign rules written in plain words'],
     ],
   },
 ]
@@ -162,7 +162,7 @@ export function How() {
       <SectionHead
         tag="HOW WILLOW FIXES IT · ON GOOGLE CLOUD"
         title="Measure the outcome. Then explain it."
-        lead="Five steps, each answering part of the problem, each running on Google Cloud in us-central1. Gemini 3 models are served from Vertex AI’s global endpoint."
+        lead="Five steps, each answering part of the problem, each running on Google Cloud in us-central1. Gemini 3 models are served from Google Cloud’s global endpoint."
       />
       <ol className="m-0 grid list-none gap-3 p-0">
         {STEPS.map((s, i) => (
@@ -280,7 +280,7 @@ export function Gains() {
             <Point title="Less money wasted">Keep what works for your skin, stop what doesn’t.</Point>
             <Point title="Advice in your own words">Wisp answers from your measurements and routine, and never invents a number.</Point>
           </ul>
-          <StackLine>Cloud Run, Firestore, Gemini on Vertex AI, Cloud Scheduler</StackLine>
+          <StackLine>Cloud Run, Firestore, Gemini on Google Cloud, Cloud Scheduler</StackLine>
         </div>
         <div
           className="flex flex-col gap-4 rounded-[36px] p-[clamp(20px,3vw,34px)]"
@@ -288,7 +288,7 @@ export function Gains() {
         >
           <h3 className="m-0 font-serif text-[clamp(26px,2.6vw,34px)] font-normal leading-[1.1]">For retailers and brands</h3>
           <BriefPoints />
-          <StackLine>BigQuery, Gemini on Vertex AI, Cloud Run</StackLine>
+          <StackLine>BigQuery, Gemini on Google Cloud, Cloud Run</StackLine>
         </div>
       </div>
     </section>

@@ -68,7 +68,7 @@ export default function CheckInPicker({ open, onClose, onStart }: { open: boolea
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
             <div className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">■ {whenCaps()}</span>
+              <span className="text-[13px] text-ink-2">{whenCaps()}</span>
               <h2 id="cap-h" className="m-0 text-[22px] font-normal tracking-[-0.01em]">
                 Check in
               </h2>

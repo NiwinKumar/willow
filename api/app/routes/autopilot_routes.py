@@ -9,7 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app import autopilot, autopilot_agent, campaigns, catalog, gemini, limits
+from app import autopilot, autopilot_agent, campaigns, catalog, gemini, limits, proof_orgs
 from app.auth import AuthUser, current_user
 from app.retailer import CATEGORY_LABEL
 from app.routes.me_routes import Goal
@@ -137,10 +137,28 @@ def overview(
     return {"rules": _views(store, user.uid), "activity": autopilot.feed(store, user.uid)}
 
 
+def _require_member(store: Store, uid: str) -> None:
+    """Rules and approvals start campaigns: the same door as a new campaign (an analyst or admin
+    of a Proof organisation, app/proof_orgs.py). Anonymous visitors "Try as" a demo org first."""
+    ok = any(
+        (m := proof_orgs.membership(store, uid, d["org_id"])) and m.at_least("analyst")
+        for d in proof_orgs.memberships(store, uid)
+    )
+    if not ok:
+        raise HTTPException(
+            403,
+            {
+                "code": "not_a_member",
+                "message": "Join an organisation as an analyst or admin first.",
+            },
+        )
+
+
 @router.post("/retailer/autopilot/rules", status_code=201)
 def create_rule(
     body: RuleBody, user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
+    _require_member(store, user.uid)
     if len(store.rules_of(user.uid)) >= 20:
         raise HTTPException(
             429, {"code": "too_many_rules", "message": "20 rules is the limit. Delete one first."}
@@ -342,6 +360,7 @@ def approve(
     aid: str, user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
     """Carry out an open proposal, through the same checks as a new campaign."""
+    _require_member(store, user.uid)
     limits.take(store, user.uid, "campaign_create")
     return _activity_call(autopilot.approve, store, user.uid, aid) | overview(user, store)
 

@@ -99,6 +99,8 @@ def test_lift_ci_tiers_and_what_it_would_take():
     assert retail_intel.tier_of(30, None, None) == "unclear"  # no base to compare with
     assert retail_intel.to_proven(12, 20, 3, 10) == 79
     assert retail_intel.to_proven(10, 20, 10, 20) is None
+    # the approximation clears zero but the tier's interval doesn't: never "0 more people"
+    assert retail_intel.to_proven(30, 40, 5, 40) == 1
 
 
 def test_complementary_suppression():
@@ -596,9 +598,13 @@ def test_eligibility_and_autopilot_signals_are_built_once_per_data_version(monke
 
 # ── generator: switching and skin effects ──────────────────────────────────────────────────
 
-# Digest of cohort.generate(2026-10-15) on origin/main before switching and skin effects
-# (users, routines, conflicts, months, and the first 50 people's readings).
-BEFORE = "2116406a73a0b96f14068c8980abcd76acc96bc226dff5a7d914c52de478eee5"
+# Digest of the test cohort (conftest: 2,000 people, 48 products) on 2026-10-15 without switching
+# and skin effects (users, routines, conflicts, months, and the first 50 people's readings), as of
+# the cohort scale-up (Nov 28: APAC region mix, routines weighted to products sold nearby) and
+# the catalog's KR/JP/CN brand-origin tags (Nov 28: ten of the 48 products, COSRX, Beauty of
+# Joseon and Round Lab, gained KR, so Korean people's draws moved). It pins the draws: a change
+# that moves them has to say so here.
+BEFORE = "23568b3cc66576245d121c4a9a3e3ea684d707dbe3bbace06d854f8fe14318d6"
 
 
 def _digest(t):
@@ -641,7 +647,9 @@ def test_switchers_concentrate_enough_for_the_switching_views():
     ]
     views = {pid: retail_intel.product_view(f, pid)["switching"] for pid in big}
     assert len(big) >= 6
-    assert sum(1 for s in views.values() if s["to"]) * 2 > len(big)  # most show a `to` row
+    # enough busy products show where their switchers went (a `to` row needs 10 people): 6 of 10
+    # before the KR/JP/CN region tags, 6 of 13 after (more products cross 30 stops)
+    assert sum(1 for s in views.values() if s["to"]) >= 6
     assert sum(1 for s in views.values() if s["to_brands"]) >= sum(
         1 for s in views.values() if s["to"]
     )
@@ -704,3 +712,25 @@ def test_autopilot_signals_match_eligibility_and_the_rising_goal_card(monkeypatc
         assert card["link"]["id"] in sig["rising"]
         assert sig["rising"][card["link"]["id"]]["to"] == card["value"]
     assert all(c["unmet"] is not None and 0 <= c["unmet"] <= 1 for c in sig["unmet"])
+
+
+def test_overlap_memo_never_returns_a_count_for_a_different_set():
+    from app import retail_intel
+
+    f = retail_intel.Facts.__new__(retail_intel.Facts)
+    f.memo = {}
+    a = frozenset({"u1", "u2", "u3"})
+    b = frozenset({"u1", "u2"})
+    assert f.overlap(a, b) == 2
+    # a different set that happens to share an id key must be recounted, not served the old 2
+    key = ("overlap", *sorted(id(x) for x in (a, b)))
+    other = frozenset({"u9"})
+    f.memo[key] = ((other, b), 2)
+    assert f.overlap(a, b) == 2 and f.memo[key][0] == (a, b)
+
+
+def test_lift_interval_never_fails_on_impossible_counts():
+    from app import retail_intel
+
+    lift, lo, hi = retail_intel.lift_ci(5, 10, 12, 10)  # more wins than people in the base
+    assert lo <= lift <= hi

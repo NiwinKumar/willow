@@ -116,4 +116,4 @@ Browsers can only display JPEG and PNG, never a DNG. Your engine already decodes
 - Schema: none (`extras` is a free object). Whole-face values, bands and verdicts are unchanged for front-only sessions (checked: identical totals on a real session). In a front + cheek-photo session, marks on the nose bridge and under-brow eyelids are now counted on the front photo instead of a cheek photo, which can move those sessions' blemish and dark-spot totals slightly.
 - Version: engine 0.4.1 (additive). A result without `by_zone` (older engine) simply has no areas; re-measuring a session adds them.
 - Impact: engine; api reads `by_zone` to compare each zone with the same zone of the baseline session (metric story); web shows it.
-- Approved by: [x] Harshini [ ] Niwin
+- Approved by: [x] Harshini [x] Niwin (Nov 28; added to CONTRACT.md §2.5)

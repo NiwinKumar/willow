@@ -230,9 +230,17 @@
   a {
     color: inherit;
   }
-  /* No focus rings anywhere (owner decision, Oct 18): focus is not outlined on any element. */
-  :focus,
+  /* Focus rings for the keyboard only (the Oct 18 "no rings" decision is reversed for WCAG 2.4.7): a mouse or a
+     tap never draws one (:focus-visible), so the look under a pointer is unchanged. Text fields keep their own
+     look: browsers treat a clicked field as focus-visible, and the caret and field style already show focus. */
+  :focus {
+    outline: none;
+  }
   :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit']), textarea, select, [contenteditable]):focus-visible {
     outline: none;
   }
   h1,
@@ -417,3 +425,42 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
   html[data-touring] dialog[open]:not(:modal) { position: fixed; inset: 0; max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em); overflow: auto; }
   html[data-touring] dialog[open]:not(:modal)::backdrop { background: rgba(18, 18, 18, .3); }
 }
+
+/* Tooltip (components/ui/Tooltip.tsx): grows out of its anchor side, leaves faster than it came. A small nub
+   points at the control. A warm tooltip (moving along a row of icons) only fades. */
+.w-tip { translate: 0 -50%; transform-origin: left center; animation: wTipIn .14s var(--ease-standard) both; }
+.w-tip[data-side="top"] { translate: -50% -100%; transform-origin: center bottom; animation-name: wTipInUp; }
+.w-tip[data-warm] { animation: wFadeIn .08s ease both; }
+.w-tip[data-phase="leaving"] { animation: wTipOut .09s var(--ease-exit) both; }
+.w-tip::before { content: ""; position: absolute; left: -3px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; rotate: 45deg; border-radius: 1.5px; background: inherit; }
+.w-tip[data-side="top"]::before { left: 50%; top: auto; bottom: -3px; margin: 0 0 0 -3.5px; }
+@keyframes wTipIn { from { opacity: 0; transform: translateX(-4px) scale(.96) } to { opacity: 1; transform: none } }
+@keyframes wTipInUp { from { opacity: 0; transform: translateY(4px) scale(.96) } to { opacity: 1; transform: none } }
+/* A marker that starts on the baseline (the middle of its scale) and slides to its reading (charts/Ruler.tsx). */
+@keyframes wFromCentre { from { left: 50% } }
+@keyframes wTipOut { from { opacity: 1 } to { opacity: 0; transform: scale(.98) } }
+
+/* Check in, when one is due (shell Sidebar + Dock): a slow halo breathes out of the button, three seconds a
+   cycle, most of it still. Checked in today: the plus turns into a tick, drawn once. Reduced motion: the halo
+   holds still as a ring (the global rule stops the loop; this sets the still frame). */
+.w-due { position: relative; isolation: isolate; }
+.w-due::after { content: ""; position: absolute; inset: 0; border-radius: inherit; corner-shape: inherit; pointer-events: none; z-index: -1; animation: wDueHalo 3.2s var(--ease-standard) infinite; }
+@keyframes wDueHalo {
+  0% { box-shadow: 0 0 0 0 rgba(237, 203, 58, .9), 0 0 0 0 rgba(246, 222, 92, .5) }
+  35% { box-shadow: 0 0 0 4px rgba(237, 203, 58, .45), 0 0 0 9px rgba(246, 222, 92, .18) }
+  70%, 100% { box-shadow: 0 0 0 7px rgba(237, 203, 58, 0), 0 0 0 14px rgba(246, 222, 92, 0) }
+}
+.w-due-icon { animation: wDueNudge 3.2s var(--ease-standard) infinite; }
+@keyframes wDueNudge { 0%, 60%, 100% { rotate: 0deg; scale: 1 } 8% { rotate: 90deg; scale: 1.12 } 18% { rotate: 90deg; scale: 1 } }
+.w-tick path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: wDrawPath .45s .1s var(--ease-standard) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .w-due::after { animation: none; box-shadow: 0 0 0 3px rgba(18, 18, 18, .85), 0 0 0 5px rgba(246, 222, 92, .9); }
+  .w-due-icon { animation: none; }
+  .w-tick path { animation: none; stroke-dashoffset: 0; }
+}
+
+/* Routine builder (features/plan): a ring that spreads and fades, a connecting line drawn from its start,
+   and a line drawing that draws itself (paths carry pathLength=1). */
+@keyframes wRingOut { from { scale: .5; opacity: .9 } to { scale: 2.6; opacity: 0 } }
+@keyframes wLine { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes wDrawPath { to { stroke-dashoffset: 0 } }

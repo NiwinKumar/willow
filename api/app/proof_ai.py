@@ -1,4 +1,4 @@
-"""Gemini where it helps a skincare brand act on Willow Proof (docs/RETAILER_INSIGHTS.md "AI in
+"""Gemini where it helps a skincare brand act on Proof by Willow (docs/RETAILER_INSIGHTS.md "AI in
 Willow Proof"). Two jobs, both grounded in the product view the page already shows:
 
 - **Claim drafts** (`claims`): marketing copy for one channel written only from the product's
@@ -55,6 +55,26 @@ CLAIMS_CAVEAT = (
     "substantiation. Drafts citing Self-reported use what users said, labelled as such; every "
     "other number is measured."
 )
+
+
+# Claims rest on observational data from a cohort that may be simulated: every claim carries which
+# cohort it came from, n, the window and the method, and only a real-only cohort can be exported
+# (app/routes/proof_routes.py refuses the rest with this message).
+EXPORT_REFUSED = "Claims from simulated data can't be exported"
+
+
+def cohort_of(counts: dict[str, Any] | None) -> dict[str, Any]:
+    """simulated (no real people), real (no simulated people) or mixed, from a view's head
+    counts (retailer.cohort_counts_of)."""
+    counts = counts or {}
+    real, synthetic = int(counts.get("real") or 0), int(counts.get("synthetic") or 0)
+    kind = "simulated" if real == 0 else "real" if synthetic == 0 else "mixed"
+    return {
+        "kind": kind,
+        "label": retail_intel.cohort_label(counts),
+        "real": real,
+        "simulated": synthetic,
+    }
 
 
 def _allowed(texts: list[str]) -> set[str]:
@@ -144,13 +164,22 @@ def claims(view: dict[str, Any], channel: str) -> dict[str, Any]:
     row = view["product"]
     label, limit = CHANNELS[channel]
     src = sources(view)
+    who = cohort_of(view.get("cohort"))
     base = {
         "product_id": row["product_id"],
         "channel": channel,
         "sources": src,
         "caveat": CLAIMS_CAVEAT
         if any(not s["measured"] for s in src)
-        else view.get("evidence_caveat"),
+        else view.get("evidence_caveat") or retail_intel.CAVEAT,
+        # what every claim stands on, shown beside it: the cohort, n, window, method
+        "observational": True,
+        "cohort": who,
+        "n": row.get("n"),
+        "window": retail_intel.WINDOW,
+        "method": retail_intel.METHOD,
+        "exportable": who["kind"] == "real",
+        "export_note": None if who["kind"] == "real" else EXPORT_REFUSED,
     }
     if row["tier"] not in CLAIMS_TIERS or not any(s["measured"] for s in src):
         return base | {
@@ -355,7 +384,7 @@ class Picks(BaseModel):
     picks: list[Pick] = Field(default_factory=list, max_length=3)
 
 
-ACTIONS_INSTRUCTIONS = """You advise a skincare brand's team on one product in Willow Proof.
+ACTIONS_INSTRUCTIONS = """You advise a skincare brand's team on one product in Proof by Willow.
 ACTIONS are things the data supports, each with its facts. Pick the 3 that would create the most
 value for this product now (revenue, retention or trust), most valuable first, and for each write
 why in one or two plain sentences for a busy brand manager.

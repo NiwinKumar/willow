@@ -7,8 +7,8 @@ import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse } from '../../data/hooks'
-import { counts, useCheckin, useCheckinDue } from '../../data/useCheckin'
-import type { RoutineEntry, Session } from '../../data/types'
+import { useCheckin, useCheckinDue } from '../../data/useCheckin'
+import type { RoutineEntry, Session, Site } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
 import { leaveDemo, useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
@@ -23,7 +23,7 @@ import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, changeTitle, changeWay, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
-import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, today, usable, verdictSentence, type HomeRead } from './derive'
+import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, today, usable, verdictSentence, type HomeRead, type Place } from './derive'
 import { useProductTests } from '../routine/productTests'
 import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
@@ -90,17 +90,29 @@ function HomeBody() {
   const shell = useShell()
   const navigate = useNavigate()
   const demo = data.mode === 'demo'
+  // A check-in left while measuring (closed, or a several-place walk) says so here when its result lands.
   // Goals live on this device (You writes them); read fresh so a change there reorders Home at once.
   const goals = data.goals
   // Judge sample runs (hosted sample photos, sample_id) are not the person's own check-ins: Home's
   // greeting, lead card and week never read them; Recent lists them as sample runs.
   const own = useMemo(() => data.all.filter((s) => !s.sample_id), [data.all])
-  const faceAll = data.series('face_full')?.sessions ?? EMPTY
-  const face = useMemo(() => (faceAll.some((s) => s.sample_id) ? faceAll.filter((s) => !s.sample_id) : faceAll), [faceAll])
+  // Every place the person tracks (the face first: it measures the most), so a baseline on any of them
+  // counts: a person who tracks only the cheek close-up is not asked for a baseline again.
+  const places = useMemo<Place[]>(
+    () =>
+      (['face_full', ...placesOf(data.profile).filter((p) => p !== 'face_full')] as Site[]).map((site) => {
+        const all = data.series(site)?.sessions ?? EMPTY
+        return { site, sessions: all.some((s) => s.sample_id) ? all.filter((s) => !s.sample_id) : all }
+      }),
+    [data],
+  )
   // The check-in schedule (You): when check-ins are due, the weekly day, and how long a gap is.
   const checkin = useCheckin()
   const due = useCheckinDue()
-  const read = useMemo(() => readHome(own, face, gapDaysFor(checkin)), [own, face, checkin])
+  const read = useMemo(() => readHome(own, places, gapDaysFor(checkin)), [own, places, checkin])
+  // The place Home reads (the face, or the first tracked place with a baseline) and its sessions.
+  const series = read.series
+  const placeName = SITE_SHORT[read.site]
 
   // A check-in still uploading or measuring is read again by the DataProvider (one session at a time, backing
   // off) until its result lands; Home redraws from the cache.
@@ -125,44 +137,46 @@ function HomeBody() {
   // Add the missing photos to a baseline without a normal range (the check-in's top-up mode).
   const ask = (text: string, context: string) => shell.openAdvisor(text, context)
 
-  const closeUp = { wanted: goals.includes('pores_texture') || goals.includes('smoother'), doneToday: (data.series('cheek_macro')?.sessions ?? EMPTY).some((s) => counts(s) && dayOf(s.created_at) === day) }
+  // A pores-and-texture goal is measured up close: a setup row for the cheek close-up unless Home already reads it.
+  const closeUpWanted = goals.includes('pores_texture') && read.site !== 'cheek_macro'
   const tracked = withArms(placesOf(data.profile), !demo && Boolean(tests.running))
-  const dueNow = !demo && checkin && due && (due.kind === 'due' || due.kind === 'late')
-  const placeChips = demo ? ['Face'] : [...tracked.map((p) => SITE_SHORT[p]), ...(dueNow ? ['Due'] : [])]
+  // The hero already says when a check-in is due; the lead card's chips name the places only.
+  const placeChips = demo ? ['Face'] : tracked.map((p) => SITE_SHORT[p])
   const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
   const todayLine = `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}, about ${minutesFor(tracked)} min`
   const lead = leadFor({ read, goals, demo, checkIn, openResult, placeChips, todayLine })
   const heroLines = withTonight(heroLinesFor(read, goals, demo, due), tonightLine(activeIn(entries, 'pm')))
-  const heroNext = demo ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
+  // The schedule chip, unless a hero line already says when the next check-in is.
+  const heroNext = demo || read.todayKind === 'done' ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
   // Routine effect: how each product's target measurement moved since it started (lib/effect.ts).
   const outcomeSessions = useOutcomeSessions()
   const effect = useMemo(() => routineEffect(entries ?? [], outcomeSessions, check.data), [entries, outcomeSessions, check.data])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
-  const latestFace = latest(face, (s) => s.status === 'done')
+  const latestRead = latest(series, (s) => s.status === 'done')
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
   // The hero's question follows what the lines above it are about: a check-in from today, an earlier
   // one (the lines still describe it), or no baseline yet.
   const heroAsk =
     read.person === 'new' || read.person === 'noBand'
-      ? { label: 'How to start', run: () => ask('How do I take a good face baseline?', 'Today') }
-      : latestFace && dayOf(latestFace.created_at) === day
+      ? { label: 'How to start', run: () => ask('How do I take a good baseline?', 'Today') }
+      : latestRead && dayOf(latestRead.created_at) === day
         ? { label: 'Ask about today', run: () => ask('Explain today’s read: what changed and what should I do today?', 'Today') }
         : {
             label: 'Ask about these',
-            run: () => ask('Explain my last check-in: what changed, and what should I do until the next one?', latestFace ? `Face check-in · ${shortDay(latestFace.created_at)}` : 'Today'),
+            run: () => ask('Explain my last check-in: what changed, and what should I do until the next one?', latestRead ? `${placeName} check-in · ${shortDay(latestRead.created_at)}` : 'Today'),
           }
   const showSetup = !demo && (read.person === 'new' || read.person === 'noBand')
 
   const setupRows: SetupRow[] = [
     {
-      t: 'Face baseline',
-      d: read.person === 'new' ? 'About three minutes, by a window' : `${plural(read.baselineFrames ?? 0, 'usable photo', 'usable photos')} of ${BAND_FRAMES} · no normal range yet`,
+      t: read.person === 'new' ? 'Your baseline' : `${placeName} baseline`,
+      d: read.person === 'new' ? `About ${minutesFor(tracked)} min, by a window` : `${plural(read.baselineFrames ?? 0, 'usable photo', 'usable photos')} of ${BAND_FRAMES} · no normal range yet`,
       state: read.person === 'new' ? 'todo' : 'part',
       part: Math.min(1, (read.baselineFrames ?? 0) / BAND_FRAMES),
       onClick: checkIn,
     },
-    ...(closeUp.wanted
+    ...(closeUpWanted
       ? [{ t: 'Cheek close-up', d: 'For your pores and texture goal', state: (data.series('cheek_macro')?.sessions.some(usable) ? 'done' : 'todo') as SetupRow['state'], onClick: checkIn }]
       : []),
     { t: 'Add your routine', d: 'So results can point to products', state: entries?.length ? 'done' : 'todo', onClick: () => navigate('/routine') },
@@ -177,7 +191,7 @@ function HomeBody() {
   ]
 
   // Your goals (trends since the baseline) leads the small-card row; What changed (the latest check-in's numbers) sits beside Routine today.
-  const trends = useMemo(() => (read.lead && !read.lead.is_baseline ? goalTrends(read.lead, read.baseline, face, goals) : []), [read.lead, read.baseline, face, goals])
+  const trends = useMemo(() => (read.lead && !read.lead.is_baseline ? goalTrends(read.lead, read.baseline, series, goals) : []), [read.lead, read.baseline, series, goals])
   const measured = showChanged ? read.lead : null
   const goalsNode = (cls: string) =>
     measured && trends.length ? (
@@ -200,7 +214,7 @@ function HomeBody() {
         rows={4}
         onOpen={(m) => navigate(`/result/${measured.id}?metric=${m}`)}
         onFull={() => openResult(measured)}
-        onAsk={() => ask('What changed since my baseline, and why?', `Face check-in · ${shortDay(measured.created_at)}`)}
+        onAsk={() => ask('What changed since my baseline, and why?', `${placeName} check-in · ${shortDay(measured.created_at)}`)}
       />
     ) : null
 
@@ -330,18 +344,18 @@ function leadFor({
 }): Lead {
   if (demo) {
     const s = read.lead
-    if (!s) return { title: 'Demo journey', sub: 'This journey has no measured face check-in to show.', aura: 'violet', note: 'Check-ins are available in your own account' }
-    return { ...doneLead(s, goals, `LATEST CHECK-IN · ${shortDay(s.created_at).toUpperCase()}`), cta: { label: 'See result', onClick: () => openResult(s) }, note: 'Check-ins are available in your own account' }
+    if (!s) return { title: 'Demo journey', sub: 'This journey has no measured check-in to show.', aura: 'violet', note: 'Check-ins are available in your own account' }
+    return { ...doneLead(s, goals, `Latest check-in · ${shortDay(s.created_at)}`), cta: { label: 'See result', onClick: () => openResult(s) }, note: 'Check-ins are available in your own account' }
   }
   const t = read.todaySession
   if (t) {
-    const site = SITE_SHORT[t.site].toUpperCase()
+    const site = SITE_SHORT[t.site]
     const again = { label: 'Check in again', onClick: checkIn }
     switch (read.todayKind) {
       case 'measuring': {
         const up = t.status === 'uploading'
         return {
-          eyebrow: `MEASURING · ${site}`,
+          eyebrow: `${site} · ${clock(t.created_at)}`,
           title: up ? 'Uploading your photos' : 'Measuring your photos',
           sub: up ? 'Keep the check-in open until the photos are up.' : 'Correcting colour and measuring. You can leave; the result lands here.',
           steps: [
@@ -365,10 +379,8 @@ function leadFor({
           secondary: { label: 'See why', onClick: () => openResult(t) },
           aura: 'grey',
         }
-      case 'unmeasured':
-        return { eyebrow: `${site} · ${clock(t.created_at)}`, title: 'Saved, not measured', sub: `Willow kept your ${SITE_SHORT[t.site].toLowerCase()} photos, but this place isn't measured yet.`, cta: { label: 'See it', onClick: () => openResult(t) }, aura: 'grey' }
       case 'done':
-        return { ...doneLead(t, goals, `CHECKED IN TODAY · ${t.site === 'face_full' ? '' : `${site} · `}${clock(t.created_at)}`), cta: { label: 'See result', onClick: () => openResult(t) } }
+        return { ...doneLead(t, goals, `Checked in today · ${t.site === read.site ? '' : `${site} · `}${clock(t.created_at)}`), cta: { label: 'See result', onClick: () => openResult(t) } }
       default:
         break
     }
@@ -376,33 +388,33 @@ function leadFor({
   const f = read.baselineFrames ?? 0
   switch (read.person) {
     case 'new':
-      return { eyebrow: 'START HERE', title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
+      return { title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
     case 'noBand': {
       // Photos kept (under 30 days): add the missing ones to this same baseline (design: "Add 2 photos").
       const need = topUpNeed(read.baseline)
       if (need > 0 && read.baseline) {
         const b = read.baseline
         return {
-          eyebrow: `BASELINE · ${f} OF ${BAND_FRAMES} USABLE PHOTOS`,
-          title: 'Finish your face baseline',
+          eyebrow: `Started ${shortDay(b.created_at)}`,
+          title: `Finish your ${SITE_SHORT[read.site].toLowerCase()} baseline`,
           sub: `${need === 1 ? 'One more photo gives' : `${countWord(need)} more photos give`} Willow your normal range. Until then results read “Not enough data yet”. Same light as ${shortDay(b.created_at)}.`,
           big: `${f}/${BAND_FRAMES}`,
           bigLabel: 'usable baseline photos',
           prog: Math.min(1, f / BAND_FRAMES),
-          chips: ['Face', `${plural(need, 'photo')} left`],
+          chips: [SITE_SHORT[read.site], `${plural(need, 'photo')} left`],
           cta: { label: 'Check in', onClick: checkIn },
           secondary: { label: 'See baseline', onClick: () => openResult(b) },
           aura: 'coral',
         }
       }
       return {
-        eyebrow: `BASELINE · ${plural(f, 'USABLE PHOTO', 'USABLE PHOTOS')}`,
+        eyebrow: read.baseline ? `Baseline · ${shortDay(read.baseline.created_at)}` : undefined,
         title: 'Your baseline has no normal range yet',
         sub: `A normal range needs ${BAND_FRAMES} usable photos; this one has ${f}. Take a check-in with ${BAND_FRAMES} or more, then make it your baseline from its result.`,
         big: `${f}/${BAND_FRAMES}`,
         bigLabel: 'usable baseline photos',
         prog: Math.min(1, f / BAND_FRAMES),
-        chips: ['Face'],
+        chips: [SITE_SHORT[read.site]],
         cta: { label: 'Check in', onClick: checkIn },
         secondary: read.baseline ? { label: 'See baseline', onClick: () => openResult(read.baseline!) } : undefined,
         aura: 'coral',
@@ -410,10 +422,10 @@ function leadFor({
     }
     case 'gap':
       return {
-        eyebrow: read.lastFace ? `LAST CHECK-IN ${shortDay(read.lastFace.created_at).toUpperCase()}` : undefined,
+        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
         title: 'Welcome back',
         sub: 'Your baseline still holds. One check-in picks up where you left off.',
-        big: read.lastFace ? String(daysSince(read.lastFace.created_at)) : undefined,
+        big: read.last ? String(daysSince(read.last.created_at)) : undefined,
         bigLabel: 'days since your last check-in',
         chips: placeChips,
         cta: { label: 'Check in now', onClick: checkIn },
@@ -421,7 +433,7 @@ function leadFor({
       }
     default:
       return {
-        eyebrow: read.lastFace ? `LAST CHECK-IN ${shortDay(read.lastFace.created_at).toUpperCase()}` : undefined,
+        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
         title: 'Your check-in',
         sub: `${cap(todayLine)}. Same window light as last time keeps results comparable.`,
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
@@ -438,7 +450,7 @@ function doneLead(s: Session, goals: string[], eyebrow: string): Lead {
   if (s.is_baseline) {
     const f = s.baseline_ref?.frames ?? s.result?.frames_used ?? 0
     const band = s.baseline_ref?.has_noise_band ?? f >= BAND_FRAMES
-    return { eyebrow: eyebrow.replace('CHECKED IN', 'BASELINE SET'), title: 'Baseline set', sub: band ? 'Your normal range is ready. The next check-in shows what changed.' : `It has ${plural(f, 'usable photo', 'usable photos')}; a normal range needs ${BAND_FRAMES}.`, big: String(f), bigLabel: f === 1 ? 'usable photo' : 'usable photos', aura: 'violet' }
+    return { eyebrow: eyebrow.replace('Checked in', 'Baseline set'), title: 'Baseline set', sub: band ? 'Your normal range is ready. The next check-in shows what changed.' : `It has ${plural(f, 'usable photo', 'usable photos')}; a normal range needs ${BAND_FRAMES}.`, big: String(f), bigLabel: f === 1 ? 'usable photo' : 'usable photos', aura: 'violet' }
   }
   const { changed, normal, kinds } = splitVerdicts(s, goals)
   const notEnough = [...kinds.values()].filter((k) => k === 'notEnough').length
@@ -459,7 +471,7 @@ function doneLead(s: Session, goals: string[], eyebrow: string): Lead {
   }
 }
 
-function linesFrom(s: Session, face: Session[], goals: string[]): HeroLine[] {
+function linesFrom(s: Session, series: Session[], goals: string[]): HeroLine[] {
   if (s.is_baseline) {
     const f = s.baseline_ref?.frames ?? s.result?.frames_used ?? 0
     if (!(s.baseline_ref?.has_noise_band ?? f >= BAND_FRAMES)) return [{ g: '◐', t: `Your baseline has ${plural(f, 'usable photo', 'usable photos')}; a normal range needs ${BAND_FRAMES}.` }]
@@ -468,7 +480,7 @@ function linesFrom(s: Session, face: Session[], goals: string[]): HeroLine[] {
   const { changed, normal } = splitVerdicts(s, goals)
   const out: HeroLine[] = []
   if (changed.length) {
-    const run = runOf(changed[0].id, face, s)
+    const run = runOf(changed[0].id, series, s)
     const first = CHANGE_WORDS[changeWay(changed[0])]
     out.push({ g: first.glyph, t: `${METRIC_META[changed[0].id].label} ${first.label.toLowerCase()}, beyond your normal range${run >= 2 ? `, ${countWord(run).toLowerCase()} check-ins in a row` : ''}.` })
     // The rest, grouped by the way they moved: what improved first, then (gently) what moved the other way.
@@ -483,7 +495,7 @@ function linesFrom(s: Session, face: Session[], goals: string[]): HeroLine[] {
 }
 
 function heroLinesFor(read: HomeRead, goals: string[], demo: boolean, due: Due | null): HeroLine[] {
-  const fromLead = read.lead ? linesFrom(read.lead, read.face, goals) : []
+  const fromLead = read.lead ? linesFrom(read.lead, read.series, goals) : []
   if (demo) return fromLead.slice(0, 3)
   const t = read.todaySession
   const others = read.lead && t && read.lead.id === t.id ? [] : fromLead
@@ -495,15 +507,18 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean, due: Due |
     case 'rejected':
       return [{ g: '—', t: "Today's photos couldn't be measured." }, ...others, { g: '→', t: 'Another check-in by a window can still count today.' }].slice(0, 3)
     case 'done':
-    case 'unmeasured':
-      return fromLead.slice(0, 3)
+      // The lead card shows what today's check-in found; the hero says it is done and what comes next (no repeat).
+      return [
+        { g: '✓', t: 'Today’s check-in is done.' },
+        { g: '→', t: due && due.kind === 'done' ? `Next one ${fmtDay(due.next)}, by the same window light.` : 'Next time, the same window light keeps results comparable.' },
+      ]
     default:
       break
   }
   const f = read.baselineFrames ?? 0
   if (read.person === 'new')
     return [
-      { g: '1', t: 'Today is for your baseline: face photos by a window.' },
+      { g: '1', t: 'Today is for your baseline: photos by a window.' },
       { g: '2', t: 'From the next check-in on, Willow shows what changed.' },
       { g: '○', t: 'Your skin is only ever compared with itself.' },
     ]
@@ -515,11 +530,8 @@ function heroLinesFor(read: HomeRead, goals: string[], demo: boolean, due: Due |
         : { g: '→', t: `A check-in with ${BAND_FRAMES} or more photos can become your baseline.` },
       { g: '○', t: 'Your skin is only ever compared with itself.' },
     ]
-  if (read.person === 'gap')
-    return [
-      { g: '○', t: 'Welcome back. Your baseline still holds.' },
-      { g: '→', t: 'One check-in today picks the trend back up.' },
-    ]
+  // Back after a gap: the lead card says "Welcome back"; the hero recalls what the last check-in showed.
+  if (read.person === 'gap') return [...(fromLead.length ? fromLead.slice(0, 2) : [{ g: '○', t: 'Your baseline still holds.' }]), { g: '→', t: 'One check-in today picks the trend back up.' }]
   // On a day the schedule doesn't ask for a check-in, say when the next one is.
   const nextLine = due && due.kind === 'upcoming' ? `Next check-in ${fmtDay(due.next)}, by the same window light.` : 'Check in today, by the same window light.'
   return [...fromLead.slice(0, 2), { g: '→', t: nextLine }]
@@ -546,7 +558,7 @@ const WEEKDAY_NAME = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'S
 
 /**
  * This week: shown on the person's weekly day (the first day of their check-in schedule, else the weekday of
- * the face baseline) once they checked in this week.
+ * the baseline) once they checked in this week.
  */
 function weekOf(all: Session[], read: HomeRead, goals: string[], weeklyDay: number | null) {
   if (!read.baseline) return null
@@ -562,13 +574,14 @@ function weekOf(all: Session[], read: HomeRead, goals: string[], weeklyDay: numb
   const fmt = (d: Date, month: boolean) => d.toLocaleDateString('en-GB', month ? { day: 'numeric', month: 'short' } : { day: 'numeric' }).toUpperCase()
   const sameMonth = days[0].getMonth() === days[6].getMonth()
   const range = sameMonth ? `${fmt(days[0], false)}–${fmt(days[6], true)}` : `${fmt(days[0], true)} – ${fmt(days[6], true)}`
-  const faceCount = done.filter((s) => s.site === 'face_full').length
-  const face = latest(done, (s) => s.site === 'face_full' && usable(s) && !s.is_baseline)
-  const sentence = face ? verdictSentence(face, goals) : null
+  const placeCount = done.filter((s) => s.site === read.site).length
+  const lead = latest(done, (s) => s.site === read.site && usable(s) && !s.is_baseline)
+  const sentence = lead ? verdictSentence(lead, goals) : null
+  const where = read.site === 'face_full' ? 'your face' : SITE_SHORT[read.site].toLowerCase()
   return {
     range,
-    // Every place counts here; Progress (where "See progress" goes) shows one place, so say how many were the face.
-    summary: `${countWord(done.length)} check-in${done.length === 1 ? '' : 's'}${faceCount && faceCount < done.length ? `, ${faceCount} of your face` : ''}.${sentence ? ` ${sentence}` : ''}`,
+    // Every place counts here; Progress (where "See progress" goes) shows one place, so say how many were Home's place.
+    summary: `${countWord(done.length)} check-in${done.length === 1 ? '' : 's'}${placeCount && placeCount < done.length ? `, ${placeCount} of ${where}` : ''}.${sentence ? ` ${sentence}` : ''}`,
     days: days.map((_, i) => ({ d: WEEKDAY[i], name: WEEKDAY_NAME[i], on: on.has(keys[i]), today: i === dow })),
   }
 }

@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Columns3, Download } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
-import { downloadCsv, type CsvValue } from './format'
+import { downloadCsv, int, type CsvValue } from './format'
 import { ToolButton } from './Layout'
 
 export type SortDir = 'asc' | 'desc'
@@ -68,6 +68,7 @@ export function DataTable<T>({
   minWidth = 720,
   rowClassName,
   columnsKey,
+  pageSize,
 }: {
   /** Names the table for screen readers (visually hidden). */
   caption: string
@@ -93,6 +94,12 @@ export function DataTable<T>({
   rowClassName?: (row: T) => string
   /** Adds the Columns menu (optional columns), remembered on this browser under this key. */
   columnsKey?: string
+  /**
+   * Long lists (the catalog, 400+ brands): the whole list is sorted, the first `pageSize` rows are drawn, and a
+   * footer offers "Show N more" and "Show all". Export always writes every sorted row. Back to the first page
+   * when the rows or the sort change.
+   */
+  pageSize?: number
 }) {
   const [hidden, setHidden] = useState<Set<string>>(() => readHidden(columnsKey, allColumns))
   const columns = useMemo(() => allColumns.filter((c) => !c.optional || !hidden.has(c.id)), [allColumns, hidden])
@@ -127,6 +134,12 @@ export function DataTable<T>({
       return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * k
     })
   }, [rows, columns, sort])
+
+  const [limit, setLimit] = useState(pageSize ?? Infinity)
+  useEffect(() => {
+    setLimit(pageSize ?? Infinity)
+  }, [rows, sort?.id, sort?.dir, pageSize])
+  const drawn = sorted.length > limit ? sorted.slice(0, limit) : sorted
 
   const toggle = (c: Column<T>) => {
     const first = c.firstDir ?? (c.align === 'right' ? 'desc' : 'asc')
@@ -242,7 +255,7 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              sorted.map((r) => {
+              drawn.map((r) => {
                 const key = rowKey(r)
                 const selected = selectedKey === key
                 return (
@@ -274,6 +287,27 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
+      {pageSize && sorted.length > pageSize ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-5 py-2.5 text-proof-small text-ink-2">
+          <span className="tnum">
+            Showing {int(drawn.length)} of {int(sorted.length)}
+          </span>
+          {drawn.length < sorted.length ? (
+            <span className="ml-auto flex items-center gap-1">
+              <button type="button" onClick={() => setLimit((l) => l + pageSize)} className="hit44 rounded-ctl border-0 bg-transparent px-2 py-1 font-medium text-ink hover:bg-pf-hover">
+                Show {int(Math.min(pageSize, sorted.length - drawn.length))} more
+              </button>
+              <button type="button" onClick={() => setLimit(Infinity)} className="hit44 rounded-ctl border-0 bg-transparent px-2 py-1 text-ink-2 hover:bg-pf-hover hover:text-ink">
+                Show all
+              </button>
+            </span>
+          ) : (
+            <button type="button" onClick={() => setLimit(pageSize)} className="hit44 ml-auto rounded-ctl border-0 bg-transparent px-2 py-1 text-ink-2 hover:bg-pf-hover hover:text-ink">
+              Show fewer
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

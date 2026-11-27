@@ -1,0 +1,1185 @@
+{
+ "version": "2026-11-27",
+ "rules": [
+  {
+   "id": "hydroquinone",
+   "group": "medicine_ingredient",
+   "match": {
+    "inci_any": [
+     "hydroquinone"
+    ]
+   },
+   "when": {
+    "always": true
+   },
+   "level": "avoid",
+   "title": "Lists hydroquinone",
+   "detail": "It lists {hits}. Hydroquinone is prescription-only in the US, and not allowed in cosmetics in the EU or Singapore. Willow never suggests it.",
+   "source": {
+    "label": "FDA: potentially harmful OTC skin lightening products",
+    "url": "https://www.fda.gov/drugs/drug-safety-communications/fda-works-protect-consumers-potentially-harmful-otc-skin-lightening-products"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "mercury",
+   "group": "medicine_ingredient",
+   "match": {
+    "inci_any": [
+     "mercury",
+     "mercurous chloride",
+     "calomel"
+    ]
+   },
+   "when": {
+    "always": true
+   },
+   "level": "avoid",
+   "title": "Lists mercury",
+   "detail": "It lists {hits}. Mercury is not allowed in cosmetics. Stop using it and ask a pharmacist.",
+   "source": {
+    "label": "HSA Singapore: whitening products that contain mercury",
+    "url": "https://www.hsa.gov.sg/announcements/stay-safe-whitening-products-contain-mercury/"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "steroid",
+   "group": "medicine_ingredient",
+   "match": {
+    "inci_any": [
+     "clobetasol",
+     "betamethasone",
+     "mometasone",
+     "fluocinolone",
+     "fluocinonide",
+     "triamcinolone",
+     "dexamethasone",
+     "hydrocortisone",
+     "desonide"
+    ]
+   },
+   "when": {
+    "always": true
+   },
+   "level": "avoid",
+   "title": "Lists a medicine, not a cosmetic ingredient",
+   "detail": "It lists {hits}, a steroid medicine. Steroids are not allowed in cosmetics; use one only as your doctor directs.",
+   "source": {
+    "label": "EU Cosmetics Regulation 1223/2009, Annex II (prohibited substances)",
+    "url": "https://eur-lex.europa.eu/eli/reg/2009/1223/oj"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "rx_retinoid",
+   "group": "medicine_ingredient",
+   "match": {
+    "inci_any": [
+     "tretinoin",
+     "retinoic acid",
+     "tazarotene",
+     "trifarotene",
+     "isotretinoin"
+    ]
+   },
+   "when": {
+    "always": true
+   },
+   "level": "avoid",
+   "title": "Lists a doctor-only retinoid",
+   "detail": "It lists {hits}, a retinoid sold only on prescription. Use it only as your doctor directs; Willow never suggests it.",
+   "source": {
+    "label": "EU Cosmetics Regulation 1223/2009, Annex II (prohibited substances)",
+    "url": "https://eur-lex.europa.eu/eli/reg/2009/1223/oj"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "antibiotic",
+   "group": "medicine_ingredient",
+   "match": {
+    "inci_any": [
+     "clindamycin",
+     "erythromycin",
+     "nadifloxacin",
+     "fusidic acid",
+     "mupirocin"
+    ]
+   },
+   "when": {
+    "always": true
+   },
+   "level": "avoid",
+   "title": "Lists a medicine, not a cosmetic ingredient",
+   "detail": "It lists {hits}, a medicine, not a cosmetic ingredient. Use it only as your doctor directs.",
+   "source": {
+    "label": "UK MHRA: borderline products, how to tell if a product is a medicine",
+    "url": "https://www.gov.uk/guidance/borderline-products-how-to-tell-if-your-product-is-a-medicine"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "mi_leave_on",
+   "group": "mi_leave_on",
+   "match": {
+    "inci_any": [
+     "methylisothiazolinone",
+     "methylchloroisothiazolinone",
+     "benzisothiazolinone",
+     "octylisothiazolinone"
+    ],
+    "category_not": [
+     "cleanser"
+    ]
+   },
+   "when": {
+    "always": true
+   },
+   "level": "check",
+   "title": "Lists a restricted preservative",
+   "detail": "It lists {hits}. The EU no longer allows methylisothiazolinone in leave-on products, after many allergy reports.",
+   "source": {
+    "label": "EU Regulation 2016/1198: methylisothiazolinone not allowed in leave-on cosmetics",
+    "url": "https://eur-lex.europa.eu/eli/reg/2016/1198/oj"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "retinoid_pregnant",
+   "group": "retinoid_life_stage",
+   "match": {
+    "inci_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "pregnant"
+    ]
+   },
+   "level": "avoid",
+   "title": "Retinoid: usually paused while pregnant",
+   "detail": "It lists {hits}. Retinoids are usually paused while pregnant, as a precaution; there are no studies that settle it. Ask your doctor or midwife.",
+   "source": {
+    "label": "American Academy of Dermatology: skin treatments during pregnancy",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/pregnancy"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_retinoid_pregnant",
+   "group": "retinoid_life_stage",
+   "match": {
+    "inci_any": [
+     "adapalene",
+     "tretinoin",
+     "retinoic acid",
+     "tazarotene",
+     "trifarotene",
+     "isotretinoin"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "pregnant"
+    ]
+   },
+   "level": "avoid",
+   "title": "Doctor-only retinoid: not used while pregnant",
+   "detail": "It lists {hits}. Doctors advise against this retinoid while pregnant. Ask your doctor before using it.",
+   "source": {
+    "label": "ACOG: skin conditions during pregnancy (patient FAQ)",
+    "url": "https://www.acog.org/womens-health/faqs/skin-conditions-during-pregnancy"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "hydroquinone_pregnant",
+   "group": "hydroquinone_life_stage",
+   "match": {
+    "inci_any": [
+     "hydroquinone"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "pregnant"
+    ]
+   },
+   "level": "avoid",
+   "title": "Hydroquinone: not advised while pregnant",
+   "detail": "It lists {hits}. A large share of hydroquinone is absorbed through the skin, so doctors advise keeping exposure low while pregnant.",
+   "source": {
+    "label": "Bozzo et al., Canadian Family Physician 2011: skin products in pregnancy",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3114665"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "retinoid_trying",
+   "group": "retinoid_life_stage",
+   "match": {
+    "inci_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "trying"
+    ]
+   },
+   "level": "avoid",
+   "title": "Retinoid: usually paused while trying for a baby",
+   "detail": "It lists {hits}. Retinoids are usually paused while trying for a baby, as a precaution; there are no studies that settle it. Ask your doctor or midwife.",
+   "source": {
+    "label": "KK Women's and Children's Hospital, Singapore: topical retinoids",
+    "url": "https://www.kkh.com.sg/medicine/topical-retinoid"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_retinoid_trying",
+   "group": "retinoid_life_stage",
+   "match": {
+    "inci_any": [
+     "adapalene",
+     "tretinoin",
+     "retinoic acid",
+     "tazarotene",
+     "trifarotene",
+     "isotretinoin"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "trying"
+    ]
+   },
+   "level": "avoid",
+   "title": "Doctor-only retinoid: not used while trying for a baby",
+   "detail": "It lists {hits}. Doctors advise against this retinoid while trying for a baby. Ask your doctor before using it.",
+   "source": {
+    "label": "KK Women's and Children's Hospital, Singapore: topical retinoids",
+    "url": "https://www.kkh.com.sg/medicine/topical-retinoid"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "hydroquinone_trying",
+   "group": "hydroquinone_life_stage",
+   "match": {
+    "inci_any": [
+     "hydroquinone"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "trying"
+    ]
+   },
+   "level": "avoid",
+   "title": "Hydroquinone: not advised while trying for a baby",
+   "detail": "It lists {hits}. A large share of hydroquinone is absorbed through the skin, so doctors advise keeping exposure low while trying for a baby.",
+   "source": {
+    "label": "Bozzo et al., Canadian Family Physician 2011: skin products in pregnancy",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3114665"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "retinoid_breastfeeding",
+   "group": "retinoid_life_stage",
+   "match": {
+    "inci_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "breastfeeding"
+    ]
+   },
+   "level": "avoid",
+   "title": "Retinoid: usually paused while breastfeeding",
+   "detail": "It lists {hits}. Retinoids are usually paused while breastfeeding, as a precaution; there are no studies that settle it. Ask your doctor or midwife.",
+   "source": {
+    "label": "KK Women's and Children's Hospital, Singapore: topical retinoids",
+    "url": "https://www.kkh.com.sg/medicine/topical-retinoid"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "rx_retinoid_breastfeeding",
+   "group": "retinoid_life_stage",
+   "match": {
+    "inci_any": [
+     "adapalene",
+     "tretinoin",
+     "retinoic acid",
+     "tazarotene",
+     "trifarotene",
+     "isotretinoin"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "breastfeeding"
+    ]
+   },
+   "level": "avoid",
+   "title": "Doctor-only retinoid: not used while breastfeeding",
+   "detail": "It lists {hits}. Doctors advise against this retinoid while breastfeeding. Ask your doctor before using it.",
+   "source": {
+    "label": "KK Women's and Children's Hospital, Singapore: topical retinoids",
+    "url": "https://www.kkh.com.sg/medicine/topical-retinoid"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "hydroquinone_breastfeeding",
+   "group": "hydroquinone_life_stage",
+   "match": {
+    "inci_any": [
+     "hydroquinone"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "breastfeeding"
+    ]
+   },
+   "level": "avoid",
+   "title": "Hydroquinone: not advised while breastfeeding",
+   "detail": "It lists {hits}. A large share of hydroquinone is absorbed through the skin, so doctors advise keeping exposure low while breastfeeding.",
+   "source": {
+    "label": "Bozzo et al., Canadian Family Physician 2011: skin products in pregnancy",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3114665"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "salicylic_leave_on_pregnant",
+   "group": "salicylic_life_stage",
+   "match": {
+    "actives_any": [
+     "salicylic acid",
+     "betaine salicylate"
+    ],
+    "pct_min": 2,
+    "category_not": [
+     "cleanser"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "pregnant"
+    ]
+   },
+   "level": "check",
+   "title": "Salicylic acid left on the skin",
+   "detail": "It lists {hits} and stays on the skin. Small amounts for a short time are generally considered fine in pregnancy; larger areas or peels are not. Ask your doctor or midwife.",
+   "source": {
+    "label": "Bozzo et al., Canadian Family Physician 2011: skin products in pregnancy",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3114665"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "salicylic_peel_pregnant",
+   "group": "salicylic_life_stage",
+   "match": {
+    "inci_any": [
+     "salicylic acid",
+     "betaine salicylate"
+    ],
+    "inci_depth": 12,
+    "category": [
+     "exfoliant",
+     "mask"
+    ]
+   },
+   "when": {
+    "life_stage_in": [
+     "pregnant"
+    ]
+   },
+   "level": "check",
+   "title": "Salicylic acid exfoliant",
+   "detail": "It lists {hits} in an exfoliant. Peels and products left on large areas are the ones doctors ask you to check in pregnancy.",
+   "source": {
+    "label": "American Academy of Dermatology: skin treatments during pregnancy",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/pregnancy"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "fragrance_reactive",
+   "group": "fragrance",
+   "match": {
+    "inci_regex": [
+     "\\b(parfum|fragrance|perfume|aroma)\\b"
+    ],
+    "inci_any": [
+     "amyl cinnamal",
+     "amylcinnamyl alcohol",
+     "anise alcohol",
+     "benzyl benzoate",
+     "benzyl cinnamate",
+     "benzyl salicylate",
+     "cinnamal",
+     "cinnamyl alcohol",
+     "citral",
+     "citronellol",
+     "coumarin",
+     "eugenol",
+     "farnesol",
+     "geraniol",
+     "hexyl cinnamal",
+     "hydroxycitronellal",
+     "hydroxyisohexyl 3-cyclohexene carboxaldehyde",
+     "isoeugenol",
+     "butylphenyl methylpropional",
+     "limonene",
+     "linalool",
+     "methyl 2-octynoate",
+     "alpha-isomethyl ionone",
+     "evernia prunastri",
+     "evernia furfuracea"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Lists fragrance",
+   "detail": "Your skin reacts easily, and it lists {hits}. Fragrance is a common cause of skin reactions. A fragrance-free option is gentler.",
+   "source": {
+    "label": "EU Cosmetics Regulation Annex III: fragrance allergens labelling (European Commission)",
+    "url": "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "essential_oils_reactive",
+   "group": "essential_oils",
+   "match": {
+    "inci_regex": [
+     "\\b(lavandula|rosmarinus|mentha|eucalyptus|melaleuca|citrus|cananga|pelargonium|santalum|cymbopogon|rosa damascena|rosa centifolia|jasminum|salvia sclarea|cinnamomum|eugenia caryophyllus|boswellia|cedrus|pogostemon|juniperus|anthemis|chamomilla|matricaria|thymus|origanum|litsea|ocimum|vetiveria|lavender|rosemary|peppermint|tea tree|orange|lemon|lime|bergamot|grapefruit|mandarin|neroli|petitgrain|geranium|ylang|sandalwood|lemongrass|jasmine|clove|frankincense|cedarwood|patchouli|chamomile)\\b.*\\boils?\\b"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Lists essential oils",
+   "detail": "Your skin reacts easily, and it lists {hits}. Essential oils carry fragrance compounds that often sting skin like yours.",
+   "source": {
+    "label": "National Rosacea Society patient survey (self-reported, weak evidence)",
+    "url": "https://www.rosacea.org/rosacea-review/1997/summer/survey-shows-skin-care-products-ingredients-may-aggravate-rosacea"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "drying_alcohol_reactive",
+   "group": "drying_alcohol",
+   "match": {
+    "inci_regex": [
+     "^(sd )?alcohol( denat\\.?)?$",
+     "^denatured alcohol$",
+     "^ethanol$",
+     "^isopropyl alcohol$",
+     "^sd alcohol \\S+$"
+    ],
+    "inci_depth": 6
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Drying alcohol near the top of the list",
+   "detail": "Your skin reacts easily, and it lists {hits}. Alcohol high in the list is the ingredient people with reactive skin most often blame for stinging.",
+   "source": {
+    "label": "National Rosacea Society patient survey (self-reported, weak evidence)",
+    "url": "https://www.rosacea.org/rosacea-review/1997/summer/survey-shows-skin-care-products-ingredients-may-aggravate-rosacea"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "cooling_reactive",
+   "group": "cooling_agents",
+   "match": {
+    "inci_any": [
+     "menthol",
+     "menthyl lactate",
+     "camphor",
+     "mentha piperita",
+     "peppermint"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Lists a cooling agent",
+   "detail": "Your skin reacts easily, and it lists {hits}. Menthol, camphor and peppermint feel cool but often sting skin that reacts easily.",
+   "source": {
+    "label": "National Rosacea Society patient survey (self-reported, weak evidence)",
+    "url": "https://www.rosacea.org/rosacea-review/1997/summer/survey-shows-skin-care-products-ingredients-may-aggravate-rosacea"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "witch_hazel_reactive",
+   "group": "witch_hazel",
+   "match": {
+    "inci_any": [
+     "hamamelis virginiana",
+     "witch hazel"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Lists witch hazel",
+   "detail": "Your skin reacts easily, and it lists {hits}. Witch hazel is often named by people whose skin stings or flushes easily.",
+   "source": {
+    "label": "National Rosacea Society patient survey (self-reported, weak evidence)",
+    "url": "https://www.rosacea.org/rosacea-review/1997/summer/survey-shows-skin-care-products-ingredients-may-aggravate-rosacea"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "bpo_reactive",
+   "group": "bpo_reactive",
+   "match": {
+    "inci_any": [
+     "benzoyl peroxide"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Benzoyl peroxide dries and stings at first",
+   "detail": "Your skin reacts easily, and it lists {hits}. Dryness, peeling and stinging are common with benzoyl peroxide; its US drug label warns of them.",
+   "source": {
+    "label": "FDA: OTC drug products with benzoyl peroxide or salicylic acid (rulemaking history)",
+    "url": "https://www.fda.gov/drugs/historical-status-otc-rulemakings/rulemaking-history-otc-acne-drug-products"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "retinoid_reactive",
+   "group": "retinoid_reactive",
+   "match": {
+    "inci_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ],
+    "inci_depth": 12
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Retinoids often irritate at first",
+   "detail": "Your skin reacts easily, and it lists {hits}. Redness, peeling and dryness are expected in the first weeks of a retinoid, more so on skin like yours.",
+   "source": {
+    "label": "DermNet: topical retinoids",
+    "url": "https://dermnetnz.org/topics/topical-retinoids"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "aha_reactive",
+   "group": "acid_reactive",
+   "match": {
+    "inci_any": [
+     "glycolic acid",
+     "lactic acid",
+     "mandelic acid"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "glycolic acid",
+     "lactic acid",
+     "mandelic acid"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Exfoliating acid (AHA)",
+   "detail": "Your skin reacts easily, and it lists {hits}. AHAs can sting, redden and make skin more sensitive to the sun.",
+   "source": {
+    "label": "FDA: alpha hydroxy acids in cosmetics",
+    "url": "https://www.fda.gov/cosmetics/cosmetic-ingredients/alpha-hydroxy-acids"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "bha_reactive",
+   "group": "acid_reactive",
+   "match": {
+    "inci_any": [
+     "salicylic acid",
+     "betaine salicylate"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "salicylic acid",
+     "betaine salicylate"
+    ],
+    "category_not": [
+     "cleanser"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Exfoliating acid (BHA) left on the skin",
+   "detail": "Your skin reacts easily, and it lists {hits}. Salicylic acid left on the skin can dry and sting.",
+   "source": {
+    "label": "FDA: OTC drug products with benzoyl peroxide or salicylic acid (rulemaking history)",
+    "url": "https://www.fda.gov/drugs/historical-status-otc-rulemakings/rulemaking-history-otc-acne-drug-products"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "azelaic_reactive",
+   "group": "azelaic_reactive",
+   "match": {
+    "inci_any": [
+     "azelaic acid"
+    ],
+    "actives_any": [
+     "azelaic acid"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Azelaic acid often tingles at first",
+   "detail": "Your skin reacts easily, and it lists {hits}. A tingling or burning feeling is common in the first weeks of azelaic acid.",
+   "source": {
+    "label": "DermNet: azelaic acid",
+    "url": "https://dermnetnz.org/topics/azelaic-acid"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "scrub_reactive",
+   "group": "scrub",
+   "match": {
+    "inci_regex": [
+     "\\b(shell|seed|kernel|pit|stone) powder\\b",
+     "\\bpumice\\b"
+    ]
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Gritty scrub",
+   "detail": "Your skin reacts easily, and it lists {hits}. Gritty scrubs rub skin that reacts easily; a gentle cleanser is the usual advice.",
+   "source": {
+    "label": "American Academy of Dermatology: how to exfoliate at home",
+    "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/routine/safely-exfoliate-at-home"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "retinoid_acid_stack_reactive",
+   "group": "stack_reactive",
+   "match": {
+    "all_groups": [
+     [
+      "retinol",
+      "retinal",
+      "retinaldehyde",
+      "retinyl palmitate",
+      "retinyl acetate",
+      "retinyl propionate",
+      "retinyl linoleate",
+      "retinyl retinoate",
+      "hydroxypinacolone retinoate"
+     ],
+     [
+      "glycolic acid",
+      "lactic acid",
+      "mandelic acid",
+      "salicylic acid",
+      "betaine salicylate"
+     ]
+    ],
+    "inci_depth": 12
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "A retinoid and an acid in one product",
+   "detail": "Your skin reacts easily, and it lists {hits}. A retinoid and an exfoliating acid together is a lot for skin like yours to start with.",
+   "source": {
+    "label": "DermNet: topical retinoids",
+    "url": "https://dermnetnz.org/topics/topical-retinoids"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "acid_stack_reactive",
+   "group": "stack_reactive",
+   "match": {
+    "all_groups": [
+     [
+      "glycolic acid",
+      "lactic acid",
+      "mandelic acid"
+     ],
+     [
+      "salicylic acid",
+      "betaine salicylate"
+     ]
+    ],
+    "inci_depth": 12
+   },
+   "when": {
+    "reactive": true
+   },
+   "level": "check",
+   "title": "Two exfoliating acids in one product",
+   "detail": "Your skin reacts easily, and it lists {hits}. Two exfoliating acids together can over-exfoliate skin that reacts easily.",
+   "source": {
+    "label": "American Academy of Dermatology: how to exfoliate at home",
+    "url": "https://www.aad.org/public/everyday-care/skin-care-secrets/routine/safely-exfoliate-at-home"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "rx_with_retinoid",
+   "group": "rx_treatment",
+   "match": {
+    "inci_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ]
+   },
+   "when": {
+    "rx_treatment": true
+   },
+   "level": "check",
+   "title": "Ask your doctor first",
+   "detail": "You use a skin medicine from a doctor, and this lists {hits}. Ask them before adding another retinoid.",
+   "source": {
+    "label": "American Academy of Dermatology: isotretinoin FAQs (skin care while on a prescription retinoid)",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin/faqs"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_with_aha",
+   "group": "rx_treatment",
+   "match": {
+    "inci_any": [
+     "glycolic acid",
+     "lactic acid",
+     "mandelic acid"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "glycolic acid",
+     "lactic acid",
+     "mandelic acid"
+    ]
+   },
+   "when": {
+    "rx_treatment": true
+   },
+   "level": "check",
+   "title": "Ask your doctor first",
+   "detail": "You use a skin medicine from a doctor, and this lists {hits}. Ask them before adding an exfoliating acid.",
+   "source": {
+    "label": "American Academy of Dermatology: isotretinoin FAQs (skin care while on a prescription retinoid)",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin/faqs"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_with_bha",
+   "group": "rx_treatment",
+   "match": {
+    "inci_any": [
+     "salicylic acid",
+     "betaine salicylate"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "salicylic acid",
+     "betaine salicylate"
+    ]
+   },
+   "when": {
+    "rx_treatment": true
+   },
+   "level": "check",
+   "title": "Ask your doctor first",
+   "detail": "You use a skin medicine from a doctor, and this lists {hits}. Ask them before adding an exfoliating acid.",
+   "source": {
+    "label": "American Academy of Dermatology: isotretinoin FAQs (skin care while on a prescription retinoid)",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin/faqs"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_with_pha",
+   "group": "rx_treatment",
+   "match": {
+    "inci_any": [
+     "gluconolactone",
+     "lactobionic acid"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "gluconolactone",
+     "lactobionic acid"
+    ]
+   },
+   "when": {
+    "rx_treatment": true
+   },
+   "level": "check",
+   "title": "Ask your doctor first",
+   "detail": "You use a skin medicine from a doctor, and this lists {hits}. Ask them before adding an exfoliating acid.",
+   "source": {
+    "label": "American Academy of Dermatology: isotretinoin FAQs (skin care while on a prescription retinoid)",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin/faqs"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_with_bpo",
+   "group": "rx_treatment",
+   "match": {
+    "inci_any": [
+     "benzoyl peroxide"
+    ],
+    "inci_depth": 12,
+    "actives_any": [
+     "benzoyl peroxide"
+    ]
+   },
+   "when": {
+    "rx_treatment": true
+   },
+   "level": "check",
+   "title": "Ask your doctor first",
+   "detail": "You use a skin medicine from a doctor, and this lists {hits}. Ask them before adding benzoyl peroxide.",
+   "source": {
+    "label": "American Academy of Dermatology: isotretinoin FAQs (skin care while on a prescription retinoid)",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin/faqs"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "rx_with_scrub",
+   "group": "rx_treatment",
+   "match": {
+    "inci_regex": [
+     "\\b(shell|seed|kernel|pit|stone) powder\\b",
+     "\\bpumice\\b"
+    ]
+   },
+   "when": {
+    "rx_treatment": true
+   },
+   "level": "check",
+   "title": "Ask your doctor first",
+   "detail": "You use a skin medicine from a doctor, and this lists {hits}. Ask them before adding a scrub. Skin on a doctor's skin medicine is usually more fragile.",
+   "source": {
+    "label": "American Academy of Dermatology: isotretinoin FAQs (skin care while on a prescription retinoid)",
+    "url": "https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin/faqs"
+   },
+   "grade": "B"
+  },
+  {
+   "id": "avoid_fragrance",
+   "group": "fragrance",
+   "match": {
+    "inci_regex": [
+     "\\b(parfum|fragrance|perfume|aroma)\\b"
+    ],
+    "inci_any": [
+     "amyl cinnamal",
+     "amylcinnamyl alcohol",
+     "anise alcohol",
+     "benzyl benzoate",
+     "benzyl cinnamate",
+     "benzyl salicylate",
+     "cinnamal",
+     "cinnamyl alcohol",
+     "citral",
+     "citronellol",
+     "coumarin",
+     "eugenol",
+     "farnesol",
+     "geraniol",
+     "hexyl cinnamal",
+     "hydroxycitronellal",
+     "hydroxyisohexyl 3-cyclohexene carboxaldehyde",
+     "isoeugenol",
+     "butylphenyl methylpropional",
+     "limonene",
+     "linalool",
+     "methyl 2-octynoate",
+     "alpha-isomethyl ionone",
+     "evernia prunastri",
+     "evernia furfuracea"
+    ]
+   },
+   "when": {
+    "avoid_has": "fragrance"
+   },
+   "level": "avoid",
+   "title": "Lists fragrance",
+   "detail": "You said you avoid fragrance. It lists {hits}.",
+   "source": {
+    "label": "EU Cosmetics Regulation Annex III: fragrance allergens labelling (European Commission)",
+    "url": "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "avoid_essential_oils",
+   "group": "essential_oils",
+   "match": {
+    "inci_regex": [
+     "\\b(lavandula|rosmarinus|mentha|eucalyptus|melaleuca|citrus|cananga|pelargonium|santalum|cymbopogon|rosa damascena|rosa centifolia|jasminum|salvia sclarea|cinnamomum|eugenia caryophyllus|boswellia|cedrus|pogostemon|juniperus|anthemis|chamomilla|matricaria|thymus|origanum|litsea|ocimum|vetiveria|lavender|rosemary|peppermint|tea tree|orange|lemon|lime|bergamot|grapefruit|mandarin|neroli|petitgrain|geranium|ylang|sandalwood|lemongrass|jasmine|clove|frankincense|cedarwood|patchouli|chamomile)\\b.*\\boils?\\b"
+    ]
+   },
+   "when": {
+    "avoid_has": "essential_oils"
+   },
+   "level": "avoid",
+   "title": "Lists essential oils",
+   "detail": "You said you avoid essential oils. It lists {hits}.",
+   "source": {
+    "label": "EU CosIng ingredient database (ingredient names)",
+    "url": "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-ingredient-database_en"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "avoid_drying_alcohol",
+   "group": "drying_alcohol",
+   "match": {
+    "inci_regex": [
+     "^(sd )?alcohol( denat\\.?)?$",
+     "^denatured alcohol$",
+     "^ethanol$",
+     "^isopropyl alcohol$",
+     "^sd alcohol \\S+$"
+    ]
+   },
+   "when": {
+    "avoid_has": "drying_alcohol"
+   },
+   "level": "avoid",
+   "title": "Lists drying alcohol",
+   "detail": "You said you avoid drying alcohol. It lists {hits}.",
+   "source": {
+    "label": "EU CosIng ingredient database (ingredient names)",
+    "url": "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-ingredient-database_en"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "avoid_lanolin",
+   "group": "lanolin",
+   "match": {
+    "inci_any": [
+     "lanolin",
+     "adeps lanae"
+    ]
+   },
+   "when": {
+    "avoid_has": "lanolin"
+   },
+   "level": "avoid",
+   "title": "Lists lanolin",
+   "detail": "You said you avoid lanolin. It lists {hits}.",
+   "source": {
+    "label": "EU CosIng ingredient database (ingredient names)",
+    "url": "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-ingredient-database_en"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "avoid_nut_oils",
+   "group": "nut_oils",
+   "match": {
+    "inci_any": [
+     "sweet almond oil",
+     "almond oil",
+     "prunus amygdalus dulcis",
+     "macadamia",
+     "brazil nut",
+     "bertholletia excelsa",
+     "argania spinosa",
+     "argan",
+     "juglans regia",
+     "walnut",
+     "corylus avellana",
+     "hazelnut",
+     "anacardium occidentale",
+     "cashew",
+     "pistacia vera",
+     "pistachio",
+     "carya illinoinensis",
+     "pecan",
+     "aleurites moluccanus",
+     "kukui"
+    ]
+   },
+   "when": {
+    "avoid_has": "nut_oils"
+   },
+   "level": "avoid",
+   "title": "Lists nut oils",
+   "detail": "You said you avoid nut oils. It lists {hits}.",
+   "source": {
+    "label": "EU CosIng ingredient database (ingredient names)",
+    "url": "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-ingredient-database_en"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "avoid_mi_preservatives",
+   "group": "mi_preservatives",
+   "match": {
+    "inci_any": [
+     "methylisothiazolinone",
+     "methylchloroisothiazolinone",
+     "benzisothiazolinone",
+     "octylisothiazolinone"
+    ]
+   },
+   "when": {
+    "avoid_has": "mi_preservatives"
+   },
+   "level": "avoid",
+   "title": "Lists MI preservatives",
+   "detail": "You said you avoid MI preservatives. It lists {hits}.",
+   "source": {
+    "label": "EU Regulation 2016/1198: methylisothiazolinone not allowed in leave-on cosmetics",
+    "url": "https://eur-lex.europa.eu/eli/reg/2016/1198/oj"
+   },
+   "grade": "A"
+  },
+  {
+   "id": "retinoid_under_18",
+   "group": "under_18",
+   "match": {
+    "inci_any": [
+     "retinol",
+     "retinal",
+     "retinaldehyde",
+     "retinyl palmitate",
+     "retinyl acetate",
+     "retinyl propionate",
+     "retinyl linoleate",
+     "retinyl retinoate",
+     "hydroxypinacolone retinoate"
+    ],
+    "inci_depth": 12
+   },
+   "when": {
+    "adult": false
+   },
+   "level": "check",
+   "title": "Made for adult skin",
+   "detail": "It lists {hits}. Retinoids are anti-ageing actives; under 18, ask a parent or pharmacist first.",
+   "source": {
+    "label": "Northwestern University on Hales et al., Pediatrics 2025: teen skincare routines",
+    "url": "https://news.northwestern.edu/stories/2025/06/tiktok-teen-skin-care-routines-are-harmful"
+   },
+   "grade": "C"
+  },
+  {
+   "id": "aha_under_18",
+   "group": "under_18",
+   "match": {
+    "actives_any": [
+     "glycolic acid",
+     "lactic acid",
+     "mandelic acid"
+    ]
+   },
+   "when": {
+    "adult": false
+   },
+   "level": "check",
+   "title": "Strong exfoliating acid",
+   "detail": "It lists {hits}. Under 18, a gentle cleanser, moisturiser and sunscreen usually do more than strong acids; ask a parent or pharmacist first.",
+   "source": {
+    "label": "Northwestern University on Hales et al., Pediatrics 2025: teen skincare routines",
+    "url": "https://news.northwestern.edu/stories/2025/06/tiktok-teen-skin-care-routines-are-harmful"
+   },
+   "grade": "C"
+  }
+ ]
+}

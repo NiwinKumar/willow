@@ -1,7 +1,10 @@
+import { useNavigate } from 'react-router-dom'
+
 import { ProductImage } from '../../components/willow/ProductImage'
 import type { RoutineEntry } from '../../data/types'
 import { imageOf } from '../routine/routineModel'
 import { dayNote, restsOn } from '../routine/schedule'
+import { isSample } from '../routine/actives'
 import { orbColours, shortName } from './derive'
 import { HomeCard } from './cards'
 import { Pill } from './parts'
@@ -10,7 +13,7 @@ type Slot = 'am' | 'pm'
 
 const PANEL: Record<Slot, { name: string; bg: string; fg: string; line: string; ring: string; badgeRing: string }> = {
   am: {
-    name: 'MORNING',
+    name: 'Morning',
     bg: 'radial-gradient(90% 100% at 50% 0%, #FFF3A8 0%, transparent 62%), radial-gradient(80% 90% at 100% 100%, #FFD9C2 0%, transparent 70%), #F6F3EC',
     fg: 'text-ink',
     line: 'rgba(18,18,18,.14)',
@@ -18,7 +21,7 @@ const PANEL: Record<Slot, { name: string; bg: string; fg: string; line: string; 
     badgeRing: '#F6F3EC',
   },
   pm: {
-    name: 'EVENING',
+    name: 'Evening',
     bg: 'radial-gradient(90% 100% at 50% 0%, #4A3FB0 0%, transparent 65%), radial-gradient(70% 80% at 0% 100%, rgba(242,95,168,.45) 0%, transparent 70%), #17143D',
     fg: 'text-inverse',
     line: 'rgba(255,255,255,.2)',
@@ -55,6 +58,9 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   onRoutine: () => void
   className?: string
 }) {
+  const navigate = useNavigate()
+  // The guest starter routine (api demo.py marks it): say so, and offer a real one.
+  const sample = [...am, ...pm].some(isSample)
   return (
     <HomeCard label="Routine today" className={`gap-3 p-4 ${className ?? ''}`} delay={160}>
       {/* Title and hint on the left; the routine check's first finding as quiet text in the right corner. */}
@@ -70,6 +76,15 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           </button>
         ) : null}
       </div>
+      {sample ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[18px] bg-[var(--synthetic-bg)] px-3.5 py-2 text-[12.5px] text-[var(--synthetic-fg)]" style={{ animation: 'wRise .5s .2s both' }}>
+          <span className="font-medium">Sample routine</span>
+          <span className="flex-1">Set up to show the routine check, not picked for your skin.</span>
+          <button type="button" onClick={() => navigate('/plan')} className="hit44 min-h-8 rounded-pill bg-selected px-3 text-[12.5px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
+            Build me a routine
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-1 flex-wrap gap-2.5">
         {(['am', 'pm'] as const).map((slot) => {
           const list = slot === 'am' ? am : pm
@@ -81,7 +96,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           return (
             <div key={slot} className={`relative flex min-w-0 flex-[1_1_250px] flex-col gap-2.5 overflow-hidden rounded-[24px] squircle px-3.5 pt-3.5 pb-3 ${p.fg}`} style={{ background: p.bg }}>
               <div className="flex items-baseline justify-between">
-                <span className="font-mono text-[10.5px] tracking-[.08em]">■ {p.name}</span>
+                <span className="text-[13px] font-medium">{p.name}</span>
                 <span className="font-dot text-[17px]" aria-label={`${ticked} of ${due} used today`}>
                   {ticked}/{due}
                 </span>
@@ -102,7 +117,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                         +
                       </span>
                       <span className="text-center text-[11px] leading-[1.2]">Sunscreen</span>
-                      <span className="font-mono text-[9.5px] tracking-[.05em] opacity-75">MISSING</span>
+                      <span className="text-[10.5px] leading-none opacity-75">Missing</span>
                     </button>
                   ) : null}
                 </div>
@@ -166,17 +181,36 @@ function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry:
   )
 }
 
-/** No products yet (or demo): the design's "Add your routine" card. */
-export function RoutineEmpty({ demo, onRoutine, className }: { demo?: boolean; onRoutine: () => void; className?: string }) {
+/**
+ * No products yet: the design's "Add your routine" card. Above the words, a faint preview of what will be here
+ * (three empty product rings on the morning line, as Routine today draws them), so the empty card says what it
+ * becomes instead of standing blank.
+ * Four tests: it shows the shape of the tracker before it exists (1); dashed rings read as "empty slots" (2); it
+ * is behind nothing and takes no clicks (3); the same rings, line and type as the filled card (4).
+ */
+export function RoutineEmpty({ onRoutine, className }: { onRoutine: () => void; className?: string }) {
+  const navigate = useNavigate()
   return (
-    <HomeCard label="Routine" className={`flex-row flex-wrap items-center justify-between gap-3 ${className ?? ''}`} delay={160}>
-      <div className="flex max-w-[380px] flex-col gap-1">
-        <h2 className="m-0 text-h3 font-normal">{demo ? 'Routine' : 'Add your routine'}</h2>
-        <span className="text-[13px] leading-[1.45] text-ink-2">
-          {demo ? 'The demo journey has no routine to tick. Routines, ticks and the routine check are available in your own account.' : 'Search the catalog for what you use. Willow marks each start date on your progress.'}
-        </span>
+    <HomeCard label="Routine" className={`justify-between gap-5 ${className ?? ''}`} delay={160}>
+      <div aria-hidden className="relative mx-auto grid w-full max-w-[300px] flex-1 grid-cols-3 place-items-center content-center gap-y-2 pt-2">
+        <span className="absolute top-[calc(50%-11px)] right-[16.6%] left-[16.6%] h-[1.5px] bg-[repeating-linear-gradient(90deg,rgba(18,18,18,.18)_0_4px,transparent_4px_8px)]" />
+        {['Cleanse', 'Treat', 'Protect'].map((t, i) => (
+          <span key={t} className="relative flex animate-[wRise_.5s_both] flex-col items-center gap-1.5" style={{ animationDelay: `${260 + i * 70}ms` }}>
+            <span className="grid size-11 place-items-center rounded-full border-[1.5px] border-dashed border-ink/25 bg-surface text-[15px] text-ink/35">+</span>
+            <span className="text-[11.5px] text-ink-2">{t}</span>
+          </span>
+        ))}
       </div>
-      {demo ? null : <Pill onClick={onRoutine}>Add a product</Pill>}
+      <div className="flex max-w-[380px] flex-col gap-1">
+        <h2 className="m-0 text-h3 font-normal">Add your routine</h2>
+        <span className="text-[13px] leading-[1.45] text-ink-2">Add what you use, or let Willow build a three-step routine around your skin and budget, every product checked for you.</span>
+      </div>
+      <span className="flex flex-wrap gap-2">
+        <Pill onClick={() => navigate('/plan')}>Build me a routine</Pill>
+        <button type="button" onClick={onRoutine} className="min-h-11 rounded-pill px-3 text-[14px] text-ink-2 underline underline-offset-4 transition-colors hover:text-ink">
+          Add a product
+        </button>
+      </span>
     </HomeCard>
   )
 }

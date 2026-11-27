@@ -2,13 +2,17 @@ import os
 
 os.environ.setdefault("AUTH_MODE", "dev")
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
+# Tests never reach the real Firestore, even one that forgets the `fake` fixture.
+os.environ["DEV_STORE"] = "memory"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import storage  # noqa: E402
+from app import dev_seed, storage  # noqa: E402
 from app.main import app  # noqa: E402
 from app.store import MemoryStore, get_store  # noqa: E402
+
+SEED_SAMPLES = dev_seed.seed_demo_campaigns
 
 
 class FakeCloud:
@@ -54,6 +58,51 @@ def no_real_gemini(monkeypatch: pytest.MonkeyPatch):
     from app import autopilot_agent
 
     monkeypatch.setattr(autopilot_agent, "model_round", offline)
+
+
+@pytest.fixture(autouse=True)
+def small_cohort(monkeypatch: pytest.MonkeyPatch):
+    """The synthetic cohort in tests: 2,000 people over the first 48 cohort products (the full
+    one, app/cohort.py USERS over 1,500 products, takes seconds to generate)."""
+    from app import cohort
+
+    monkeypatch.setattr(cohort, "USERS", 2000)
+    monkeypatch.setattr(cohort, "PRODUCT_LIMIT", 48)
+
+
+@pytest.fixture(autouse=True)
+def no_sample_campaigns(monkeypatch: pytest.MonkeyPatch):
+    """Joining a demo org seeds sample campaigns (app/dev_seed.py); tests that count campaigns
+    start without them. A test that needs them asks for `samples_on`."""
+    monkeypatch.setattr(dev_seed, "seed_demo_campaigns", lambda *a, **k: [])
+
+
+@pytest.fixture
+def samples_on(monkeypatch: pytest.MonkeyPatch):
+    """Seeding on, over the test cohort's outcomes (sample portfolios are built from Proven
+    products: app/dev_seed.py)."""
+    from datetime import date
+
+    from app import cohort, retail_intel, retailer
+
+    monkeypatch.setattr(dev_seed, "seed_demo_campaigns", SEED_SAMPLES)
+    raw = _cohort_raw(cohort.USERS, cohort.PRODUCT_LIMIT, date(2026, 11, 28))
+    monkeypatch.setattr(retailer, "fetch", lambda: raw)
+    monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": None, "version": 0})
+    monkeypatch.setattr(retail_intel, "_facts", {})
+
+
+_RAW: dict = {}
+
+
+def _cohort_raw(users, limit, today):
+    """The test cohort's rows, generated once per session."""
+    from app import cohort, retailer
+
+    key = (users, limit, today)
+    if key not in _RAW:
+        _RAW[key] = retailer.raw_from_tables(cohort.generate(today))
+    return _RAW[key]
 
 
 @pytest.fixture(autouse=True)

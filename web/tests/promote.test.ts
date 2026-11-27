@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, reachRange, ctrText, dateRange, durationText, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
+import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, nextMove, portfolioOf, reachRange, ctrText, dateRange, durationText, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
 
 const p = (brand: string, eligible: boolean) => ({ brand, eligible })
 
@@ -54,6 +54,9 @@ test('api errors become words, with the reasons the api sent', () => {
   assert.equal(promoError({ status: 429, code: 'too_many_active', message: '' }).kind, 'too_many')
   assert.equal(promoError({ status: 429, code: 'rate_limited', message: '' }).kind, 'rate')
   assert.equal(promoError({ status: 409, code: 'ended', message: '' }).kind, 'ended')
+  const twice = promoError({ status: 409, code: 'already_running', message: 'This product already has a running campaign; end it or wait for its result.' })
+  assert.equal(twice.kind, 'already_running')
+  assert.equal(twice.title, 'This product already has a running campaign')
   assert.equal(promoError(new TypeError('fetch failed')).title, 'Couldn’t reach Willow')
 })
 
@@ -67,6 +70,7 @@ test('the preview carries the consumer disclosure and an example match', () => {
 
 test('helpers: running count, workspace, order, bars', () => {
   assert.equal(runningCount([{ status: 'active' }, { status: 'paused' }, { status: 'ended' }, { status: 'active' }]), 2)
+  assert.equal(runningCount([{ status: 'active' }, { status: 'active', sample: true }]), 1) // samples never take a slot
   assert.equal(workspaceId({ kind: 'retailer' }), 'retailer')
   assert.equal(workspaceId({ kind: 'brand', brand: 'COSRX' }), 'COSRX')
   const e = (tier: 'promising' | 'too_few' | 'unclear', product: string) => ({ product_id: product, product, brand: 'B', tier, eligible: false, reasons: [], goals: [], skin_types: [], evidence: '' })
@@ -154,7 +158,42 @@ test('campaign insight words the verdict only when it is measured', async () => 
   assert.match(campaignInsight(g(0.15, 0.05, 0.25)).detail, /25 in 100 .* against 10 in 100/)
   assert.equal(campaignInsight(g(0.05, -0.04, 0.14)).tone, 'wait')
   assert.equal(campaignInsight(g(-0.1, -0.2, -0.01)).tone, 'neutral')
+  // An ended campaign's verdict is final: past tense, and no "too early".
+  assert.equal(campaignInsight({ ...g(0.15, 0.05, 0.25), status: 'ended' }).headline, 'The card made people add this product.')
+  const flat = campaignInsight({ ...g(0.05, -0.04, 0.14), status: 'ended' })
+  assert.equal(flat.tone, 'neutral')
+  assert.doesNotMatch(flat.headline, /early/)
   assert.deepEqual(cumulativeDays([{ day: 'a', impressions: 5, clicks: 1, adds: 0 }, { day: 'b', impressions: 7, clicks: 2, adds: 1 }]).map((d) => d.values), [[5, 1, 0], [12, 3, 1]])
   assert.equal(ownRecordInsight({ rate: null, base_rate: 0.3, n: 40 }), null)
   assert.match(ownRecordInsight({ rate: 0.64, base_rate: 0.29, n: 67 })!, /^64 in 100 of its users .* 29 in 100 non-users/)
+})
+
+const inc = (lift: number, lo: number, hi: number) => ({ exposed: { n: 40, added: 8, rate: 0.2 }, holdout: { n: 10, added: 1, rate: 0.1 }, lift, lift_lo: lo, lift_hi: hi })
+const camp = (status: 'active' | 'paused' | 'ended', i: ReturnType<typeof inc> | null, extra: Partial<{ impressions: number; clicks: number; adds: number }> = {}) => ({
+  id: `c-${status}-${i?.lift ?? 'x'}`,
+  product: 'P',
+  product_id: 'p',
+  status,
+  stats: { impressions: 100, clicks: 20, adds: 5, ctr: 0.2, daily: [], incrementality: i, incrementality_note: '', ...extra },
+})
+
+test('after a result: run a clear winner again, end a clear loser, otherwise look at the evidence or wait', () => {
+  assert.equal(nextMove(camp('ended', inc(0.1, 0.02, 0.18)))?.kind, 'again')
+  assert.equal(nextMove(camp('ended', inc(0.02, -0.05, 0.09)))?.kind, 'evidence')
+  assert.equal(nextMove(camp('ended', null))?.kind, 'evidence')
+  assert.equal(nextMove(camp('active', inc(-0.1, -0.18, -0.02)))?.kind, 'end')
+  assert.equal(nextMove(camp('active', null)), null)
+  assert.equal(nextMove(camp('active', inc(0.1, 0.02, 0.18))), null)
+})
+
+test('the portfolio sums delivery and counts clear holdout results', () => {
+  const p = portfolioOf([camp('ended', inc(0.1, 0.02, 0.18)), camp('active', null, { impressions: 300, clicks: 60, adds: 15 }), { ...camp('ended', inc(0.14, -0.01, 0.29)), id: 'z', product: 'Best' }])
+  assert.equal(p.impressions, 500)
+  assert.equal(p.clicks, 100)
+  assert.equal(p.adds, 25)
+  assert.equal(p.ctr, 0.2)
+  assert.equal(p.addRate, 0.25)
+  assert.deepEqual([p.measured, p.clear, p.collecting], [2, 1, 1])
+  assert.deepEqual(p.best, { product: 'Best', lift: 0.14, id: 'z' })
+  assert.equal(portfolioOf([]).ctr, null)
 })

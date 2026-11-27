@@ -53,11 +53,11 @@ Diagnosis or disease names; skin age; hydration measurement; UV spots/porphyrins
 - Brands: aggregate efficacy evidence reports (consented, anonymized).
 
 ## Why we win (rubric mapping)
-- **Tech & Gen AI (40%):** real calibrated imaging pipeline + Gemini doing six distinct jobs (region labelling, grounded explanations with number validation, label OCR, routine compatibility reasoning, function-calling advisor, retailer questions over aggregates with validated charts). Cloud Run x2, Firestore, Firebase Hosting/Auth, Vertex AI, BigQuery.
+- **Tech & Gen AI (40%):** real calibrated imaging pipeline + Gemini doing six distinct jobs (region labelling, grounded explanations with number validation, label OCR, routine compatibility reasoning, function-calling advisor, retailer questions over aggregates with validated charts). Cloud Run x2, Firestore, Firebase Hosting/Auth, Gemini Enterprise Agent Platform (formerly Vertex AI), BigQuery.
 - **Impact (25%):** ends guesswork for shoppers; gives retailers outcome data nobody else has.
 - **Innovation (25%):** personal noise-floor change detection on consumer phones; "CV measures, Gemini explains" so numbers are never invented.
 - **UX (10%):** guided capture with live quality checks, calm inclusive copy, signal-vs-noise visuals.
-- **Social Choice:** "#DoesItWork 24-hour split-arm challenge" reel, forearm only (privacy-safe), shareable result card.
+- **Social Choice:** "#DoesItWork 24-hour split-arm challenge" reel, forearm only (privacy-safe), and a shareable result card (built Nov 27, `web/src/lib/share.ts`): Share on a result or a product-test verdict draws a card with the person's verdicts in words and the week count, never a face photo, a number or a skin-tone reading, then opens the system share sheet or saves the image.
 
 ## Competitor lessons
 Neutrogena dropped its USD 50 scanner hardware for selfies (friction kills adoption) -> our attachment is a paper cone. Selfie apps' scores jump with lighting -> our quality gates + MDC. Brand-locked upsell feels like a scam -> brand-neutral catalog, multi-store links. LLM "skin scanners" invent numbers -> Gemini never measures. Bias on darker skin -> tone-relative thresholds + fairness report.

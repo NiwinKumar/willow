@@ -7,7 +7,7 @@ import { useAuth } from '../../../../lib/useAuth'
 import { useRetailData } from '../../context'
 import { flagsFor, KIND_TONE, templateCsv } from '../../shelf'
 import { sectionPath, useRetailState } from '../../state'
-import { Badge, Button, ErrorState, int, Panel, pct, ProductCell, SkeletonPanel, ToolButton } from '../../ui'
+import { Badge, Button, ErrorState, int, Panel, pct, ProductCell, Select, SkeletonPanel, ToolButton } from '../../ui'
 
 /*
  * Shelf vs results (retailer workspace, Market -> Categories; api shelf.py): per category, each measured product's
@@ -35,7 +35,7 @@ function saveOpen(v: boolean) {
   }
 }
 
-export function ShelfResults({ category }: { category: string }) {
+export function ShelfResults({ category: picked, standalone = false }: { category: string; standalone?: boolean }) {
   const { user, loading, continueAsGuest, getIdToken } = useAuth()
   const { filters } = useRetailData()
   const { carry } = useRetailState()
@@ -113,6 +113,11 @@ export function ShelfResults({ category }: { category: string }) {
   }
 
   const v = view?.key === key ? view.v : null
+  // Standalone (Campaigns → Shelf check): always open, with its own category picker (the one with most flags first).
+  const [own, setOwn] = useState('')
+  const firstFlagged = v ? ([...v.categories].sort((a, b) => v.flags.filter((f) => f.category === b.category).length - v.flags.filter((f) => f.category === a.category).length)[0]?.category ?? '') : ''
+  const category = standalone ? own || firstFlagged : picked
+  if (standalone && !open) setOpenState(true)
   if (!v) {
     if (failed === key)
       return (
@@ -152,19 +157,30 @@ export function ShelfResults({ category }: { category: string }) {
           open ? (
             v.source === 'gemini' && v.summary ? v.summary : 'Each product’s share of the shelf against its share of the visible changes, with what to act on.'
           ) : (
-            <>
-              <strong>{v.flags.length} {v.flags.length === 1 ? 'product' : 'products'}</strong> to look at
-              {here ? `, ${here} in ${cat?.label.toLowerCase() ?? 'this category'}` : ''}. Shelf = {basisWord}.
-            </>
+            v.flags.length === 0 && v.pending ? (
+              // "0 products to look at" beside "Gemini is checking…" read as a verdict before there was one.
+              <>Checking each product’s share of the shelf against its share of the visible changes. Shelf = {basisWord}.</>
+            ) : v.flags.length === 0 ? (
+              <>Nothing to act on: every product’s shelf share is in line with its share of the visible changes. Shelf = {basisWord}.</>
+            ) : (
+              <>
+                <strong>{v.flags.length} {v.flags.length === 1 ? 'product' : 'products'}</strong> to look at
+                {here ? `, ${here} in ${cat?.label.toLowerCase() ?? 'this category'}` : ''}. Shelf = {basisWord}.
+              </>
+            )
           )
         }
         actions={
+          standalone ? (
+            <Select label="Category" hideLabel value={category} onChange={setOwn} options={v.categories.map((c) => ({ value: c.category, label: `${c.label} · ${v.flags.filter((f) => f.category === c.category).length} flagged` }))} />
+          ) : (
           <ToolButton onClick={() => setOpen(!open)} label={open ? 'Hide shelf check' : 'Show shelf check'}>
             <span aria-hidden className="contents">
               <ChevronDown size={14} strokeWidth={1.8} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
               {open ? 'Hide' : 'Show'}
             </span>
           </ToolButton>
+          )
         }
         footnote={open ? v.note : undefined}
         flush
