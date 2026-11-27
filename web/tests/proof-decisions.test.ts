@@ -62,6 +62,17 @@ test('a running campaign takes "Proven, not promoted" away; a saved claim takes 
   assert.deepEqual(keys, [])
 })
 
+test('a sample campaign (simulated) only ever shows as a result, labelled; it never promotes or slips', () => {
+  const inc = { exposed: { n: 260, added: 44, rate: 0.17 }, holdout: { n: 66, added: 9, rate: 0.14 }, lift: 0.03, lift_lo: -0.07, lift_hi: 0.13 }
+  const done = { ...campaign('s1', 'mine', 'ended'), sample: true, stats: { reach: 260, impressions: 900, adds: 44, incrementality: inc } } as unknown as Campaign
+  const running = { ...campaign('s2', 'mine', 'active'), sample: true } as unknown as Campaign
+  const cards = composeCards(base({ rows: [row('mine', 'Acme', { tier: 'unclear' })], campaigns: [done, running] }))
+  assert.deepEqual(cards.map((c) => c.key).filter((k) => /campaign|promoted/.test(k)), ['campaign_result--s1'])
+  assert.match(cards.find((c) => c.kind === 'campaign_result')!.trigger, /^Sample campaign, simulated\. Adoption/)
+  // a running sample leaves "Proven, not promoted" in place
+  assert.ok(kinds(base({ rows: [row('mine', 'Acme')], campaigns: [running] })).includes('proven_not_promoted--mine'))
+})
+
 test('4 · evidence slipped: a live campaign or a saved claim on a product below its tier', () => {
   const slipped = row('mine', 'Acme', { tier: 'unclear', tier_label: 'No clear effect yet', lift: 0.02 })
   const keys = kinds(base({ rows: [slipped], campaigns: [campaign('c1', 'mine', 'active')], claimed: new Set(['mine']) }))

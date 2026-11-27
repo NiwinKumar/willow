@@ -591,6 +591,8 @@ export type Campaign = {
   created_at: string
   /** Started by an AutoCampaign rule; null for one a person created. Missing from older api builds. */
   rule?: { id: string; name: string } | null
+  /** A sample campaign: simulated history seeded when a demo seat is joined. Never served to shoppers, never takes a running slot. */
+  sample?: boolean
   product: string | null
   brand: string | null
   category: string | null

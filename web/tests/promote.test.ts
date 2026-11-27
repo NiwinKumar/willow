@@ -70,6 +70,7 @@ test('the preview carries the consumer disclosure and an example match', () => {
 
 test('helpers: running count, workspace, order, bars', () => {
   assert.equal(runningCount([{ status: 'active' }, { status: 'paused' }, { status: 'ended' }, { status: 'active' }]), 2)
+  assert.equal(runningCount([{ status: 'active' }, { status: 'active', sample: true }]), 1) // samples never take a slot
   assert.equal(workspaceId({ kind: 'retailer' }), 'retailer')
   assert.equal(workspaceId({ kind: 'brand', brand: 'COSRX' }), 'COSRX')
   const e = (tier: 'promising' | 'too_few' | 'unclear', product: string) => ({ product_id: product, product, brand: 'B', tier, eligible: false, reasons: [], goals: [], skin_types: [], evidence: '' })

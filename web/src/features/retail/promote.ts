@@ -85,8 +85,8 @@ export function wilson(k: number, n: number): [number, number] | null {
   return [r(c - h), r(c + h)]
 }
 
-/** Running campaigns count against the cap (ended and paused don't). */
-export const runningCount = (cs: Pick<Campaign, 'status'>[]) => cs.filter((c) => c.status === 'active').length
+/** Running campaigns count against the cap (ended, paused and sample ones don't, as campaigns.active_count). */
+export const runningCount = (cs: Pick<Campaign, 'status' | 'sample'>[]) => cs.filter((c) => c.status === 'active' && !c.sample).length
 
 /** The api's workspace value for "Viewing as": 'retailer' or the brand's catalog name (null: unknown brand). */
 export function workspaceId(ws: { kind: 'retailer' } | { kind: 'brand'; brand: string | null }): string | null {
@@ -197,7 +197,7 @@ export const reachOf = (c: Pick<Campaign, 'stats'>): number | null => c.stats.re
 export function campaignSummary(cs: Pick<Campaign, 'status' | 'stats'>[]): { active: number; reach: number | null; impressions: number; lifts: number[] } {
   const reaches = cs.map(reachOf)
   return {
-    active: runningCount(cs),
+    active: cs.filter((c) => c.status === 'active').length,
     reach: reaches.every((r) => r !== null) ? reaches.reduce((sum: number, r) => sum + (r ?? 0), 0) : null,
     impressions: cs.reduce((sum, c) => sum + c.stats.impressions, 0),
     lifts: cs.flatMap((c) => (c.stats.incrementality ? [c.stats.incrementality.lift] : [])),

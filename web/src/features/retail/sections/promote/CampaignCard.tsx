@@ -20,6 +20,15 @@ export function StatusBadge({ status }: { status: Campaign['status'] }) {
   )
 }
 
+/** A sample campaign (api `sample`): simulated shoppers and results, labelled as every simulated figure is. `short` for a table cell. */
+export function SampleBadge({ short = false }: { short?: boolean }) {
+  return (
+    <span title="Sample campaign: simulated shoppers and results, so the pages have a result to show. No shopper sees it." className="retail-synthetic inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-pill px-2 font-mono text-[11px] uppercase">
+      {short ? 'Sample' : 'Sample · simulated'}
+    </span>
+  )
+}
+
 export type Confirm = 'delete' | 'end'
 
 export function ErrorBox({ error }: { error: PromoError }) {

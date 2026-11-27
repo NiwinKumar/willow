@@ -639,20 +639,23 @@ def test_incrementality_in_the_campaign_stats(client, fake):
     assert inc["lift"] == 0.0 and inc["lift_lo"] == 0.0 and inc["lift_hi"] == 0.0
 
 
-def test_dev_seed_gives_each_kind_of_campaign_with_history():
+def test_dev_seed_gives_each_kind_of_campaign_with_history(samples_on):
     from app import dev_seed
     from app.store import MemoryStore
 
     store = MemoryStore()
     ids = dev_seed.seed_demo_campaigns(store)
     assert len(ids) == 3 and dev_seed.seed_demo_campaigns(store) == []  # once
-    by = {cid: campaigns.view(store, cid, store.campaign_get(cid)) for cid in ids}
-    clear, collecting, ended = (by[s["id"]] for s in dev_seed.SPECS)
-    assert clear["status"] == "active" and len(clear["stats"]["daily"]) == 12
-    inc = clear["stats"]["incrementality"]
-    assert inc["lift"] > 0 and inc["lift_lo"] > 0 and inc["exposed"]["n"] == 640
+    running, collecting, ended = (campaigns.view(store, i, store.campaign_get(i)) for i in ids)
+    assert running["sample"] and running["demo"] and running["org_id"] is None
+    assert running["status"] == "active" and len(running["stats"]["daily"]) == 12
+    inc = running["stats"]["incrementality"]
+    # still running: a lift so far whose interval still includes zero
+    assert inc["lift"] > 0 and inc["lift_lo"] < 0 < inc["lift_hi"] and inc["exposed"]["n"] == 420
     assert collecting["status"] == "active" and collecting["stats"]["incrementality"] is None
     assert ended["status"] == "ended" and len(ended["stats"]["daily"]) == 14
+    # the finished one is the clear result judges open: interval above zero
     inc = ended["stats"]["incrementality"]
-    assert inc["lift_lo"] < 0 < inc["lift_hi"]
-    assert campaigns.active_count(store, dev_seed.DEV_OWNER) == 2
+    assert inc["lift"] > 0 and inc["lift_lo"] > 0
+    # samples never take a running slot
+    assert campaigns.active_count(store, dev_seed.DEV_OWNER) == 0

@@ -482,7 +482,11 @@ def _decide(
     a = rdoc["action"]
     mine = store.campaigns_of(uid)
     rule_campaigns = [(c, d) for c, d in mine if d.get("rule_id") == rid]
-    busy = {d["product_id"] for _, d in mine if campaigns.status_of(d, at) in ("active", "paused")}
+    busy = {
+        d["product_id"]
+        for _, d in mine
+        if not campaigns.is_sample(d) and campaigns.status_of(d, at) in ("active", "paused")
+    }
     no_lift = {d["product_id"] for _, d in rule_campaigns if d.get("ended_reason") == "no_lift"}
     props = [
         d
