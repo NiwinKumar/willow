@@ -224,12 +224,14 @@ export default function Journey() {
         {state === 'ready' ? (
           <div className="flex gap-1" aria-hidden>
             {slides.map((_, k) => (
-              <button key={k} type="button" tabIndex={-1} onClick={() => go(k)} className="h-1 flex-1 overflow-hidden rounded-full bg-ink/10">
-                <span
-                  key={`${k}-${i}`}
-                  className="block h-full origin-left rounded-full bg-ink"
-                  style={k < i ? undefined : k === i && i < last ? { animation: `wFill ${slideMs(k)}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === i ? undefined : 'scaleX(0)' }}
-                />
+              <button key={k} type="button" tabIndex={-1} onClick={() => go(k)} className="-my-3 flex-1 py-3">
+                <span className="block h-1 overflow-hidden rounded-full bg-ink/10">
+                  <span
+                    key={`${k}-${i}`}
+                    className="block h-full origin-left rounded-full bg-ink"
+                    style={k < i ? undefined : k === i && i < last ? { animation: `wFill ${slideMs(k)}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { transform: k === i ? undefined : 'scaleX(0)' }}
+                  />
+                </span>
               </button>
             ))}
           </div>

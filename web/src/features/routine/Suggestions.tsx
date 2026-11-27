@@ -12,8 +12,8 @@ import { ProductChecked } from './checked'
 
 /**
  * "Suggested today" as a row of small tiles, built only from what the api answered: tonight's alternating pair
- * ("■ TONIGHT", from the schedules) or a conflict the check says to alternate ("Alternate nights" sets both
- * schedules), a gap from the routine check ("■ MORNING · MISSING") and a product whose start was followed by a
+ * ("Tonight", from the schedules) or a conflict the check says to alternate ("Alternate nights" sets both
+ * schedules), a gap from the routine check ("Missing in the morning") and a product whose start was followed by a
  * real change ("◆"). Nothing to suggest: the section is not shown.
  */
 export function Suggestions({ findings, entries, sessions, usedLastNight, onFind, onAlternate }: {
@@ -40,7 +40,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
     }
   }
   const row = 'flex items-center gap-3 border-t border-line py-2.5 first:border-t-0 first:pt-0'
-  const tag = 'truncate font-mono text-[10px] tracking-[.08em] text-ink-2'
+  const tag = 'truncate text-[12px] text-ink-2'
   const title = 'line-clamp-2 text-[14px] leading-[1.3] text-pretty'
   const act = 'hit44 min-h-9 shrink-0 rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-colors'
   return (
@@ -60,7 +60,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
               </span>
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className={tag}>TONIGHT</span>
+              <span className={tag}>Tonight</span>
               <span className={title}>{tonight.done ? `${compactName(tonight.on)} tonight. ${compactName(tonight.off)} rests.` : `${compactName(tonight.on)} and ${compactName(tonight.off)} on the same night.`}</span>
             </div>
             {tonight.done ? (
@@ -80,7 +80,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
                 {sun ? 'SPF' : '+'}
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className={tag}>{sun ? 'MORNING · MISSING' : 'MISSING STEP'}</span>
+                <span className={tag}>{sun ? 'Missing in the morning' : 'Missing step'}</span>
                 <span className={title} title={f.fix}>
                   {sun ? 'Add a sunscreen to your mornings.' : f.title}
                 </span>
@@ -96,7 +96,7 @@ export function Suggestions({ findings, entries, sessions, usedLastNight, onFind
             <ProductImage product={imageOf(e)} size={36} />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className={tag}>
-                ◆ CHANGED · {METRIC_META[o.metric].label.toUpperCase()} {fmtSigned(m.delta, m)}
+                ◆ Changed · {METRIC_META[o.metric].label} {fmtSigned(m.delta, m)}
                 {unitOf(m) ? ` ${unitOf(m)}` : ''}
               </span>
               <span className={title} title={`It moved beyond your normal range since you started it on ${fmtDate(e.started_at)}. Timing is an association, not proof.`}>

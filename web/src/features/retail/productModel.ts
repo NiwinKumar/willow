@@ -1,4 +1,5 @@
 import type { ProductRow, ProofTier, Seg } from './types'
+import { pct, pts } from './ui/format.ts'
 
 /**
  * Pure helpers for the Products, product page, Compare and Categories screens (no React, so `npm test` covers
@@ -174,3 +175,106 @@ export function spotlightOf(rows: ProductRow[]): ProductRow | null {
   return promising[0] ?? null
 }
 
+
+/* ───────────── The product page's lead: the verdict, who it works for, where it sits in its category ───────────── */
+
+/**
+ * The group a product works best for: the largest lift over non-users of the same group (rate − base rate, above
+ * zero), ties by n, among groups the api did not suppress with 10+ people. The same rule as the api's "Promote to
+ * <skin> skin" next step (proof_ai.py), so the page never recommends two groups. Only skin type and goal are passed
+ * in (tone bands are never ranked). Null when no group beats its own non-users.
+ */
+export function bestSeg(segs: Seg[], min = 10): Seg | null {
+  const ok = segs.filter((s) => !s.suppressed && s.rate !== null && s.n !== null && s.n >= min && s.base_rate !== null && s.rate > s.base_rate)
+  ok.sort((a, b) => b.rate! - b.base_rate! - (a.rate! - a.base_rate!) || b.n! - a.n! || a.label.localeCompare(b.label))
+  return ok[0] ?? null
+}
+
+/**
+ * The verdict in one sentence, in the tier's words: what the evidence says against people with the same goals who
+ * don't use it. Numbers come from the row only (rates and lift as the api sent them).
+ */
+export function verdictLine(p: Pick<ProductRow, 'tier' | 'rate' | 'base_rate' | 'lift' | 'to_proven' | 'n' | 'reason'>): string {
+  if (p.rate === null || p.tier === 'too_few') {
+    if (p.reason === 'not_measured') return 'Its goals have no Willow measure, so no outcome is measured.'
+    if (p.reason === 'unused') return 'No Willow users have it in their routine yet, so there is nothing to measure.'
+    return 'Collecting: fewer than 10 people have reached week 8 with it.'
+  }
+  const vs = p.base_rate !== null ? ` (${pct(p.rate)} against ${pct(p.base_rate)})` : ''
+  if (p.tier === 'proven') return `Linked to a held visible change: ${pts(p.lift)} over people with the same goals who don’t use it.`
+  if (p.tier === 'promising') {
+    const more = p.to_proven ? ` About ${p.to_proven} more ${p.to_proven === 1 ? 'person' : 'people'} at week 8 would settle it, if the rates hold.` : ''
+    return `Ahead of people with the same goals${vs}, but the interval still reaches zero.${more}`
+  }
+  return `Users and non-users with the same goals change at about the same rate${vs}.`
+}
+
+/** Where a product sits among the other measured products of its category (the api's competitor rows). */
+export type CategorySpot = { self: number; median: number; delta: number; others: number[]; min: number; max: number }
+
+/**
+ * This product's rate against the median of the other measured products in its category that share a goal.
+ * Null when the product has no rate or fewer than two others are measured (a median of one is just a rival).
+ */
+export function categorySpot(rows: { rate: number | null; is_self?: boolean }[]): CategorySpot | null {
+  const self = rows.find((r) => r.is_self)?.rate ?? null
+  const others = rows.filter((r) => !r.is_self && r.rate !== null).map((r) => r.rate!)
+  if (self === null || others.length < 2) return null
+  const s = [...others].sort((a, b) => a - b)
+  const mid = s.length / 2
+  const median = r2(s.length % 2 ? s[Math.floor(mid)] : (s[mid - 1] + s[mid]) / 2)
+  return { self, median, delta: r2(self - median), others: s, min: Math.min(self, s[0]), max: Math.max(self, s[s.length - 1]) }
+}
+
+/**
+ * Where a product stands on promotion, from this organisation's campaigns (sample ones included: a sample that ran
+ * is history the page must not hide). `running`: active; `paused`; `ended`: the latest finished one, with its
+ * adoption lift against the randomised holdout when it was measured. Absent: never promoted.
+ */
+export type Promo = { state: 'running' | 'paused' | 'ended'; lift: number | null; campaignId: string; sample: boolean }
+
+export function promoHistory(campaigns: { id: string; product_id: string; status: 'active' | 'paused' | 'ended'; created_at: string; sample?: boolean; stats: { incrementality: { lift: number } | null } }[]): Map<string, Promo> {
+  const rank = { running: 3, paused: 2, ended: 1 } as const
+  const m = new Map<string, Promo & { at: string }>()
+  for (const c of campaigns) {
+    const state = c.status === 'active' ? 'running' : c.status
+    const v = { state, lift: c.stats.incrementality?.lift ?? null, campaignId: c.id, sample: Boolean(c.sample), at: c.created_at } as Promo & { at: string }
+    const cur = m.get(c.product_id)
+    if (!cur || rank[state] > rank[cur.state] || (rank[state] === rank[cur.state] && c.created_at > cur.at)) m.set(c.product_id, v)
+  }
+  return new Map([...m].map(([k, { at: _at, ...v }]) => [k, v]))
+}
+
+/** The promotion note a product row carries: "Campaign running", "Campaign paused", "Promoted before, +8 pts adoption" (the finished campaign's lift against its holdout). */
+export function promoNote(p: Promo | undefined): string | null {
+  if (!p) return null
+  if (p.state === 'running') return 'Campaign running'
+  if (p.state === 'paused') return 'Campaign paused'
+  return p.lift !== null ? `Promoted before, ${pts(p.lift)} adoption` : 'Promoted before'
+}
+
+/** The Products page's lead: what to act on in the rows in view. */
+export type ProductsLead = {
+  /** Proven with no campaign running or paused, strongest lower bound first. Some may have run one before. */
+  toPromote: ProductRow[]
+  /** Of toPromote, how many ran a campaign before (finished; offer "run again", never "never promoted"). */
+  ranBefore: number
+  /** Proven in total (to tell "all promoted" from "none Proven"). */
+  proven: number
+  /** Promising, closest to Proven first (the api's to_proven; unknown last). */
+  close: ProductRow[]
+  /** Measured, but users change about as much as non-users. */
+  unclear: ProductRow[]
+}
+
+export function productsLead(rows: ProductRow[], promo: ReadonlyMap<string, Pick<Promo, 'state'>>): ProductsLead {
+  const proven = rows.filter((r) => r.tier === 'proven')
+  const toPromote = proven.filter((r) => (promo.get(r.product_id)?.state ?? 'ended') === 'ended').sort((a, b) => (b.lift_lo ?? -1) - (a.lift_lo ?? -1) || (b.n ?? 0) - (a.n ?? 0))
+  const ranBefore = toPromote.filter((r) => promo.has(r.product_id)).length
+  const close = rows.filter((r) => r.tier === 'promising').sort((a, b) => (a.to_proven ?? 1e9) - (b.to_proven ?? 1e9) || (b.lift ?? 0) - (a.lift ?? 0))
+  const unclear = rows.filter((r) => r.tier === 'unclear').sort((a, b) => (b.users ?? 0) - (a.users ?? 0))
+  return { toPromote, ranBefore, proven: proven.length, close, unclear }
+}
+
+/** Rows drawn per step on long tables: enough to scan, small enough to open without a stall. */
+export const PAGE_ROWS = 100

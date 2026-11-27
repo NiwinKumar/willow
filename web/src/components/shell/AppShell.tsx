@@ -4,14 +4,15 @@ import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'rea
 import type { CaptureMode, Site } from '../../data/types'
 import type { TrackPlace } from '../../lib/track'
 import { useActivateData, useData } from '../../data/useData'
-import { useCheckinDue } from '../../data/useCheckin'
 import { identity } from '../../lib/identity'
+import { useKeyboardInset } from '../../lib/useKeyboardInset'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { prefs } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
 import { useResultReady } from '../../features/progress/useResultReady'
 import { WillowLoader } from '../willow/WillowLoader'
 import { CanvasBlobs } from './CanvasBlobs'
+import { useCheckInState } from './checkInState'
 import { AdvisorFab } from './AdvisorFab'
 import { Dock } from './Dock'
 import { Header } from './Header'
@@ -55,8 +56,8 @@ export function AppShell() {
   // The advisor as a full-screen chat (Expand, or ?advisor=full); the same chat, Esc or Collapse returns to the panel.
   const [advisorFull, setAdvisorFull] = useState(false)
   const current = destinationOf(location.pathname)
-  // The check-in schedule: the Check in button says when one is due today or late (null otherwise).
-  const due = useCheckinDue()?.short ?? null
+  // The Check in button's state: due (schedule in You), done today, or idle.
+  const checkInState = useCheckInState()
 
   // A new page starts at the top (a #anchor scrolls itself); query changes keep the scroll.
   useEffect(() => {
@@ -162,7 +163,7 @@ export function AppShell() {
   const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   return (
     <ShellContext.Provider value={api}>
-      <div className="relative min-h-dvh overflow-x-clip pb-[140px] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
+      <div className="relative min-h-dvh overflow-x-clip pb-[calc(140px+env(safe-area-inset-bottom))] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
         <CanvasBlobs />
         <div inert={covered || undefined}>
         <ModeBanner />
@@ -175,17 +176,17 @@ export function AppShell() {
               setCollapsed(!collapsed)
             }}
             onCheckIn={() => setCheckIn({ open: true })}
-            due={due}
+            checkIn={checkInState}
             name={me.short}
             initials={me.initials}
           />
         ) : (
-          <Header current={current} name={me.short} initials={me.initials} />
+          <Header />
         )}
         <div className="relative z-[1]">
           <Outlet />
         </div>
-        {wide ? null : <Dock current={current} due={due} onCheckIn={() => setCheckIn({ open: true })} />}
+        {wide ? null : <Dock current={current} checkIn={checkInState} onCheckIn={() => setCheckIn({ open: true })} />}
         </div>
         <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} covered={advisor.open} />
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />
@@ -248,6 +249,8 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
     }
   }, [open])
   const inset = phone || full ? 0 : 12
+  // Full screen: while typing, the panel spans only the visible area, so the composer sits on the keyboard.
+  useKeyboardInset(open && (phone || full))
   return (
     <div
       ref={panel}
@@ -259,9 +262,9 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
       tabIndex={-1}
       className="fixed z-[45] flex flex-col overflow-hidden squircle outline-none backdrop-blur-[28px] backdrop-saturate-[1.5]"
       style={{
-        top: inset,
+        top: inset || 'var(--kb-top, 0px)',
         right: inset,
-        bottom: inset,
+        bottom: inset || 'var(--kb, 0px)',
         width: phone || full ? '100vw' : 'min(440px, calc(100vw - 24px))',
         borderRadius: !open && !reduced ? 160 : phone || full ? 0 : 32,
         background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.92)',

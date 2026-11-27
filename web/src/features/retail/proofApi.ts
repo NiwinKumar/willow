@@ -9,8 +9,9 @@ import { ApiError, request, retailerGet, type RetailerAnswer } from '../../lib/a
 
 export type OrgKind = 'retailer' | 'brand'
 export type Role = 'admin' | 'analyst' | 'viewer'
-export type ProofOrg = { id: string; name: string; kind: OrgKind; brands: string[]; all_brands?: boolean; verified: string | boolean | null }
-export type ProofInstance = { id: string; name: string; accent?: string | null; domains: string[]; demo: boolean }
+export type ProofOrg = { id: string; name: string; kind: OrgKind; brands: string[]; all_brands?: boolean; verified: string | boolean | null; logo_url?: string | null }
+/** `label`: a quiet line about the instance ("Demo catalog · every brand"); newer api builds only. */
+export type ProofInstance = { id: string; name: string; label?: string | null; accent?: string | null; domains: string[]; demo: boolean }
 export type InstanceView = { instance: ProofInstance; orgs: ProofOrg[] }
 export type Membership = { org_id: string; role: Role; demo: boolean; instance?: string; joined_at?: string | null }
 export type MeView = { memberships: Membership[]; current: { org_id: string; role: Role } | null }
@@ -110,8 +111,13 @@ export type RangeApi = { filename: string; source: 'file' | 'catalog'; rows: Ran
 /** `from`: whose item file a brand's range comes from (the retailer's, filtered to the brand). */
 export type RangeView = { range: RangeApi | null; from: { org_id: string; name: string } | null }
 
-/** POST /v1/proof/orgs/{org}/ask: the checked Ask, told whose question it is (`scope`). */
-export type OrgAnswer = RetailerAnswer & { scope?: { brand: string | null; names_hidden: boolean } }
+/** POST /v1/proof/orgs/{org}/ask: the checked Ask, told whose question it is (`scope`), in a thread. */
+export type OrgAnswer = RetailerAnswer & { scope?: { brand: string | null; names_hidden: boolean }; thread_id?: string | null }
+/** One saved Ask conversation (GET /v1/proof/orgs/{org}/ask/threads[/{id}]). */
+/** A saved turn: `q` (older drafts of the contract said `question`), the full answer object as the POST returned it. */
+export type AskTurn = { q?: string; question?: string; answer: OrgAnswer | null; at?: string | null }
+/** In the list `turns` is a count; in the detail it is the turns. */
+export type AskThread = { id: string; title: string; updated_at: string | null; created_at?: string | null; turns?: AskTurn[] | number }
 
 /** GET /v1/proof/orgs/{org}/fit: what opted-in shoppers avoid and react to; counts of people, ≥ min_group. */
 export type FitView = {
@@ -152,7 +158,11 @@ export const proofApi = {
   range: (t: string, org: string) => request<RangeView>(t, `${P}/orgs/${enc(org)}/range`),
   putRange: (t: string, org: string, body: { filename: string; source: 'file' | 'catalog'; rows: RangeRowApi[] }) => request<RangeView>(t, `${P}/orgs/${enc(org)}/range`, { method: 'PUT', ...json(body) }),
   deleteRange: (t: string, org: string) => request<void>(t, `${P}/orgs/${enc(org)}/range`, { method: 'DELETE' }),
-  ask: (t: string, org: string, body: { question: string; cohort: string; range: string; brand?: string | null }) => request<OrgAnswer>(t, `${P}/orgs/${enc(org)}/ask`, { method: 'POST', ...json(body) }),
+  ask: (t: string, org: string, body: { question: string; cohort: string; range: string; brand?: string | null; thread_id?: string | null }) => request<OrgAnswer>(t, `${P}/orgs/${enc(org)}/ask`, { method: 'POST', ...json(body) }),
+  askThreads: (t: string, org: string) => request<{ threads: AskThread[] } | AskThread[]>(t, `${P}/orgs/${enc(org)}/ask/threads`).then((r) => (Array.isArray(r) ? r : (r.threads ?? []))),
+  askThread: (t: string, org: string, id: string) => request<AskThread | { thread: AskThread }>(t, `${P}/orgs/${enc(org)}/ask/threads/${enc(id)}`).then((r) => ('thread' in r && r.thread ? r.thread : (r as AskThread))),
+  deleteAskThread: (t: string, org: string, id: string) => request<void>(t, `${P}/orgs/${enc(org)}/ask/threads/${enc(id)}`, { method: 'DELETE' }),
+  askSuggestions: (t: string, org: string, f?: { cohort: string; range: string }) => request<{ suggestions: string[] } | string[]>(t, `${P}/orgs/${enc(org)}/ask/suggestions${f ? `?${new URLSearchParams(f)}` : ''}`).then((r) => (Array.isArray(r) ? r : (r.suggestions ?? []))),
   fit: (t: string, org: string) => request<FitView>(t, `${P}/orgs/${enc(org)}/fit`),
   research: () => retailerGet<ResearchView>(`${P}/research`),
   clicks: (days = 30) => retailerGet<ClicksView>(`/v1/retailer/clicks?days=${days}`),
@@ -199,4 +209,14 @@ export function verifiedText(o: Pick<ProofOrg, 'verified'>): string | null {
 export function claimCohortText(c: SavedClaim['cohort']): string {
   if (typeof c === 'string') return `${c} cohort`
   return c.label ?? `${c.kind ?? c.filter ?? 'unknown'} cohort`
+}
+
+/** The demo catalog instance (a `label`, e.g. "Demo catalog · every brand"; id `willow`): its name adds nothing to the org's, so it stays out of the bar. */
+export const isFallbackInstance = (i: { id: string; label?: string | null } | null) => Boolean(i?.label) || i?.id === 'willow'
+
+/** Starter questions when the api has none for this organisation: answerable from the aggregates. */
+export function fallbackSuggestions(kind: 'brand' | 'retailer', brand: string | null): string[] {
+  if (kind === 'brand' && brand)
+    return [`Which ${brand} products show the most visible change, and for whom?`, `How does ${brand} compare with the market on visible change?`, `Which ${brand} products are closest to Proven?`, `Where is demand growing for the goals ${brand} targets?`]
+  return ['Which redness products work in the budget tier?', 'Where is demand growing fastest?', 'How much more often do users change than people with the same goals who don’t use it?', 'Which products do people say are working, and is it measured?']
 }

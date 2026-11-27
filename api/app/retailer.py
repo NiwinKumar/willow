@@ -331,7 +331,7 @@ def outcome_of(first: dict[str, dict[str, int]], uh: str, metrics: list[str]) ->
 
 def product_targets(p: dict[str, Any]) -> list[str]:
     """The metrics a product's concerns map to (empty: nothing Willow measures)."""
-    return sorted({m for c in p["concerns"] for m in cohort.CONCERN_METRICS.get(c, [])})
+    return cohort.product_metrics(p)
 
 
 def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
@@ -418,6 +418,28 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         if (r["user_hash"], r["product_id"]) not in rows_of:
             users_of[r["product_id"]].append(r["user_hash"])
         rows_of[(r["user_hash"], r["product_id"])] = r
+    # A product's base (eligible people with one of its goals who do not use it), counted from
+    # sets built once: every product does not walk every person.
+    everyone_el = [uh for uh in users if eligible(uh)]
+    goal_el = {
+        g: frozenset(uh for uh in everyone_el if g in users[uh]["goals"]) for g in cohort.GOALS
+    }
+    pools: dict[tuple[str, ...], frozenset[str]] = {}
+    wins_of: dict[tuple[str, ...], frozenset[str]] = {}
+    both: dict[tuple[tuple[str, ...], tuple[str, ...]], int] = {}
+
+    def base_nk(pid: str, metrics: list[str], members: list[str]) -> tuple[int, int]:
+        gk, mk = tuple(pgoals[pid]), tuple(metrics)
+        if gk not in pools:
+            pools[gk] = frozenset().union(*(goal_el[g] for g in gk))
+        if mk not in wins_of:
+            wins_of[mk] = frozenset(uh for uh in everyone_el if outcome(uh, metrics) is not None)
+        pool, won = pools[gk], wins_of[mk]
+        if (gk, mk) not in both:
+            both[(gk, mk)] = len(pool & won)
+        mine = [uh for uh in members if uh in pool]
+        return len(pool) - len(mine), both[(gk, mk)] - sum(1 for uh in mine if uh in won)
+
     rows, below_min, unused, not_measured = [], 0, 0, 0
     for pid, p in sorted(products.items()):
         metrics, members = targets[pid], users_of.get(pid, [])
@@ -432,15 +454,10 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             below_min += 1
             continue
         wins = [uh for uh in el if outcome(uh, metrics) is not None]
-        same_goal = [
-            uh
-            for uh, u in users.items()
-            if (uh, pid) not in rows_of and set(u["goals"]) & set(pgoals[pid]) and eligible(uh)
-        ]
-        base_k = sum(1 for uh in same_goal if outcome(uh, metrics) is not None)
+        base_n, base_k = base_nk(pid, metrics, members)
         base = (
-            {"k": base_k, "n": len(same_goal), "rate": round(base_k / len(same_goal), 2)}
-            if len(same_goal) >= MIN_GROUP
+            {"k": base_k, "n": base_n, "rate": round(base_k / base_n, 2)}
+            if base_n >= MIN_GROUP
             else None
         )
 
@@ -461,13 +478,13 @@ def aggregate(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
                 "product": p["name"],
                 "brand": p["brand"],
                 "category": p["category"],
-                "concern": CONCERN_SHORT[p["concerns"][0]],
+                "concern": CONCERN_SHORT[cohort.concerns_of(p)[0]],
                 "goal_ids": pgoals[pid],
                 "n": len(el),
                 "cells": cells("tone", cohort.TONE_BANDS),
                 "cells_skin": cells("skin_type", cohort.SKIN_TYPES),
                 "rate": round(rate, 2),
-                "lift": None if base is None else round(rate - base_k / len(same_goal), 2),
+                "lift": None if base is None else round(rate - base_k / base_n, 2),
                 "base": base,
                 "weeks": statistics.median([outcome(uh, metrics) for uh in wins]) if wins else None,
                 "cont": round(len(kept) / len(members), 2),

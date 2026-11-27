@@ -141,7 +141,7 @@ function Body({ d }: { d: Insights }) {
       [`People at week ${wk} (n)`, (x) => x.product.n],
       [`Visible change by week ${wk} (%)`, (x) => (x.product.rate === null ? (noDataReason(x.product) ?? '') : Math.round(x.product.rate * 100))],
       ['Visible change 95% interval', (x) => interval(x.product.rate_lo, x.product.rate_hi) ?? ''],
-      ['Non-users (%)', (x) => (x.product.base_rate === null ? '' : Math.round(x.product.base_rate * 100))],
+      ['Same goals, not using it: changed anyway (%)', (x) => (x.product.base_rate === null ? '' : Math.round(x.product.base_rate * 100))],
       ['Lift (pts)', (x) => (x.product.lift === null ? '' : Math.round(x.product.lift * 100))],
       ['Lift 95% interval (pts)', (x) => (x.product.lift_lo === null || x.product.lift_hi === null ? '' : `${Math.round(x.product.lift_lo * 100)} to ${Math.round(x.product.lift_hi * 100)}`)],
       ['Weeks to first change (median)', (x) => x.product.weeks],
@@ -165,6 +165,16 @@ function Body({ d }: { d: Insights }) {
     return (
       <>
         <strong>{a.product}</strong> leads on visible change, {pct(a.rate)} against {pct(b.rate)}. {clear ? 'The 95% intervals don’t overlap.' : 'The 95% intervals overlap, so the gap may be chance.'}
+        {/* A higher rate can come from users who'd have changed anyway: say so when the lift ranks them the other way. */}
+        {(() => {
+          const byLift = m.filter((x) => x.product.lift !== null).sort((p, q) => q.product.lift! - p.product.lift!)[0]?.product
+          return byLift && byLift.product_id !== a.product_id && byLift.lift !== null ? (
+            <>
+              {' '}
+              Against people with the same goals not using it, <strong>{byLift.product}</strong> adds more: {pts(byLift.lift)} against {pts(a.lift)}.
+            </>
+          ) : null
+        })()}
       </>
     )
   })()
@@ -174,14 +184,14 @@ function Body({ d }: { d: Insights }) {
     {
       id: 'rate',
       label: 'Visible change',
-      tip: `Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Tick: non-users with the same goals.`,
+      tip: `Share of people using it who saw a visible change by week ${wk}. Bar: 95% interval. Grey tick: people with the same goals not using it.`,
       value: (p) => p.rate,
       better: 'high',
       cell: (p, lead) => (p.rate === null ? <span className="text-proof-small text-ink-2">{noDataReason(p)}</span> : <RateInterval rate={p.rate} lo={p.rate_lo} hi={p.rate_hi} base={p.base_rate} n={p.n} weeks={wk} strong={lead} wide />),
     },
     {
       id: 'base',
-      label: 'Non-users',
+      label: 'Same goals, not using it',
       tip: `Share of people with the same goals who don’t use it and saw a visible change by week ${wk}.`,
       value: (p) => p.base_rate,
       cell: (p) => (p.rate === null ? none : p.base_rate === null ? <Suppressed short /> : <span className="tnum text-ink-2">{pct(p.base_rate)}</span>),
@@ -189,7 +199,7 @@ function Body({ d }: { d: Insights }) {
     {
       id: 'lift',
       label: 'Lift',
-      tip: 'Visible change among users minus non-users, in percentage points. Hover a value for its 95% interval.',
+      tip: 'Users who changed minus people with the same goals not using it, in percentage points. Hover a value for its 95% interval.',
       value: (p) => p.lift,
       better: 'high',
       cell: (p) => (p.rate === null ? none : <LiftValue lift={p.lift} lo={p.lift_lo} hi={p.lift_hi} />),
@@ -436,7 +446,7 @@ const unmeasured = (s: { status: string; d?: Detail } | undefined) => s?.status 
 function SegRate({ seg, unmeasured = false }: { seg: Seg | undefined; unmeasured?: boolean }) {
   const ci = seg ? segInterval(seg) : null
   const ok = seg && !seg.suppressed && seg.rate !== null
-  const tip = useTooltip(ok ? `${pct(seg.rate)} of ${int(seg.n)} people${ci ? ` · 95% interval ${interval(ci.lo, ci.hi)}` : ''}${seg.base_rate !== null ? ` · non-users ${pct(seg.base_rate)} (${pts(seg.rate! - seg.base_rate)})` : ''}` : '')
+  const tip = useTooltip(ok ? `${pct(seg.rate)} of ${int(seg.n)} people${ci ? ` · 95% interval ${interval(ci.lo, ci.hi)}` : ''}${seg.base_rate !== null ? ` · same group not using it ${pct(seg.base_rate)} (${pts(seg.rate! - seg.base_rate)})` : ''}` : '')
   if (unmeasured) return <span className="text-ink-3">—</span>
   if (!ok) return <Suppressed short />
   return (

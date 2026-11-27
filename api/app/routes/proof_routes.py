@@ -744,10 +744,77 @@ class OrgAskIn(BaseModel):
     cohort: retailer.Cohort = "mixed"
     range: retailer.Range = "all"
     brand: str | None = Field(default=None, max_length=120)  # retailer only: the brand in focus
+    # the conversation this question continues (GET .../ask/threads); absent = a new one
+    thread_id: str | None = Field(default=None, max_length=40)
 
 
 ASK_TTL_S = 3600
 _answers: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+
+# Conversations (proof_ask_threads/{id}): one person's, inside one org, private to that person.
+MAX_THREADS = 30  # kept per person and org (the oldest goes first)
+MAX_TURNS = 20  # kept per conversation (the oldest turn goes first)
+TITLE_CHARS = 60
+THREAD_ID = re.compile(r"^t_[0-9a-f]{16}$")
+
+
+def _title(question: str) -> str:
+    q = " ".join(question.split())
+    if len(q) <= TITLE_CHARS:
+        return q
+    cut = q[:TITLE_CHARS].rsplit(" ", 1)[0] or q[:TITLE_CHARS]
+    return cut.rstrip(" ,;:-") + "…"
+
+
+def _own_thread(store: Store, m: Member, tid: str) -> Doc:
+    """The caller's conversation in this org, or 404 (someone else's reads as missing)."""
+    doc = store.proof_ask_thread_get(tid) if THREAD_ID.match(tid) else None
+    if doc is None or doc.get("uid") != m.uid or doc.get("org_id") != m.org_id:
+        raise _not_found("Conversation")
+    return doc
+
+
+def _threads_of(store: Store, m: Member) -> list[tuple[str, Doc]]:
+    rows = [(t, d) for t, d in store.proof_ask_threads_of(m.uid) if d.get("org_id") == m.org_id]
+    return sorted(rows, key=lambda r: iso(r[1].get("updated_at")) or "", reverse=True)
+
+
+def _turn_view(t: Doc) -> dict[str, Any]:
+    return {"q": t["q"], "answer": t["answer"], "at": iso(t.get("at"))}
+
+
+def _thread_view(tid: str, d: Doc) -> dict[str, Any]:
+    return {
+        "id": tid,
+        "org_id": d["org_id"],
+        "title": d["title"],
+        "created_at": iso(d.get("created_at")),
+        "updated_at": iso(d.get("updated_at")),
+        "turns": [_turn_view(t) for t in d.get("turns", [])],
+    }
+
+
+def _save_turn(
+    store: Store, m: Member, tid: str | None, thread: Doc | None, question: str, answer: Doc
+) -> str:
+    """Add the turn (a new conversation when `thread` is None); keep the newest MAX_TURNS turns
+    and the person's newest MAX_THREADS conversations in this org."""
+    at = _now()
+    turn = {"q": question, "answer": answer, "at": at}
+    if tid is None or thread is None:
+        tid = f"t_{secrets.token_hex(8)}"
+        thread = {
+            "org_id": m.org_id,
+            "uid": m.uid,
+            "title": _title(question),
+            "created_at": at,
+            "turns": [],
+        }
+    thread = {**thread, "updated_at": at, "turns": [*thread["turns"], turn][-MAX_TURNS:]}
+    store.proof_ask_thread_set(tid, thread)
+    for old, _ in _threads_of(store, m)[MAX_THREADS:]:
+        store.proof_ask_thread_delete(old)
+    return tid
 
 
 @router.post("/proof/orgs/{org}/ask")
@@ -760,33 +827,142 @@ def org_ask(
     else:
         brand = retail_intel.find_brand(body.brand) if body.brand else None
         hide = False
+    # before the daily limit: an unknown conversation costs no question
+    thread = _own_thread(store, m, body.thread_id) if body.thread_id else None
+    # a follow-up gets the last turns as context (question and answer text only)
+    history = [
+        (t["q"], str((t.get("answer") or {}).get("answer") or ""))
+        for t in (thread or {}).get("turns", [])[-retailer_ask.HISTORY_TURNS :]
+    ]
     scope = retailer_ask.scope_for(brand, hide)
     question = " ".join(body.question.lower().split())
-    key = (question, body.cohort, body.range, brand, hide, retailer_routes._data_version())
+    key = (
+        question,
+        body.cohort,
+        body.range,
+        brand,
+        hide,
+        tuple(history),
+        retailer_routes._data_version(),
+    )
     hit = _answers.get(key)
     if hit and time.time() - hit[0] < ASK_TTL_S:
-        return hit[1]
-    limits.take(store, m.uid, "retailer_ask")
+        answer = hit[1]
+    else:
+        limits.take(store, m.uid, "retailer_ask")
+        try:
+            data = retailer_routes._ask_inputs(body.cohort, body.range)
+        except Exception as exc:
+            limits.refund(store, m.uid, "retailer_ask")
+            raise HTTPException(503, retailer_routes.UNAVAILABLE) from exc
+        try:
+            answer = retailer_ask.ask(body.question, data, scope, history)
+        except retailer_ask.Unavailable as exc:
+            limits.refund(store, m.uid, "retailer_ask")
+            raise HTTPException(
+                503,
+                {
+                    "code": "assistant_unavailable",
+                    "message": "The assistant is unavailable right now. Try again in a minute.",
+                },
+            ) from exc
+        answer = {**answer, "scope": {"brand": brand, "names_hidden": scope.masked}}
+        if not answer.get("refused"):
+            _answers[key] = (time.time(), answer)
+    tid = _save_turn(store, m, body.thread_id, thread, body.question, answer)
+    return {**answer, "thread_id": tid}
+
+
+@router.get("/proof/orgs/{org}/ask/threads")
+def ask_threads(
+    m: Member = Depends(member_of("viewer")), store: Store = Depends(get_store)
+) -> list[dict[str, Any]]:
+    """The caller's own conversations in this org, newest first (`turns` = how many)."""
+    return [
+        {
+            "id": tid,
+            "title": d["title"],
+            "updated_at": iso(d.get("updated_at")),
+            "turns": len(d.get("turns", [])),
+        }
+        for tid, d in _threads_of(store, m)
+    ]
+
+
+@router.get("/proof/orgs/{org}/ask/threads/{tid}")
+def ask_thread(
+    tid: str, m: Member = Depends(member_of("viewer")), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    return _thread_view(tid, _own_thread(store, m, tid))
+
+
+@router.delete("/proof/orgs/{org}/ask/threads/{tid}", status_code=204)
+def delete_ask_thread(
+    tid: str, m: Member = Depends(member_of("viewer")), store: Store = Depends(get_store)
+) -> Response:
+    _own_thread(store, m, tid)
+    store.proof_ask_thread_delete(tid)
+    return Response(status_code=204)
+
+
+# Starter questions per org kind, from the same aggregates Ask answers from (no Gemini).
+
+
+def suggestions_for(org: dict[str, Any], insights: dict[str, Any]) -> list[str]:
+    if org["kind"] == "brand":
+        brand = org["brands"][0] if org["brands"] else org["name"]
+        rows = [
+            r
+            for r in (insights.get("product_outcomes") or {}).values()
+            if r.get("brand") in org["brands"] and r.get("product")
+        ]
+        rows.sort(key=lambda r: (-r["n"], r["product"]))
+        if not rows:
+            return [
+                f"Which of {brand}'s products have the most people tracking them?",
+                f"How does {brand} compare with the category for each goal?",
+                f"Which goals do people choose {brand} for?",
+                f"Do people keep using {brand}'s products after week 4?",
+            ]
+        top = rows[0]
+        concern = top.get("concern") or "their goal"
+        second = rows[1]["product"] if len(rows) > 1 else None
+        return [
+            f"How is {top['product']} doing for {concern}, and by which week do people see a "
+            "change?",
+            f"Which skin types does {top['product']} work best for?",
+            f"How does {top['product']} compare with the category for {concern}?",
+            f"Do people keep using {second} after week 4?"
+            if second
+            else f"Do people keep using {top['product']} after week 4?",
+        ]
+    needs = sorted(insights.get("needs") or [], key=lambda n: (-n["n"], n["goal"]))
+    goal = needs[0]["goal"].lower() if needs else "each goal"
+    gaps = [g for g in insights.get("gaps") or [] if not str(g.get("action", "")).startswith("Cov")]
+    gap = gaps[0]["goal"].lower() if gaps else goal
+    cats = sorted(insights.get("categories") or [], key=lambda c: -sum(f["n"] for f in c["flows"]))
+    cat = cats[0]["label"].lower() if cats else "serum"
+    return [
+        f"Which {cat} products should get more shelf space for {goal}?",
+        f"Where is our range thin for {gap}, and at which price tier?",
+        "Which goals are growing month on month?",
+        "Which routine clashes are most common, and which products resolve them?",
+    ]
+
+
+@router.get("/proof/orgs/{org}/ask/suggestions")
+def ask_suggestions(
+    cohort: retailer.Cohort = Query("mixed"),
+    range_: retailer.Range = Query("all", alias="range"),
+    m: Member = Depends(member_of("viewer")),
+) -> dict[str, Any]:
+    """Four starter questions for this org: a brand's about its own products, the retailer's
+    about range, shelf and demand. Named from the data; generic when it is unavailable."""
     try:
-        data = retailer_routes._ask_inputs(body.cohort, body.range)
-    except Exception as exc:
-        limits.refund(store, m.uid, "retailer_ask")
-        raise HTTPException(503, retailer_routes.UNAVAILABLE) from exc
-    try:
-        answer = retailer_ask.ask(body.question, data, scope)
-    except retailer_ask.Unavailable as exc:
-        limits.refund(store, m.uid, "retailer_ask")
-        raise HTTPException(
-            503,
-            {
-                "code": "assistant_unavailable",
-                "message": "The assistant is unavailable right now. Try again in a minute.",
-            },
-        ) from exc
-    answer = {**answer, "scope": {"brand": brand, "names_hidden": scope.masked}}
-    if not answer.get("refused"):
-        _answers[key] = (time.time(), answer)
-    return answer
+        insights = retailer.insights(cohort, range_)
+    except Exception:  # BigQuery unavailable: still four questions, without names
+        insights = {}
+    return {"kind": m.org["kind"], "suggestions": suggestions_for(m.org, insights)}
 
 
 # -- fit: what opted-in shoppers avoid and react to ----------------------------------------------

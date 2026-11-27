@@ -70,5 +70,5 @@ export function useHomeCards(d: Insights) {
       nameOf: names.name,
     })
   }, [rows, mix, brand, campaigns, shelf.data, segments, d, claims.data, auto.data, brandOrgs, carry, signals, brandDetail, names])
-  return { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards }
+  return { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, segments }
 }

@@ -666,17 +666,36 @@ def test_dev_seed_gives_each_kind_of_campaign_with_history(samples_on):
 
     store = MemoryStore()
     ids = dev_seed.seed_demo_campaigns(store)
-    assert len(ids) == 3 and dev_seed.seed_demo_campaigns(store) == []  # once
-    running, collecting, ended = (campaigns.view(store, i, store.campaign_get(i)) for i in ids)
-    assert running["sample"] and running["demo"] and running["org_id"] is None
-    assert running["status"] == "active" and len(running["stats"]["daily"]) == 12
-    inc = running["stats"]["incrementality"]
-    # still running: a lift so far whose interval still includes zero
-    assert inc["lift"] > 0 and inc["lift_lo"] < 0 < inc["lift_hi"] and inc["exposed"]["n"] == 420
-    assert collecting["status"] == "active" and collecting["stats"]["incrementality"] is None
-    assert ended["status"] == "ended" and len(ended["stats"]["daily"]) == 14
-    # the finished one is the clear result judges open: interval above zero
-    inc = ended["stats"]["incrementality"]
-    assert inc["lift"] > 0 and inc["lift_lo"] > 0
-    # samples never take a running slot
+    assert len(ids) == 6 and dev_seed.seed_demo_campaigns(store) == []  # once
+    views = [campaigns.view(store, i, store.campaign_get(i)) for i in ids]
+    assert all(v["sample"] and v["demo"] and v["org_id"] is None for v in views)
+    # slots in order: won, running, won, running, stopped, running (6 Proven products here)
+    won, running, won2, _, stopped, _ = views
+    for v in (won, won2):  # finished clear results: the interval sits above zero
+        inc = v["stats"]["incrementality"]
+        assert v["status"] == "ended" and inc["lift_lo"] > 0 and inc["exposed"]["n"] >= 1400
+        assert len(v["stats"]["daily"]) == v["days"]
+    assert running["status"] == "active" and running["stats"]["incrementality"]["lift"] > 0
+    assert len(running["stats"]["daily"]) < running["days"]
+    # stopped early: ended before its planned length, with only the days it ran
+    doc = store.campaign_get(ids[4])
+    assert stopped["status"] == "ended" and doc["ended_early"]
+    assert sum(1 for d in stopped["stats"]["daily"] if d["impressions"]) <= 7
+    # samples store group counts, not people, and never take a running slot
+    assert not store.campaign_members(ids[0])
     assert campaigns.active_count(store, dev_seed.DEV_OWNER) == 0
+
+
+def test_sample_numbers_follow_the_measured_lift_and_are_fixed_per_product():
+    from app import dev_seed
+
+    a = dev_seed.numbers("won", "p1", 0.3)
+    assert a == dev_seed.numbers("won", "p1", 0.3)  # the same for every person
+    assert dev_seed.adoption_uplift(0.4) > dev_seed.adoption_uplift(0.1)
+    flat = dev_seed.numbers("flat", "p1", 0.3)["tally"]
+    inc = campaigns.incrementality_of(
+        {g: (flat[g]["n"], flat[g]["added"]) for g in ("exposed", "holdout")}
+    )
+    assert inc["lift_lo"] < 0 < inc["lift_hi"]  # the unclear result
+    collecting = dev_seed.numbers("collecting", "p1", 0.3)["tally"]
+    assert collecting["holdout"]["n"] < campaigns.MIN_GROUP

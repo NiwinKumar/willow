@@ -17,7 +17,8 @@
     },
     {
       "id": "willow",
-      "name": "Willow (all brands)",
+      "name": "Proof demo",
+      "label": "Demo catalog · every brand",
       "accent": "#1F7F45",
       "domains": [],
       "demo": true,

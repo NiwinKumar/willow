@@ -124,7 +124,7 @@ export default function Plan() {
     <PlanContext.Provider value={state}>
       <div className="relative flex h-dvh flex-col overflow-hidden">
         <SoftBackdrop background={BACKDROP} />
-        <header className="relative z-10 flex items-center justify-between gap-3 px-[clamp(14px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
+        <header className="relative z-10 flex items-center justify-between gap-3 px-[clamp(16px,3vw,32px)] pt-[clamp(10px,2.2vh,22px)]">
           <Back step={step} go={go} exit={exit} />
           <Progress step={step} />
           <Link to={exit} className="flex min-h-11 items-center rounded-pill bg-white/55 px-3.5 text-[13.5px] text-ink no-underline backdrop-blur-[12px] transition-colors hover:bg-white/85">
@@ -159,8 +159,9 @@ function Progress({ step }: { step: StepId }) {
   const at = STEP_IDS.indexOf(step)
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-      <span key={step} className="animate-[wWord_.35s_both] font-mono text-[10.5px] tracking-[.08em] text-ink-2" aria-live="polite">
-        {STAGE_NAME[step].toUpperCase()}
+      {/* the bar says where you are; the stage name is for screen readers only */}
+      <span className="sr-only" aria-live="polite">
+        {STAGE_NAME[step]}
       </span>
       <ol aria-label={`Build a routine: ${STAGE_NAME[step]}`} className="m-0 flex w-full max-w-[300px] list-none gap-1 p-0">
         {STEP_IDS.map((id, i) => (

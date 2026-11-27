@@ -120,34 +120,61 @@ const promoteTo = (id: string, carry: string) => `/retail/campaigns${carry}${q(c
 const ref = (r: ProductRow) => ({ id: r.product_id, name: r.product, brand: r.brand, image_url: r.image_url, category: r.category })
 const liftInterval = (lo: number | null, hi: number | null) => (lo === null || hi === null ? null : `95% interval ${pts(lo)} to ${pts(hi)}`)
 /** The shelf cards' figure is results-vs-shelf share; their interval is the lift's, so it says so. */
-const shelfLiftInterval = (lo: number | null, hi: number | null) => (lo === null || hi === null ? null : `Lift over non-users, 95% interval ${pts(lo)} to ${pts(hi)}`)
+const shelfLiftInterval = (lo: number | null, hi: number | null) => (lo === null || hi === null ? null : `Gap over people with the same goals not using it, 95% interval ${pts(lo)} to ${pts(hi)}`)
+
+/** The comparison group in words, after a lift figure ("+54 pts more than people not using it"). */
+export const GAP_NOTE = 'more than people not using it'
+
+/** A product's record against its comparison group, in one sentence: the gap is the point. */
+export const gapSentence = (r: Pick<ProductRow, 'rate' | 'n' | 'base_rate' | 'lift'>, weeks: number) =>
+  `${pct(r.rate)} of ${int(r.n)} users saw a visible change by week ${weeks}${r.base_rate !== null ? `; ${pct(r.base_rate)} of people with the same goals who don’t use it changed anyway` : ''}: a ${pts(r.lift)} gap.`
+
+/**
+ * Where each product stands on promotion, the same everywhere on Home (cards, brief, counts): `running` (a
+ * campaign is live or paused, sample or not), `measured` (none running; an ended one has its lift against the holdout,
+ * so its result card offers "Run it again"), `ended` (ended before a lift was measured). Absent: never promoted.
+ */
+export function promotionOf(campaigns: Pick<Campaign, 'product_id' | 'status' | 'stats'>[]): Map<string, 'running' | 'measured' | 'ended'> {
+  const m = new Map<string, 'running' | 'measured' | 'ended'>()
+  const rank = { running: 3, measured: 2, ended: 1 } as const
+  for (const c of campaigns) {
+    const v = c.status !== 'ended' ? 'running' : c.stats.incrementality ? 'measured' : c.status === 'ended' ? 'ended' : null
+    if (!v) continue
+    const cur = m.get(c.product_id)
+    if (!cur || rank[v] > rank[cur]) m.set(c.product_id, v)
+  }
+  return m
+}
 
 /** The cards for one organisation, most people first. Results are a separate lane. */
 export function composeCards(x: ComposeInput): DecisionCard[] {
   const cards: DecisionCard[] = []
   const rowById = new Map(x.rows.map((r) => [r.product_id, r]))
   const mine = x.brand ? x.rows.filter((r) => r.brand === x.brand) : x.rows
-  // a sample campaign (simulated) never promotes a product: it only shows up as a result (12)
+  // A simulated (sample) campaign never makes evidence slip (4); it does count as a promotion, like any other.
   const live = x.campaigns.filter((c) => !c.sample)
-  const active = new Set(live.filter((c) => c.status === 'active').map((c) => c.product_id))
+  const promo = promotionOf(x.campaigns)
 
   if (x.mix === 'brand') {
     // 1 · Proven, not promoted
     for (const r of mine) {
-      if (r.tier !== 'proven' || active.has(r.product_id) || r.n === null) continue
+      // Running, or promoted before with a measured result (12 offers "Run it again"): no card here.
+      const p = promo.get(r.product_id)
+      if (r.tier !== 'proven' || r.n === null || p === 'running' || p === 'measured') continue
+      const before = p === 'ended'
       cards.push({
         key: `proven_not_promoted--${r.product_id}`,
         kind: 'proven_not_promoted',
         type: TYPE_LABEL.proven_not_promoted,
-        title: `${r.product} is Proven and not promoted`,
-        trigger: `${pct(r.rate)} of ${int(r.n)} users saw a visible change by week ${x.weeks}, ${pts(r.lift)} over non-users with the same goals. No campaign is running for it.`,
+        title: before ? `${r.product} is Proven; its campaign has ended` : `${r.product} is Proven and not promoted`,
+        trigger: `${gapSentence(r, x.weeks)} ${before ? 'Its last campaign ended before its lift was measured.' : 'It has never had a campaign.'}`,
         figure: pts(r.lift),
-        figureNote: 'over non-users',
+        figureNote: GAP_NOTE,
         n: r.n,
         interval: liftInterval(r.lift_lo, r.lift_hi),
         people: r.users ?? r.n,
         product: ref(r),
-        primary: { kind: 'link', label: 'Promote where it works', to: promoteTo(r.product_id, x.carry) },
+        primary: { kind: 'link', label: before ? 'Promote again' : 'Promote where it works', to: promoteTo(r.product_id, x.carry) },
         secondary: { kind: 'link', label: 'View proof', to: productTo(r.product_id, x.carry) },
         waiting: 'Adoption against the randomised holdout, once each group has 10 people',
         lane: 'decide',
@@ -161,7 +188,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
         kind: 'nearly_proven',
         type: TYPE_LABEL.nearly_proven,
         title: `${r.product} is close to Proven`,
-        trigger: `${pts(r.lift)} over non-users in ${int(r.n)} people at week ${x.weeks}; about ${int(r.to_proven)} more people would settle it if the rates hold.`,
+        trigger: `${pts(r.lift)} more than people with the same goals not using it, in ${int(r.n)} people at week ${x.weeks}; about ${int(r.to_proven)} more people would settle it if the rates hold.`,
         figure: `+${int(r.to_proven)}`,
         figureNote: 'people needed',
         n: r.n,
@@ -212,7 +239,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
           kind: 'over_shelved',
           type: TYPE_LABEL.over_shelved,
           title: `${s.product} takes more shelf than its results`,
-          trigger: `${pct(s.shelf_share)} of ${s.category_label.toLowerCase()} ${where}, ${pct(s.results_share)} of the visible changes; ${int(s.n)} people at week ${x.weeks}, lift over non-users ${pts(s.lift)}.`,
+          trigger: `${pct(s.shelf_share)} of ${s.category_label.toLowerCase()} ${where}, ${pct(s.results_share)} of the visible changes; ${int(s.n)} people at week ${x.weeks}, ${pts(s.lift)} against people with the same goals not using it.`,
           figure: pts(s.gap),
           figureNote: 'results vs shelf',
           n: s.n,
@@ -234,7 +261,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
           kind: 'under_shelved',
           type: TYPE_LABEL.under_shelved,
           title: `${s.product} delivers more than its shelf`,
-          trigger: `${pct(s.results_share)} of the visible changes in ${s.category_label.toLowerCase()} from ${pct(s.shelf_share)} of ${where}; Proven in ${int(s.n)} people, ${pts(s.lift)} over non-users.`,
+          trigger: `${pct(s.results_share)} of the visible changes in ${s.category_label.toLowerCase()} from ${pct(s.shelf_share)} of ${where}; Proven in ${int(s.n)} people, ${pts(s.lift)} more than people with the same goals not using it.`,
           figure: `+${Math.round(s.gap * 100)} pts`,
           figureNote: 'results vs shelf',
           n: s.n,
@@ -302,9 +329,9 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
       kind: 'evidence_slipped',
       type: TYPE_LABEL.evidence_slipped,
       title: `${r.product} is promoted but no longer Proven`,
-      trigger: `A campaign is live while the product reads “${r.tier_label ?? r.tier}”${r.n !== null ? ` in ${int(r.n)} people at week ${x.weeks}` : ''}${r.lift !== null ? `, ${pts(r.lift)} over non-users` : ''}. Campaigns are for Proven products only.`,
+      trigger: `A campaign is live while the product reads “${r.tier_label ?? r.tier}”${r.n !== null ? ` in ${int(r.n)} people at week ${x.weeks}` : ''}${r.lift !== null ? `, ${pts(r.lift)} against people with the same goals not using it` : ''}. Campaigns are for Proven products only.`,
       figure: r.lift !== null ? pts(r.lift) : '—',
-      figureNote: r.lift !== null ? 'over non-users now' : 'no measured lift now',
+      figureNote: r.lift !== null ? `${GAP_NOTE} now` : 'no measured lift now',
       n: r.n,
       interval: liftInterval(r.lift_lo, r.lift_hi),
       people: c.stats.reach ?? c.stats.impressions ?? 0,
@@ -447,7 +474,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
       key: `campaign_result--${c.id}`,
       kind: 'campaign_result',
       type: TYPE_LABEL.campaign_result,
-      title: `${c.product ?? c.product_id}: campaign result ${c.status === 'ended' ? 'in' : 'so far'}`,
+      title: c.status === 'ended' && cleared ? `${c.product ?? c.product_id} was promoted once: ${pts(inc.lift)} adoption. Run it again?` : `${c.product ?? c.product_id}: campaign result ${c.status === 'ended' ? 'in' : 'so far'}`,
       trigger: `${c.sample ? 'Sample campaign, simulated. ' : ''}Adoption ${pts(inc.lift)} against the randomised holdout: ${pct(inc.exposed.rate)} of ${int(inc.exposed.n)} who could see the card, ${pct(inc.holdout.rate)} of ${int(inc.holdout.n)} held out.`,
       figure: pts(inc.lift),
       figureNote: cleared ? 'interval above zero' : 'interval includes zero',
@@ -473,7 +500,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
       title: a.rule_name ? `Rule “${a.rule_name}” proposes a campaign` : 'An AutoCampaign rule proposes a campaign',
       trigger: a.text.replace(/^Proposed: /, ''),
       figure: r?.lift !== undefined && r?.lift !== null ? pts(r.lift) : '—',
-      figureNote: r ? 'over non-users' : '',
+      figureNote: r ? GAP_NOTE : '',
       n: r?.n ?? null,
       interval: r ? liftInterval(r.lift_lo, r.lift_hi) : null,
       people: r?.users ?? r?.n ?? 0,
@@ -537,7 +564,7 @@ function samplingBrief(r: ProductRow, weeks: number): string {
   return [
     `# Sampling brief: ${r.product} (${r.brand})`,
     '',
-    `Status: Promising. ${pts(r.lift)} over non-users with the same goals in ${int(r.n)} people at week ${weeks}${r.lift_lo !== null && r.lift_hi !== null ? ` (95% interval ${pts(r.lift_lo)} to ${pts(r.lift_hi)})` : ''}.`,
+    `Status: Promising. ${pts(r.lift)} more than people with the same goals not using it, in ${int(r.n)} people at week ${weeks}${r.lift_lo !== null && r.lift_hi !== null ? ` (95% interval ${pts(r.lift_lo)} to ${pts(r.lift_hi)})` : ''}.`,
     `About ${int(r.to_proven)} more people at week ${weeks} would settle it if the rates hold.`,
     '',
     '## Aim',

@@ -86,7 +86,7 @@ def test_dry_run_writes_nothing_and_write_appends_without_overwriting(merge_mod,
         "cosrx-snail-96-mucin-power-essence",
     ]
     rows = sheet.read_text().splitlines()
-    assert len(rows) == 1 + len(merged) and rows[0].endswith(",detail,notes")
+    assert len(rows) == 1 + len(merged) and rows[0].endswith(",detail,notes,concerns_source")
     # a second run finds nothing new
     assert merge_mod.main([*args, "--write"]) == 0
     assert len(json.loads(catalog.read_text())) == len(merged)
