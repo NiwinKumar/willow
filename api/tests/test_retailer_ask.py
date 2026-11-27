@@ -253,3 +253,22 @@ def test_new_rows_start_the_kept_answers_over(client, fake, monkeypatch):
     version["v"] = 2  # BigQuery rows refreshed
     client.post("/v1/retailer/ask", json=ask)
     assert len(calls) == 2
+
+
+def test_a_percent_from_the_question_never_comes_back():
+    from app import retailer_ask
+
+    data = {"cohort": {"real": 0, "simulated": 40}, "products": [{"share": 0.95}]}
+    echo = retailer_ask.Answer(answer="No, it is not 95%.", follow_ups=[], refused=False)
+    assert retailer_ask.problems(echo, data, "Is it 95% for this serum?")
+    fine = retailer_ask.Answer(answer="95% of users still used it.", follow_ups=[], refused=False)
+    assert not retailer_ask.problems(fine, data, "How many still use it?")
+
+
+def test_proof_never_calls_a_product_safe():
+    from app import retailer_ask
+
+    reply = retailer_ask.Answer(
+        answer="Here is the view.", follow_ups=["Which is safest?"], refused=False
+    )
+    assert "banned wording" in retailer_ask.problems(reply, {"cohort": {}}, "Show me serums")

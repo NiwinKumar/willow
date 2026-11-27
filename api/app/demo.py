@@ -32,7 +32,8 @@ CACHE_SECONDS = 300
 EXT_CONTENT_TYPE = {"dng": "image/x-adobe-dng", "jpg": "image/jpeg", "jpeg": "image/jpeg"}
 
 # A routine that shows what the rule table catches: a retinoid and a BHA in the same evening,
-# and no sunscreen in the morning.
+# and no sunscreen in the morning. Added for guests, each entry is marked `sample: true` (the app
+# shows "Sample routine" and offers "Replace with my own").
 JUDGE_ROUTINE: list[tuple[str, list[str]]] = [
     ("the-derma-co-2-niacinamide-gentle-skin-cleanser", ["am", "pm"]),
     ("dot-and-key-barrier-repair-intense-moisturizer-ceramides", ["am", "pm"]),

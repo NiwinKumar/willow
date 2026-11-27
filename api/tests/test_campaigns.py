@@ -58,6 +58,9 @@ def _as(uid: str) -> TestClient:
 
 
 def _create(client, pid=PROVEN, workspace="retailer", goals=("dark_spots",), skin=(), days=14):
+    # creating needs a Proof org membership (app/proof_orgs.py): "Try as" the demo retailer
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
     return client.post(
         "/v1/retailer/campaigns",
         json={
@@ -505,6 +508,8 @@ def test_assignment_is_stable_and_near_the_share():
 
 
 def _holdout_campaign(client, fake, pct=0.5):
+    join = {"instance": "willow", "org_id": "willow", "role": "analyst"}
+    assert client.post("/v1/proof/join", json=join).status_code == 200
     res = client.post(
         "/v1/retailer/campaigns",
         json={

@@ -15,6 +15,7 @@ and `source` (which aggregate tables the chart and the answer drew on).
 import calendar
 import json
 import logging
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -45,7 +46,8 @@ who said it is working for them; quote it only as what people said, never as a m
 - Quote numbers exactly as they appear; a fraction may be written as a whole percent (0.36 -> 36%).
   Never compute new numbers (no differences, sums, averages or ratios you derive yourself).
 - refused: true when the question asks about individual people (who, which user, a named
-  person) or for something INSIGHTS does not hold; then give no numbers and no chart, say what
+  person) or for something INSIGHTS does not hold (sales, revenue, prices paid, profit, margins,
+  returns, stock levels, anything per person); then give no numbers and no chart, say what
   is not available and what group-level view could answer instead. Otherwise false.
 - Skin-tone bands describe coverage of the cohort; never rank or compare people by skin tone and
   never imply lighter skin is better.
@@ -157,16 +159,25 @@ def _names(insights: dict[str, Any]) -> set[str]:
     return set(_index(insights))
 
 
+_ASKED_PERCENT = re.compile(r"\d+(?:[.,]\d+)?(?=\s*(?:%|percent))", re.IGNORECASE)
+# Proof never says a product is safe, in an answer or a suggested follow-up.
+_UNSAFE_WORDS = re.compile(r"\bsafe(?:ly|st|r|ty)?\b", re.IGNORECASE)
+
+
 def problems(reply: Answer, insights: dict[str, Any], question: str) -> list[str]:
     """Everything shown is checked: answer, chart title, follow-ups, bar labels and values.
     The question's own digits are not allowed back ("is it 95%?" must not be echoed)."""
     plain, pct = numbers.collect(insights), numbers.percents(insights)
-    allowed = plain | pct
+    # A percent the question supplies may not come back, even when the same figure sits somewhere
+    # in the data ("is it 95%?" must not be echoed as if it were the answer). Bare numbers in the
+    # question (weeks, counts) stay allowed: "by week 8" is a legitimate thing to answer about.
+    asked = set().union(*(numbers.in_text(m) for m in _ASKED_PERCENT.findall(question)))
+    allowed = (plain | pct) - asked
     found = []
     texts = [reply.answer, *reply.follow_ups, reply.chart.title if reply.chart else ""]
     if not all(numbers.only_known(t, allowed) for t in texts):
         found.append("text quotes a number that is not in the data")
-    if any(BANNED.search(t) for t in texts):
+    if any(BANNED.search(t) or _UNSAFE_WORDS.search(t) for t in texts):
         found.append("banned wording")
     if reply.refused and reply.chart:
         found.append("a refusal has no chart")
