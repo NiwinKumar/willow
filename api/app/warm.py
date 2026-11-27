@@ -39,6 +39,16 @@ def _rows() -> str:
     return "rows"
 
 
+def _proof_lists() -> str:
+    """Proof's product and brand lists (every catalog product and brand: 3,000+ rows since the
+    catalog grew), so the first judge to open Products or the brand picker doesn't wait."""
+    from app.routes import retailer_routes
+
+    retailer_routes.proof_products("mixed", "all")
+    retailer_routes.proof_brands("mixed", "all")
+    return "proof lists"
+
+
 def _status() -> str:
     from app import demo
 
@@ -97,6 +107,7 @@ def run(budget_s: float = WARM_BUDGET_S) -> None:
     rows = pool.submit(_rows)
     jobs = [rows, pool.submit(_status), pool.submit(_rule)]
     jobs += [pool.submit(_demo), pool.submit(_demo_check)]
+    jobs += [pool.submit(lambda: (rows.exception(), _proof_lists())[1])]
     # Answers read the rows, so they start once the rows are in (or failed).
     jobs += [pool.submit(lambda q=q: (rows.exception(), _ask(q))[1]) for q in ASK_SUGGESTIONS]
     done, pending = wait(jobs, timeout=budget_s)
