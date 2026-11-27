@@ -110931,33 +110931,88 @@
     "name": "Dermal Repair Cream",
     "category": "moisturizer",
     "concerns": [
-      "dryness_barrier",
-      "fine_lines",
       "redness_sensitivity",
-      "uneven_tone"
+      "dryness_barrier",
+      "fine_lines"
     ],
-    "key_actives": [],
-    "inci": [],
-    "price": null,
-    "size": "1.7 oz",
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "heparan sulfate",
+        "pct": null
+      },
+      {
+        "name": "acetyl glucosamine",
+        "pct": null
+      },
+      {
+        "name": "sodium hyaluronate",
+        "pct": null
+      },
+      {
+        "name": "camellia sinensis leaf extract",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Aqua/Water",
+      "Caprylic/Capric Triglyceride",
+      "C12-15 Alkyl Benzoate",
+      "Glycerin",
+      "Cetearyl Alcohol",
+      "Argania Spinosa Kernel Oil",
+      "Heparan Sulfate",
+      "Acetyl Glucosamine",
+      "Dimethicone",
+      "Ethylhexyl Palmitate",
+      "Glyceryl Stearate",
+      "PEG-100 Stearate",
+      "Potassium Cetyl Phosphate",
+      "Butylene Glycol",
+      "Tocopheryl Acetate",
+      "Tocopherol",
+      "1,2-Hexanediol",
+      "Caprylyl Glycol",
+      "Sodium Hyaluronate",
+      "Camellia Sinensis Leaf Extract",
+      "Chenopodium Quinoa Seed Extract",
+      "Acrylates/C10-30 Alkyl Acrylate Crosspolymer",
+      "Aminomethyl Propanol",
+      "Palmitic Acid",
+      "Sodium Benzoate",
+      "Sorbic Acid",
+      "Potassium Sorbate",
+      "Phenoxyethanol",
+      "Disodium EDTA"
+    ],
+    "price": {
+      "amount": 167.0,
+      "currency": "USD"
+    },
+    "size": "50 ml",
     "region": [
       "US"
     ],
     "stores": [
       {
+        "store": "Brand site",
+        "url": "https://sentelabs.com/products/sente-dermal-repair-cream",
+        "region": "US",
+        "price": null
+      },
+      {
         "store": "Dermstore",
-        "url": "https://www.dermstore.com/p/sente-dermal-repair-cream-50ml/12902892/?bvstate=pg%3A3%2Fct%3Ar",
+        "url": "https://www.dermstore.com/p/sente-dermal-repair-cream-50ml/12902892/",
         "region": "US",
         "price": null
       }
     ],
-    "source_url": "https://www.dermstore.com/p/sente-dermal-repair-cream-50ml/12902892/?bvstate=pg%3A3%2Fct%3Ar",
+    "image_url": "https://sentelabs.com/cdn/shop/products/dermal-repair-cream-559533.jpg?v=1708891682",
+    "image_source": "https://sentelabs.com/products/sente-dermal-repair-cream",
+    "source_url": "https://sentelabs.com/products/sente-dermal-repair-cream",
     "last_verified": "2026-11-27",
-    "detail": "index",
-    "notes": "Dermstore lists this product in its bestseller assortment and on a separate product page, with price and ingredients left for exact-variant verification.",
-    "image_url": "https://main.thgimages.com/?url=https://static.thcdn.com/productimg/original/12902892-8295050869917202.jpg&format=webp&width=1500&height=1500&fit=cover",
-    "image_source": "https://www.dermstore.com/p/sente-dermal-repair-cream-50ml/12902892/?bvstate=pg%3A3%2Fct%3Ar",
-    "concerns_source": "brand_page"
+    "detail": "full",
+    "notes": "Brand page shows USD 167 (50 ml) in the page text but USD 116 in its og:price tag, so the store price is null; 167 is the reference price. Dermstore URL from a web-search result, not opened."
   },
   {
     "product_id": "paula-s-choice-10-azelaic-acid-booster",
@@ -122365,5 +122420,833 @@
     "image_url": "https://main.thgimages.com/?url=https://static.thcdn.com/productimg/original/12949480-4835329278293154.jpg&format=webp&width=1500&height=1500&fit=cover",
     "image_source": "https://www.lookfantastic.com/p/caudalie-vinoclean-instant-foaming-cleanser-50ml/12855156/?variation=12764533",
     "concerns_source": "brand_page"
+  },
+  {
+    "product_id": "hydrinity-restorative-ha-masque",
+    "brand": "Hydrinity",
+    "name": "Restorative HA+ Masque",
+    "category": "mask",
+    "concerns": [
+      "dryness_barrier",
+      "redness_sensitivity"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "sodium hyaluronate",
+        "pct": null
+      },
+      {
+        "name": "hydrolyzed hyaluronic acid",
+        "pct": null
+      },
+      {
+        "name": "ceramide np",
+        "pct": null
+      },
+      {
+        "name": "oligopeptide-1",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Water/Aqua/Eau",
+      "Butylene Glycol",
+      "Glycerin",
+      "Sodium Hyaluronate",
+      "Hydrolyzed Hyaluronic Acid",
+      "Urea",
+      "Allantoin",
+      "Propanediol",
+      "Acrylates/C10-30 Alkyl Acrylate Crosspolymer",
+      "Arginine",
+      "Chlorphenesin",
+      "Epilobium Angustifolium Flower/Leaf/Stem Extract",
+      "Disodium EDTA",
+      "Sodium Polyacrylate",
+      "Polyglyceryl-4 Caprate",
+      "Phenoxyethanol",
+      "Polyquaternium-51",
+      "Sodium Lauroyl Lactylate",
+      "Sodium Polyglutamate",
+      "1,2-Hexanediol",
+      "Bifida Ferment Lysate",
+      "Lactobacillus Ferment Lysate",
+      "Lactococcus Ferment Lysate",
+      "Codium Tomentosum Extract",
+      "Chlorella Vulgaris Extract",
+      "Iodopropynyl Butylcarbamate",
+      "Ceramide NP",
+      "Lactic Acid",
+      "Ceramide AP",
+      "Phytosphingosine",
+      "Cholesterol",
+      "Bis-PEG-18 Methyl Ether Dimethyl Silane",
+      "Xanthan Gum",
+      "Carbomer",
+      "Ethylhexylglycerin",
+      "Tocopherol",
+      "Sodium Metabisulfite",
+      "Ceramide EOP",
+      "Oligopeptide-1"
+    ],
+    "price": {
+      "amount": 120.0,
+      "currency": "USD"
+    },
+    "size": "5 single-use sheet masques",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://www.hydrinity.com/products/restorative-masque",
+        "region": "US",
+        "price": {
+          "amount": 120.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://www.hydrinity.com/cdn/shop/files/Restorative-HA_-Masque.jpg?v=1756308519&width=1024",
+    "image_source": "https://www.hydrinity.com/products/restorative-masque",
+    "source_url": "https://www.hydrinity.com/products/restorative-masque",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "Brand site, box of 5 single-use biocellulose masques, USD 120.00. Brand says 1-2 times a week. \"Epidermal growth factors\" in the brand copy has no matching INCI name, so it is not a key active."
+  },
+  {
+    "product_id": "hydrinity-prelude-facial-treatment-cleanser",
+    "brand": "Hydrinity",
+    "name": "PRELUDE Facial Treatment Cleanser",
+    "category": "cleanser",
+    "concerns": [
+      "dullness"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "fulvic acid",
+        "pct": null
+      },
+      {
+        "name": "aloe barbadensis (aloe vera) leaf juice",
+        "pct": null
+      },
+      {
+        "name": "panthenol",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Water/Aqua/Eau",
+      "Sodium Lauroyl Methyl Isethionate",
+      "Propanediol",
+      "Cocamidopropyl Betaine",
+      "Sodium Methyl Oleoyl Taurate",
+      "Fulvic Acid",
+      "Cocamidopropyl Hydroxysultaine",
+      "Coco Glucoside",
+      "Lauryl Glucoside",
+      "Glycerin",
+      "Aloe Barbadensis (Aloe Vera) Leaf Juice",
+      "Tocopherol",
+      "Panthenol",
+      "Salvia Hispanica Seed Extract",
+      "Helianthus Annuus (Sunflower) Seed Oil",
+      "Anthemis Nobilis (Roman Chamomile) Oil",
+      "Simmondsia Chinensis (Jojoba) Seed Oil",
+      "Ethylhexylglycerin",
+      "Xylitol",
+      "Tetrasodium Glutamate Diacetate",
+      "Caprylyl Glycol",
+      "Sodium Cocoyl Glycinate",
+      "Polysorbate 20",
+      "Galactoarabinan",
+      "Trehalose",
+      "Sorbitol",
+      "Citrus Paradisi (Grapefruit) Peel Oil",
+      "Sodium Benzoate",
+      "Sodium Chloride",
+      "Sodium Phosphate",
+      "Rosa Moschata Seed Oil",
+      "Citrus Bergamia (Bergamot) Oil",
+      "Citrus Aurantium Dulcis (Orange) Peel Oil",
+      "Linalool",
+      "Benzyl Alcohol",
+      "Cocamidopropyl Dimethylamine",
+      "Lavandula Angustifolia (Lavender) Oil",
+      "Citrus Limon (Lemon) Peel Oil",
+      "Citrus Aurantifolia (Lime) Oil",
+      "Litsea Cubeba Fruit Oil",
+      "Citrus Reticulata (Tangerine) Peel Oil",
+      "d-Limonene",
+      "Citric Acid",
+      "Phenoxyethanol",
+      "Sodium Hydroxide",
+      "Sodium Glycolate",
+      "Sodium Formate"
+    ],
+    "price": {
+      "amount": 58.0,
+      "currency": "USD"
+    },
+    "size": "",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://www.hydrinity.com/products/prelude-facial-treatment-cleanser",
+        "region": "US",
+        "price": null
+      }
+    ],
+    "image_url": "https://www.hydrinity.com/cdn/shop/files/prelude-pdp.png?v=1758900844&width=1000",
+    "image_source": "https://www.hydrinity.com/products/prelude-facial-treatment-cleanser",
+    "source_url": "https://www.hydrinity.com/products/prelude-facial-treatment-cleanser",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "The person named \"Hydrinity cleanser\"; Prelude is the brand's only face cleanser on hydrinity.com. USD 58.00 from the page's product price, but the page shows no size, so the store price is null and `size` is empty. Contains fragrant essential oils (bergamot, orange, lavender, lemon, lime, tangerine) and limonene/linalool. Concern `dullness` is a soft fit; the brand claims only cleansing and balance."
+  },
+  {
+    "product_id": "isdin-fusion-water-magic-spf-50",
+    "brand": "ISDIN",
+    "name": "Fotoprotector Fusion Water MAGIC SPF 50",
+    "category": "sunscreen",
+    "concerns": [
+      "dark_spots_pigmentation",
+      "oiliness_shine"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "ethylhexyl salicylate",
+        "pct": null
+      },
+      {
+        "name": "ethylhexyl triazone",
+        "pct": null
+      },
+      {
+        "name": "bis-ethylhexyloxyphenol methoxyphenyl triazine",
+        "pct": null
+      },
+      {
+        "name": "butyl methoxydibenzoylmethane",
+        "pct": null
+      },
+      {
+        "name": "phenylbenzimidazole sulfonic acid",
+        "pct": null
+      },
+      {
+        "name": "sodium hyaluronate",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Aqua (Water)",
+      "Dibutyl Adipate",
+      "Propanediol",
+      "Ethylhexyl Salicylate",
+      "Ethylhexyl Triazone",
+      "Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine",
+      "Dimethicone",
+      "Butyl Methoxydibenzoylmethane",
+      "Phenylbenzimidazole Sulfonic Acid",
+      "Silica",
+      "Diisopropyl Sebacate",
+      "Arginine",
+      "Pentylene Glycol",
+      "Hydroxyacetophenone",
+      "Lauryl PEG/PPG-18/18 Methicone",
+      "VP/Eicosene Copolymer",
+      "Polysorbate 60",
+      "Dimethicone/Vinyl Dimethicone Crosspolymer",
+      "Glycerin",
+      "Caprylyl Glycol",
+      "Hydrated Silica",
+      "Tocopheryl Acetate",
+      "PEG-10 Dimethicone",
+      "Tetrasodium Glutamate Diacetate",
+      "Parfum (Fragrance)",
+      "Sclerotium Gum",
+      "Sodium Hyaluronate",
+      "Porphyridium Cruentum Extract",
+      "Xanthan Gum",
+      "Citric Acid"
+    ],
+    "price": {
+      "amount": 23.75,
+      "currency": "GBP"
+    },
+    "size": "50 ml",
+    "region": [
+      "UK",
+      "EU"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://www.isdin.com/en-GB/product/fotoprotector-isdin/magic-spf-50",
+        "region": "UK",
+        "price": null
+      },
+      {
+        "store": "Beauty Bay",
+        "url": "https://www.beautybay.com/p/isdin/fusion-water-magic-spf-50/",
+        "region": "UK",
+        "price": null
+      }
+    ],
+    "image_url": "https://www.isdin.com/sites/default/files/productos/imagenes/es_1349_th_fpfusionwatermagicspf5050ml_main_image_0_1.jpg?v=1713424184",
+    "image_source": "https://www.isdin.com/en-GB/product/fotoprotector-isdin/magic-spf-50",
+    "source_url": "https://www.isdin.com/en-GB/product/fotoprotector-isdin/magic-spf-50",
+    "last_verified": "2026-11-28",
+    "detail": "full",
+    "notes": "The US site sells a different SPF 40 \"Fusion Water MAGIC\"; this is the EU/UK SPF 50, INCI from isdin.com/en-GB (no price there). Reference price GBP 23.75 is Beauty Bay's UK listing for the 50 ml (out of stock when seen on 2026-11-28, so no store price is recorded). Sold in the UK and EU only."
+  },
+  {
+    "product_id": "face-reality-ultra-gentle-gel-cleanser",
+    "brand": "Face Reality",
+    "name": "Ultra Gentle Gel Cleanser",
+    "category": "cleanser",
+    "concerns": [
+      "acne_blemishes",
+      "redness_sensitivity"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "glycyrrhiza glabra (licorice) root extract",
+        "pct": null
+      },
+      {
+        "name": "camellia sinensis (green tea) leaf extract",
+        "pct": null
+      },
+      {
+        "name": "fomes officinalis (mushroom) extract",
+        "pct": null
+      },
+      {
+        "name": "panthenol",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Aqua (Water)",
+      "Cocamidopropyl Betaine",
+      "Glycerin",
+      "Decyl Glucoside",
+      "Xanthan Gum",
+      "Phenoxyethanol",
+      "Butylene Glycol",
+      "Fomes Officinalis (Mushroom) Extract",
+      "Citric Acid",
+      "Disodium EDTA",
+      "Potassium Sorbate",
+      "Hamamelis Virginiana (Witch Hazel) Water",
+      "Camellia Sinensis (Green Tea) Leaf Extract",
+      "Glycyrrhiza Glabra (Licorice) Root Extract",
+      "Panthenol (D)",
+      "Ethylhexylglycerin",
+      "Alcohol"
+    ],
+    "price": {
+      "amount": 33.0,
+      "currency": "USD"
+    },
+    "size": "6 oz",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://facerealityskincare.com/products/ultra-gentle-cleanser",
+        "region": "US",
+        "price": {
+          "amount": 33.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://facerealityskincare.com/cdn/shop/files/FR_2025_PDP_Cleansers_2048x2048_UGGC_Front.png?v=1754415667",
+    "image_source": "https://facerealityskincare.com/products/ultra-gentle-cleanser",
+    "source_url": "https://facerealityskincare.com/products/ultra-gentle-cleanser",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "Brand site, 6 oz, USD 33.00 (a smaller size is also sold; og:price showed 14.00 for it)."
+  },
+  {
+    "product_id": "face-reality-barrier-balance-creamy-cleanser",
+    "brand": "Face Reality",
+    "name": "Barrier Balance Creamy Cleanser",
+    "category": "cleanser",
+    "concerns": [
+      "dryness_barrier",
+      "redness_sensitivity",
+      "acne_blemishes"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "panthenol",
+        "pct": null
+      },
+      {
+        "name": "allantoin",
+        "pct": null
+      },
+      {
+        "name": "bisabolol",
+        "pct": null
+      },
+      {
+        "name": "centella asiatica (gotu kola) leaf extract",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Aqua (Water)",
+      "Sodium Stearoyl Glutamate",
+      "Glyceryl Stearate",
+      "Stearic Acid",
+      "Cocamidopropyl Betaine",
+      "Glycerin",
+      "Polyacrylate Crosspolymer-6",
+      "Cetyl Alcohol",
+      "Caprylic/Capric Triglyceride",
+      "Panthenol (D)",
+      "Inulin",
+      "Hydrolyzed Jojoba Esters",
+      "Saccharide Isomerate",
+      "Allantoin",
+      "Bisabolol (L-alpha)",
+      "Alpha-Glucan Oligosaccharide",
+      "Aloe Barbadensis Leaf Juice Powder",
+      "Centella Asiatica (Gotu Kola) Leaf Extract",
+      "Xanthan Gum",
+      "Phenoxyethanol",
+      "Ethylhexylglycerin",
+      "Sodium Hydroxide",
+      "Potassium Sorbate",
+      "Sodium Gluconate",
+      "Citric Acid",
+      "Sodium Citrate"
+    ],
+    "price": {
+      "amount": 37.0,
+      "currency": "USD"
+    },
+    "size": "6 oz",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://facerealityskincare.com/products/barrier-balance-creamy-cleanser",
+        "region": "US",
+        "price": {
+          "amount": 37.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://facerealityskincare.com/cdn/shop/files/FR_2025_PDP_Cleansers_2048x2048_BBCC_Front.png?v=1754500807",
+    "image_source": "https://facerealityskincare.com/products/barrier-balance-creamy-cleanser",
+    "source_url": "https://facerealityskincare.com/products/barrier-balance-creamy-cleanser",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "Brand site, 6 oz, USD 37.00."
+  },
+  {
+    "product_id": "face-reality-8-l-mandelic-serum",
+    "brand": "Face Reality",
+    "name": "8% L-Mandelic Serum",
+    "category": "exfoliant",
+    "concerns": [
+      "acne_blemishes",
+      "texture_pores",
+      "uneven_tone"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "mandelic acid",
+        "pct": 8.0
+      },
+      {
+        "name": "lactic acid",
+        "pct": null
+      },
+      {
+        "name": "niacinamide",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Aqua (Water)",
+      "Hamamelis Virginiana (Witch Hazel) Water",
+      "Mandelic Acid (L)",
+      "Alcohol",
+      "Lactic Acid (L)",
+      "Butylene Glycol",
+      "PPG-3 Benzyl Ether Myristate",
+      "Alcohol Denat",
+      "Niacinamide",
+      "Sodium Lactate",
+      "Xanthan Gum",
+      "Sodium PCA",
+      "Sodium Hyaluronate (L)",
+      "Urea",
+      "Phenethyl Alcohol",
+      "Caprylyl Glycol",
+      "Potassium Sorbate"
+    ],
+    "price": {
+      "amount": 44.0,
+      "currency": "USD"
+    },
+    "size": "1 oz",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://facerealityskincare.com/products/8-mandelic-serum",
+        "region": "US",
+        "price": {
+          "amount": 44.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://facerealityskincare.com/cdn/shop/files/FR_2025_PDP_Serums_2048x2048_Mandelic_8_Front.png?v=1754435221",
+    "image_source": "https://facerealityskincare.com/products/8-mandelic-serum",
+    "source_url": "https://facerealityskincare.com/products/8-mandelic-serum",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "The person named \"mandelic\" next to their Face Reality cleansers; the brand also sells a 15% version, so confirm the strength with them. Brand site, 1 oz, USD 44.00. Contains alcohol and alcohol denat."
+  },
+  {
+    "product_id": "plated-skin-science-intense-serum",
+    "brand": "Plated Skin Science",
+    "name": "INTENSE Serum",
+    "category": "serum",
+    "concerns": [
+      "fine_lines",
+      "texture_pores"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "human platelet extract",
+        "pct": null
+      },
+      {
+        "name": "panthenol",
+        "pct": null
+      },
+      {
+        "name": "hyaluronic acid",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "water",
+      "glycerin",
+      "pentylene glycol",
+      "panthenol",
+      "human platelet extract",
+      "polyacrylate crosspolymer-6",
+      "hyaluronic acid",
+      "caprylyl glycol",
+      "1,2-hexanediol",
+      "hydrolyzed gelatin",
+      "arginine",
+      "silanetriol"
+    ],
+    "price": {
+      "amount": 258.0,
+      "currency": "USD"
+    },
+    "size": "15 ml",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://platedskinscience.com/products/intense-serum",
+        "region": "US",
+        "price": {
+          "amount": 258.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://platedskinscience.com/cdn/shop/files/plated_INTENSE_Serum_Feb26_FINAL.png?v=1785436418&width=1500",
+    "image_source": "https://platedskinscience.com/products/intense-serum",
+    "source_url": "https://platedskinscience.com/products/intense-serum",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "The person said \"Plated serum at night\"; INTENSE is Plated's night serum (DAILY is the other). Brand site, 15 ml, USD 258.00."
+  },
+  {
+    "product_id": "mixi-mandelic-8-serum",
+    "brand": "Mixi",
+    "name": "Mandelic 8% Serum",
+    "category": "exfoliant",
+    "concerns": [
+      "acne_blemishes",
+      "uneven_tone",
+      "texture_pores",
+      "redness_sensitivity"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "mandelic acid",
+        "pct": 8.0
+      },
+      {
+        "name": "lactic acid",
+        "pct": null
+      },
+      {
+        "name": "niacinamide",
+        "pct": null
+      },
+      {
+        "name": "hyaluronic acid",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Purified Water",
+      "L-Mandelic Acid (8%)",
+      "Lactic Acid",
+      "Hyaluronic Acid",
+      "Niacinamide (Vitamin B3)",
+      "Sodium Lactate",
+      "Sodium PCA",
+      "Glycerin",
+      "Licorice Root Extract",
+      "Hamamelis Virginiana Leaf Extract",
+      "Green Tea Extract",
+      "Xanthan Gum"
+    ],
+    "price": {
+      "amount": 45.0,
+      "currency": "USD"
+    },
+    "size": "1 oz",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Fairytale Facials",
+        "url": "https://fairytalefacials.com/products/mixi-mandelic-8-serum",
+        "region": "US",
+        "price": {
+          "amount": 45.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      },
+      {
+        "store": "Art of Skin Care",
+        "url": "https://artofskincare.com/products/mixi-mandelic-serum",
+        "region": "US",
+        "price": null
+      }
+    ],
+    "image_url": "https://i0.wp.com/mixiskincare.com/wp-content/uploads/2024/09/mandelic-8-1.jpg?fit=720%2C898&ssl=1",
+    "image_source": "https://mixiskincare.com/mixi-mandelic-serums/",
+    "source_url": "https://mixiskincare.com/mixi-mandelic-serums/",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "The person said \"Mixi exfoliating serum\"; Mixi's exfoliating serum is its mandelic serum (5, 8, 11 and 15%), 8% assumed as the strength Mixi recommends in its acne routine page. The brand store (mixipixi.com) needs a clinic login, so INCI and USD 45.00 (1 oz) are from Fairytale Facials, a stockist; Art of Skin Care showed USD 34.40 without a size, so no price there."
+  },
+  {
+    "product_id": "epicutis-hydrobiome-serum",
+    "brand": "Epicutis",
+    "name": "Hydrobiome Serum",
+    "category": "serum",
+    "concerns": [
+      "dryness_barrier",
+      "redness_sensitivity"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "disodium tetramethylhexadecenylcysteine formylprolinate",
+        "pct": null
+      },
+      {
+        "name": "sodium hyaluronate",
+        "pct": null
+      },
+      {
+        "name": "sodium tocopheryl phosphate",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Water",
+      "Propanediol",
+      "Pentylene Glycol",
+      "Glycerin",
+      "Disodium Tetramethylhexadecenylcysteine Formylprolinate",
+      "Sodium Tocopheryl Phosphate",
+      "Sodium Hyaluronate",
+      "Sodium Phytate",
+      "Carbomer",
+      "Potassium Hydroxide"
+    ],
+    "price": {
+      "amount": 165.0,
+      "currency": "USD"
+    },
+    "size": "50 ml",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://epicutis.com/products/hydrobiome-serum",
+        "region": "US",
+        "price": {
+          "amount": 165.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://epicutis.com/cdn/shop/files/HydrobiomeSerumHero25.jpg?v=1775015981&width=2048",
+    "image_source": "https://epicutis.com/products/hydrobiome-serum",
+    "source_url": "https://epicutis.com/products/hydrobiome-serum",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "The person said \"Epicutis hydrating serum\"; Hydrobiome is the brand's hydrating serum (Lipid Serum is the other serum). Brand site, 50 ml, USD 165.00."
+  },
+  {
+    "product_id": "skinbetter-trio-rebalancing-moisture-treatment",
+    "brand": "skinbetter science",
+    "name": "Trio Rebalancing Moisture Treatment",
+    "category": "moisturizer",
+    "concerns": [
+      "dryness_barrier",
+      "fine_lines"
+    ],
+    "concerns_source": "brand_page",
+    "key_actives": [
+      {
+        "name": "cholesterol",
+        "pct": null
+      },
+      {
+        "name": "ceramide np",
+        "pct": null
+      },
+      {
+        "name": "urea",
+        "pct": null
+      },
+      {
+        "name": "squalane",
+        "pct": null
+      },
+      {
+        "name": "sodium hyaluronate",
+        "pct": null
+      }
+    ],
+    "inci": [
+      "Aqua/Water",
+      "Caprylic/Capric Triglyceride",
+      "Glyceryl Stearate",
+      "Cholesterol",
+      "Glycerin",
+      "Hydroxyethyl Urea",
+      "Butylene Glycol",
+      "Sodium Lactate",
+      "Polyglyceryl-6 Palmitate/Succinate",
+      "Sodium PCA",
+      "Squalane",
+      "Isocetyl Stearoyl Stearate",
+      "Ethyl Macadamiate",
+      "N-Capryloyl Lysine",
+      "Jojoba Esters",
+      "Carnitine",
+      "Dimethicone",
+      "Sodium Hyaluronate",
+      "Urea",
+      "Aminopropyl Ascorbyl Phosphate",
+      "Salicornia Herbacea Extract",
+      "Ceramide EOP",
+      "Ceramide NP",
+      "Linoleic Acid",
+      "Linolenic Acid",
+      "Carnosine",
+      "Caffeine",
+      "Salicylic Acid",
+      "Tocopherol",
+      "Pullulan",
+      "Caprylyl Methicone",
+      "Sclerotium Gum",
+      "Xanthan Gum",
+      "Cetearyl Alcohol",
+      "Ethylhexylglycerin",
+      "Triethyl Citrate",
+      "Silica",
+      "Lecithin",
+      "Phytic Acid",
+      "Pentaerythrityl Tetra-di-t-butyl Hydroxyhydrocinnamate",
+      "Triacetin",
+      "Sodium Hydroxide",
+      "Phenoxyethanol",
+      "Lactic Acid"
+    ],
+    "price": {
+      "amount": 160.0,
+      "currency": "USD"
+    },
+    "size": "50 ml",
+    "region": [
+      "US"
+    ],
+    "stores": [
+      {
+        "store": "Brand site",
+        "url": "https://www.skinbetter.com/shop/product-category/moisturizers/trio-rebalancing-moisture-treatment-M012.html",
+        "region": "US",
+        "price": {
+          "amount": 160.0,
+          "currency": "USD",
+          "checked": "2026-11-27"
+        }
+      }
+    ],
+    "image_url": "https://www.skinbetter.com/dw/image/v2/AAFM_PRD/on/demandware.static/-/Sites-acd-sbs-master-catalog/default/dw207ab94d/pdpimages/M012/Trio%20Product%20Smear%20PDP_2000x2000_12_1.jpg",
+    "image_source": "https://www.skinbetter.com/shop/product-category/moisturizers/trio-rebalancing-moisture-treatment-M012.html",
+    "source_url": "https://www.skinbetter.com/shop/product-category/moisturizers/trio-rebalancing-moisture-treatment-M012.html",
+    "last_verified": "2026-11-27",
+    "detail": "full",
+    "notes": "Brand site, 50 ml, USD 160.00. Contains a small amount of salicylic acid (after caffeine in the INCI), so it is not listed as a key active."
   }
 ]
