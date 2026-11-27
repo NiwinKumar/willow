@@ -98,6 +98,8 @@ def get_me(
 ) -> dict[str, Any]:
     """The caller's memberships (of one instance when given); current = the one used last."""
     rows = proof_orgs.memberships(store, user.uid, instance)
+    # the org in use first: older memberships get their sample campaigns (once) on the way in
+    proof_orgs.ensure_samples(store, user.uid, rows[:1])
     current = {"org_id": rows[0]["org_id"], "role": rows[0]["role"]} if rows else None
     return {"memberships": [proof_orgs.member_view(m) for m in rows], "current": current}
 
