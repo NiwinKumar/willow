@@ -39,15 +39,17 @@ export function FeelPanel({ x }: { x: ProductDetail }) {
 function Body({ f, x }: { f: Feel; x: ProductDetail }) {
   const { liked, notLiked } = splitTags(f.tags)
   return (
-    <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-12">
-      <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
+    // Stacked: the panel is two-thirds of the page, so side-by-side columns cut tag names ("Ski…") and drew the
+    // felt-vs-measured cells as tall, narrow boxes.
+    <div className="flex flex-col gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-x-10 gap-y-6 md:grid-cols-3">
         <Verdicts f={f} />
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="contents">
           <TagList title="Liked" tags={liked} empty={`No tag reaches ${MIN_GROUP} people yet.`} />
           <TagList title="Not liked" tags={notLiked} empty={`No tag reaches ${MIN_GROUP} people yet.`} />
         </div>
       </div>
-      <div className="flex min-w-0 flex-col gap-3 border-t border-line pt-5 lg:col-span-7 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
+      <div className="flex min-w-0 flex-col gap-3 border-t border-line pt-5">
         <div className="flex flex-col gap-0.5">
           <h3 className="m-0 text-proof-body font-medium text-ink">Felt vs measured</h3>
           {f.agree ? (

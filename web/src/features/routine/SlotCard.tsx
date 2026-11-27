@@ -49,8 +49,9 @@ export function SlotCard({ slot, entries, ticked, sessions, clock = null, checks
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[22px] font-light tracking-[-0.02em]">{t.name}</h2>
           {due.length ? (
-            <span className="font-mono text-[12px] tracking-[.06em] opacity-75" aria-label={`${done} of ${due.length} used today`}>
-              {done}/{due.length} TODAY
+            <span className="font-mono text-[12px] opacity-75" aria-label={`${done} of ${due.length} used today`}>
+              {/* the count rises into place when a tick changes it */}
+              <span key={done} className="inline-block motion-safe:animate-[wRise_.32s_var(--ease-standard)_both]">{done}</span>/{due.length} today
             </span>
           ) : null}
         </div>
@@ -63,20 +64,20 @@ export function SlotCard({ slot, entries, ticked, sessions, clock = null, checks
           Nothing here yet · add a product
         </button>
       ) : null}
-      {entries.map((e) => {
+      {entries.map((e, i) => {
         const on = ticked(e.id)
         const starts = e.started_at.slice(0, 10) > today
         const o = outcomeFor(e, sessions)
         const name = entryName(e)
         const short = compactName(e)
         const rest = restsOn(e, today)
-        const note = starts ? `FROM ${fmtDate(e.started_at).toUpperCase()}` : dayNote(e, slot, today)
+        const note = starts ? `From ${fmtDate(e.started_at)}` : dayNote(e, slot, today)
         // Evidence clock: only products with a clocked active (basics never get a verdict date).
         const due = verdictDue(e, clock)
         const dueDay = due ? localDay(due.due) : null
         const check = e.product_id ? checks[e.product_id] : undefined
         return (
-          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: 'wRise .4s both' }}>
+          <div key={e.id} className="flex items-center gap-2.5 rounded-[20px] py-1.5 pr-1.5 pl-1.5" style={{ background: t.card, animation: `wRise .4s var(--ease-standard) ${Math.min(i, 6) * 45}ms both` }}>
             <button
               type="button"
               aria-pressed={on}
@@ -103,7 +104,7 @@ export function SlotCard({ slot, entries, ticked, sessions, clock = null, checks
               <span className="flex min-w-0 items-center gap-2 text-[12px] leading-[1.4]">
                 <span className="truncate opacity-70">{metaLine(e.brand, e.category)}</span>
                 {note ? (
-                  <span className={`shrink-0 font-mono text-[10.5px] tracking-[.05em] ${rest ? 'opacity-60' : ''}`} title={scheduleWords(e.schedule, !e.slots.includes('am'))}>
+                  <span className={`shrink-0 text-[11.5px] ${rest ? 'opacity-60' : ''}`} title={scheduleWords(e.schedule, !e.slots.includes('am'))}>
                     {note}
                   </span>
                 ) : null}

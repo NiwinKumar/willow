@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type Pos = { x: number; y: number; below: boolean }
+
+/** Hover delay before a tooltip shows (ms). */
+const HOVER_DELAY = 300
 
 /**
  * Tooltip behaviour for any trigger: shows on hover and keyboard focus, hides on leave, blur, Esc or scroll.
@@ -23,7 +26,25 @@ export function useTooltip(content: ReactNode) {
     const below = r.top < 96
     setPos({ x: Math.min(Math.max(r.left + r.width / 2, 150), window.innerWidth - 150), y: below ? r.bottom + 8 : r.top - 8, below })
   }, [])
-  const hide = useCallback(() => setPos(null), [])
+  // Hover waits a moment (a pointer passing over a row of icons doesn't flash tips); keyboard focus, and a tap
+  // (which focuses), show it at once. Touch never triggers the hover path.
+  const timer = useRef<number | null>(null)
+  const hide = useCallback(() => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = null
+    setPos(null)
+  }, [])
+  const enter = useCallback(
+    (e: PointerEvent<HTMLElement>) => {
+      if (e.pointerType === 'touch') return
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(show, HOVER_DELAY)
+    },
+    [show],
+  )
+  useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+  }, [])
   useEffect(() => {
     if (!pos) return
     const key = (e: KeyboardEvent) => e.key === 'Escape' && setPos(null)
@@ -49,7 +70,7 @@ export function useTooltip(content: ReactNode) {
       ref.current = el
     },
     'aria-describedby': id,
-    onPointerEnter: show,
+    onPointerEnter: enter,
     onPointerLeave: hide,
     onFocus: show,
     onBlur: hide,

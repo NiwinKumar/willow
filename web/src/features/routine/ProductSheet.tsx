@@ -315,7 +315,8 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
 
       {inUse || productId ? (
         <div className="card flex flex-col gap-3 bg-sunken px-5 py-4">
-          <span className="font-mono text-[12px] tracking-[.06em] text-ink-2">■ TEST THIS PRODUCT</span>
+          {/* Section titles in this sheet are one style (as "How does it feel?"), not mono eyebrows. */}
+          <h4 className="text-[17px] font-normal">Try it on one forearm first</h4>
           {ownTest ? (
             <>
               <span className="text-[15px]">
@@ -388,7 +389,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
 
       {inUse && outcome ? (
         <div className="card flex flex-col gap-1.5 bg-sunken px-5 py-4">
-          <span className="font-mono text-[12px] text-ink-2">■ YOUR READINGS SINCE START</span>
+          <h4 className="text-[17px] font-normal">Your readings since you started</h4>
           <span className="flex items-center gap-2 text-[15px]">
             <VerdictGlyph kind={OUTCOME_GLYPH[outcome.kind]} way={outcome.kind === 'real' ? outcome.way : undefined} />
             {outcome.text}
@@ -399,7 +400,11 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
 
       {product ? (
         <div className="flex flex-col gap-3 rounded-lg squircle bg-selected px-5 py-4 text-inverse">
-          <span className="font-mono text-[12px] tracking-[.06em] text-cta">{outcomes?.synthetic ? '■ SIMULATED COHORT · SYNTHETIC DATA' : '■ COHORT OUTCOMES'}</span>
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[17px] font-normal">Cohort outcomes</h4>
+            {/* simulated data is always labelled (DESIGN.md "Synthetic & demo data") */}
+            {outcomes?.synthetic ? <span className="rounded-pill bg-[var(--synthetic-bg)] px-2.5 py-0.5 font-mono text-[11px] tracking-[.06em] text-[var(--synthetic-fg)]">SIMULATED · SYNTHETIC DATA</span> : null}
+          </span>
           {cohort ? (
             <>
               <span className="flex flex-wrap items-baseline gap-2.5">
@@ -407,7 +412,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
                 <span className="text-[14px] text-[#BDBAB4]">of {cohort.n} people</span>
               </span>
               <span aria-hidden className="block h-2.5 overflow-hidden rounded-[10px] bg-[#2A2A2A]">
-                <span className="block h-full rounded-[10px]" style={{ width: `${Math.round(cohort.rate * 100)}%`, background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink), var(--aura-coral))' }} />
+                <span className="block h-full origin-left rounded-[10px] motion-safe:animate-[wFill_.9s_var(--ease-standard)_.2s_both]" style={{ width: `${Math.round(cohort.rate * 100)}%`, background: 'linear-gradient(90deg, var(--aura-violet), var(--aura-pink), var(--aura-coral))' }} />
               </span>
               <span className="text-[14px] leading-[1.5] text-[#E4E1DB]">
                 were still improved beyond photo noise at week 8 on what it targets.{cohort.weeks !== null ? ` The improvement typically began around week ${cohort.weeks}.` : ''}

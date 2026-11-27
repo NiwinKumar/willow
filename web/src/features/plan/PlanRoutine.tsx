@@ -16,6 +16,7 @@ import { usePlan } from './draft'
 import { SLOT_WORDS, WHEN_WORDS, errorText, money, moneyOf, priceIn, type PlanPick, type PlanWhen } from './planApi'
 import { card, cardStyle, primary, secondary, stagger } from './styles'
 import { Frame } from './ui'
+import { Celebration } from './Celebration'
 
 /** The date `weeks` from today, as a short date ("12 Feb"). */
 const weeksFrom = (weeks: number) => fmtDate(weeksAfter(localDay(), weeks))
@@ -38,6 +39,8 @@ export function PlanRoutineStep() {
   const [busy, setBusy] = useState<'all' | 'base' | null>(null)
   const onStore = useStoreClick('plan')
   const [error, setError] = useState<string | null>(null)
+  // Saved: the garden plays, then the plan ends on the routine (nothing added: a toast, straight on).
+  const [saved, setSaved] = useState<number | null>(null)
 
   const picks = useMemo(() => (result?.picks ?? []).map((p, i) => (swaps[i] ? { ...p, product: swaps[i], check: null, proof: null } : p)), [result, swaps])
   const ids = useMemo(() => (result?.picks ?? []).flatMap((p, i) => [swaps[i]?.product_id ?? p.product.product_id, ...p.alternatives.map((a) => a.product_id)]), [result, swaps])
@@ -67,8 +70,11 @@ export function PlanRoutineStep() {
         added++
       }
       refreshRoutine(uid)
-      toast(added ? `Added ${added} ${added === 1 ? 'product' : 'products'} to your routine` : 'These are already in your routine')
-      navigate(exit)
+      if (added) setSaved(added)
+      else {
+        toast('These are already in your routine')
+        navigate(exit)
+      }
     } catch (e) {
       setBusy(null)
       setError(errorText(e, 'Could not add them just now. Check your connection and try again.'))
@@ -76,13 +82,15 @@ export function PlanRoutineStep() {
   }
 
   return (
+    <>
+    {saved !== null ? <Celebration title="Your routine is set" line={`${saved} ${saved === 1 ? 'product' : 'products'} added. Tick each one as you use it, and Willow lines them up with your check-ins.`} onDone={() => navigate(exit)} /> : null}
     <Frame
       wide
-      eyebrow={`${picks.length} PRODUCTS · CHECKED FOR YOU`}
       title="Your routine"
+      sub={`${picks.length} products, each checked for you`}
       aside={
         <span className="flex flex-col items-end">
-          <span className="font-mono text-[10.5px] tracking-[.08em] text-ink-2">TOTAL</span>
+          <span className="text-[12px] text-ink-2">Total</span>
           <RollingNumber value={total} duration={900} delay={200} format={(v) => money(Math.round(v * 100) / 100, currency)} className="font-dot text-[clamp(24px,3.6vh,34px)] leading-none font-extrabold tabular-nums" />
         </span>
       }
@@ -158,6 +166,7 @@ export function PlanRoutineStep() {
         </div>
       </div>
     </Frame>
+    </>
   )
 }
 
@@ -239,7 +248,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
         <span className="flex flex-none flex-col items-end gap-1.5">
           <span className="text-[15px] tabular-nums">{moneyOf(priceIn(p, currency))}</span>
           {pick.alternatives.length || pick.why.length > 1 || p.stores.length ? (
-            <button type="button" aria-expanded={open} aria-controls={panel} onClick={onToggle} className="flex min-h-8 items-center gap-1 rounded-pill px-2 text-[12.5px] text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
+            <button type="button" aria-expanded={open} aria-controls={panel} onClick={onToggle} className="hit44 flex min-h-8 items-center gap-1 rounded-pill px-2 text-[12.5px] text-ink-2 transition-colors hover:bg-ink/5 hover:text-ink">
               {open ? 'Less' : 'More'}
               <span aria-hidden className="inline-block transition-transform duration-300 ease-standard" style={{ rotate: open ? '180deg' : '0deg' }}>
                 ⌄
@@ -281,7 +290,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
                       target="_blank"
                       rel="noopener noreferrer sponsored"
                       onClick={() => onStore(p.product_id, st.store)}
-                      className="inline-flex min-h-8 items-center gap-1.5 rounded-pill bg-white px-3 text-[12.5px] text-ink no-underline shadow-[0_1px_4px_rgba(0,0,0,.08)] transition-transform active:scale-95"
+                      className="hit44 inline-flex min-h-8 items-center gap-1.5 rounded-pill bg-white px-3 text-[12.5px] text-ink no-underline shadow-[0_1px_4px_rgba(0,0,0,.08)] transition-transform active:scale-95"
                     >
                       {st.store}
                       {st.price ? <span className="text-ink-2">{money(st.price.amount, st.price.currency)}</span> : null}
@@ -305,7 +314,7 @@ function PickCard({ pick, i, open, onToggle, check, checks, loading, profileComp
                       </span>
                     </span>
                     <CheckedChip check={checks[a.product_id]} short />
-                    <button type="button" onClick={() => (a.product_id === original.product_id ? onRestore() : onSwap(a))} className="min-h-8 rounded-pill bg-white px-3 text-[12.5px] shadow-[0_1px_4px_rgba(0,0,0,.08)] transition-transform active:scale-95">
+                    <button type="button" onClick={() => (a.product_id === original.product_id ? onRestore() : onSwap(a))} className="hit44 min-h-8 rounded-pill bg-white px-3 text-[12.5px] shadow-[0_1px_4px_rgba(0,0,0,.08)] transition-transform active:scale-95">
                       {a.product_id === original.product_id ? 'Use the pick' : 'Use this'}
                     </button>
                   </div>

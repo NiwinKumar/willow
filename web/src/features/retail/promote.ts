@@ -293,9 +293,11 @@ export function campaignInsight(c: Pick<Campaign, 'status' | 'stats'>): { tone: 
       detail: `${delivery} The real test is the holdout: it unlocks once ${HOLDOUT_MIN} people are in each group.`,
     }
   const per100 = `${Math.round(inc.exposed.rate * 100)} in 100 people who could see the card added the product, against ${Math.round(inc.holdout.rate * 100)} in 100 who could not.`
-  if (inc.lift_lo > 0) return { tone: 'good', headline: 'The card is making people add this product.', detail: per100 }
+  // An ended campaign's verdict is final: past tense, and "no clear effect" instead of "too early".
+  const done = c.status === 'ended'
+  if (inc.lift_lo > 0) return { tone: 'good', headline: done ? 'The card made people add this product.' : 'The card is making people add this product.', detail: per100 }
   if (inc.lift_hi < 0) return { tone: 'neutral', headline: 'People who saw the card were less likely to add the product.', detail: per100 }
-  return { tone: 'wait', headline: 'Too early to say whether the card changes anything.', detail: `${per100} The gap could still be chance.` }
+  return done ? { tone: 'neutral', headline: 'The card made no clear difference.', detail: `${per100} The gap is within chance.` } : { tone: 'wait', headline: 'Too early to say whether the card changes anything.', detail: `${per100} The gap could still be chance.` }
 }
 
 /** The product's own record in a sentence (before any promotion): users' share with a visible change vs non-users with the same goals. */
@@ -304,4 +306,58 @@ export function ownRecordInsight(row: { rate: number | null; base_rate: number |
   const a = Math.round(row.rate * 100)
   const b = Math.round(row.base_rate * 100)
   return `${a} in 100 of its users had a visible change by week 8, against ${b} in 100 non-users with the same goals. The campaign promotes something that works on its own.`
+}
+
+/** The portfolio at a glance (Campaigns, P2B): the delivery funnel summed over campaigns, and the holdout results. */
+export type Portfolio = {
+  impressions: number
+  clicks: number
+  adds: number
+  /** clicks / impressions; null at 0 impressions. */
+  ctr: number | null
+  /** adds / clicks; null at 0 clicks. */
+  addRate: number | null
+  /** Campaigns with a holdout result (both groups 10+). */
+  measured: number
+  /** Of those, the ones whose lift interval sits above zero. */
+  clear: number
+  /** Running campaigns still waiting for 10 per group. */
+  collecting: number
+  /** The largest measured lift and its product. */
+  best: { product: string; lift: number; id: string } | null
+}
+
+export function portfolioOf(cs: Pick<Campaign, 'id' | 'status' | 'stats' | 'product' | 'product_id'>[]): Portfolio {
+  const sum = (k: 'impressions' | 'clicks' | 'adds') => cs.reduce((s, c) => s + (c.stats[k] ?? 0), 0)
+  const impressions = sum('impressions')
+  const clicks = sum('clicks')
+  const adds = sum('adds')
+  const measured = cs.filter((c) => c.stats.incrementality)
+  const top = [...measured].sort((a, b) => b.stats.incrementality!.lift - a.stats.incrementality!.lift)[0]
+  return {
+    impressions,
+    clicks,
+    adds,
+    ctr: impressions ? clicks / impressions : null,
+    addRate: clicks ? adds / clicks : null,
+    measured: measured.length,
+    clear: measured.filter((c) => c.stats.incrementality!.lift_lo > 0).length,
+    collecting: cs.filter((c) => c.status === 'active' && !c.stats.incrementality).length,
+    best: top ? { product: top.product ?? top.product_id, lift: top.stats.incrementality!.lift, id: top.id } : null,
+  }
+}
+
+/**
+ * What to do after a campaign's result (P2B; the campaign page used to end at the verdict): run it again when an
+ * ended campaign clearly lifted adoption; end a running one whose card is clearly doing worse than its holdout;
+ * look at where the product works when an ended one could not show a lift. Null while the evidence is still coming.
+ */
+export function nextMove(c: Pick<Campaign, 'status' | 'stats'>): { kind: 'again' | 'end' | 'evidence'; label: string; why: string } | null {
+  const inc = c.stats.incrementality
+  if (c.status === 'ended') {
+    if (inc && inc.lift_lo > 0) return { kind: 'again', label: 'Run it again', why: 'It clearly lifted adoption; the same audience is a safe start.' }
+    return { kind: 'evidence', label: 'See where it works', why: inc ? 'No clear lift this time: pick the skin types where the product works best.' : 'It ended before the holdout could be measured.' }
+  }
+  if (inc && inc.lift_hi < 0) return { kind: 'end', label: 'End it now', why: 'People who saw the card added it less than the holdout did.' }
+  return null
 }

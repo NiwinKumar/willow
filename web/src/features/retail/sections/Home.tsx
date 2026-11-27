@@ -1,87 +1,87 @@
-import { ArrowRight, ArrowRightLeft, BellOff, Check, CheckCircle2, CircleDashed, Clock, Download, History, Inbox, Layers, Mail, Megaphone, MoreHorizontal, Send, Sparkles, TrendingUp, TriangleAlert, Users, X, type LucideIcon } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { History, Mail } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
-import { api, type Campaign } from '../../../lib/api'
-import { setQueryData } from '../../../lib/query'
-import { useAuth } from '../../../lib/useAuth'
-import { DISMISS_REASONS, kindOfKey, laneOf, STATUS_WORD, TYPE_LABEL, type CardAction, type CardKind, type DecisionCard } from '../decisions'
+import { agoText } from '../autopilot'
+import { kindOfKey, laneOf, type DecisionCard } from '../decisions'
+import { Board, type Lane, type LaneId } from '../home/Board'
+import { AnswerItem, BriefPanel, CardView, LiveCampaign, ProgressItem, type Brief } from '../home/Cards'
+import { campaignTotals, changeText, demandTrends, pooledRate, portfolio, risingGoal, weekBrief } from '../home/dashboard'
+import { GuideChip, GuidePanel, useGuide } from '../home/Guide'
+import { ProofPanel } from '../home/ProofPanel'
+import { campaignsFor, DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, type Tile } from '../home/Pulse'
+import { NeedsYou, type Update } from '../home/Rail'
+import { DecisionLog, Requests } from '../home/Requests'
 import { useHomeCards } from '../homeData'
 import { useOrg } from '../org'
-import { useDecide, setRequests, withTransition } from '../orgData'
-import { ProductImage } from '../../routine/productUi'
-import { canAct, isNotMember, proofApi, proofError, ROLE_LABEL, type DecisionLogEntry, type EvidenceRequest } from '../proofApi'
-import { coverage, homeScope, statusOf } from '../range'
-import { rangeIds, useOnceFlag } from '../rangeStore'
+import { useDecide } from '../orgData'
+import { canAct, ROLE_LABEL, type DecisionLogEntry } from '../proofApi'
+import { homeScope } from '../range'
+import { rangeIds } from '../rangeStore'
 import { sectionPath, useRetailState } from '../state'
-import type { Insights, ProductRow } from '../types'
-import { Badge, Bone, Button, downloadText, EmptyState, int, KpiStrip, Menu, MenuItem, MenuLabel, PageHeader, Panel, SidePanel, SkeletonPanel, Tabs, useTooltip } from '../ui'
-import { Spotlight } from './Overview'
-import { spotlightOf } from '../productModel'
+import type { Insights } from '../types'
+import { Bone, Button, IconButton, int, pct, pts, SidePanel, SkeletonPanel } from '../ui'
 import { InsightsGate } from './shared'
-import { agoText } from '../autopilot'
 
 /*
- * Home = Decisions (research/finals/06 §6.4): the first line counts decisions, not KPIs. Three lanes: To decide
- * (at most five cards, most people first; each with its trigger, the figure with n and interval, one primary
- * action, one secondary, Dismiss with a reason and Snooze), In progress (accepted cards, live campaigns, sent
- * evidence requests, each naming what it waits for), Results (campaign results with their interval, answers
- * from brands, done decisions). Accepting moves a card to In progress; every change is logged on the
- * organisation with the numbers as they were (Decision log). Below: evidence requests between the retailer and
- * its brands, and (brands) the strongest proof. A first-run guide ticks itself from real state.
+ * Home: the organisation's dashboard (research/finals/06 §6.4; owner feedback Nov 27 and Nov 28).
+ *
+ * The person came to learn how their products are doing and what needs them. The top bar already says who they
+ * are (logo, name, role), so Home has no title block of its own. Two columns, then sections:
+ *
+ *   ┌──────────────── information (3/4) ────────────────┬── Needs you (1/4) ──┐
+ *   │ This week: 2-3 sentences from the figures (code)  │ top 3 decisions     │
+ *   │ KPI band, per role (4 tiles, each opens a section)│ (full cards)        │
+ *   │ How your products compare (users vs same goals)   │ Latest: requests,   │
+ *   │ What people come for  │  Campaign funnel          │ answers, results    │
+ *   └───────────────────────────────────────────────────┴─────────────────────┘
+ *   Decisions: the rest, one lane at a time (More to decide · In progress · Results)
+ *   Evidence requests
+ *
+ * Phones stack it as: This week, KPIs, Needs you, then the panels. One click away: Weekly digest, Decision
+ * log (side panel), a brief (side panel), Ask. The first-run guide folds into a chip once two steps are done.
+ * Four tests for each part are in its own file's header (home/*.tsx).
  */
 
-const MAX_CARDS = 5
+const PRIORITY = 3
+const LATEST = 4
 
 export default function Home() {
   return (
-    <InsightsGate
-      skeleton={
-        <div className="flex flex-col gap-6">
-          <div aria-hidden className="flex flex-col gap-2">
-            <Bone className="h-7 w-56" />
-            <Bone className="h-4 w-[min(520px,80%)]" />
-          </div>
-          <SkeletonPanel height={96} />
-          <div className="grid gap-4 lg:grid-cols-3">
-            <SkeletonPanel height={320} />
-            <SkeletonPanel height={320} />
-            <SkeletonPanel height={320} />
-          </div>
-        </div>
-      }
-    >
+    <InsightsGate skeleton={<HomeSkeleton />}>
       {(d) => <Body d={d} />}
     </InsightsGate>
   )
 }
 
-const KIND_ICON: Record<CardKind, { icon: LucideIcon; tone: string }> = {
-  proven_not_promoted: { icon: Megaphone, tone: 'bg-proof-leaf-soft text-proof-leaf' },
-  nearly_proven: { icon: CircleDashed, tone: 'bg-pf-amber-soft text-pf-amber' },
-  claim_ready: { icon: CheckCircle2, tone: 'bg-proof-leaf-soft text-proof-leaf' },
-  evidence_slipped: { icon: TriangleAlert, tone: 'bg-pf-red-soft text-pf-red' },
-  expectation_gap: { icon: Clock, tone: 'bg-sunken text-ink' },
-  losing_switchers: { icon: ArrowRightLeft, tone: 'bg-pf-amber-soft text-pf-amber' },
-  routine_clash: { icon: Layers, tone: 'bg-sunken text-ink' },
-  over_shelved: { icon: TriangleAlert, tone: 'bg-pf-amber-soft text-pf-amber' },
-  under_shelved: { icon: TrendingUp, tone: 'bg-proof-leaf-soft text-proof-leaf' },
-  unmet_group: { icon: Users, tone: 'bg-sunken text-ink' },
-  demand_shift: { icon: TrendingUp, tone: 'bg-sunken text-ink' },
-  campaign_result: { icon: Sparkles, tone: 'bg-proof-leaf-soft text-proof-leaf' },
-  auto_proposal: { icon: Megaphone, tone: 'bg-sunken text-ink' },
+function HomeSkeleton() {
+  return (
+    <div aria-hidden className="grid grid-cols-1 gap-x-6 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <Bone className="h-4 w-[min(640px,92%)]" />
+          <Bone className="h-4 w-[min(460px,70%)]" />
+        </div>
+        <SkeletonPanel height={116} />
+        <SkeletonPanel height={300} />
+      </div>
+      <div className="flex flex-col gap-3">
+        <Bone className="h-5 w-24" />
+        <SkeletonPanel height={196} />
+        <SkeletonPanel height={196} />
+      </div>
+    </div>
+  )
 }
-
-/** A view-transition name for a card (lane moves glide where the browser supports it). */
-const vt = (key: string) => ({ viewTransitionName: `dc-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}` }) as React.CSSProperties
 
 function Body({ d }: { d: Insights }) {
   const { carry, param, setParam } = useRetailState()
-  const { org, role, orgs, instance } = useOrg()
+  const { org, role, orgs } = useOrg()
   const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards } = useHomeCards(d)
   const decide = useDecide()
-  const [showAll, setShowAll] = useState(false)
+  const [brief, setBrief] = useState<Brief | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const board = useRef<HTMLElement>(null)
 
   const items = decisions.data?.items ?? {}
   const decide_ = cards.filter((c) => c.lane === 'decide' && laneOf(items[c.key]) === 'decide')
@@ -98,8 +98,10 @@ function Body({ d }: { d: Insights }) {
   const answered = outbox.filter((r) => r.status !== 'open')
   const inProgressN = accepted.length + live.length + sentOpen.length
   const resultsN = resultCards.length + answered.length + done.length
-  const shown = showAll ? decide_ : decide_.slice(0, MAX_CARDS)
+  const priority = decide_.slice(0, PRIORITY)
+  const rest = decide_.slice(PRIORITY)
   const loadingCards = prodState.status === 'loading' || (mix === 'retailer' && shelf.status === 'loading' && !shelf.data)
+  const canDecide = canAct(role) || !org
 
   const snapshotOf = (c: DecisionCard) => ({ title: c.title.slice(0, 200), figure: `${c.figure} ${c.figureNote}`.trim().slice(0, 120), n: c.n })
   const logByKey = useMemo(() => {
@@ -108,630 +110,212 @@ function Body({ d }: { d: Insights }) {
     return m
   }, [decisions.data])
 
-  // ── the KPI strip: one row, four figures
+  // ── the figures (home/dashboard.ts, tested)
   const ids = rangeIds(range)
-  const { rows: inRange, scope } = homeScope(rows, ids, brand)
-  const from = range?.from ? `${range.from}’s` : 'the retailer’s'
-  const cov = coverage(inRange.map((r) => ({ status: statusOf(r), match: r.product_id })))
-  const proven = inRange.filter((r) => r.tier === 'proven').length
-  const ownCampaigns = brand ? campaigns.filter((c) => c.brand === brand) : campaigns
-  const running = ownCampaigns.filter((c) => c.status === 'active').length
+  const { rows: inScope, scope } = homeScope(rows, ids, brand)
+  const p = portfolio(inScope)
+  const rate = pooledRate(inScope)
+  const market = pooledRate(rows)
+  const own = campaignsFor(campaigns, brand)
+  const camp = campaignTotals(own)
+  const focusGoals = useMemo(() => new Set(brand ? rows.filter((r) => r.brand === brand).flatMap((r) => r.goal_ids) : []), [rows, brand])
+  const demand = useMemo(() => demandTrends(d.needs_by_month, focusGoals), [d.needs_by_month, focusGoals])
+  const people = d.needs_by_month?.people ?? []
+  const peopleChange = people.length > 1 && people.at(-2) ? ((people.at(-1) ?? 0) - (people.at(-2) ?? 0)) / (people.at(-2) ?? 1) : null
+  const name = org?.kind === 'brand' ? (brand ?? org.name) : (org?.name ?? brand ?? 'Your range')
+  const sentences = weekBrief({ mix, name: mix === 'brand' ? (brand ?? name) : name, p, rate, market, rising: risingGoal(demand.rows), camp })
 
-  const header = (
-    <>
-      <strong>{decide_.length} to decide</strong> · {inProgressN} in progress · {resultsN} {resultsN === 1 ? 'result' : 'results'}
-    </>
+  const guide = useGuide({ mix, rangeConnected: Boolean(range) || mix === 'brand', decided: Object.keys(items).length > 0, campaigns: campaigns.length > 0 })
+  const ask = (q: string) => setParam({ ask: '1', q }, { push: true })
+  const promoteTo = `${sectionPath('campaigns')}${carry}`
+
+  const proofScore = p.measured ? p.proven / p.measured : null
+  // Campaigns as activity (live, run, reach per day); the lift itself is the funnel's last step, said once there.
+  const campaignTile: Tile = camp.count
+    ? {
+        id: 'campaigns',
+        label: 'Campaigns',
+        value: int(camp.live),
+        unit: `live of ${int(camp.count)}`,
+        note: `${int(camp.reach)} people reached`,
+        mark: camp.daily.length > 1 ? marks.spark(camp.daily.map((x) => x.impressions), `Impressions per day over ${camp.daily.length} days, latest ${int(camp.daily.at(-1)?.impressions)}`) : undefined,
+        to: promoteTo,
+      }
+    : { id: 'campaigns', label: 'Campaigns', value: '0', unit: 'running', note: p.proven ? 'A Proven product is ready to promote' : 'Promote once a product is Proven', to: promoteTo }
+  const tiles: Tile[] =
+    mix === 'brand'
+      ? [
+          { id: 'measured', label: 'Products measured', value: int(p.measured), unit: `of ${int(p.total)}`, note: portfolioNote(p), mark: marks.meter(p.total ? p.measured / p.total : null, `${p.measured} of ${p.total} products measured`), to: `${sectionPath('products')}${carry}` },
+          { id: 'proven', label: 'Proven', value: int(p.proven), unit: `of ${int(p.measured)} measured`, note: p.measured ? (p.promising ? `${int(p.promising)} Promising, close behind` : 'None Promising') : 'Nothing measured yet', mark: marks.ring(proofScore, `${p.proven} of ${p.measured} measured products are Proven`), to: `${sectionPath('products')}${carry}` },
+          {
+            id: 'rate',
+            label: 'Visible change',
+            value: rate ? pct(rate.rate) : '—',
+            unit: rate ? `of ${int(rate.n)}` : undefined,
+            note: market ? `Market: ${pct(market.rate)}` : 'No measured products yet',
+            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name} against the market: ${pct(rate.rate)} of ${int(rate.n)} people using ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against ${pct(market.rate)} of ${int(market.n)} across every measured product.` } : null,
+            to: `${sectionPath('market')}${carry}`,
+          },
+          campaignTile,
+        ]
+      : [
+          { id: 'coverage', label: scope === 'range' ? 'Range measured' : 'Catalog measured', value: int(p.measured), unit: `of ${int(p.total)}`, note: `${p.total ? pct(p.measured / p.total) : '—'} · ${portfolioNote(p)}`, mark: marks.meter(p.total ? p.measured / p.total : null, `${p.measured} of ${p.total} products measured`), to: `${sectionPath('range')}${carry}` },
+          { id: 'proven', label: 'Proven', value: int(p.proven), unit: `of ${int(p.measured)} measured`, note: p.measured ? (p.promising ? `${int(p.promising)} Promising, close behind` : 'None Promising') : 'Nothing measured yet', mark: marks.ring(proofScore, `${p.proven} of ${p.measured} measured products are Proven`), to: `${sectionPath('products')}${carry}` },
+          // People, not the least-served group: that group is already a decision card in Needs you.
+          { id: 'people', label: 'People measured', value: int(d.needs_by_month?.people.at(-1) ?? null), unit: 'this month', note: d.needs_by_month && d.needs_by_month.people.length > 1 ? `${changeText(peopleChange)} on the month before` : 'with a reading', mark: d.needs_by_month ? marks.spark(d.needs_by_month.people, `People with a reading per month: ${d.needs_by_month.people.map((n) => int(n)).join(', ')}`, 'ink') : undefined, to: `${sectionPath('customers')}${carry}` },
+          campaignTile,
+        ]
+
+  // ── the board's lanes (below the dashboard) and the rail's "Latest" (pointers into them)
+  const cardOf = (c: DecisionCard, i: number, o: { lead?: boolean; result?: boolean } = {}) => (
+    <CardView key={c.key} c={c} index={i} lead={o.lead} result={o.result} canDecide={canDecide} legacy={!org} onAsk={o.result ? undefined : ask} onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, o.result && status === 'accepted' ? 'done' : status, { reason, snapshot: snapshotOf(c) })} />
   )
+  const progressItems = [
+    ...accepted.map(([key, v]) => {
+      const card = cards.find((c) => c.key === key)
+      const snap = logByKey.get(key)?.snapshot
+      return (
+        <ProgressItem
+          key={key}
+          vkey={key}
+          kind={kindOfKey(key)}
+          title={card?.title ?? snap?.title ?? key}
+          figure={card ? `${card.figure} ${card.figureNote}` : (snap?.figure ?? '')}
+          n={card?.n ?? snap?.n ?? null}
+          meta={`Accepted ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`}
+          waiting={card?.waiting ?? 'Its follow-up measurement'}
+          actions={
+            canAct(role) ? (
+              <>
+                <Button size="sm" onClick={() => void decide(key, 'done', { snapshot: card ? snapshotOf(card) : (snap ?? undefined) })}>
+                  Mark done
+                </Button>
+                <Button size="sm" kind="ghost" onClick={() => void decide(key, 'open')}>
+                  Reopen
+                </Button>
+              </>
+            ) : null
+          }
+        />
+      )
+    }),
+    ...live.map((c) => <LiveCampaign key={c.id} c={c} carry={carry} />),
+    ...sentOpen.map((r) => <ProgressItem key={r.id} vkey={`rq-${r.id}`} kind="over_shelved" title={`Asked ${r.to_name ?? orgName(orgs, r.to_org)} for evidence`} figure={r.snapshot?.figure ?? ''} n={r.snapshot?.n ?? null} meta={`Sent ${agoText(r.created_at)}`} waiting="The brand’s answer" sub={r.product ?? r.snapshot?.title} />),
+  ]
+  const resultItems = [
+    ...resultCards.map((c, i) => cardOf(c, i, { result: true })),
+    ...answered.map((r) => <AnswerItem key={r.id} r={r} from={r.to_name ?? orgName(orgs, r.to_org)} />),
+    ...done.map(([key, v]) => {
+      const snap = logByKey.get(key)?.snapshot
+      return <ProgressItem key={key} vkey={key} kind={kindOfKey(key)} title={snap?.title ?? key} figure={snap?.figure ?? ''} n={snap?.n ?? null} meta={`Done ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`} done />
+    }),
+  ]
+  const lanes: Lane[] = [
+    { id: 'decide', label: 'More to decide', count: rest.length, items: rest.map((c, i) => cardOf(c, i)), empty: priority.length ? 'Everything waiting for you is in Needs you, above.' : 'Nothing waits for a decision.' },
+    { id: 'progress', label: 'In progress', count: inProgressN, items: progressItems, empty: 'Accept a card and it waits here for its measurement.' },
+    { id: 'results', label: 'Results', count: resultsN, items: resultItems, empty: 'Campaign results and brands’ answers land here, with their intervals.' },
+  ]
+  const laneParam = param('lane') as LaneId | null
+  const lane: LaneId = laneParam && lanes.some((l) => l.id === laneParam) ? laneParam : (lanes.find((l) => l.items.length)?.id ?? 'decide')
+  const openLane = (l: LaneId) => {
+    setParam({ lane: l })
+    requestAnimationFrame(() => board.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }))
+  }
+
+  const toRequests = () => document.getElementById('requests-h')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const updates: Update[] = [
+    ...inbox.filter((r) => r.status === 'open').map((r): Update => ({ key: `in-${r.id}`, kind: 'request', text: <><span className="font-medium">{r.from_name ?? orgName(orgs, r.from_org)}</span> asked for evidence on {r.product ?? r.product_id}</>, meta: `Waiting for your answer · ${agoText(r.created_at)}`, onClick: toRequests })),
+    ...answered.map((r): Update => ({ key: `ans-${r.id}`, kind: 'answer', text: <><span className="font-medium">{r.to_name ?? orgName(orgs, r.to_org)}</span> {r.status === 'answered' ? 'answered' : 'declined'} on {r.product ?? r.product_id}</>, meta: agoText(r.updated_at ?? r.created_at), to: `/retail/products/${encodeURIComponent(r.product_id)}${carry}` })),
+    ...resultCards.map((c): Update => ({ key: `res-${c.key}`, kind: 'result', text: <><span className="font-medium">{c.product?.name ?? c.title}</span>: {c.figure} adoption against the holdout</>, meta: c.figureNote === 'interval above zero' ? 'Campaign result · clear: interval above zero' : 'Campaign result · not yet clear: interval includes zero', to: c.secondary?.kind === 'link' ? c.secondary.to : undefined, onClick: () => openLane('results') })),
+    ...live.map((c): Update => ({ key: `live-${c.id}`, kind: 'live', text: <><span className="font-medium">{c.product ?? c.product_id}</span>: campaign live, {int(c.stats.reach ?? c.stats.impressions)} reached</>, meta: 'Lift once each group has 10 people', to: `${sectionPath('campaigns', c.id)}${carry}` })),
+  ]
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title={org ? org.name : brand ?? 'Home'}
-        description={header}
-        purpose={mix === 'brand' ? 'Prove what works, claim it in words a retailer accepts, and promote it with a measured lift. Each card is one decision with its evidence and one action.' : 'Decide what to stock, what to question and what to promote. Each card is one decision with its evidence and one action.'}
-        actions={
-          org ? (
-            <>
-              <Button to={`${sectionPath('digest')}${carry}`}>
-                <Mail size={15} strokeWidth={1.6} aria-hidden /> Weekly digest
-              </Button>
-              <Button onClick={() => setParam({ log: '1' }, { push: true })}>
-                <History size={15} strokeWidth={1.6} aria-hidden /> Decision log
-              </Button>
-            </>
-          ) : null
-        }
-      />
+    <div className="flex flex-col gap-10">
+      {!guide.hidden && !guide.compact ? <GuidePanel g={guide} /> : null}
 
-      <KpiStrip
-        label="Your range at a glance"
-        items={[
-          { id: 'range', label: scope === 'range' ? (range?.from ? `In ${range.from}’s range` : 'Products in your range') : scope === 'catalog' ? 'Products in the catalog' : `${brand} products`, value: int(cov.total), note: <Link to={`${sectionPath('range')}${carry}`} className="text-ink-2 no-underline hover:text-ink">{scope === 'range' ? `from ${range?.filename}` : scope === 'catalog' ? 'Connect your range →' : scope === 'brand_range' ? `in ${from} range →` : ids ? `in the catalog; none are in ${from} range →` : 'in the catalog →'}</Link> },
-          { id: 'measured', label: 'Measured', value: int(cov.measured), note: `${int(cov.collecting)} collecting · ${int(cov.no_users)} no users yet` },
-          { id: 'proven', label: 'Proven', value: int(proven), note: cov.measured ? `of ${int(cov.measured)} measured` : 'none measured yet' },
-          { id: 'campaigns', label: 'Campaigns running', value: int(running), note: `${ownCampaigns.filter((c) => c.stats.incrementality).length} with a measured lift` },
-        ]}
-      />
-
-      <GettingStarted mix={mix} rangeConnected={Boolean(range) || mix === 'brand'} decided={Object.keys(items).length > 0} campaigns={campaigns.length > 0} />
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <div className="flex min-w-0 flex-col lg:col-span-7">
-        <Lane title="To decide" count={decide_.length} empty={loadingCards ? null : mix === 'brand' && !rows.some((r) => r.brand === brand) ? <NoProducts brand={brand} /> : 'Nothing waits for a decision. New cards appear when the data moves.'}>
-          {loadingCards ? (
-            <>
-              <SkeletonPanel height={180} />
-              <SkeletonPanel height={180} />
-            </>
-          ) : (
-            <>
-              {shown.map((c, i) => (
-                <CardView key={c.key} c={c} index={i} canDecide={canAct(role) || !org} legacy={!org} onDecide={(status, reason) => void decide(c.key, status, { reason, snapshot: snapshotOf(c) })} />
-              ))}
-              {decide_.length > MAX_CARDS ? (
-                <button type="button" onClick={() => setShowAll((v) => !v)} className="hit44 self-start border-0 bg-transparent px-1 text-proof-small text-ink-2 hover:text-ink">
-                  {showAll ? 'Show the top five' : `Show ${decide_.length - MAX_CARDS} more`}
-                </button>
-              ) : null}
-            </>
-          )}
-        </Lane>
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:grid-rows-[auto_auto_auto_1fr] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col gap-3 lg:col-start-1">
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            {loadingCards ? (
+              <span aria-hidden className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
+                <Bone className="h-4 w-[min(640px,92%)]" />
+                <Bone className="h-4 w-[min(460px,70%)]" />
+              </span>
+            ) : (
+              <p key={sentences.join('')} className="m-0 min-w-[min(100%,440px)] max-w-[68ch] flex-1 text-proof-answer text-ink-2 [text-wrap:pretty] animate-[wFadeIn_.3s_ease_both]">
+                {sentences.map((s, i) => (
+                  <span key={i} className={i === 0 ? 'font-medium text-ink' : ''}>
+                    {s}{' '}
+                  </span>
+                ))}
+              </p>
+            )}
+            {!guide.hidden && guide.compact ? <GuideChip g={guide} open={guideOpen} onToggle={() => setGuideOpen((o) => !o)} /> : null}
+          </div>
+          {!guide.hidden && guide.compact && guideOpen ? <GuidePanel g={guide} onClose={() => setGuideOpen(false)} /> : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
-        <Lane title="In progress" count={inProgressN} empty="Accept a card and it waits here for its measurement.">
-          {accepted.map(([key, v]) => {
-            const card = cards.find((c) => c.key === key)
-            const snap = logByKey.get(key)?.snapshot
-            return (
-              <ProgressItem
-                key={key}
-                vkey={key}
-                kind={kindOfKey(key)}
-                title={card?.title ?? snap?.title ?? key}
-                figure={card ? `${card.figure} ${card.figureNote}` : (snap?.figure ?? '')}
-                n={card?.n ?? snap?.n ?? null}
-                meta={`Accepted ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`}
-                waiting={card?.waiting ?? 'Its follow-up measurement'}
-                actions={
-                  canAct(role) ? (
-                    <>
-                      <Button size="sm" onClick={() => void decide(key, 'done', { snapshot: card ? snapshotOf(card) : (snap ?? undefined) })}>
-                        <Check size={14} strokeWidth={1.8} aria-hidden /> Mark done
-                      </Button>
-                      <Button size="sm" kind="ghost" onClick={() => void decide(key, 'open')}>
-                        Reopen
-                      </Button>
-                    </>
-                  ) : null
-                }
-              />
-            )
-          })}
-          {live.map((c) => (
-            <LiveCampaign key={c.id} c={c} carry={carry} />
-          ))}
-          {sentOpen.map((r) => (
-            <ProgressItem key={r.id} vkey={`rq-${r.id}`} kind="over_shelved" title={`Asked ${r.to_name ?? orgName(orgs, r.to_org)} for evidence`} figure={r.snapshot?.figure ?? ''} n={r.snapshot?.n ?? null} meta={`Sent ${agoText(r.created_at)}`} waiting="The brand’s answer" sub={r.product ?? r.snapshot?.title} />
-          ))}
-        </Lane>
+        <div className="lg:col-start-1">{loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}</div>
 
-        <Lane title="Results" count={resultsN} empty="Campaign results and brands’ answers land here, with their intervals.">
-          {resultCards.map((c, i) => (
-            <CardView key={c.key} c={c} index={i} canDecide={canAct(role) || !org} legacy={!org} result onDecide={(status, reason) => void decide(c.key, status === 'accepted' ? 'done' : status, { reason, snapshot: snapshotOf(c) })} />
-          ))}
-          {answered.map((r) => (
-            <AnswerItem key={r.id} r={r} from={r.to_name ?? orgName(orgs, r.to_org)} />
-          ))}
-          {done.map(([key, v]) => {
-            const snap = logByKey.get(key)?.snapshot
-            return <ProgressItem key={key} vkey={key} kind={kindOfKey(key)} title={snap?.title ?? key} figure={snap?.figure ?? ''} n={snap?.n ?? null} meta={`Done ${v.updated_at ? agoText(v.updated_at) : ''}${v.by_role ? ` · ${ROLE_LABEL[v.by_role]}` : ''}`} done />
-          })}
-        </Lane>
+        <NeedsYou
+          className="lg:col-start-2 lg:row-span-4 lg:row-start-1"
+          count={decide_.length}
+          loading={loadingCards}
+          empty={!priority.length}
+          cards={mix === 'brand' && !rows.some((r) => r.brand === brand) ? <NoProducts brand={brand} /> : priority.map((c, i) => cardOf(c, i, { lead: i === 0 }))}
+          updates={updates.slice(0, LATEST)}
+          updatesTotal={updates.length}
+          onAllUpdates={() => openLane('results')}
+          actions={
+            org ? (
+              <>
+                <IconButton to={`${sectionPath('digest')}${carry}`} label="Weekly digest">
+                  <Mail size={15} strokeWidth={1.6} aria-hidden />
+                </IconButton>
+                <IconButton onClick={() => setParam({ log: '1' }, { push: true })} label="Decision log">
+                  <History size={15} strokeWidth={1.6} aria-hidden />
+                </IconButton>
+              </>
+            ) : null
+          }
+        />
+
+        <ProofPanel className="lg:col-start-1" rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
+
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:col-start-1 xl:grid-cols-12">
+          <DemandPanel className="xl:col-span-7" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
+          <FunnelPanel className="xl:col-span-5" t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
-        {org ? <Requests className={mix === 'brand' ? 'lg:col-span-5' : 'lg:col-span-12'} inbox={inbox} outbox={outbox} loading={requests.status === 'loading'} /> : null}
-        {mix === 'brand' ? <BrandSpotlight rows={rows} brand={brand} weeks={d.cohort.weeks} className={org ? 'lg:col-span-7' : 'lg:col-span-12'} /> : null}
-      </div>
+      <Board ref={board} lanes={lanes} lane={lane} onLane={(l) => setParam({ lane: l })} />
 
-      {instance?.demo ? <p className="m-0 text-proof-small text-ink-2">Demo instance: cards are composed from the {d.cohort.real ? 'mixed' : 'simulated'} cohort and labelled as such wherever they are exported.</p> : null}
+      {org ? <Requests inbox={inbox} outbox={outbox} loading={requests.status === 'loading'} /> : null}
+
+      <p className="m-0 border-t border-line pt-4 text-proof-small text-ink-2">
+        {d.cohort.real ? 'Mixed' : 'Simulated'} cohort: every card and figure here is composed from it and labelled as such wherever it is exported.
+      </p>
 
       <SidePanel open={param('log') === '1'} onClose={() => setParam({ log: null })} title="Decision log" subtitle={org ? `${org.name} · every accept, dismiss, snooze and done, with the numbers at the time` : undefined} width={520} labelledBy="proof-log-title">
         <DecisionLog log={decisions.data?.log ?? []} />
       </SidePanel>
+      <BriefPanel brief={brief} onClose={() => setBrief(null)} />
     </div>
   )
 }
 
 const orgName = (orgs: { id: string; name: string }[], id: string) => orgs.find((o) => o.id === id)?.name ?? id
 
-/* ───────────────────────────── lanes and cards ───────────────────────────── */
-
-function Lane({ title, count, empty, children }: { title: string; count: number; empty: ReactNode; children: ReactNode }) {
-  const kids = Array.isArray(children) ? children.flat().filter(Boolean) : children
-  const isEmpty = Array.isArray(kids) ? kids.length === 0 : !kids
-  return (
-    <section aria-label={title} className="flex min-w-0 flex-col gap-3">
-      <h2 className="m-0 flex items-center gap-2 text-proof-h text-ink">
-        {title}
-        <span className="rounded-pill bg-sunken px-2 text-proof-label text-ink-2 tnum">{count}</span>
-      </h2>
-      {isEmpty && count === 0 ? empty ? <div className="rounded-card border border-dashed border-line px-4 py-6 text-proof-small text-ink-2">{empty}</div> : null : children}
-    </section>
-  )
-}
-
-function CardView({ c, index, canDecide, legacy, result = false, onDecide }: { c: DecisionCard; index: number; canDecide: boolean; legacy: boolean; result?: boolean; onDecide: (status: 'accepted' | 'dismissed' | 'snoozed', reason?: string) => void }) {
-  const k = KIND_ICON[c.kind]
-  const Icon = k.icon
-  const ivTip = useTooltip(c.interval ?? '')
-  return (
-    <article style={{ ...vt(c.key), animationDelay: `${index * 40}ms` }} className="flex min-w-0 flex-col gap-3 rounded-card border border-line bg-surface p-4 animate-[proofPage_.28s_var(--ease-standard)_both]">
-      <div className="flex items-center gap-2">
-        <span aria-hidden className={`grid size-6 shrink-0 place-items-center rounded-ctl ${k.tone}`}>
-          <Icon size={13} strokeWidth={1.9} />
-        </span>
-        <span className="min-w-0 flex-1 truncate text-proof-small text-ink-2">{c.type}</span>
-        {canDecide && !legacy ? <CardMenu onDecide={onDecide} /> : null}
-      </div>
-      <div className="flex min-w-0 items-start gap-3">
-        {c.product ? (
-          <Link to={`/retail/products/${encodeURIComponent(c.product.id)}`} aria-hidden tabIndex={-1} className="shrink-0 overflow-hidden rounded-ctl border border-line bg-pf-bg2 p-0.5">
-            <ProductImage product={{ image_url: c.product.image_url, category: c.product.category || 'serum', name: c.product.name }} size={32} decorative />
-          </Link>
-        ) : null}
-        <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="m-0 text-proof-body font-medium text-ink [text-wrap:pretty]">{c.title}</h3>
-          <p className="m-0 text-proof-small text-ink-2 [text-wrap:pretty]">{c.trigger}</p>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[22px] font-semibold leading-7 tracking-[-0.02em] text-ink tnum">{c.figure}</span>
-        <span className="text-proof-small text-ink-2">{c.figureNote}</span>
-        <span className="ml-auto flex items-center gap-2 text-proof-label text-ink-2 tnum">
-          {c.n !== null ? <span>n={int(c.n)}</span> : null}
-          {c.interval ? (
-            <>
-              <span {...ivTip.trigger} tabIndex={0} className="cursor-help underline decoration-line-strong decoration-dotted underline-offset-2">
-                interval
-              </span>
-              {ivTip.node}
-            </>
-          ) : null}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <ActionButton a={c.primary} c={c} primary canDecide={canDecide} onAccept={() => onDecide('accepted')} result={result} />
-        {c.secondary ? <ActionButton a={c.secondary} c={c} canDecide={canDecide} onAccept={() => onDecide('accepted', 'evidence requested')} result={result} /> : null}
-      </div>
-    </article>
-  )
-}
-
-/** Dismiss (with a reason) and Snooze for a week. */
-function CardMenu({ onDecide }: { onDecide: (status: 'dismissed' | 'snoozed', reason?: string) => void }) {
-  return (
-    <Menu label="More: snooze or dismiss" align="right" width={240} triggerClass="hit44 grid size-7 place-items-center rounded-ctl border-0 bg-transparent text-ink-2 hover:bg-pf-hover hover:text-ink" trigger={<MoreHorizontal size={15} strokeWidth={1.7} aria-hidden />}>
-      {(close) => (
-        <>
-          <MenuItem
-            onClick={() => {
-              close()
-              onDecide('snoozed', 'snoozed for 7 days')
-              toast('Snoozed for a week')
-            }}
-          >
-            <BellOff size={14} strokeWidth={1.7} aria-hidden className="text-ink-2" /> Snooze for a week
-          </MenuItem>
-          <MenuLabel>Dismiss because…</MenuLabel>
-          {DISMISS_REASONS.map((r) => (
-            <MenuItem
-              key={r}
-              onClick={() => {
-                close()
-                onDecide('dismissed', r)
-                toast(`Dismissed · ${r}`)
-              }}
-            >
-              <X size={14} strokeWidth={1.7} aria-hidden className="text-ink-2" /> {r}
-            </MenuItem>
-          ))}
-        </>
-      )}
-    </Menu>
-  )
-}
-
-function ActionButton({ a, c, primary = false, canDecide, onAccept, result }: { a: CardAction; c: DecisionCard; primary?: boolean; canDecide: boolean; onAccept: () => void; result: boolean }) {
-  const navigate = useNavigate()
-  const { carry } = useRetailState()
-  const { org, orgs } = useOrg()
-  const { getIdToken } = useAuth()
-  const { user } = useAuth()
-  const [busy, setBusy] = useState(false)
-  const kind = primary ? 'primary' : 'secondary'
-  // The primary action decides (accepts) and does the thing; a secondary link only opens the evidence.
-  const run = async () => {
-    if (a.kind === 'link') {
-      if (primary && canDecide) onAccept()
-      navigate(a.to)
-      return
-    }
-    if (a.kind === 'accept') {
-      onAccept()
-      toast(result ? 'Noted · moved to the log' : `Accepted · ${c.title}`)
-      return
-    }
-    if (a.kind === 'brief') {
-      downloadText(a.file, a.body, 'text/markdown')
-      if (canDecide) onAccept()
-      return
-    }
-    if (a.kind === 'request') {
-      const to = orgs.find((o) => o.kind === 'brand' && o.brands.includes(a.brand))
-      if (!org || !to) return
-      setBusy(true)
-      try {
-        const t = await getIdToken()
-        const sent = await proofApi.sendRequest(t, org.id, { to_org: to.id, product_id: a.productId, message: a.message, snapshot: { title: c.title.slice(0, 200), figure: `${c.figure} ${c.figureNote}`.slice(0, 120), n: c.n } })
-        withTransition(() => setRequests(org.id, (v) => ({ inbox: v?.inbox ?? [], outbox: [sent, ...(v?.outbox ?? []).filter((x) => x.id !== sent.id)] })))
-        onAccept()
-        toast(`Evidence request sent to ${to.name}`)
-      } catch (e) {
-        toast.error(proofError(e, 'send the request'))
-      } finally {
-        setBusy(false)
-      }
-      return
-    }
-    if (a.kind === 'autopilot') {
-      if (!user) return
-      setBusy(true)
-      try {
-        const t = await getIdToken()
-        const v = await api.autopilotAct(t, a.activityId, a.act)
-        setQueryData(['autopilot', user.uid], { rules: v.rules, activity: v.activity })
-        if (a.act === 'approve') {
-          onAccept()
-          toast(v.campaign_id ? 'Approved · the campaign has started' : (v.outcome ?? 'Approved'))
-        } else toast('Declined')
-      } catch (e) {
-        if (isNotMember(e)) toast.error('AutoCampaign needs an analyst or admin', { description: 'Approving starts a campaign, so it needs a role that can act for an organisation.', action: { label: 'Choose how to explore', onClick: () => navigate(`/retail${carry}${carry ? '&' : '?'}choose=1`) } })
-        else toast.error(proofError(e, a.act === 'approve' ? 'approve the proposal' : 'decline the proposal'))
-      } finally {
-        setBusy(false)
-      }
-    }
-  }
-  const icon = a.kind === 'brief' ? <Download size={14} strokeWidth={1.7} aria-hidden /> : a.kind === 'request' ? <Send size={14} strokeWidth={1.7} aria-hidden /> : a.kind === 'link' && !primary ? null : null
-  const needsRole = (a.kind === 'accept' || a.kind === 'request' || a.kind === 'autopilot') && !canDecide
-  return (
-    <Button size="sm" kind={kind} onClick={() => void run()} disabled={busy || needsRole} title={needsRole ? 'Viewers can read; an analyst or admin decides' : undefined}>
-      {icon}
-      {busy ? 'Working…' : a.label}
-      {a.kind === 'link' && primary ? <ArrowRight size={14} strokeWidth={1.7} aria-hidden /> : null}
-    </Button>
-  )
-}
-
-function ProgressItem({ vkey, kind, title, figure, n, meta, waiting, actions, sub, done = false }: { vkey: string; kind: CardKind | null; title: string; figure: string; n: number | null; meta: string; waiting?: string; actions?: ReactNode; sub?: string; done?: boolean }) {
-  return (
-    <article style={vt(vkey)} className="flex min-w-0 flex-col gap-2 rounded-card border border-line bg-surface p-4 animate-[proofPage_.28s_var(--ease-standard)_both]">
-      <div className="flex items-center gap-2 text-proof-small text-ink-2">
-        {done ? <CheckCircle2 size={14} strokeWidth={1.8} aria-hidden className="text-proof-leaf" /> : <Clock size={14} strokeWidth={1.8} aria-hidden className="text-pf-amber" />}
-        <span className="truncate">{kind ? TYPE_LABEL[kind] : 'Decision'}</span>
-      </div>
-      <h3 className="m-0 text-proof-body font-medium text-ink [text-wrap:pretty]">{title}</h3>
-      {sub ? <p className="m-0 text-proof-small text-ink-2">{sub}</p> : null}
-      {figure ? (
-        <p className="m-0 text-proof-small text-ink-2 tnum">
-          <span className="font-medium text-ink">{figure}</span>
-          {n !== null ? ` · n=${int(n)}` : ''}
-        </p>
-      ) : null}
-      <p className="m-0 text-proof-label text-ink-2">{meta}</p>
-      {waiting && !done ? (
-        <p className="m-0 rounded-ctl bg-pf-bg2 px-2.5 py-1.5 text-proof-small text-ink-2">
-          <span className="font-medium text-ink">Waiting for</span> {waiting.charAt(0).toLowerCase() + waiting.slice(1)}
-        </p>
-      ) : null}
-      {actions ? <div className="flex flex-wrap gap-2 pt-1">{actions}</div> : null}
-    </article>
-  )
-}
-
-function LiveCampaign({ c, carry }: { c: Campaign; carry: string }) {
-  const [now] = useState(() => Date.now())
-  const start = Date.parse(c.starts_at)
-  const day = Math.min(c.days, Math.max(1, Math.ceil((now - start) / 86_400_000)))
-  return (
-    <Link to={`${sectionPath('campaigns', c.id)}${carry}`} style={vt(`camp-${c.id}`)} className="flex min-w-0 flex-col gap-2 rounded-card border border-line bg-surface p-4 no-underline transition-colors hover:bg-pf-hover animate-[proofPage_.28s_var(--ease-standard)_both]">
-      <span className="flex items-center gap-2 text-proof-small text-ink-2">
-        <Megaphone size={14} strokeWidth={1.8} aria-hidden className="text-pf-amber" /> Campaign live · day {day} of {c.days}
-      </span>
-      <span className="text-proof-body font-medium text-ink">{c.product ?? c.product_id}</span>
-      <span className="text-proof-small text-ink-2 tnum">
-        {int(c.stats.reach ?? c.stats.impressions)} reached · {int(c.stats.adds)} adds
-      </span>
-      <span className="rounded-ctl bg-pf-bg2 px-2.5 py-1.5 text-proof-small text-ink-2">
-        <span className="font-medium text-ink">Waiting for</span> 10 people in each group, then the lift against the holdout
-      </span>
-    </Link>
-  )
-}
-
-function AnswerItem({ r, from }: { r: EvidenceRequest; from: string }) {
-  return (
-    <article style={vt(`ans-${r.id}`)} className="flex min-w-0 flex-col gap-2 rounded-card border border-line bg-surface p-4 animate-[proofPage_.28s_var(--ease-standard)_both]">
-      <span className="flex items-center gap-2 text-proof-small text-ink-2">
-        <Inbox size={14} strokeWidth={1.8} aria-hidden className={r.status === 'answered' ? 'text-proof-leaf' : 'text-ink-2'} />
-        {r.status === 'answered' ? `${from} answered` : `${from} declined`} · {agoText(r.updated_at ?? r.created_at)}
-      </span>
-      <span className="text-proof-body font-medium text-ink">{r.product ?? r.product_id}</span>
-      {r.reply ? <p className="m-0 rounded-ctl bg-pf-bg2 px-3 py-2 text-proof-small text-ink [text-wrap:pretty]">“{r.reply}”</p> : null}
-      <Link to={`/retail/products/${encodeURIComponent(r.product_id)}`} className="self-start text-proof-small font-medium text-ink no-underline hover:underline">
-        Re-read the evidence →
-      </Link>
-    </article>
-  )
-}
-
-/* ───────────────────────────── evidence requests ───────────────────────────── */
-
-function Requests({ inbox, outbox, loading, className }: { inbox: EvidenceRequest[]; outbox: EvidenceRequest[]; loading: boolean; className?: string }) {
-  const { org, orgs } = useOrg()
-  const [tab, setTab] = useState<'inbox' | 'sent'>(org?.kind === 'brand' || (inbox.length > 0 && !outbox.length) ? 'inbox' : 'sent')
-  const list = tab === 'inbox' ? inbox : outbox
-  return (
-    <Panel
-      title="Evidence requests"
-      id="requests-h"
-      className={className}
-      description={org?.kind === 'brand' ? 'The retailer asks for evidence before a range review; answer here and it lands on their Home.' : 'Ask a brand for evidence from a card; their answer lands in Results.'}
-      flush
-    >
-      <div className="px-5">
-        <Tabs
-          label="Requests"
-          value={tab}
-          onChange={setTab}
-          panelId="requests-panel"
-          tabs={[
-            { id: 'inbox', label: 'Inbox', count: inbox.filter((r) => r.status === 'open').length },
-            { id: 'sent', label: 'Sent', count: outbox.length },
-          ]}
-        />
-      </div>
-      <div id="requests-panel" role="tabpanel" className="flex flex-col">
-        {loading ? (
-          <div className="flex flex-col gap-2 p-5">
-            <Bone className="h-4 w-3/4" />
-            <Bone className="h-4 w-1/2" />
-          </div>
-        ) : list.length ? (
-          <ul className="m-0 flex list-none flex-col p-0">
-            {list.map((r) => (
-              <RequestRow key={r.id} r={r} incoming={tab === 'inbox'} other={(tab === 'inbox' ? r.from_name : r.to_name) ?? orgName(orgs, tab === 'inbox' ? r.from_org : r.to_org)} />
-            ))}
-          </ul>
-        ) : (
-          <EmptyState compact title={tab === 'inbox' ? 'No requests for you' : 'No requests sent'} body={tab === 'inbox' ? 'When the retailer asks for evidence on one of your products, it appears here.' : org?.kind === 'brand' ? 'Brands answer requests; the retailer sends them.' : 'Send one from an “Over-shelved, under-delivering” card.'} />
-        )}
-      </div>
-    </Panel>
-  )
-}
-
-function RequestRow({ r, incoming, other }: { r: EvidenceRequest; incoming: boolean; other: string }) {
-  const { org, role } = useOrg()
-  const { getIdToken } = useAuth()
-  const [reply, setReply] = useState('')
-  const [busy, setBusy] = useState(false)
-  const answer = async (status: 'answered' | 'declined') => {
-    if (!org) return
-    setBusy(true)
-    try {
-      const t = await getIdToken()
-      const next = await proofApi.answerRequest(t, org.id, r.id, { status, reply: reply.trim() || (status === 'declined' ? 'Declined' : '') })
-      withTransition(() => setRequests(org.id, (v) => ({ inbox: (v?.inbox ?? []).map((x) => (x.id === r.id ? { ...x, ...next } : x)), outbox: v?.outbox ?? [] })))
-      toast(status === 'answered' ? 'Answer sent' : 'Request declined')
-    } catch (e) {
-      toast.error(proofError(e, 'answer the request'))
-    } finally {
-      setBusy(false)
-    }
-  }
-  const tone = r.status === 'answered' ? 'green' : r.status === 'declined' ? 'gray' : 'amber'
-  return (
-    <li className="flex flex-col gap-2 border-t border-line px-5 py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-proof-body font-medium text-ink">{r.product ?? r.product_id}</span>
-        <Badge tone={tone}>{r.status === 'open' ? 'Waiting' : r.status === 'answered' ? 'Answered' : 'Declined'}</Badge>
-        <span className="ml-auto text-proof-label text-ink-2">
-          {incoming ? `From ${other}` : `To ${other}`} · {agoText(r.created_at)}
-        </span>
-      </div>
-      <p className="m-0 text-proof-small text-ink-2 [text-wrap:pretty]">{r.message}</p>
-      {r.snapshot?.figure ? (
-        <p className="m-0 text-proof-label text-ink-2 tnum">
-          At the time: {r.snapshot.figure}
-          {r.snapshot.n !== null && r.snapshot.n !== undefined ? ` · n=${int(r.snapshot.n)}` : ''}
-        </p>
-      ) : null}
-      {r.reply ? <p className="m-0 rounded-ctl bg-pf-bg2 px-3 py-2 text-proof-small text-ink">“{r.reply}”</p> : null}
-      {incoming && r.status === 'open' && canAct(role) ? (
-        <div className="flex flex-col gap-2">
-          <label className="sr-only" htmlFor={`reply-${r.id}`}>
-            Your answer
-          </label>
-          <textarea id={`reply-${r.id}`} value={reply} onChange={(e) => setReply(e.target.value)} rows={2} maxLength={600} placeholder="Your answer: what evidence you hold, a study date, or what you will change" className="w-full resize-y rounded-ctl border border-line bg-surface px-3 py-2 text-proof-small text-ink placeholder:text-ink-2 hover:border-line-strong" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" kind="primary" onClick={() => void answer('answered')} disabled={busy || reply.trim().length < 3}>
-              <Send size={14} strokeWidth={1.7} aria-hidden /> Send answer
-            </Button>
-            <Button size="sm" kind="ghost" onClick={() => void answer('declined')} disabled={busy}>
-              Decline
-            </Button>
-            <Link to={`/retail/products/${encodeURIComponent(r.product_id)}`} className="ml-auto self-center text-proof-small text-ink-2 no-underline hover:text-ink">
-              Open the product’s proof →
-            </Link>
-          </div>
-        </div>
-      ) : null}
-    </li>
-  )
-}
-
-/* ───────────────────────────── decision log ───────────────────────────── */
-
-function DecisionLog({ log }: { log: DecisionLogEntry[] }) {
-  if (!log.length) return <EmptyState compact title="No decisions yet" body="Accept, dismiss or snooze a card on Home and it is recorded here: who, when, and the numbers at the time." />
-  const sorted = [...log].sort((a, b) => b.at.localeCompare(a.at))
-  return (
-    <ol className="m-0 flex list-none flex-col p-0">
-      {sorted.map((e, i) => {
-        const kind = kindOfKey(e.key)
-        return (
-          <li key={`${e.key}-${e.at}-${i}`} className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
-            <span className="flex flex-wrap items-center gap-2">
-              <Badge tone={e.status === 'accepted' || e.status === 'done' ? 'green' : e.status === 'dismissed' ? 'gray' : 'amber'}>{STATUS_WORD[e.status]}</Badge>
-              <span className="text-proof-label text-ink-2">
-                {new Date(e.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                {e.by_role ? ` · ${ROLE_LABEL[e.by_role]}` : ''}
-              </span>
-            </span>
-            <span className="text-proof-body font-medium text-ink">{e.snapshot?.title ?? (kind ? TYPE_LABEL[kind] : e.key)}</span>
-            {e.snapshot?.figure ? (
-              <span className="text-proof-small text-ink-2 tnum">
-                {e.snapshot.figure}
-                {e.snapshot.n !== null && e.snapshot.n !== undefined ? ` · n=${int(e.snapshot.n)}` : ''}
-              </span>
-            ) : null}
-            {e.reason ? <span className="text-proof-small text-ink-2">Reason: {e.reason}</span> : null}
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
-/* ───────────────────────────── getting started ───────────────────────────── */
-
-function GettingStarted({ mix, rangeConnected, decided, campaigns }: { mix: 'retailer' | 'brand'; rangeConnected: boolean; decided: boolean; campaigns: boolean }) {
-  const [hidden, hide] = useOnceFlag('guide-hidden')
-  const [visited] = useOnceFlag('visited-product')
-  const { carry } = useRetailState()
-  if (hidden) return null
-  const steps = [
-    {
-      title: 'Connect your range',
-      body: mix === 'brand' ? 'Your products arrive from the retailer’s item file, matched to the measured catalog.' : 'Upload your item file once; Proof matches it to the measured catalog.',
-      items: [{ label: mix === 'brand' ? 'Your products are in the catalog' : 'Item file connected', done: rangeConnected, to: `${sectionPath('range')}${carry}` }],
-    },
-    {
-      title: 'See what works',
-      body: 'Every product’s visible change against non-users with the same goals, with n and interval.',
-      items: [{ label: 'Open a product’s proof', done: visited, to: `${sectionPath('products')}${carry}` }],
-    },
-    {
-      title: 'Act and measure',
-      body: 'Decide on a card; promote a Proven product with a randomised holdout to measure the lift.',
-      items: [
-        { label: 'Decide on a first card', done: decided, to: null },
-        { label: mix === 'brand' ? 'Launch or approve a campaign' : 'Launch or approve a campaign', done: campaigns, to: `${sectionPath('campaigns')}${carry}` },
-      ],
-    },
-  ]
-  const all = steps.flatMap((s) => s.items)
-  const doneN = all.filter((i) => i.done).length
-  if (doneN === all.length) return null
-  return (
-    <section aria-labelledby="guide-h" className="flex flex-col gap-4 rounded-card border border-line bg-surface p-5 animate-[proofPage_.24s_var(--ease-standard)_both]">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="guide-h" className="m-0 text-proof-h text-ink">
-          How Proof works
-        </h2>
-        <span className="flex items-center gap-3">
-          <span className="text-proof-small text-ink-2 tnum">
-            {doneN} of {all.length} done
-          </span>
-          <button type="button" onClick={hide} className="hit44 border-0 bg-transparent text-proof-small text-ink-2 hover:text-ink">
-            Hide guide
-          </button>
-        </span>
-      </div>
-      <ol className="m-0 grid list-none grid-cols-1 gap-5 p-0 md:grid-cols-3">
-        {steps.map((s, i) => {
-          const stepDone = s.items.every((x) => x.done)
-          return (
-            <li key={s.title} className="flex gap-3">
-              <span aria-hidden className={`grid size-6 shrink-0 place-items-center rounded-full text-proof-label font-medium tnum transition-colors duration-300 ${stepDone ? 'bg-proof-leaf text-[var(--bg-canvas)]' : 'bg-proof-leaf-soft text-proof-leaf'}`}>
-                {stepDone ? <Check size={13} strokeWidth={3} /> : i + 1}
-              </span>
-              <span className="flex min-w-0 flex-col gap-1.5">
-                <span className="text-proof-body font-medium text-ink">{s.title}</span>
-                <span className="text-proof-small text-ink-2">{s.body}</span>
-                <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                  {s.items.map((it) => (
-                    <li key={it.label} className="flex items-center gap-2 text-proof-small">
-                      <span aria-hidden className={`grid size-4 place-items-center rounded-full border transition-colors duration-300 ${it.done ? 'border-proof-leaf bg-proof-leaf text-[var(--bg-canvas)]' : 'border-line-strong'}`}>{it.done ? <Check size={10} strokeWidth={3.2} /> : null}</span>
-                      <span className="sr-only">{it.done ? 'Done: ' : 'To do: '}</span>
-                      {it.to && !it.done ? (
-                        <Link to={it.to} className="text-ink no-underline hover:underline">
-                          {it.label}
-                        </Link>
-                      ) : (
-                        <span className={it.done ? 'text-ink-2 line-through decoration-line-strong' : 'text-ink'}>{it.label}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
-  )
-}
-
-/* ───────────────────────────── brand pieces ───────────────────────────── */
-
 function NoProducts({ brand }: { brand: string | null }) {
   const { carry } = useRetailState()
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-dashed border-line px-4 py-5 text-proof-small text-ink-2">
-      <span className="font-medium text-ink">{brand ? `${brand} has no product in the catalog for this filter` : 'No products for this filter'}</span>
+    <div className="flex flex-col gap-2 rounded-card border border-dashed border-line px-5 py-5 text-proof-small text-ink-2">
+      <span className="text-proof-body font-medium text-ink">{brand ? `${brand} has no product in the catalog for this filter` : 'No products for this filter'}</span>
       <span>Check the range: products the retailer lists that Willow doesn’t know yet can be requested there.</span>
       <Link to={`${sectionPath('range')}${carry}`} className="self-start font-medium text-ink no-underline hover:underline">
         Open your range →
       </Link>
     </div>
-  )
-}
-
-function BrandSpotlight({ rows, brand, weeks, className }: { rows: ProductRow[]; brand: string | null; weeks: number; className?: string }) {
-  const { carry } = useRetailState()
-  const mine = brand ? rows.filter((r) => r.brand === brand) : rows
-  const spot = spotlightOf(mine)
-  if (spot) return <div className={className}><Spotlight row={spot} weeksN={weeks} mine /></div>
-  // An empty brand workspace gets the next useful step, not "nothing is Proven".
-  const collecting = mine.filter((r) => statusOf(r) === 'collecting').length
-  const unused = mine.filter((r) => statusOf(r) === 'no_users').length
-  return (
-    <section className={`flex flex-col gap-2 rounded-card border border-line bg-surface p-5 ${className ?? ''}`}>
-      <h2 className="m-0 text-proof-h text-ink">Your next step</h2>
-      <p className="m-0 text-proof-body text-ink-2">
-        {mine.length
-          ? `${mine.length} ${mine.length === 1 ? 'product is' : 'products are'} in the catalog; ${collecting} ${collecting === 1 ? 'is' : 'are'} collecting people and ${unused} ${unused === 1 ? 'has' : 'have'} no users yet. A product gets a Proof tier once 10 people reach week ${weeks}.`
-          : 'None of your products is in the catalog yet.'}
-      </p>
-      <p className="m-0 text-proof-small text-ink-2">Sampling grows n fastest: a nearly-proven card offers a brief when one is close.</p>
-      <Link to={`${sectionPath('products')}${carry}`} className="self-start text-proof-small font-medium text-ink no-underline hover:underline">
-        See where each product stands →
-      </Link>
-    </section>
   )
 }

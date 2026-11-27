@@ -15,7 +15,7 @@ const HAPPY_MS = 1600
  *   thinking while a question is out → speaking while the answer is revealed → a happy hop when it lands,
  *   listening while the pointer is on it or the person is typing a question, sleepy after a long quiet spell,
  *   idle otherwise.
- * Bottom right (phones: above the dock, tucked away while scrolling down). Opening: the cat shrinks away as the advisor grows out of its spot;
+ * Bottom right on wide screens; on phones, in the header's right corner (never over content or the tab bar). Opening: the cat shrinks away as the advisor grows out of its spot;
  * closing: the advisor folds back into the corner and the cat pops out again (AppShell's AdvisorHost does the
  * panel's half). Reduced motion: both only fade.
  */
@@ -76,29 +76,13 @@ export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; o
     }
   }, [])
 
-  // Phones: the cat floats over the content's right edge, so it tucks away while the page scrolls down and comes
-  // back on the way up or at the end of the page (where the content already clears it).
-  const [tucked, setTucked] = useState(false)
-  useEffect(() => {
-    if (wide) return setTucked(false)
-    let lastY = window.scrollY
-    const onScroll = () => {
-      const y = window.scrollY
-      const atEnd = y + window.innerHeight >= document.documentElement.scrollHeight - 40
-      if (y < 80 || atEnd || y < lastY - 8) setTucked(false)
-      else if (y > lastY + 8) setTucked(true)
-      else return
-      lastY = y
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [wide])
-
   const state: AvatarState =
     phase === 'thinking' ? 'thinking' : phase === 'revealing' ? 'speaking' : happy ? 'happy' : hover || typing ? 'listening' : dozing && !open ? 'sleepy' : 'idle'
-  const size = wide ? 64 : 58
+  // Phones: the cat sits in the header's right corner (where the profile pill was; You is a tab now), so it
+  // never covers content or the tab bar's thumb zone. Wide: bottom right, as drawn.
+  const size = wide ? 64 : 46
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
-  const hidden = covered || (tucked && !open)
+  const hidden = covered
   return (
     // The holder shows and hides the cat: it shrinks away as the advisor grows out of its spot, and pops back
     // (a little overshoot) once the advisor has folded back into it. The button inside keeps hover and press.
@@ -107,8 +91,8 @@ export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; o
       style={{
         width: size,
         height: size,
-        right: wide ? 24 : 16,
-        bottom: wide ? 20 : 'calc(max(14px, env(safe-area-inset-bottom)) + 76px)',
+        right: wide ? 24 : 'clamp(14px,4vw,38px)',
+        ...(wide ? { bottom: 20 } : { top: 'calc(env(safe-area-inset-top) + 11px)' }),
         opacity: hidden ? 0 : 1,
         scale: hidden && !reduced ? '0.4' : '1',
         pointerEvents: hidden ? 'none' : undefined,

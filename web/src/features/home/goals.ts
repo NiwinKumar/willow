@@ -18,6 +18,10 @@ export type GoalTrend = {
   line: string
   /** "Now 1.9% · baseline 2.7%". */
   reading: string | null
+  /** The baseline and latest readings, formatted, and the unit ("%"), for the card's "3.1 → 2.1 %". */
+  from: string | null
+  to: string | null
+  unit: string
   points: { t: number; v: number }[]
   baseline: number | null
   band: number | null
@@ -56,6 +60,9 @@ export function goalTrends(lead: Session, baseline: Session | null, face: Sessio
       way: kind === 'changed' ? changeWay(m) : null,
       line: run >= 2 ? `${head} · ${countWord(run).toLowerCase()} check-ins in a row` : head,
       reading: bm?.value != null && !lead.is_baseline ? `Now ${fmtReading(m.value, m)}${unit} · baseline ${fmtReading(bm.value, bm)}${unit}` : null,
+      from: bm?.value != null ? fmtReading(bm.value, bm) : null,
+      to: m.value != null ? fmtReading(m.value, m) : null,
+      unit,
       points: same.flatMap((s) => {
         const v = s.result?.metrics.find((x) => x.id === m.id)?.value
         return v == null ? [] : [{ t: Date.parse(s.created_at), v }]

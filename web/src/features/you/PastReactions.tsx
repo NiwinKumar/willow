@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { AITag } from '../../components/willow/AITag'
 import { AVOID_OPTIONS, LIFE_STAGES, matchIngredients, NOTE_MAX, readNote, useIngredientNames, type AvoidId, type LifeStage, type NoteRead } from '../../lib/safety'
@@ -27,6 +27,14 @@ export function PastReactions({ value, onChange, dense = false }: { value: PastV
   const names = useIngredientNames(focus || typed.length > 0)
   const options = useMemo(() => matchIngredients(names.data ?? [], typed, value.avoid_ingredients), [names.data, typed, value.avoid_ingredients])
   const input = useRef<HTMLInputElement>(null)
+  const list = useRef<HTMLUListElement>(null)
+  // The suggestions open below the field; near the bottom of a scroll box (the plan's card, a phone with the
+  // keyboard up) they would open out of sight: bring them into view once, as they appear.
+  const listOpen = focus && typed.trim().length >= 2
+  const hasOptions = options.length > 0
+  useEffect(() => {
+    if (listOpen) list.current?.scrollIntoView({ block: 'nearest' })
+  }, [listOpen, hasOptions])
   const [read, setRead] = useState<NoteRead | null>(null)
   const [reading, setReading] = useState(false)
   const [readError, setReadError] = useState<string | null>(null)
@@ -131,8 +139,8 @@ export function PastReactions({ value, onChange, dense = false }: { value: PastV
             }}
             className="min-h-11 w-full rounded-[16px] bg-white px-3.5 text-[16px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)] outline-none transition-shadow focus:shadow-[inset_0_0_0_1.5px_rgba(18,18,18,.45)] disabled:opacity-55"
           />
-          {focus && typed.trim().length >= 2 ? (
-            <ul id={listId} role="listbox" aria-label="Ingredient names" className="absolute inset-x-0 top-[calc(100%+6px)] z-20 m-0 flex max-h-60 list-none flex-col overflow-y-auto rounded-[16px] bg-surface p-1 shadow-[0_18px_40px_-18px_rgba(0,0,0,.35),inset_0_0_0_1px_rgba(18,18,18,.06)] animate-[wRise_.2s_var(--ease-standard)_both]">
+          {listOpen ? (
+            <ul ref={list} id={listId} role="listbox" aria-label="Ingredient names" className="absolute inset-x-0 top-[calc(100%+6px)] z-20 m-0 flex max-h-60 list-none flex-col overflow-y-auto rounded-[16px] bg-surface p-1 shadow-[0_18px_40px_-18px_rgba(0,0,0,.35),inset_0_0_0_1px_rgba(18,18,18,.06)] animate-[wRise_.2s_var(--ease-standard)_both]">
               {options.map((o, i) => (
                 <li
                   key={o}
@@ -180,7 +188,7 @@ export function PastReactions({ value, onChange, dense = false }: { value: PastV
             rows={dense ? 2 : 3}
             placeholder="e.g. A scented moisturiser made my cheeks sting"
             onChange={(e) => onChange({ note: e.target.value.slice(0, NOTE_MAX) || null })}
-            className="block w-full resize-none rounded-[16px] bg-white px-3.5 py-2.5 pb-6 text-[15px] leading-[1.45] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)] outline-none transition-shadow focus:shadow-[inset_0_0_0_1.5px_rgba(18,18,18,.45)]"
+            className="block w-full resize-none rounded-[16px] bg-white px-3.5 py-2.5 pb-6 text-[16px] leading-[1.45] sm:text-[15px] text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.12)] outline-none transition-shadow focus:shadow-[inset_0_0_0_1.5px_rgba(18,18,18,.45)]"
           />
           <span aria-live="polite" className={`pointer-events-none absolute right-3 bottom-1.5 font-mono text-[10.5px] tabular-nums ${note.length > NOTE_MAX - 40 ? 'text-ink' : 'text-ink-2'}`}>
             {note.length}/{NOTE_MAX}

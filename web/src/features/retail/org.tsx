@@ -1,4 +1,4 @@
-import { Building2, LogIn, ShieldCheck, Store } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -7,8 +7,9 @@ import { ApiError } from '../../lib/api'
 import { setQueryData, useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { ProofMark } from './brand'
-import { proofApi, proofError, ROLE_HINT, ROLE_LABEL, verifiedText, type InstanceView, type Membership, type MeView, type ProofInstance, type ProofOrg, type Role } from './proofApi'
-import { Badge, Bone, Button, Combobox, ErrorState, Select } from './ui'
+import { ChooseOrg } from './ChooseOrg'
+import { proofApi, ROLE_LABEL, type InstanceView, type Membership, type MeView, type ProofInstance, type ProofOrg, type Role } from './proofApi'
+import { Bone, Button, ErrorState, primeBrandLogos, Select } from './ui'
 import { slugOf } from './ui/format'
 
 /*
@@ -110,6 +111,10 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }, [instanceId])
 
   const orgs = useMemo(() => (inst.status === 'ready' ? inst.v.orgs : []), [inst])
+  // Orgs carry their logo (newer api): every BrandLogo of that org's brand uses it too.
+  useEffect(() => {
+    primeBrandLogos(Object.fromEntries(orgs.flatMap((o) => (o.logo_url ? [[o.name, o.logo_url], ...(o.kind === 'brand' ? o.brands.map((b) => [b, o.logo_url]) : [])] : []))))
+  }, [orgs])
   const memberships = useMemo(() => me.data?.memberships ?? [], [me.data])
   const currentId = (() => {
     if (pick && memberships.some((m) => m.org_id === pick)) return pick
@@ -197,8 +202,11 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   if (!me.data) return <GateLoading />
   if (choosing && inst.v.instance.demo)
     return (
+      <GateFrame wide>
       <ChooseOrg
         view={inst.v}
+        memberships={memberships}
+        lockup={<Lockup instance={inst.v.instance} />}
         onPick={async (id) => {
           await switchOrg(id, { rejoin: true })
           doneChoosing()
@@ -206,9 +214,15 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         onSignOut={signOut}
         onCancel={org ? doneChoosing : undefined}
       />
+      </GateFrame>
     )
   if (!org) {
-    if (inst.v.instance.demo) return <ChooseOrg view={inst.v} onPick={switchOrg} onSignOut={signOut} />
+    if (inst.v.instance.demo)
+      return (
+        <GateFrame wide>
+          <ChooseOrg view={inst.v} memberships={memberships} lockup={<Lockup instance={inst.v.instance} />} onPick={switchOrg} onSignOut={signOut} />
+        </GateFrame>
+      )
     return (
       <GateFrame>
         <ErrorState title={`You’re not a member of ${inst.v.instance.name} yet`} body="Ask an admin of your organisation to invite you. Invites are sent from Settings → Team." />
@@ -226,10 +240,10 @@ export const brandSlugOf = (org: ProofOrg | null) => (org?.kind === 'brand' && o
 
 /* ───────────────────────────── gate screens ───────────────────────────── */
 
-function GateFrame({ children }: { children: ReactNode }) {
+function GateFrame({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return (
-    <main className="flex min-h-dvh items-start justify-center px-4 pb-16 pt-[12vh] sm:px-6">
-      <div className="flex w-full max-w-[720px] flex-col gap-6 animate-[proofPage_.24s_var(--ease-standard)_both]">{children}</div>
+    <main className={`flex min-h-dvh items-start justify-center px-4 pb-16 sm:px-6 ${wide ? 'pt-[8vh]' : 'pt-[12vh]'}`}>
+      <div className={`flex w-full flex-col gap-6 animate-[proofPage_.24s_var(--ease-standard)_both] ${wide ? 'max-w-[760px]' : 'max-w-[720px]'}`}>{children}</div>
     </main>
   )
 }
@@ -254,13 +268,15 @@ function Lockup({ instance }: { instance: ProofInstance | null }) {
         <span className="font-semibold">Proof</span>
         <span className="text-ink-2">by Willow</span>
       </span>
-      {instance ? (
+      {instance && !instance.label && instance.id !== 'willow' ? (
         <>
           <span aria-hidden className="text-[20px] font-light text-line-strong">
             /
           </span>
           <InstanceName instance={instance} />
         </>
+      ) : instance?.label ? (
+        <span className="ml-1 text-proof-small text-ink-2">{instance.label}</span>
       ) : null}
     </div>
   )
@@ -310,118 +326,6 @@ function SignIn({ instance }: { instance: ProofInstance | null }) {
         <p className="m-0 border-t border-line pt-4 text-proof-small text-ink-2">A guest account is enough for the demo. Proof shows aggregates only: no person, photo or group under 10 people is ever visible to a business.</p>
       </section>
     </GateFrame>
-  )
-}
-
-function ChooseOrg({ view, onPick, onSignOut, onCancel }: { view: InstanceView; onPick: (id: string) => Promise<void>; onSignOut: () => Promise<void>; onCancel?: () => void }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  const pick = async (id: string) => {
-    setBusy(id)
-    try {
-      await onPick(id)
-    } catch (e) {
-      toast.error(proofError(e, 'join that organisation'))
-      setBusy(null)
-    }
-  }
-  const retailer = view.orgs.filter((o) => o.kind === 'retailer')
-  const brands = view.orgs.filter((o) => o.kind === 'brand')
-  return (
-    <GateFrame>
-      <Lockup instance={view.instance} />
-      <div className="flex flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="m-0 text-proof-title text-ink">Choose how to explore</h1>
-          <Badge tone="amber">Demo</Badge>
-        </div>
-        <p className="m-0 max-w-[62ch] text-proof-body text-ink">
-          Proof shows which skincare products are linked to a measured, held change in people’s own photos, against people with the same goals who don’t use them. A retailer uses it to run its range; a brand uses it to prove and promote its products.
-        </p>
-        <p className="m-0 max-w-[62ch] text-proof-small text-ink-2">
-          {view.instance.name} is a demo: pick a seat to join with a demo role. You land on Home, where each card is one decision with its evidence and one action. In a real deployment the retailer’s admin invites you and brands are verified from its supplier list. Switch any time from the account menu (“Try as”).
-        </p>
-      </div>
-      <ul className={`m-0 grid list-none grid-cols-1 gap-3 p-0 ${brands.length > 5 ? '' : 'sm:grid-cols-2'}`}>
-        {[...retailer, ...(brands.length > 5 ? [] : brands)].map((o, i) => (
-          <li key={o.id} className="animate-[proofPage_.28s_var(--ease-standard)_both]" style={{ animationDelay: `${i * 40}ms` }}>
-            <OrgChoice org={o} busy={busy === o.id} disabled={busy !== null} onPick={() => void pick(o.id)} />
-          </li>
-        ))}
-      </ul>
-      {brands.length > 5 ? (
-        <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-5">
-          <span className="text-proof-body font-medium text-ink">Or explore as one of {brands.length} brands</span>
-          <span className="text-proof-small text-ink-2">A brand sees its own products’ evidence, answers the retailer’s requests and promotes what is Proven.</span>
-          <div>
-            <Combobox label="Brand" value="" emptyText="Choose a brand" options={brands.map((o) => ({ value: o.id, label: o.name, hint: 'Analyst' }))} onChange={(id) => void pick(id)} width={320} disabled={busy !== null} />
-          </div>
-        </div>
-      ) : null}
-      <div className="flex items-center justify-between gap-3 text-proof-small text-ink-2">
-        <span>Memberships made here are marked demo; campaigns they launch are shown to guest accounts only.</span>
-        {onCancel ? (
-          <button type="button" onClick={onCancel} className="hit44 shrink-0 border-0 bg-transparent text-proof-small text-ink-2 underline-offset-2 hover:text-ink hover:underline">
-            Back
-          </button>
-        ) : null}
-        <button type="button" onClick={() => void onSignOut()} className="hit44 shrink-0 border-0 bg-transparent text-proof-small text-ink-2 underline-offset-2 hover:text-ink hover:underline">
-          Sign out
-        </button>
-      </div>
-    </GateFrame>
-  )
-}
-
-function OrgChoice({ org, busy, disabled, onPick }: { org: ProofOrg; busy: boolean; disabled: boolean; onPick: () => void }) {
-  const role: Role = org.kind === 'brand' ? 'analyst' : 'admin'
-  const Icon = org.kind === 'brand' ? Building2 : Store
-  const basis = verifiedText(org)
-  return (
-    <button
-      type="button"
-      onClick={onPick}
-      disabled={disabled}
-      className="group flex h-full w-full flex-col gap-3 rounded-card border border-line bg-surface p-5 text-left transition-[border-color,background,transform] duration-150 hover:border-line-strong hover:bg-pf-hover active:scale-[.99] disabled:cursor-wait disabled:opacity-70"
-    >
-      <span className="flex items-center gap-3">
-        <span aria-hidden className={`grid size-9 shrink-0 place-items-center rounded-ctl ${org.kind === 'brand' ? 'bg-proof-leaf-soft text-proof-leaf' : 'bg-ink text-inverse'}`}>
-          <Icon size={17} strokeWidth={1.7} />
-        </span>
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-proof-body font-medium text-ink">
-            {ROLE_LABEL[role]} at {org.name}
-          </span>
-          <span className="text-proof-small text-ink-2">{org.kind === 'brand' ? `Brand · ${org.brands.join(', ')}` : 'Retailer · every brand in the range'}</span>
-        </span>
-      </span>
-      <ul className="m-0 flex list-none flex-col gap-1 p-0 text-proof-small text-ink-2">
-        {(org.kind === 'brand'
-          ? [
-              ['Prove', 'which of your products show a measured change, for whom'],
-              ['Claim', 'listing lines that quote only measured statements'],
-              ['Promote', 'Proven products, with a holdout that measures the lift'],
-            ]
-          : [
-              ['Stock', 'what earns its shelf, from outcomes across your range'],
-              ['Question', 'ask a brand for evidence before a range review'],
-              ['Promote', 'Proven products to the people they work for'],
-            ]
-        ).map(([k, v]) => (
-          <li key={k}>
-            <span className="font-medium text-ink">{k}:</span> {v}
-          </li>
-        ))}
-      </ul>
-      <span className="mt-auto flex flex-wrap items-center gap-2 text-proof-label text-ink-2">
-        {basis ? (
-          <span className="inline-flex items-center gap-1 text-proof-leaf">
-            <ShieldCheck size={13} strokeWidth={1.8} aria-hidden /> {basis}
-          </span>
-        ) : null}
-        <span>{ROLE_HINT[role]}</span>
-        <span className="ml-auto font-medium text-ink group-hover:underline">{busy ? 'Joining…' : 'Open →'}</span>
-      </span>
-    </button>
   )
 }
 

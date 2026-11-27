@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { TrendChart } from '../../components/charts'
+import { FluidTrend, TrendChart } from '../../components/charts'
 import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
 import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
@@ -69,11 +69,17 @@ export function ChangedCard({ session, baseline, goals, onOpen, onFull, onAsk, c
                 <VerdictLine kind={kind} way={changeWay(m)} className="text-[12px] text-ink-2" />
               </span>
               <span className="flex flex-none flex-col items-end gap-0.5">
-                <span className="flex items-baseline gap-[3px]">
-                  <span className="font-dot text-[18px]">{fmtReading(m.value, m)}</span>
-                  {unit ? <span className="text-[10.5px] text-ink-2">{unit}</span> : null}
+                {/* metric-num (DESIGN.md): Geist Mono 15 with the unit; the dot-matrix face is for large numerals only. */}
+                <span className="flex items-baseline gap-[3px] tnum">
+                  <span className="font-mono text-[15px] font-medium">{fmtReading(m.value, m)}</span>
+                  {unit ? <span className="text-[11px] text-ink-2">{unit}</span> : null}
                 </span>
-                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? <span className="text-[11px] text-ink-2">{fmtSigned(m.delta, m)}</span> : null}
+                {m.delta !== null && kind !== 'baseline' && kind !== 'notCompared' ? (
+                  <span className={`font-mono text-[11.5px] tnum ${kind === 'changed' ? 'text-signal-ink' : 'text-ink-2'}`}>
+                    {fmtSigned(m.delta, m)}
+                    {unit && unit !== '°' ? ` ${unit}` : ''}
+                  </span>
+                ) : null}
               </span>
             </button>
           )
@@ -186,7 +192,7 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
                   <span aria-hidden>△ </span>
                   {r.flag.text}
                 </span>
-                <button type="button" onClick={() => onAsk(r.flag!.question)} className="inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-colors hover:bg-white">
+                <button type="button" onClick={() => onAsk(r.flag!.question)} className="hit44 inline-flex min-h-8 flex-none items-center rounded-pill bg-white/85 px-3 text-[12px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-colors hover:bg-white">
                   Ask Wisp
                 </button>
               </div>
@@ -199,22 +205,25 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
   )
 }
 
-/** Your goals: each measure the person chose, as a trend since the baseline against their own normal range. */
+/**
+ * Your goals: each measure the person chose, as a trend since the baseline against their own normal range.
+ * Each row leads with the measure and what happened in words, then the two numbers that matter (baseline →
+ * now, with the unit), then the trend at the row's full width with its first and last dates under it. The
+ * dashed line and the band are explained once, in a legend at the foot.
+ */
 export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, className }: { trends: GoalTrend[]; baseline: Session | null; onOpen: (metricId: string) => void; onProgress: () => void; onAsk?: () => void; className?: string }) {
-  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background] duration-300'
+  const small = 'inline-flex min-h-9 items-center rounded-pill px-3 text-[12.5px] whitespace-nowrap transition-[background,scale] duration-200 active:scale-[.97]'
   return (
-    <HomeCard label="Your goals" className={`@container gap-2 p-4 ${className ?? ''}`} delay={320}>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <div className="flex min-w-0 flex-col">
+    <HomeCard label="Your goals" className={`gap-3 p-4 ${className ?? ''}`} delay={320}>
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <h2 className="m-0 text-h3 font-normal">Your goals</h2>
-          <span className="text-[11px] text-ink-2">
-            {baseline ? `since baseline · ${shortDay(baseline.created_at)} · ` : ''}dashed: baseline · shaded: normal
-          </span>
+          <span className="text-[12.5px] text-ink-2">{baseline ? `Since your baseline, ${shortDay(baseline.created_at)}` : 'Since your baseline'}</span>
         </div>
         <div className="flex gap-1.5">
           {onAsk ? (
             <button type="button" onClick={onAsk} className={`${small} text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.14)] hover:bg-ink/5`}>
-              Ask about goals
+              Ask
             </button>
           ) : null}
           <button type="button" onClick={onProgress} className={`${small} bg-selected text-inverse hover:bg-[#2a2a2a]`}>
@@ -223,35 +232,74 @@ export function GoalsCard({ trends, baseline, onOpen, onProgress, onAsk, classNa
         </div>
       </div>
       <ul className="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
-        {trends.slice(0, 3).map((t) => (
-          <li key={t.id} className="flex flex-1">
-            <button
-              type="button"
-              onClick={() => onOpen(t.id)}
-              aria-label={`${t.label}: ${t.line}. Open in the result.`}
-              title={t.reading ?? undefined}
-              className="flex min-h-14 max-h-24 flex-1 items-center gap-3 rounded-[18px] squircle bg-ink/[.035] py-2.5 pr-4 pl-2.5 text-left text-ink transition-[background,translate] duration-300 ease-standard hover:translate-x-0.5 hover:bg-ink/[.07]"
-            >
-              <span aria-hidden className="size-9 flex-none rounded-[12px] squircle shadow-[inset_0_0_10px_2px_rgba(255,255,255,.5)]" style={{ background: metricAura(t.id) }} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[14px]">{t.label}</span>
-                <span className="flex items-center gap-1.5 truncate text-[12px] text-ink-2">
-                  <span aria-hidden className={`flex-none ${t.kind === 'changed' && t.way !== 'otherWay' ? 'text-signal' : ''}`}>
-                    {t.way ? CHANGE_WORDS[t.way].glyph : VERDICT_WORDS[t.kind].glyph}
+        {trends.slice(0, 3).map((t, i) => {
+          const ember = t.kind === 'changed' && t.way !== 'otherWay'
+          const first = t.points[0]
+          const last = t.points[t.points.length - 1]
+          return (
+            <li key={t.id} className="flex flex-1 animate-[wRise_.5s_both]" style={{ animationDelay: `${360 + i * 60}ms` }}>
+              <button
+                type="button"
+                onClick={() => onOpen(t.id)}
+                aria-label={`${t.label}: ${t.line}.${t.reading ? ` ${t.reading}.` : ''} Open in the result.`}
+                className="group flex flex-1 flex-col gap-2.5 rounded-[18px] squircle bg-ink/[.035] px-3.5 pt-3 pb-2.5 text-left text-ink transition-[background,scale] duration-200 ease-standard hover:bg-ink/[.06] active:scale-[.99]"
+              >
+                <span className="flex items-start gap-3">
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden className="size-2.5 flex-none rounded-full" style={{ background: metricAura(t.id) }} />
+                      <span className="truncate text-[14.5px]">{t.label}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[12px] leading-[1.35] text-ink-2">
+                      <span aria-hidden className={`flex-none ${ember ? 'text-signal' : ''}`}>
+                        {t.way ? CHANGE_WORDS[t.way].glyph : VERDICT_WORDS[t.kind].glyph}
+                      </span>
+                      <span className="line-clamp-2">{t.line}</span>
+                    </span>
                   </span>
-                  <span className="truncate">{t.line}</span>
+                  {t.from && t.to ? (
+                    <span className="flex flex-none items-baseline gap-1 pt-px font-mono text-[12.5px] whitespace-nowrap tnum">
+                      <span className="text-ink-2">{t.from}</span>
+                      <span aria-hidden className="text-ink-2">→</span>
+                      <span className={ember ? 'text-signal-ink' : ''}>{t.to}</span>
+                      {t.unit ? <span className="font-ui text-[11px] text-ink-2">{t.unit}</span> : null}
+                    </span>
+                  ) : null}
                 </span>
-              </span>
-              {t.points.length > 1 ? (
-                <span className="hidden flex-none text-ink-2 @min-[380px]:block">
-                  <TrendChart points={t.points} baseline={t.baseline} band={t.band} width={120} height={36} stroke={t.kind === 'changed' && t.way !== 'otherWay' ? 'var(--signal-change)' : 'currentColor'} label={`${t.label} across your check-ins, with your baseline and normal range`} />
-                </span>
-              ) : null}
-            </button>
-          </li>
-        ))}
+                {t.points.length > 1 ? (
+                  <span className="flex flex-1 flex-col text-ink-2">
+                    <FluidTrend fill points={t.points} baseline={t.baseline} band={t.band} height={40} stroke={ember ? 'var(--signal-change)' : 'currentColor'} dates={[shortDay(new Date(first.t).toISOString()), shortDay(new Date(last.t).toISOString())]} label={`${t.label} across your check-ins, with your baseline and normal range`} />
+                  </span>
+                ) : null}
+              </button>
+            </li>
+          )
+        })}
       </ul>
+      <TrendLegend />
     </HomeCard>
+  )
+}
+
+/** What the dashed line and the band mean, drawn with the same marks as the charts (said once per card). */
+export function TrendLegend({ className = '' }: { className?: string }) {
+  return (
+    <span className={`flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11.5px] text-ink-2 ${className}`}>
+      <span className="flex items-center gap-1.5">
+        <svg aria-hidden width="16" height="6" viewBox="0 0 16 6" className="text-ink-2">
+          <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="1.25" strokeDasharray="4 3" />
+        </svg>
+        Baseline
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden className="h-2 w-4 rounded-[3px] bg-ink/14" />
+        Your normal range
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden className="size-2 rounded-full bg-signal" />
+        Beyond it
+      </span>
+    </span>
   )
 }
 

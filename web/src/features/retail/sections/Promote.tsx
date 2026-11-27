@@ -8,7 +8,8 @@ import { setQueryData, useQuery } from '../../../lib/query'
 import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
 import { fetchProducts } from '../productData'
-import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, runningCount, workspaceId } from '../promote'
+import { promoHistory } from '../productModel'
+import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, portfolioOf, runningCount, workspaceId } from '../promote'
 import { useOrg } from '../org'
 import { purposeOf, sectionPath, useRetailState } from '../state'
 import { ShelfResults } from './market/ShelfResults'
@@ -18,6 +19,7 @@ import { AutoCampaigns } from './promote/AutoCampaigns'
 import { CampaignsTable } from './promote/CampaignsTable'
 import { CreateCampaign } from './promote/CreateCampaign'
 import { EligibleList } from './promote/EligibleList'
+import { Portfolio } from './promote/Portfolio'
 import { useCampaignPoll } from './promote/useCampaignPoll'
 
 /*
@@ -181,8 +183,8 @@ function Body({ uid }: { uid: string }) {
   const showAll = param('all') === '1' && !lockedBrand
   const listed = showAll ? campaigns : mine
   const elsewhere = lockedBrand ? 0 : campaigns.length - mine.length
-  const runningFor = new Map<string, number>()
-  for (const c of mine) if (c.status === 'active') runningFor.set(c.product_id, (runningFor.get(c.product_id) ?? 0) + 1)
+  // Each product's campaigns in this workspace (samples included): running, paused or promoted before.
+  const promo = promoHistory(mine)
   const workspaceOf = (c: Campaign) => (c.workspace === wsId ? null : c.workspace === 'retailer' ? 'retailer workspace' : `${c.workspace} workspace`)
 
   const target = createTarget(param('new'), param('product'))
@@ -216,8 +218,10 @@ function Body({ uid }: { uid: string }) {
   }
 
   const sum = campaignSummary(listed)
+  const samples = listed.length > 0 && listed.every((c) => c.sample)
   const description = listed.length ? (
     <>
+      {samples ? 'A sample portfolio (simulated, no shopper sees it): ' : null}
       {sum.active ? (
         <>
           <strong>{sum.active} active</strong> {sum.active === 1 ? 'campaign' : 'campaigns'}
@@ -238,7 +242,7 @@ function Body({ uid }: { uid: string }) {
     </>
   ) : eligible.length ? (
     <>
-      Promote a Proven product to the people its evidence covers. <strong>{brand ? `${eligible.length} of your products` : `${eligible.length} ${eligible.length === 1 ? 'product' : 'products'}`}</strong> {eligible.length === 1 ? 'is' : 'are'} ready.
+      Promote a Proven product to the people its evidence covers. <strong>{brand ? `${int(eligible.length)} of your products` : `${int(eligible.length)} ${eligible.length === 1 ? 'product' : 'products'}`}</strong> {eligible.length === 1 ? 'is' : 'are'} ready.
     </>
   ) : (
     answerLine(all, brand)
@@ -286,6 +290,8 @@ function Body({ uid }: { uid: string }) {
           <SkeletonTable rows={3} />
         </div>
       ) : listed.length ? (
+        <>
+        <Portfolio p={portfolioOf(listed)} openTo={(id) => `${sectionPath('campaigns', id)}${carry}`} />
         <section aria-labelledby="proof-campaigns-h" className="flex min-w-0 flex-col overflow-hidden rounded-card border border-line bg-surface">
           <CampaignsTable
             campaigns={listed}
@@ -294,8 +300,8 @@ function Body({ uid }: { uid: string }) {
                 <h2 id="proof-campaigns-h" className="m-0 text-proof-h text-ink">
                   Campaigns
                 </h2>
-                <span className="text-proof-small text-ink-2 tnum">
-                  {running} of {MAX_ACTIVE} running
+                <span className="text-proof-small text-ink-2 tnum" title="You can run up to three of your own campaigns at once; sample campaigns don’t take a slot.">
+                  {running} of {MAX_ACTIVE} launch slots in use
                 </span>
               </>
             }
@@ -319,6 +325,7 @@ function Body({ uid }: { uid: string }) {
           />
           <Rules />
         </section>
+        </>
       ) : (
         <HowItWorks />
       )}
@@ -328,14 +335,15 @@ function Body({ uid }: { uid: string }) {
         eligible={eligible}
         notEligible={notEligible}
         extras={rows}
-        runningFor={runningFor}
+        promo={promo}
         onPromote={(id) => openCreate(id)}
+        onOpenCampaign={(id) => openCampaign(id)}
         carry={carry}
         empty={
           <EmptyState
             compact
             title={brand ? `No ${brand} product is Proven yet` : 'No product is Proven yet'}
-            body="A product can be promoted once 30+ people have 8 weeks of readings and its lift over non-users stays above zero across the 95% interval. What each one still needs is listed below."
+            body="A product can be promoted once 30+ people have 8 weeks of readings and its lift over people with the same goals not using it stays above zero across the 95% interval. What each one still needs is listed below."
             action={{ label: 'See products', to: `${sectionPath('products')}${carry}` }}
           />
         }
@@ -393,7 +401,7 @@ function Updated({ at }: { at: number | null }) {
 }
 
 const STEPS = [
-  { title: 'Evidence decides eligibility', body: 'Only Proven products can be promoted: 30+ people, and a lift over non-users whose 95% interval stays above zero.' },
+  { title: 'Evidence decides eligibility', body: 'Only Proven products can be promoted: 30+ people, and a lift over people with the same goals not using it whose 95% interval stays above zero.' },
   { title: 'Reach the people it works for', body: 'Target only the goals and skin types the evidence covers. Shoppers see one card, labelled Sponsored, on their Routine page.' },
   { title: 'Measure the lift you caused', body: 'A random share of matching shoppers never sees the card. The difference in adoption between the groups is the campaign’s lift.' },
 ]

@@ -20,7 +20,7 @@ import { Badge, Bone, Button, copyText, EmptyState, int, Panel, Segmented, useTo
  * button only; once run, changing the channel drafts again. Results are kept per channel for the visit.
  */
 
-const BLOCKED_TEXT = 'Claims need a Proven or Promising product: the evidence does not show a visible change above non-users yet.'
+const BLOCKED_TEXT = 'Claims need a Proven or Promising product: the evidence does not show a visible change above people with the same goals not using it yet.'
 const CHECKED_LINE = 'Every draft cites its evidence; numbers, overclaims (“clinically proven”, condition names) and self-reported wording are checked before you see it.'
 
 type Run = { status: 'loading'; channel: ClaimChannel } | { status: 'ready'; d: Claims } | { status: 'error'; title: string; message: string }

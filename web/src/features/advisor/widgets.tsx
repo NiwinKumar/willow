@@ -32,7 +32,7 @@ function Frame({ title, link, onLink, children }: { title: string; link: string;
   return (
     <div className="flex flex-col gap-2.5 rounded-[22px] bg-sunken/80 p-3.5" style={{ animation: 'wRise .45s both' }}>
       <span className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] tracking-[.06em] text-ink-2">■ {title.toUpperCase()}</span>
+        <span className="text-[12.5px] text-ink-2">{title}</span>
         <button type="button" onClick={onLink} className="hit44 inline-flex items-center gap-1 rounded-pill bg-white px-2.5 py-1 text-[12px] transition-colors hover:bg-ink/5">
           {link} <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden />
         </button>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { TimelineChart } from '../../components/charts'
+import { DotNumber } from '../../components/willow/DotNumber'
 import { Sheet } from '../../components/ui/Sheet'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
@@ -53,11 +54,11 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
   return (
     <Sheet open={open} onClose={onClose} title={`${label} detail`} hideTitle variant="bottom" size="lg">
       <div className="flex flex-col gap-5 pb-2">
-        <div className="flex flex-col gap-2.5">
-          <span className="font-mono text-[12px] leading-[1.4] text-ink-2 uppercase">
-            ■ {conf.label} · {look.unitLabel}
-          </span>
+        <div className="flex flex-col gap-1.5">
           <h2 className="m-0 font-serif text-[clamp(28px,3.25vw,42px)] leading-[1.05] font-normal">{label}</h2>
+          <span className="text-[13.5px] leading-[1.4] text-ink-2">
+            {conf.label} · {look.unitLabel}
+          </span>
         </div>
         {/* What changed first, in words; the numbers below are the detail behind it. */}
         <StoryCard session={session} metricId={m.id} />
@@ -66,7 +67,7 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
           {stats.map(([k, v, dark]) => (
             <div key={k} className={`flex flex-col gap-2 rounded-[24px] p-4 ${dark ? 'bg-selected text-inverse' : 'bg-sunken'}`}>
               <span className="text-[13px] opacity-80">{k}</span>
-              <span className={numeric(v) ? 'font-dot text-[30px] leading-[1.1] font-extrabold tnum' : 'text-[20px] leading-[1.1]'}>{v}</span>
+              {numeric(v) ? <DotNumber text={v} className="text-[30px] leading-[1.1] font-extrabold tnum" /> : <span className="text-[20px] leading-[1.1]">{v}</span>}
             </div>
           ))}
         </div>

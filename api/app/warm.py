@@ -14,7 +14,10 @@ from datetime import UTC, datetime, timedelta
 
 log = logging.getLogger("willow.warm")
 
-WARM_BUDGET_S = 45
+# Startup waits this long for the warm-up, so a new instance takes traffic only once Proof's
+# views are built (~60-90 s on 1 vCPU at 35,000 simulated people, Nov 28). Cloud Run's startup
+# probe allows 240 s; the old revision keeps serving meanwhile.
+WARM_BUDGET_S = 150
 
 # The Ask panel's suggestions (web/src/features/retail/AskAggregates.tsx SUGGESTIONS) and the
 # brand journey's typed rule (web/src/features/journey/brandSegments.ts RULE_WORDS).
@@ -42,10 +45,16 @@ def _rows() -> str:
 def _proof_lists() -> str:
     """Proof's product and brand lists (every catalog product and brand: 3,000+ rows since the
     catalog grew), so the first judge to open Products or the brand picker doesn't wait."""
+    from app import retail_intel
     from app.routes import retailer_routes
 
     retailer_routes.proof_products("mixed", "all")
     retailer_routes.proof_brands("mixed", "all")
+    # Campaigns, Customers and the brief are as heavy at 35,000 people: eligibility took ~22 s
+    # on a fresh instance (Nov 28), so it is built here too, before a judge opens Campaigns.
+    retail_intel.eligibility_all()
+    retail_intel.segments("mixed", "all")
+    retail_intel.brief("mixed", "all")
     return "proof lists"
 
 

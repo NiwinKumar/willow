@@ -11,7 +11,7 @@ export function Chip({ children, tone = 'neutral', selected, onToggle, disabled,
         : tone === 'ink'
           ? 'bg-selected text-inverse'
           : 'text-ink shadow-[inset_0_0_0_1px_var(--line-strong)]'
-  const cls = `inline-flex items-center gap-1.5 rounded-pill px-3 text-[13px] leading-none whitespace-nowrap ${onToggle ? 'min-h-10 cursor-pointer transition-colors' : 'min-h-7'} ${t} ${className}`
+  const cls = `inline-flex items-center gap-1.5 rounded-pill px-3 text-[13px] leading-none whitespace-nowrap ${onToggle ? 'hit44 min-h-10 cursor-pointer transition-colors' : 'min-h-7'} ${t} ${className}`
   if (onToggle)
     return (
       <button type="button" aria-pressed={Boolean(selected)} disabled={disabled} onClick={onToggle} className={cls}>
