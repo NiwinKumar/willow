@@ -14,7 +14,10 @@ from datetime import UTC, datetime, timedelta
 
 log = logging.getLogger("willow.warm")
 
-WARM_BUDGET_S = 45
+# Startup waits this long for the warm-up, so a new instance takes traffic only once Proof's
+# views are built (~60-90 s on 1 vCPU at 35,000 simulated people, Nov 28). Cloud Run's startup
+# probe allows 240 s; the old revision keeps serving meanwhile.
+WARM_BUDGET_S = 150
 
 # The Ask panel's suggestions (web/src/features/retail/AskAggregates.tsx SUGGESTIONS) and the
 # brand journey's typed rule (web/src/features/journey/brandSegments.ts RULE_WORDS).
