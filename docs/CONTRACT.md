@@ -164,6 +164,8 @@ The place close-ups `left_cheek_macro`, `right_cheek_macro`, `forehead_macro` an
 - `pores`: `{mean_diameter_mm}`
 - `dark_circles`: `{delta_a_star, delta_melanin_proxy}`
 
+On `face_full` results (engine 0.4.1+), `redness`, `tone_evenness`, `blemishes`, `pigment_spots` and `dark_circles` also carry `by_zone`: `{zone: {value, within_session_sd, mdc95, n}}` per face-map zone (`forehead`, `nose`, `right_cheek`, `left_cheek`, `around_mouth`, `chin`, `right_jaw`, `left_jaw`; `right_under_eye` / `left_under_eye` for dark circles). A zone appears only when enough of its skin was seen; an older result has no `by_zone`. Definitions: `docs/METRICS.md` "Readings by area".
+
 ### 2.6 Candidate (for Gemini labelling, done by the api)
 ```json
 {
