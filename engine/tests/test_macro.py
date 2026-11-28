@@ -333,3 +333,20 @@ def test_a_lost_face_is_kept_on_the_second_try_only_at_the_sessions_scale(monkey
     assert pm._find_face(img, retry_px_per_mm=found_px * 1.1) is not None
     # every shrink gives a different scale (2x, 3x, 4x): none is near 1.5x
     assert pm._find_face(img, retry_px_per_mm=found_px * 1.5) is None
+
+
+def test_close_up_colour_bands_get_the_room_light_floor_and_values_do_not_move(
+    tmp_path, monkeypatch
+):
+    # a close-up has no colour reference: a new room's light moves its colours as a face's
+    _macro(tmp_path / "c.jpg")
+    photos = [str(tmp_path / "c.jpg")] * 3
+    floored = {m["id"]: m for m in analyze_macro(photos, "cheek_macro")["metrics"]}
+    monkeypatch.setattr(config, "CLOSEUP_LIGHT_FLOOR", {})
+    plain = {m["id"]: m for m in analyze_macro(photos, "cheek_macro")["metrics"]}
+    for mid, m in floored.items():
+        assert m["value"] == plain[mid]["value"]  # only the band changes
+        if mid in ("tone_ita", "redness"):
+            assert plain[mid]["mdc95"] < config.ROOM_LIGHT_FLOOR[mid] == m["mdc95"]
+        else:  # marks, pores and texture keep their own spread
+            assert m["mdc95"] == plain[mid]["mdc95"]
