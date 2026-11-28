@@ -166,7 +166,7 @@ export default function Progress() {
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-stretch gap-4">
-          <section aria-label="Calendar" className="flex flex-col gap-3.5 rounded-[44px] bg-surface p-[clamp(16px,2.6vw,28px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
+          <section aria-label="Calendar" className="flex flex-col gap-3.5 rounded-[clamp(32px,4.5vw,44px)] bg-surface px-[clamp(20px,3vw,32px)] pt-[clamp(24px,3.2vw,32px)] pb-[clamp(18px,2.6vw,28px)] shadow-[0_30px_70px_-50px_rgba(0,0,0,.35)] squircle">
             <Calendar
               month={month}
               days={days}

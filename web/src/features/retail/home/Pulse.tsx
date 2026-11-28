@@ -154,7 +154,7 @@ export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = ''
         </div>
       ) : (
         <>
-          <ol className="m-0 flex list-none flex-col gap-3 px-5 pb-4 pt-1">
+          <ol className="m-0 flex flex-1 list-none flex-col justify-center gap-4 px-5 pb-4 pt-1">
             {steps.map((s, i) => {
               const w = s.value / top
               const prev = i ? steps[i - 1].value : null
@@ -176,7 +176,7 @@ export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = ''
               )
             })}
           </ol>
-          <div className="mt-auto flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-line px-5 py-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-line px-5 py-3">
             {t.best ? (
               <>
                 <span className="text-proof-small text-ink-2">

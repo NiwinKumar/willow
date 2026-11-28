@@ -188,6 +188,18 @@
     color-scheme: light;
     -webkit-text-size-adjust: 100%;
   }
+  html {
+    --edge-fade-mask: none;
+  }
+  /* Phones: how far fixed layers fade at the screen's top and bottom edges: 28px in Safari (no safe-area inset,
+     its bars sit over the page), 0 when the app has insets of its own. Used by the grain and CanvasBlobs. */
+  @media (hover: none) and (max-width: 899px) {
+    html {
+      --edge-fade-top: max(0px, calc(28px - env(safe-area-inset-top) * 100));
+      --edge-fade-bottom: max(0px, calc(28px - env(safe-area-inset-bottom) * 100));
+      --edge-fade-mask: linear-gradient(180deg, transparent 0, #000 var(--edge-fade-top), #000 calc(100% - var(--edge-fade-bottom)), transparent 100%);
+    }
+  }
   html,
   body {
     margin: 0;
@@ -209,6 +221,11 @@
     z-index: 9999;
     opacity: var(--opacity-grain);
     mix-blend-mode: multiply;
+    /* Safari draws the page on under its status bar and toolbar, without this fixed layer: eased out over the
+       last 28px at those edges, the grain fades instead of stopping at a hard line (--edge-fade-*: 0 where the
+       app has real safe-area insets, a Home Screen app). */
+    -webkit-mask-image: var(--edge-fade-mask);
+    mask-image: var(--edge-fade-mask);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   [data-theme="dark"] body::before,

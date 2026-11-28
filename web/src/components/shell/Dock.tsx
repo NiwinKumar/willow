@@ -19,6 +19,10 @@ const TABS: { id: Exclude<Destination, null>; label: string; to: string; icon: N
  * scrolls under it through a long, eased fade that never shows an edge. (The advisor lives in the header on
  * phones: AdvisorFab.)
  */
+// The fade eases back out over EDGE at the screen's bottom: 28px in Safari (no bottom inset), 0 over a home
+// indicator (Home Screen app), where it stays solid to the edge.
+const EDGE = 'max(0px, calc(28px - env(safe-area-inset-bottom) * 100))'
+
 export function Dock({ current, onCheckIn, checkIn }: { current: Destination; onCheckIn: () => void; checkIn: CheckInState }) {
   const bar = useRef<HTMLDivElement>(null)
   const { pathname } = useLocation()
@@ -35,11 +39,18 @@ export function Dock({ current, onCheckIn, checkIn }: { current: Destination; on
   }, [current, pathname])
   return (
     <>
-      {/* Eased fade (many stops, so no band is visible): the canvas comes up softly behind the bar only. */}
+      {/* Eased fade (many stops, so no band is visible): the canvas comes up softly behind the bar, then eases out
+          again at the screen's edge. Safari draws the page on under its own toolbar, so a fade that stayed solid to
+          the edge showed as a hard line with content below it (EDGE). */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[34] h-[calc(120px+env(safe-area-inset-bottom))]"
-        style={{ background: 'linear-gradient(180deg, rgba(236,235,231,0) 0%, rgba(236,235,231,.04) 18%, rgba(236,235,231,.14) 36%, rgba(236,235,231,.32) 54%, rgba(236,235,231,.55) 72%, rgba(236,235,231,.75) 88%, rgba(236,235,231,.82) 100%)' }}
+        style={{
+          background: [
+            `linear-gradient(180deg, rgba(236,235,231,.82), rgba(236,235,231,.32) 55%, rgba(236,235,231,0)) bottom / 100% ${EDGE} no-repeat`,
+            `linear-gradient(180deg, rgba(236,235,231,0) 0%, rgba(236,235,231,.04) 18%, rgba(236,235,231,.14) 36%, rgba(236,235,231,.32) 54%, rgba(236,235,231,.55) 72%, rgba(236,235,231,.75) 88%, rgba(236,235,231,.82) 100%) top / 100% calc(100% - ${EDGE}) no-repeat`,
+          ].join(', '),
+        }}
       />
       <div className="pointer-events-none fixed inset-x-0 z-[35] flex items-center justify-center gap-2.5 px-4" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 10px)' }}>
         <nav

@@ -10,7 +10,7 @@ import { campaignTotals, changeText, demandTrends, pooledRate, portfolio, rising
 import { GuideChip, GuidePanel, useGuide } from '../home/Guide'
 import { ProofPanel } from '../home/ProofPanel'
 import { campaignsFor, DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, type Tile } from '../home/Pulse'
-import { NeedsYou, type Update } from '../home/Rail'
+import { LatestPanel, NeedsYou, SLOTS, type Update } from '../home/Rail'
 import { DecisionLog, Requests } from '../home/Requests'
 import { useHomeCards } from '../homeData'
 import { useOrg } from '../org'
@@ -43,8 +43,7 @@ import { InsightsGate } from './shared'
  * Four tests for each part are in its own file's header (home/*.tsx).
  */
 
-const PRIORITY = 3
-const LATEST = 4
+const PRIORITY = SLOTS
 
 export default function Home() {
   return (
@@ -167,8 +166,8 @@ function Body({ d }: { d: Insights }) {
         ]
 
   // ── the board's lanes (below the dashboard) and the rail's "Latest" (pointers into them)
-  const cardOf = (c: DecisionCard, i: number, o: { lead?: boolean; result?: boolean } = {}) => (
-    <CardView key={c.key} c={c} index={i} lead={o.lead} result={o.result} canDecide={canDecide} legacy={!org} onAsk={o.result ? undefined : ask} onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, o.result && status === 'accepted' ? 'done' : status, { reason, snapshot: snapshotOf(c) })} />
+  const cardOf = (c: DecisionCard, i: number, o: { lead?: boolean; result?: boolean; rail?: boolean } = {}) => (
+    <CardView key={c.key} c={c} index={i} lead={o.lead} rail={o.rail} result={o.result} canDecide={canDecide} legacy={!org} onAsk={o.result ? undefined : ask} onBrief={setBrief} onDecide={(status, reason) => void decide(c.key, o.result && status === 'accepted' ? 'done' : status, { reason, snapshot: snapshotOf(c) })} />
   )
   const progressItems = [
     ...accepted.map(([key, v]) => {
@@ -234,8 +233,13 @@ function Body({ d }: { d: Insights }) {
     <div className="flex flex-col gap-10">
       {!guide.hidden && !guide.compact ? <GuidePanel g={guide} /> : null}
 
-      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:grid-rows-[auto_auto_auto_1fr] xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-3 lg:col-start-1">
+      {/* A fixed frame (owner feedback, Nov 28: nothing appears or disappears with the data). Top: the summary,
+          key numbers and the comparison on the left; two decision slots on the right that stretch to the left
+          column's height. Below: demand, the funnel and Latest side by side, equal height. */}
+      <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
             {loadingCards ? (
               <span aria-hidden className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
@@ -256,17 +260,15 @@ function Body({ d }: { d: Insights }) {
           {!guide.hidden && guide.compact && guideOpen ? <GuidePanel g={guide} onClose={() => setGuideOpen(false)} /> : null}
         </div>
 
-        <div className="lg:col-start-1">{loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}</div>
+        <div>{loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}</div>
+        <ProofPanel className="flex-1" rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
+        </div>
 
         <NeedsYou
-          className="lg:col-start-2 lg:row-span-4 lg:row-start-1"
           count={decide_.length}
           loading={loadingCards}
-          empty={!priority.length}
-          cards={mix === 'brand' && !rows.some((r) => r.brand === brand) ? <NoProducts brand={brand} /> : priority.map((c, i) => cardOf(c, i, { lead: i === 0 }))}
-          updates={updates.slice(0, LATEST)}
-          updatesTotal={updates.length}
-          onAllUpdates={() => openLane('results')}
+          empty={mix === 'brand' && !rows.some((r) => r.brand === brand) ? <NoProducts brand={brand} /> : undefined}
+          cards={mix === 'brand' && !rows.some((r) => r.brand === brand) ? [] : priority.map((c, i) => cardOf(c, i, { lead: i === 0, rail: true }))}
           actions={
             org ? (
               <>
@@ -281,12 +283,13 @@ function Body({ d }: { d: Insights }) {
           }
         />
 
-        <ProofPanel className="lg:col-start-1" rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
+      </div>
 
-        <div className="grid grid-cols-1 items-stretch gap-6 lg:col-start-1 xl:grid-cols-12">
-          <DemandPanel className="xl:col-span-7" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
-          <FunnelPanel className="xl:col-span-5" t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
-        </div>
+      <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-12">
+        <DemandPanel className="md:col-span-2 xl:col-span-5" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
+        <FunnelPanel className="xl:col-span-4" t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
+        <LatestPanel className="xl:col-span-3" updates={updates} total={updates.length} onAll={() => openLane('results')} />
+      </div>
       </div>
 
       <Board ref={board} lanes={lanes} lane={lane} onLane={(l) => setParam({ lane: l })} />
