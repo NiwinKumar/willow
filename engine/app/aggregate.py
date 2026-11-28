@@ -25,15 +25,20 @@ def mdc95(sd: float | None, n: int | None = None) -> float | None:
     return band
 
 
-def summarize(values: list[float], baseline: dict | None, min_sd: float = 0.0) -> dict:
+def summarize(
+    values: list[float], baseline: dict | None, min_sd: float = 0.0, floor: float = 0.0
+) -> dict:
     """min_sd: the smallest photo-to-photo SD this metric can honestly have (config.MIN_SD).
     Identical values in every photo (a count that did not move, 0% dark spots) would otherwise
-    give a band of 0, and any later difference would be called real."""
+    give a band of 0, and any later difference would be called real. floor: the smallest band
+    (config.ROOM_LIGHT_FLOOR): what a new room's light alone moves the reading by."""
     mean = statistics.fmean(values)
     sd = max(statistics.stdev(values), min_sd) if len(values) > 1 else None
     # A noise band needs config.MIN_FRAMES_FOR_BAND photos: from 2, the spread is so uncertain
     # that the band came out at hundreds of degrees (Oct 14) - honest, but of no use to anyone.
     band = mdc95(sd, len(values)) if len(values) >= config.MIN_FRAMES_FOR_BAND else None
+    if band is not None:
+        band = max(band, floor)
     out = {
         "value": round(mean, 3),
         "within_session_sd": None if sd is None else round(sd, 3),

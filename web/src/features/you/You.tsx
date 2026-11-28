@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { LanguagePicker } from '../../components/willow/LanguagePicker'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Sheet } from '../../components/ui/Sheet'
 import { Toggle } from '../../components/ui/Toggle'
@@ -16,12 +15,14 @@ import type { PhotoTime, ProfilePatch } from '../../lib/api'
 import { GOALS, MAX_GOALS } from '../../lib/metrics'
 import { browserTz, localProfile, PHOTO_TIME_CLOCK, PHOTO_TIMES, placesOf, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
 import { CHOICE_COPY, choicesOf, minutesFor, TRACK_CHOICES, trackOf } from '../../lib/track'
+import { LANGUAGES, setLanguage, useLanguage } from '../../lib/language'
 import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
 import { useAuth } from '../../lib/useAuth'
 import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { resetChat } from '../advisor/chatStore'
 import { dayOf } from '../home/derive'
+import { DATA_LOCATION_LINE } from '../website/dataLocation'
 import { ReminderRows } from './Reminders'
 import { SafetyRows } from './SafetyRows'
 import { Group, GroupIndex, Row, ToggleRow } from './settings'
@@ -84,9 +85,7 @@ export default function You() {
         </Group>
       )}
       <Group id="language" title="Language">
-        <Row label="Willow’s answers in your language" hint="Explanations, what changed, and Wisp. Gemini writes and checks them in English first, then translates; a translation is used only if every number stays the same.">
-          <LanguagePicker />
-        </Row>
+        <LanguageRow />
       </Group>
       <Group id="setup" title="Photo setup and help">
         <CaptureSetupRow />
@@ -99,6 +98,27 @@ export default function You() {
       </Group>
       {demo ? null : <DeleteGroup />}
     </main>
+  )
+}
+
+/**
+ * No picker: Wisp answers in the language you write to it in, and explanations and what changed follow
+ * (lib/language.ts). Shown here so it is never a mystery, with one way back to English.
+ */
+function LanguageRow() {
+  const lang = useLanguage()
+  const name = LANGUAGES.find((l) => l.code === lang)?.name ?? 'English'
+  return (
+    <Row label="Follows how you write to Wisp" hint="Explanations, what changed and Wisp’s answers come back in the language of your last question. Gemini writes and checks them in English first; a translation is used only if every number stays the same.">
+      <span className="text-[14px] text-ink-2">
+        Now: <span lang={lang} className="text-ink">{name}</span>
+      </span>
+      {lang === 'en' ? null : (
+        <button type="button" className={outline} onClick={() => setLanguage('en')}>
+          Use English
+        </button>
+      )}
+    </Row>
   )
 }
 
@@ -404,6 +424,7 @@ function PrivacyRows() {
     ['On your account', me.status === 'loading' ? 'Checking…' : server ? `Saved · sharing ${server.aggregate_insights_opt_in ? 'on' : 'off'}` : me.status === 'error' ? 'Couldn’t check' : 'Not saved yet'],
     // Same retention as the consent (Welcome): previews and spot close-ups live under results/, which the bucket deletes at 30 days.
     ['Original photos and previews', 'Deleted 30 days after upload'],
+    ['Stored and measured in', 'Google Cloud us-central1 (Iowa, USA)'],
     ['Measurements', 'Kept until you delete them'],
     ['AI use', 'Explanations, spot labels, label reading, routine check, Wisp (the assistant)'],
     ['Scope', 'Cosmetic appearance only'],
@@ -439,21 +460,24 @@ function PrivacyRows() {
         <p className="mt-2 mb-1 text-[13px] leading-[1.55] text-ink-2">
           Willow stores your original photos privately for 30 days, then deletes them, with their small previews and spot close-ups. Measurements, verdicts and spot locations stay until you delete them. Gemini explains measured results, labels detected spots, reads ingredient labels, checks routines and answers your questions to Wisp; it does not produce measurements. Willow tracks cosmetic appearance only and does not diagnose.
         </p>
+        <p className="mt-2 mb-1 text-[13px] leading-[1.55] text-ink-2">{DATA_LOCATION_LINE}</p>
       </details>
     </>
   )
 }
 
 /**
- * "Sponsored suggestions" (users/{uid}.profile.hide_sponsored, on by default): Routine's one labelled card for a
- * product that met Willow's evidence bar. Off hides it; nothing else in the app reads campaigns.
+ * "Sponsored suggestions" (users/{uid}.profile.hide_sponsored, off until the person turns it on, like sharing):
+ * Routine's one labelled card for a product that met Willow's evidence bar. Off hides it; nothing else in the app
+ * reads campaigns.
  */
 function SponsoredToggle() {
   const { getIdToken } = useAuth()
   const uid = useOwner()
   const me = useMe()
   const [local, setLocal] = useState<boolean | null>(null)
-  const on = local ?? !me.data?.profile?.hide_sponsored
+  // opt-in: on only once the account says so (an explicit false); no profile yet reads as off
+  const on = local ?? me.data?.profile?.hide_sponsored === false
   const onChange = (next: boolean) => {
     if (!uid) return
     setLocal(next)

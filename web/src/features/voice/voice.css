@@ -1,0 +1,27 @@
+/* Wisp's voice mode (VoiceMode.tsx). Enters softly (the scrim fades, the sheet rises and settles, the orb
+   grows in), leaves faster. Text that changes with the state cross-fades on its key. Transform and opacity
+   only. Reduced motion: short fades, no movement. */
+.vm-scrim { animation: vmFade .32s var(--ease-standard) both; }
+.vm-sheet { animation: vmSheetIn .52s var(--ease-standard) both; }
+.vm-orb { animation: vmOrbIn .8s .08s var(--ease-standard) both; }
+.vm-swap { animation: vmSwap .36s var(--ease-standard) both; }
+.vm-caption { animation: vmSwap .28s var(--ease-standard) both; }
+[data-phase="leaving"] .vm-scrim { animation: vmFadeOut .22s var(--ease-exit) both; }
+[data-phase="leaving"] .vm-sheet { animation: vmSheetOut .22s var(--ease-exit) both; }
+
+.vm-btn { transition: transform .16s var(--ease-standard), background-color .2s ease, color .2s ease, box-shadow .2s ease; }
+.vm-btn:active { transform: scale(.94); }
+.vm-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+@keyframes vmFade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes vmFadeOut { to { opacity: 0 } }
+@keyframes vmSheetIn { from { opacity: 0; transform: translateY(18px) scale(.985) } to { opacity: 1; transform: none } }
+@keyframes vmSheetOut { to { opacity: 0; transform: translateY(10px) scale(.99) } }
+@keyframes vmOrbIn { from { opacity: 0; transform: scale(.88) } to { opacity: 1; transform: none } }
+@keyframes vmSwap { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-sheet, .vm-orb, .vm-swap, .vm-caption { animation: vmFade .2s ease both; }
+  [data-phase="leaving"] .vm-sheet { animation: vmFadeOut .15s ease both; }
+  .vm-btn:active { transform: none; }
+}

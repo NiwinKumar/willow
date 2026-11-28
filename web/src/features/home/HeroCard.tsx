@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { useHomeFit } from './fit'
 import { ArrowCircle, Glyph } from './parts'
 
 export type HeroLine = { g: string; t: string }
@@ -13,12 +14,14 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
   const [now] = useState(() => new Date())
   const hr = now.getHours()
   const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening'
+  // Home fitted to the screen: the card follows the window's height (padding, gaps and greeting scale with it).
+  const fit = useHomeFit()
   return (
     <section
       aria-label="Today"
-      className="clip-card relative isolate flex min-h-[clamp(240px,20vw,260px)] min-w-0 animate-[wRise_.6s_both] flex-col justify-between gap-7 overflow-hidden rounded-[36px] squircle text-ink [--clip-r:36px]"
+      className={`clip-card relative isolate flex min-w-0 animate-[wRise_.6s_both] flex-col justify-between overflow-hidden rounded-[36px] squircle text-ink [--clip-r:36px] ${fit ? 'min-h-0 gap-[clamp(8px,2.2vh,28px)]' : 'min-h-[clamp(240px,20vw,260px)] gap-7'}`}
       style={{
-        padding: 'clamp(20px,2.4vw,30px)',
+        padding: fit ? 'clamp(14px,2.3vh,30px) clamp(20px,2.4vw,30px)' : 'clamp(20px,2.4vw,30px)',
         background: 'linear-gradient(180deg, #F8E2CB 0%, #F4C6B6 38%, #DDBBDD 62%, #9DB4E8 84%, #84A3E0 100%)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.4), 0 40px 80px -50px rgba(40,50,110,.5)',
       }}
@@ -34,8 +37,8 @@ export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', nex
         {/* The check-in schedule: "Check-in due today", "2 days late", "Next check-in Sat 17 Oct". */}
         {next ? <span className="rounded-pill bg-white/55 px-3 py-1.5 text-[12.5px] backdrop-blur-[10px]">{next}</span> : null}
       </div>
-      <div className="flex flex-col gap-4">
-        <h1 className="m-0 font-serif text-[clamp(40px,3.8vw,58px)] leading-[.9] font-normal tracking-[-0.02em]">
+      <div className={`flex flex-col ${fit ? 'gap-[clamp(8px,1.6vh,16px)]' : 'gap-4'}`}>
+        <h1 className={`m-0 font-serif leading-[.9] font-normal tracking-[-0.02em] ${fit ? 'text-[clamp(32px,min(3.8vw,5vh),58px)]' : 'text-[clamp(40px,3.8vw,58px)]'}`}>
           {/* A guest has no name to greet ("Good evening, there" read oddly). */}
           {name ? (
             <>

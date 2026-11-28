@@ -500,6 +500,7 @@ def _count_confirmed(good: list[dict]) -> None:
 # front, left cheek, right cheek): each cheek and jaw from the photo that faces it, the rest
 # from the front. A side with no photo of its own is measured on the front.
 SIDE_ZONES = {"right": {"right_cheek", "right_jaw"}, "left": {"left_cheek", "left_jaw"}}
+MARK_KIND = {"blemishes": "blemish", "pigment_spots": "spot"}  # extras.marks (_photo_marks)
 VIEW_CODE = {"front": 0.0, "right": 1.0, "left": 2.0}  # candidate feature `view` (numbers only)
 
 
@@ -585,6 +586,53 @@ def _owned_marks(f: dict, sides: set[str]) -> list[bool]:
     """_keeps, and confirmed by another photo of the same view when there was one."""
     confirmed = f.get("confirmed") or [True] * len(f["mark_zones"])
     return [ok and k for ok, k in zip(confirmed, _keeps(f, sides), strict=True)]
+
+
+def _photo_marks(refs: list[dict], sides: set[str]) -> dict[str, list[dict]]:
+    """Every mark the session counts on each view's reference photo (Nov 28): blemishes and
+    dark spots in the zones that photo measures, confirmed by another photo of its view when
+    there was one (_owned_marks), at photo pixels of that photo (frame_index). Unlike
+    `candidates` (at most max_candidates, with crops for labelling) nothing is left out, so the
+    marks drawn add up to the photo's counts. extras.marks of blemishes / pigment_spots."""
+    out: dict[str, list[dict]] = {"blemish": [], "spot": []}
+    for f in refs:
+        box, n_b = f["box"], len(f["blemishes"])
+        marks = [*f["blemishes"], *f["spots"]]
+        own = _owned_marks(f, sides)
+        for i, (m, zone, ok) in enumerate(zip(marks, f["mark_zones"], own, strict=True)):
+            if ok:
+                out["blemish" if i < n_b else "spot"].append(
+                    {
+                        "view": f["view"],
+                        "frame_index": f["index"],
+                        "x": round(box.x + m.x, 1),
+                        "y": round(box.y + m.y, 1),
+                        "r": round(float(m.radius), 1),
+                        "zone": zone,
+                    }
+                )
+    return out
+
+
+MESH_POINTS = 468  # face-mesh landmarks (the iris points after them are left out)
+
+
+def _face_points(refs: list[dict]) -> list[dict]:
+    """Each view's reference photo's face-mesh landmarks at photo pixels (Nov 28): the same
+    point of the face has the same index in every photo, so an app can carry a place from one
+    check-in's photo to the same place on another's (the spot diary's "this spot, week by
+    week"). extras.face_points of blemishes."""
+    out = []
+    for f in refs:
+        pts = np.asarray(f["face"].points, dtype=np.float64)[:MESH_POINTS]
+        out.append(
+            {
+                "view": f["view"],
+                "frame_index": f["index"],
+                "points": np.round(pts, 1).tolist(),
+            }
+        )
+    return out
 
 
 def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
@@ -709,7 +757,12 @@ def _by_zone(metric_id: str, have: list[dict]) -> dict[str, dict]:
                 per_zone.setdefault(z, []).append(float(v))
     out = {}
     for z, vals in per_zone.items():
-        s = summarize(vals, None, config.MIN_SD.get(metric_id, 0.0))
+        s = summarize(
+            vals,
+            None,
+            config.MIN_SD.get(metric_id, 0.0),
+            config.ROOM_LIGHT_FLOOR.get(metric_id, 0.0),
+        )
         out[z] = {
             "value": s["value"],
             "within_session_sd": s["within_session_sd"],
@@ -1233,7 +1286,10 @@ def analyze_face(
             return "failed"
 
     per_frame, frames, warnings = [], [], []
-    for i, f in enumerate(map_frames(measure, list(enumerate(files)))):  # photos in parallel
+    t_frames = time.perf_counter()
+    measured = map_frames(measure, list(enumerate(files)))  # photos in parallel
+    frames_ms = (time.perf_counter() - t_frames) * 1000
+    for i, f in enumerate(measured):
         if f == "face_not_found":
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
@@ -1268,6 +1324,8 @@ def analyze_face(
         _assign_views(good, side_groups)
         _combine_views(good, side_refs)
     _zone_marks(good, side_refs)
+    marks = _photo_marks([good[0], *side_refs.values()], set(side_refs)) if good else {}
+    face_points = _face_points([good[0], *side_refs.values()]) if good else []
 
     metrics = []
     _session_lines(good)
@@ -1276,7 +1334,11 @@ def analyze_face(
         have = [f for f in good if f["values"][metric_id] is not None]
         if have:
             summary = summarize(
-                [f["values"][metric_id] for f in have], base, config.MIN_SD.get(metric_id, 0.0)
+                [f["values"][metric_id] for f in have],
+                base,
+                config.MIN_SD.get(metric_id, 0.0),
+                # a new room's light moves colour readings more than five photos in one room
+                config.ROOM_LIGHT_FLOOR.get(metric_id, 0.0),
             )
             extras = _mean_extras([f["extras"][metric_id] for f in have])
             if metric_id == "tone_ita":
@@ -1288,6 +1350,10 @@ def analyze_face(
                     extras[k] = have[0]["extras"]["lines"].get(k, [])
             if metric_id in ZONE_METRICS and (zones := _by_zone(metric_id, have)):
                 extras["by_zone"] = zones
+            if metric_id in MARK_KIND:  # every counted mark, placed on its photo
+                extras["marks"] = marks.get(MARK_KIND[metric_id], [])
+            if metric_id == "blemishes" and face_points:
+                extras["face_points"] = face_points
         else:
             summary = {
                 "value": None,
@@ -1425,6 +1491,9 @@ def analyze_face(
         ),
         "timings_ms": {
             "total": round((time.perf_counter() - t0) * 1000, 1),
+            # where the time goes (engine logs): measuring every photo, then the session's own
+            # work (confirming marks across photos, crops and uploads, preview, overlay)
+            "frames": round(frames_ms, 1),
             **({"overlay": round(overlay_ms, 1)} if draw else {}),
         },
         "warnings": warnings,

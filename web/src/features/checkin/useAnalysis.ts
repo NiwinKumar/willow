@@ -2,15 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { watchSession } from '../../data/live'
 import { useData } from '../../data/useData'
-import { ApiError, api, type AnalysisStage, type SessionView } from '../../lib/api'
+import { ApiError, api, type AnalysisStage, type QueuePlace, type SessionView } from '../../lib/api'
 import { useAuth } from '../../lib/useAuth'
+import { nextPlace, queuedPlace } from './queue'
 
 /** What the first read of the session said, so the screen can name the site before the result lands. */
-export type SessionMeta = Pick<SessionView['session'], 'id' | 'site' | 'capture_mode' | 'n_frames' | 'status'> & { sample_id?: string | null; stage?: AnalysisStage | null }
+export type SessionMeta = Pick<SessionView['session'], 'id' | 'site' | 'capture_mode' | 'n_frames' | 'status'> & { sample_id?: string | null; stage?: AnalysisStage | null; queue?: QueuePlace | null }
 
 export type AnalysisState =
   | { kind: 'idle' }
-  | { kind: 'running'; startedAt: number }
+  /** `queue`: in the api's line for the engine (measured only while this page keeps asking), else null. */
+  | { kind: 'running'; startedAt: number; queue?: QueuePlace | null }
   | { kind: 'done'; view: SessionView; fresh: boolean; startedAt: number; endedAt: number }
   | { kind: 'error'; status: number | null; code: string | null; message: string; startedAt: number; endedAt: number }
   | { kind: 'offline'; startedAt: number }
@@ -23,6 +25,8 @@ const STAGE_POLL_MS = 2000
  * shown as it is, one that another tab (or a reload) is analysing is waited for (up to the api's 6 min
  * stale window), anything else is analysed. analyze is one synchronous call (~35 s on a cold engine);
  * while it runs, `watch` reads the session's live `stage` every 2 s so the steps tick when the api moves on.
+ * A 409 conflict (another run, or still in line for the engine: `queued`, with the place) reads again and asks
+ * again, for as long as the page is open: a check-in in line is measured only while someone keeps asking.
  */
 async function analyzeOnce(
   token: string,
@@ -30,6 +34,7 @@ async function analyzeOnce(
   onMeta: (m: SessionMeta) => void,
   alive: () => boolean,
   watch: () => () => void,
+  onQueued: (place: QueuePlace | null) => void,
 ): Promise<{ view: SessionView; fresh: boolean }> {
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
   let current = await api.getSession(token, sessionId)
@@ -46,7 +51,10 @@ async function analyzeOnce(
   try {
     return { view: await api.analyze(token, sessionId), fresh: true }
   } catch (e) {
-    if (e instanceof ApiError && e.status === 409 && e.code === 'conflict') return analyzeOnce(token, sessionId, onMeta, alive, watch)
+    if (e instanceof ApiError && e.status === 409 && e.code === 'conflict') {
+      if (e.detail?.queued === true) onQueued(queuedPlace(e.detail))
+      return analyzeOnce(token, sessionId, onMeta, alive, watch, onQueued)
+    }
     throw e
   } finally {
     stop()
@@ -56,7 +64,8 @@ async function analyzeOnce(
 /**
  * The flow's measuring state, kept above the steps so Back or a re-render never starts a second run.
  * `note`/`deviation` ("Anything different today?") are PATCHed onto the session right before analyze.
- * `stage` is the api's live analysis stage (received → engine → explaining) while measuring, else null.
+ * `stage` is the api's live analysis stage (received → queued → engine → explaining) while measuring, else null;
+ * the place in line rides on the running state (`state.queue`).
  */
 export function useAnalysis(sessionId: string | null, extra: { note: string; deviation: boolean }) {
   const { user, loading: authLoading, getIdToken } = useAuth()
@@ -111,10 +120,19 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
     setState({ kind: 'running', startedAt })
     setStage(null)
     const live = () => mounted.current && currentId.current === sessionId
+    /** The place in line after a reading of the session (kept between one ask and the next). */
+    const follow = (stage: AnalysisStage | null | undefined, place: QueuePlace | null | undefined) =>
+      setState((s) => (s.kind === 'running' && s.startedAt === startedAt ? { ...s, queue: nextPlace(s.queue ?? null, stage, place) } : s))
     const onMeta = (m: SessionMeta) => {
       if (!live()) return
       setMeta(m)
       setStage(m.status === 'processing' ? (m.stage ?? null) : null)
+      if (m.status === 'processing') follow(m.stage, m.queue)
+    }
+    const onQueued = (place: QueuePlace | null) => {
+      if (!live()) return
+      setStage('queued')
+      setState((s) => (s.kind === 'running' && s.startedAt === startedAt ? { ...s, queue: place ?? s.queue ?? null } : s))
     }
     /** Read the stage every STAGE_POLL_MS while analyze is in flight; returns the stop function. */
     const watch = () => {
@@ -125,7 +143,10 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
           if (!on || !live()) break
           try {
             const v = await api.getSession(await getIdToken(), sessionId)
-            if (on && live()) setStage(v.session.stage ?? null)
+            if (on && live()) {
+              setStage(v.session.stage ?? null)
+              follow(v.session.stage, v.session.queue)
+            }
           } catch {
             /* a missed reading: the next one, or the answer, catches up */
           }
@@ -153,7 +174,7 @@ export function useAnalysis(sessionId: string | null, extra: { note: string; dev
             /* the note is optional: measuring goes ahead without it */
           }
         }
-        const { view, fresh } = await analyzeOnce(token, sessionId, onMeta, live, watch)
+        const { view, fresh } = await analyzeOnce(token, sessionId, onMeta, live, watch, onQueued)
         // Into the cache even if the person closed the check-in: Home shows it without a refetch.
         upsert.current(view)
         if (!live()) return

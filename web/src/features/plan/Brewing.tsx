@@ -1,33 +1,43 @@
-import { useEffect, useEffectEvent, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
-import { RollingNumber } from '../../components/willow/RollingNumber'
+import { ProductImage } from '../../components/willow/ProductImage'
 import { useData } from '../../data/useData'
 import { ApiError } from '../../lib/api'
 import { MAX_GOALS } from '../../lib/metrics'
 import { putSafety } from '../../lib/safety'
 import { useAuth } from '../../lib/useAuth'
 import { useReducedMotion } from '../../lib/useReducedMotion'
+import { BrewScene, type Rgb } from './brewScene'
 import { usePlan } from './draft'
-import { errorText, money, postPlan, saveLastPlan, type FunnelStep, type PlanResponse } from './planApi'
-
-type Nearest = { product_id: string; brand: string; name: string; price: number; currency: string; budget: number }
+import { SLOT_WORDS, errorText, money, postPlan, saveLastPlan, type FunnelStep, type PlanPick, type PlanResponse } from './planApi'
 import { card, cardStyle, primary, secondary } from './styles'
 import { Frame } from './ui'
 
-/** One filter's beat: the dots settle, the count rolls, the scan line passes. */
-const BEAT = 720
-const FIRST = 520
-const HOLD = 1250
+type Nearest = { product_id: string; brand: string; name: string; price: number; currency: string; budget: number }
+
+/** The catalog stage settles, then one filter per beat, then the picks gather and the screen holds before moving on. */
+const FIRST = 900
+const BEAT = 780
+const GATHER = 900
+const HOLD = 1350
 /** At most this many dots are drawn; above it each dot stands for a few products (said under the dish). */
 const MAX_DOTS = 180
-const GOLDEN = Math.PI * (3 - Math.sqrt(5))
 
 /**
  * The "brewing" moment between the questions and the plan. It asks /v1/plan and saves the answers to the
- * account, and while the plan is made the catalog sits in a glass dish as one dot per product. When the
- * answer lands, the dish replays the api's REAL funnel: each filter (sold where you are, within budget, no
- * flags, fit) drops the dots that did not pass and the survivors gather closer, the counts roll down beside
- * it. About four seconds, skippable; with reduced motion the counts are simply shown.
+ * account. The scene is one continuous dish (brewScene.ts): while the plan is made, dots bloom out of the
+ * centre and turn; when the answer lands, the dish replays the api's REAL funnel. Each filter passes as a
+ * ripple: the dots it drops drift out and fade where it reaches them, the survivors close up and shift colour
+ * (violet for the whole catalog, through sky, to willow green for what fits), the count rolls down, the bar
+ * shrinks with it and the step's tick draws in, and the heading's words dissolve into the next stage's.
+ * Last, the survivors gather into the picks' places and the picks' photos appear there. About five and a half
+ * seconds, skippable; with reduced motion the end state is shown at once, with a button on.
+ *
+ * Four tests (for the scene):
+ *   1. Tells: how many products each published rule left, with the real counts; the dots are the same counts.
+ *   2. Understood at a glance: dots leave as the count drops; the caption says what one dot is.
+ *   3. Never in the way: canvas and transform/opacity only, no layout moves; Skip is always there.
+ *   4. Belongs: the aura hues, the willow green for "fits", onboarding's glass card and serif heading.
  */
 export function Brewing() {
   const { request, draft, setResult, go, set } = usePlan()
@@ -80,23 +90,29 @@ export function Brewing() {
   }
 
   const funnel = useMemo(() => plan?.funnel ?? [], [plan])
+  const picks = useMemo(() => plan?.picks ?? [], [plan])
   const last = funnel.length - 1
-  // Reduced motion shows the whole funnel at once.
-  const stage = plan && reduce ? last : played
+  // Stages 0..last are the funnel's steps; last + 1 is the picks gathering. Reduced motion shows the end at once.
+  const stage = plan && reduce ? last + 1 : played
+  const gathered = Boolean(plan) && stage > last
 
-  // Play the funnel: one filter per beat, then hold on the result and move on (at once after Skip).
+  // Play the funnel: one filter per beat, the gathering, then a hold on the result and on (at once after Skip).
+  // `go` changes with the route, so it is read through an effect event: the scene must not replay while it leaves.
+  const leave = useEffectEvent(() => go('profile', { replace: true }))
   useEffect(() => {
     if (!plan || !funnel.length) return
-    if (skip) return void go('profile', { replace: true })
+    if (skip) return void leave()
     if (reduce) return
-    const timers: number[] = []
-    funnel.forEach((_, i) => timers.push(window.setTimeout(() => setPlayed(i), i === 0 ? 60 : FIRST + i * BEAT)))
-    timers.push(window.setTimeout(() => go('profile', { replace: true }), FIRST + last * BEAT + HOLD))
+    const at = (i: number) => (i === 0 ? 60 : FIRST + (i - 1) * BEAT)
+    const timers = funnel.map((_, i) => window.setTimeout(() => setPlayed(i), at(i)))
+    const gather = at(last) + GATHER
+    timers.push(window.setTimeout(() => setPlayed(last + 1), gather))
+    timers.push(window.setTimeout(() => leave(), gather + HOLD))
     return () => timers.forEach((t) => window.clearTimeout(t))
-  }, [plan, reduce, skip, funnel, last, go])
+  }, [plan, reduce, skip, funnel, last])
 
-  const done = Boolean(plan) && stage >= last
-  const now = stage >= 0 ? funnel[stage] : null
+  const now = stage >= 0 && stage <= last ? funnel[stage] : null
+  const fit = funnel[last]?.n ?? 0
 
   if (error)
     return (
@@ -142,13 +158,14 @@ export function Brewing() {
       </Frame>
     )
 
+  const title = gathered ? `${picks.length} ${picks.length === 1 ? 'pick' : 'picks'} for your routine` : stage === last && now ? `${fit} ${fit === 1 ? 'product fits' : 'products fit'} you` : now ? checkingWords(now, stage) : 'Reading the catalog'
   return (
     <Frame
       wide
-      title={done ? <span key="d" className="inline-block animate-[wWord_.5s_both]">{`${funnel[last].n} ${funnel[last].n === 1 ? 'product fits' : 'products fit'} you`}</span> : <span key={now?.id ?? 'w'} className="inline-block animate-[wWord_.45s_both]">{now ? checkingWords(now, stage) : 'Reading the catalog'}</span>}
+      title={<Morph text={title} />}
       sub="Fixed rules from published sources do the choosing. No AI picks a product."
       actions={
-        reduce && done ? (
+        reduce && gathered ? (
           <button type="button" className={primary} onClick={() => go('profile', { replace: true })}>
             See your skin profile <span aria-hidden>→</span>
           </button>
@@ -160,11 +177,11 @@ export function Brewing() {
       }
     >
       <div className="grid items-center gap-[clamp(12px,3vh,36px)] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Dish funnel={funnel} stage={stage} reduce={reduce} />
-        <FunnelList funnel={funnel} stage={stage} />
+        <Dish funnel={funnel} picks={picks} stage={stage} reduce={reduce} />
+        <FunnelList funnel={funnel} stage={stage} reduce={reduce} />
       </div>
       <p className="sr-only" role="status" aria-live="polite">
-        {done ? `${funnel[last].n} of ${funnel[0].n} products fit you.` : now ? `${now.label}: ${now.n}` : 'Building your routine'}
+        {gathered ? `${fit} of ${funnel[0].n} products fit you. ${picks.length} picks for your routine.` : now ? `${now.label}: ${now.n}` : 'Building your routine'}
       </p>
     </Frame>
   )
@@ -175,16 +192,21 @@ function checkingWords(step: FunnelStep, i: number): string {
   return `${step.label}…`
 }
 
-/** A small fixed-seed random source (mulberry32), so the dish lays out the same way on every render. */
-function seeded(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+/** The scene's colour per stage: violet for the whole catalog, through sky and teal, to willow green for what fits. */
+const LOADING: Rgb = [183, 160, 255]
+const STOPS: Rgb[] = [
+  [122, 92, 255],
+  [61, 123, 255],
+  [52, 160, 170],
+  [79, 184, 102],
+]
+function stageColour(i: number, last: number): Rgb {
+  const f = last > 0 ? Math.min(1, Math.max(0, i / last)) : 1
+  const x = f * (STOPS.length - 1)
+  const k = Math.min(STOPS.length - 2, Math.floor(x))
+  const p = x - k
+  const [a, b] = [STOPS[k], STOPS[k + 1]]
+  return [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p, a[2] + (b[2] - a[2]) * p]
 }
 
 /** Dot counts per stage: one per product, or scaled when the catalog is larger than MAX_DOTS (never zero while any product is left). */
@@ -194,91 +216,212 @@ function dotCounts(funnel: FunnelStep[]): { counts: number[]; per: number } {
   return { counts: funnel.map((f) => (f.n > 0 ? Math.max(1, Math.round(f.n / per)) : 0)), per }
 }
 
-function Dish({ funnel, stage, reduce }: { funnel: FunnelStep[]; stage: number; reduce: boolean }) {
+/** Where each pick gathers, in the dish's unit circle: one in the middle, two side by side, more on a ring. */
+function slotsFor(n: number): { x: number; y: number }[] {
+  if (n <= 1) return [{ x: 0, y: 0 }]
+  if (n === 2) return [{ x: -0.34, y: 0 }, { x: 0.34, y: 0 }]
+  const r = n === 3 ? 0.4 : 0.46
+  return Array.from({ length: n }, (_, k) => {
+    const a = -Math.PI / 2 + (k / n) * Math.PI * 2
+    return { x: Math.cos(a) * r, y: Math.sin(a) * r }
+  })
+}
+
+function Dish({ funnel, picks, stage, reduce }: { funnel: FunnelStep[]; picks: PlanPick[]; stage: number; reduce: boolean }) {
   const { counts, per } = useMemo(() => dotCounts(funnel), [funnel])
   const d0 = counts[0] ?? 0
   const last = counts.length - 1
-  // Each dot gets a fixed random rank: it survives a stage while its rank is under that stage's count.
-  const { ranks, jitter } = useMemo(() => {
-    const rand = seeded(d0 * 7919 + (counts[last] ?? 0))
-    const r = Array.from({ length: d0 }, (_, i) => i)
-    for (let i = r.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1))
-      ;[r[i], r[j]] = [r[j], r[i]]
+  const gathered = d0 > 0 && stage > last
+  const canvas = useRef<HTMLCanvasElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const scene = useRef<BrewScene | null>(null)
+  // What the scene has been told so far (catalog, stages, gathering), so each change is told once and in order.
+  const told = useRef(-2)
+  const [px, setPx] = useState(0)
+
+  // The scene lives as long as the dish: sized to its box, turning while the catalog is read.
+  useLayoutEffect(() => {
+    const c = canvas.current
+    const b = box.current
+    if (!c || !b) return
+    const s = new BrewScene(c)
+    scene.current = s
+    told.current = -2
+    const ro = new ResizeObserver(() => {
+      s.resize(b.clientWidth)
+      setPx(b.clientWidth)
+    })
+    ro.observe(b)
+    s.resize(b.clientWidth)
+    if (!reduce) {
+      s.seed(MAX_DOTS, LOADING, performance.now())
+      s.start()
     }
-    return { ranks: r, jitter: r.map(() => rand()) }
-  }, [d0, counts, last])
-  const s = Math.max(0, stage)
-  const done = stage >= 0 && stage >= last
-  const R = 44 // % of the dish, from the centre
-  const alive = counts[s] ?? 0
-  const radius = R * Math.max(0.42, Math.sqrt(alive / Math.max(1, d0)))
-  const size = Math.min(13, ((radius * 2) / Math.sqrt(Math.max(1, alive))) * 0.62)
-  const base = Math.min(7.6, ((R * 2) / Math.sqrt(Math.max(1, d0))) * 0.62)
+    return () => {
+      ro.disconnect()
+      s.stop()
+      scene.current = null
+    }
+  }, [reduce])
+
+  useEffect(() => {
+    const s = scene.current
+    if (!s || !d0) return
+    const t = performance.now()
+    if (told.current < -1) {
+      s.catalog(d0, d0 * 7919 + (counts[last] ?? 0), stageColour(0, last), t)
+      told.current = 0
+    }
+    // Stages may arrive together (reduced motion, a remount): each one still runs, in order.
+    const upTo = Math.min(stage, last)
+    for (let i = told.current + 1; i <= upTo; i++) s.filter(counts[i], stageColour(i, last), t)
+    told.current = Math.max(told.current, upTo)
+    if (gathered && told.current === last) {
+      s.resolve(slotsFor(picks.length), stageColour(last, last), t)
+      told.current = last + 1
+    }
+    if (reduce) s.settle(t)
+  }, [d0, counts, last, stage, gathered, picks.length, reduce])
+
+  const slots = slotsFor(picks.length)
+  const bubble = picks.length <= 3 ? 0.25 : picks.length === 4 ? 0.22 : 0.19
+  const f = last > 0 ? Math.min(1, Math.max(0, stage) / last) : 0
+  const caption = !d0 ? 'Willow’s catalog, checked for you' : gathered ? picks.map((p) => SLOT_WORDS[p.slot]).join(' · ') : per > 1 ? `Each dot is about ${Math.round(per)} products` : 'Each dot is one product in the catalog'
 
   return (
     <figure className="m-0 flex flex-col items-center gap-2">
       <div
+        ref={box}
         className="relative aspect-square w-[min(220px,52vw,27vh)] rounded-full sm:w-[min(300px,62vw,38vh)]"
         style={{ background: 'radial-gradient(circle at 50% 38%, rgba(255,255,255,.9), rgba(255,255,255,.45) 62%, rgba(255,255,255,.2))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.9), inset 0 -18px 40px rgba(156,211,255,.25), inset 0 10px 30px rgba(255,255,255,.7), 0 40px 80px -40px rgba(15,59,58,.45)' }}
       >
-        {/* the brew itself: a slow turning bloom under the dots */}
+        {/* the brew itself: a slow turning bloom, and two tints that cross-fade from violet to green as the filters run */}
         <div aria-hidden className="absolute inset-[9%] overflow-hidden rounded-full">
           <div
-            className="absolute inset-[-30%] opacity-70 blur-[22px]"
+            className="absolute inset-[-30%] blur-[22px]"
             style={{
               background: 'conic-gradient(from 0deg, rgba(216,184,255,.75), rgba(156,211,255,.7), rgba(184,233,134,.7), rgba(255,178,122,.6), rgba(216,184,255,.75))',
-              animation: reduce ? undefined : `wTurn ${d0 ? 14 : 5}s linear infinite`,
-              opacity: done ? 0.45 : d0 ? 0.55 : 0.8,
-              transition: 'opacity .8s',
+              animation: reduce ? undefined : 'wTurn 14s linear infinite',
+              opacity: gathered ? 0.35 : d0 ? 0.5 : 0.8,
+              transition: 'opacity 1.2s ease',
             }}
           />
+          <div className="absolute inset-0 transition-opacity duration-[900ms] ease-standard" style={{ background: 'radial-gradient(circle at 50% 55%, rgba(122,92,255,.32), transparent 70%)', opacity: d0 ? 1 - f : 0.4 }} />
+          <div className="absolute inset-0 transition-opacity duration-[900ms] ease-standard" style={{ background: 'radial-gradient(circle at 50% 55%, rgba(79,184,102,.34), rgba(184,233,134,.18) 45%, transparent 72%)', opacity: d0 ? f : 0 }} />
         </div>
-        {/* the filter passing through: a soft scan line, once per stage */}
-        {stage > 0 && !reduce ? (
-          <div key={stage} aria-hidden className="pointer-events-none absolute inset-[6%] overflow-hidden rounded-full">
-            <div className="absolute inset-x-0 h-[18%] animate-[wPlanScan_.7s_var(--ease-standard)_both]" style={{ background: 'linear-gradient(180deg, transparent, rgba(255,255,255,.85) 50%, transparent)' }} />
-          </div>
-        ) : null}
-        <div aria-hidden className="absolute inset-0">
-          {ranks.map((rank, i) => {
-            const survives = rank < alive
-            // Before the filters run, every dot sits in the full spiral at its own index.
-            const idx = stage <= 0 ? i : rank
-            const total = stage <= 0 ? d0 : alive
-            const rr = (stage <= 0 ? R : radius) * Math.sqrt((idx + 0.5) / Math.max(1, total))
-            const a = idx * GOLDEN
-            const x = 50 + rr * Math.cos(a)
-            const y = 50 + rr * Math.sin(a)
-            const sz = stage <= 0 ? base : size
-            const fin = done && survives
-            const style: CSSProperties = {
-              left: `${x}%`,
-              top: `${y}%`,
-              width: `${sz}%`,
-              height: `${sz}%`,
-              translate: '-50% -50%',
-              opacity: stage < 0 ? 0 : survives ? 1 : 0,
-              scale: survives ? 1 : 0.3,
-              filter: survives ? 'none' : 'blur(2px)',
-              background: fin ? 'radial-gradient(circle at 35% 30%, #fff 0%, var(--action-tag) 30%, var(--willow-400) 75%)' : 'radial-gradient(circle at 35% 30%, rgba(255,255,255,.95) 0%, rgba(122,92,255,.55) 45%, rgba(15,59,58,.75) 100%)',
-              boxShadow: fin ? '0 0 0 1px rgba(255,255,255,.7), 0 4px 14px -2px rgba(46,139,71,.6)' : 'inset 0 0 0 .5px rgba(255,255,255,.6)',
-              transition: `left .75s var(--ease-spring) ${jitter[i] * 180}ms, top .75s var(--ease-spring) ${jitter[i] * 180}ms, width .6s var(--ease-standard), height .6s var(--ease-standard), opacity .45s ease ${survives ? 0 : jitter[i] * 220}ms, scale .45s var(--ease-standard) ${jitter[i] * 220}ms, filter .45s, background .6s ease ${jitter[i] * 300}ms, box-shadow .6s`,
-              animation: stage === 0 ? `wDotIn .5s var(--ease-bounce) ${Math.round(jitter[i] * 420)}ms both` : undefined,
-            }
-            return <span key={i} className="absolute rounded-full" style={style} />
-          })}
-          {done && !reduce ? <span className="absolute top-1/2 left-1/2 size-[36%] animate-[wRingOut_1.1s_var(--ease-standard)_both] rounded-full border-2 border-[var(--willow-400)]" style={{ translate: '-50% -50%' }} /> : null}
-        </div>
-        {!d0 ? <span className="absolute inset-0 grid place-items-center font-mono text-[11px] tracking-[.08em] text-ink-2">MIXING…</span> : null}
+        <canvas ref={canvas} aria-hidden className="absolute inset-0 size-full" />
+        {/* the picks, where the last dots gathered */}
+        {gathered && px
+          ? picks.map((p, k) => (
+              <span
+                key={p.product.product_id}
+                className="absolute"
+                style={{ left: `${50 + slots[k].x * 44}%`, top: `${50 + slots[k].y * 44}%`, translate: '-50% -50%', animation: `wPlanPick .8s var(--ease-spring) ${380 + k * 110}ms both` }}
+              >
+                <ProductImage product={p.product} size={Math.round(px * bubble)} decorative />
+              </span>
+            ))
+          : null}
+        {gathered && !reduce ? <span aria-hidden className="absolute top-1/2 left-1/2 size-[40%] animate-[wRingOut_1.3s_var(--ease-standard)_both] rounded-full border-2 border-[var(--willow-400)]" style={{ translate: '-50% -50%' }} /> : null}
       </div>
-      <figcaption className="text-center text-[12px] text-ink-2 [@media(max-height:720px)]:hidden">{d0 ? (per > 1 ? `Each dot is about ${Math.round(per)} products` : 'Each dot is one product in the catalog') : 'Willow’s catalog, checked for you'}</figcaption>
+      <figcaption className="text-center text-[12px] text-ink-2 [@media(max-height:720px)]:hidden">
+        <Morph text={caption} />
+      </figcaption>
     </figure>
   )
 }
 
-function FunnelList({ funnel, stage }: { funnel: FunnelStep[]; stage: number }) {
+/**
+ * Words that dissolve into the next words: the old line blurs out word by word as the new one rises in,
+ * both in the same grid cell so nothing below moves. The old line is dropped once it has gone.
+ */
+function Morph({ text }: { text: string }) {
+  const [lines, setLines] = useState([{ id: 0, text, out: false }])
+  const top = lines[lines.length - 1]
+  if (top.text !== text) setLines([...lines.filter((l) => !l.out).map((l) => ({ ...l, out: true })), { id: top.id + 1, text, out: false }])
+  useEffect(() => {
+    if (!lines.some((l) => l.out)) return
+    const t = window.setTimeout(() => setLines((ls) => ls.filter((l) => !l.out)), 700)
+    return () => window.clearTimeout(t)
+  }, [lines])
+  return (
+    <span className="inline-grid">
+      {lines.map((l) => (
+        <span key={l.id} aria-hidden={l.out || undefined} className="[grid-area:1/1]">
+          {l.text.split(' ').map((w, i) => (
+            <span key={i}>
+              <span className="inline-block" style={{ animation: l.out ? `wPlanWordOut .26s var(--ease-exit) ${i * 16}ms both` : `wPlanWordIn .6s var(--ease-standard) ${200 + i * 48}ms both` }}>
+                {w}
+              </span>{' '}
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** A count that rolls from where it was to its new value without re-rendering (it writes its own text). */
+function Count({ value, from, on, delay, reduce }: { value: number; from: number; on: boolean; delay: number; reduce: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const shown = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (!on) {
+      el.textContent = '–'
+      shown.current = null
+      return
+    }
+    const start = shown.current ?? from
+    if (reduce || start === value) {
+      el.textContent = String(value)
+      shown.current = value
+      return
+    }
+    let raf = 0
+    let t0 = 0
+    const tick = (t: number) => {
+      if (!t0) t0 = t + delay
+      const p = Math.max(0, Math.min(1, (t - t0) / 700))
+      const v = Math.round(start + (value - start) * (1 - Math.pow(1 - p, 3)))
+      el.textContent = String(v)
+      shown.current = v
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [on, value, from, delay, reduce])
+  return (
+    <span className={`tnum transition-colors duration-500 ${on ? 'text-ink' : 'text-ink-2'}`}>
+      <span ref={ref} aria-hidden />
+      <span className="sr-only">{on ? value : ''}</span>
+    </span>
+  )
+}
+
+function FunnelList({ funnel, stage, reduce }: { funnel: FunnelStep[]; stage: number; reduce: boolean }) {
   const n0 = funnel[0]?.n || 1
+  const last = funnel.length - 1
+  const list = useRef<HTMLOListElement>(null)
+  const pill = useRef<HTMLSpanElement>(null)
+  // One white pill slides down to the row being checked (and fades once every row is done).
+  useLayoutEffect(() => {
+    const ol = list.current
+    const el = pill.current
+    if (!ol || !el) return
+    const place = () => {
+      const row = ol.children[Math.min(Math.max(stage, 0), last) + 1] as HTMLElement | undefined
+      if (!row) return
+      el.style.transform = `translateY(${row.offsetTop}px)`
+      el.style.height = `${row.offsetHeight}px`
+      el.style.opacity = stage >= 0 && stage <= last ? '1' : '0'
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(ol)
+    return () => ro.disconnect()
+  }, [stage, last])
   if (!funnel.length)
     return (
       <ol className="m-0 flex list-none flex-col gap-1.5 p-0" aria-hidden>
@@ -288,23 +431,36 @@ function FunnelList({ funnel, stage }: { funnel: FunnelStep[]; stage: number }) 
       </ol>
     )
   return (
-    <ol className={`${card} m-0 flex list-none flex-col p-1.5`} style={cardStyle}>
+    <ol ref={list} className={`${card} relative m-0 flex animate-[wFadeIn_.5s_ease_both] list-none flex-col p-1.5`} style={cardStyle}>
+      <span ref={pill} aria-hidden className="absolute inset-x-1.5 top-0 rounded-[18px] bg-white opacity-0 shadow-[0_1px_6px_rgba(0,0,0,.05)] transition-[transform,opacity,height] duration-[560ms] ease-spring" />
       {funnel.map((f, i) => {
         const st = i < stage ? 'done' : i === stage ? 'on' : 'up'
-        const lastRow = i === funnel.length - 1
+        const lastRow = i === last
+        const c = stageColour(i, last)
+        const ticked = st === 'done' || (lastRow && st === 'on')
+        const prev = i === 0 ? 1 : funnel[i - 1].n / n0
         return (
-          <li key={f.id} className={`relative flex items-center gap-3 rounded-[18px] px-3 py-[clamp(5px,.9vh,10px)] transition-[background-color,opacity] duration-500 ${st === 'on' ? 'bg-white' : ''} ${st === 'up' ? 'opacity-45' : 'opacity-100'}`}>
-            <span aria-hidden className={`grid size-[22px] flex-none place-items-center rounded-full text-[11px] transition-colors duration-500 ${st === 'up' ? 'border-[1.5px] border-ink/25' : lastRow && st === 'on' ? 'bg-[var(--willow-400)] text-white' : 'bg-selected text-inverse'}`}>
-              {st === 'done' || (lastRow && st === 'on') ? <span className="animate-[wDotIn_.3s_var(--ease-bounce)_both]">✓</span> : st === 'on' ? <span className="size-1.5 animate-[wBreathe_1s_ease-in-out_infinite] rounded-full bg-lime" /> : null}
+          <li key={f.id} className={`relative flex items-center gap-3 rounded-[18px] px-3 py-[clamp(5px,.9vh,10px)] transition-opacity duration-500 ${st === 'up' ? 'opacity-45' : 'opacity-100'}`}>
+            <span aria-hidden className={`relative grid size-[22px] flex-none place-items-center rounded-full transition-[background-color,box-shadow] duration-500 ${st === 'up' ? 'shadow-[inset_0_0_0_1.5px_rgba(18,18,18,.22)]' : lastRow && ticked ? 'bg-[var(--willow-400)]' : 'bg-selected'}`}>
+              {ticked ? (
+                <svg viewBox="0 0 22 22" className="w-tick absolute inset-0 size-full" fill="none">
+                  <path d="M6.5 11.5l3 3 6-6.5" pathLength={1} stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : st === 'on' ? (
+                <span className="size-1.5 animate-[wBreathe_1s_ease-in-out_infinite] rounded-full bg-lime" />
+              ) : null}
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="truncate text-[14px]">{f.label}</span>
               <span aria-hidden className="h-[3px] overflow-hidden rounded-pill bg-ink/[.07]">
-                <span className="block h-full origin-left rounded-pill transition-transform duration-700 ease-standard" style={{ transform: `scaleX(${st === 'up' ? 0 : f.n / n0})`, background: lastRow ? 'var(--willow-400)' : 'rgba(18,18,18,.55)' }} />
+                <span
+                  className="block h-full origin-left rounded-pill transition-[transform,opacity] duration-[800ms] ease-standard"
+                  style={{ transform: `scaleX(${st === 'up' ? prev : f.n / n0})`, opacity: st === 'up' ? 0 : 1, background: `rgb(${c.map((v) => v | 0).join(',')})`, transitionDelay: st === 'up' || reduce ? '0ms' : '160ms' }}
+                />
               </span>
             </span>
-            <span className="w-[3.2em] text-right font-dot text-[20px] leading-none font-extrabold tabular-nums">
-              {st === 'up' ? <span className="text-ink-2">–</span> : <RollingNumber value={f.n} from={i === 0 ? 0 : funnel[i - 1].n} duration={600} format={(v) => String(Math.round(v))} />}
+            <span className="w-[3.2em] text-right font-dot text-[20px] leading-none font-extrabold">
+              <Count value={f.n} from={i === 0 ? 0 : funnel[i - 1].n} on={st !== 'up'} delay={i === 0 ? 0 : 160} reduce={reduce} />
             </span>
           </li>
         )

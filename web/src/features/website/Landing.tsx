@@ -13,6 +13,7 @@ import { Lockup } from './Decor'
 import { HeroGarden } from './HeroGarden'
 import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH, useOpenApp } from './destinations'
 import { LiveStatus } from './Method'
+import { DATA_LOCATION } from './dataLocation'
 import { SectionRail } from './SectionRail'
 import { Culture, Gains, How, Problem, SectionHead, storySection, Unique } from './Story'
 import { glide, SECTIONS, setupReveal } from './scroll'
@@ -240,6 +241,9 @@ function Footer() {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] items-start gap-8">
         <p className="col-span-full m-0 max-w-[560px] font-serif text-[clamp(28px,3vw,40px)] leading-[1.1] min-[400px]:col-span-2">
           Original photos are deleted 30 days after upload. You can delete everything, any time.
+        </p>
+        <p className="col-span-full m-0 max-w-[560px] text-[14px] leading-[1.55] text-ink-2 min-[400px]:col-span-2">
+          {DATA_LOCATION.where} {DATA_LOCATION.leaves}
         </p>
         {FOOTER.map((c) => (
           <div key={c.title} className="flex flex-col gap-2.5">

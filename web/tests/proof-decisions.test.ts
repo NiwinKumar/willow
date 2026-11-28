@@ -169,3 +169,34 @@ test('the digest counts waiting decisions, results and requests, and says what m
   assert.equal(mondayOf(now).toISOString().slice(0, 10), '2026-11-30')
   assert.equal(mondayOf(Date.parse('2026-11-30T09:00:00Z')).toISOString().slice(0, 10), '2026-11-30')
 })
+
+test('range calls (retailer only): stock more, sample, review for delisting, each with its effect and what it rests on', () => {
+  const rows = [
+    row('star', 'Acme', { users: 200, lift_lo: 0.25, lift_hi: 0.45, cont8: 0.7 }),
+    row('weak', 'Other', { users: 90, lift_lo: 0.05, lift_hi: 0.3 }),
+    row('close', 'Acme', { tier: 'promising', n: 25, lift: 0.2, lift_lo: 0.02, lift_hi: 0.38, to_proven: 6 }),
+    row('far', 'Acme', { tier: 'promising', n: 25, lift: 0.1, lift_lo: -0.1, lift_hi: 0.3, to_proven: 400 }),
+    row('drag', 'Other', { tier: 'unclear', n: 60, users: 150, rate: 0.1, base_rate: 0.35, lift: -0.25, lift_lo: -0.36, lift_hi: -0.14, cont8: 0.8 }),
+    row('meh', 'Other', { tier: 'unclear', n: 60, users: 300, rate: 0.3, base_rate: 0.33, lift: -0.03, lift_lo: -0.12, lift_hi: 0.06 }),
+  ]
+  const calls = composeCards(base({ mix: 'retailer', brand: null, rows })).filter((c) => c.kind === 'range_call')
+  assert.deepEqual(calls.map((c) => c.key).sort(), ['range_call--delist--drag', 'range_call--sample--close', 'range_call--stock--star'])
+  const stock = calls.find((c) => c.key.includes('stock'))!
+  // the effect is the lift interval per 100 people, never a point projection
+  assert.equal(stock.figure, '25–45')
+  assert.match(stock.effect!.text, /about 25 to 45 more/)
+  assert.match(stock.effect!.basis, /Observational: 80 users at week 8.*Not a sales forecast/)
+  const delist = calls.find((c) => c.key.includes('delist'))!
+  // a whole interval below zero ('meh' crosses zero and is left alone); the swap is the category's best Proven product
+  assert.match(delist.effect!.text, /users change 14 pts less often.*star serum \(Acme\), Proven/)
+  assert.equal(calls.find((c) => c.key.includes('sample'))!.figure, '+6')
+  // brands never get range calls
+  assert.ok(!composeCards(base({ rows })).some((c) => c.kind === 'range_call'))
+})
+
+test('a range call names another brand only as the naming policy allows', () => {
+  const rows = [row('star', 'Acme'), row('drag', 'Other', { tier: 'unclear', n: 60, rate: 0.1, base_rate: 0.35, lift: -0.25, lift_lo: -0.36, lift_hi: -0.14 })]
+  const delist = composeCards(base({ mix: 'retailer', brand: null, rows, nameOf: (b) => (b === 'Acme' ? 'Brand A' : b) })).find((c) => c.key === 'range_call--delist--drag')!
+  assert.match(delist.effect!.text, /star serum \(Brand A\)/)
+  assert.doesNotMatch(delist.effect!.text, /Acme/)
+})

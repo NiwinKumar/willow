@@ -7,7 +7,7 @@ from zoneinfo import available_timezones
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import baselines, campaigns, changes, storage, tracks, views
+from app import baselines, campaigns, changes, spot_diary, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
@@ -66,6 +66,17 @@ def patterns(
     """What else moves this person's skin: each kind of change they noted at check-ins against
     their readings, found by code against their own normal range (app/changes.py)."""
     return changes.find(store, user.uid)
+
+
+@router.get("/spots/check-ins")
+def spots_by_check_in(
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Spot diary: each face check-in's photos (front, cheeks) with every mark it counted and
+    the counts Progress shows, in the order the person checked in; nothing is matched across
+    check-ins (app/spot_diary.py)."""
+    return spot_diary.check_ins(store, user.uid)
 
 
 @router.get("/spots")
@@ -245,6 +256,7 @@ PROFILE_FIELDS = (
     "skin_type",
     "checkin",
     "hide_sponsored",
+    "sponsored_opt_in_at",
     "track",
     "safety",
 )
@@ -304,7 +316,8 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, max_length=60)
     skin_type: Literal["oily", "combination", "dry", "normal", "sensitive"] | None = None
     checkin: Checkin | None = None
-    # Routine's "Sponsored · Willow Proven" card off (null = back to the default, shown)
+    # Routine's "Sponsored · Willow Proven" card: false turns it on, true off; null = back to the
+    # default, off (sponsored suggestions are opt-in, like sharing)
     hide_sponsored: bool | None = None
     # the places every check-in covers, in capture order (null = the app's default)
     track: list[TrackPlace] | None = Field(default=None, min_length=1, max_length=5)
@@ -337,7 +350,8 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
         "display_name": p.get("display_name"),
         "skin_type": p.get("skin_type"),
         "checkin": p.get("checkin"),
-        "hide_sponsored": bool(p.get("hide_sponsored")),
+        # opt-in: hidden unless the person turned it on (sponsored_opt_in)
+        "hide_sponsored": not campaigns.sponsored_opt_in(p),
         "track": list(p["track"]) if p.get("track") else None,
         "safety": SafetyProfile.model_validate(p["safety"]).model_dump()
         if p.get("safety")
@@ -356,9 +370,14 @@ def put_profile(
     """CONTRACT section 4 users/{uid}.profile. Partial: only the fields sent change."""
     saved = (store.user_get(user.uid) or {}).get("profile") or {}
     changes = body.model_dump(include=body.model_fields_set)
+    if "hide_sponsored" in changes:
+        # the person's own choice (the You switch, the card's Hide or its Undo): only an explicit
+        # false sent now opts in; true or null opts out
+        on = changes["hide_sponsored"] is False
+        was = saved.get("sponsored_opt_in_at") if campaigns.sponsored_opt_in(saved) else None
+        changes["sponsored_opt_in_at"] = (was or datetime.now(UTC)) if on else None
     profile = {k: saved.get(k) for k in PROFILE_FIELDS} | changes
     profile["goals"] = profile.get("goals") or []
-    profile["hide_sponsored"] = bool(profile.get("hide_sponsored"))
     profile["updated_at"] = datetime.now(UTC)
     store.user_merge(user.uid, {"profile": profile})
     return {"profile": _profile_out(profile)}

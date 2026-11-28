@@ -24,8 +24,10 @@ export type ObjectStatus = {
 }
 /** POST /v1/sessions/{id}/frames: targets for the new frames only; `dropped`: left-out frames removed (1-based). */
 export type AddFramesResponse = { session_id: string; n_frames: number; upload_urls: UploadTarget[]; expires_in_seconds: number; dropped: number[] }
-/** Live analysis stage while a session is processing (api analysis.run). */
-export type AnalysisStage = 'received' | 'engine' | 'explaining'
+/** Live analysis stage while a session is processing (api analysis.run); "queued": in line for the engine. */
+export type AnalysisStage = 'received' | 'queued' | 'engine' | 'explaining'
+/** A place in the api's line for the engine (api engine_gate.py): 1 = next, eta_s = seconds until it starts. */
+export type QueuePlace = { position: number; eta_s: number }
 
 /** SessionView as the api returns it: {session, result, labels, explanation}. */
 export type SessionView = {
@@ -59,6 +61,8 @@ export type SessionView = {
     label_details?: Record<string, LabelDetail>
     /** Live analysis stage while processing, else null. */
     stage?: AnalysisStage | null
+    /** While stage is "queued": the place in line, else null. */
+    queue?: QueuePlace | null
     /** Detail views only: signed GET per uploaded frame (null for DNG or a missing photo). */
     frame_urls?: (string | null)[]
     /** Detail views only: signed tight crop per candidate id (crops that exist). */
@@ -182,6 +186,34 @@ export type StoryProduct = {
     normal_range?: number | null
   } | null
 }
+/** One counted mark on a photo (engine extras.marks, photo pixels): a blemish or a dark spot. */
+export type SpotMark = { kind: 'blemish' | 'spot'; x: number; y: number; r: number; zone: string | null }
+/** One photo of a check-in (front, or a cheek) with its areas and every mark counted on it. */
+export type SpotCheckInView = {
+  view: ViewName
+  photo: { url: string; width: number | null; height: number | null }
+  rois: { name: string; polygon: [number, number][] }[]
+  /** The photo's face-mesh landmarks (same index = same point of the face in every photo); null on older check-ins. */
+  landmarks?: [number, number][] | null
+  /** Front photo only: its whole areas (its own `rois` leave out the chin and mouth skin the cheek photos measure). */
+  full_rois?: { name: string; polygon: [number, number][] }[] | null
+  marks: SpotMark[]
+  /** This photo's counts; null on a check-in measured before every mark was listed. */
+  blemishes: number | null
+  dark_spots: number | null
+}
+/** One face check-in for the spot diary: the counts Progress shows, and its photos. `complete`: every mark is placed
+ * (engine 0.4.4+); older check-ins draw only the up to 40 marks the engine handed out, until measured again. */
+export type SpotCheckIn = {
+  id: string
+  created_at: string
+  complete: boolean
+  blemishes: number | null
+  dark_spots: number | null
+  by_zone: Record<string, { blemishes?: number; dark_spots?: number }>
+  views: SpotCheckInView[]
+}
+
 /** GET /v1/sessions/{id}/story/{metric_id}: what changed, in points. `source` "gemini": Gemini wrote them from the
  * metric's whole history (every number checked against the measurements); "facts": the same facts written by code
  * (Gemini down, or a point failed the checks). `reasons`: up to two AI-suggested possible reasons. */
@@ -601,6 +633,8 @@ export const api = {
   retailerClaims: (token: string, productId: string, body: { channel: RetailerClaimChannel } & RetailerFilters) =>
     request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }, LONG_TIMEOUT_MS),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
+  /** The spot diary: each face check-in's photos with every counted mark (api app/spot_diary.py). */
+  spotCheckIns: (token: string) => request<{ check_ins: SpotCheckIn[] }>(token, '/v1/spots/check-ins'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),
@@ -647,10 +681,8 @@ export const api = {
   advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
   clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
   advisorChatStream,
-  /** Talk to Wisp: the spoken question as text and its language (api app/voice.py). */
-  voiceHear: (token: string, audio_base64: string, mime_type: string) => request<{ text: string; lang: string }>(token, '/v1/advisor/voice/hear', { method: 'POST', body: JSON.stringify({ audio_base64, mime_type }) }, LONG_TIMEOUT_MS),
-  /** Wisp's checked answer read aloud in the person's language: a WAV, base64. */
-  voiceSpeak: (token: string, text: string) => request<{ audio_base64: string; mime_type: string }>(token, '/v1/advisor/voice/speak', { method: 'POST', body: JSON.stringify({ text }) }, LONG_TIMEOUT_MS),
+  /** Talk to Wisp (api app/live.py): the voice mode's WebSocket; the first message signs in. */
+  voiceLiveUrl: (demo: boolean) => `${API_URL.replace(/^http/, 'ws')}/v1/${demo ? 'demo/' : ''}voice/live`,
   /** Proof-gated promotion (api campaign_routes.py): the consumer's sponsored card and its events. */
   sponsored: (token: string, placement: SponsoredPlacement = 'routine') => request<{ item: SponsoredItem | null }>(token, `/v1/sponsored?placement=${placement}`),
   sponsoredEvent: (token: string, campaignId: string, kind: SponsoredEventKind) => request<void>(token, `/v1/sponsored/${encodeURIComponent(campaignId)}/events`, { method: 'POST', ...json({ kind }) }),

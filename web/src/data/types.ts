@@ -146,8 +146,8 @@ export type Session = {
   counts_ref?: { session_id: string } | null
   /** Live: the hosted sample these photos were copied from (judge sample runs), else null. */
   sample_id?: string | null
-  /** Live, while processing: the analysis stage (received, engine, explaining). */
-  stage?: 'received' | 'engine' | 'explaining' | null
+  /** Live, while processing: the analysis stage (received, queued, engine, explaining). */
+  stage?: 'received' | 'queued' | 'engine' | 'explaining' | null
   /** Live detail views only: signed URL of each uploaded photo (null for DNG or a missing photo). */
   frame_urls?: (string | null)[]
   /** Live detail views only: signed tight crop per candidate id. */

@@ -255,6 +255,15 @@ def test_face_pipeline_end_to_end(tmp_path, fake_landmarks):
     assert {"right_under_eye", "left_under_eye"} <= names
     assert names <= set(config.FACE_ZONES) | set(SQUARES)
     assert r["quality"]["pose"] == {"yaw": 1.0, "pitch": -2.0, "roll": 0.5}
+    # the logs say where the time went: measuring the photos, within the whole run
+    assert 0 < r["timings_ms"]["frames"] <= r["timings_ms"]["total"]
+    # colour and light readings: at least the between-room floor; marks and lines: their own spread
+    for mid, floor in config.ROOM_LIGHT_FLOOR.items():
+        if m[mid]["mdc95"] is not None:
+            assert m[mid]["mdc95"] >= floor
+            for zone in m[mid]["extras"].get("by_zone", {}).values():
+                assert zone["mdc95"] is None or zone["mdc95"] >= floor
+    assert m["blemishes"]["mdc95"] < config.ROOM_LIGHT_FLOOR["glow"]  # no floor on counts
 
 
 def test_face_pose_gate(tmp_path, fake_landmarks):

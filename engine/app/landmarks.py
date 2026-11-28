@@ -518,9 +518,19 @@ def polygon_mask(shape: tuple[int, int], polygon: np.ndarray) -> np.ndarray:
     return mask.astype(bool)
 
 
-def _local_mean(values: np.ndarray, mask: np.ndarray, sigma: float) -> np.ndarray:
-    """Average of `values` over `mask` pixels nearby (Gaussian, sigma in px)."""
-    weight = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), sigma)
+def mask_weight(mask: np.ndarray, sigma: float) -> np.ndarray:
+    """_local_mean's weight: the blurred mask. Several values averaged over one mask at one sigma
+    can share it (a large-sigma blur is the slowest step of a photo)."""
+    return cv2.GaussianBlur(mask.astype(np.float32), (0, 0), sigma)
+
+
+def _local_mean(
+    values: np.ndarray, mask: np.ndarray, sigma: float, weight: np.ndarray | None = None
+) -> np.ndarray:
+    """Average of `values` over `mask` pixels nearby (Gaussian, sigma in px). `weight`:
+    mask_weight(mask, sigma), when the caller already has it."""
+    if weight is None:
+        weight = mask_weight(mask, sigma)
     total = cv2.GaussianBlur(np.where(mask, values, 0).astype(np.float32), (0, 0), sigma)
     return total / np.maximum(weight, 1e-6)
 

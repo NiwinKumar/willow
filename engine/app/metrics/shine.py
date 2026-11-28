@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from app import config
-from app.landmarks import _local_mean
+from app.landmarks import _local_mean, mask_weight
 
 
 def specular(lab: np.ndarray, linear: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
@@ -23,8 +23,9 @@ def specular(lab: np.ndarray, linear: np.ndarray, skin: np.ndarray, px_per_mm: f
     k = max(round(config.SHINE_WINDOW_MM * px_per_mm) | 1, 3)
     fill = 4 * px_per_mm
     background = []
+    weight = mask_weight(skin, fill)  # one blurred mask for both channels
     for v, scale in ((L, 2.55), (chroma, 2.0)):
-        filled = np.where(skin, v, _local_mean(v, skin, fill))
+        filled = np.where(skin, v, _local_mean(v, skin, fill, weight))
         q = np.clip(filled * scale, 0, 255).astype(np.uint8)
         background.append(cv2.medianBlur(q, min(k, 255)).astype(np.float32) / scale)
     brighter = L > background[0] + config.SHINE_DELTA_L

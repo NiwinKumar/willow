@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" role="img" aria-labelledby="t d">
+<title id="t">Trust, scale and infrastructure</title><desc id="d">Evals, the instrument retest, cost per use, the 200-at-once load test, CI and the Google Cloud services.</desc>
+<defs>
+<style>@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap');</style>
+<linearGradient id="gGCP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A9BFF"/><stop offset="1" stop-color="#2F6FE4"/></linearGradient>
+<linearGradient id="gFB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC52E"/><stop offset="1" stop-color="#FF8A00"/></linearGradient>
+<linearGradient id="gGem" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3D7BFF"/><stop offset=".55" stop-color="#7A5CFF"/><stop offset="1" stop-color="#F25FA8"/></linearGradient>
+<linearGradient id="gAI" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6A4DF5"/><stop offset="1" stop-color="#D9479A"/></linearGradient>
+<linearGradient id="gTile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232326"/><stop offset="1" stop-color="#050505"/></linearGradient>
+<radialGradient id="gBud" cx="50%" cy="72%" r="60%"><stop offset="0" stop-color="#FF6B4A"/><stop offset=".55" stop-color="#F25FA8"/><stop offset="1" stop-color="#C9A8FF"/></radialGradient>
+<filter id="bSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter>
+<filter id="bSofter" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="0.9"/></filter>
+<filter id="bHair" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="0.4"/></filter>
+<filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#121212" flood-opacity=".06"/></filter>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+<marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0.6 0.8L9 5 0.6 9.2z" fill="rgba(18,18,18,.62)"/></marker>
+<marker id="ahs" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0.6 0.8L9 5 0.6 9.2z" fill="rgba(18,18,18,.62)"/></marker>
+<marker id="ahL" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0.6 0.8L9 5 0.6 9.2z" fill="#226B37"/></marker>
+<pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r="1" fill="rgba(18,18,18,.07)"/></pattern>
+</defs>
+<rect width="1920" height="1080" fill="#F5F4F0"/>
+<g opacity=".28" filter="url(#glow)"><circle cx="1850" cy="30" r="110" fill="#D8B8FF"/><circle cx="1720" cy="0" r="70" fill="#FFB27A"/></g>
+<g transform="translate(64,48) scale(0.9375)"><rect width="64" height="64" rx="32" fill="#FFFFFF" stroke="rgba(18,18,18,.10)" stroke-width="1.5"/><rect x="31" y="35" width="2.2" height="22" rx="1.1" fill="#6FAE9C" filter="url(#bHair)"/><ellipse cx="39.5" cy="43.5" rx="8" ry="4.4" transform="rotate(-35 39.5 43.5)" fill="#86C5B0" filter="url(#bSofter)"/><path d="M32 9c7.6 0 13 5.6 13 14.2 0 8.3-5.8 14.3-13 14.3s-13-6-13-14.3C19 14.6 24.4 9 32 9z" fill="url(#gBud)" filter="url(#bSoft)"/></g>
+<text x="144" y="66" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13" font-weight="500" fill="#5E5B56" text-anchor="start" letter-spacing="0.1em">HOW WILLOW WORKS  ·  5 OF 5</text>
+<text x="142" y="110" font-family="'Instrument Serif', 'Iowan Old Style', Georgia, serif" font-size="46" font-weight="400" fill="#121212" text-anchor="start">Trust, scale and infrastructure</text>
+<text x="144" y="142" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="1100">What we measured about ourselves, failures included, and what it all runs on. Shown live on /evidence.</text>
+<text x="1856" y="98" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="300" fill="#121212" text-anchor="end">200/200</text>
+<text x="1856" y="122" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="end">at once, with the queue</text>
+<text x="1642.4" y="98" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="300" fill="#121212" text-anchor="end">35% → 7%</text>
+<text x="1642.4" y="122" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="end">false changes, held-out people</text>
+<text x="1378.4" y="98" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="300" fill="#121212" text-anchor="end">0</text>
+<text x="1378.4" y="122" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="end">invented numbers in 168 answers</text>
+<rect x="64" y="176" width="576" height="340" rx="26" fill="#F2EEFF" stroke="rgba(122,92,255,.22)" stroke-width="1.2" />
+<text x="88" y="213" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#6A4DF5" text-anchor="start" letter-spacing="0.1em">GEMINI EVALS</text>
+<text x="616" y="213" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="500" fill="#6A4DF5" text-anchor="end" letter-spacing="0.06em">api/evals</text>
+<text x="88" y="300" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="64" font-weight="300" fill="#121212" text-anchor="start">0</text>
+<text x="132" y="276" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17" font-weight="600" fill="#121212" text-anchor="start">invented numbers shown</text>
+<text x="132" y="298" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#5E5B56" text-anchor="start">in 168 answers on two models</text>
+<circle cx="92" cy="343" r="3" fill="#6A4DF5"/>
+<text x="104" y="348" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">84 cases each on 3.8 Flash and 3.5 Flash-Lite</text>
+<circle cx="92" cy="365" r="3" fill="#6A4DF5"/>
+<text x="104" y="370" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">62 adversarial: injected numbers and instructions</text>
+<circle cx="92" cy="387" r="3" fill="#6A4DF5"/>
+<text x="104" y="392" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">19 first answers rejected, 18 fixed on retry</text>
+<circle cx="92" cy="409" r="3" fill="#6A4DF5"/>
+<text x="104" y="414" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">1 wording slip reached the answer</text>
+<circle cx="92" cy="431" r="3" fill="#6A4DF5"/>
+<text x="104" y="436" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">production: 7 answers stopped by a validator</text>
+<circle cx="92" cy="453" r="3" fill="#6A4DF5"/>
+<text x="104" y="458" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">in 30 days of logs (105 Gemini calls)</text>
+<rect x="664" y="176" width="576" height="340" rx="26" fill="#EDF2FF" stroke="rgba(61,123,255,.22)" stroke-width="1.2" />
+<text x="688" y="213" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#2F6FE4" text-anchor="start" letter-spacing="0.1em">INSTRUMENT RETEST  ·  SAME PHOTO, RETAKEN</text>
+<text x="688" y="300" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="56" font-weight="300" fill="#121212" text-anchor="start">35% → 7%</text>
+<text x="960" y="276" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17" font-weight="600" fill="#121212" text-anchor="start">false “changed”</text>
+<text x="960" y="298" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#5E5B56" text-anchor="start">on 7 held-out people</text>
+<circle cx="692" cy="343" r="3" fill="#2F6FE4"/>
+<text x="704" y="348" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">17 consenting people (MST-E), all 10 Monk tones</text>
+<circle cx="692" cy="365" r="3" fill="#2F6FE4"/>
+<text x="704" y="370" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">672 simulated retakes: room light, framing,</text>
+<circle cx="692" cy="387" r="3" fill="#2F6FE4"/>
+<text x="704" y="392" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">blur, noise, JPEG, measured by the real engine</text>
+<circle cx="692" cy="409" r="3" fill="#2F6FE4"/>
+<text x="704" y="414" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">5-photo baselines, then 3-photo check-ins</text>
+<circle cx="692" cy="431" r="3" fill="#2F6FE4"/>
+<text x="704" y="436" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">room-light floor learned on 10 people, checked</text>
+<circle cx="692" cy="453" r="3" fill="#2F6FE4"/>
+<text x="704" y="458" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="510">on the other 7 (engine 0.4.3)</text>
+<rect x="1264" y="176" width="592" height="340" rx="26" fill="#F1EFEA" stroke="rgba(18,18,18,.10)" stroke-width="1.2" />
+<text x="1288" y="213" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#4A4741" text-anchor="start" letter-spacing="0.1em">COST PER USE  ·  PRODUCTION MEDIANS</text>
+<rect x="1280" y="242" width="560" height="40" rx="10" fill="#FFFFFF" stroke="rgba(18,18,18,.06)"/>
+<text x="1298" y="268" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Face check-in</text>
+<text x="1440" y="268" font-family="'Geist Mono', ui-monospace, monospace" font-size="17" font-weight="500" fill="#121212" text-anchor="start">$0.0253</text>
+<text x="1540" y="268" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="290">engine + explanation + labels</text>
+<rect x="1280" y="288" width="560" height="40" rx="10" fill="#FFFFFF" stroke="rgba(18,18,18,.06)"/>
+<text x="1298" y="314" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Wisp answer</text>
+<text x="1440" y="314" font-family="'Geist Mono', ui-monospace, monospace" font-size="17" font-weight="500" fill="#121212" text-anchor="start">$0.0047</text>
+<text x="1540" y="314" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="290">one checked reply</text>
+<rect x="1280" y="334" width="560" height="40" rx="10" fill="#FFFFFF" stroke="rgba(18,18,18,.06)"/>
+<text x="1298" y="360" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Routine check</text>
+<text x="1440" y="360" font-family="'Geist Mono', ui-monospace, monospace" font-size="17" font-weight="500" fill="#121212" text-anchor="start">$0.0012</text>
+<text x="1540" y="360" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="290">rules plus Gemini</text>
+<rect x="1280" y="380" width="560" height="40" rx="10" fill="#FFFFFF" stroke="rgba(18,18,18,.06)"/>
+<text x="1298" y="406" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Reading story</text>
+<text x="1440" y="406" font-family="'Geist Mono', ui-monospace, monospace" font-size="17" font-weight="500" fill="#121212" text-anchor="start">$0.0013</text>
+<text x="1540" y="406" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="290">one reading</text>
+<rect x="1280" y="426" width="560" height="40" rx="10" fill="#FFFFFF" stroke="rgba(18,18,18,.06)"/>
+<text x="1298" y="452" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Proof Ask</text>
+<text x="1440" y="452" font-family="'Geist Mono', ui-monospace, monospace" font-size="17" font-weight="500" fill="#121212" text-anchor="start">$0.1446</text>
+<text x="1540" y="452" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="290">before slicing (191k tokens)</text>
+<text x="1288" y="492" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="550">Logged tokens and engine seconds × list prices; idle instances not included</text>
+<rect x="64" y="540" width="1176" height="272" rx="26" fill="#E8F3EC" stroke="rgba(46,139,71,.24)" stroke-width="1.2" />
+<text x="88" y="577" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#226B37" text-anchor="start" letter-spacing="0.1em">SCALE  ·  200 PEOPLE PRESS MEASURE AT THE SAME MOMENT</text>
+<text x="1216" y="577" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="500" fill="#226B37" text-anchor="end" letter-spacing="0.06em">LOCAL: REAL API + 2 ENGINES</text>
+<text x="88" y="622" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Before: no line</text>
+<text x="88" y="644" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start">186 timed out; the engine answered 429</text>
+<rect x="372" y="604" width="360" height="22" rx="11" fill="rgba(18,18,18,.07)"/>
+<rect x="372" y="604" width="25.2" height="22" rx="11" fill="#E8552F"/>
+<text x="748" y="621" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="500" fill="#121212" text-anchor="start">14/200</text>
+<text x="88" y="692" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">With the queue</text>
+<text x="88" y="714" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start">all measured; the last in 939 s</text>
+<rect x="372" y="674" width="360" height="22" rx="11" fill="rgba(18,18,18,.07)"/>
+<rect x="372" y="674" width="360.0" height="22" rx="11" fill="#226B37"/>
+<text x="748" y="691" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="500" fill="#121212" text-anchor="start">200/200</text>
+<text x="88" y="784" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="720">The line lives in each api instance: oldest first, a place and an estimate, 409 to ask again.</text>
+<text x="860" y="614" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="500" fill="#226B37" text-anchor="start" letter-spacing="0.1em">PROJECTED ON CLOUD RUN</text>
+<text x="860" y="642" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start">engine instances</text>
+<text x="1010" y="642" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start">per hour</text>
+<text x="1110" y="642" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start">all 200 done</text>
+<text x="860" y="670" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start">8 (now)</text>
+<text x="1010" y="670" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">706</text>
+<text x="1110" y="670" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">1,020 s</text>
+<text x="860" y="696" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start">25</text>
+<text x="1010" y="696" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">2,206</text>
+<text x="1110" y="696" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">326 s</text>
+<text x="860" y="722" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start">50</text>
+<text x="1010" y="722" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">4,412</text>
+<text x="1110" y="722" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">163 s</text>
+<text x="860" y="748" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start">100</text>
+<text x="1010" y="748" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">8,824</text>
+<text x="1110" y="748" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="400" fill="#121212" text-anchor="start">82 s</text>
+<text x="860" y="784" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="350">Over 8 needs a quota raise; $0.47 of engine at any size</text>
+<rect x="1264" y="540" width="592" height="272" rx="26" fill="#F1EFEA" stroke="rgba(18,18,18,.10)" stroke-width="1.2" />
+<text x="1288" y="577" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#4A4741" text-anchor="start" letter-spacing="0.1em">QUALITY GATES ON EVERY CHANGE</text>
+<circle cx="1292" cy="609" r="3" fill="#4A4741"/>
+<text x="1304" y="614" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">Lighthouse accessibility 100 on 10 pages,</text>
+<circle cx="1292" cy="633" r="3" fill="#4A4741"/>
+<text x="1304" y="638" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">desktop and mobile; 0 serious axe issues</text>
+<circle cx="1292" cy="657" r="3" fill="#4A4741"/>
+<text x="1304" y="662" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">GitHub Actions: ruff and pytest for the api,</text>
+<circle cx="1292" cy="681" r="3" fill="#4A4741"/>
+<text x="1304" y="686" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">pytest for the engine, web lint, build, tests</text>
+<circle cx="1292" cy="705" r="3" fill="#4A4741"/>
+<text x="1304" y="710" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">Proof crawl: every Proof page as a retailer</text>
+<circle cx="1292" cy="729" r="3" fill="#4A4741"/>
+<text x="1304" y="734" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">and as a brand seat, in headless Chrome</text>
+<circle cx="1292" cy="753" r="3" fill="#4A4741"/>
+<text x="1304" y="758" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#3A3833" text-anchor="start" data-maxw="540">/evidence regenerated from the results files</text>
+<rect x="64" y="836" width="1792" height="194" rx="26" fill="#EDF2FF" stroke="rgba(61,123,255,.22)" stroke-width="1.2" />
+<text x="88" y="873" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#2F6FE4" text-anchor="start" letter-spacing="0.1em">RUNS ON GOOGLE CLOUD  ·  US-CENTRAL1</text>
+<rect x="80.0" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M108.00,902.00 L121.86,910.00 L121.86,926.00 L108.00,934.00 L94.14,926.00 L94.14,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(100.00,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l5.5 5.5-5.5 5.5M12.5 6.5l5.5 5.5-5.5 5.5"/></g>
+<text x="132.0" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Cloud Run</text>
+<text x="92.0" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">api: 1 vCPU, 1–3</text>
+<text x="92.0" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">engine: 2 vCPU, 2–8</text>
+<rect x="301.5" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M329.50,902.00 L343.36,910.00 L343.36,926.00 L329.50,934.00 L315.64,926.00 L315.64,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(321.50,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.6"/><path d="M12 3.2v3M12 17.8v3M3.2 12h3M17.8 12h3M5.8 5.8l2.1 2.1M16.1 16.1l2.1 2.1M5.8 18.2l2.1-2.1M16.1 7.9l2.1-2.1"/></g>
+<text x="353.5" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Cloud Build</text>
+<text x="313.5" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">engine image, tagged</text>
+<text x="313.5" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">in Artifact Registry</text>
+<rect x="523.0" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M551.00,902.00 L564.86,910.00 L564.86,926.00 L551.00,934.00 L537.14,926.00 L537.14,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(543.00,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.2 2"/></g>
+<text x="575.0" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Cloud Scheduler</text>
+<text x="535.0" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">reminders every 15 min,</text>
+<text x="535.0" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">Proof warm, OIDC</text>
+<rect x="744.5" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M772.50,902.00 L786.36,910.00 L786.36,926.00 L772.50,934.00 L758.64,926.00 L758.64,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(764.50,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15.5" r="4.2"/><path d="M11 12.5l8.5-8.5M16 8l2.4 2.4M13.6 10.4l2 2"/></g>
+<text x="796.5" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Secret Manager</text>
+<text x="756.5" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">Web Push (VAPID)</text>
+<text x="756.5" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">keys</text>
+<rect x="966.0" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M994.00,902.00 L1007.86,910.00 L1007.86,926.00 L994.00,934.00 L980.14,926.00 L980.14,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(986.00,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5h14M5 11h14M5 15.5h10M5 20h6"/></g>
+<text x="1018.0" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Cloud Logging</text>
+<text x="978.0" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">a line per Gemini call;</text>
+<text x="978.0" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">the cost report</text>
+<rect x="1187.5" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M1215.50,902.00 L1229.36,910.00 L1229.36,926.00 L1215.50,934.00 L1201.64,926.00 L1201.64,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(1207.50,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20.5c0-3.9 3.1-7 7-7s7 3.1 7 7"/></g>
+<text x="1239.5" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">IAM</text>
+<text x="1199.5" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">sa-api, sa-engine,</text>
+<text x="1199.5" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">sa-scheduler; no keys</text>
+<rect x="1409.0" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<rect x="1421.0" y="902" width="32" height="32" rx="8.3" fill="url(#gFB)"/>
+<g transform="translate(1428.04,909.04) scale(0.7467)" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M3.4 12h17.2M12 3.4c2.4 2.6 3.6 5.5 3.6 8.6s-1.2 6-3.6 8.6c-2.4-2.6-3.6-5.5-3.6-8.6S9.6 6 12 3.4z"/></g>
+<text x="1461.0" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Firebase</text>
+<text x="1421.0" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">Hosting and Auth,</text>
+<text x="1421.0" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">two sites</text>
+<rect x="1630.5" y="890" width="209.5" height="92" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.07)"/>
+<path d="M1658.50,902.00 L1672.36,910.00 L1672.36,926.00 L1658.50,934.00 L1644.64,926.00 L1644.64,910.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="2.88" stroke-linejoin="round"/>
+<g transform="translate(1650.50,910.00) scale(0.6667)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.2 3v5.2c0 4.5-3 8.3-7.2 9.8-4.2-1.5-7.2-5.3-7.2-9.8V6z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></g>
+<text x="1682.5" y="923" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15.5" font-weight="600" fill="#121212" text-anchor="start" data-maxw="149.5">Model Armor</text>
+<text x="1642.5" y="954" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">template wisp-input</text>
+<text x="1642.5" y="972" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="187.5">on Wisp questions</text>
+<rect x="84" y="994" width="22" height="22" rx="5.7" fill="#121212"/>
+<g transform="translate(88.84,998.84) scale(0.5133)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.4" width="14" height="10" rx="2.2"/><path d="M8.2 10.4V7.6a3.8 3.8 0 0 1 7.6 0v2.8"/></g>
+<text x="116" y="1011" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#121212" text-anchor="start" data-maxw="1700">Stored and measured in us-central1. Gemini 3.x answers from its global endpoint; live voice stays in us-central1. Delete my data removes everything at once.</text>
+<text x="64" y="1056" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="400" fill="#67635D" text-anchor="start" letter-spacing="0.04em">Sources: web/src/data/evidence.json · docs/EVALS.md, docs/EVIDENCE.md, infra/README.md (Scale), engine/app/config.py · .github/workflows/ci.yml · infra/setup.sh</text>
+</svg>

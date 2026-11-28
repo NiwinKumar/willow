@@ -4,6 +4,7 @@ import { useChat } from '../../features/advisor/chatStore'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { AssistantAvatar, type AvatarState } from '../assistant/AssistantAvatar'
 import { MODE_BANNER_EVENT } from './ModeBanner'
+import { MORPH_CLOSE_MS } from './morph'
 
 // No input anywhere for this long (panel closed, nothing pending): the cat dozes off. Any input wakes it.
 const DOZE_MS = 90_000
@@ -16,9 +17,10 @@ const HAPPY_MS = 1600
  *   thinking while a question is out → speaking while the answer is revealed → a happy hop when it lands,
  *   listening while the pointer is on it or the person is typing a question, sleepy after a long quiet spell,
  *   idle otherwise.
- * Bottom right on wide screens; on phones, in the header's right corner (never over content, the mode banner or the tab bar). Opening: the cat shrinks away as the advisor grows out of its spot;
- * closing: the advisor folds back into the corner and the cat pops out again (AppShell's AdvisorHost does the
- * panel's half). Reduced motion: both only fade.
+ * Bottom right on wide screens; on phones, in the header's right corner (never over content, the mode banner or the tab bar). Opening: the panel's glass
+ * starts as this button's circle and grows out of it while the cat fades into it (swelling a little with it);
+ * closing: the glass shrinks back onto the button and the cat settles back in as it lands (AppShell's
+ * AdvisorHost does the panel's half; the timings are shared through morph.ts). Reduced motion: both only fade.
  */
 export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; onToggle: () => void; wide: boolean; covered: boolean }) {
   const { phase, messages } = useChat()
@@ -116,23 +118,25 @@ export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; o
     }
   }, [wide])
   return (
-    // The holder shows and hides the cat: it shrinks away as the advisor grows out of its spot, and pops back
-    // (a little overshoot) once the advisor has folded back into it. The button inside keeps hover and press.
+    // The holder shows and hides the cat: it fades into the glass growing out of it, and settles back as the
+    // glass lands on it. The button inside keeps hover and press. Named for the page morph (morph.ts) so the
+    // moving cards never draw over it.
     <div
       ref={holder}
-      className="fixed z-[36]"
+      data-wisp-fab
+      className="fixed z-[36] [view-transition-name:wisp-fab]"
       style={{
         width: size,
         height: size,
         right: wide ? 24 : 'clamp(14px,4vw,38px)',
         ...(wide ? { bottom: 20 } : { top: 'calc(env(safe-area-inset-top) + 11px)' }),
         opacity: hidden ? 0 : 1,
-        scale: hidden && !reduced ? '0.4' : '1',
+        scale: hidden && !reduced ? '1.08' : '1',
         pointerEvents: hidden ? 'none' : undefined,
         transition: hidden
-          ? 'scale .2s var(--ease-exit), opacity .16s ease'
-          : // back once the panel has nearly folded away
-            'scale .55s var(--ease-bounce) .24s, opacity .2s ease .24s',
+          ? 'scale .32s var(--ease-spring), opacity .14s ease-out'
+          : // back as the glass lands on it and fades (AdvisorHost: from MORPH_CLOSE_MS - 220)
+            `scale .36s var(--ease-spring) ${MORPH_CLOSE_MS - 220}ms, opacity .22s ease-out ${MORPH_CLOSE_MS - 220}ms`,
       }}
     >
       <button

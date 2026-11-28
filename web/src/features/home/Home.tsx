@@ -1,4 +1,5 @@
-import { useMemo, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -6,7 +7,7 @@ import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
+import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpotCheckIns } from '../../data/hooks'
 import { useCheckin, useCheckinDue } from '../../data/useCheckin'
 import type { RoutineEntry, Session, Site } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
@@ -21,15 +22,18 @@ import { addToCalendar } from '../../lib/reminders'
 import { fmtDay, gapDaysFor, scheduleText, weeklyDayOf, type Checkin, type Due } from '../../lib/schedule'
 import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, changeTitle, changeWay, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
 import { article, distinctNames, BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, today, usable, verdictSentence, type HomeRead, type Place } from './derive'
 import { useProductTests } from '../routine/productTests'
 import { useOutcomeSessions } from '../routine/routineModel'
+import { useSessionView } from '../progress/useSessionView'
 import { restsOn } from '../routine/schedule'
 import { readForearm } from './forearm'
 import { HeroCard, type HeroLine } from './HeroCard'
 import { goalTrends } from './goals'
+import { HomeFit } from './fit'
 import { LeadCard, type Lead } from './LeadCard'
 import { topUpNeed } from '../checkin/topup'
 import { RoutineEmpty, RoutineToday } from './RoutineToday'
@@ -76,12 +80,150 @@ export default function Home() {
   return <HomeBody />
 }
 
-function Frame({ children, busy }: { children: ReactNode; busy?: boolean }) {
+/** Gap under the last row when Home fills the screen: the shell's 16px over the page plus the frame's 8px top. */
+const FIT_GAP = 24
+
+/**
+ * The page. Fitted (`fit`): exactly one screen high, from where it starts (under the shell's padding or the demo
+ * banner) to the window's bottom, with the same gap above the first card and below the last row.
+ */
+function Frame({ children, busy, fit = false }: { children: ReactNode; busy?: boolean; fit?: boolean }) {
+  const own = useRef<HTMLElement | null>(null)
+  const [top, setTop] = useState(16)
+  // Where the page starts: re-read after every render, on resize and once things above it settle (the demo
+  // banner, fonts); a state change only when it moved.
+  useLayoutEffect(() => {
+    if (!fit) return
+    const measure = () => {
+      const el = own.current
+      if (el) setTop(Math.round(el.getBoundingClientRect().top + window.scrollY))
+    }
+    measure()
+    const late = window.setTimeout(measure, 600)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.clearTimeout(late)
+      window.removeEventListener('resize', measure)
+    }
+  })
   return (
-    <main aria-busy={busy || undefined} className="relative mx-auto flex max-w-[1320px] flex-col gap-3.5" style={{ padding: 'clamp(10px,1.6vw,22px) clamp(16px,3vw,32px) 24px' }}>
+    <main
+      ref={own}
+      aria-busy={busy || undefined}
+      className={`relative mx-auto flex max-w-[1320px] flex-col gap-3.5 ${fit ? 'overflow-hidden' : ''}`}
+      style={fit ? { padding: `8px clamp(16px,2vw,32px) ${FIT_GAP}px`, height: `calc(100dvh - ${top}px)` } : { padding: 'clamp(10px,1.6vw,22px) clamp(16px,3vw,32px) 24px' }}
+    >
       {children}
     </main>
   )
+}
+
+/**
+ * Home fills the screen when the window is a desktop one at least 640px tall (760px with goals) and the cards sit in one row
+ * (the grid at least 960px wide: narrower, with Wisp open beside a laptop-sized page, the cards stack in
+ * pairs and the page scrolls as before), and every column under the hero holds its cards at their least
+ * height (below). Tells the shell to drop its bottom padding while it does.
+ *
+ * The least height is each card's own: a card that grows with its column keeps its header, its foot and room
+ * for one row of its list (cards.tsx), a card that doesn't keeps its natural height. When a column can't hold
+ * its cards at that (measured after every render and whenever a card changes size), Home scrolls instead, and
+ * keeps scrolling until the page is wider or the window taller than when it didn't fit (never flipping back
+ * and forth at one size). Measured in a layout effect, so the switch lands before paint (and inside a page
+ * morph's update: components/shell/morph.ts).
+ *
+ * The Wisp button sits over the bottom-right corner of the last column: the card there (whichever it is) keeps
+ * its content left of the button, by that much more padding on its right (HomeBody).
+ */
+function useFitScreen(dense: boolean, wispOpen: boolean) {
+  // A person with goals has six cards under the hero: they need a taller window (760px) to fit without
+  // squeezing every list to one row; fewer cards fit from 640px.
+  const tall = useMediaQuery(`(min-width: 900px) and (min-height: ${dense ? 760 : 640}px)`)
+  const [width, setWidth] = useState(0)
+  const [vh, setVh] = useState(() => (typeof window === 'undefined' ? 900 : window.innerHeight))
+  const [blocked, setBlocked] = useState<{ w: number; h: number } | null>(null)
+  const [corner, setCorner] = useState<number | null>(null)
+  const grid = useRef<HTMLDivElement | null>(null)
+  const ro = useRef<ResizeObserver | null>(null)
+  const gridRef = useCallback((el: HTMLDivElement | null) => {
+    ro.current?.disconnect()
+    grid.current = el
+    if (!el) return
+    // flushSync: when Wisp or the sidebar moves the page (a view transition, components/shell/morph.ts), the
+    // switch between fitted and scrolling lands before the transition captures the new layout, so it is
+    // cross-faded with everything else instead of jumping after it.
+    ro.current = new ResizeObserver(([e]) => flushSync(() => setWidth(Math.round((e.target as HTMLElement).getBoundingClientRect().width))))
+    // the page (main) around the grid: its full width, padding included
+    if (el.parentElement) ro.current.observe(el.parentElement)
+  }, [])
+  useEffect(() => {
+    const onResize = () => setVh(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  // The grid's width once fitted (its side padding is clamp(16px, 2vw, 32px) then, 3vw scrolling): measured on
+  // the page itself, so being fitted or not never changes the answer.
+  const fitPad = Math.min(32, Math.max(16, (typeof window === 'undefined' ? 1440 : window.innerWidth) * 0.02))
+  const fit = tall && width - 2 * fitPad >= 960 && !(blocked && width <= blocked.w && vh <= blocked.h)
+  useLayoutEffect(() => {
+    if (!fit) return
+    const html = document.documentElement
+    html.dataset.homeFit = ''
+    return () => {
+      delete html.dataset.homeFit
+    }
+  }, [fit])
+  // Every render while fitted: do the columns hold their cards, and where is the Wisp button's corner? (Each
+  // state is set only when its value changed, so this settles in one pass.)
+  useLayoutEffect(() => {
+    const el = grid.current
+    if (!fit || !el) {
+      setCorner((c) => (c ? null : c))
+      return
+    }
+    const cols = Array.from(el.querySelectorAll<HTMLElement>(':scope > [data-fit-col]'))
+    const check = () => {
+      // The page may already have its new width (Wisp opening re-renders Home through the shell before the
+      // resize observer reports it): decide only on the width this render was laid out for.
+      const live = el.parentElement ? Math.round(el.parentElement.getBoundingClientRect().width) : width
+      if (live !== width) {
+        setWidth(live)
+        return
+      }
+      for (const col of cols) {
+        const last = col.lastElementChild
+        if (!last) continue
+        if (last.getBoundingClientRect().bottom > col.getBoundingClientRect().bottom + 1) {
+          setBlocked({ w: width, h: window.innerHeight })
+          return
+        }
+      }
+      const next = fabCorner(cols.at(-1)?.lastElementChild ?? null, wispOpen)
+      setCorner((c) => (c === next ? c : next))
+    }
+    check()
+    // a card that grows after this render (a font, a photo, a list re-fit) is checked again in the same frame
+    const watch = new ResizeObserver(() => flushSync(check))
+    for (const col of cols) for (const c of Array.from(col.children)) watch.observe(c)
+    return () => watch.disconnect()
+  })
+  return { fit, gridRef, corner }
+}
+
+/** Card padding that already keeps content off the card's edge (p-4). */
+const CARD_PAD = 16
+
+/** How far the Wisp button (resting, bottom right) reaches into a card from its right, with a little air, past the card's padding; null when it doesn't. */
+function fabCorner(card: Element | null, wispOpen: boolean): number | null {
+  const fab = document.querySelector<HTMLElement>('[data-wisp-fab]')
+  if (!card || !fab || wispOpen) return null
+  // its resting circle (its own scale while it hides or hops is left out)
+  const f = fab.getBoundingClientRect()
+  const size = fab.offsetWidth
+  const left = f.left + f.width / 2 - size / 2
+  const top = f.top + f.height / 2 - size / 2
+  const r = card.getBoundingClientRect()
+  if (!size || left >= r.right || top >= r.bottom) return null
+  return Math.max(0, Math.round(r.right - left + 8 - CARD_PAD))
 }
 
 function HomeBody() {
@@ -124,7 +266,7 @@ function HomeBody() {
   const setUse = useSetRoutineUse()
   const check = useRoutineCheck(entries)
   const tests = useProductTests()
-  const spots = useSpots()
+  const spotCheckIns = useSpotCheckIns()
   const byId = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e])), [entries])
 
   const day = today()
@@ -147,7 +289,7 @@ function HomeBody() {
   const names = tracked.map((p) => SITE_SHORT[p].toLowerCase())
   const todayLine = `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}, about ${minutesFor(tracked)} min`
   const lead = leadFor({ read, goals, demo, checkIn, openResult, placeChips, todayLine })
-  const heroLines = withTonight(heroLinesFor(read, goals, demo, due), tonightLine(activeIn(entries, 'pm')))
+  const heroLinesAll = withTonight(heroLinesFor(read, goals, demo, due), tonightLine(activeIn(entries, 'pm')))
   // The schedule chip, unless a hero line already says when the next check-in is.
   const heroNext = demo || read.todayKind === 'done' ? null : read.person === 'new' ? 'No check-ins yet' : (due?.label ?? null)
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
@@ -231,18 +373,42 @@ function HomeBody() {
   // How the last check-in's photos came out. On the demo journey, the last one whose photos were used: a
   // retake that found no face is not what the showcase account is there to show.
   const lastPhotos = latest(own, (s) => s.status === 'done' && Boolean(s.result) && (!demo || usable(s)))
+  // Every photo of it is signed by the single view only (the list signs the reference photo); the demo journey is read from its own endpoint, which has none.
+  const lastPhotosView = useSessionView(demo ? null : (lastPhotos?.id ?? null))
+  // With goals on the left, the routine's effect moves under Routine today (the routine and whether it works,
+  // together) and the baseline tile under the goals: two tall cards never share one column while another holds
+  // Routine today alone, which then stretched its panels into empty space (the demo journey). Without goals (a
+  // first check-in) the effect keeps the left column.
+  const { fit, gridRef, corner } = useFitScreen(Boolean(measured && trends.length), shell.advisorOpen)
+  // A tall window has room for Routine today's full panels even when it shares its column: 940px beside the
+  // baseline tile, 1100px beside the routine's effect (a person with goals).
+  const roomy = useMediaQuery(`(min-height: ${measured && trends.length ? 1100 : 940}px)`)
+  // Fitted to the screen, the greeting keeps its first two lines (the lead card beside it carries the rest).
+  const heroLines = fit ? heroLinesAll.slice(0, 2) : heroLinesAll
+  const goalsShown = Boolean(measured && trends.length)
+  const effectNode = effect?.rows.length ? <RoutineEffectCard className="flex-1" effect={effect} sessions={outcomeSessions} asOfTime={asOf} asOf={asOfSession ? shortDay(asOfSession.created_at) : null} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> : null
+  const baselineNode = read.baseline ? <BaselineTile className="flex-1" baseline={read.baseline} asOf={asOfSession?.created_at ?? null} onOpen={() => navigate('/progress')} /> : null
+  // Fitted to the screen with goals (an active person, the demo journey), six cards no longer fit three columns
+  // one screen high as they stack when scrolling. Fitted: the goals have the first column (the spot diary under
+  // them), the photos sit over what changed, and the routine's effect sits under Routine today (the routine and
+  // whether it moves anything, together); the baseline tile gives way (the goals card already says "Since your
+  // baseline, 23 Aug").
+  const fitGoals = fit && goalsShown
   const aims: Slot[] = []
-  if (measured && trends.length) aims.push({ key: 'goals', node: goalsNode('flex-1') })
+  if (goalsShown) aims.push({ key: 'goals', node: goalsNode('flex-1'), grow: true })
   if (showSetup) aims.push({ key: 'setup', node: <SetupCard className="flex-1" rows={setupRows} /> })
-  if (effect?.rows.length) aims.push({ key: 'effect', node: <RoutineEffectCard className="flex-1" effect={effect} asOf={asOfSession ? shortDay(asOfSession.created_at) : null} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
+  if (effectNode && !goalsShown) aims.push({ key: 'effect', node: effectNode })
+  if (baselineNode && goalsShown && !fitGoals) aims.push({ key: 'baseline', node: baselineNode })
   const last: Slot[] = []
-  if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} onOpen={() => openResult(lastPhotos)} /> })
+  if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} frameUrls={lastPhotosView?.session.frame_urls ?? null} next={due?.label ?? null} demo={demo} shared={fit && Boolean(measured)} onOpen={() => openResult(lastPhotos)} /> })
   if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
-  const diary = !demo && spots.data?.enough_data ? spots.data : null
-  if (diary) last.push({ key: 'spots', node: <SpotDiaryTile className="flex-1" diary={diary} onOpen={() => navigate('/spots')} /> })
-  const daily: Slot[] = [{ key: 'routine', node: null, grow: true }]
+  // The spot diary (every face check-in, with every counted mark): fitted with goals it sits under them.
+  const weeks = !demo ? (spotCheckIns.data?.check_ins ?? []) : []
+  if (weeks.length) (fitGoals ? aims : last).push({ key: 'spots', node: <SpotDiaryTile className="flex-1" weeks={weeks} onOpen={() => navigate('/spots')} /> })
+  const daily: Slot[] = [{ key: 'routine', node: null, grow: !(effectNode && goalsShown) }]
+  if (effectNode && goalsShown) daily.push({ key: 'effect', node: effectNode, grow: true })
   if (forearm) daily.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
-  if (read.baseline && !demo) daily.push({ key: 'baseline', node: <BaselineTile className="flex-1" baseline={read.baseline} onOpen={() => navigate('/progress')} /> })
+  if (baselineNode && !goalsShown && !demo) daily.push({ key: 'baseline', node: baselineNode })
 
   const am = activeIn(entries, 'am')
   const pm = activeIn(entries, 'pm')
@@ -271,6 +437,7 @@ function HomeBody() {
     routineCard = (
       <RoutineToday
         className={routineCls}
+        compact={fit && daily.length > 1 && !roomy}
         am={am}
         pm={pm}
         used={used}
@@ -289,7 +456,8 @@ function HomeBody() {
   const week = demo ? null : weekOf(own, read, goals, weeklyDayOf(checkin))
 
   return (
-    <Frame>
+    <HomeFit.Provider value={fit}>
+    <Frame fit={fit}>
       {data.status === 'error' ? (
         <div role="status" className="glass-pill flex flex-wrap items-center gap-3 self-center rounded-pill py-1.5 pr-1.5 pl-4 text-[13px] shadow-[inset_0_0_0_1px_rgba(255,255,255,.75)]">
           Couldn't refresh. Showing your last saved check-ins.
@@ -299,7 +467,7 @@ function HomeBody() {
         </div>
       ) : null}
       {week ? <WeekBand {...week} onProgress={() => navigate('/progress')} /> : null}
-      <div className="@container grid grid-cols-12 items-stretch gap-3.5">
+      <div ref={gridRef} className={`@container grid grid-cols-12 items-stretch gap-3.5 ${fit ? 'min-h-0 flex-[1_1_0] grid-rows-[max-content_minmax(0,1fr)]' : ''}`}>
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <HeroCard
             name={me.guest ? null : me.first}
@@ -313,16 +481,28 @@ function HomeBody() {
           <LeadCard lead={lead} />
         </div>
         {columns.map((col, i) => (
-          <div key={col[0].key} className={`flex min-w-0 flex-col gap-3.5 ${spans[i]}`}>
-            {col.map((c, k) => (
-              <div key={c.key} className={`flex min-w-0 ${(col.some((x) => x.grow) ? c.grow : k === col.length - 1) ? 'flex-1' : ''}`}>
-                {c.node}
-              </div>
-            ))}
+          <div key={col[0].key} data-fit-col className={`flex min-w-0 flex-col gap-3.5 ${fit ? 'min-h-0' : ''} ${spans[i]}`}>
+            {col.map((c, k) => {
+              const grow = col.some((x) => x.grow) ? c.grow : k === col.length - 1
+              // Fitted: a growing card takes the column's rest (its lists show what fits) but never less than its
+              // least height (no min-h-0: useFitScreen falls back to scrolling instead); the others their own height.
+              // The card under the Wisp button: its content keeps left of the button (its padding, 16px, plus how far the button reaches in).
+              const inCorner = corner && i === columns.length - 1 && k === col.length - 1
+              return (
+                <div
+                  key={c.key}
+                  className={`flex min-w-0 ${fit ? (grow ? '' : 'min-h-0 flex-none') : grow ? 'flex-1' : ''} ${inCorner ? '[&>*]:pr-[calc(16px+var(--fab-x))]!' : ''}`}
+                  style={{ ...(fit && grow ? { flex: '1 1 0' } : null), ...(inCorner ? ({ '--fab-x': `${corner}px` } as CSSProperties) : null) }}
+                >
+                  {c.node}
+                </div>
+              )
+            })}
           </div>
         ))}
       </div>
     </Frame>
+    </HomeFit.Provider>
   )
 }
 
@@ -398,6 +578,10 @@ function leadFor({
     }
   }
   const f = read.baselineFrames ?? 0
+  // Beside "Last check-in · Face · 26 Nov" a bare "Cheek close-up" chip read as the last check-in's place:
+  // the eyebrow names the last one's place, and the chip says it lists the next one's.
+  const lastLine = read.last ? `Last check-in · ${SITE_SHORT[read.last.site]} · ${shortDay(read.last.created_at)}` : undefined
+  const nextChips = placeChips.length ? [`Next: ${placeChips.join(' + ')}`] : undefined
   switch (read.person) {
     case 'new':
       return { title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
@@ -434,23 +618,23 @@ function leadFor({
     }
     case 'gap':
       return {
-        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
+        eyebrow: lastLine,
         title: 'Welcome back',
         sub: 'Your baseline still holds. One check-in picks up where you left off.',
         big: read.last ? String(daysSince(read.last.created_at)) : undefined,
         bigLabel: 'days since your last check-in',
-        chips: placeChips,
+        chips: nextChips,
         cta: { label: 'Check in now', onClick: checkIn },
         aura: 'sky',
       }
     default:
       return {
-        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
+        eyebrow: lastLine,
         title: 'Your check-in',
         sub: `${cap(todayLine)}. Same window light as last time keeps results comparable.`,
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
         bigLabel: 'days since your baseline',
-        chips: placeChips,
+        chips: nextChips,
         cta: { label: 'Check in', onClick: checkIn },
         aura: 'violet',
       }

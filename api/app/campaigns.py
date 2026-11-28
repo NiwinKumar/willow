@@ -475,12 +475,20 @@ def attribute_add(store: Store, uid: str, product_id: str) -> None:
             )
 
 
+def sponsored_opt_in(profile: dict[str, Any]) -> bool:
+    """Sponsored cards are on only when the person switched them on (sponsored_opt_in_at, set by
+    PUT /v1/me/profile with hide_sponsored false). A stored hide_sponsored false alone does not
+    count: profile saves before the opt-in (Nov 2026) wrote false for everyone."""
+    return bool(profile.get("sponsored_opt_in_at")) and profile.get("hide_sponsored") is False
+
+
 def sponsored(store: Store, uid: str, guest: bool = False) -> dict[str, Any] | None:
-    """The one sponsored card for this person today, or None (hidden, no goals, nothing that
+    """The one sponsored card for this person today, or None (not turned on: sponsored cards are
+    opt-in, on only with `sponsored_opt_in_at`, set when the person chose it; no goals, nothing that
     matches, or the evidence unavailable: no card rather than an unproven one). Demo campaigns
     (is_demo) reach guests only (`guest`: an anonymous account), never a real signed-in user."""
     profile = (store.user_get(uid) or {}).get("profile") or {}
-    if profile.get("hide_sponsored"):
+    if not sponsored_opt_in(profile):
         return None
     goals = set(cohort.goals_of(profile.get("goals")))
     if not goals:

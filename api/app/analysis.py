@@ -12,7 +12,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
-from app import baselines, engine, explain, labeller, previews, storage, views
+from app import baselines, engine, engine_gate, explain, labeller, previews, storage, views
 from app.store import Store
 
 log = logging.getLogger("willow.analysis")
@@ -128,6 +128,48 @@ def _within[T](future: Future, deadline: float, fallback: Callable[[], T], what:
     return fallback()
 
 
+def _line_done(gate: engine_gate.Gate | None) -> dict[str, Any]:
+    """Out of the line for good: no place kept (only written when the line is on)."""
+    return {"queue": None, "queue_since": None} if gate is not None else {}
+
+
+def _through_line(
+    gate: engine_gate.Gate, store: Store, uid: str, session_id: str, doc: dict, request: dict
+) -> dict[str, Any]:
+    """engine.analyze once this instance's line lets it through (app/engine_gate.py). While it
+    waits, the session shows stage "queued" with its place; engine_gate.InLine when the wait is
+    over first (the route puts the session back and the person asks again, keeping the place)."""
+    since = engine_gate.place_since(doc)
+
+    def waiting(position: int, eta_s: int) -> None:
+        store.session_update(
+            uid,
+            session_id,
+            {
+                "stage": "queued",
+                "queue": {"position": position, "eta_s": eta_s},
+                "queue_since": since,
+            },
+        )
+        doc["queue_since"] = since
+
+    def starting() -> None:
+        try:
+            store.session_update(uid, session_id, {"stage": "engine", "queue": None})
+        except Exception:
+            log.warning("could not write stage engine for %s/%s", uid, session_id)
+
+    try:
+        return gate.call(lambda: engine.analyze(request), since.timestamp(), waiting, starting)
+    except engine_gate.InLine:
+        # keep the place for the next ask (written once even if the place was never shown)
+        try:
+            store.session_update(uid, session_id, {"queue_since": since})
+        except Exception:
+            log.warning("could not keep the place in line for %s/%s", uid, session_id)
+        raise
+
+
 def gemini_budget(started: float | None) -> float:
     """Seconds the Gemini work may take now: GEMINI_BUDGET_S, or 0 when the request (started at
     time.monotonic() `started`) is too close to Cloud Run's limit."""
@@ -157,7 +199,7 @@ def run(
             "status": "processing",
             "processing_started_at": datetime.now(UTC),
             "error": None,
-            # Live stage the check-in polls (received, engine, explaining); None when done.
+            # Live stage the check-in polls (received, queued, engine, explaining); None when done.
             "stage": "received",
         },
     )
@@ -182,9 +224,13 @@ def run(
         "output_prefix": f"gs://{bucket}/{views.results_prefix(uid, session_id)}",
         "options": {"compute_overlays": True, "max_candidates": 40},
     }
-    _stage(store, uid, session_id, "engine")
+    gate = engine_gate.current()
     try:
-        result = engine.analyze(request)
+        if gate is None:
+            _stage(store, uid, session_id, "engine")
+            result = engine.analyze(request)
+        else:
+            result = _through_line(gate, store, uid, session_id, doc, request)
     except engine.EngineError as exc:
         log.warning("engine failed for %s/%s: %s %s", uid, session_id, exc.code, exc.message)
         store.session_update(
@@ -194,6 +240,7 @@ def run(
                 "status": "failed",
                 "error": {"code": exc.code, "message": exc.public_message},
                 "stage": None,
+                **_line_done(gate),
             },
         )
         raise
@@ -245,6 +292,7 @@ def run(
         {
             "status": "done",
             "stage": None,
+            **_line_done(gate),
             "measured": measured,
             # Placeholder numbers are kept for debugging only; views never return them.
             "result_json": json.dumps(result),

@@ -53,7 +53,7 @@ Local signed URLs: the api impersonates `sa-api` to sign. Project Owner does not
 
 Judging (Oct 19 - Nov 7) and the Grand Finale (Singapore, Dec 4): kept warm since Oct 19 with `--min-instances 2` on `willow-engine` (both places of one check-in start warm) and `--min-instances 1` on `willow-api`. Idle cost about $3.05/day (about ₹255/day). Nov 2: kept warm through the finale (about ₹8,200 more from Nov 2 to Dec 4, within the ₹10,000 the team set for it). If the team is not shortlisted, set both back to `--min-instances 0` that day (`gcloud run services update <service> --region us-central1 --min-instances 0`); otherwise do it on Dec 5.
 
-Finale day (Dec 3-4), a little more headroom: `gcloud run services update willow-api --region us-central1 --min-instances 2` and `gcloud run services update willow-engine --region us-central1 --min-instances 3`; back to 1 and 2 after. Load test Nov 2: 20 people at once on every public judge page, no errors, every page under 2 s from India (about 0.35 s of it network), so the current maxima (api 3, engine 8) and the 20 vCPU quota are enough.
+Finale day (Dec 3-4), a little more headroom: `gcloud run services update willow-api --region us-central1 --min-instances 2` and `gcloud run services update willow-engine --region us-central1 --min-instances 3`; back to 1 and 2 after. Load test Nov 2: 20 people at once on every public judge page, no errors, every page under 2 s from India (about 0.35 s of it network), so the current maxima (api 3, engine 8) and the 20 vCPU quota are enough for browsing. That test did not measure check-ins; see "Scale" below for 200 at once.
 
 ## Finale caps (environment variables, no code change)
 
@@ -71,3 +71,84 @@ positive whole number is ignored (logged as "ignoring cap override") and the def
 Gemini cap allows more paid calls; check the budget alert before raising it far.
 To set one, add it to `infra/api-env.yaml` (or `--update-env-vars DEMO_WISP_DAILY_CAP=2000` on
 `gcloud run services update willow-api --region us-central1`); this makes a new revision. Remove it on Dec 5.
+
+## Scale: 200 check-ins at once (Nov 28)
+
+Real settings (`gcloud run services describe`, Nov 28): **willow-engine** 2 vCPU / 4 GiB, `--concurrency 1`,
+min 2, max 8, timeout 300 s; **willow-api** 1 vCPU / 2 GiB, `--concurrency 80`, min 1, max 3, timeout 300 s.
+A face check-in holds one engine instance for 40.8 s (median of production runs, `api/scripts/cost_report.py`),
+so 8 instances measure 8 at a time, about 700 an hour.
+
+Before the line, check-in number 9 of a burst still went to the engine: Cloud Run held it a few seconds, answered
+429, and the person read "The measurement took too long". The api had a second ceiling of its own: its sync routes
+share anyio's 40 worker threads, so 40 check-ins waiting on the engine also held up every poll and page read on that
+instance.
+
+**The line** (`api/app/engine_gate.py`, off until the variables are set; nothing changes on deploy without them):
+each api instance lets `ENGINE_SLOTS` analyses call the engine at once; the rest wait, oldest first, and their
+session shows stage `queued` with `queue: {position, eta_s}`. One request waits at most `ENGINE_QUEUE_WAIT_S`
+(the web gives analyze 150 s; the engine and Gemini need about 90 s of it). Past that the session is put back as
+it was and the api answers 409 `conflict` with `queued: true`; the deployed web already re-reads and asks again on
+that answer, and the session's `queue_since` keeps its place. An engine 429/503 (every instance taken) is asked
+again every 3 s within the same wait. Nothing is marked failed and no daily analysis is spent while in line.
+
+| Variable | Sets | Default | Finale suggestion |
+|---|---|---|---|
+| `ENGINE_SLOTS` | analyses one api instance sends the engine at once; 0 = no line | 0 | `3` (3 api instances x 3 = 9 for 8 engine instances; the 9th is retried on 429) |
+| `ENGINE_QUEUE_WAIT_S` | longest wait inside one analyze request | 45 | 45 |
+| `ENGINE_EXPECTED_S` | first estimate of one analysis, for "about N s" (then this instance's own runs) | 45 | 45 |
+| `API_THREADS` | worker threads for the api's sync routes (anyio's default 40) | 40 | `100` (above `--concurrency 80`) |
+
+Limits, said plainly: the line lives in each api instance's memory and inside the person's request, so the order is
+oldest-first per instance (roughly fair across 3 instances), and someone who closes the app while in line leaves the
+check-in unmeasured (photos kept, status back to `uploading`). A durable queue (Cloud Tasks in front of the engine,
+dispatch rate = engine instances) removes both; it needs a new queue, an internal route and IAM, so it is not built.
+The check-in screen does not yet word the `queued` stage ("In line, about N s"); it shows its generic engine line.
+
+Load test (`api/scripts/loadtest/`; photos: the bucket's `demo/samples/mei_face_week1` and `mei_cheek_week1`, copied
+locally, never committed). One laptop, shared with other work: the face pair ran with 2 engine workers (a run with 4
+beside other heavy jobs overloaded the machine, and 3 beside another benchmark kept the load average above 30). The
+queue model is checked on those 2 local workers; the production rows apply it with production's own engine time, not
+the laptop's.
+
+```bash
+cd api
+uv run python scripts/loadtest/engine_pool.py --workers 2 --port 8126 --frames <dir with mei_face_week1/ and mei_cheek_week1/> --log /tmp/pool.jsonl &
+ENGINE_SLOTS=2 API_THREADS=256 uv run python scripts/loadtest/run_api.py --people 200 --port 8116 &   # --site cheek_macro --frames 3 for close-ups
+uv run python scripts/loadtest/drive.py --people 200 --pool-log /tmp/pool.jsonl --label "line on" --out scripts/loadtest/results/<day>-face-line.json
+uv run python scripts/loadtest/report.py   # the tables below, and the Evidence page's "Scale" section
+```
+
+What it shows: as deployed, 186 of 200 people saw an error and every page read on the api waited about 30 s for a
+thread; with the line, all 200 were measured, nobody saw an error, polls stayed under 1 s (p95), and the last person
+was done when the queue model said (940 s predicted, 939 s measured). The wait itself is long: it is the engine's
+throughput, which only more instances shorten (the projection below).
+
+Measured locally on 2026-11-28: one laptop (Apple M5, 10 cores, shared with other work): the real api and 2 real engine processes, one analysis each at a time, standing in for Cloud Run instances; 200 people press Measure at once, the demo sample's five face photos (Mei, generated).
+
+| Run | Succeeded | Errors | End to end p50 / p95 / p99 | Poll p95 | Engine s/analysis |
+|---|---|---|---|---|---|
+| no line (as deployed) | 14/200 | 186 504:engine_timeout | 50.5 / 68.4 / 68.4 s | 30.3 s | 9.4 |
+| line on (ENGINE_SLOTS=2, API_THREADS=256) | 200/200 | none | 516.4 / 899.2 / 931.8 s | 0.9 s | 9.4 |
+| no line (as deployed), the three cheek close-ups | 44/200 | 156 504:engine_timeout | 46.3 / 54.1 / 56.7 s | 30.1 s | 2.5 |
+
+Model check: 2 local instances at 9.4 s each predict the last of 200 done at 940 s; measured 939.4 s.
+
+Projection for production (not measured): 40.8 s per face check-in on the engine (median of 23 production runs), the same line, Gemini and cold starts left out. Engine cost per check-in $0.0024 at list price (whole check-in with Gemini $0.0253); it is the same at any instance count.
+
+| Engine max instances | vCPU (with api) | 200 people: half done | 95% done | all done | Check-ins per hour | Engine cost of the burst |
+|---|---|---|---|---|---|---|
+| 8 (now) | 19 | 8.8 min | 16.3 min | 17.0 min | 706 | $0.47 |
+| 25 | 53 (quota increase) | 2.7 min | 5.4 min | 5.4 min | 2206 | $0.47 |
+| 50 | 103 (quota increase) | 82 s | 2.7 min | 2.7 min | 4412 | $0.47 |
+| 100 | 203 (quota increase) | 41 s | 82 s | 82 s | 8824 | $0.47 |
+
+Cost per use, medians of 30 days of production logs at list prices read on 2026-11-28 (idle minimum instances, storage, Firestore and BigQuery not included):
+
+| Unit | US$ | Measured from |
+|---|---|---|
+| Face check-in | 0.0253 | 23 engine runs, median 40.8 s; explanation: 4 calls; candidate_labels x2: 13 calls |
+| Wisp answer | 0.0047 | advisor_reply: 23 calls |
+| Routine check | 0.0012 | routine_check: 9 calls |
+| Reading story | 0.0013 | metric_story: 6 calls |
+| Proof Ask answer | 0.1446 | retailer_ask: 106 calls |

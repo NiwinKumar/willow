@@ -62,6 +62,26 @@ MIN_SD = {
     "pores": 2.0,  # per cm2 (one or two pores more or less in a ~1 cm2 field)
     "texture": 0.05,  # index
 }
+# Between-room floor on a face reading's normal range (Nov 29, engine 0.4.3), in the reading's own
+# units: a later check-in counts as changed only beyond max(the baseline's own mdc95, this floor).
+# Five photos taken minutes apart share one room's light, so their spread misses what a new room
+# does to colour and light readings. Learned with engine/scripts/instrument_retest.py
+# --learn-floors (docs/EVIDENCE.md): MST-E face photos, each check-in retaken in simulation under
+# a new room's light (exposure within half a stop, red/blue within 6%), the 95th percentile of
+# |change| with nothing changed, over 10 of 17 people (seed 7, split within Monk groups). On the
+# other 7 people false "changed" calls on these readings fell from 117 of 240 (49%) to 15 (6%),
+# and on all nine face readings from 126 of 356 (35%) to 24 (7%). The cost: a real
+# change smaller than the floor is not called. Face photos only, whatever the capture mode: a
+# face never carries a colour reference (RAW included), so its colours follow the room's light.
+# Forearm sessions correct colour with white paper and close-ups were not tested: no floor.
+ROOM_LIGHT_FLOOR = {
+    "tone_ita": 33.93,  # degrees
+    "redness": 3.63,  # a*
+    "glow": 15.21,  # index
+    "shine": 6.69,  # % of T-zone
+    "tone_evenness": 2.87,
+    "dark_circles": 2.42,  # delta L*
+}
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
 ZONE_MIN_MM2 = 50.0  # a face-map zone needs this much skin in a photo for a by-zone reading
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading

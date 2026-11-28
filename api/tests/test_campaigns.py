@@ -75,9 +75,9 @@ def _create(client, pid=PROVEN, workspace="retailer", goals=("dark_spots",), ski
 
 def _shopper(uid="shopper", goals=("dark_spots",), skin="oily", **extra) -> TestClient:
     c = _as(uid)
-    assert c.put(
-        "/v1/me/profile", json={"goals": list(goals), "skin_type": skin, **extra}
-    ).is_success
+    # sponsored cards are opt-in: this shopper turned them on unless a test says otherwise
+    body = {"goals": list(goals), "skin_type": skin, "hide_sponsored": False, **extra}
+    assert c.put("/v1/me/profile", json=body).is_success
     return c
 
 
@@ -375,6 +375,35 @@ def test_hide_sponsored(client, fake):
     shopper = _shopper(hide_sponsored=True)
     assert shopper.get("/v1/sponsored").json()["item"] is None
     shopper.put("/v1/me/profile", json={"hide_sponsored": False})
+    assert shopper.get("/v1/sponsored").json()["item"]
+
+
+def test_sponsored_is_off_until_the_person_turns_it_on(client, fake):
+    """Opt-in, like sharing: a profile that never chose (goals and skin type match) gets no card,
+    and null puts it back to off."""
+    _create(client)
+    shopper = _shopper(hide_sponsored=None)
+    assert shopper.get("/v1/me").json()["profile"]["hide_sponsored"] is True
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+    shopper.put("/v1/me/profile", json={"hide_sponsored": False})
+    assert shopper.get("/v1/sponsored").json()["item"]
+    shopper.put("/v1/me/profile", json={"hide_sponsored": None})
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+
+
+def test_an_old_stored_false_is_not_an_opt_in(client, fake):
+    """Profile saves before the opt-in wrote hide_sponsored false for everyone: without the
+    person's own choice (sponsored_opt_in_at) that reads as off, in /v1/me and for the card."""
+    _create(client)
+    shopper = _shopper(hide_sponsored=None)
+    profile = fake.store.user_get("shopper")["profile"]
+    fake.store.user_merge("shopper", {"profile": {**profile, "hide_sponsored": False}})
+    assert shopper.get("/v1/me").json()["profile"]["hide_sponsored"] is True
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+    shopper.put("/v1/me/profile", json={"skin_type": "oily"})  # other edits keep it off
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+    shopper.put("/v1/me/profile", json={"hide_sponsored": False})  # the You switch
+    assert fake.store.user_get("shopper")["profile"]["sponsored_opt_in_at"]
     assert shopper.get("/v1/sponsored").json()["item"]
 
 

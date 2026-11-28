@@ -142,6 +142,12 @@ export function useSpots() {
   return useQuery(['spots', uid], (t) => api.spots(t), { enabled: Boolean(uid), staleMs: 10 * 60_000 })
 }
 
+/** The spot diary, check-in by check-in (api GET /v1/spots/check-ins). Signed photo links last about an hour. */
+export function useSpotCheckIns() {
+  const uid = useOwner()
+  return useQuery(['spot-check-ins', uid], (t) => api.spotCheckIns(t), { enabled: Boolean(uid), staleMs: 10 * 60_000 })
+}
+
 /** The account as the api knows it (consent on record). */
 export function useMe() {
   const uid = useOwner()

@@ -15,17 +15,21 @@ import { usePlan } from './draft'
 import { SLOT_WORDS, WHEN_WORDS, errorText, money, moneyOf, priceIn, type PlanPick, type PlanWhen } from './planApi'
 import { card, cardStyle, primary, secondary, stagger } from './styles'
 import { Frame } from './ui'
-import { Celebration } from './Celebration'
+import { Celebration, type JourneyStep } from './Celebration'
+import { planSave } from '../routine/sampleRoutine'
 
 /** The date `weeks` from today, as a short date ("12 Feb"). */
 const weeksFrom = (weeks: number) => fmtDate(weeksAfter(localDay(), weeks))
+/** A schedule line's first sentence ("Add the serum at night."), for the short list on the celebration. */
+const firstSentence = (t: string) => t.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? t
 const slotsOf = (w: PlanWhen): ('am' | 'pm')[] => (w === 'both' ? ['am', 'pm'] : [w])
 
 /**
  * (g) The plan: the morning and evening order at a glance, each pick with its check, why, verdict date,
  * proof and two alternatives a tap away, the week-by-week start (one new active at a time), notes and the
  * total. "Add all" / "Start with the base only" write to the routine (POST /v1/routine, each pick starting
- * on its plan day, today + start_week weeks; products already in the routine are skipped), then the plan ends at `?next=` or Routine.
+ * on its plan day, today + start_week weeks; products already in the person's own routine are skipped, and a guest's
+ * sample routine is removed: routine/sampleRoutine.ts planSave), then the plan ends at `?next=` or Routine.
  */
 export function PlanRoutineStep() {
   const { result, exit } = usePlan()
@@ -39,7 +43,7 @@ export function PlanRoutineStep() {
   const onStore = useStoreClick('plan')
   const [error, setError] = useState<string | null>(null)
   // Saved: the garden plays, then the plan ends on the routine (nothing added: a toast, straight on).
-  const [saved, setSaved] = useState<number | null>(null)
+  const [saved, setSaved] = useState<{ added: number; replaced: boolean; steps: JourneyStep[] } | null>(null)
 
   const picks = useMemo(() => (result?.picks ?? []).map((p, i) => (swaps[i] ? { ...p, product: swaps[i], check: null, proof: null } : p)), [result, swaps])
   const ids = useMemo(() => (result?.picks ?? []).flatMap((p, i) => [swaps[i]?.product_id ?? p.product.product_id, ...p.alternatives.map((a) => a.product_id)]), [result, swaps])
@@ -59,18 +63,27 @@ export function PlanRoutineStep() {
     try {
       const token = await getIdToken()
       const { entries } = await api.routine(token)
-      const have = new Set(entries.filter((e) => !e.ended_at && e.product_id).map((e) => e.product_id))
+      const chosen = which === 'all' ? picks : base
+      // A guest's sample routine is replaced, not added to: the picks go in first, then the sample entries go.
+      const byId = new Map(chosen.map((p) => [p.product.product_id, p]))
+      const plan = planSave(entries, [...byId.keys()])
       const today = localDay()
-      let added = 0
-      for (const p of which === 'all' ? picks : base) {
-        if (have.has(p.product.product_id)) continue
-        await api.addRoutine(token, { product_id: p.product.product_id, slots: slotsOf(p.when), started_at: weeksAfter(today, p.start_week), source: 'catalog' })
-        have.add(p.product.product_id)
-        added++
+      for (const id of plan.add) {
+        const p = byId.get(id)
+        if (!p) continue
+        await api.addRoutine(token, { product_id: id, slots: slotsOf(p.when), started_at: weeksAfter(today, p.start_week), source: 'catalog' })
       }
+      for (const id of plan.removeSample) await api.deleteRoutine(token, id)
+      const added = plan.add.length
+      const replaced = plan.removeSample.length > 0
       refreshRoutine(uid)
-      // Confirmed either way: the garden, with words that say whether anything new went in.
-      setSaved(added)
+      // Confirmed either way: the garden, with words that say whether anything new went in, and the first
+      // steps of the plan's own schedule (today's with their photos; the later ones only when they were added).
+      const steps: JourneyStep[] = result.schedule
+        .filter((s) => s.week === 0 || which === 'all')
+        .slice(0, 3)
+        .map((s) => ({ when: s.week === 0 ? 'Today' : `Week ${s.week} · ${weeksFrom(s.week)}`, text: firstSentence(s.text), products: s.week === 0 ? base.map((p) => p.product) : undefined }))
+      setSaved({ added, replaced, steps })
     } catch (e) {
       setBusy(null)
       setError(errorText(e, 'Could not add them just now. Check your connection and try again.'))
@@ -79,7 +92,7 @@ export function PlanRoutineStep() {
 
   return (
     <>
-    {saved !== null ? <Celebration title="Your routine is set" line={saved ? `${saved} ${saved === 1 ? 'product' : 'products'} added. Tick each one as you use it, and Willow lines them up with your check-ins.` : 'All of these were already in your routine. Tick each one as you use it, and Willow lines them up with your check-ins.'} onDone={() => navigate(exit)} /> : null}
+    {saved !== null ? <Celebration title="Your routine is set" line={saved.added ? `${saved.added} ${saved.added === 1 ? 'product' : 'products'} added${saved.replaced ? ', in place of the sample routine' : ''}. Tick each one as you use it, and Willow lines them up with your check-ins.` : 'All of these were already in your routine. Tick each one as you use it, and Willow lines them up with your check-ins.'} steps={saved.steps} cta="Open my routine" onDone={() => navigate(exit)} /> : null}
     <Frame
       wide
       title="Your routine"

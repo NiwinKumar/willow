@@ -46,3 +46,57 @@ jobs:
       - run: npm run build
       # Pure-function tests under `node --test`; Node 24 strips the TypeScript types itself.
       - run: npm test
+  # Every Proof route and a dozen product pages, as the retailer and as a brand seat, must render without an error
+  # boundary or a TypeError (web/scripts/proof-crawl.mjs). The api runs as on a laptop: dev auth, in-memory store,
+  # fixture engine, and the synthetic cohort generated in-process in place of BigQuery (as api/tests/conftest.py
+  # does), so no Google Cloud credentials are needed; Gemini features are not reached by the crawl.
+  proof-crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { version: "0.12.15" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: uv sync --frozen
+        working-directory: api
+      - name: Start the api (synthetic cohort, no cloud)
+        working-directory: api
+        env: { AUTH_MODE: dev, DEV_STORE: memory, ENGINE_MODE: fixture, ALLOWED_ORIGINS: "http://localhost:4173", PYTHONPATH: . }
+        run: |
+          cat > /tmp/ci_api.py <<'PY'
+          from datetime import date
+
+          from app import cohort, retailer
+
+          raw = retailer.raw_from_tables(cohort.generate(date(2026, 11, 28)))
+          retailer.fetch = lambda: raw  # the rows BigQuery would serve
+
+          import uvicorn  # noqa: E402
+
+          from app.main import app  # noqa: E402
+
+          uvicorn.run(app, port=8080, log_level="warning")
+          PY
+          nohup uv run python /tmp/ci_api.py > /tmp/api.log 2>&1 &
+      - name: Build and serve the web (dev auth against the local api)
+        working-directory: web
+        env: { VITE_AUTH_MODE: dev, VITE_API_URL: "http://localhost:8080" }
+        run: |
+          npm ci --no-fund --no-audit
+          npm run build
+          nohup npx vite preview --port 4173 --strictPort > /tmp/web.log 2>&1 &
+      - name: Wait for the api
+        run: |
+          for i in $(seq 1 90); do curl -sf -H 'X-Dev-Uid: ci' http://localhost:8080/v1/retailer/products > /dev/null && exit 0; sleep 5; done
+          cat /tmp/api.log; exit 1
+      # Ubuntu 24.04 runners block the unprivileged user namespaces Chrome's sandbox needs.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # puppeteer-core drives the runner's own Chrome; installed outside the repo, so it is not a web dependency.
+      - run: npm install --prefix /tmp/pptr --no-save --no-fund --no-audit puppeteer-core@23.11.1
+      - name: Crawl Proof
+        working-directory: web
+        run: PUPPETEER=/tmp/pptr/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js CHROME="$(command -v google-chrome)" BASE=http://localhost:4173 API=http://localhost:8080 N=12 node scripts/proof-crawl.mjs
+      - if: failure()
+        run: tail -n 80 /tmp/api.log /tmp/web.log

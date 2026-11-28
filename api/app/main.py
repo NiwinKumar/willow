@@ -1,6 +1,7 @@
 """Willow product API (Cloud Run service `willow-api`). Contract: docs/CONTRACT.md section 3."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -8,10 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from app import __version__, storage
+from app import __version__, engine_gate, storage
 from app.routes.autopilot_routes import router as autopilot_router
 from app.routes.campaign_routes import router as campaign_router
 from app.routes.demo_routes import router as demo_router
+from app.routes.live_routes import router as live_router
 from app.routes.me_routes import router as me_router
 from app.routes.plan_routes import router as plan_router
 from app.routes.product_requests_routes import router as product_requests_router
@@ -29,14 +31,12 @@ from app.similar import router as similar_router
 
 settings = get_settings()
 
-app = FastAPI(title="Willow api", version=__version__)
 log = logging.getLogger("willow.api")
 if not logging.getLogger().handlers:
     # Uvicorn configures only its own loggers; without this the app's info lines are dropped.
     logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
 
 
-@app.on_event("startup")
 def _dev_seed() -> None:
     """DEV_STORE=memory (with AUTH_MODE=dev): the sample campaign portfolio with history, in
     memory only (needs the BigQuery rows; skipped without them)."""
@@ -50,13 +50,26 @@ def _dev_seed() -> None:
             log.warning("dev sample campaigns skipped: %s", exc)
 
 
-@app.on_event("startup")
 def _warm() -> None:
     """Production: load the rows, status and kept Gemini answers before serving (app/warm.py)."""
     if settings.auth_mode != "dev":
         from app import warm
 
         warm.run()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Startup, in the order (and on the event loop, blocking) as the old startup hooks ran.
+    Nothing ran at shutdown."""
+    _dev_seed()
+    # API_THREADS: room for every check-in waiting on the engine plus the polls (engine_gate.py)
+    await engine_gate.threads_from_env()
+    _warm()
+    yield
+
+
+app = FastAPI(title="Willow api", version=__version__, lifespan=lifespan)
 
 
 # Registered before CORS, so it sits inside it: an unexpected error still reaches the browser as
@@ -119,6 +132,7 @@ app.include_router(waitlist_router)
 app.include_router(plan_router)
 app.include_router(proof_router)
 app.include_router(similar_router)
+app.include_router(live_router)
 if storage.dev_uploads_enabled():
     from app.routes.dev_routes import router as dev_router
 

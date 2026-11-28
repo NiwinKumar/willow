@@ -1,28 +1,27 @@
 import { ArrowDown, ArrowUp, Check, Maximize2, Minimize2, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useShell, type AdvisorSeed } from '../../components/shell/ShellContext'
-import { LanguagePicker } from '../../components/willow/LanguagePicker'
 import { useRoutine, useRoutineCheck } from '../../data/hooks'
 import type { MetricId, Product, Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { fmtDate } from '../../lib/format'
 import { useAuth } from '../../lib/useAuth'
 import { useDemoStatus } from '../../lib/useDemoStatus'
-import { api, type AdvisorStage } from '../../lib/api'
+import type { AdvisorStage } from '../../lib/api'
 import { toJpegBase64 } from '../../lib/image'
-import { language, setLanguage, type LangCode } from '../../lib/language'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { GOALS, METRIC_META } from '../../lib/metrics'
 import { verdictCounts } from '../../lib/verdict'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
-import { advisorToken, ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
+import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
-import { canRecord, markSpeakNext, prime, record, stopReading, useSpeaking } from './voice'
+import { openVoice } from '../voice/openVoice'
+import { noteThinking } from './motion'
 import { useComposing, WispMark, wispState } from './Wisp'
 
 const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
@@ -54,10 +53,9 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
             {full ? 'Collapse' : 'Expand'}
           </button>
         ) : null}
+        {/* No language picker: Wisp answers in the language a question is written in and the app follows
+            each answer's language (chatStore reveal → adoptLanguage). */}
         {data.mode === 'live' ? <ContextChip /> : null}
-        <span className="ml-auto">
-          <LanguagePicker compact />
-        </span>
       </div>
       <Chat seed={seed} full={full} onExitFull={full ? onToggleFull : undefined} />
     </div>
@@ -191,15 +189,19 @@ function useStarters(): string[] {
 
 /**
  * Suggested questions in one row that scrolls sideways (soft edges where it continues), so they never take
- * more than one line: a new chat's starters, or the latest answer's follow-ups.
+ * more than one line: a new chat's starters, or the latest answer's follow-ups. The row keeps its place while
+ * a question is out (its chips fade away and the next set rises in), so the composer below never jumps.
  */
-function SuggestionRow({ items, disabled, label }: { items: string[]; disabled: boolean; label: string }) {
-  if (!items.length) return null
+function SuggestionRow({ items, setKey, live, label }: { items: string[]; setKey: string; live: boolean; label: string }) {
+  // what the row last showed, kept (faded) while nothing new is offered
+  const [shown, setShown] = useState({ key: setKey, items })
+  if (live && items.length && (shown.key !== setKey || shown.items !== items)) setShown({ key: setKey, items })
+  const visible = live && items.length > 0
   return (
-    <div role="group" aria-label={label} className="w-full max-w-[756px]">
-      <div className="no-scrollbar flex snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain px-1.5 py-0.5 [mask-image:linear-gradient(90deg,transparent_0,#000_14px,#000_calc(100%-24px),transparent)]">
-        {items.map((t, i) => (
-          <button key={t} type="button" disabled={disabled} onClick={() => ask(t)} className="min-h-10 shrink-0 snap-start whitespace-nowrap rounded-pill border border-ink/[.08] bg-surface/90 px-4 text-[13px] backdrop-blur-[12px] transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white disabled:opacity-50" style={{ animation: `wRise .35s ${Math.min(i, 5) * 50}ms both` }}>
+    <div role="group" aria-label={label} aria-hidden={!visible || undefined} inert={!visible || undefined} className="w-full max-w-[756px] transition-opacity duration-200 ease-out" style={{ opacity: visible ? 1 : 0 }}>
+      <div key={shown.key} className="no-scrollbar flex min-h-[44px] snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain px-1.5 py-0.5 [mask-image:linear-gradient(90deg,transparent_0,#000_14px,#000_calc(100%-24px),transparent)]">
+        {shown.items.map((t, i) => (
+          <button key={t} type="button" onClick={() => ask(t)} className="min-h-10 shrink-0 snap-start whitespace-nowrap rounded-pill border border-ink/[.08] bg-surface/90 px-4 text-[13px] backdrop-blur-[12px] transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white" style={{ animation: `wRise .45s cubic-bezier(.32,.72,0,1) ${Math.min(i, 5) * 45}ms both` }}>
             {t}
           </button>
         ))}
@@ -225,6 +227,27 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
   const busy = chat.phase !== 'idle'
   const capped = chat.capMessage !== null
   const started = chat.messages.length > 0
+  // New chat: the conversation fades away first, then the empty chat rises in (nothing vanishes at once).
+  const [leaving, setLeaving] = useState(false)
+  const startOver = () => {
+    if (leaving) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return newChat()
+    setLeaving(true)
+    window.setTimeout(() => {
+      newChat()
+      setLeaving(false)
+    }, 200)
+  }
+  // The first question: the empty chat's intro fades up and away over the arriving question, not at once.
+  const [intro, setIntro] = useState<'shown' | 'leaving' | 'gone'>(started ? 'gone' : 'shown')
+  useLayoutEffect(() => {
+    if (!started) return setIntro('shown')
+    if (intro !== 'shown') return
+    setIntro('leaving')
+    const t = window.setTimeout(() => setIntro('gone'), 240)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the chat starts or empties
+  }, [started])
 
   // Another person on this tab (Google switch, sign-out then sign-in) never sees the last one's chat.
   // The demo journey's chat is Mei's (DEMO_OWNER): her stored questions, and new ones answered from her data.
@@ -293,7 +316,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-4 pt-2">
       {started ? (
-        <div className={`flex items-center gap-2.5 py-1 ${column}`}>
+        <div className={`flex items-center gap-2.5 py-1 ${column}`} style={{ animation: 'wRise .45s cubic-bezier(.32,.72,0,1) both' }}>
           <span className="flex-none">
             <WispMark size={40} state={wispState(chat.phase)} />
           </span>
@@ -303,7 +326,7 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
               {status}
             </span>
           </div>
-          <button type="button" onClick={newChat} disabled={busy} className="hit44 min-h-9 rounded-pill border border-ink/12 bg-surface px-4 text-[13px]">
+          <button type="button" onClick={startOver} disabled={busy || leaving} className="hit44 min-h-9 rounded-pill border border-ink/12 bg-surface px-4 text-[13px]">
             New chat
           </button>
         </div>
@@ -320,11 +343,15 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
             else if (el.scrollTop < lastTop.current - 2) setAtEnd(false)
             lastTop.current = el.scrollTop
           }}
-          className={`no-scrollbar -mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-[3px] pt-1 pb-3 ${started ? 'justify-start' : 'justify-center'}`}
-          style={{ maskImage: 'linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%)' }}
+          className={`no-scrollbar -mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-[3px] pt-1 pb-3 transition-opacity duration-200 ease-out ${started ? 'justify-start' : 'justify-center'}`}
+          style={{ maskImage: 'linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 18px), transparent 100%)', opacity: leaving ? 0 : 1 }}
         >
-          {started ? null : (
-            <div className="flex flex-col items-center gap-3 text-center" style={{ animation: 'wRise .5s both' }}>
+          {intro === 'gone' ? null : (
+            <div
+              aria-hidden={started || undefined}
+              className={`flex flex-col items-center gap-3 text-center ${started ? 'pointer-events-none absolute inset-0 justify-center' : ''}`}
+              style={{ animation: started ? 'advOut .24s ease-out both' : 'wRise .5s cubic-bezier(.32,.72,0,1) both' }}
+            >
               <EmptyWisp />
               <h2 className="font-serif text-[26px] leading-none font-normal">Ask about your results</h2>
               <p className="max-w-[440px] leading-[1.5] text-ink-2">Answers use your measured results, your routine and the product catalog. Wisp can’t diagnose, and won’t quote a number Willow didn’t measure.</p>
@@ -386,12 +413,13 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
 
       <div className="relative z-[2] flex flex-none flex-col items-center gap-2.5 pt-1" style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}>
         {!capped ? (
-          !started ? (
-            <SuggestionRow items={starters} disabled={busy} label="Suggested questions" />
-          ) : last?.role === 'willow' && chat.phase === 'idle' ? (
-            // the latest answer's follow-ups (Gemini writes them to build on that answer), same row
-            <SuggestionRow key={last.id} items={last.reply.follow_up_suggestions} disabled={busy} label="Follow-up questions" />
-          ) : null
+          // a new chat's starters, or the latest answer's follow-ups (Gemini writes them to build on that answer)
+          <SuggestionRow
+            items={!started ? starters : last?.role === 'willow' ? last.reply.follow_up_suggestions : []}
+            setKey={!started ? 'starters' : String(last?.id ?? '')}
+            live={!busy && !leaving && (!started || last?.role === 'willow')}
+            label={started ? 'Follow-up questions' : 'Suggested questions'}
+          />
         ) : null}
         <Composer busy={busy} thinking={chat.phase === 'thinking'} capped={capped} />
       </div>
@@ -416,9 +444,13 @@ function Thinking({ stages }: { stages: AdvisorStage[] }) {
   const now = steps.at(-1) ?? 'Reading your check-ins'
   const done = steps.slice(0, -1)
   return (
-    <div role="status" className="flex items-start gap-3" style={{ animation: 'wRise .3s both' }}>
-      <WispMark size={34} state="thinking" />
-      <div className="flex min-w-[220px] flex-col gap-1.5 rounded-[8px_24px_24px_24px] bg-surface px-3.5 py-3">
+    // Wisp's mark sits exactly where the answer's will (Messages Answer), so the answer takes over in place:
+    // its bubble opens out of this one (motion.ts).
+    <div role="status" className="flex items-start gap-3" style={{ animation: 'wRise .4s cubic-bezier(.32,.72,0,1) both' }}>
+      <span className="-mt-0.5 -ml-1">
+        <WispMark size={34} state="thinking" />
+      </span>
+      <div ref={noteThinking} className="flex min-w-[220px] flex-col gap-1.5 rounded-[8px_28px_28px_28px] bg-surface px-3.5 py-3 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
         {done.map((w) => (
           <span key={w} className="flex items-center gap-2 text-[12.5px] text-ink-2" style={{ animation: 'advIn .35s both' }}>
             <Check size={13} strokeWidth={2} className="text-willow-700" aria-hidden />
@@ -473,7 +505,6 @@ async function toAttachment(file: File): Promise<Attachment> {
 function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean; capped: boolean }) {
   const [draft, setDraft] = useState('')
   const phone = useMediaQuery('(max-width: 639px)')
-  const [listening, setListening] = useState(false)
   const [attach, setAttach] = useState<Attachment[]>([])
   const [reading, setReading] = useState(false)
   const field = useRef<HTMLTextAreaElement>(null)
@@ -506,50 +537,12 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
     setReading(false)
     setAttach((a) => [...a, ...added].slice(0, MAX_PHOTOS))
   }
-  // Talk to Wisp (voice.ts): Gemini hears the question in any language; the checked answer is read aloud.
-  const canTalk = useMemo(() => canRecord(), [])
-  const [hearing, setHearing] = useState(false)
-  const speaking = useSpeaking()
-  const recording = useRef<Awaited<ReturnType<typeof record>> | null>(null)
+  // Talk to Wisp: the mic opens live voice mode (features/voice); nothing said there joins this chat.
+  const canTalk = typeof window !== 'undefined' && 'AudioWorkletNode' in window && Boolean(navigator.mediaDevices?.getUserMedia)
   const left = 1000 - draft.length
-
-  const toggleMic = async () => {
-    if (hearing) return
-    if (listening && recording.current) {
-      setListening(false)
-      setHearing(true)
-      try {
-        const audio = await recording.current.stop()
-        recording.current = null
-        const heard = await api.voiceHear(await advisorToken(), audio.base64, audio.mime)
-        if (!heard.text) {
-          toast('Wisp didn’t catch that. Try again a little closer.')
-          return
-        }
-        // the answer comes back in the language spoken, and is read aloud once it has passed its checks
-        if (heard.lang !== language()) setLanguage(heard.lang as LangCode)
-        markSpeakNext()
-        ask(heard.text)
-      } catch (e) {
-        toast(e instanceof Error && e.message ? e.message : 'Wisp couldn’t hear that just now. Try again, or type it.')
-      } finally {
-        setHearing(false)
-      }
-      return
-    }
-    prime()
-    try {
-      recording.current = await record()
-      setListening(true)
-    } catch {
-      toast('Allow the microphone to talk to Wisp, or type your question.')
-    }
-  }
 
   const send = () => {
     if ((!draft.trim() && !attach.length) || busy || capped || reading) return
-    recording.current?.cancel()
-    setListening(false)
     ask(draft, undefined, attach)
     setDraft('')
     setAttach([])
@@ -576,12 +569,6 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           </div>
           <span className="text-[11.5px] text-ink-2">Product and label photos only, never faces or skin. They are sent with this question and not kept.</span>
         </div>
-      ) : null}
-      {speaking ? (
-        <button type="button" onClick={stopReading} className="mx-auto mb-1 inline-flex min-h-9 items-center gap-2 rounded-pill bg-white/90 px-3.5 text-[12.5px] shadow-[0_10px_24px_-14px_rgba(0,0,0,.35)]" style={{ animation: 'wRise .3s both' }}>
-          <span aria-hidden className="size-2 animate-pulse rounded-full" style={{ background: 'var(--aura-coral)' }} />
-          Wisp is reading the answer aloud · Stop
-        </button>
       ) : null}
       <form
         onSubmit={(e) => {
@@ -623,11 +610,10 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
               send()
             }
           }}
-          readOnly={listening}
           disabled={capped}
           maxLength={1000}
           aria-describedby="ask-keys"
-          placeholder={hearing ? 'Hearing your question…' : listening ? 'Listening… tap the mic again to ask' : capped ? `Daily limit reached · resets at ${resetTime()}` : thinking ? 'Waiting for the answer…' : phone ? 'Ask Wisp anything' : 'Ask about a result, product or ingredient'}
+          placeholder={capped ? `Daily limit reached · resets at ${resetTime()}` : thinking ? 'Waiting for the answer…' : phone ? 'Ask Wisp anything' : 'Ask about a result, product or ingredient'}
           className="max-h-[160px] min-h-[46px] min-w-0 flex-1 resize-none bg-transparent px-2 py-[13px] text-[16px] leading-[20px] outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap sm:text-[14px]"
         />
         <span id="ask-keys" className="sr-only">
@@ -637,18 +623,15 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
         {canTalk ? (
           <button
             type="button"
-            onClick={() => void toggleMic()}
-            aria-pressed={listening}
-            aria-busy={hearing || undefined}
-            aria-label={hearing ? 'Wisp is listening to your question' : listening ? 'Stop and ask' : 'Talk to Wisp'}
-            title={hearing ? 'Hearing your question…' : listening ? 'Tap to ask' : 'Talk to Wisp: ask aloud in any language'}
-            disabled={capped || hearing || busy}
-            className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full transition-colors"
-            style={{ background: listening ? 'var(--aura-coral)' : 'var(--bg-sunken)', color: listening ? '#fff' : 'var(--text-primary)', boxShadow: listening ? '0 0 0 6px rgba(255,107,74,.25)' : 'none' }}
+            onClick={openVoice}
+            aria-label="Talk to Wisp"
+            title="Talk to Wisp: a voice chat in any language"
+            disabled={capped}
+            className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full bg-sunken text-ink transition-colors hover:bg-ink/10"
           >
             <span aria-hidden className="flex h-[18px] items-center gap-[2.5px]">
               {[8, 16, 11, 6].map((h, i) => (
-                <span key={i} className="w-[3px] rounded-[3px] bg-current" style={{ height: h, animation: listening ? `advBar ${0.6 + (i % 3) * 0.15}s ease-in-out ${i * 0.08}s infinite` : undefined }} />
+                <span key={i} className="w-[3px] rounded-[3px] bg-current" style={{ height: h }} />
               ))}
             </span>
           </button>

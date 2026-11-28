@@ -2,6 +2,7 @@ import './retail.css'
 
 import { ArrowLeftRight, Check, ChevronDown, ChevronsUpDown, LogOut, Monitor, Moon, MoreHorizontal, Search, ShieldCheck, Sun } from 'lucide-react'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { setFavicon } from '../../lib/favicon'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -91,6 +92,11 @@ function useProofTheme(): [ThemePref, (t: ThemePref) => void] {
 
 export default function Retail() {
   const [theme, setTheme] = useProofTheme()
+  // Proof's own tab icon (lib/favicon.ts) while it is open; Willow's again when the person leaves for the app.
+  useLayoutEffect(() => {
+    setFavicon('proof')
+    return () => setFavicon('willow')
+  }, [])
   return (
     <div className="proof-root relative min-h-dvh bg-canvas font-geist text-proof-body text-ink antialiased">
       <OrgProvider>

@@ -8,6 +8,7 @@ import { failureReasons } from '../../lib/warnings'
 import { pad2, plural, siteLower } from './model'
 import { Orb, type OrbState } from './parts'
 import { outcomeOf } from './outcome'
+import { queueLine } from './queue'
 import type { AnalysisState } from './useAnalysis'
 
 const ERROR_COPY: Record<string, string> = {
@@ -151,6 +152,9 @@ export function ProcessingStep(props: {
   const [shown, setShown] = useState(0)
   const answered = state.kind === 'done'
   const stage = state.kind === 'running' ? props.stage : null
+  // In the api's line for the engine: measured only while this page keeps asking, so never "you can leave".
+  const place = state.kind === 'running' ? (state.queue ?? null) : null
+  const queued = state.kind === 'running' && stage !== 'engine' && stage !== 'explaining' && (stage === 'queued' || place !== null)
   // The engine answered while analyze was still running: its three stages already stand ticked.
   // (per run: a retry starts its stages again)
   const run = 'startedAt' in state ? state.startedAt : null
@@ -224,6 +228,7 @@ export function ProcessingStep(props: {
         if (i < 3) return { name, detail: i === 0 ? 'Checked · the outcome lands with the result' : 'Done', glyph: '✓', tone: 'done' }
         return { name, detail: 'Gemini is writing the explanation · every number is checked against the measurement', glyph: '◌', tone: 'run' }
       }
+      if (live && i === 0 && queued) return { name, detail: queueLine(place), glyph: '◌', tone: 'run' }
       if (live && i === 0 && (received || state.kind === 'running'))
         return {
           name,
@@ -260,7 +265,7 @@ export function ProcessingStep(props: {
       : outcome === 'offline'
         ? 'The connection dropped while waiting for the result. Nothing was lost: Willow keeps measuring, and this page picks it up when you’re back online.'
         : ''
-  const slow = state.kind === 'running' && elapsed > SLOW_AFTER_S
+  const slow = state.kind === 'running' && elapsed > SLOW_AFTER_S && !queued
   const waitLine = !site || site === 'face_full' ? WAIT_LINE.face : WAIT_LINE.other
   // A sample baseline with a later-week sample to run: the comparison is one more run away, so it is offered here.
   const offerNext = Boolean(sample && props.nextSample && view?.session.is_baseline)
@@ -293,7 +298,8 @@ export function ProcessingStep(props: {
           </span>
           <span className="font-mono text-[12px] text-ink-2">ELAPSED · {outcome === 'run' ? `USUALLY ${waitLine}` : failedRun || outcome === 'rejected' ? 'STOPPED' : 'FINISHED'}</span>
           {slow ? <p className="m-0 mt-2 max-w-[340px] text-[14px] leading-[1.45] text-ink-2">Taking longer than usual (the engine may be waking up). {sample ? 'The sample photos are saved' : 'Your photos are saved'}; you can leave, and the result lands in {sample ? 'Progress' : 'Home'}.</p> : null}
-          {outcome === 'run' && !slow ? (
+          {outcome === 'run' && queued ? <p className="m-0 mt-2 max-w-[340px] text-[13px] leading-[1.45] text-ink-2">{queueLine(place)}</p> : null}
+          {outcome === 'run' && !slow && !queued ? (
             <p className="m-0 mt-2 max-w-[340px] text-[13px] leading-[1.45] text-ink-2">
               {stage === 'explaining' ? 'Measured. Gemini is writing the explanation now.' : 'Most of the wait is the measurement engine reading every photo.'} You can leave; it keeps going and the result lands in {sample ? 'Progress' : 'Home'}.
             </p>

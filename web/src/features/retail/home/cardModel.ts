@@ -1,4 +1,4 @@
-import { ArrowRightLeft, CheckCircle2, CircleDashed, Clock, Layers, Megaphone, Sparkles, TrendingUp, TriangleAlert, Users, type LucideIcon } from 'lucide-react'
+import { ArrowRightLeft, Boxes, CheckCircle2, CircleDashed, Clock, Layers, Megaphone, Sparkles, TrendingUp, TriangleAlert, Users, type LucideIcon } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
 import type { CardKind, DecisionCard } from '../decisions'
@@ -20,6 +20,7 @@ export const KIND_ICON: Record<CardKind, { icon: LucideIcon; tone: string }> = {
   demand_shift: { icon: TrendingUp, tone: 'bg-sunken text-ink' },
   campaign_result: { icon: Sparkles, tone: 'bg-proof-leaf-soft text-proof-leaf' },
   auto_proposal: { icon: Megaphone, tone: 'bg-sunken text-ink' },
+  range_call: { icon: Boxes, tone: 'bg-sunken text-ink' },
 }
 
 
@@ -41,6 +42,7 @@ export function askAboutCard(c: Pick<DecisionCard, 'kind' | 'title' | 'product'>
     unmet_group: `${c.title}: which products come closest for this group?`,
     demand_shift: `${c.title}: which products serve this goal best?`,
     losing_switchers: `Which brands do people switch to from ${what}, and why might that be?`,
+    range_call: `How does ${what} compare with others in its category on visible change and continuation?`,
   }
   return (q[c.kind] ?? `Tell me more about this: ${c.title}`).slice(0, 300)
 }

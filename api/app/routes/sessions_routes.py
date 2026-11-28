@@ -12,6 +12,7 @@ from app import (
     changes,
     changes_ai,
     engine,
+    engine_gate,
     limits,
     metric_story,
     sessions,
@@ -403,6 +404,30 @@ def analyze_session(
         raise HTTPException(exc.status, {"code": exc.code, "message": exc.public_message}) from exc
     except analysis.SessionGone as exc:
         raise _not_found() from exc
+    except engine_gate.InLine as exc:
+        # Still in line when this request's wait ran out (app/engine_gate.py): put the session
+        # back as it was and say so. The web re-reads and asks again on a 409 conflict, keeping
+        # its place (queue_since). Not a failure: no daily analysis spent, nothing marked failed.
+        # The shown place is cleared: out of this request's line, it is no longer true.
+        limits.refund(store, uid, "analyze")
+        store.session_update(
+            uid,
+            session_id,
+            {
+                **(before or {"status": doc["status"], "error": doc.get("error"), "stage": None}),
+                "queue": None,
+            },
+        )
+        raise HTTPException(
+            409,
+            {
+                "code": "conflict",
+                "message": "In line for the measurement engine; asking again keeps your place.",
+                "queued": True,
+                "position": exc.position,
+                "eta_s": exc.eta_s,
+            },
+        ) from exc
     except Exception as exc:
         # Anything else (token minting, Firestore, a malformed engine answer): never leave the
         # session "processing" for minutes; mark it failed so "Try again" works at once.

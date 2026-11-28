@@ -25,6 +25,9 @@
       // Willow Proof in its dark theme: paint the page dark before the app loads (no white flash on refresh).
       try {
         if (location.pathname.indexOf('/retail') === 0) {
+          // Proof by Willow's own tab icon (lib/favicon.ts keeps it in step after load)
+          document.querySelectorAll('link[rel="icon"]').forEach(function (l) { l.href = '/proof-favicon-' + l.sizes.value.split('x')[0] + '.png' })
+          document.querySelector('link[rel="apple-touch-icon"]').href = '/proof-apple-touch-icon.png'
           var t = localStorage.getItem('willow.proof.theme')
           if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('proof-boot-dark')
         }

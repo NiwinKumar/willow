@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" role="img" aria-labelledby="t d">
+<title id="t">The check-in image pipeline</title><desc id="d">From five photos to eleven readings judged against the person's own noise band, then explained by Gemini.</desc>
+<defs>
+<style>@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap');</style>
+<linearGradient id="gGCP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A9BFF"/><stop offset="1" stop-color="#2F6FE4"/></linearGradient>
+<linearGradient id="gFB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC52E"/><stop offset="1" stop-color="#FF8A00"/></linearGradient>
+<linearGradient id="gGem" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3D7BFF"/><stop offset=".55" stop-color="#7A5CFF"/><stop offset="1" stop-color="#F25FA8"/></linearGradient>
+<linearGradient id="gAI" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6A4DF5"/><stop offset="1" stop-color="#D9479A"/></linearGradient>
+<linearGradient id="gTile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232326"/><stop offset="1" stop-color="#050505"/></linearGradient>
+<radialGradient id="gBud" cx="50%" cy="72%" r="60%"><stop offset="0" stop-color="#FF6B4A"/><stop offset=".55" stop-color="#F25FA8"/><stop offset="1" stop-color="#C9A8FF"/></radialGradient>
+<filter id="bSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter>
+<filter id="bSofter" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="0.9"/></filter>
+<filter id="bHair" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="0.4"/></filter>
+<filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#121212" flood-opacity=".06"/></filter>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+<marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0.6 0.8L9 5 0.6 9.2z" fill="rgba(18,18,18,.62)"/></marker>
+<marker id="ahs" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0.6 0.8L9 5 0.6 9.2z" fill="rgba(18,18,18,.62)"/></marker>
+<marker id="ahL" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0.6 0.8L9 5 0.6 9.2z" fill="#226B37"/></marker>
+<pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r="1" fill="rgba(18,18,18,.07)"/></pattern>
+</defs>
+<rect width="1920" height="1080" fill="#F5F4F0"/>
+<g opacity=".28" filter="url(#glow)"><circle cx="1850" cy="30" r="110" fill="#D8B8FF"/><circle cx="1720" cy="0" r="70" fill="#FFB27A"/></g>
+<g transform="translate(64,48) scale(0.9375)"><rect width="64" height="64" rx="32" fill="#FFFFFF" stroke="rgba(18,18,18,.10)" stroke-width="1.5"/><rect x="31" y="35" width="2.2" height="22" rx="1.1" fill="#6FAE9C" filter="url(#bHair)"/><ellipse cx="39.5" cy="43.5" rx="8" ry="4.4" transform="rotate(-35 39.5 43.5)" fill="#86C5B0" filter="url(#bSofter)"/><path d="M32 9c7.6 0 13 5.6 13 14.2 0 8.3-5.8 14.3-13 14.3s-13-6-13-14.3C19 14.6 24.4 9 32 9z" fill="url(#gBud)" filter="url(#bSoft)"/></g>
+<text x="144" y="66" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13" font-weight="500" fill="#5E5B56" text-anchor="start" letter-spacing="0.1em">HOW WILLOW WORKS  ·  1 OF 5</text>
+<text x="142" y="110" font-family="'Instrument Serif', 'Iowan Old Style', Georgia, serif" font-size="46" font-weight="400" fill="#121212" text-anchor="start">The check-in image pipeline</text>
+<text x="144" y="142" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="1100">Photos in, eleven readings out, each judged against your own noise band. Gemini only writes the words.</text>
+<text x="1856" y="98" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="300" fill="#121212" text-anchor="end">40.8 s</text>
+<text x="1856" y="122" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="end">median face check-in</text>
+<text x="1664.0" y="98" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="300" fill="#121212" text-anchor="end">11</text>
+<text x="1664.0" y="122" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="end">readings</text>
+<text x="1558.4" y="98" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="34" font-weight="300" fill="#121212" text-anchor="end">478</text>
+<text x="1558.4" y="122" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="400" fill="#5E5B56" text-anchor="end">face landmarks</text>
+<rect x="64" y="176" width="732" height="236" rx="26" fill="#FFF3EC" stroke="rgba(255,107,74,.22)" stroke-width="1.2" />
+<text x="88" y="213" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#E8552F" text-anchor="start" letter-spacing="0.1em">IN THE BROWSER AND THE API</text>
+<rect x="820" y="176" width="1036" height="236" rx="26" fill="#EDF2FF" stroke="rgba(61,123,255,.22)" stroke-width="1.2" />
+<text x="844" y="213" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#2F6FE4" text-anchor="start" letter-spacing="0.1em">IN THE ENGINE  ·  CLOUD RUN, PRIVATE</text>
+<rect x="80" y="234" width="214" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="96" y="250" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(103.92,257.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.6" width="11" height="18.8" rx="2.6"/><circle cx="12" cy="10.5" r="3"/><path d="M10.5 18.2h3"/></g>
+<text x="144" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="136">Capture</text>
+<rect x="222.4" y="224" width="55.6" height="20" rx="10" fill="#FFEDE2"/>
+<text x="230.4" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#A84300" text-anchor="start" letter-spacing="0.05em">PERSON</text>
+<text x="96" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">5 photos for a baseline,</text>
+<text x="96" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">3 for each check-in; cues</text>
+<text x="96" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">for light, framing, hold</text>
+<circle cx="82" cy="236" r="17" fill="#FFFFFF"/><circle cx="82" cy="236" r="14" fill="#E8552F"/>
+<text x="82" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">1</text>
+<rect x="322" y="234" width="214" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<path d="M356.00,250.00 L371.59,259.00 L371.59,277.00 L356.00,286.00 L340.41,277.00 L340.41,259.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="3.24" stroke-linejoin="round"/>
+<g transform="translate(347.00,259.00) scale(0.7500)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="4.6" rx="1.4"/><rect x="4" y="9.7" width="16" height="4.6" rx="1.4"/><rect x="4" y="15.4" width="16" height="4.6" rx="1.4"/><path d="M7 6.3h.01M7 12h.01M7 17.7h.01" stroke-width="2.6"/></g>
+<text x="386" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="136">Signed upload</text>
+<rect x="477.6" y="224" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="485.6" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="338" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">straight to Cloud Storage</text>
+<text x="338" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">on a V4 signed URL;</text>
+<text x="338" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">deleted after 30 days</text>
+<circle cx="324" cy="236" r="17" fill="#FFFFFF"/><circle cx="324" cy="236" r="14" fill="#E8552F"/>
+<text x="324" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">2</text>
+<rect x="564" y="234" width="214" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<path d="M598.00,250.00 L613.59,259.00 L613.59,277.00 L598.00,286.00 L582.41,277.00 L582.41,259.00 Z" fill="url(#gGCP)" stroke="url(#gGCP)" stroke-width="3.24" stroke-linejoin="round"/>
+<g transform="translate(589.00,259.00) scale(0.7500)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l5.5 5.5-5.5 5.5M12.5 6.5l5.5 5.5-5.5 5.5"/></g>
+<text x="628" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="136">Analyze</text>
+<rect x="719.6" y="224" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="727.6" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="580" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">api checks token and caps,</text>
+<text x="580" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">waits for an engine slot,</text>
+<text x="580" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="184">calls it with an ID token</text>
+<circle cx="566" cy="236" r="17" fill="#FFFFFF"/><circle cx="566" cy="236" r="14" fill="#E8552F"/>
+<text x="566" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">3</text>
+<rect x="836" y="234" width="230" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="852" y="250" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(859.92,257.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8.2L12 4.4l7.5 3.8-7.5 3.8z"/><path d="M4.5 12.4l7.5 3.8 7.5-3.8M4.5 16.4l7.5 3.8 7.5-3.8"/></g>
+<text x="900" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="152">Decode and colour</text>
+<rect x="1007.6" y="224" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="1015.6" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="852" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">JPEG, HEIC: linear sRGB;</text>
+<text x="852" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">RAW: a card or white paper</text>
+<text x="852" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">corrects colour; then Lab</text>
+<circle cx="838" cy="236" r="17" fill="#FFFFFF"/><circle cx="838" cy="236" r="14" fill="#2F6FE4"/>
+<text x="838" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">4</text>
+<rect x="1094" y="234" width="230" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="1110" y="250" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(1117.92,257.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c4.1 0 6.8 3.5 6.8 8.3 0 5.1-3.1 9.9-6.8 9.9s-6.8-4.8-6.8-9.9C5.2 6.3 7.9 2.8 12 2.8z"/><path d="M9.2 9.6L12 7.2l2.8 2.4M9.2 9.6l2.8 4 2.8-4M9.2 9.6l-.2 6.2 3 1.9 3-1.9-.2-6.2M12 13.6v4.1" stroke-width="1.3"/></g>
+<text x="1158" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="152">Face landmarks</text>
+<rect x="1265.6" y="224" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="1273.6" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="1110" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">MediaPipe, 478 points;</text>
+<text x="1110" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">regions as mesh polygons;</text>
+<text x="1110" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">front view: turn ≤ 15°</text>
+<circle cx="1096" cy="236" r="17" fill="#FFFFFF"/><circle cx="1096" cy="236" r="14" fill="#2F6FE4"/>
+<text x="1096" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">5</text>
+<rect x="1352" y="234" width="230" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="1368" y="250" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(1375.92,257.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.2 3v5.2c0 4.5-3 8.3-7.2 9.8-4.2-1.5-7.2-5.3-7.2-9.8V6z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></g>
+<text x="1416" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="152">Quality gates</text>
+<rect x="1523.6" y="224" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="1531.6" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="1368" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">blurry · over- or under-</text>
+<text x="1368" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">exposed (&gt; 2% clipped) ·</text>
+<text x="1368" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">pose · hand over face</text>
+<circle cx="1354" cy="236" r="17" fill="#FFFFFF"/><circle cx="1354" cy="236" r="14" fill="#2F6FE4"/>
+<text x="1354" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">6</text>
+<rect x="1610" y="234" width="230" height="160" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="1626" y="250" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(1633.92,257.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6.5h10M10 12h10M10 17.5h10M3.6 6.5l1.4 1.4 2.6-2.6M3.6 12l1.4 1.4 2.6-2.6M3.6 17.5l1.4 1.4 2.6-2.6"/></g>
+<text x="1674" y="274" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="152">Skin mask</text>
+<rect x="1781.6" y="224" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="1789.6" y="238.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="1626" y="310" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">eyes, brows, lips, nostrils</text>
+<text x="1626" y="330" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">cut; hair by black-hat;</text>
+<text x="1626" y="350" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="200">glare &gt; p99, shadow &lt; p1</text>
+<circle cx="1612" cy="236" r="17" fill="#FFFFFF"/><circle cx="1612" cy="236" r="14" fill="#2F6FE4"/>
+<text x="1612" y="241.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">7</text>
+<path d="M299,314.0 L315,314.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M541,314.0 L557,314.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1071,314.0 L1087,314.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1329,314.0 L1345,314.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1587,314.0 L1603,314.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M783,314.0 L829,314.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="64" y="438" width="1792" height="286" rx="26" fill="#EDF2FF" stroke="rgba(61,123,255,.22)" stroke-width="1.2" />
+<text x="88" y="475" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#2F6FE4" text-anchor="start" letter-spacing="0.1em">ELEVEN READINGS, MEASURED ON EVERY USABLE PHOTO</text>
+<text x="1832" y="475" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="500" fill="#2F6FE4" text-anchor="end" letter-spacing="0.06em">THRESHOLDS ARE RELATIVE TO YOUR OWN SKIN</text>
+<rect x="80.0" y="496" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="94.0" y="511" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="110.0" y="521" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Skin tone · ITA°</text>
+<text x="110.0" y="542" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">atan2(L* − 50, b*) per cheek; descriptive, never ranked</text>
+<rect x="524.0" y="496" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="538.0" y="511" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="554.0" y="521" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Redness</text>
+<text x="554.0" y="542" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">mean of the regions’ median a* on cheeks and nose</text>
+<rect x="968.0" y="496" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="982.0" y="511" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="998.0" y="521" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Tone evenness</text>
+<text x="998.0" y="542" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">spread of region L*, plus melanin index within regions</text>
+<rect x="1412.0" y="496" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="1426.0" y="511" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="1442.0" y="521" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Dark spots</text>
+<text x="1442.0" y="542" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">darker than your own skin nearby; seen in 2+ photos</text>
+<rect x="80.0" y="570" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="94.0" y="585" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="110.0" y="595" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Blemishes</text>
+<text x="110.0" y="616" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">round, redder than your skin nearby; crops kept</text>
+<rect x="524.0" y="570" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="538.0" y="585" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="554.0" y="595" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Pores · close-up</text>
+<text x="554.0" y="616" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">dark blobs 0.05–0.3 mm per cm²; the iris sets scale</text>
+<rect x="968.0" y="570" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="982.0" y="585" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="998.0" y="595" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Texture · close-up</text>
+<text x="998.0" y="616" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">RMS Laplacian of L* at 0.4 mm, divided by mean L*</text>
+<rect x="1412.0" y="570" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="1426.0" y="585" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="1442.0" y="595" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Under-eye</text>
+<text x="1442.0" y="616" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">under-eye L* minus the same side’s cheek L*</text>
+<rect x="80.0" y="644" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="94.0" y="659" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="110.0" y="669" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Lines</text>
+<text x="110.0" y="690" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">Hessian ridges 0.6–1 mm, at least 5 mm long; mm per cm²</text>
+<rect x="524.0" y="644" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="538.0" y="659" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="554.0" y="669" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Shine</text>
+<text x="554.0" y="690" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">share of the T-zone brighter and greyer than skin nearby</text>
+<rect x="968.0" y="644" width="428.0" height="62" rx="14" fill="#FFFFFF" stroke="rgba(18,18,18,.08)"/>
+<rect x="982.0" y="659" width="4" height="32" rx="2" fill="#2F6FE4" opacity=".55"/>
+<text x="998.0" y="669" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start" data-maxw="384.0">Glow</text>
+<text x="998.0" y="690" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="384.0">cheek L*, chroma and smoothness; your change only</text>
+<rect x="1412.0" y="644" width="428.0" height="62" rx="14" fill="none" stroke="rgba(47,111,228,.4)" stroke-dasharray="5 5"/>
+<text x="1430.0" y="669" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#121212" text-anchor="start">Same for every skin tone</text>
+<text x="1430.0" y="690" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="398.0">spot thresholds scale with your own lightness</text>
+<path d="M1725.0,399 L1725.0,432" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="64" y="750" width="1100" height="280" rx="26" fill="#E8F3EC" stroke="rgba(46,139,71,.24)" stroke-width="1.2" />
+<text x="88" y="787" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#226B37" text-anchor="start" letter-spacing="0.1em">JUDGE AGAINST YOUR OWN NORMAL RANGE</text>
+<text x="1140" y="787" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="500" fill="#226B37" text-anchor="end" letter-spacing="0.06em">ROOM-LIGHT FLOOR: 35% → 7% FALSE CHANGES</text>
+<rect x="1188" y="750" width="668" height="280" rx="26" fill="#F2EEFF" stroke="rgba(122,92,255,.22)" stroke-width="1.2" />
+<text x="1212" y="787" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="13.5" font-weight="500" fill="#6A4DF5" text-anchor="start" letter-spacing="0.1em">THEN GEMINI WRITES THE WORDS</text>
+<rect x="80" y="808" width="334" height="206" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="96" y="824" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(103.92,831.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19v-7M12 19V5.5M18 19v-4.5M3.5 19.5h17"/></g>
+<text x="144" y="848" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="256">Photo to session</text>
+<rect x="355.6" y="798" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="363.6" y="812.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="96" y="884" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">each reading on every photo that</text>
+<text x="96" y="904" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">passed the gates: mean and SD;</text>
+<text x="96" y="924" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">the sharpest front photo is the</text>
+<text x="96" y="944" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">reference for spots and crops;</text>
+<text x="96" y="964" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">outputs: preview, redness</text>
+<text x="96" y="984" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">overlay, spot crops</text>
+<circle cx="82" cy="810" r="17" fill="#FFFFFF"/><circle cx="82" cy="810" r="14" fill="#226B37"/>
+<text x="82" y="815.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">8</text>
+<rect x="445" y="808" width="334" height="206" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="461" y="824" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(468.92,831.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19.5v-6M12 19.5V9M19 19.5V4.5" stroke-width="3"/></g>
+<text x="509" y="848" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="256">Noise band (MDC95)</text>
+<rect x="720.6" y="798" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="728.6" y="812.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="461" y="884" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="14.0" font-weight="400" fill="#121212" text-anchor="start" data-maxw="304">max(1.96·√2·sd, t·sd·√(1 + 1/n))</text>
+<text x="461" y="904" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">t at 0.975 with n − 1; needs 3+</text>
+<text x="461" y="924" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">usable photos, else no band;</text>
+<text x="461" y="944" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">colour and light readings:</text>
+<text x="461" y="964" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="14.0" font-weight="400" fill="#121212" text-anchor="start" data-maxw="304">band = max(mdc95, floor)</text>
+<text x="461" y="984" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">the floor from a room-light test</text>
+<circle cx="447" cy="810" r="17" fill="#FFFFFF"/><circle cx="447" cy="810" r="14" fill="#226B37"/>
+<text x="447" y="815.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">9</text>
+<rect x="810" y="808" width="334" height="206" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="826" y="824" width="36" height="36" rx="9.4" fill="#121212"/>
+<g transform="translate(833.92,831.92) scale(0.8400)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6.5h10M10 12h10M10 17.5h10M3.6 6.5l1.4 1.4 2.6-2.6M3.6 12l1.4 1.4 2.6-2.6M3.6 17.5l1.4 1.4 2.6-2.6"/></g>
+<text x="874" y="848" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="256">Verdict</text>
+<rect x="1085.6" y="798" width="42.4" height="20" rx="10" fill="#EEEDE9"/>
+<text x="1093.6" y="812.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#4A4741" text-anchor="start" letter-spacing="0.05em">CODE</text>
+<text x="826" y="884" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">|change| &gt; band: Improved, or</text>
+<text x="826" y="904" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">Moved the other way; tone only</text>
+<text x="826" y="924" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">Shifted. Else Within normal</text>
+<text x="826" y="944" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">range. No band yet: no verdict.</text>
+<text x="826" y="964" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">Each face area is compared</text>
+<text x="826" y="984" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="304">too, on its own band</text>
+<circle cx="812" cy="810" r="17" fill="#FFFFFF"/><circle cx="812" cy="810" r="14" fill="#226B37"/>
+<text x="812" y="815.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">10</text>
+<rect x="1204" y="808" width="304" height="206" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="1220" y="824" width="36" height="36" rx="9.4" fill="#FFFFFF" stroke="rgba(18,18,18,.14)"/>
+<path d="M12 2C12.6 7.4 16.6 11.4 22 12C16.6 12.6 12.6 16.6 12 22C11.4 16.6 7.4 12.6 2 12C7.4 11.4 11.4 7.4 12 2Z" fill="url(#gGem)" transform="translate(1226.12,830.12) scale(0.9900)"/>
+<text x="1268" y="848" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="226">Gemini explains</text>
+<rect x="1462.8" y="798" width="29.2" height="20" rx="10" fill="#EEE9FF"/>
+<text x="1470.8" y="812.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#5536D6" text-anchor="start" letter-spacing="0.05em">AI</text>
+<text x="1220" y="884" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">gets the numbers as shown; any</text>
+<text x="1220" y="904" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">other number, disease word or</text>
+<text x="1220" y="924" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">“worse” rejects it; change words</text>
+<text x="1220" y="944" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">only for a real change; a Flash-</text>
+<text x="1220" y="964" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">Lite retry, then a fixed template;</text>
+<text x="1220" y="984" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">35 s budget after the engine</text>
+<circle cx="1206" cy="810" r="17" fill="#FFFFFF"/><circle cx="1206" cy="810" r="14" fill="#6A4DF5"/>
+<text x="1206" y="815.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">11</text>
+<rect x="1536" y="808" width="304" height="206" rx="16" fill="#FFFFFF" stroke="rgba(18,18,18,.08)" filter="url(#shadow)"/>
+<rect x="1552" y="824" width="36" height="36" rx="9.4" fill="#FFFFFF" stroke="rgba(18,18,18,.14)"/>
+<path d="M12 2C12.6 7.4 16.6 11.4 22 12C16.6 12.6 12.6 16.6 12 22C11.4 16.6 7.4 12.6 2 12C7.4 11.4 11.4 7.4 12 2Z" fill="url(#gGem)" transform="translate(1558.12,830.12) scale(0.9900)"/>
+<rect x="1576.4" y="848.4" width="16.6" height="16.6" rx="5.0" fill="#121212" stroke="#FFFFFF" stroke-width="2"/>
+<g transform="translate(1579.55,851.55) scale(0.4278)" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c4.1 0 6.8 3.5 6.8 8.3 0 5.1-3.1 9.9-6.8 9.9s-6.8-4.8-6.8-9.9C5.2 6.3 7.9 2.8 12 2.8z"/><path d="M9.2 9.6L12 7.2l2.8 2.4M9.2 9.6l2.8 4 2.8-4M9.2 9.6l-.2 6.2 3 1.9 3-1.9-.2-6.2M12 13.6v4.1" stroke-width="1.3"/></g>
+<text x="1600" y="848" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#121212" text-anchor="start" data-maxw="226">Spot labels</text>
+<rect x="1794.8" y="798" width="29.2" height="20" rx="10" fill="#EEE9FF"/>
+<text x="1802.8" y="812.2" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="11" font-weight="600" fill="#5536D6" text-anchor="start" letter-spacing="0.05em">AI</text>
+<text x="1552" y="884" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">up to 20 crops with context,</text>
+<text x="1552" y="904" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">each asked twice in a different</text>
+<text x="1552" y="924" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">order; kept only if both agree</text>
+<text x="1552" y="944" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">and neither is low confidence;</text>
+<text x="1552" y="964" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">shown as AI-suggested; moles</text>
+<text x="1552" y="984" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.5" font-weight="400" fill="#5E5B56" text-anchor="start" data-maxw="274">are never counted or ringed</text>
+<circle cx="1538" cy="810" r="17" fill="#FFFFFF"/><circle cx="1538" cy="810" r="14" fill="#6A4DF5"/>
+<text x="1538" y="815.32" font-family="Outfit, 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14.700000000000001" font-weight="600" fill="#FFFFFF" text-anchor="middle">12</text>
+<path d="M419,911.0 L438,911.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M784,911.0 L803,911.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1149,911.0 L1197,911.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1513,911.0 L1529,911.0" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M247.0,729 L247.0,744" fill="none" stroke="rgba(18,18,18,.55)" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<text x="64" y="1056" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="400" fill="#67635D" text-anchor="start" letter-spacing="0.04em">Engine 0.4.3 · sources: docs/METRICS.md, docs/CONTRACT.md, engine/app/config.py, docs/GEMINI_SPEC.md, web/src/data/evidence.json</text>
+</svg>

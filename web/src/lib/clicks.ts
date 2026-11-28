@@ -11,8 +11,11 @@ import { useAuth } from './useAuth'
 export type ClickSurface = 'product_sheet' | 'wisp' | 'plan' | 'sponsored'
 export type StoreClick = { product_id: string; store: string; surface: ClickSurface }
 
-/** The disclosure that sits near every group of store links (the Terms say the same). */
-export const COMMISSION_NOTE = 'We may earn a commission if you buy through these links.'
+/**
+ * The disclosure that sits near every group of store links (the Terms say the same). True of the catalog: no store
+ * link carries an affiliate code (api/seed/products.json), so Willow earns nothing from a purchase.
+ */
+export const COMMISSION_NOTE = 'Plain store links: Willow earns nothing if you buy through them.'
 
 /** Send one click. Never throws. */
 export function recordClick(getToken: () => Promise<string>, click: StoreClick): void {

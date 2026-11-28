@@ -108,3 +108,67 @@ def test_an_answer_whose_translation_failed_stays_english_throughout(monkeypatch
     translate._cache.clear()
     reply = {"message": "Steady", "blocks": [{"type": "answer", "text": "Steady by 2"}]}
     assert translate.wisp_reply(reply, "zh") is reply  # no lang, no labels: one language
+
+
+# --- The language a question is written in (no picker: Wisp answers in kind, Nov 28) ----------
+
+
+def test_each_language_is_told_from_how_the_question_is_written():
+    asked = {
+        "en": "Can I use this serum with my retinol at night?",
+        "hi": "क्या मैं यह सीरम रात में लगा सकती हूँ?",
+        "ta": "இந்த சீரத்தை இரவில் பயன்படுத்தலாமா?",
+        "zh": "我晚上可以用这个精华吗？",
+        "ja": "この美容液は夜に使えますか？",
+        "ko": "이 세럼을 밤에 써도 되나요?",
+        "th": "ใช้เซรั่มนี้ตอนกลางคืนได้ไหม",
+        "vi": "Tôi có thể dùng serum này vào buổi tối không?",
+        "id": "Apakah saya bisa pakai serum ini di malam hari?",
+        "ms": "Boleh tak saya guna serum ini selepas mandi?",
+        "tl": "Pwede ko bang gamitin ang serum na ito sa gabi?",
+    }
+    assert {code: translate.detect(q) for code, q in asked.items()} == {c: c for c in asked}
+    assert translate.detect("Mình nên dùng gì?") == "vi"  # few marks of its own: its words
+
+
+def test_a_question_that_cannot_tell_keeps_the_apps_language():
+    assert translate.detect("ok", fallback="zh") == "zh"
+    assert translate.detect("CeraVe PM?", fallback="hi") == "hi"
+    assert translate.detect("", fallback="ta") == "ta"
+    assert translate.detect("ok") == "en"
+
+
+def test_english_product_names_inside_another_language_do_not_make_it_english():
+    q = "क्या मैं CeraVe PM Facial Moisturizing Lotion रात में लगा सकती हूँ?"
+    assert translate.detect(q) == "hi"
+    assert translate.detect("这个CeraVe PM lotion适合晚上用吗") == "zh"
+    assert translate.detect("Is 雪花秀 good for my redness?", fallback="zh") == "en"
+
+
+def test_a_language_willow_does_not_answer_in_reads_as_english():
+    assert translate.detect("Можно ли использовать эту сыворотку ночью?", fallback="hi") == "en"
+    assert translate.detect("Can you answer in Hindi?") == "en"  # the word, not the language
+
+
+def test_the_answer_comes_back_in_the_language_of_the_question(client, fake, monkeypatch):
+    from app import advisor
+    from tests.test_advisor import _fake_model
+
+    english = {"message": "Use it at night.", "product_ids": [], "follow_up_suggestions": []}
+    _fake_model(monkeypatch, [], english)
+
+    def answer(prompt_id, contents, schema, **kw):
+        if schema is translate._Out:
+            return schema(texts=["晚上使用。"])
+        return advisor.Reply.model_validate(english)
+
+    monkeypatch.setattr(translate.gemini, "generate_json", answer)
+    translate._cache.clear()
+    ask = {"messages": [{"role": "user", "text": "我晚上可以用吗？"}]}
+    # the question's language wins over the app's (X-Willow-Lang)
+    res = client.post("/v1/advisor/chat", json=ask, headers={"X-Willow-Lang": "hi"})
+    assert res.status_code == 200, res.text
+    assert res.json()["lang"] == "zh" and res.json()["message"] == "晚上使用。"
+    ask = {"messages": [{"role": "user", "text": "Can I use it at night?"}]}
+    res = client.post("/v1/advisor/chat", json=ask, headers={"X-Willow-Lang": "zh"})
+    assert "lang" not in res.json() and res.json()["message"] == "Use it at night."
