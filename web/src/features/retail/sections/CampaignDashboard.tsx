@@ -489,13 +489,13 @@ function Works({ d, productTo }: { d: ProductDetail; productTo: string }) {
           <BlobRadial
             axes={segs.map((g) => g.label)}
             layers={[
-              ...(withBase ? [{ id: 'base', label: 'Non-users, same goals', tone: 'grey' as const, values: segs.map((g) => (g.base_rate ?? 0) / peak) }] : []),
+              ...(withBase ? [{ id: 'base', label: 'Same goals, not using it', tone: 'grey' as const, values: segs.map((g) => (g.base_rate ?? 0) / peak) }] : []),
               { id: 'users', label: 'People using it', tone: 'leaf' as const, values: segs.map((g) => (g.rate ?? 0) / peak) },
             ]}
             rings={[pct(peak), pct(peak / 2)]}
             centre={String(p.n ?? '')}
             centreCaption="people measured"
-            caption={`Share of people with a visible change by week 8, by ${by.name}, for the product and for non-users with the same goals`}
+            caption={`Share of people with a visible change by week 8, by ${by.name}, for the product and for people with the same goals not using it (changed anyway)`}
             format={(v) => pct(v * peak)}
             compact
           />
@@ -507,7 +507,7 @@ function Works({ d, productTo }: { d: ProductDetail; productTo: string }) {
             {withBase ? (
               <li className="inline-flex items-center gap-2">
                 <span aria-hidden className="size-2.5 rounded-full bg-[var(--pf-base)]" />
-                Non-users, same goals
+                Same goals, not using it
               </li>
             ) : null}
           </ul>

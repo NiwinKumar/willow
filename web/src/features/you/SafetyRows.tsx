@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react'
 import { useState } from 'react'
 
 import { useOwner } from '../../data/hooks'
@@ -14,12 +15,12 @@ const yesNo = (v: boolean | null) => (v === null ? 'Not answered' : v ? 'Yes' : 
 
 function summary(s: SafetyProfile): { k: string; v: string }[] {
   return [
-    { k: 'Pregnancy and breastfeeding', v: LIFE_STAGES.find((l) => l.id === s.life_stage)?.label ?? 'Not answered' },
+    { k: 'Pregnancy', v: LIFE_STAGES.find((l) => l.id === s.life_stage)?.label ?? 'Not answered' },
     { k: 'Avoid', v: s.avoid.length ? s.avoid.map((a) => AVOID_OPTIONS.find((o) => o.id === a)?.label ?? a).join(', ') : 'Nothing' },
     { k: 'Reacted to before', v: s.avoid_ingredients.length ? s.avoid_ingredients.join(', ') : 'Nothing added' },
     { k: 'Your note', v: s.note ? (s.note.length > 90 ? `${s.note.slice(0, 90).trimEnd()}…` : s.note) : 'None' },
     { k: 'Reacts easily', v: yesNo(s.reactive) },
-    { k: 'Prescription skin treatment', v: yesNo(s.rx_treatment) },
+    { k: 'Prescription treatment', v: yesNo(s.rx_treatment) },
     { k: 'Where you buy', v: MARKETS.find((m) => m.id === s.market)?.label ?? 'Not answered' },
   ]
 }
@@ -37,7 +38,15 @@ export function SafetyRows() {
       <Row
         stack
         label="Your answers"
-        hint="Every product is checked against these with fixed rules from published sources. They never change a measurement."
+        hint="Products are checked against these with fixed rules from published sources."
+        action={
+          s && !editing && safety.status === 'ready' ? (
+            <button type="button" onClick={() => setEditing(true)} className="hit44 inline-flex min-h-9 items-center gap-1.5 rounded-pill bg-sunken px-3.5 text-[13px] transition-[background-color,scale] duration-200 ease-standard hover:bg-muted active:scale-[.97]">
+              <Pencil size={13} strokeWidth={1.8} aria-hidden />
+              Edit
+            </button>
+          ) : null
+        }
       >
         {safety.status === 'loading' || safety.status === 'idle' ? (
           <span aria-busy className="skeleton block h-20 rounded-[16px]" />
@@ -55,19 +64,15 @@ export function SafetyRows() {
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-3" style={{ animation: 'wFadeIn .3s both' }}>
-            <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[14px]">
-              {summary(s).map((r) => (
-                <div key={r.k} className="contents">
-                  <dt className="text-ink-2">{r.k}</dt>
-                  <dd className="m-0">{r.v}</dd>
-                </div>
-              ))}
-            </dl>
-            <button type="button" onClick={() => setEditing(true)} className={`${outline} self-start`}>
-              Edit answers
-            </button>
-          </div>
+          // A compact sheet of answers: label over value, tiles that fill the width (two on a phone).
+          <dl className="m-0 grid grid-cols-2 gap-1.5 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]" style={{ animation: 'wFadeIn .3s both' }}>
+            {summary(s).map((r) => (
+              <div key={r.k} className="flex min-w-0 flex-col gap-0.5 rounded-[16px] bg-sunken/70 px-3 py-2.5">
+                <dt className="text-[12px] text-ink-2">{r.k}</dt>
+                <dd className="m-0 text-[14px] leading-snug [overflow-wrap:anywhere]">{r.v}</dd>
+              </div>
+            ))}
+          </dl>
         )}
       </Row>
       <ReactionsRow setAside={s?.avoid_products.length ?? 0} />

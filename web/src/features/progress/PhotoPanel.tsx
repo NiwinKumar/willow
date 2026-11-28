@@ -340,7 +340,7 @@ function RegionLayer({ regions, box, open, onPick }: { regions: RegionItem[]; bo
               strokeWidth={on ? 2.5 : 1.5}
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
-              className="cursor-pointer stroke-white outline-none transition-[fill] duration-200 hover:fill-white/20"
+              className="cursor-pointer stroke-white outline-none transition-[fill,stroke] duration-200 hover:fill-white/20 focus-visible:fill-white/25 focus-visible:stroke-[var(--focus-ring)] focus-visible:[stroke-width:3]"
             />
           </g>
         )

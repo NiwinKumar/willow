@@ -394,7 +394,8 @@ def test_bigquery_failure_after_expiry_serves_the_last_rows(monkeypatch):
 def test_stale_rows_are_served_at_once_while_one_refresh_runs(monkeypatch):
     import threading
 
-    old, new = _raw(), _raw()
+    old = _raw()
+    new = {**old, "users": old["users"][:-1]}  # a new export: the rows changed
     monkeypatch.setattr(retailer, "_raw", {"at": 0.0, "data": old, "version": 3})
     monkeypatch.setattr(retailer, "_views", {})
     gate, calls = threading.Event(), []

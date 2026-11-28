@@ -3,7 +3,7 @@ import type { RoutineEntry, Session } from '../../data/types'
 import { failureReasons, leftOutPhotos } from '../../lib/warnings'
 import { REASON_SHORT, dayOf, sessionState, usedFrames } from './model'
 
-export type Note = { day: string; text: string; dot: string; kind: 'routine' | 'baseline' | 'rejected' | 'note' | 'quality' }
+export type Note = { day: string; text: string; dot: string; kind: 'routine' | 'baseline' | 'rejected' | 'note' | 'quality' | 'changes' }
 
 export const NOTE_DOT = {
   routine: 'var(--willow-400)',
@@ -11,6 +11,7 @@ export const NOTE_DOT = {
   rejected: 'var(--aura-coral)',
   note: 'var(--action-primary)',
   quality: '#C9C6C0',
+  changes: 'var(--aura-lilac)',
 } as const
 
 export const productName = (e: RoutineEntry) => e.custom_name || [e.brand].filter(Boolean).join(' ') || 'a product'
@@ -28,6 +29,8 @@ export function sessionNotes(s: Session): Note[] {
   const left = leftOutPhotos(s.result)
   if (left) out.push({ day, kind: 'quality', dot: NOTE_DOT.quality, text: left })
   if (s.note) out.push({ day, kind: 'note', dot: NOTE_DOT.note, text: `“${s.note}”` })
+  // what else was different since the last check-in (the person's own answer)
+  if (s.changes?.words.length) out.push({ day, kind: 'changes', dot: NOTE_DOT.changes, text: `Noted: ${s.changes.words.join(', ')}` })
   return out
 }
 

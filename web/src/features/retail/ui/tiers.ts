@@ -5,7 +5,7 @@ export const TIERS: Record<ProofTier, { label: string; glyph: string; text: stri
   proven: {
     label: 'Proven',
     glyph: '●',
-    text: '30+ people, and the gap over people with the same goals not using it stays above zero across its 95% interval.',
+    text: '30+ people, the gap over people with the same goals not using it stays above zero across its 95% interval, and it passes the false-discovery check across all products tested. Observational: a campaign holdout is the causal test.',
     tone: 'text-proof-leaf',
   },
   promising: {

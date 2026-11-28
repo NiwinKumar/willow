@@ -313,7 +313,7 @@ def status() -> dict[str, Any]:
             "api": {"status": "ok", "version": __version__, "runtime": "Cloud Run, us-central1"},
             "gemini": {
                 "model": settings.gemini_model,
-                "endpoint": f"Vertex AI ({settings.vertex_location})",
+                "endpoint": f"Gemini Enterprise Agent Platform ({settings.vertex_location})",
             },
             "catalog": {"products": len(catalog.products())},
             "storage": {"bucket": settings.bucket},

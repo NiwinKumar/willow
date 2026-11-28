@@ -4,21 +4,25 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useShell, type AdvisorSeed } from '../../components/shell/ShellContext'
+import { LanguagePicker } from '../../components/willow/LanguagePicker'
 import { useRoutine, useRoutineCheck } from '../../data/hooks'
 import type { MetricId, Product, Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { fmtDate } from '../../lib/format'
 import { useAuth } from '../../lib/useAuth'
 import { useDemoStatus } from '../../lib/useDemoStatus'
-import type { AdvisorStage } from '../../lib/api'
+import { api, type AdvisorStage } from '../../lib/api'
 import { toJpegBase64 } from '../../lib/image'
+import { language, setLanguage, type LangCode } from '../../lib/language'
 import { useMediaQuery } from '../../lib/useMediaQuery'
+import { GOALS, METRIC_META } from '../../lib/metrics'
 import { verdictCounts } from '../../lib/verdict'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
-import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
+import { advisorToken, ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
+import { canRecord, markSpeakNext, prime, record, stopReading, useSpeaking } from './voice'
 import { useComposing, WispMark, wispState } from './Wisp'
 
 const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
@@ -51,6 +55,9 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
           </button>
         ) : null}
         {data.mode === 'live' ? <ContextChip /> : null}
+        <span className="ml-auto">
+          <LanguagePicker compact />
+        </span>
       </div>
       <Chat seed={seed} full={full} onExitFull={full ? onToggleFull : undefined} />
     </div>
@@ -147,6 +154,11 @@ function ContextRows({ dots, latest, products }: { dots: string[]; latest: Sessi
 }
 
 /** Starter questions from the person's own data (no numbers in them), else plain generic ones. */
+/**
+ * A new chat's suggestions, from the person's own data so each one leads to an insight: the latest check-in,
+ * the reading that moved most beyond its normal range, the routine check's clash and gap, a product being
+ * judged, and their goals. Shown in one scrolling row (SuggestionRow), up to six.
+ */
 function useStarters(): string[] {
   const data = useData()
   const routine = useRoutine()
@@ -154,17 +166,46 @@ function useStarters(): string[] {
   return useMemo(() => {
     const out: string[] = []
     const face = data.series('face_full')?.sessions.filter(usable).at(-1)
-    if (face && !face.is_baseline) out.push(verdictCounts(face).changed > 0 ? `What changed in my ${fmtDate(face.created_at)} face check-in?` : `What does my ${fmtDate(face.created_at)} face check-in show?`)
+    if (face && !face.is_baseline) out.push(verdictCounts(face).changed > 0 ? `What changed in my ${fmtDate(face.created_at)} check-in?` : `What does my ${fmtDate(face.created_at)} check-in show?`)
+    // the reading that moved most beyond its own normal range, in words
+    const moved = (face?.result?.metrics ?? [])
+      .filter((m) => m.id !== 'tone_ita' && m.verdict === 'real_change' && m.delta != null && m.mdc95)
+      .sort((a, b) => Math.abs(b.delta! / b.mdc95!) - Math.abs(a.delta! / a.mdc95!))[0]
+    if (moved && METRIC_META[moved.id]) out.push(`Why did my ${METRIC_META[moved.id].label.toLowerCase()} change?`)
     const findings = check.data && routine.data ? findingsOf(check.data, routine.data) : []
     const conflict = findings.find((f) => f.kind === 'Conflict')
     const gap = findings.find((f) => f.kind === 'Gap')
     if (conflict) out.push(conflict.question)
     if (gap) out.push(gap.question)
-    if (!conflict && (routine.data ?? []).filter((e) => !e.ended_at).length >= 2) out.push('Is my routine OK together?')
+    const active = (routine.data ?? []).filter((e) => !e.ended_at)
+    const judged = active.find((e) => e.custom_name)
+    if (judged?.custom_name) out.push(`Is ${judged.custom_name.split(' ').slice(0, 4).join(' ')} working for me?`)
+    if (!conflict && active.length >= 2) out.push('Is my routine OK together?')
+    const goal = GOALS.find((g) => data.goals.includes(g.id))
+    if (goal) out.push(`What helps most with ${goal.label.toLowerCase()}?`)
     out.push('How should I take my next photos?')
-    if (out.length < 3) out.push('What can you help me with?')
-    return out.slice(0, 4)
+    if (out.length < 4) out.push('What can you help me with?')
+    return [...new Set(out)].slice(0, 6)
   }, [data, routine.data, check.data])
+}
+
+/**
+ * Suggested questions in one row that scrolls sideways (soft edges where it continues), so they never take
+ * more than one line: a new chat's starters, or the latest answer's follow-ups.
+ */
+function SuggestionRow({ items, disabled, label }: { items: string[]; disabled: boolean; label: string }) {
+  if (!items.length) return null
+  return (
+    <div role="group" aria-label={label} className="w-full max-w-[756px]">
+      <div className="no-scrollbar flex snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain px-1.5 py-0.5 [mask-image:linear-gradient(90deg,transparent_0,#000_14px,#000_calc(100%-24px),transparent)]">
+        {items.map((t, i) => (
+          <button key={t} type="button" disabled={disabled} onClick={() => ask(t)} className="min-h-10 shrink-0 snap-start whitespace-nowrap rounded-pill border border-ink/[.08] bg-surface/90 px-4 text-[13px] backdrop-blur-[12px] transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white disabled:opacity-50" style={{ animation: `wRise .35s ${Math.min(i, 5) * 50}ms both` }}>
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: boolean; onExitFull?: () => void }) {
@@ -344,14 +385,13 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
       </div>
 
       <div className="relative z-[2] flex flex-none flex-col items-center gap-2.5 pt-1" style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}>
-        {!started && !capped ? (
-          <div className="flex flex-wrap justify-center gap-2">
-            {starters.map((t, i) => (
-              <button key={t} type="button" onClick={() => ask(t)} className="min-h-11 rounded-pill border border-ink/[.08] bg-surface/90 px-[18px] text-[13px] backdrop-blur-[12px] transition-transform hover:-translate-y-0.5" style={{ animation: `wRise .45s ${i * 70}ms both` }}>
-                {t}
-              </button>
-            ))}
-          </div>
+        {!capped ? (
+          !started ? (
+            <SuggestionRow items={starters} disabled={busy} label="Suggested questions" />
+          ) : last?.role === 'willow' && chat.phase === 'idle' ? (
+            // the latest answer's follow-ups (Gemini writes them to build on that answer), same row
+            <SuggestionRow key={last.id} items={last.reply.follow_up_suggestions} disabled={busy} label="Follow-up questions" />
+          ) : null
         ) : null}
         <Composer busy={busy} thinking={chat.phase === 'thinking'} capped={capped} />
       </div>
@@ -398,12 +438,6 @@ function Thinking({ stages }: { stages: AdvisorStage[] }) {
   )
 }
 
-type Recognition = { lang: string; interimResults: boolean; onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void; onend: () => void; onerror: () => void; start: () => void; stop: () => void }
-const SpeechRecognitionCtor = (): (new () => Recognition) | null => {
-  const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
-}
-
 /**
  * Which model answers: a small sparkle mark (drawn here, not the trademarked logo file), named for screen
  * readers. One model, so no picker.
@@ -442,7 +476,6 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
   const [listening, setListening] = useState(false)
   const [attach, setAttach] = useState<Attachment[]>([])
   const [reading, setReading] = useState(false)
-  const rec = useRef<Recognition | null>(null)
   const field = useRef<HTMLTextAreaElement>(null)
   // grow with the question, up to about seven lines (then it scrolls)
   useEffect(() => {
@@ -473,30 +506,50 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
     setReading(false)
     setAttach((a) => [...a, ...added].slice(0, MAX_PHOTOS))
   }
-  const canDictate = useMemo(() => SpeechRecognitionCtor() !== null, [])
+  // Talk to Wisp (voice.ts): Gemini hears the question in any language; the checked answer is read aloud.
+  const canTalk = useMemo(() => canRecord(), [])
+  const [hearing, setHearing] = useState(false)
+  const speaking = useSpeaking()
+  const recording = useRef<Awaited<ReturnType<typeof record>> | null>(null)
   const left = 1000 - draft.length
 
-  const toggleMic = () => {
-    if (listening) {
-      rec.current?.stop()
+  const toggleMic = async () => {
+    if (hearing) return
+    if (listening && recording.current) {
+      setListening(false)
+      setHearing(true)
+      try {
+        const audio = await recording.current.stop()
+        recording.current = null
+        const heard = await api.voiceHear(await advisorToken(), audio.base64, audio.mime)
+        if (!heard.text) {
+          toast('Wisp didn’t catch that. Try again a little closer.')
+          return
+        }
+        // the answer comes back in the language spoken, and is read aloud once it has passed its checks
+        if (heard.lang !== language()) setLanguage(heard.lang as LangCode)
+        markSpeakNext()
+        ask(heard.text)
+      } catch (e) {
+        toast(e instanceof Error && e.message ? e.message : 'Wisp couldn’t hear that just now. Try again, or type it.')
+      } finally {
+        setHearing(false)
+      }
       return
     }
-    const Ctor = SpeechRecognitionCtor()
-    if (!Ctor) return
-    const r = new Ctor()
-    r.lang = navigator.language || 'en-IN'
-    r.interimResults = true
-    r.onresult = (e) => setDraft(Array.from(e.results, (x) => x[0].transcript).join(' ').slice(0, 1000))
-    r.onend = () => setListening(false)
-    r.onerror = () => setListening(false)
-    rec.current = r
-    setListening(true)
-    r.start()
+    prime()
+    try {
+      recording.current = await record()
+      setListening(true)
+    } catch {
+      toast('Allow the microphone to talk to Wisp, or type your question.')
+    }
   }
 
   const send = () => {
     if ((!draft.trim() && !attach.length) || busy || capped || reading) return
-    rec.current?.stop()
+    recording.current?.cancel()
+    setListening(false)
     ask(draft, undefined, attach)
     setDraft('')
     setAttach([])
@@ -523,6 +576,12 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           </div>
           <span className="text-[11.5px] text-ink-2">Product and label photos only, never faces or skin. They are sent with this question and not kept.</span>
         </div>
+      ) : null}
+      {speaking ? (
+        <button type="button" onClick={stopReading} className="mx-auto mb-1 inline-flex min-h-9 items-center gap-2 rounded-pill bg-white/90 px-3.5 text-[12.5px] shadow-[0_10px_24px_-14px_rgba(0,0,0,.35)]" style={{ animation: 'wRise .3s both' }}>
+          <span aria-hidden className="size-2 animate-pulse rounded-full" style={{ background: 'var(--aura-coral)' }} />
+          Wisp is reading the answer aloud · Stop
+        </button>
       ) : null}
       <form
         onSubmit={(e) => {
@@ -568,21 +627,22 @@ function Composer({ busy, thinking, capped }: { busy: boolean; thinking: boolean
           disabled={capped}
           maxLength={1000}
           aria-describedby="ask-keys"
-          placeholder={listening ? 'Listening… speak your question' : capped ? `Daily limit reached · resets at ${resetTime()}` : thinking ? 'Waiting for the answer…' : phone ? 'Ask Wisp anything' : 'Ask about a result, product or ingredient'}
+          placeholder={hearing ? 'Hearing your question…' : listening ? 'Listening… tap the mic again to ask' : capped ? `Daily limit reached · resets at ${resetTime()}` : thinking ? 'Waiting for the answer…' : phone ? 'Ask Wisp anything' : 'Ask about a result, product or ingredient'}
           className="max-h-[160px] min-h-[46px] min-w-0 flex-1 resize-none bg-transparent px-2 py-[13px] text-[16px] leading-[20px] outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap sm:text-[14px]"
         />
         <span id="ask-keys" className="sr-only">
           Enter sends, Shift and Enter starts a new line.
         </span>
         <GeminiMark />
-        {canDictate ? (
+        {canTalk ? (
           <button
             type="button"
-            onClick={toggleMic}
+            onClick={() => void toggleMic()}
             aria-pressed={listening}
-            aria-label={listening ? 'Stop dictation' : 'Dictate'}
-            title={listening ? 'Stop dictation' : 'Dictate'}
-            disabled={capped}
+            aria-busy={hearing || undefined}
+            aria-label={hearing ? 'Wisp is listening to your question' : listening ? 'Stop and ask' : 'Talk to Wisp'}
+            title={hearing ? 'Hearing your question…' : listening ? 'Tap to ask' : 'Talk to Wisp: ask aloud in any language'}
+            disabled={capped || hearing || busy}
             className="hit44 mb-1 grid size-[38px] flex-none place-items-center rounded-full transition-colors"
             style={{ background: listening ? 'var(--aura-coral)' : 'var(--bg-sunken)', color: listening ? '#fff' : 'var(--text-primary)', boxShadow: listening ? '0 0 0 6px rgba(255,107,74,.25)' : 'none' }}
           >

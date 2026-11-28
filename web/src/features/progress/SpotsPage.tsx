@@ -3,17 +3,17 @@ import { useMemo, useState } from 'react'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { WillowLoader } from '../../components/willow/WillowLoader'
-import { useOwner, useSpotWeeks } from '../../data/hooks'
+import { useOwner, useSpotCheckIns } from '../../data/hooks'
 import type { ViewName } from '../../data/types'
-import type { SpotWeek, SpotWeekView } from '../../lib/api'
+import type { SpotCheckIn, SpotCheckInView } from '../../lib/api'
 import { MOLE_NOTE } from '../../lib/spotLabels'
-import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areaPhoto, areasOf, boxAround, carry, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewsOf, type Box } from '../../lib/spotWeeks'
+import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areaPhoto, areasOf, boxAround, carry, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewsOf, type Box } from '../../lib/spotDiary'
 import { Crumb, Page, StatusCard } from './parts'
 
 const RING = { blemish: 'var(--willow-400)', spot: 'var(--aura-apricot)' } as const
 
 /**
- * The spot diary (`/spots`, api GET /v1/spots/weeks): your check-ins week by week. Pick a week (or two to compare),
+ * The spot diary (`/spots`, api GET /v1/spots/check-ins): your check-ins, in order. Pick one (or two to compare),
  * look at each photo (front, left cheek, right cheek) with every blemish and dark spot it counted, and follow one
  * area across the weeks. Counts are the check-in's own, as Progress shows them; nothing is matched across weeks, so
  * there are no "appeared" or "faded" totals to trust or doubt. Live accounts only.
@@ -21,8 +21,8 @@ const RING = { blemish: 'var(--willow-400)', spot: 'var(--aura-apricot)' } as co
 export default function SpotsPage() {
   const owner = useOwner()
   const shell = useShell()
-  const q = useSpotWeeks()
-  const weeks = useMemo(() => q.data?.weeks ?? [], [q.data])
+  const q = useSpotCheckIns()
+  const weeks = useMemo(() => q.data?.check_ins ?? [], [q.data])
   const [picked, setPicked] = useState<string[]>([])
   const [comparing, setComparing] = useState(true) // opens on the last two check-ins side by side
   const [all, setAll] = useState(false)
@@ -86,7 +86,7 @@ export default function SpotsPage() {
     <Page label="Spot diary">
       {crumb}
       <div className="flex flex-col gap-1.5">
-        <h1 className="m-0 font-serif text-[clamp(30px,3.4vw,44px)] leading-[1] font-normal tracking-[-0.01em]">Your spots, week by week</h1>
+        <h1 className="m-0 font-serif text-[clamp(30px,3.4vw,44px)] leading-[1] font-normal tracking-[-0.01em]">Your spot diary</h1>
         <p className="m-0 max-w-[640px] text-[15px] leading-[1.45] text-ink-2">Every blemish and dark spot Willow counted, ringed on your photos.</p>
       </div>
 
@@ -142,7 +142,7 @@ export default function SpotsPage() {
 
       <div className={`grid w-full gap-4 ${selected.length > 1 ? 'max-w-[980px] grid-cols-2' : 'max-w-[520px] grid-cols-1'}`}>
         {selected.map((w) => (
-          <WeekPhoto key={w.id} week={w} view={viewOf(w, v)} viewName={v} area={null} compact={selected.length > 1} />
+          <CheckInPhoto key={w.id} week={w} view={viewOf(w, v)} viewName={v} area={null} compact={selected.length > 1} />
         ))}
       </div>
       {selected.length > 1 ? <CompareLine a={selected[0]} b={selected[1]} view={v} /> : null}
@@ -169,13 +169,13 @@ export default function SpotsPage() {
 }
 
 /** One photo of a check-in with every mark it counted, and its counts; with an area picked, that area's outline. */
-function WeekPhoto({ week, view, viewName, area, compact }: { week: SpotWeek; view: SpotWeekView | undefined; viewName: ViewName; area: string | null; compact: boolean }) {
+function CheckInPhoto({ week, view, viewName, area, compact }: { week: SpotCheckIn; view: SpotCheckInView | undefined; viewName: ViewName; area: string | null; compact: boolean }) {
   return (
     <figure className="m-0 flex flex-col gap-2">
       {view ? (
         <MarkedPhoto view={view} area={area} label={`${VIEW_LABEL[viewName]}, ${dayLabel(week.created_at, { day: 'numeric', month: 'long' })}`} />
       ) : (
-        <div className="grid aspect-[4/5] place-items-center rounded-[28px] bg-sunken p-6 text-center text-[14px] text-ink-2">No {VIEW_LABEL[viewName].toLowerCase()} photo this week</div>
+        <div className="grid aspect-[4/5] place-items-center rounded-[28px] bg-sunken p-6 text-center text-[14px] text-ink-2">No {VIEW_LABEL[viewName].toLowerCase()} photo at this check-in</div>
       )}
       <figcaption className="flex flex-col gap-0.5">
         <span className={compact ? 'text-[15px]' : 'text-[17px]'}>
@@ -190,7 +190,7 @@ function WeekPhoto({ week, view, viewName, area, compact }: { week: SpotWeek; vi
 }
 
 /** "Right cheek: 31 → 16 blemishes", from the two photos' own counts. */
-function CompareLine({ a, b, view }: { a: SpotWeek; b: SpotWeek; view: ViewName }) {
+function CompareLine({ a, b, view }: { a: SpotCheckIn; b: SpotCheckIn; view: ViewName }) {
   const va = viewOf(a, view)
   const vb = viewOf(b, view)
   const line = (x: number | null | undefined, y: number | null | undefined, word: string) => (x != null && y != null ? `${x} → ${y} ${word}` : null)
@@ -208,7 +208,7 @@ function CompareLine({ a, b, view }: { a: SpotWeek; b: SpotWeek; view: ViewName 
 
 /** A photo (or the `box` part of it) with its marks ringed, in photo pixels; an area's outline when given. `target`:
  * a place to circle (the spot being followed); `onPick`: tap anywhere to pick a place (photo pixels). */
-function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]', target, onPick, dim }: { view: SpotWeekView; area?: string | null; box?: Box | null; label: string; rounded?: string; target?: { x: number; y: number; r: number } | null; onPick?: (x: number, y: number) => void; dim?: boolean }) {
+function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]', target, onPick, dim }: { view: SpotCheckInView; area?: string | null; box?: Box | null; label: string; rounded?: string; target?: { x: number; y: number; r: number } | null; onPick?: (x: number, y: number) => void; dim?: boolean }) {
   const W = view.photo.width ?? 1
   const H = view.photo.height ?? 1
   const b = box ?? { x: 0, y: 0, w: W, h: H }
@@ -242,14 +242,14 @@ function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]', targe
 }
 
 /**
- * One area across the check-ins: the same patch of skin from each week's photo (the area's outline follows the face,
- * so the crop does too), large for the week on the slider and as a strip, with that area's counts from Progress.
+ * One area across the check-ins: the same patch of skin from each check-in's photo (the area's outline follows the face,
+ * so the crop does too), large for the check-in on the slider and as a strip, with that area's counts from Progress.
  * Tap a spot to follow that place: a close-up of it from every check-in, and whether a mark was counted there, so a
- * spot that is fading, staying, or keeps coming back in the same place shows week by week. A place is followed by
+ * spot that is fading, staying, or keeps coming back in the same place shows check-in by check-in. A place is followed by
  * where it sits in the area (its share across and down), not by matching marks, so nothing is claimed to be "the
  * same spot": the close-ups show it.
  */
-function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; area: string; prefer: ViewName; current: string | undefined }) {
+function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotCheckIn[]; area: string; prefer: ViewName; current: string | undefined }) {
   const rows = weeks
     .map((w) => {
       const view = areaPhoto(w, area, prefer)
@@ -298,7 +298,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
         </div>
         <div className="flex flex-col gap-3">
           <span className="text-[22px]">{dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })}</span>
-          <span className="text-[16px]">{countLine(row.counts.blemishes, row.counts.darkSpots) || 'Not counted this week'}</span>
+          <span className="text-[16px]">{countLine(row.counts.blemishes, row.counts.darkSpots) || 'Not counted at this check-in'}</span>
           <label className="flex flex-col gap-1.5 text-[13px] text-ink-2">
             Move through your check-ins
             <input type="range" min={0} max={rows.length - 1} step={1} value={i} onChange={(e) => setAt(Number(e.target.value))} aria-valuetext={dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })} className="w-full accent-[var(--text-primary)]" />
@@ -323,7 +323,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
 
       <div className="flex flex-col gap-2 border-t border-ink/10 pt-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="m-0 text-[17px] font-normal">This spot, week by week</h3>
+          <h3 className="m-0 text-[17px] font-normal">This spot at each check-in</h3>
           <span className="text-[13px] text-ink-2">A mark was counted here at {marked} of {rows.length} check-ins</span>
         </div>
         <ol aria-label="The spot at every check-in" className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
@@ -343,7 +343,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
             )
           })}
         </ol>
-        <p className="m-0 text-[12.5px] leading-snug text-ink-2">The same place on your face each week, found from the face points around it (brows, nose, hairline…), so it stays put when your head turns or the photo is framed differently. Whether it is the very same spot, the close-ups show; Willow does not decide that.</p>
+        <p className="m-0 text-[12.5px] leading-snug text-ink-2">The same place on your face at each check-in, found from the face points around it (brows, nose, hairline…), so it stays put when your head turns or the photo is framed differently. Whether it is the very same spot, the close-ups show; Willow does not decide that.</p>
       </div>
     </section>
   )

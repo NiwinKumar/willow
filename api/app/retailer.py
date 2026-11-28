@@ -763,7 +763,12 @@ def _refresh(raw: dict[str, Any], fetch_rows) -> None:
         log.warning("retailer insights refresh failed; serving the cached rows: %s", exc)
         raw["at"] = time.time() - CACHE_SECONDS + 60
         return
-    raw["data"], raw["at"], raw["version"] = data, time.time(), raw["version"] + 1
+    # Same rows as before (the export did not change): keep the version, so nothing cached on it is
+    # rebuilt. Bumping it every 10 minutes made the next Proof visit rebuild everything (Nov 28).
+    same = data == raw["data"]
+    raw["data"], raw["at"] = data, time.time()
+    if not same:
+        raw["version"] += 1
 
 
 def _refresh_in_background(raw: dict[str, Any], fetch_rows) -> None:
@@ -792,14 +797,44 @@ def _rows() -> tuple[dict[str, list[dict[str, Any]]], int]:
         return raw["data"], raw["version"]
 
 
-def insights(cohort_: str = "mixed", range_: str = "all") -> dict[str, Any]:
-    """The aggregates for one filter (default: every row, all time), cached per filter."""
+_pending: set[tuple] = set()
+_pending_lock = threading.Lock()
+
+
+def _later(key: tuple, rebuild) -> None:
+    """Run `rebuild` once in a background thread (never two for one key at a time). Cloud Run
+    gives it CPU while any request is in flight."""
+    with _pending_lock:
+        if key in _pending:
+            return
+        _pending.add(key)
+
+    def run() -> None:
+        try:
+            rebuild()
+        except Exception as exc:  # the stale value stays; the next request tries again
+            log.warning("background rebuild %s failed: %s", key[0], exc)
+        finally:
+            with _pending_lock:
+                _pending.discard(key)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def insights(cohort_: str = "mixed", range_: str = "all", fresh: bool = False) -> dict[str, Any]:
+    """The aggregates for one filter (default: every row, all time), cached per filter. `fresh`
+    waits for today's build instead of serving yesterday's at the day change."""
     if cohort_ not in ("simulated", "mixed", "real") or range_ not in RANGE_DAYS:
         raise ValueError(f"unknown filter {cohort_}/{range_}")
     raw, version = _rows()
     today = datetime.now(UTC).date()
     hit = _views.get((cohort_, range_))
     if hit and hit[0] == version and hit[1] == today:
+        return hit[2]
+    if hit and hit[0] == version and not fresh:
+        # a new day, the same data: yesterday's aggregates until today's are built (in the
+        # background here, or by the midnight warm run), so nobody waits at the day change
+        _later(("insights", cohort_, range_), lambda: insights(cohort_, range_, fresh=True))
         return hit[2]
     since = since_of(range_, today)
     data = {

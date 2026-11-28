@@ -257,8 +257,11 @@
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
+  /* Text fields: a soft ring instead of the outline (WCAG 2.4.7: keyboard focus is always visible). */
   :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit']), textarea, select, [contenteditable]):focus-visible {
     outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 60%, transparent);
+    border-radius: 12px;
   }
   h1,
   h2,
@@ -292,6 +295,13 @@
   }
   .squircle {
     corner-shape: squircle;
+  }
+  /* Safari leaves blurred and blended children (the hero's bloom and grain) unclipped by overflow + radius, so a
+     square of them shows past the rounded corners: clip to the same rounded box where squircles are not drawn. */
+  @supports not (corner-shape: squircle) {
+    .clip-card {
+      clip-path: inset(0 round var(--clip-r, 36px));
+    }
   }
   /* Standard card: #FAFAF8, radius 30, inset highlight + long soft shadow. */
   .card {
@@ -481,3 +491,32 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
 @keyframes wRingOut { from { scale: .5; opacity: .9 } to { scale: 2.6; opacity: 0 } }
 @keyframes wLine { from { transform: scaleX(0) } to { transform: scaleX(1) } }
 @keyframes wDrawPath { to { stroke-dashoffset: 0 } }
+
+/* The page making room for Wisp or the sidebar (AppShell morph): the page's box glides to its new size while
+   the old frame stays crisp (not stretched) and the new one fades in over it; everything else holds still. */
+::view-transition-group(willow-page) {
+  animation-duration: 440ms;
+  animation-timing-function: cubic-bezier(.32, .72, 0, 1);
+}
+::view-transition-old(willow-page),
+::view-transition-new(willow-page) {
+  height: 100%;
+  width: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+::view-transition-old(willow-page) {
+  animation: 260ms cubic-bezier(.4, 0, 1, 1) both vt-fade-out;
+}
+::view-transition-new(willow-page) {
+  animation: 380ms cubic-bezier(.32, .72, 0, 1) 60ms both vt-fade-in;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(wisp-panel) {
+  animation: none;
+}
+@keyframes vt-fade-out { to { opacity: 0 } }
+@keyframes vt-fade-in { from { opacity: 0 } }

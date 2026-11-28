@@ -78,7 +78,7 @@ app.add_middleware(
     allow_origins=settings.origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Dev-Uid"],
+    allow_headers=["Authorization", "Content-Type", "X-Dev-Uid", "X-Willow-Lang"],
     # Browsers re-ask the preflight once per URL; cache it (Chrome caps this at 2 hours).
     max_age=7200,
 )

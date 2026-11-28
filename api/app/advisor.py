@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, model_validator
 from app import advisor_blocks as blocks_mod
 from app import (
     catalog,
+    changes,
     explain,
     feel,
     gemini,
@@ -73,6 +74,10 @@ own measurements, check their routine and find products from Willow's facts-only
   never write "diagnose"; say Willow follows how skin looks over time, not what a condition is,
   suggest a dermatologist, and offer what Willow does measure. Asked for a skin score or skin
   age: say Willow gives neither, only change against their own baseline.
+- noted_since_last_check_in on a session = what the person said was different before it (stress,
+  sleep, their period, travel, sun, diet, routine changes). Mention it as context when a reading
+  moved, never as the cause. life_patterns are found by code across their check-ins ("higher on
+  weeks you noted…"): repeat them only as written, never invent one.
 - Routine products with in_use false were stopped: do not treat them as part of the routine.
 - recent_use on a routine product = days_used, the days the person ticked it as used, out of
   of_days, the days it was in the routine recently (recent_window_days in CONTEXT); null = not
@@ -254,7 +259,8 @@ def _compact(p: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[s
 def context(store: Store, uid: str) -> dict[str, Any]:
     """Latest measured session (quality passed) per site and capture mode, plus the routine."""
     latest: dict[str, dict[str, Any]] = {}
-    for sid, doc in sorted(store.sessions_list(uid), key=lambda r: str(r[1].get("created_at"))):
+    sessions = store.sessions_list(uid)
+    for sid, doc in sorted(sessions, key=lambda r: str(r[1].get("created_at"))):
         result = measured_result(doc)
         # A session that failed the quality check has no numbers: keep the last good reading.
         if doc.get("status") != "done" or result is None or not result["quality"]["passed"]:
@@ -266,6 +272,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "photos": doc.get("n_frames"),
             "photos_used": result["frames_used"],
             "quality_passed": result["quality"]["passed"],
+            # what the person said was different since their previous check-in (tags in words)
+            "noted_since_last_check_in": (changes.view(doc) or {}).get("words") or None,
             # Rounded as the app shows them (explain.decimals), so the advisor never quotes
             # 2.5 blemishes for a screen that says 3.
             "metrics": [
@@ -325,6 +333,8 @@ def context(store: Store, uid: str) -> dict[str, Any]:
             "past_reactions_note": _trimmed(((safety.profile_of(doc) or {}).get("note")) or ""),
         },
         "latest_sessions": latest,
+        # what else lines up with their readings, found by code (app/changes.py)
+        "life_patterns": [p["text"] for p in changes.patterns_in(sessions)["patterns"]],
         "routine": routine,
         "recent_window_days": routine_log.RECENT_DAYS,
         "note": "Every site is measured: the face, the cheek, forehead, chin and nose close-ups "
@@ -556,7 +566,9 @@ def chat(
         "Write the reply to the last USER message as blocks, answer first. Product ids (in "
         "[product:ID], products blocks, product widgets and product_ids): only ids from TOOL "
         "RESULTS or the routine in CONTEXT that you actually recommend or discuss. "
-        "follow_up_suggestions: up to 3 short questions the person might ask next."
+        "follow_up_suggestions: 3 short follow-up questions (under 8 words each) that build on "
+        "this reply: about a product, reading, finding or step you just named, or the next "
+        "thing to check. Written as the person would ask them. Never generic questions."
         + (
             f"\nThe last USER message came with {len(images)} attached photo(s), above. "
             "photos_show: what they show."

@@ -8,7 +8,8 @@
 ## Hackathon fit
 - Event: Google Cloud AI Builder Cup 2026 (Hack2skill). Deadline Oct 18, 2026.
 - Theme: **Retail & Commerce: Intelligent Customer and Business Experiences**. Problem statement: "Build an AI-powered solution that transforms how businesses understand, engage, and serve customers while improving operational efficiency across physical and digital commerce" (discovery, personalization, conversational shopping, demand planning, inventory, customer insights, fraud).
-- Rubric: Technical Merit & Gen AI 40% | Problem Alignment & Impact 25% | Innovation & Creativity 25% | UX & Solution Design 10%.
+- Rubric (qualifying round): Technical Merit & Gen AI 40% | Problem Alignment & Impact 25% | Innovation & Creativity 25% | UX & Solution Design 10%.
+- Rubric (Grand Finale, Dec 4, participant guide): Technical Merit & GenAI 30 (GenAI central 10, end to end on Google Cloud 10, scalability 10) | Problem Alignment & Impact 25 (theme 10, problem and user 5, impact 10) | Innovation 20 (originality 10, GenAI innovation 10) | UX 15 (usability and accessibility 10, cohesion 5) | Pitch 10 (explaining 5, answering 5).
 - Special awards (USD 2,000 each, no published criteria): Best use of Google Cloud AI tools, Most Impactful Solution, Social Choice, Best UI/UX.
 - Required: Gemini/Gemma; deployed on Cloud Run or Firebase; working public link (end-to-end); public GitHub repo; PDF deck; demo video; brief description explaining use of Firebase, Firestore, Cloud Run and Gemini.
 - Fresh-work rule: only code written during the hackathon; open-source libraries, pretrained models and public datasets are fine with attribution.
@@ -35,7 +36,7 @@ Capture (standardized) -> Measure (CV, calibrated) -> Compare to your own noise 
 4. Timeline/compare: metric series with noise band, before/after slider, treated vs control.
 5. Routine: Gemini label scan of product photos, routine list, Gemini compatibility check (clashes, duplicates, gaps).
 6. Advisor chat: Gemini with function calling over the catalog + the user's metrics; every product with multi-store links.
-7. Retailer dashboard: BigQuery + in-app view with a Gemini "ask this data" assistant (synthetic cohort clearly labeled). Looker Studio dropped Oct 13 (cut list item 5): one link for judges, and the in-app view answers questions.
+7. Retailer dashboard: BigQuery + in-app view with a Gemini "ask this data" assistant (synthetic cohort clearly labeled). The in-app view is the main surface; a Data Studio (Looker Studio) report over the same suppressed aggregates is linked from the README as a secondary view.
 8. Judge mode: seeded real journey, sample photos, try-your-own selfie.
 
 ## Non-goals (say no if asked)

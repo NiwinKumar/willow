@@ -8,8 +8,6 @@ from fastapi.testclient import TestClient
 from app import campaigns
 from app.main import app
 
-SUN = "the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50"  # Proven in the test cohort
-
 
 @pytest.fixture(autouse=True)
 def _samples(samples_on, fake):
@@ -86,11 +84,12 @@ def test_a_brand_org_gets_only_its_brand_and_switching_never_duplicates():
     rows = _campaigns(guest)
     assert {r["brand"] for r in rows} == {"The Derma Co"}
     assert {r["workspace"] for r in rows} == {"The Derma Co"}
-    assert SUN in {r["product_id"] for r in rows} and 3 <= len(rows) <= 5
+    # one campaign per Proven product of the brand, up to 5 (Nov 28: fewer products are Proven
+    # since effects are scaled by category and Proven needs false-discovery control); the first
+    # slot is a finished campaign with a clear lift
+    assert 1 <= len(rows) <= 5
     assert any(r["status"] == "ended" and r["stats"]["incrementality"] for r in rows)
-    # a finished one whose interval includes zero, and one still collecting (holdout under 10)
-    assert any(r["status"] == "ended" and r["stats"]["incrementality"]["lift_lo"] < 0 for r in rows)
-    assert any(r["status"] == "active" and r["stats"]["incrementality"] is None for r in rows)
+    brand_products = {r["product_id"] for r in rows}
     # Minimalist's samples (if it has a Proven product it can promote in the test cohort) are
     # only its own products
     _join(guest, "minimalist", "analyst")
@@ -99,7 +98,7 @@ def test_a_brand_org_gets_only_its_brand_and_switching_never_duplicates():
     rows = _campaigns(guest)
     by_org = {o: [r for r in rows if r["org_id"] == o] for o in ("minimalist", "northside")}
     assert {r["brand"] for r in by_org["minimalist"]} <= {"Minimalist"}
-    assert SUN not in {r["product_id"] for r in by_org["northside"]}
+    assert not brand_products & {r["product_id"] for r in by_org["northside"]}
     products = [r["product_id"] for r in rows]
     assert len(products) == len(set(products))
 

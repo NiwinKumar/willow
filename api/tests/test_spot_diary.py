@@ -1,4 +1,4 @@
-"""The spot diary week by week (app/spot_weeks.py, GET /v1/spots/weeks)."""
+"""The spot diary (app/spot_diary.py, GET /v1/spots/check-ins)."""
 
 import json
 from datetime import UTC, datetime
@@ -100,7 +100,7 @@ def _session(fake, sid, day, **kw):
 def test_every_mark_on_its_photo_with_the_counts_progress_shows(client, fake):
     _session(fake, "s_20261120_aaaaaaaa", "2026-11-20")
     _session(fake, "s_20261127_bbbbbbbb", "2026-11-27")
-    weeks = client.get("/v1/spots/weeks").json()["weeks"]
+    weeks = client.get("/v1/spots/check-ins").json()["check_ins"]
     assert [w["id"] for w in weeks] == [
         "s_20261120_aaaaaaaa",
         "s_20261127_bbbbbbbb",
@@ -120,7 +120,7 @@ def test_every_mark_on_its_photo_with_the_counts_progress_shows(client, fake):
 
 def test_an_older_check_in_draws_its_candidates_and_gives_no_photo_counts(client, fake):
     _session(fake, "s_20261120_aaaaaaaa", "2026-11-20", with_marks=False)
-    w = client.get("/v1/spots/weeks").json()["weeks"][0]
+    w = client.get("/v1/spots/check-ins").json()["check_ins"][0]
     assert w["complete"] is False
     assert w["blemishes"] == 3  # the check-in's own count stays
     front = w["views"][0]

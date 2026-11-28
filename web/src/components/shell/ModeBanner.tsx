@@ -25,7 +25,7 @@ export function ModeBanner() {
       ? `■ JUDGE TOUR · ${tour.seen.length} OF ${JUDGE_STOPS.length} STOPS${data.mode === 'demo' ? " · MEI, A SIMULATED PERSON, READ-ONLY" : ' · YOUR OWN GUEST ACCOUNT'}`
       : "■ DEMO JOURNEY · MEI IS SIMULATED: GENERATED PHOTOS, MEASURED BY THE LIVE ENGINE · READ-ONLY"
   return (
-    <div role="note" className="relative z-[21] flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-selected px-4 py-2.5 text-center font-mono text-[12px] tracking-[.06em] text-inverse">
+    <aside aria-label={tour.on ? "Judge tour" : "Demo journey"} className="relative z-[21] flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-selected px-4 py-2.5 text-center font-mono text-[12px] tracking-[.06em] text-inverse">
       <span>{text}</span>
       {tour.on ? (
         <>
@@ -41,6 +41,6 @@ export function ModeBanner() {
           Leave demo
         </Link>
       ) : null}
-    </div>
+    </aside>
   )
 }

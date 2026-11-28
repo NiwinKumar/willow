@@ -13,6 +13,7 @@ import { campaignsFor, DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, 
 import { LatestPanel, NeedsYou, SLOTS, type Update } from '../home/Rail'
 import { DecisionLog, Requests } from '../home/Requests'
 import { useHomeCards } from '../homeData'
+import { useCampaignsLoading } from '../pipeline'
 import { useOrg } from '../org'
 import { useDecide } from '../orgData'
 import { canAct, ROLE_LABEL, type DecisionLogEntry } from '../proofApi'
@@ -100,6 +101,7 @@ function Body({ d }: { d: Insights }) {
   const priority = decide_.slice(0, PRIORITY)
   const rest = decide_.slice(PRIORITY)
   const loadingCards = prodState.status === 'loading' || (mix === 'retailer' && shelf.status === 'loading' && !shelf.data)
+  const loadingCampaigns = useCampaignsLoading()
   const canDecide = canAct(role) || !org
 
   const snapshotOf = (c: DecisionCard) => ({ title: c.title.slice(0, 200), figure: `${c.figure} ${c.figureNote}`.trim().slice(0, 120), n: c.n })
@@ -122,7 +124,9 @@ function Body({ d }: { d: Insights }) {
   const people = d.needs_by_month?.people ?? []
   const peopleChange = people.length > 1 && people.at(-2) ? ((people.at(-1) ?? 0) - (people.at(-2) ?? 0)) / (people.at(-2) ?? 1) : null
   const name = org?.kind === 'brand' ? (brand ?? org.name) : (org?.name ?? brand ?? 'Your range')
-  const sentences = weekBrief({ mix, name: mix === 'brand' ? (brand ?? name) : name, p, rate, market, rising: risingGoal(demand.rows), camp })
+  const briefLines = weekBrief({ mix, name: mix === 'brand' ? (brand ?? name) : name, p, rate, market, rising: risingGoal(demand.rows), camp })
+  // simulated people in the numbers: the headline says so in its first words (the notice above says why)
+  const sentences = d.cohort.synthetic && briefLines.length ? [`In the simulated cohort, ${briefLines[0].charAt(0).toLowerCase()}${briefLines[0].slice(1)}`, ...briefLines.slice(1)] : briefLines
 
   const guide = useGuide({ mix, rangeConnected: Boolean(range) || mix === 'brand', decided: Object.keys(items).length > 0, campaigns: campaigns.length > 0 })
   const ask = (q: string) => setParam({ ask: '1', q }, { push: true })
@@ -152,7 +156,7 @@ function Body({ d }: { d: Insights }) {
             value: rate ? pct(rate.rate) : '—',
             unit: rate ? `of ${int(rate.n)}` : undefined,
             note: market ? `Market: ${pct(market.rate)}` : 'No measured products yet',
-            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name} against the market: ${pct(rate.rate)} of ${int(rate.n)} people using ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against ${pct(market.rate)} of ${int(market.n)} across every measured product.` } : null,
+            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name} against the market: ${pct(rate.rate)} of ${int(rate.n)} product uses across ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against ${pct(market.rate)} of ${int(market.n)} product uses across every measured product (one person can use several).` } : null,
             to: `${sectionPath('market')}${carry}`,
           },
           campaignTile,
@@ -261,7 +265,7 @@ function Body({ d }: { d: Insights }) {
         </div>
 
         <div>{loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}</div>
-        <ProofPanel className="flex-1" rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
+        <ProofPanel className="flex-1" loading={loadingCards} rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
         </div>
 
         <NeedsYou
@@ -287,8 +291,8 @@ function Body({ d }: { d: Insights }) {
 
       <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-12">
         <DemandPanel className="md:col-span-2 xl:col-span-5" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
-        <FunnelPanel className="xl:col-span-4" t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
-        <LatestPanel className="xl:col-span-3" updates={updates} total={updates.length} onAll={() => openLane('results')} />
+        <FunnelPanel className="xl:col-span-4" loading={loadingCampaigns} t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
+        <LatestPanel className="xl:col-span-3" loading={loadingCards || loadingCampaigns || requests.status === 'loading'} updates={updates} total={updates.length} onAll={() => openLane('results')} />
       </div>
       </div>
 

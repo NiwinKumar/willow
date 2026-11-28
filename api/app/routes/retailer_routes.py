@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app import brand_logos, limits, proof_ai, retail_intel, retailer, retailer_ask
 from app.auth import AuthUser, current_user
+from app.routes import reminders_routes
 from app.store import Store, get_store
 
 router = APIRouter(prefix="/v1/retailer", tags=["retailer"])
@@ -234,3 +235,18 @@ def proof_claims(
     if out["source"] != "gemini":
         limits.refund(store, user.uid, "proof_claims")
     return out
+
+
+@router.post("/internal/warm", dependencies=[Depends(reminders_routes._scheduler)])
+def proof_warm() -> dict[str, Any]:
+    """Cloud Scheduler, just after midnight UTC (job willow-proof-warm, infra/README.md): build
+    today's Proof facts, the views Home and the lists open with, and the aggregates, so the first
+    visit of the day is served from cache instead of waiting on a rebuild (Nov 28). Same OIDC
+    check as the reminder run."""
+    started = time.monotonic()
+    try:
+        retail_intel.rebuild_day("mixed", "all")
+        retailer.insights("mixed", "all", fresh=True)
+    except Exception as exc:  # BigQuery unavailable: yesterday's cache keeps serving
+        raise HTTPException(503, UNAVAILABLE) from exc
+    return {"ok": True, "seconds": round(time.monotonic() - started, 1)}

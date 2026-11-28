@@ -1,10 +1,11 @@
-"""Spot diary, week by week (GET /v1/spots/weeks, Nov 28).
+"""Spot diary (GET /v1/spots/check-ins, Nov 28).
 
-Each measured face check-in as its photos show it: per view (front, left cheek, right cheek) the
-photo, its areas and every blemish and dark spot the check-in counted on it, with the counts
-Progress shows (the whole face and by area). Nothing is matched across weeks: the person
-compares weeks by eye, side by side or area by area, so no number rests on deciding which
-mark is "the same spot" (the old diary's appeared / faded totals did, and were inflated).
+Each measured face check-in, in the order the person took them (however far apart), as its
+photos show it: per view (front, left cheek, right cheek) the photo, its areas and every blemish
+and dark spot the check-in counted on it, with the counts Progress shows (the whole face and by
+area). Nothing is matched across check-ins: the person compares check-ins by eye, side by side
+or area by area, so no number rests on deciding which mark is "the same spot" (the old diary's
+appeared / faded totals did, and were inflated).
 
 Marks come from the engine's extras.marks (0.4.3+: every counted mark). Older results only have
 `candidates` (at most 40 a check-in, the front's first); those check-ins say `complete: false`
@@ -115,7 +116,7 @@ def _counts(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def weeks(store: Store, uid: str) -> dict[str, Any]:
+def check_ins(store: Store, uid: str) -> dict[str, Any]:
     rows = []
     for sid, d in store.sessions_list(uid):
         result = measured_result(d)
@@ -148,7 +149,8 @@ def weeks(store: Store, uid: str) -> dict[str, Any]:
     out = []
     for sid, d, result, photos in plans:
         marks, complete = marks_of(result, d.get("labels") or {})
-        # each photo's face-mesh landmarks (engine extras.face_points): carry a place between weeks
+        # each photo's face-mesh landmarks (engine extras.face_points): carry a place between
+        # check-ins
         landmarks = {
             p["view"]: p["points"]
             for p in (_metric(result, "blemishes").get("extras") or {}).get("face_points") or []
@@ -192,4 +194,4 @@ def weeks(store: Store, uid: str) -> dict[str, Any]:
                 "views": shown,
             }
         )
-    return {"weeks": out}
+    return {"check_ins": out}

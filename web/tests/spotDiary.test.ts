@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import type { SpotWeek, SpotWeekView } from '../src/lib/api.ts'
-import { areaBox, areaCounts, areasOf, countLine, shownWeeks, viewWithArea, viewsOf } from '../src/lib/spotWeeks.ts'
+import type { SpotCheckIn, SpotCheckInView } from '../src/lib/api.ts'
+import { areaBox, areaCounts, areasOf, countLine, shownWeeks, viewWithArea, viewsOf } from '../src/lib/spotDiary.ts'
 
 const square = (x: number, y: number, s: number): [number, number][] => [
   [x, y],
@@ -11,7 +11,7 @@ const square = (x: number, y: number, s: number): [number, number][] => [
   [x + s, y + s],
   [x, y + s],
 ]
-const view = (v: SpotWeekView['view'], rois: SpotWeekView['rois']): SpotWeekView => ({
+const view = (v: SpotCheckInView['view'], rois: SpotCheckInView['rois']): SpotCheckInView => ({
   view: v,
   photo: { url: 'u', width: 1000, height: 1200 },
   rois,
@@ -19,7 +19,7 @@ const view = (v: SpotWeekView['view'], rois: SpotWeekView['rois']): SpotWeekView
   blemishes: 3,
   dark_spots: 1,
 })
-const week = (id: string, views: SpotWeekView[], complete = true): SpotWeek => ({
+const week = (id: string, views: SpotCheckInView[], complete = true): SpotCheckIn => ({
   id,
   created_at: `2026-11-${id.padStart(2, '0')}T10:00:00Z`,
   complete,
@@ -67,7 +67,7 @@ test('count words', () => {
 })
 
 test('a place is found again from the area\'s steadiest edge, and the mark there with it', async () => {
-  const { areaFrame, toAreaPoint, fromAreaPoint, markAt, spotBox, startPoint } = await import('../src/lib/spotWeeks.ts')
+  const { areaFrame, toAreaPoint, fromAreaPoint, markAt, spotBox, startPoint } = await import('../src/lib/spotDiary.ts')
   // the forehead's top (hairline) moves between weeks; its bottom (the brows) and width stay
   const wk1 = view('front', [{ name: 'forehead', polygon: [[100, 300], [500, 300], [500, 500], [100, 500]] }])
   const wk2 = view('front', [{ name: 'forehead', polygon: [[120, 150], [520, 150], [520, 520], [120, 520]] }])
@@ -91,7 +91,7 @@ test('a place is found again from the area\'s steadiest edge, and the mark there
 })
 
 test('a place is carried to another photo through the face landmarks around it', async () => {
-  const { carry, markNear, boxAround } = await import('../src/lib/spotWeeks.ts')
+  const { carry, markNear, boxAround } = await import('../src/lib/spotDiary.ts')
   // the same face, next week: 1.25x closer, shifted, and turned a little (a rotation)
   const from: [number, number][] = []
   for (let gx = 0; gx < 6; gx++) for (let gy = 0; gy < 6; gy++) from.push([200 + gx * 60, 200 + gy * 60])
@@ -111,7 +111,7 @@ test('a place is carried to another photo through the face landmarks around it',
 })
 
 test('a front area is followed on the front photo, whole, with the cheek photos\' marks in it carried over', async () => {
-  const { areaPhoto } = await import('../src/lib/spotWeeks.ts')
+  const { areaPhoto } = await import('../src/lib/spotDiary.ts')
   const grid: [number, number][] = []
   for (let gx = 0; gx < 6; gx++) for (let gy = 0; gy < 6; gy++) grid.push([gx * 100, gy * 100])
   const front = view('front', [{ name: 'chin', polygon: [[200, 400], [300, 400], [300, 500]] }])

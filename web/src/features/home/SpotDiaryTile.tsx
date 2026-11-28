@@ -1,11 +1,11 @@
-import type { SpotWeek } from '../../lib/api'
-import { AREA_LABEL, countLine, dayLabel } from '../../lib/spotWeeks'
+import type { SpotCheckIn } from '../../lib/api'
+import { AREA_LABEL, countLine, dayLabel } from '../../lib/spotDiary'
 
 /**
  * Spot diary tile: the latest face check-in's counts (as Progress has them), its busiest areas, and how the blemish
- * count compares with the check-in before. Nothing summed across weeks (those totals were unreliable).
+ * count compares with the check-in before. Nothing summed across check-ins (those totals were unreliable).
  */
-export function SpotDiaryTile({ weeks, onOpen, className = '' }: { weeks: SpotWeek[]; onOpen: () => void; className?: string }) {
+export function SpotDiaryTile({ weeks, onOpen, className = '' }: { weeks: SpotCheckIn[]; onOpen: () => void; className?: string }) {
   const last = weeks[weeks.length - 1]
   const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null
   const areas = Object.entries(last.by_zone)

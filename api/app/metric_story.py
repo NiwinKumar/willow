@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from app import (
     baselines,
+    changes,
     cohort,
     explain,
     gemini,
@@ -92,6 +93,9 @@ Rules:
   area's own verdict_vs_baseline).
 - Area names only as the "label" in FACTS (left and right are the person's own). Never name a
   condition, a cause, a treatment or a product the person does not already use.
+- "this_week" (what the person said was different since their previous check-in) and
+  "patterns" (found by code across their check-ins) are shown in their own row below: do not
+  repeat them, never write one as the reason for a change, and never write a pattern of your own.
 - Cosmetic language only; never diagnose. Skin tone (tone_ita) is descriptive: never better or
   worse, never lighter or darker as a goal.
 - British spelling."""
@@ -315,6 +319,13 @@ def facts(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
                 }
             )
     out["routine"] = products
+    # what else was different (the person's tags, never their free text: it could hold numbers)
+    noted = changes.view(doc)
+    if noted and noted["words"]:
+        out["this_week"] = noted["words"]
+    found = changes.for_metric(rows, metric_id) if metric_id != "tone_ita" else []
+    if found:
+        out["patterns"] = [p["text"] for p in found]
     return out
 
 
@@ -567,4 +578,7 @@ def story(store: Store, uid: str, sid: str, doc: dict[str, Any], metric_id: str)
         "areas": f.get("areas") or [],
         "spots": f.get("spots"),
         "has_previous": "previous_day" in f,
+        # what else was different and what it lines up with, for the metric detail's rows
+        "this_week": f.get("this_week") or [],
+        "patterns": f.get("patterns") or [],
     }

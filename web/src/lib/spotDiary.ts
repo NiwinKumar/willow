@@ -1,9 +1,9 @@
-/** The spot diary, week by week (api GET /v1/spots/weeks): which weeks show, areas, crops and counts. */
-import type { SpotWeek, SpotWeekView } from './api'
+/** The spot diary (api GET /v1/spots/check-ins): which check-ins show, areas, crops and counts. */
+import type { SpotCheckIn, SpotCheckInView } from './api'
 import type { ViewName } from '../data/types'
 
 /** How many of the latest check-ins the picker shows before "Earlier". */
-export const RECENT_WEEKS = 5
+export const RECENT_CHECK_INS = 5
 
 export const VIEW_ORDER: ViewName[] = ['front', 'left', 'right']
 export const VIEW_LABEL: Record<ViewName, string> = { front: 'Front face', left: 'Left cheek', right: 'Right cheek' }
@@ -23,22 +23,22 @@ export const AREA_LABEL: Record<string, string> = {
 export const dayLabel = (iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }) =>
   new Date(iso).toLocaleDateString('en-GB', opts)
 
-/** The weeks the picker shows: the latest RECENT_WEEKS, or all of them. Oldest first. */
-export function shownWeeks(weeks: SpotWeek[], all: boolean): SpotWeek[] {
-  return all ? weeks : weeks.slice(-RECENT_WEEKS)
+/** The weeks the picker shows: the latest RECENT_CHECK_INS, or all of them. Oldest first. */
+export function shownWeeks(weeks: SpotCheckIn[], all: boolean): SpotCheckIn[] {
+  return all ? weeks : weeks.slice(-RECENT_CHECK_INS)
 }
 
 /** The views a check-in has, in toggle order. */
-export function viewsOf(w: SpotWeek | undefined): ViewName[] {
+export function viewsOf(w: SpotCheckIn | undefined): ViewName[] {
   return VIEW_ORDER.filter((v) => w?.views.some((x) => x.view === v))
 }
 
-export function viewOf(w: SpotWeek | undefined, v: ViewName): SpotWeekView | undefined {
+export function viewOf(w: SpotCheckIn | undefined, v: ViewName): SpotCheckInView | undefined {
   return w?.views.find((x) => x.view === v)
 }
 
 /** The areas a photo shows (its outlines), in face order; never the under-eye patches. */
-export function areasOf(view: SpotWeekView | undefined): string[] {
+export function areasOf(view: SpotCheckInView | undefined): string[] {
   const have = new Set(view?.rois.map((r) => r.name) ?? [])
   return Object.keys(AREA_LABEL).filter((a) => have.has(a))
 }
@@ -52,8 +52,8 @@ export function countLine(blemishes: number | null | undefined, darkSpots: numbe
 export type Box = { x: number; y: number; w: number; h: number }
 
 /** The square around an area's outline on one photo (with a margin), kept inside the photo: the same patch of skin
- * every week, since the outline follows the face. Null when the photo has no such area. */
-export function areaBox(view: SpotWeekView | undefined, area: string, margin = 0.18): Box | null {
+ * at every check-in, since the outline follows the face. Null when the photo has no such area. */
+export function areaBox(view: SpotCheckInView | undefined, area: string, margin = 0.18): Box | null {
   const roi = view?.rois.find((r) => r.name === area)
   if (!view || !roi || roi.polygon.length < 3) return null
   const xs = roi.polygon.map((p) => p[0])
@@ -70,14 +70,14 @@ export function areaBox(view: SpotWeekView | undefined, area: string, margin = 0
 }
 
 /** The photo of a check-in that shows an area: the preferred view's, else any view that has it. */
-export function viewWithArea(w: SpotWeek, area: string, prefer: ViewName): SpotWeekView | undefined {
+export function viewWithArea(w: SpotCheckIn, area: string, prefer: ViewName): SpotCheckInView | undefined {
   const pref = viewOf(w, prefer)
   if (pref && areaBox(pref, area)) return pref
   return w.views.find((v) => areaBox(v, area))
 }
 
 /** One area's counts per check-in, as Progress has them (by area): blemishes and the dark spots placed there. */
-export function areaCounts(w: SpotWeek, area: string): { blemishes: number | null; darkSpots: number | null } {
+export function areaCounts(w: SpotCheckIn, area: string): { blemishes: number | null; darkSpots: number | null } {
   const z = w.by_zone[area]
   return { blemishes: z?.blemishes ?? null, darkSpots: w.complete ? (z?.dark_spots ?? 0) : null }
 }
@@ -88,7 +88,7 @@ export function areaCounts(w: SpotWeek, area: string): { blemishes: number | nul
 export type AreaFrame = { x: number; y: number; s: number }
 const ANCHOR: Record<string, 'top' | 'bottom' | 'middle'> = { forehead: 'bottom', chin: 'top', around_mouth: 'top' }
 
-export function areaFrame(view: SpotWeekView, area: string): AreaFrame | null {
+export function areaFrame(view: SpotCheckInView, area: string): AreaFrame | null {
   const roi = view.rois.find((r) => r.name === area)
   if (!roi || roi.polygon.length < 3) return null
   const xs = roi.polygon.map((p) => p[0])
@@ -114,7 +114,7 @@ export const SPOT_CLOSE_UP = 0.3
 export const SPOT_NEAR = 0.06
 
 /** The close-up square around one place of an area, kept inside the photo. */
-export function spotBox(view: SpotWeekView, f: AreaFrame, p: AreaPoint): Box {
+export function spotBox(view: SpotCheckInView, f: AreaFrame, p: AreaPoint): Box {
   const { x, y } = fromAreaPoint(f, p)
   const s = f.s * SPOT_CLOSE_UP
   const W = view.photo.width ?? Infinity
@@ -122,10 +122,10 @@ export function spotBox(view: SpotWeekView, f: AreaFrame, p: AreaPoint): Box {
   return { x: Math.min(Math.max(x - s / 2, 0), W - s), y: Math.min(Math.max(y - s / 2, 0), H - s), w: s, h: s }
 }
 
-/** The counted mark at a place of an area that week (the nearest within SPOT_NEAR), or null. */
-export function markAt(view: SpotWeekView, f: AreaFrame, p: AreaPoint): SpotWeekView['marks'][number] | null {
+/** The counted mark at a place of an area at that check-in (the nearest within SPOT_NEAR), or null. */
+export function markAt(view: SpotCheckInView, f: AreaFrame, p: AreaPoint): SpotCheckInView['marks'][number] | null {
   const { x, y } = fromAreaPoint(f, p)
-  let best: SpotWeekView['marks'][number] | null = null
+  let best: SpotCheckInView['marks'][number] | null = null
   let bestD = Infinity
   for (const m of view.marks) {
     const d = Math.hypot(m.x - x, m.y - y)
@@ -137,8 +137,8 @@ export function markAt(view: SpotWeekView, f: AreaFrame, p: AreaPoint): SpotWeek
   return best
 }
 
-/** Where to start following: the biggest mark in the area that week, else the area's anchor. */
-export function startPoint(view: SpotWeekView, area: string, f: AreaFrame): AreaPoint {
+/** Where to start following: the biggest mark in the area at that check-in, else the area's anchor. */
+export function startPoint(view: SpotCheckInView, area: string, f: AreaFrame): AreaPoint {
   const big = view.marks.filter((m) => m.zone === area).sort((a, b) => b.r - a.r)[0]
   return big ? toAreaPoint(f, big.x, big.y) : { u: 0, v: 0 }
 }
@@ -185,8 +185,8 @@ function solve3(A: number[][], b: number[]): number[] | null {
 }
 
 /** The counted mark nearest a photo point within `radius` (plus the mark's own size), or null. */
-export function markNear(view: SpotWeekView, x: number, y: number, radius: number): SpotWeekView['marks'][number] | null {
-  let best: SpotWeekView['marks'][number] | null = null
+export function markNear(view: SpotCheckInView, x: number, y: number, radius: number): SpotCheckInView['marks'][number] | null {
+  let best: SpotCheckInView['marks'][number] | null = null
   let bestD = Infinity
   for (const m of view.marks) {
     const d = Math.hypot(m.x - x, m.y - y)
@@ -199,7 +199,7 @@ export function markNear(view: SpotWeekView, x: number, y: number, radius: numbe
 }
 
 /** A square of side `size` around a photo point, kept inside the photo. */
-export function boxAround(view: SpotWeekView, x: number, y: number, size: number): Box {
+export function boxAround(view: SpotCheckInView, x: number, y: number, size: number): Box {
   const W = view.photo.width ?? Infinity
   const H = view.photo.height ?? Infinity
   return { x: Math.min(Math.max(x - size / 2, 0), W - size), y: Math.min(Math.max(y - size / 2, 0), H - size), w: size, h: size }
@@ -213,7 +213,7 @@ const FRONT_AREAS = new Set(['forehead', 'nose', 'around_mouth', 'chin'])
  * marks the cheek photos counted in that area carried onto it through the face landmarks, so the area shows every
  * mark its count is made of (with cheek photos, the front measures only the middle of the chin and mouth skin).
  */
-export function areaPhoto(w: SpotWeek, area: string, prefer: ViewName): SpotWeekView | undefined {
+export function areaPhoto(w: SpotCheckIn, area: string, prefer: ViewName): SpotCheckInView | undefined {
   const front = viewOf(w, 'front')
   const rois = front?.full_rois ?? front?.rois
   if (!front || !FRONT_AREAS.has(area) || !rois?.some((r) => r.name === area)) return viewWithArea(w, area, prefer)

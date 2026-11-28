@@ -2,6 +2,7 @@
 
 import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
 import { DEV_UID } from './devAuth'
+import { langHeader } from './language'
 import type { LabelDetail } from './spotLabels'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
@@ -42,6 +43,8 @@ export type SessionView = {
     baseline: { session_id: string; frames: number | null; has_noise_band: boolean } | null
     note: string | null
     deviation: boolean
+    /** What else was different since the last check-in, as the person said (null: not answered). */
+    changes?: CheckInChanges | null
     error: { code: string; message: string } | null
     explanation_source: 'template' | 'gemini' | null
     preview: { url: string; width: number | null; height: number | null } | null
@@ -185,7 +188,7 @@ export type StoryProduct = {
 /** One counted mark on a photo (engine extras.marks, photo pixels): a blemish or a dark spot. */
 export type SpotMark = { kind: 'blemish' | 'spot'; x: number; y: number; r: number; zone: string | null }
 /** One photo of a check-in (front, or a cheek) with its areas and every mark counted on it. */
-export type SpotWeekView = {
+export type SpotCheckInView = {
   view: ViewName
   photo: { url: string; width: number | null; height: number | null }
   rois: { name: string; polygon: [number, number][] }[]
@@ -200,14 +203,14 @@ export type SpotWeekView = {
 }
 /** One face check-in for the spot diary: the counts Progress shows, and its photos. `complete`: every mark is placed
  * (engine 0.4.3+); older check-ins draw only the up to 40 marks the engine handed out, until measured again. */
-export type SpotWeek = {
+export type SpotCheckIn = {
   id: string
   created_at: string
   complete: boolean
   blemishes: number | null
   dark_spots: number | null
   by_zone: Record<string, { blemishes?: number; dark_spots?: number }>
-  views: SpotWeekView[]
+  views: SpotCheckInView[]
 }
 
 export type MetricStory = {
@@ -217,8 +220,69 @@ export type MetricStory = {
   source: 'gemini' | 'facts'
   products: StoryProduct[]
   has_previous: boolean
+  /** What the person noted as different since their last check-in (their tags, in words). */
+  this_week?: string[]
+  /** Patterns found by code across their check-ins for this reading ("Blemishes were higher on 4 of the 5…"). */
+  patterns?: string[]
   areas?: StoryArea[]
   spots?: { check_ins: number; days_covered: number; areas: StorySpotArea[] } | null
+}
+
+/** The tags a person can note at a check-in (api app/changes.py TAGS). */
+export type ChangeTag =
+  | 'period'
+  | 'stress_work'
+  | 'stress_study'
+  | 'sleep_poor'
+  | 'travel'
+  | 'travel_hot'
+  | 'travel_cold'
+  | 'travel_humid'
+  | 'sport_gym'
+  | 'sport_swim'
+  | 'sport_outdoor'
+  | 'sun'
+  | 'diet'
+  | 'diet_sugar'
+  | 'diet_dairy'
+  | 'diet_spicy'
+  | 'diet_alcohol'
+  | 'diet_less_water'
+  | 'routine_skipped'
+  | 'routine_new'
+  | 'makeup_new'
+  | 'clinic'
+  | 'picked'
+  | 'unwell'
+  | 'new_medicine'
+
+/** What else was different since the last check-in (kept on the session; private to the person). */
+export type CheckInChanges = { tags: ChangeTag[]; words: string[]; other: string | null; nothing: boolean; answered_at: string | null }
+
+/** GET /v1/sessions/{id}/changes: the answer so far, the last check-in's day, routine products in between. */
+export type ChangesPrefill = {
+  changes: CheckInChanges | null
+  since: string | null
+  routine: { name: string; brand: string; started: string | null; stopped: string | null; use: { days_used: number; of_days: number } | null }[]
+}
+
+/** POST /v1/sessions/{id}/changes/read: "Anything else?" read into tags for the person to confirm. */
+export type ChangesRead = {
+  tags: ChangeTag[]
+  words: string[]
+  products: { text: string; match: { product_id: string; brand: string; name: string } | null }[]
+  reaction: boolean
+  source: 'gemini' | 'words'
+}
+
+/** GET /v1/patterns: what else lines up with the person's readings (found by code, never a cause). */
+export type ChangePatterns = {
+  answered: number
+  patterns: { group: string; about: string; metric_id: string; metric: string; higher: boolean; way: string | null; noted: number; same_way: number; others: number; areas: string[]; text: string }[]
+  /** Enough check-ins on both sides and no clear difference (a finding, worded by the api). */
+  same: { group: string; about: string; text: string }[]
+  /** Noted, but not enough check-ins yet to compare: listed without numbers. */
+  learning: { group: string; about: string }[]
 }
 
 /** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */
@@ -248,6 +312,8 @@ export type AnswerBlock =
 export type AdvisorReply = {
   /** Plain text of the answer (older api builds send only this). */
   message: string
+  /** The language the words were translated into (api app/translate.py); absent for English. */
+  lang?: string
   /** The structured answer, answer first; absent from older api builds. */
   blocks?: AnswerBlock[]
   product_ids: string[]
@@ -401,6 +467,7 @@ export async function request<T>(token: string, path: string, init?: RequestInit
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}),
+      ...langHeader(),
       ...(init?.headers ?? {}),
     },
   }, timeoutMs)
@@ -490,8 +557,14 @@ export const api = {
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
   /** What changed for one metric since the previous check-in, in points (api app/metric_story.py). */
   metricStory: (token: string, sessionId: string, metricId: string) => request<MetricStory>(token, `/v1/sessions/${sessionId}/story/${metricId}`, undefined, LONG_TIMEOUT_MS),
-  patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
+  patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean; changes?: { tags: ChangeTag[]; other: string | null; nothing: boolean } | null }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
+  /** What changed since the last check-in: the answer so far and the routine in between (api app/changes.py). */
+  checkInChanges: (token: string, sessionId: string) => request<ChangesPrefill>(token, `/v1/sessions/${sessionId}/changes`),
+  /** "Anything else?" read into tags (Gemini, else a word list); saves nothing. */
+  readChanges: (token: string, sessionId: string, text: string) => request<ChangesRead>(token, `/v1/sessions/${sessionId}/changes/read`, { method: 'POST', ...json({ text }) }, LONG_TIMEOUT_MS),
+  /** What else lines up with the person's readings, across their answered check-ins. */
+  patterns: (token: string) => request<ChangePatterns>(token, '/v1/patterns'),
   /** `force`: measure a done session again with every frame (counts as an analysis). */
   analyze: (token: string, sessionId: string, force = false) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}/analyze${force ? '?force=1' : ''}`, { method: 'POST' }, ANALYZE_TIMEOUT_MS),
@@ -550,8 +623,8 @@ export const api = {
   retailerClaims: (token: string, productId: string, body: { channel: RetailerClaimChannel } & RetailerFilters) =>
     request<RetailerClaims>(token, `/v1/retailer/products/${encodeURIComponent(productId)}/claims`, { method: 'POST', ...json(body) }, LONG_TIMEOUT_MS),
   spots: (token: string) => request<SpotDiary>(token, '/v1/spots'),
-  /** The spot diary week by week: each face check-in's photos with every counted mark (api app/spot_weeks.py). */
-  spotWeeks: (token: string) => request<{ weeks: SpotWeek[] }>(token, '/v1/spots/weeks'),
+  /** The spot diary: each face check-in's photos with every counted mark (api app/spot_diary.py). */
+  spotCheckIns: (token: string) => request<{ check_ins: SpotCheckIn[] }>(token, '/v1/spots/check-ins'),
   demoSamples: () => publicGet<{ samples: DemoSample[] }>('/v1/demo/samples'),
   demoJourney: () => publicGet<{ sessions: SessionView[] }>('/v1/demo/journey'),
   demoStatus: () => publicGet<DemoStatus>('/v1/demo/status'),
@@ -590,7 +663,7 @@ export const api = {
   /** Wisp on the demo journey: Mei's stored chat, and questions answered from her data (never stored, no sign-in). */
   demoAdvisorHistory: () => publicGet<{ messages: AdvisorHistoryMessage[]; keep: number }>('/v1/demo/advisor/history'),
   demoAdvisorChat: async (messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) => {
-    const res = await fetch(`${API_URL}/v1/demo/advisor/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(images.length ? { messages, images } : { messages }) })
+    const res = await fetch(`${API_URL}/v1/demo/advisor/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(images.length ? { messages, images } : { messages }) })
     const body = (await res.json().catch(() => null)) as { detail?: { message?: string; code?: string } } | null
     if (!res.ok) throw new ApiError(res.status, body?.detail?.message ?? 'Wisp is unavailable right now.', body?.detail?.code ?? null, (body?.detail as Record<string, unknown>) ?? null)
     return body as unknown as AdvisorReply
@@ -598,6 +671,10 @@ export const api = {
   advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
   clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
   advisorChatStream,
+  /** Talk to Wisp: the spoken question as text and its language (api app/voice.py). */
+  voiceHear: (token: string, audio_base64: string, mime_type: string) => request<{ text: string; lang: string }>(token, '/v1/advisor/voice/hear', { method: 'POST', body: JSON.stringify({ audio_base64, mime_type }) }, LONG_TIMEOUT_MS),
+  /** Wisp's checked answer read aloud in the person's language: a WAV, base64. */
+  voiceSpeak: (token: string, text: string) => request<{ audio_base64: string; mime_type: string }>(token, '/v1/advisor/voice/speak', { method: 'POST', body: JSON.stringify({ text }) }, LONG_TIMEOUT_MS),
   /** Proof-gated promotion (api campaign_routes.py): the consumer's sponsored card and its events. */
   sponsored: (token: string, placement: SponsoredPlacement = 'routine') => request<{ item: SponsoredItem | null }>(token, `/v1/sponsored?placement=${placement}`),
   sponsoredEvent: (token: string, campaignId: string, kind: SponsoredEventKind) => request<void>(token, `/v1/sponsored/${encodeURIComponent(campaignId)}/events`, { method: 'POST', ...json({ kind }) }),
@@ -775,7 +852,7 @@ async function advisorChatStream(
     res = await fetch(`${API_URL}${demo ? '/v1/demo/advisor/chat/stream' : '/v1/advisor/chat/stream'}`, {
       method: 'POST',
       signal,
-      headers: { ...(demo ? {} : { Authorization: `Bearer ${token}` }), 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) },
+      headers: { ...(demo ? {} : { Authorization: `Bearer ${token}` }), 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}), ...langHeader() },
       body: JSON.stringify(images.length ? { messages, images } : { messages }),
     })
   } catch (e) {

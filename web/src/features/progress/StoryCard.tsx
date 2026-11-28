@@ -4,6 +4,7 @@ import type { Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { api, type MetricStory } from '../../lib/api'
 import { unitOf } from '../../lib/metrics'
+import { useLanguage } from '../../lib/language'
 import { useAuth } from '../../lib/useAuth'
 import { areaStatus, productLine, productStatus, sentence, spotLine, typicalLine, type Status } from './storyParts'
 
@@ -16,7 +17,8 @@ import { areaStatus, productLine, productStatus, sentence, spotLine, typicalLine
 export function StoryCard({ session, metricId }: { session: Session; metricId: string }) {
   const { getIdToken } = useAuth()
   const { mode } = useData()
-  const key = `${session.id}/${metricId}`
+  const lang = useLanguage()
+  const key = `${session.id}/${metricId}/${lang}`
   // The answer for one session and metric; anything else (a different key) means still loading.
   const [got, setGot] = useState<{ key: string; story: MetricStory | null } | null>(null)
 
@@ -142,6 +144,17 @@ function StoryDetails({ story, unit }: { story: MetricStory; unit: string }) {
               {`${allSpots.length - spots.length} more area${allSpots.length - spots.length === 1 ? '' : 's'} · show`}
             </button>
           ) : null}
+        </div>
+      ) : null}
+      {story.this_week?.length || story.patterns?.length ? (
+        <div className={block}>
+          <span className={head}>What else was going on · lines up with, never a cause</span>
+          {story.this_week?.length ? <p className="m-0 text-[15px] leading-[1.5]">Since your last check-in you noted: {story.this_week.join(', ')}.</p> : null}
+          {story.patterns?.map((p) => (
+            <p key={p} className="m-0 text-[15px] leading-[1.5]">
+              {p}
+            </p>
+          ))}
         </div>
       ) : null}
       {products.length ? (

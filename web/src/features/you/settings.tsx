@@ -16,12 +16,15 @@ export function Group({ id, title, children, tone = 'plain' }: { id: string; tit
   )
 }
 
-export function Row({ label, hint, children, stack = false, id }: { label: ReactNode; hint?: ReactNode; children?: ReactNode; stack?: boolean; id?: string }) {
+export function Row({ label, hint, children, stack = false, id, action }: { label: ReactNode; hint?: ReactNode; children?: ReactNode; stack?: boolean; id?: string; /** A stacked row's control in its top-right corner (e.g. Edit). */ action?: ReactNode }) {
   return (
     <div id={id} className={`flex scroll-mt-24 gap-x-6 gap-y-3 py-4 ${stack ? 'flex-col' : 'flex-wrap items-center justify-between'}`}>
-      <div className={`flex min-w-0 flex-col gap-0.5 ${stack ? '' : 'flex-[1_1_240px]'}`}>
-        <span className="text-[15px]">{label}</span>
-        {hint ? <span className="text-[13px] leading-[1.45] text-ink-2">{hint}</span> : null}
+      <div className={`flex min-w-0 items-start gap-3 ${stack ? '' : 'flex-[1_1_240px]'}`}>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[15px]">{label}</span>
+          {hint ? <span className="text-[13px] leading-[1.45] text-ink-2">{hint}</span> : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       {children ? <div className={stack ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'}>{children}</div> : null}
     </div>

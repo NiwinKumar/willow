@@ -22,6 +22,14 @@ gcloud run deploy willow-api --source api --region us-central1 \
 # once the reminders block of setup.sh has run, add (secrets mounted as env vars, not in the yaml):
 #   --update-secrets=VAPID_PRIVATE_KEY=willow-vapid-private:latest,VAPID_PUBLIC_KEY=willow-vapid-public:latest
 
+# Proof's daily prebuild (Nov 28): just after midnight UTC every cached Proof number is for a new day; this
+# rebuilds them before anyone visits (POST /v1/retailer/internal/warm, the reminder job's OIDC check: same
+# service account and audience). Free tier.
+gcloud scheduler jobs create http willow-proof-warm --location us-central1 --schedule "2 0 * * *" --time-zone Etc/UTC \
+  --http-method POST --uri https://willow-api-hrlt7lqdwa-uc.a.run.app/v1/retailer/internal/warm \
+  --oidc-service-account-email sa-scheduler@$PROJECT_ID.iam.gserviceaccount.com \
+  --oidc-token-audience https://willow-api-hrlt7lqdwa-uc.a.run.app/v1/internal/reminders --attempt-deadline 300s
+
 # web (VITE_API_URL is the api's Cloud Run URL). The Firebase web config (VITE_FIREBASE_*) is not in the repo:
 # put web/.env.local (from the team) in place first, or the build ships without it and sign-in fails
 # (auth/invalid-api-key, the app stuck on "Opening Willow"). App routes are served no-cache (firebase.json),

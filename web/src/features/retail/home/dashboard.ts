@@ -138,7 +138,7 @@ export function weekBrief(x: BriefInput): string[] {
   }
   if (x.rate && x.market && x.mix === 'brand') {
     const d = Math.round((x.rate.rate - x.market.rate) * 100)
-    s.push(`${pct(x.rate.rate)} of people using them saw a visible change (n=${int(x.rate.n)}), ${d === 0 ? 'level with' : `${Math.abs(d)} ${Math.abs(d) === 1 ? 'point' : 'points'} ${d > 0 ? 'above' : 'below'}`} the market’s ${pct(x.market.rate)}.`)
+    s.push(`${pct(x.rate.rate)} of uses saw a visible change by week 8 (${int(x.rate.n)} product uses), ${d === 0 ? 'level with' : `${Math.abs(d)} ${Math.abs(d) === 1 ? 'point' : 'points'} ${d > 0 ? 'above' : 'below'}`} the market’s ${pct(x.market.rate)}.`)
   }
   // What moved: demand first (no tile shows it); the best campaign lift only when demand is flat.
   if (x.rising && x.rising.change !== null && Math.round(x.rising.change * 100) > 0) s.push(`Demand for ${x.rising.goal.toLowerCase()} grew ${Math.round(x.rising.change * 100)}% last month, to ${int(x.rising.latest)} people.`)

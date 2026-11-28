@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
+import { ArrowRight, Lightbulb } from 'lucide-react'
 
+import { LogoMark } from '../../components/willow/Logo'
 import { ProductImage } from '../../components/willow/ProductImage'
 import type { RoutineEntry } from '../../data/types'
 import { imageOf } from '../routine/routineModel'
@@ -48,13 +50,19 @@ function fit(n: number): { rows: number; cols: number; px: number } {
  * rests today is drawn fainter with "RESTS ☾" and is not counted as due. A dashed Sunscreen slot appears only
  * when the routine check found that gap; the conflict chip is the check's first finding.
  */
+/** "Alternate nights for Retinol and Skin Perfecting"; without a short fix, "Retinol and Skin Perfecting: see how to pair them". */
+function tipText(c: { names: string[]; fix: string | null }): string {
+  const names = c.names.length > 1 ? `${c.names.slice(0, -1).join(', ')} and ${c.names.at(-1)}` : (c.names[0] ?? '')
+  return c.fix ? `${c.fix.charAt(0).toUpperCase()}${c.fix.slice(1)} for ${names}` : `${names}: see how to pair them`
+}
+
 export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflict, onRoutine, className }: {
   am: RoutineEntry[]
   pm: RoutineEntry[]
   used: (entryId: string, slot: Slot) => boolean
   onToggle: (entry: RoutineEntry, slot: Slot, on: boolean) => void
   missingSunscreen: boolean
-  conflict: { label: string; title: string } | null
+  conflict: { names: string[]; fix: string | null; title: string } | null
   onRoutine: () => void
   className?: string
 }) {
@@ -70,23 +78,35 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           <span className="text-caption text-ink-2">Tap a product when you use it</span>
         </div>
         {conflict ? (
-          <button type="button" onClick={onRoutine} title={conflict.title} aria-label={`Routine check: ${conflict.title}`} className="flex min-h-11 items-center gap-1.5 text-left text-[12px] text-ink-2 transition-colors hover:text-ink sm:ml-auto">
-            <span aria-hidden>△</span>
-            {conflict.label}
+          // The routine check's first finding, said as the tip it is ("Alternate nights for Retinol and Skin
+          // Perfecting"): two products that are better not used together, and how to space them.
+          <button type="button" onClick={onRoutine} title={conflict.title} className="hit44 flex items-center gap-1.5 rounded-pill bg-sunken px-3 py-1.5 text-left text-[12.5px] text-ink transition-colors hover:bg-muted sm:ml-auto">
+            <Lightbulb size={14} strokeWidth={1.8} aria-hidden className="shrink-0 text-ink-2" />
+            <span className="text-pretty"><span className="sr-only">Routine tip: </span>{tipText(conflict)}</span>
           </button>
         ) : null}
       </div>
       {sample ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-[18px] bg-[var(--synthetic-bg)] px-4 py-3 text-[12.5px] text-[var(--synthetic-fg)]" style={{ animation: 'wRise .5s .2s both' }}>
-          {/* Title over its sentence as one block, the button beside it (below it when there is no room). */}
-          <span className="flex min-w-0 flex-[1_1_180px] flex-col gap-0.5 text-left">
-            <span className="font-medium">Sample routine</span>
-            <span className="leading-[1.4] text-pretty">Set up to show the routine check, not picked for your skin.</span>
+        // The guest starter routine, said kindly and with the way out: a soft aura card (the app's own hues, not a
+        // warning colour), a Willow bud, and the one action on the right.
+        <button
+          type="button"
+          onClick={() => navigate('/plan')}
+          className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[22px] py-2.5 pr-2.5 pl-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,.7),0_10px_24px_-18px_rgba(122,92,255,.45)] transition-[scale,box-shadow] duration-200 ease-standard hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,.9),0_14px_28px_-16px_rgba(122,92,255,.5)] active:scale-[.985]"
+          style={{ background: 'linear-gradient(115deg, #FFF0E4 0%, #FCE8F3 48%, #ECE6FF 100%)', animation: 'wRise .5s .2s both' }}
+        >
+          <span aria-hidden className="grid size-10 place-items-center rounded-full bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,.9)] transition-transform duration-300 ease-standard group-hover:-translate-y-0.5">
+            <LogoMark size={26} />
           </span>
-          <button type="button" onClick={() => navigate('/plan')} className="hit44 min-h-9 shrink-0 rounded-pill bg-selected px-3.5 text-[12.5px] text-inverse transition-[scale] duration-200 ease-standard active:scale-[.97]">
-            Build me a routine
-          </button>
-        </div>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[14px] font-medium text-ink">This is a sample</span>
+            <span className="text-[12.5px] leading-[1.4] text-ink-2 text-pretty">Let Willow build yours</span>
+          </span>
+          <span className="flex min-h-10 items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[13px] text-inverse transition-[gap] duration-200 ease-standard group-hover:gap-2">
+            Build mine
+            <ArrowRight size={14} strokeWidth={1.8} aria-hidden />
+          </span>
+        </button>
       ) : null}
       <div className="flex flex-1 flex-wrap gap-2.5">
         {(['am', 'pm'] as const).map((slot) => {
@@ -115,7 +135,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                     <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
-                    <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
+                    <button type="button" onClick={onRoutine} aria-label="Sunscreen missing in Morning. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
                       <span aria-hidden className="grid place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-white/50 text-[16px]" style={{ width: px, height: px }}>
                         +
                       </span>

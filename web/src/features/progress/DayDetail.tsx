@@ -21,6 +21,7 @@ import { useAuth } from '../../lib/useAuth'
 import { readableWarnings } from '../../lib/warnings'
 import { CHANGE_WORDS, VERDICT_WORDS, changeCounts, changeLines, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { BaselineDialog } from './BaselineDialog'
+import { ChangesRow } from './ChangesRow'
 import { InsightsCard, NextAction } from './ExplanationCard'
 import { frameFor, photoSize } from './frame'
 import { MetricTile } from './MetricCard'
@@ -225,6 +226,8 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
         : 'not compared'
 
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
+  // What else was different (asked at face check-ins): shown on the day of a measured face check-in.
+  const faceCheckIn = shown.find((s) => s.site === 'face_full' && s.live && s.status === 'done') ?? null
   const notes = [
     ...started.map((e) => ({
       text: `Started ${productName(e)}`,
@@ -232,7 +235,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
     })),
     ...shown.flatMap((s) =>
       sessionNotes(s)
-        .filter((n) => n.kind !== 'note')
+        .filter((n) => n.kind !== 'note' && n.kind !== 'changes')
         .map((n) => (multi ? { ...n, text: `${placeOf(s)}: ${n.text}` } : n)),
     ),
   ]
@@ -365,6 +368,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
                 <span className="max-w-[190px] text-[13.5px] leading-[1.3]">{bigLabel}</span>
               </div>
             </div>
+            {faceCheckIn ? <ChangesRow session={faceCheckIn} /> : null}
           </section>
           {told.length ? (
             <div className="grid content-stretch gap-3">

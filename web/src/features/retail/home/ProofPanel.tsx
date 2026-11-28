@@ -21,7 +21,7 @@ import { proofRows } from './dashboard'
 /** Rows the panel always has: blank rows hold the frame when fewer products are compared (Home is a fixed layout). */
 const ROWS = 5
 
-export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '' }: { rows: ProductRow[]; mix: 'brand' | 'retailer'; scopeWord: string; weeks: number; brand: string | null; className?: string }) {
+export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '', loading = false }: { rows: ProductRow[]; mix: 'brand' | 'retailer'; scopeWord: string; weeks: number; brand: string | null; className?: string; loading?: boolean }) {
   const { carry } = useRetailState()
   const { rows: shown, count } = proofRows(rows, ROWS)
   const title = mix === 'brand' ? 'How your products compare' : `Strongest in ${scopeWord}`
@@ -37,7 +37,18 @@ export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '' 
           </Link>
         ) : null}
       </div>
-      {shown.length ? (
+      {loading ? (
+        // the products are still loading: the panel's frame with skeleton rows, never "none of your products"
+        <ul aria-hidden className="m-0 flex list-none flex-col p-0 pt-9">
+          {Array.from({ length: ROWS }, (_, k) => (
+            <li key={k} className="flex h-[65px] items-center gap-4 border-t border-line px-5">
+              <span className="retail-shimmer h-3.5 w-[34%] rounded-pill" />
+              <span className="retail-shimmer ml-auto h-2 w-[38%] rounded-pill" />
+              <span className="retail-shimmer h-3.5 w-12 rounded-pill" />
+            </li>
+          ))}
+        </ul>
+      ) : shown.length ? (
         <>
           <p className="m-0 flex flex-wrap items-center gap-x-4 gap-y-1 px-5 pb-3 text-proof-small text-ink-2">
             <span>Visible change by week {weeks}:</span>

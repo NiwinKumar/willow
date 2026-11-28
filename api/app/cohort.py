@@ -2,7 +2,7 @@
 
 USERS simulated people, every row `is_synthetic = true`, fixed seed. What is simulated, stated
 plainly (the retailer page's "About this data" panel repeats it):
-- People and products: USERS people (30,000) using the 1,500 best-known catalog products in
+- People and products: USERS people (35,000) using the 1,500 best-known catalog products in
   api/seed/cohort_products.json (scripts/pick_cohort_products.py: the 48 products of the first
   cohort, every full product with a measured concern, then index products of famous brands by
   hero-product rank, balanced across categories and regions). Most products carry the
@@ -101,6 +101,21 @@ SKIN_EFFECT = {
 SKIN_SPREAD = (0.85, 1.15)  # random spread per product x skin type
 # Weekly drift of an effective product at full size, in units of the metric's MDC95 (invented).
 EFFECT_RANGE = (0.45, 1.2)
+# How much of that a product's category can plausibly move skin (finals, Nov 28: a rinse-off
+# cleanser showed +54 points over people not using it, which no reviewer believes). Leave-on
+# actives keep the full size; a cleanser is on the skin for a minute; sunscreen protects more than
+# it changes. Applied after the draw, so every random stream and person stays what it was.
+CATEGORY_EFFECT = {
+    "serum": 1.0,
+    "treatment": 1.0,
+    "exfoliant": 0.9,
+    "eye_care": 0.7,
+    "moisturizer": 0.55,
+    "mask": 0.45,
+    "toner": 0.4,
+    "sunscreen": 0.35,
+    "cleanser": 0.2,
+}
 SWITCH_SHARE = 0.5  # of stopped product uses, the share followed by another product
 # How strongly switchers lean toward category products that work for others and are popular
 # (an invented assumption): weight = ((1 + effect) * (1 + share already using it)) ** PULL.
@@ -442,7 +457,8 @@ def generate(
     noise = _noise()
     effect: dict[str, float] = {}
     for p in products:  # weekly drift, in units of the metric's MDC95, at full size
-        effect[p["product_id"]] = 0.0 if rng.random() < 0.3 else rng.uniform(*EFFECT_RANGE)
+        drawn = 0.0 if rng.random() < 0.3 else rng.uniform(*EFFECT_RANGE)
+        effect[p["product_id"]] = drawn * CATEGORY_EFFECT.get(p["category"], 0.6)
     goals_pool = [g for g in GOALS if g in by_goal]
     # New draws come from their own streams (SEED + n), so every draw above and in the loop below
     # stays what it is without switching and skin effects: the same people, goals, routines,
