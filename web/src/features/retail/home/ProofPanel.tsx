@@ -18,9 +18,12 @@ import { proofRows } from './dashboard'
  * the panel's arrival, nothing over text; (4) kit panel, tier dots, leaf for the product's own mark only.
  */
 
+/** Rows the panel always has: blank rows hold the frame when fewer products are compared (Home is a fixed layout). */
+const ROWS = 5
+
 export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '' }: { rows: ProductRow[]; mix: 'brand' | 'retailer'; scopeWord: string; weeks: number; brand: string | null; className?: string }) {
   const { carry } = useRetailState()
-  const { rows: shown, count } = proofRows(rows, 5)
+  const { rows: shown, count } = proofRows(rows, ROWS)
   const title = mix === 'brand' ? 'How your products compare' : `Strongest in ${scopeWord}`
   return (
     <section aria-labelledby="proof-h" className={`flex min-w-0 flex-col rounded-card border border-line bg-surface ${className}`}>
@@ -57,6 +60,11 @@ export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '' 
           <ul className="m-0 flex list-none flex-col p-0">
             {shown.map((r, i) => (
               <ProofRow key={r.product_id} r={r} i={i} carry={carry} showBrand={mix === 'retailer'} />
+            ))}
+            {Array.from({ length: ROWS - shown.length }, (_, k) => (
+              <li key={`blank-${k}`} className="flex h-[65px] items-center border-t border-line px-5 text-proof-small text-ink-2">
+                {k === 0 ? `A product shows here once 10 people using it reach week ${weeks}` : null}
+              </li>
             ))}
           </ul>
         </>

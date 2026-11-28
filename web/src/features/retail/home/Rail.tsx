@@ -25,7 +25,13 @@ const ICON: Record<Update['kind'], { icon: LucideIcon; tone: string }> = {
   live: { icon: Megaphone, tone: 'text-ink-2' },
 }
 
-export function NeedsYou({ count, loading, cards, empty, updates, updatesTotal, onAllUpdates, actions, className = '' }: { count: number; loading: boolean; cards: ReactNode; empty: boolean; updates: Update[]; updatesTotal: number; onAllUpdates: () => void; actions?: ReactNode; className?: string }) {
+/** Decision cards Needs you always shows: a fixed frame, so Home's layout never moves with the data. */
+export const SLOTS = 2
+/** Rows Latest always shows (blank rows keep the panel's shape when fewer things moved). */
+export const LATEST_ROWS = 3
+
+export function NeedsYou({ count, loading, cards, empty, actions, className = '' }: { count: number; loading: boolean; cards: ReactNode[]; empty?: ReactNode; actions?: ReactNode; className?: string }) {
+  const open = Math.max(0, SLOTS - cards.length)
   return (
     <aside aria-labelledby="needs-h" className={`flex min-w-0 flex-col gap-3 ${className}`}>
       <div className="flex h-8 items-center justify-between gap-2">
@@ -35,42 +41,65 @@ export function NeedsYou({ count, loading, cards, empty, updates, updatesTotal, 
         </h2>
         {actions ? <div className="-mr-1.5 flex items-center gap-0.5">{actions}</div> : null}
       </div>
-      {loading ? (
-        <div aria-hidden className="flex flex-col gap-3">
-          <div className="retail-shimmer h-[196px] rounded-card" />
-          <div className="retail-shimmer h-[196px] rounded-card" />
-        </div>
-      ) : empty ? (
-        <div className="flex items-start gap-3 rounded-card border border-line bg-surface px-4 py-4 animate-[proofPage_.24s_var(--ease-standard)_both]">
-          <CheckCircle2 size={18} strokeWidth={1.8} aria-hidden className="mt-px shrink-0 text-proof-leaf" />
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-proof-body font-medium text-ink">Nothing to decide today</span>
-            <span className="text-proof-small text-ink-2 [text-wrap:pretty]">A card appears when the data moves: a product nears Proven, a campaign’s lift comes in, demand shifts.</span>
-          </span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fit,minmax(240px,1fr))] lg:grid-cols-1">{cards}</div>
-      )}
-      {updates.length ? (
-        <section aria-labelledby="latest-h" className="mt-3 flex flex-col">
-          <div className="flex items-baseline justify-between gap-3 pb-1">
-            <h3 id="latest-h" className="m-0 text-proof-body font-semibold text-ink">
-              Latest
-            </h3>
-            {updatesTotal > updates.length ? (
-              <button type="button" onClick={onAllUpdates} className="hit44 rounded-ctl border-0 bg-transparent px-1 text-proof-small text-ink-2 hover:text-ink">
-                All results ↓
-              </button>
-            ) : null}
+      {/* Two equal slots that fill the column's height (the left column sets it): cards stretch, actions sit at
+          their foot, and a slot with no card holds a quiet line instead of collapsing. */}
+      <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1 lg:grid-rows-2">
+        {loading ? (
+          <>
+            <div aria-hidden className="retail-shimmer min-h-[196px] rounded-card" />
+            <div aria-hidden className="retail-shimmer min-h-[196px] rounded-card" />
+          </>
+        ) : !cards.length && empty ? (
+          <div className="md:col-span-2 lg:col-span-1 lg:row-span-2">{empty}</div>
+        ) : !cards.length ? (
+          <div className="flex min-h-[160px] items-start gap-3 rounded-card border border-line bg-surface px-4 py-4 md:col-span-2 lg:col-span-1 lg:row-span-2 animate-[proofPage_.24s_var(--ease-standard)_both]">
+            <CheckCircle2 size={18} strokeWidth={1.8} aria-hidden className="mt-px shrink-0 text-proof-leaf" />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-proof-body font-medium text-ink">Nothing to decide today</span>
+              <span className="text-proof-small text-ink-2 [text-wrap:pretty]">A card appears when the data moves: a product nears Proven, a campaign’s lift comes in, demand shifts.</span>
+            </span>
           </div>
-          <ul className="m-0 flex list-none flex-col p-0">
-            {updates.map((u) => (
-              <UpdateRow key={u.key} u={u} />
+        ) : (
+          <>
+            {cards}
+            {Array.from({ length: open }, (_, k) => (
+              <div key={`open-${k}`} className="flex min-h-[120px] items-center justify-center rounded-card border border-dashed border-line px-4 text-center text-proof-small text-ink-2">
+                Nothing else waits for you
+              </div>
             ))}
-          </ul>
-        </section>
-      ) : null}
+          </>
+        )}
+      </div>
     </aside>
+  )
+}
+
+/** "Latest": one line per thing that moved, always LATEST_ROWS rows tall, beside demand and the funnel. */
+export function LatestPanel({ updates, total, onAll, className = '' }: { updates: Update[]; total: number; onAll: () => void; className?: string }) {
+  const shown = updates.slice(0, LATEST_ROWS)
+  return (
+    <section aria-labelledby="latest-h" className={`flex min-w-0 flex-col rounded-card border border-line bg-surface ${className}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 pb-2 pt-4">
+        <h2 id="latest-h" className="m-0 text-proof-h text-ink">
+          Latest
+        </h2>
+        {total > shown.length ? (
+          <button type="button" onClick={onAll} className="hit44 rounded-ctl border-0 bg-transparent px-0 text-proof-small text-ink-2 hover:text-ink">
+            All {int(total)} ↓
+          </button>
+        ) : null}
+      </div>
+      <ul className="m-0 flex flex-1 list-none flex-col p-0 px-3 pb-3">
+        {shown.map((u) => (
+          <UpdateRow key={u.key} u={u} />
+        ))}
+        {Array.from({ length: LATEST_ROWS - shown.length }, (_, k) => (
+          <li key={`blank-${k}`} className="flex flex-1 items-center border-t border-line px-2 py-2.5 text-proof-small text-ink-2 first:border-t-0">
+            {k === 0 ? (shown.length ? 'Nothing else new' : 'Nothing new yet: results, requests and live campaigns show here') : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -87,7 +116,7 @@ function UpdateRow({ u }: { u: Update }) {
   )
   const cls = 'flex w-full items-start gap-2.5 rounded-ctl border-0 bg-transparent px-2 py-2.5 text-left no-underline transition-colors hover:bg-pf-hover'
   return (
-    <li className="border-t border-line first:border-t-0">
+    <li className="flex flex-1 flex-col border-t border-line first:border-t-0">
       {u.to ? (
         <Link to={u.to} className={cls}>
           {body}

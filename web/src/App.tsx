@@ -29,6 +29,7 @@ const Home = lazy(() => import('./features/home/Home'))
 const Progress = lazy(() => import('./features/progress/Progress'))
 const Result = lazy(() => import('./features/progress/Result'))
 const ProductTest = lazy(() => import('./features/progress/ProductTest'))
+const SpotsPage = lazy(() => import('./features/progress/SpotsPage'))
 const Routine = lazy(() => import('./features/routine/Routine'))
 const You = lazy(() => import('./features/you/You'))
 
@@ -75,6 +76,7 @@ export default function App() {
               <Route path="/result" element={<Page><Result /></Page>} />
               <Route path="/result/:sessionId" element={<Page><Result /></Page>} />
               <Route path="/test" element={<Page><ProductTest /></Page>} />
+              <Route path="/spots" element={<Page><SpotsPage /></Page>} />
               <Route path="/routine" element={<Page><Routine /></Page>} />
               <Route path="/you" element={<Page><You /></Page>} />
               <Route path="/replay/:day" element={<Page><CheckInReplay /></Page>} />
