@@ -492,11 +492,20 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
 @keyframes wLine { from { transform: scaleX(0) } to { transform: scaleX(1) } }
 @keyframes wDrawPath { to { stroke-dashoffset: 0 } }
 
-/* The page making room for Wisp or the sidebar (AppShell morph): the page's box glides to its new size while
-   the old frame stays crisp (not stretched) and the new one fades in over it; everything else holds still. */
-::view-transition-group(willow-page) {
-  animation-duration: 440ms;
+/* Page morph (components/shell/morph.ts): the page making room for Wisp or the sidebar. Each card in view is
+   its own shared element: its box glides and resizes to its new place on the panel's spring curve, and its
+   contents (drawn at the box's width) cross-fade early and quickly from the old layout to the new one, so the
+   double image is brief and nothing jumps. The cut to the card's rounded box keeps a taller old layout from
+   showing below it. The rest of the page (headings, gaps) cross-fades in place, unscaled. Closing is a
+   little quicker, like the panel. */
+::view-transition-group(willow-page),
+::view-transition-group(*.willow-card) {
+  animation-duration: 480ms;
   animation-timing-function: cubic-bezier(.32, .72, 0, 1);
+}
+::view-transition-group(*.willow-card) {
+  overflow: clip;
+  border-radius: 30px;
 }
 ::view-transition-old(willow-page),
 ::view-transition-new(willow-page) {
@@ -505,18 +514,32 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
   object-fit: none;
   object-position: left top;
 }
-::view-transition-old(willow-page) {
-  animation: 260ms cubic-bezier(.4, 0, 1, 1) both vt-fade-out;
+::view-transition-old(willow-page),
+::view-transition-old(*.willow-card) {
+  animation: 180ms ease-out both vt-fade-out;
 }
-::view-transition-new(willow-page) {
-  animation: 380ms cubic-bezier(.32, .72, 0, 1) 60ms both vt-fade-in;
+::view-transition-new(willow-page),
+::view-transition-new(*.willow-card) {
+  animation: 180ms ease-out both vt-fade-in;
+}
+:root[data-morph="close"]::view-transition-group(willow-page),
+:root[data-morph="close"]::view-transition-group(*.willow-card) {
+  animation-duration: 380ms;
 }
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
 }
-::view-transition-group(wisp-panel) {
+/* Wisp's panel and button stay live through the morph (their own transitions keep playing), above the cards. */
+::view-transition-group(wisp-panel),
+::view-transition-group(wisp-fab),
+::view-transition-new(wisp-panel),
+::view-transition-new(wisp-fab) {
   animation: none;
+}
+::view-transition-old(wisp-panel),
+::view-transition-old(wisp-fab) {
+  display: none;
 }
 @keyframes vt-fade-out { to { opacity: 0 } }
 @keyframes vt-fade-in { from { opacity: 0 } }

@@ -1,5 +1,5 @@
 import { Copy, ExternalLink, Info, RotateCcw } from 'lucide-react'
-import { memo, useState, type ReactNode } from 'react'
+import { memo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import { Disclaimer } from '../../components/willow/Disclaimer'
@@ -21,6 +21,7 @@ import { useChecks, type ProductCheck } from '../../lib/safety'
 import { CheckedChip } from '../../components/willow/CheckedChip'
 import { ReactionEscalation } from './ReactionEscalation'
 import { mentionsReaction } from '../../lib/reactions'
+import { useGrow } from './motion'
 
 /** "gemini-3.8-flash" -> "Gemini 3.8 Flash" for the info popover. */
 const modelName = (id: string) => id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -40,7 +41,7 @@ export const UserBubble = memo(function UserBubble({ m }: { m: Extract<ChatMessa
   return (
     <div className="group flex flex-col items-end gap-1">
       {m.context ? <span className="text-[12px] text-ink-2">From {m.context}</span> : null}
-      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .35s cubic-bezier(.2,.7,.2,1) both' }}>
+      <div className="flex max-w-[min(82%,560px)] flex-col gap-2.5 rounded-[26px_26px_8px_26px] bg-selected px-3.5 py-2.5 text-[13.5px] leading-[1.45] whitespace-pre-wrap text-inverse" style={{ animation: 'advSlide .42s cubic-bezier(.32,.72,0,1) both' }}>
         {m.photos?.length ? (
           <span className="flex flex-wrap justify-end gap-1.5">
             {m.photos.map((p) => (
@@ -182,6 +183,11 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions, que
   // The api may flag it (`escalation`); else the question's own words.
   const reaction = Boolean((r as AdvisorReply & { escalation?: unknown }).escalation) || mentionsReaction(question)
   const revealing = m.shown < m.blocks.length
+  // A just-arrived answer: its bubble opens out of the thinking bubble and down to each new block (motion.ts),
+  // with Wisp's mark holding still in its place; an answer from the history rises in as a whole.
+  const [fresh] = useState(() => Date.now() - Date.parse(m.at) < 3000)
+  const bubble = useRef<HTMLDivElement>(null)
+  useGrow(bubble, `${m.shown}${revealing}`, fresh, '8px 28px 28px 28px')
   const byId = new Map(r.products.map((p) => [p.product_id, p]))
   const productName = (id: string) => byId.get(id)?.name ?? null
   // A translated answer names measurements, verdicts and card labels in its own language (api translate.py).
@@ -198,15 +204,15 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions, que
   }
   const widgetLinks: WidgetLinks = { go: actions.go, onProduct: actions.onProduct, onAdd: actions.onAdd, product: (id) => byId.get(id) ?? null, labels }
   return (
-    <div className="group flex w-full items-start gap-3" style={{ animation: 'wRise .4s both' }} aria-busy={revealing}>
+    <div className="group flex w-full items-start gap-3" style={{ animation: fresh ? undefined : 'wRise .4s both' }} aria-busy={revealing}>
       <span className="-mt-0.5 -ml-1">
         <WispMark size={34} state={revealing ? 'speaking' : 'idle'} still={!revealing} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div lang={r.lang} className="flex min-w-0 flex-col gap-3 rounded-[8px_28px_28px_28px] bg-surface px-4 pt-3.5 pb-2 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
+        <div ref={bubble} lang={r.lang} className="flex min-w-0 flex-col gap-3 rounded-[8px_28px_28px_28px] bg-surface px-4 pt-3.5 pb-2 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
           {/* Screen readers get each block once, as it appears; the reveal is only visual. */}
           {m.blocks.slice(0, m.shown).map((b, i) => (
-            <div key={i} style={{ animation: 'advIn .55s cubic-bezier(.2,.7,.2,1) both' }}>
+            <div key={i} style={{ animation: `advIn .5s cubic-bezier(.32,.72,0,1) ${fresh && i === 0 ? 120 : 60}ms both` }}>
               {b.type === 'widget' ? (
                 <Widget spec={b.widget} links={widgetLinks} />
               ) : b.type === 'products' ? (
