@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from app import reminders
+from app import reminder_text, reminders
 from app.auth import AuthUser, current_user
 from app.settings import Settings, get_settings
 from app.store import Store, get_store
@@ -155,6 +155,17 @@ def push_test(
     return _deliver(store, user.uid, reminders.payload("test"), settings)
 
 
+@router.get("/me/recap")
+def weekly_recap(
+    user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
+) -> dict[str, Any]:
+    """This week's reminder line and recap line (app/reminder_text.py); null when none passed."""
+    doc = store.user_get(user.uid) or {}
+    places = reminders.places_of(doc.get("profile"))
+    lines = reminder_text.lines(store, user.uid, doc, places, datetime.now(UTC).date())
+    return {"body": lines["body"] if lines else None, "recap": (lines or {}).get("recap") or None}
+
+
 def _scheduler(
     authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
@@ -211,7 +222,8 @@ def run_reminders(
             continue
         testing = any(t.get("ended_at") is None for _, t in store.product_tests_list(uid))
         places = reminders.places_of(doc.get("profile"), test_running=testing)
-        result = _deliver(store, uid, reminders.payload("checkin", places), settings)
+        message = reminder_text.checkin_message(store, uid, doc, places, day)
+        result = _deliver(store, uid, message, settings)
         for k, v in result.items():
             totals[k] += v
     log.info("reminders run: %s", totals)

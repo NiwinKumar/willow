@@ -2,9 +2,10 @@ import { ChevronDown, Info, RefreshCw, Sparkles } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { useShell } from '../../components/shell/ShellContext'
-import type { RoutineCheck } from '../../data/types'
+import type { RoutineCheck, RoutineFix } from '../../data/types'
 import type { QueryResult } from '../../lib/query'
 import { useMediaQuery } from '../../lib/useMediaQuery'
+import { fixFor } from './fixes'
 import { ProductImage } from './productUi'
 import { SEVERITY_STYLE, compactName, entryName, imageOf, type Finding } from './routineModel'
 
@@ -24,7 +25,7 @@ const ROWS_FROM = 3
  * findings are one-line rows that open on tap, so the lists stay in reach. It runs by itself whenever the
  * routine changes (useRoutineCheck is keyed by the routine); the icon button re-asks.
  */
-export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }: { check: QueryResult<RoutineCheck> & { rerun: () => Promise<void> }; findings: Finding[]; count: number; onFind: (f: Finding) => void; onAlternate: (f: Finding) => Promise<void> }) {
+export function RoutineCheckCard({ check, findings, count, onFind, onAlternate, fixes, onApplyFix }: { check: QueryResult<RoutineCheck> & { rerun: () => Promise<void> }; findings: Finding[]; count: number; onFind: (f: Finding) => void; onAlternate: (f: Finding) => Promise<void>; fixes?: RoutineFix[]; onApplyFix?: (fix: RoutineFix) => Promise<void> }) {
   const shell = useShell()
   const phone = useMediaQuery('(max-width: 639px)')
   const [rerun, setRerun] = useState(false)
@@ -37,6 +38,14 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
     setAlternating(f.key)
     try {
       await onAlternate(f)
+    } finally {
+      setAlternating(null)
+    }
+  }
+  const apply = async (f: Finding, fix: RoutineFix) => {
+    setAlternating(f.key)
+    try {
+      await onApplyFix?.(fix)
     } finally {
       setAlternating(null)
     }
@@ -124,6 +133,8 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
             {shown.map((f, i) => {
               const sev = SEVERITY_STYLE[f.severity]
               const open = !phone || openKey === f.key
+              // A checked fix (Gemini's proposal, validated against the rule table) replaces "Alternate these"
+              const fix = onApplyFix ? fixFor(f, fixes) : null
               const items = f.entries.length ? f.entries.map((e) => ({ id: e.id, name: compactName(e), full: entryName(e), image: <ProductImage product={imageOf(e)} size={rows ? 20 : 26} decorative /> })) : f.products.map((p) => ({ id: p, name: p, full: p, image: null }))
               const actions = (
                 <span className={`flex flex-wrap gap-2 ${rows ? 'justify-end @min-[700px]:shrink-0 @min-[700px]:flex-nowrap' : 'mt-auto justify-end pt-1'}`}>
@@ -132,7 +143,11 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                       Find one
                     </button>
                   ) : null}
-                  {f.alternate && f.entries.length === 2 ? (
+                  {fix ? (
+                    <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void apply(f, fix)} className="hit44 min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink disabled:opacity-60">
+                      {alternating === f.key ? 'Saving…' : 'Apply'}
+                    </button>
+                  ) : f.alternate && f.entries.length === 2 ? (
                     <button type="button" disabled={alternating !== null} aria-busy={alternating === f.key} onClick={() => void alternate(f)} className="hit44 min-h-8 rounded-pill bg-white px-3.5 text-[12.5px] text-ink disabled:opacity-60">
                       {alternating === f.key ? 'Saving…' : 'Alternate these'}
                     </button>
@@ -180,6 +195,15 @@ export function RoutineCheckCard({ check, findings, count, onFind, onAlternate }
                         </button>
                       ) : null}
                     </div>
+                    {open && fix ? (
+                      <p className="flex items-start gap-1.5 text-[12.5px] leading-[1.45] text-[#D5D8FF] motion-safe:animate-[wRise_.3s_var(--ease-standard)_both]">
+                        <Sparkles size={12} strokeWidth={1.8} aria-hidden className="mt-[3px] shrink-0" />
+                        <span>
+                          <span className="sr-only">Suggested fix, checked against the ingredient rules: </span>
+                          {fix.reason}
+                        </span>
+                      </p>
+                    ) : null}
                     {open && !rows ? productList : null}
                   </div>
                   {open && rows ? (

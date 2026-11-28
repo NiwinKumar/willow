@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { useRoutine, useRoutineCheck, useRoutineLog } from '../../data/hooks'
-import type { Product, RoutineEntry } from '../../data/types'
+import type { Product, RoutineEntry, RoutineFix } from '../../data/types'
 import { useData } from '../../data/useData'
 import { localDay } from '../../lib/api'
 import { fmtDate, plural } from '../../lib/format'
@@ -18,6 +18,7 @@ import { useProductTests } from './productTests'
 import { entryName, findingsOf, useOutcomeSessions, type Finding } from './routineModel'
 import { addDays } from './schedule'
 import { RoutineCheckCard } from './RoutineCheckCard'
+import { useRoutineFixes } from './fixes'
 import { SlotCard } from './SlotCard'
 import { SponsoredCard } from './SponsoredCard'
 import { ProductTests, TestStrip } from './TestsTab'
@@ -56,6 +57,7 @@ export default function Routine() {
   const stopped = useMemo(() => entries.filter((e) => e.ended_at), [entries])
   const check = useRoutineCheck(routine.data)
   const findings = useMemo(() => (check.data ? findingsOf(check.data, entries) : []), [check.data, entries])
+  const fixes = useRoutineFixes(routine.data, check.data)
   const today = localDay()
   const log = useRoutineLog()
   const ticks = log.data?.find((d) => d.date === today)?.used ?? {}
@@ -123,6 +125,14 @@ export default function Routine() {
   const alternateFinding = async (f: Finding) => {
     const [a, b] = f.entries
     await (usedLastNight(b.id) && !usedLastNight(a.id) ? alternate(a, b) : alternate(b, a))
+  }
+
+  const applyFix = async (fix: RoutineFix) => {
+    try {
+      await writes.applyFix(fix, entries)
+    } catch (e) {
+      toast(failureText(e, "Couldn't apply that change. Nothing changed; try again."))
+    }
   }
 
   const testRead = readForearm(treated, controls, tests.running)
@@ -210,7 +220,7 @@ export default function Routine() {
       {attention && !showTests && !showVerdict && current.length ? (
         <div className="@container">
           <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-3 @min-[1020px]:grid-cols-[minmax(0,1fr)_360px]">
-            <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} />
+            <RoutineCheckCard check={check} findings={findings} count={current.length} onFind={find} onAlternate={alternateFinding} fixes={fixes.data} onApplyFix={applyFix} />
             <div className="flex min-w-0 flex-col gap-3 empty:hidden [&>section]:flex-1">
               {suggested.any ? <Suggestions findings={findings} entries={current} sessions={sessions} usedLastNight={usedLastNight} onFind={find} onAlternate={alternate} /> : <TestStrip read={testRead} onStart={() => setTab('tests')} />}
             </div>

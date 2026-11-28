@@ -184,6 +184,19 @@ export type RoutineEntry = {
   feel?: FeelAnswer | null
   /** One answer per week, oldest first (a new answer in the same week replaces it), at most 26. */
   feel_history?: FeelAnswer[]
+  /** The person's one-line note, read into fixed tags by Gemini (PUT /v1/routine/{id}/note); tags are [] when none were read. */
+  note?: RoutineNote | null
+}
+
+export type NoteTag = 'stinging' | 'dryness' | 'tightness' | 'breakouts' | 'oiliness' | 'redness_flare' | 'pleasant_texture' | 'scent_issue'
+export type RoutineNote = { text: string; tags: NoteTag[]; source: 'gemini' | 'none'; at: string }
+
+/** A validated schedule change for one flagged pair (POST /v1/routine/fixes): applied with PATCH /v1/routine/{id}. */
+export type RoutineFix = {
+  products: string[]
+  issue: string
+  changes: { id: string; slots?: ('am' | 'pm')[]; schedule?: RoutineSchedule | null }[]
+  reason: string
 }
 
 export type FeelVerdict = 'working' | 'unsure' | 'not_for_me'

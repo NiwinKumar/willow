@@ -78,6 +78,7 @@ function faqs(): Faq[] {
       to: '/evidence#checked',
       link: 'The eval results',
     },
+    { q: 'Where else does Gemini work?', a: 'In the background, unasked: it reads spot labels twice, explains readings, checks translations, proposes routine fixes, writes reminder text, tags your notes and slices Proof Ask. Code checks each one first.', to: '/evidence#invisible-ai', link: 'AI working for you' },
   ]
 }
 

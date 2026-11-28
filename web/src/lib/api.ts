@@ -1,6 +1,6 @@
 /** Thin client for willow-api (docs/CONTRACT.md section 3, api/README.md). Every call sends the Firebase ID token. */
 
-import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
+import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineFix, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
 import { DEV_UID } from './devAuth'
 import { langHeader } from './language'
 import type { LabelDetail } from './spotLabels'
@@ -613,6 +613,8 @@ export const api = {
   deleteRoutine: (token: string, id: string) => request<void>(token, `/v1/routine/${id}`, { method: 'DELETE' }),
   /** How the product feels to the person (self-reported): a verdict and up to 4 look-and-feel tags. Answers the entry. */
   putFeel: (token: string, id: string, body: { verdict: FeelVerdict; tags: FeelTag[] }) => request<RoutineEntry>(token, `/v1/routine/${id}/feel`, { method: 'PUT', ...json(body) }),
+  putNote: (token: string, id: string, text: string) => request<RoutineEntry>(token, `/v1/routine/${id}/note`, { method: 'PUT', ...json({ text }) }),
+  routineFixes: (token: string, today: string) => request<{ fixes: RoutineFix[] }>(token, `/v1/routine/fixes?today=${today}`, { method: 'POST' }, LONG_TIMEOUT_MS),
   /** Routine use ticks; days are the person's own calendar days (YYYY-MM-DD, see localDay). Default range: last 14 days. */
   routineLog: (token: string, range: { from?: string; to?: string } = {}) => {
     const qs = new URLSearchParams(Object.entries(range).filter((e): e is [string, string] => Boolean(e[1])))
@@ -643,6 +645,7 @@ export const api = {
   demoRoutineLog: (range: { from: string; to: string }) =>
     publicGet<{ from: string; to: string; days: RoutineLogDay[] }>(`/v1/demo/routine/log?${new URLSearchParams(range).toString()}`),
   demoRoutineCheck: () => publicGet<RoutineCheck>('/v1/demo/routine/check'),
+  demoRoutineFixes: (today: string) => publicGet<{ fixes: RoutineFix[] }>(`/v1/demo/routine/fixes?today=${today}`),
   startSample: (token: string, sampleId: string) =>
     request<{ session_id: string; site: Site; n_frames: number }>(token, `/v1/demo/samples/${sampleId}/session`, { method: 'POST' }, LONG_TIMEOUT_MS),
   judgeSetup: (token: string) => request<{ routine_added: number }>(token, '/v1/demo/judge-setup', { method: 'POST' }, LONG_TIMEOUT_MS),

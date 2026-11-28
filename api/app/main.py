@@ -22,6 +22,7 @@ from app.routes.products_routes import router as products_router
 from app.routes.proof_routes import router as proof_router
 from app.routes.reminders_routes import router as reminders_router
 from app.routes.retailer_routes import router as retailer_router
+from app.routes.routine_ai_routes import router as routine_ai_router
 from app.routes.sessions_routes import router as sessions_router
 from app.routes.shelf_routes import router as shelf_router
 from app.routes.survey_routes import router as survey_router
@@ -119,6 +120,7 @@ async def public_cache_headers(request: Request, call_next):
 app.include_router(sessions_router)
 app.include_router(me_router)
 app.include_router(products_router)
+app.include_router(routine_ai_router)
 app.include_router(retailer_router)
 app.include_router(demo_router)
 app.include_router(product_tests_router)

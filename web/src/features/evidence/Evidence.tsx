@@ -11,6 +11,7 @@ import { ARMOR, BREAK_IT, CHECKS, wispLink } from './checks'
 import { dayOf, evidence, money, partLine, REPO_BLOB, type A11yCell } from './data'
 import { EvalSection } from './EvalSection'
 import { InstrumentRetest } from './InstrumentRetest'
+import { InvisibleAI } from './InvisibleAI'
 import { Ext, Section, tile } from './parts'
 import { ScaleSection } from './ScaleSection'
 
@@ -97,6 +98,8 @@ export default function Evidence() {
             ))}
           </ul>
         </Section>
+
+        <InvisibleAI />
 
         <Section id="break" title="Try to break it" lead="Each one opens Wisp in the app with the question typed; a guest account is enough. The answers are live, so they can differ each time.">
           <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
