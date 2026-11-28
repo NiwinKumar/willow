@@ -25,9 +25,13 @@ class Blemish:
     area_px: int
 
 
-def _local_mean(values: np.ndarray, skin: np.ndarray, sigma: float) -> np.ndarray:
-    """Average of `values` over skin pixels nearby (Gaussian, sigma in px)."""
-    weight = cv2.GaussianBlur(skin.astype(np.float32), (0, 0), sigma)
+def _local_mean(
+    values: np.ndarray, skin: np.ndarray, sigma: float, weight: np.ndarray | None = None
+) -> np.ndarray:
+    """Average of `values` over skin pixels nearby (Gaussian, sigma in px). `weight`: the
+    blurred skin mask at this sigma, when the caller already has it (two values, one mask)."""
+    if weight is None:
+        weight = cv2.GaussianBlur(skin.astype(np.float32), (0, 0), sigma)
     total = cv2.GaussianBlur(np.where(skin, values, 0).astype(np.float32), (0, 0), sigma)
     return total / np.maximum(weight, 1e-6)
 
@@ -60,8 +64,9 @@ def find_blemishes(
         search = skin
     lab, (skin, search), px_per_mm, back = working_scale(lab, [skin, search], px_per_mm)
     sigma_bg = config.BLEMISH_BACKGROUND_MM * px_per_mm
-    a_bg = _local_mean(lab[..., 1], skin, sigma_bg)
-    l_bg = _local_mean(lab[..., 0], skin, sigma_bg)
+    weight = cv2.GaussianBlur(skin.astype(np.float32), (0, 0), sigma_bg)
+    a_bg = _local_mean(lab[..., 1], skin, sigma_bg, weight)
+    l_bg = _local_mean(lab[..., 0], skin, sigma_bg, weight)
     smooth = max(0.15 * px_per_mm, 0.5)
     redder = cv2.GaussianBlur(
         np.where(skin, lab[..., 1] - a_bg, 0).astype(np.float32), (0, 0), smooth

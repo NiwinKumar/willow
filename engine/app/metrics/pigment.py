@@ -128,9 +128,10 @@ def find_spots(
     sigma_bg = config.SPOT_BACKGROUND_MM * px_per_mm
     l_bg = _local_mean(l_star, skin, sigma_bg)
     plain = skin & (l_bg - l_star < config.SPOT_BACKGROUND_EXCLUDE * spread)
-    l_bg = _local_mean(l_star, plain, sigma_bg)
+    weight = cv2.GaussianBlur(plain.astype(np.float32), (0, 0), sigma_bg)  # shared: L* and C*
+    l_bg = _local_mean(l_star, plain, sigma_bg, weight)
     chroma = np.hypot(lab[..., 1], lab[..., 2])
-    c_bg = _local_mean(chroma, plain, sigma_bg)
+    c_bg = _local_mean(chroma, plain, sigma_bg, weight)
     darker = cv2.GaussianBlur(np.where(skin, l_bg - l_star, 0).astype(np.float32), (0, 0), smooth)
     z = np.clip(darker / spread, 0, None)
 

@@ -12,11 +12,24 @@ import { bandOf, bandText, deltaText, metricOf, sessionState, valueText } from '
 import { StoryCard } from './StoryCard'
 import { metricSeries } from './series'
 
+/**
+ * Face colour and light readings whose normal range includes the between-room floor (engine 0.4.3,
+ * engine/app/config.py ROOM_LIGHT_FLOOR): a baseline measured before keeps its old band, so it is not said for it.
+ */
+const ROOM_LIGHT = new Set(['tone_ita', 'redness', 'glow', 'shine', 'tone_evenness', 'dark_circles'])
+const atLeast = (v: string | undefined, min: number[]) => {
+  const p = (v ?? '').split('.').map(Number)
+  for (let i = 0; i < min.length; i++) if ((p[i] ?? 0) !== min[i]) return (p[i] ?? 0) > min[i]
+  return true
+}
+const ROOM_LINE = ' For colour and light, your range also allows for a change of room light between check-ins.'
+
 /** Why this verdict, in one sentence, from the same numbers the stats show. */
-function why(m: Metric, s: Session, band: number | null): string {
+function why(m: Metric, s: Session, band: number | null, baseline: Session | null): string {
   const kind = verdictKind(m, s)
-  if (kind === 'changed' && band !== null) return `The change (${deltaText(m)}) is larger than your normal range of ${bandText(m, band)}.`
-  if (kind === 'normal' && band !== null) return `The change (${deltaText(m)}) is inside your normal range of ${bandText(m, band)}.`
+  const room = baseline?.site === 'face_full' && ROOM_LIGHT.has(m.id) && atLeast(baseline.result?.engine_version, [0, 4, 3]) ? ROOM_LINE : ''
+  if (kind === 'changed' && band !== null) return `The change (${deltaText(m)}) is larger than your normal range of ${bandText(m, band)}.${room}`
+  if (kind === 'normal' && band !== null) return `The change (${deltaText(m)}) is inside your normal range of ${bandText(m, band)}.${room}`
   if (kind === 'baseline') return 'This check-in is your baseline. Later check-ins are compared with it.'
   if (kind === 'notEnough') return 'Your baseline has fewer than 3 usable photos, so there is no normal range yet: the change is shown but cannot be called a change.'
   if (m.value === null) return 'No value was produced this time. Missing values stay missing.'
@@ -75,7 +88,7 @@ export function MetricSheet({ metric, session, baseline, baselineLabel = 'Baseli
           <VerdictGlyph kind={kind} way={changeWay(m)} size={20} onDark />
           <span className="flex flex-col gap-[3px]">
             <span className="text-[17px]">{wordsFor(m, session).label}</span>
-            <span className="text-[14px] text-white/70">{why(m, session, band)}</span>
+            <span className="text-[14px] text-white/70">{why(m, session, band, baseline)}</span>
           </span>
         </div>
         {series.points.length ? (

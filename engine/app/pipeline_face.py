@@ -709,7 +709,12 @@ def _by_zone(metric_id: str, have: list[dict]) -> dict[str, dict]:
                 per_zone.setdefault(z, []).append(float(v))
     out = {}
     for z, vals in per_zone.items():
-        s = summarize(vals, None, config.MIN_SD.get(metric_id, 0.0))
+        s = summarize(
+            vals,
+            None,
+            config.MIN_SD.get(metric_id, 0.0),
+            config.ROOM_LIGHT_FLOOR.get(metric_id, 0.0),
+        )
         out[z] = {
             "value": s["value"],
             "within_session_sd": s["within_session_sd"],
@@ -1233,7 +1238,10 @@ def analyze_face(
             return "failed"
 
     per_frame, frames, warnings = [], [], []
-    for i, f in enumerate(map_frames(measure, list(enumerate(files)))):  # photos in parallel
+    t_frames = time.perf_counter()
+    measured = map_frames(measure, list(enumerate(files)))  # photos in parallel
+    frames_ms = (time.perf_counter() - t_frames) * 1000
+    for i, f in enumerate(measured):
         if f == "face_not_found":
             per_frame.append({"index": i, "passed": False, "reasons": ["face_not_found"]})
             continue
@@ -1276,7 +1284,11 @@ def analyze_face(
         have = [f for f in good if f["values"][metric_id] is not None]
         if have:
             summary = summarize(
-                [f["values"][metric_id] for f in have], base, config.MIN_SD.get(metric_id, 0.0)
+                [f["values"][metric_id] for f in have],
+                base,
+                config.MIN_SD.get(metric_id, 0.0),
+                # a new room's light moves colour readings more than five photos in one room
+                config.ROOM_LIGHT_FLOOR.get(metric_id, 0.0),
             )
             extras = _mean_extras([f["extras"][metric_id] for f in have])
             if metric_id == "tone_ita":
@@ -1425,6 +1437,9 @@ def analyze_face(
         ),
         "timings_ms": {
             "total": round((time.perf_counter() - t0) * 1000, 1),
+            # where the time goes (engine logs): measuring every photo, then the session's own
+            # work (confirming marks across photos, crops and uploads, preview, overlay)
+            "frames": round(frames_ms, 1),
             **({"overlay": round(overlay_ms, 1)} if draw else {}),
         },
         "warnings": warnings,

@@ -602,5 +602,1331 @@
         }
       }
     ]
+  },
+  "instrument_retest": {
+    "photos": 66,
+    "people": 17,
+    "photos_with_baseline": 57,
+    "baselines_failed": 9,
+    "retakes": 672,
+    "retakes_rejected": 104,
+    "rejected_by_reason": {
+      "overexposed": 75,
+      "pose_out_of_range": 25,
+      "occlusion_suspected": 4
+    },
+    "checkins": 114,
+    "checkins_refused": 10,
+    "checkins_with_any_false_change": 81,
+    "pairs": 818,
+    "false_change": 252,
+    "false_change_pct": 30.8,
+    "metrics": {
+      "blemishes": {
+        "pairs": 87,
+        "false_change": 5,
+        "false_change_pct": 5.7,
+        "median_delta_over_band": 0.23,
+        "median_band": 5.089,
+        "no_verdict": 27
+      },
+      "dark_circles": {
+        "pairs": 92,
+        "false_change": 10,
+        "false_change_pct": 10.9,
+        "median_delta_over_band": 0.26,
+        "median_band": 1.438,
+        "no_verdict": 22
+      },
+      "glow": {
+        "pairs": 92,
+        "false_change": 43,
+        "false_change_pct": 46.7,
+        "median_delta_over_band": 0.91,
+        "median_band": 4.329,
+        "no_verdict": 22
+      },
+      "lines": {
+        "pairs": 92,
+        "false_change": 4,
+        "false_change_pct": 4.3,
+        "median_delta_over_band": 0.27,
+        "median_band": 1.094,
+        "no_verdict": 22
+      },
+      "pigment_spots": {
+        "pairs": 87,
+        "false_change": 9,
+        "false_change_pct": 10.3,
+        "median_delta_over_band": 0.31,
+        "median_band": 0.628,
+        "no_verdict": 27
+      },
+      "redness": {
+        "pairs": 92,
+        "false_change": 58,
+        "false_change_pct": 63.0,
+        "median_delta_over_band": 1.47,
+        "median_band": 1.048,
+        "no_verdict": 22
+      },
+      "shine": {
+        "pairs": 92,
+        "false_change": 40,
+        "false_change_pct": 43.5,
+        "median_delta_over_band": 0.71,
+        "median_band": 0.454,
+        "no_verdict": 22
+      },
+      "tone_evenness": {
+        "pairs": 92,
+        "false_change": 30,
+        "false_change_pct": 32.6,
+        "median_delta_over_band": 0.51,
+        "median_band": 0.93,
+        "no_verdict": 22
+      },
+      "tone_ita": {
+        "pairs": 92,
+        "false_change": 53,
+        "false_change_pct": 57.6,
+        "median_delta_over_band": 1.19,
+        "median_band": 7.678,
+        "no_verdict": 22
+      }
+    },
+    "by_band": {
+      "very_light": {
+        "photos": 5,
+        "people": 5,
+        "mst": [
+          1,
+          9
+        ],
+        "with_baseline": 5,
+        "checkins": 10,
+        "metrics": {
+          "blemishes": {
+            "pairs": 9,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.17,
+            "median_band": 3.407,
+            "no_verdict": 1
+          },
+          "dark_circles": {
+            "pairs": 9,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.21,
+            "median_band": 1.535,
+            "no_verdict": 1
+          },
+          "glow": {
+            "pairs": 9,
+            "false_change": 5,
+            "false_change_pct": 55.6,
+            "median_delta_over_band": 1.13,
+            "median_band": 4.968,
+            "no_verdict": 1
+          },
+          "lines": {
+            "pairs": 9,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.09,
+            "median_band": 5.757,
+            "no_verdict": 1
+          },
+          "pigment_spots": {
+            "pairs": 9,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.4,
+            "median_band": 0.345,
+            "no_verdict": 1
+          },
+          "redness": {
+            "pairs": 9,
+            "false_change": 7,
+            "false_change_pct": 77.8,
+            "median_delta_over_band": 2.39,
+            "median_band": 1.165,
+            "no_verdict": 1
+          },
+          "shine": {
+            "pairs": 9,
+            "false_change": 3,
+            "false_change_pct": 33.3,
+            "median_delta_over_band": 0.6,
+            "median_band": 0.367,
+            "no_verdict": 1
+          },
+          "tone_evenness": {
+            "pairs": 9,
+            "false_change": 2,
+            "false_change_pct": 22.2,
+            "median_delta_over_band": 0.08,
+            "median_band": 1.753,
+            "no_verdict": 1
+          },
+          "tone_ita": {
+            "pairs": 9,
+            "false_change": 5,
+            "false_change_pct": 55.6,
+            "median_delta_over_band": 1.98,
+            "median_band": 4.635,
+            "no_verdict": 1
+          }
+        }
+      },
+      "light": {
+        "photos": 6,
+        "people": 4,
+        "mst": [
+          1,
+          6
+        ],
+        "with_baseline": 4,
+        "checkins": 8,
+        "metrics": {
+          "blemishes": {
+            "pairs": 6,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.21,
+            "median_band": 12.31,
+            "no_verdict": 2
+          },
+          "dark_circles": {
+            "pairs": 7,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.26,
+            "median_band": 0.912,
+            "no_verdict": 1
+          },
+          "glow": {
+            "pairs": 7,
+            "false_change": 3,
+            "false_change_pct": 42.9,
+            "median_delta_over_band": 0.77,
+            "median_band": 4.877,
+            "no_verdict": 1
+          },
+          "lines": {
+            "pairs": 7,
+            "false_change": 1,
+            "false_change_pct": 14.3,
+            "median_delta_over_band": 0.17,
+            "median_band": 0.912,
+            "no_verdict": 1
+          },
+          "pigment_spots": {
+            "pairs": 6,
+            "false_change": 1,
+            "false_change_pct": 16.7,
+            "median_delta_over_band": 0.59,
+            "median_band": 0.605,
+            "no_verdict": 2
+          },
+          "redness": {
+            "pairs": 7,
+            "false_change": 2,
+            "false_change_pct": 28.6,
+            "median_delta_over_band": 0.69,
+            "median_band": 1.094,
+            "no_verdict": 1
+          },
+          "shine": {
+            "pairs": 7,
+            "false_change": 1,
+            "false_change_pct": 14.3,
+            "median_delta_over_band": 0.15,
+            "median_band": 0.717,
+            "no_verdict": 1
+          },
+          "tone_evenness": {
+            "pairs": 7,
+            "false_change": 3,
+            "false_change_pct": 42.9,
+            "median_delta_over_band": 0.79,
+            "median_band": 0.463,
+            "no_verdict": 1
+          },
+          "tone_ita": {
+            "pairs": 7,
+            "false_change": 4,
+            "false_change_pct": 57.1,
+            "median_delta_over_band": 1.14,
+            "median_band": 6.059,
+            "no_verdict": 1
+          }
+        }
+      },
+      "intermediate": {
+        "photos": 7,
+        "people": 5,
+        "mst": [
+          1,
+          6
+        ],
+        "with_baseline": 6,
+        "checkins": 12,
+        "metrics": {
+          "blemishes": {
+            "pairs": 9,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.34,
+            "median_band": 4.081,
+            "no_verdict": 3
+          },
+          "dark_circles": {
+            "pairs": 11,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.26,
+            "median_band": 0.923,
+            "no_verdict": 1
+          },
+          "glow": {
+            "pairs": 11,
+            "false_change": 3,
+            "false_change_pct": 27.3,
+            "median_delta_over_band": 0.64,
+            "median_band": 4.935,
+            "no_verdict": 1
+          },
+          "lines": {
+            "pairs": 11,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.45,
+            "median_band": 1.783,
+            "no_verdict": 1
+          },
+          "pigment_spots": {
+            "pairs": 9,
+            "false_change": 1,
+            "false_change_pct": 11.1,
+            "median_delta_over_band": 0.17,
+            "median_band": 0.842,
+            "no_verdict": 3
+          },
+          "redness": {
+            "pairs": 11,
+            "false_change": 6,
+            "false_change_pct": 54.5,
+            "median_delta_over_band": 1.84,
+            "median_band": 0.855,
+            "no_verdict": 1
+          },
+          "shine": {
+            "pairs": 11,
+            "false_change": 7,
+            "false_change_pct": 63.6,
+            "median_delta_over_band": 1.25,
+            "median_band": 0.173,
+            "no_verdict": 1
+          },
+          "tone_evenness": {
+            "pairs": 11,
+            "false_change": 2,
+            "false_change_pct": 18.2,
+            "median_delta_over_band": 0.47,
+            "median_band": 0.795,
+            "no_verdict": 1
+          },
+          "tone_ita": {
+            "pairs": 11,
+            "false_change": 5,
+            "false_change_pct": 45.5,
+            "median_delta_over_band": 0.87,
+            "median_band": 8.263,
+            "no_verdict": 1
+          }
+        }
+      },
+      "tan": {
+        "photos": 12,
+        "people": 5,
+        "mst": [
+          3,
+          6
+        ],
+        "with_baseline": 12,
+        "checkins": 24,
+        "metrics": {
+          "blemishes": {
+            "pairs": 18,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.22,
+            "median_band": 3.72,
+            "no_verdict": 6
+          },
+          "dark_circles": {
+            "pairs": 19,
+            "false_change": 3,
+            "false_change_pct": 15.8,
+            "median_delta_over_band": 0.36,
+            "median_band": 1.107,
+            "no_verdict": 5
+          },
+          "glow": {
+            "pairs": 19,
+            "false_change": 9,
+            "false_change_pct": 47.4,
+            "median_delta_over_band": 0.92,
+            "median_band": 5.123,
+            "no_verdict": 5
+          },
+          "lines": {
+            "pairs": 19,
+            "false_change": 3,
+            "false_change_pct": 15.8,
+            "median_delta_over_band": 0.24,
+            "median_band": 0.97,
+            "no_verdict": 5
+          },
+          "pigment_spots": {
+            "pairs": 18,
+            "false_change": 2,
+            "false_change_pct": 11.1,
+            "median_delta_over_band": 0.19,
+            "median_band": 0.695,
+            "no_verdict": 6
+          },
+          "redness": {
+            "pairs": 19,
+            "false_change": 10,
+            "false_change_pct": 52.6,
+            "median_delta_over_band": 1.17,
+            "median_band": 1.274,
+            "no_verdict": 5
+          },
+          "shine": {
+            "pairs": 19,
+            "false_change": 10,
+            "false_change_pct": 52.6,
+            "median_delta_over_band": 1.06,
+            "median_band": 0.339,
+            "no_verdict": 5
+          },
+          "tone_evenness": {
+            "pairs": 19,
+            "false_change": 6,
+            "false_change_pct": 31.6,
+            "median_delta_over_band": 0.42,
+            "median_band": 1.385,
+            "no_verdict": 5
+          },
+          "tone_ita": {
+            "pairs": 19,
+            "false_change": 10,
+            "false_change_pct": 52.6,
+            "median_delta_over_band": 1.02,
+            "median_band": 8.985,
+            "no_verdict": 5
+          }
+        }
+      },
+      "brown": {
+        "photos": 18,
+        "people": 11,
+        "mst": [
+          1,
+          10
+        ],
+        "with_baseline": 18,
+        "checkins": 36,
+        "metrics": {
+          "blemishes": {
+            "pairs": 26,
+            "false_change": 5,
+            "false_change_pct": 19.2,
+            "median_delta_over_band": 0.26,
+            "median_band": 4.133,
+            "no_verdict": 10
+          },
+          "dark_circles": {
+            "pairs": 26,
+            "false_change": 4,
+            "false_change_pct": 15.4,
+            "median_delta_over_band": 0.28,
+            "median_band": 1.438,
+            "no_verdict": 10
+          },
+          "glow": {
+            "pairs": 26,
+            "false_change": 13,
+            "false_change_pct": 50.0,
+            "median_delta_over_band": 1.0,
+            "median_band": 3.221,
+            "no_verdict": 10
+          },
+          "lines": {
+            "pairs": 26,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.22,
+            "median_band": 1.566,
+            "no_verdict": 10
+          },
+          "pigment_spots": {
+            "pairs": 26,
+            "false_change": 3,
+            "false_change_pct": 11.5,
+            "median_delta_over_band": 0.33,
+            "median_band": 0.625,
+            "no_verdict": 10
+          },
+          "redness": {
+            "pairs": 26,
+            "false_change": 19,
+            "false_change_pct": 73.1,
+            "median_delta_over_band": 2.08,
+            "median_band": 1.034,
+            "no_verdict": 10
+          },
+          "shine": {
+            "pairs": 26,
+            "false_change": 13,
+            "false_change_pct": 50.0,
+            "median_delta_over_band": 1.09,
+            "median_band": 0.541,
+            "no_verdict": 10
+          },
+          "tone_evenness": {
+            "pairs": 26,
+            "false_change": 9,
+            "false_change_pct": 34.6,
+            "median_delta_over_band": 0.51,
+            "median_band": 0.805,
+            "no_verdict": 10
+          },
+          "tone_ita": {
+            "pairs": 26,
+            "false_change": 13,
+            "false_change_pct": 50.0,
+            "median_delta_over_band": 0.98,
+            "median_band": 8.537,
+            "no_verdict": 10
+          }
+        }
+      },
+      "dark": {
+        "photos": 13,
+        "people": 6,
+        "mst": [
+          2,
+          10
+        ],
+        "with_baseline": 12,
+        "checkins": 24,
+        "metrics": {
+          "blemishes": {
+            "pairs": 19,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.18,
+            "median_band": 6.307,
+            "no_verdict": 5
+          },
+          "dark_circles": {
+            "pairs": 20,
+            "false_change": 3,
+            "false_change_pct": 15.0,
+            "median_delta_over_band": 0.22,
+            "median_band": 2.085,
+            "no_verdict": 4
+          },
+          "glow": {
+            "pairs": 20,
+            "false_change": 10,
+            "false_change_pct": 50.0,
+            "median_delta_over_band": 0.94,
+            "median_band": 4.346,
+            "no_verdict": 4
+          },
+          "lines": {
+            "pairs": 20,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.29,
+            "median_band": 0.912,
+            "no_verdict": 4
+          },
+          "pigment_spots": {
+            "pairs": 19,
+            "false_change": 2,
+            "false_change_pct": 10.5,
+            "median_delta_over_band": 0.38,
+            "median_band": 0.425,
+            "no_verdict": 5
+          },
+          "redness": {
+            "pairs": 20,
+            "false_change": 14,
+            "false_change_pct": 70.0,
+            "median_delta_over_band": 1.79,
+            "median_band": 1.252,
+            "no_verdict": 4
+          },
+          "shine": {
+            "pairs": 20,
+            "false_change": 6,
+            "false_change_pct": 30.0,
+            "median_delta_over_band": 0.43,
+            "median_band": 0.593,
+            "no_verdict": 4
+          },
+          "tone_evenness": {
+            "pairs": 20,
+            "false_change": 8,
+            "false_change_pct": 40.0,
+            "median_delta_over_band": 0.83,
+            "median_band": 1.062,
+            "no_verdict": 4
+          },
+          "tone_ita": {
+            "pairs": 20,
+            "false_change": 16,
+            "false_change_pct": 80.0,
+            "median_delta_over_band": 1.97,
+            "median_band": 5.869,
+            "no_verdict": 4
+          }
+        }
+      }
+    },
+    "by_mst": {
+      "mst_1_3": {
+        "photos": 28,
+        "people": 7,
+        "with_baseline": 22,
+        "checkins": 44,
+        "metrics": {
+          "blemishes": {
+            "pairs": 33,
+            "false_change": 3,
+            "false_change_pct": 9.1,
+            "median_delta_over_band": 0.23,
+            "median_band": 6.936,
+            "no_verdict": 11
+          },
+          "dark_circles": {
+            "pairs": 35,
+            "false_change": 2,
+            "false_change_pct": 5.7,
+            "median_delta_over_band": 0.24,
+            "median_band": 1.409,
+            "no_verdict": 9
+          },
+          "glow": {
+            "pairs": 35,
+            "false_change": 17,
+            "false_change_pct": 48.6,
+            "median_delta_over_band": 0.91,
+            "median_band": 4.675,
+            "no_verdict": 9
+          },
+          "lines": {
+            "pairs": 35,
+            "false_change": 1,
+            "false_change_pct": 2.9,
+            "median_delta_over_band": 0.16,
+            "median_band": 1.408,
+            "no_verdict": 9
+          },
+          "pigment_spots": {
+            "pairs": 33,
+            "false_change": 5,
+            "false_change_pct": 15.2,
+            "median_delta_over_band": 0.4,
+            "median_band": 0.801,
+            "no_verdict": 11
+          },
+          "redness": {
+            "pairs": 35,
+            "false_change": 22,
+            "false_change_pct": 62.9,
+            "median_delta_over_band": 1.75,
+            "median_band": 0.994,
+            "no_verdict": 9
+          },
+          "shine": {
+            "pairs": 35,
+            "false_change": 14,
+            "false_change_pct": 40.0,
+            "median_delta_over_band": 0.6,
+            "median_band": 0.212,
+            "no_verdict": 9
+          },
+          "tone_evenness": {
+            "pairs": 35,
+            "false_change": 11,
+            "false_change_pct": 31.4,
+            "median_delta_over_band": 0.38,
+            "median_band": 0.762,
+            "no_verdict": 9
+          },
+          "tone_ita": {
+            "pairs": 35,
+            "false_change": 19,
+            "false_change_pct": 54.3,
+            "median_delta_over_band": 1.12,
+            "median_band": 7.561,
+            "no_verdict": 9
+          }
+        }
+      },
+      "mst_4_7": {
+        "photos": 18,
+        "people": 5,
+        "with_baseline": 16,
+        "checkins": 32,
+        "metrics": {
+          "blemishes": {
+            "pairs": 22,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.22,
+            "median_band": 4.941,
+            "no_verdict": 10
+          },
+          "dark_circles": {
+            "pairs": 24,
+            "false_change": 3,
+            "false_change_pct": 12.5,
+            "median_delta_over_band": 0.4,
+            "median_band": 1.107,
+            "no_verdict": 8
+          },
+          "glow": {
+            "pairs": 24,
+            "false_change": 12,
+            "false_change_pct": 50.0,
+            "median_delta_over_band": 0.99,
+            "median_band": 3.575,
+            "no_verdict": 8
+          },
+          "lines": {
+            "pairs": 24,
+            "false_change": 3,
+            "false_change_pct": 12.5,
+            "median_delta_over_band": 0.32,
+            "median_band": 1.278,
+            "no_verdict": 8
+          },
+          "pigment_spots": {
+            "pairs": 22,
+            "false_change": 2,
+            "false_change_pct": 9.1,
+            "median_delta_over_band": 0.24,
+            "median_band": 0.618,
+            "no_verdict": 10
+          },
+          "redness": {
+            "pairs": 24,
+            "false_change": 14,
+            "false_change_pct": 58.3,
+            "median_delta_over_band": 1.18,
+            "median_band": 1.247,
+            "no_verdict": 8
+          },
+          "shine": {
+            "pairs": 24,
+            "false_change": 15,
+            "false_change_pct": 62.5,
+            "median_delta_over_band": 1.33,
+            "median_band": 0.281,
+            "no_verdict": 8
+          },
+          "tone_evenness": {
+            "pairs": 24,
+            "false_change": 9,
+            "false_change_pct": 37.5,
+            "median_delta_over_band": 0.71,
+            "median_band": 0.929,
+            "no_verdict": 8
+          },
+          "tone_ita": {
+            "pairs": 24,
+            "false_change": 13,
+            "false_change_pct": 54.2,
+            "median_delta_over_band": 1.02,
+            "median_band": 9.369,
+            "no_verdict": 8
+          }
+        }
+      },
+      "mst_8_10": {
+        "photos": 20,
+        "people": 5,
+        "with_baseline": 19,
+        "checkins": 38,
+        "metrics": {
+          "blemishes": {
+            "pairs": 32,
+            "false_change": 2,
+            "false_change_pct": 6.2,
+            "median_delta_over_band": 0.26,
+            "median_band": 5.089,
+            "no_verdict": 6
+          },
+          "dark_circles": {
+            "pairs": 33,
+            "false_change": 5,
+            "false_change_pct": 15.2,
+            "median_delta_over_band": 0.21,
+            "median_band": 2.546,
+            "no_verdict": 5
+          },
+          "glow": {
+            "pairs": 33,
+            "false_change": 14,
+            "false_change_pct": 42.4,
+            "median_delta_over_band": 0.81,
+            "median_band": 4.33,
+            "no_verdict": 5
+          },
+          "lines": {
+            "pairs": 33,
+            "false_change": 0,
+            "false_change_pct": 0.0,
+            "median_delta_over_band": 0.3,
+            "median_band": 0.912,
+            "no_verdict": 5
+          },
+          "pigment_spots": {
+            "pairs": 32,
+            "false_change": 2,
+            "false_change_pct": 6.2,
+            "median_delta_over_band": 0.3,
+            "median_band": 0.425,
+            "no_verdict": 6
+          },
+          "redness": {
+            "pairs": 33,
+            "false_change": 22,
+            "false_change_pct": 66.7,
+            "median_delta_over_band": 1.91,
+            "median_band": 1.02,
+            "no_verdict": 5
+          },
+          "shine": {
+            "pairs": 33,
+            "false_change": 11,
+            "false_change_pct": 33.3,
+            "median_delta_over_band": 0.48,
+            "median_band": 0.893,
+            "no_verdict": 5
+          },
+          "tone_evenness": {
+            "pairs": 33,
+            "false_change": 10,
+            "false_change_pct": 30.3,
+            "median_delta_over_band": 0.61,
+            "median_band": 1.062,
+            "no_verdict": 5
+          },
+          "tone_ita": {
+            "pairs": 33,
+            "false_change": 21,
+            "false_change_pct": 63.6,
+            "median_delta_over_band": 1.79,
+            "median_band": 6.95,
+            "no_verdict": 5
+          }
+        }
+      }
+    },
+    "source_photos_checked": 148,
+    "source_photos_refused": 59,
+    "source_refused_by_reason": {
+      "pose_out_of_range": 54,
+      "overexposed": 4,
+      "occlusion_suspected": 1
+    },
+    "people_checked": 19,
+    "run_at": "2026-11-28",
+    "engine_version": "0.4.2",
+    "source": "MST-E (Monk Skin Tone Examples), Google and TONL: 19 consenting adults across all 10 Monk skin tones, well-lit front-facing photos without masks",
+    "licence": "TONL permission for research or human-annotator-training use only; not for training ML models. Images by TONL, Copyright TONL.CO 2022, all rights reserved. Photos are not in the repo or the app.",
+    "baseline_photos": 5,
+    "checkin_photos": 3,
+    "tests_per_baseline": 2,
+    "per_person": 4,
+    "retake_ranges": {
+      "room": {
+        "exposure_ev": [
+          -0.5,
+          0.5
+        ],
+        "wb_gain": [
+          -0.06,
+          0.06
+        ]
+      },
+      "photo": {
+        "exposure_ev": [
+          -0.1,
+          0.1
+        ],
+        "wb_gain": [
+          -0.01,
+          0.01
+        ],
+        "roll_deg": [
+          -3.0,
+          3.0
+        ],
+        "scale": [
+          0.92,
+          1.08
+        ],
+        "shift_frac": [
+          -0.03,
+          0.03
+        ],
+        "blur_px": [
+          0.0,
+          0.6
+        ],
+        "noise": [
+          0.0,
+          2.0
+        ],
+        "jpeg_quality": [
+          80,
+          95
+        ]
+      }
+    },
+    "long_edge_px": 2400,
+    "seed": 7,
+    "minutes": 20.1,
+    "floor_check": {
+      "seed": 7,
+      "learn_people": 10,
+      "check_people": 7,
+      "check_photos": 28,
+      "check_checkins": 52,
+      "floors": {
+        "tone_ita": 33.93,
+        "redness": 3.63,
+        "glow": 15.21,
+        "shine": 6.69,
+        "tone_evenness": 2.87,
+        "dark_circles": 2.42
+      },
+      "median_band_before": {
+        "tone_ita": 7.678,
+        "redness": 1.048,
+        "glow": 4.329,
+        "shine": 0.454,
+        "tone_evenness": 0.93,
+        "dark_circles": 1.438
+      },
+      "metrics": {
+        "blemishes": {
+          "pairs": 38,
+          "before": 2,
+          "after": 2,
+          "before_pct": 5.3,
+          "after_pct": 5.3
+        },
+        "dark_circles": {
+          "pairs": 40,
+          "before": 5,
+          "after": 2,
+          "before_pct": 12.5,
+          "after_pct": 5.0
+        },
+        "glow": {
+          "pairs": 40,
+          "before": 23,
+          "after": 1,
+          "before_pct": 57.5,
+          "after_pct": 2.5
+        },
+        "lines": {
+          "pairs": 40,
+          "before": 2,
+          "after": 2,
+          "before_pct": 5.0,
+          "after_pct": 5.0
+        },
+        "pigment_spots": {
+          "pairs": 38,
+          "before": 5,
+          "after": 5,
+          "before_pct": 13.2,
+          "after_pct": 13.2
+        },
+        "redness": {
+          "pairs": 40,
+          "before": 27,
+          "after": 5,
+          "before_pct": 67.5,
+          "after_pct": 12.5
+        },
+        "shine": {
+          "pairs": 40,
+          "before": 24,
+          "after": 4,
+          "before_pct": 60.0,
+          "after_pct": 10.0
+        },
+        "tone_evenness": {
+          "pairs": 40,
+          "before": 14,
+          "after": 0,
+          "before_pct": 35.0,
+          "after_pct": 0.0
+        },
+        "tone_ita": {
+          "pairs": 40,
+          "before": 24,
+          "after": 3,
+          "before_pct": 60.0,
+          "after_pct": 7.5
+        }
+      },
+      "by_mst": {
+        "mst_1_3": {
+          "blemishes": {
+            "pairs": 14,
+            "before": 0,
+            "after": 0,
+            "before_pct": 0.0,
+            "after_pct": 0.0
+          },
+          "dark_circles": {
+            "pairs": 15,
+            "before": 1,
+            "after": 0,
+            "before_pct": 6.7,
+            "after_pct": 0.0
+          },
+          "glow": {
+            "pairs": 15,
+            "before": 9,
+            "after": 1,
+            "before_pct": 60.0,
+            "after_pct": 6.7
+          },
+          "lines": {
+            "pairs": 15,
+            "before": 0,
+            "after": 0,
+            "before_pct": 0.0,
+            "after_pct": 0.0
+          },
+          "pigment_spots": {
+            "pairs": 14,
+            "before": 2,
+            "after": 2,
+            "before_pct": 14.3,
+            "after_pct": 14.3
+          },
+          "redness": {
+            "pairs": 15,
+            "before": 11,
+            "after": 2,
+            "before_pct": 73.3,
+            "after_pct": 13.3
+          },
+          "shine": {
+            "pairs": 15,
+            "before": 8,
+            "after": 1,
+            "before_pct": 53.3,
+            "after_pct": 6.7
+          },
+          "tone_evenness": {
+            "pairs": 15,
+            "before": 5,
+            "after": 0,
+            "before_pct": 33.3,
+            "after_pct": 0.0
+          },
+          "tone_ita": {
+            "pairs": 15,
+            "before": 9,
+            "after": 1,
+            "before_pct": 60.0,
+            "after_pct": 6.7
+          }
+        },
+        "mst_4_7": {
+          "blemishes": {
+            "pairs": 8,
+            "before": 0,
+            "after": 0,
+            "before_pct": 0.0,
+            "after_pct": 0.0
+          },
+          "dark_circles": {
+            "pairs": 9,
+            "before": 1,
+            "after": 0,
+            "before_pct": 11.1,
+            "after_pct": 0.0
+          },
+          "glow": {
+            "pairs": 9,
+            "before": 6,
+            "after": 0,
+            "before_pct": 66.7,
+            "after_pct": 0.0
+          },
+          "lines": {
+            "pairs": 9,
+            "before": 2,
+            "after": 2,
+            "before_pct": 22.2,
+            "after_pct": 22.2
+          },
+          "pigment_spots": {
+            "pairs": 8,
+            "before": 2,
+            "after": 2,
+            "before_pct": 25.0,
+            "after_pct": 25.0
+          },
+          "redness": {
+            "pairs": 9,
+            "before": 5,
+            "after": 0,
+            "before_pct": 55.6,
+            "after_pct": 0.0
+          },
+          "shine": {
+            "pairs": 9,
+            "before": 7,
+            "after": 1,
+            "before_pct": 77.8,
+            "after_pct": 11.1
+          },
+          "tone_evenness": {
+            "pairs": 9,
+            "before": 4,
+            "after": 0,
+            "before_pct": 44.4,
+            "after_pct": 0.0
+          },
+          "tone_ita": {
+            "pairs": 9,
+            "before": 4,
+            "after": 0,
+            "before_pct": 44.4,
+            "after_pct": 0.0
+          }
+        },
+        "mst_8_10": {
+          "blemishes": {
+            "pairs": 16,
+            "before": 2,
+            "after": 2,
+            "before_pct": 12.5,
+            "after_pct": 12.5
+          },
+          "dark_circles": {
+            "pairs": 16,
+            "before": 3,
+            "after": 2,
+            "before_pct": 18.8,
+            "after_pct": 12.5
+          },
+          "glow": {
+            "pairs": 16,
+            "before": 8,
+            "after": 0,
+            "before_pct": 50.0,
+            "after_pct": 0.0
+          },
+          "lines": {
+            "pairs": 16,
+            "before": 0,
+            "after": 0,
+            "before_pct": 0.0,
+            "after_pct": 0.0
+          },
+          "pigment_spots": {
+            "pairs": 16,
+            "before": 1,
+            "after": 1,
+            "before_pct": 6.2,
+            "after_pct": 6.2
+          },
+          "redness": {
+            "pairs": 16,
+            "before": 11,
+            "after": 3,
+            "before_pct": 68.8,
+            "after_pct": 18.8
+          },
+          "shine": {
+            "pairs": 16,
+            "before": 9,
+            "after": 2,
+            "before_pct": 56.2,
+            "after_pct": 12.5
+          },
+          "tone_evenness": {
+            "pairs": 16,
+            "before": 5,
+            "after": 0,
+            "before_pct": 31.2,
+            "after_pct": 0.0
+          },
+          "tone_ita": {
+            "pairs": 16,
+            "before": 11,
+            "after": 2,
+            "before_pct": 68.8,
+            "after_pct": 12.5
+          }
+        }
+      },
+      "all": {
+        "pairs": 356,
+        "before": 126,
+        "after": 24
+      }
+    }
+  },
+  "scale": {
+    "generated_at": "2026-11-28T18:54:47+00:00",
+    "tested_on": "2026-11-28",
+    "where": "one laptop (Apple M5, 10 cores, shared with other work): the real api and 2 real engine processes, one analysis each at a time, standing in for Cloud Run instances",
+    "people": 200,
+    "photos": "the demo sample's five face photos (Mei, generated)",
+    "measured": {
+      "no_line": {
+        "label": "no line (as deployed)",
+        "people": 200,
+        "succeeded": 14,
+        "failed": 186,
+        "errors": {
+          "504:engine_timeout": 186
+        },
+        "e2e_s": {
+          "p50": 50.5,
+          "p95": 68.4,
+          "p99": 68.4,
+          "max": 68.4
+        },
+        "wall_s": 68.4,
+        "max_place_in_line": null,
+        "asks_per_person_mean": 1,
+        "poll_p95_s": 30.3,
+        "engine_s_p50": 9.4,
+        "workers": 2,
+        "engine_answered_429": 186
+      },
+      "line": {
+        "label": "line on (ENGINE_SLOTS=2, API_THREADS=256)",
+        "people": 200,
+        "succeeded": 200,
+        "failed": 0,
+        "errors": {},
+        "e2e_s": {
+          "p50": 516.4,
+          "p95": 899.2,
+          "p99": 931.8,
+          "max": 939.4
+        },
+        "wall_s": 939.4,
+        "max_place_in_line": 198,
+        "asks_per_person_mean": 10.97,
+        "poll_p95_s": 0.9,
+        "engine_s_p50": 9.4,
+        "workers": 2,
+        "engine_answered_429": 0
+      },
+      "other_no_line": {
+        "label": "no line (as deployed)",
+        "people": 200,
+        "succeeded": 44,
+        "failed": 156,
+        "errors": {
+          "504:engine_timeout": 156
+        },
+        "e2e_s": {
+          "p50": 46.3,
+          "p95": 54.1,
+          "p99": 56.7,
+          "max": 56.7
+        },
+        "wall_s": 56.7,
+        "max_place_in_line": null,
+        "asks_per_person_mean": 1,
+        "poll_p95_s": 30.1,
+        "engine_s_p50": 2.5,
+        "workers": 2,
+        "engine_answered_429": 156,
+        "photos": "the three cheek close-ups"
+      }
+    },
+    "model_check": {
+      "workers": 2,
+      "engine_s_p50": 9.4,
+      "predicted_last_s": 940,
+      "measured_wall_s": 939.4
+    },
+    "production": {
+      "engine_s_median": 40.8,
+      "runs_seen": 23,
+      "engine_usd_per_checkin": 0.0024,
+      "checkin_usd": 0.0253,
+      "now_max_instances": 8,
+      "quota_vcpu": 20
+    },
+    "projection": [
+      {
+        "max_instances": 8,
+        "vcpu": 19,
+        "needs_quota_increase": false,
+        "done_p50_s": 530,
+        "done_p95_s": 979,
+        "last_done_s": 1020,
+        "per_hour": 706,
+        "burst_engine_usd": 0.47
+      },
+      {
+        "max_instances": 25,
+        "vcpu": 53,
+        "needs_quota_increase": true,
+        "done_p50_s": 163,
+        "done_p95_s": 326,
+        "last_done_s": 326,
+        "per_hour": 2206,
+        "burst_engine_usd": 0.47
+      },
+      {
+        "max_instances": 50,
+        "vcpu": 103,
+        "needs_quota_increase": true,
+        "done_p50_s": 82,
+        "done_p95_s": 163,
+        "last_done_s": 163,
+        "per_hour": 4412,
+        "burst_engine_usd": 0.47
+      },
+      {
+        "max_instances": 100,
+        "vcpu": 203,
+        "needs_quota_increase": true,
+        "done_p50_s": 41,
+        "done_p95_s": 82,
+        "last_done_s": 82,
+        "per_hour": 8824,
+        "burst_engine_usd": 0.47
+      }
+    ]
   }
 }

@@ -10,7 +10,9 @@ import { backButton, Lockup, SoftBackdrop } from '../website/Decor'
 import { ARMOR, BREAK_IT, CHECKS, wispLink } from './checks'
 import { dayOf, evidence, money, partLine, REPO_BLOB, type A11yCell } from './data'
 import { EvalSection } from './EvalSection'
+import { InstrumentRetest } from './InstrumentRetest'
 import { Ext, Section, tile } from './parts'
+import { ScaleSection } from './ScaleSection'
 
 const BACKDROP = 'radial-gradient(42% 42% at 88% 12%, rgba(156,211,255,.5), transparent 70%), radial-gradient(42% 44% at 8% 82%, rgba(216,184,255,.42), transparent 70%), var(--bg-canvas)'
 
@@ -168,6 +170,7 @@ export default function Evidence() {
             <Ext href={`${REPO_BLOB}docs/METRICS.md`}>The formulas for every reading</Ext>
           </p>
         </Section>
+        <InstrumentRetest />
 
         {cost ? (
           <Section id="cost" title="What it costs and how it scales" lead={`Median use from ${cost.window_days} days of production logs, at list prices read on ${dayOf(cost.priced_on)}.`}>
@@ -188,6 +191,7 @@ export default function Evidence() {
             </p>
           </Section>
         ) : null}
+        <ScaleSection />
 
         <Section id="simulated" title="Simulated, and labelled">
           <div className="grid gap-2 sm:grid-cols-2">
