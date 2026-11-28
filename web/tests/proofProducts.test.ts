@@ -136,7 +136,7 @@ test('a compare row has one leader or none', () => {
 test('the product verdict says what the evidence says, in the tier’s words', () => {
   assert.equal(verdictLine(row({ product_id: 'p', lift: 0.42 })), 'Linked to a held visible change: +42 pts over people with the same goals who don’t use it.')
   assert.match(verdictLine(row({ product_id: 'p', tier: 'promising', rate: 0.5, base_rate: 0.4, to_proven: 12 })), /^Ahead of people with the same goals \(50% against 40%\), but the interval still reaches zero\. About 12 more people/)
-  assert.equal(verdictLine(row({ product_id: 'p', tier: 'unclear', rate: 0.31, base_rate: 0.3 })), 'Users and non-users with the same goals change at about the same rate (31% against 30%).')
+  assert.equal(verdictLine(row({ product_id: 'p', tier: 'unclear', rate: 0.31, base_rate: 0.3 })), 'People using it change at about the same rate as people with the same goals who don’t (31% against 30%).')
   assert.equal(verdictLine(row({ product_id: 'p', tier: 'too_few', rate: null, reason: 'unused' })), 'No Willow users have it in their routine yet, so there is nothing to measure.')
 })
 

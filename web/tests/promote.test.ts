@@ -165,7 +165,7 @@ test('campaign insight words the verdict only when it is measured', async () => 
   assert.doesNotMatch(flat.headline, /early/)
   assert.deepEqual(cumulativeDays([{ day: 'a', impressions: 5, clicks: 1, adds: 0 }, { day: 'b', impressions: 7, clicks: 2, adds: 1 }]).map((d) => d.values), [[5, 1, 0], [12, 3, 1]])
   assert.equal(ownRecordInsight({ rate: null, base_rate: 0.3, n: 40 }), null)
-  assert.match(ownRecordInsight({ rate: 0.64, base_rate: 0.29, n: 67 })!, /^64 in 100 of its users .* 29 in 100 non-users/)
+  assert.match(ownRecordInsight({ rate: 0.64, base_rate: 0.29, n: 67 })!, /^64 in 100 of its users .* 29 in 100 people with the same goals who don’t use it/)
 })
 
 const inc = (lift: number, lo: number, hi: number) => ({ exposed: { n: 40, added: 8, rate: 0.2 }, holdout: { n: 10, added: 1, rate: 0.1 }, lift, lift_lo: lo, lift_hi: hi })
