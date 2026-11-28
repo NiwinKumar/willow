@@ -75,9 +75,9 @@ def _create(client, pid=PROVEN, workspace="retailer", goals=("dark_spots",), ski
 
 def _shopper(uid="shopper", goals=("dark_spots",), skin="oily", **extra) -> TestClient:
     c = _as(uid)
-    assert c.put(
-        "/v1/me/profile", json={"goals": list(goals), "skin_type": skin, **extra}
-    ).is_success
+    # sponsored cards are opt-in: this shopper turned them on unless a test says otherwise
+    body = {"goals": list(goals), "skin_type": skin, "hide_sponsored": False, **extra}
+    assert c.put("/v1/me/profile", json=body).is_success
     return c
 
 
@@ -376,6 +376,19 @@ def test_hide_sponsored(client, fake):
     assert shopper.get("/v1/sponsored").json()["item"] is None
     shopper.put("/v1/me/profile", json={"hide_sponsored": False})
     assert shopper.get("/v1/sponsored").json()["item"]
+
+
+def test_sponsored_is_off_until_the_person_turns_it_on(client, fake):
+    """Opt-in, like sharing: a profile that never chose (goals and skin type match) gets no card,
+    and null puts it back to off."""
+    _create(client)
+    shopper = _shopper(hide_sponsored=None)
+    assert shopper.get("/v1/me").json()["profile"]["hide_sponsored"] is True
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+    shopper.put("/v1/me/profile", json={"hide_sponsored": False})
+    assert shopper.get("/v1/sponsored").json()["item"]
+    shopper.put("/v1/me/profile", json={"hide_sponsored": None})
+    assert shopper.get("/v1/sponsored").json()["item"] is None
 
 
 def test_rotation_is_deterministic_per_person_and_day(client, fake):

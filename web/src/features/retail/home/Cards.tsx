@@ -109,6 +109,15 @@ export function CardView({ c, index, canDecide, legacy, result = false, onDecide
           <p title={rail ? c.trigger : undefined} className={`m-0 text-proof-small text-ink-2 [text-wrap:pretty] ${rail ? 'line-clamp-3' : ''}`}>{c.trigger}</p>
         </div>
       </div>
+      {c.effect ? (
+        // A range call's expected effect, with what it rests on: the decision's consequence, never a projection beyond the rows.
+        <div className="flex flex-col gap-1 rounded-ctl bg-sunken px-3 py-2.5">
+          <p title={rail ? c.effect.text : undefined} className={`m-0 text-proof-small text-ink [text-wrap:pretty] ${rail ? 'line-clamp-2' : ''}`}>
+            <span className="font-medium">Expected effect.</span> {c.effect.text}
+          </p>
+          {rail ? null : <p className="m-0 text-proof-label text-ink-2 [text-wrap:pretty]">{c.effect.basis}</p>}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="text-[22px] font-semibold leading-7 tracking-[-0.02em] text-ink tnum">{c.figure}</span>
         <span className="text-proof-small text-ink-2">{c.figureNote}</span>

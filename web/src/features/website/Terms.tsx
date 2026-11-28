@@ -5,10 +5,11 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { fmtDate } from '../../lib/format'
 import { CONSENT_VERSION } from '../../lib/prefs'
+import { DATA_LOCATION } from './dataLocation'
 import { backButton, Lockup, SoftBackdrop } from './Decor'
 
 /** The date this notice last changed. Change it with every edit to the wording below. */
-const UPDATED = '2026-11-27'
+const UPDATED = '2026-11-28'
 const ISSUES = 'https://github.com/NiwinKumar/willow/issues'
 
 const BACKDROP = 'radial-gradient(40% 40% at 12% 18%, rgba(156,211,255,.55), transparent 70%), radial-gradient(40% 45% at 88% 82%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
@@ -24,7 +25,7 @@ const DO_NEVER: [string, string][] = [
   ['Check a routine for well-known ingredient clashes and missing sunscreen', 'Give a dose, or tell anyone to start, stop or change a prescribed treatment'],
   ['Show patch-test steps and a sunscreen note with a new active', 'Suggest retinoids to someone who says they are pregnant, breastfeeding or trying'],
   ['Tell you to see a dermatologist for a changing mole, pain or a reaction', 'Assess, track, count or classify a mole'],
-  ['Label paid placement “Sponsored” on the card, and say we may earn a commission at store links', 'Sell ranking, or let payment change what we suggest to you'],
+  ['Label paid placement “Sponsored” on the card, and keep store links plain (no affiliate codes)', 'Sell ranking, or let payment change what we suggest to you'],
   ['Let brands quote what was measured, in how many people, over what period, as observational', 'Say “clinically proven”, “treats” or “cures”, or attach a condition name to a claim'],
   ['Ask separately for photos, AI processing and sharing; delete photos after 30 days', 'Use face data to recognise anyone, sell individual data, or serve under-18s'],
 ]
@@ -72,10 +73,11 @@ export default function Terms() {
             {[
               'Willow is for adults (18+). It tracks how your skin looks over time against your own baseline. It is cosmetic only and never diagnoses.',
               'Original photos, previews and spot close-ups are deleted 30 days after upload. Measurements stay until you delete them.',
+              `${DATA_LOCATION.where} ${DATA_LOCATION.leaves}`,
               'Every number comes from computer vision. Gemini explains, answers and reads labels; it never produces a measurement.',
               'Your chats with Wisp are kept (the newest 200 messages) so the conversation continues; New chat clears them.',
               'Sharing group statistics with brands and retailers is off unless you switch it on, and groups under 10 people are never shown.',
-              'We may earn a commission from store links. Routine can show one product marked Sponsored; switch it off in You. Delete everything at any time from You.',
+              'Store links are plain: Willow earns nothing when you buy. Sponsored suggestions are off unless you switch them on in You, and are always marked Sponsored. Delete everything at any time from You.',
             ].map((t) => (
               <li key={t} className="flex gap-3">
                 <span aria-hidden className="mt-[9px] size-2 flex-none rounded-full bg-willow-400" />
@@ -174,7 +176,7 @@ export default function Terms() {
           </p>
         </Section>
 
-        <Section title="Where it is kept">
+        <Section title="Where it is kept" id="where">
           <p>
             Photos, records and aggregate tables are stored in the United States, in Google Cloud’s us-central1 region (Iowa): a private Cloud Storage bucket that only Willow’s own services can read, a Firestore database and a BigQuery dataset. Willow’s services run on Cloud Run in the same region, and the website is served by Firebase Hosting. If you live outside the US, using Willow means your data is stored there. Nobody at a retailer or brand can see your photos or your records.
           </p>
@@ -198,10 +200,10 @@ export default function Terms() {
 
         <Section title="Money">
           <p>
-            Willow is free. Store links go to the store’s own page, and we may earn a commission if you buy through them; this never changes which products Willow shows you or in what order. Prices can change; the store’s own page has the current one.
+            Willow is free. Store links go to the store’s own page with no affiliate code, so Willow earns nothing if you buy; which products Willow shows you, and in what order, is never for sale. Prices can change; the store’s own page has the current one.
           </p>
           <p>
-            Brands can pay to show one product on Routine, under your own routine, marked “Sponsored” in words. Only a product whose measured results met Willow’s evidence bar for your goals can be shown, and “Why am I seeing this?” on the card says which of your goals matched. Payment never changes your measurements, Wisp’s answers or your other suggestions. Switch sponsored suggestions off at any time in You.
+            Brands can pay to show one product on Routine, under your own routine, marked “Sponsored” in words. Only a product whose measured results met Willow’s evidence bar for your goals can be shown, and “Why am I seeing this?” on the card says which of your goals matched. Payment never changes your measurements, Wisp’s answers or your other suggestions. Sponsored suggestions are off until you switch them on in You, and you can switch them off again at any time.
           </p>
         </Section>
 
@@ -280,9 +282,9 @@ function Card({ children }: { children: ReactNode }) {
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section aria-label={title}>
+    <section id={id} aria-label={title} className={id ? 'scroll-mt-6' : undefined}>
       <Card>
         <h2 className="m-0 font-serif text-[clamp(28px,3.4vw,38px)] leading-[1.05] font-normal">{title}</h2>
         <div className="flex flex-col gap-3 text-[16px] leading-[1.6] text-[#2A2926] [&_li]:pl-1 [&_p]:m-0 [&_ul]:m-0 [&_ul]:flex [&_ul]:flex-col [&_ul]:gap-2 [&_ul]:pl-5">{children}</div>

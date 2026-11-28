@@ -134,7 +134,7 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
       },
       csv: (r) => (proven?.get(r.brand) ? `${proven.get(r.brand)!.proven} of ${proven.get(r.brand)!.measured}` : ''),
     },
-    { id: 'users', header: 'People', headerText: 'People using any of its products', align: 'right', width: '80px', sortValue: (r) => r.users, firstDir: 'desc', cell: (r) => (r.users === null ? <Suppressed short /> : <span className="tnum">{int(r.users)}</span>), csv: (r) => r.users ?? 'suppressed' },
+    { id: 'users', header: <HeadTip label="Users" tip="People using any of its products, at any week. Visible change is of those who reached week 8 (n at wk 8)." />, headerText: 'People using any of its products', align: 'right', width: '80px', sortValue: (r) => r.users, firstDir: 'desc', cell: (r) => (r.users === null ? <Suppressed short /> : <span className="tnum">{int(r.users)}</span>), csv: (r) => r.users ?? 'suppressed' },
     { id: 'cont8', header: 'Still using', headerText: 'Still using at week 8 (%)', align: 'right', width: '112px', sortValue: (r) => r.cont8, firstDir: 'desc', cell: (r) => (r.cont8 === null ? <Suppressed short /> : <span className="tnum">{pct(r.cont8)}</span>), csv: (r) => (r.cont8 === null ? 'suppressed' : Math.round(r.cont8 * 100)), optional: true },
     { id: 'share', header: 'Routines', headerText: 'Share of routines (%)', align: 'right', width: '88px', sortValue: (r) => r.routine_share, firstDir: 'desc', cell: (r) => (r.routine_share === null ? <Suppressed short /> : <span className="tnum">{r.routine_share === 0 && r.users ? 'under 1%' : pct(r.routine_share)}</span>), csv: (r) => (r.routine_share === null ? 'suppressed' : Math.round(r.routine_share * 100)), optional: true, hidden: true },
     { id: 'products', header: 'Products', headerText: 'Catalogue products', align: 'right', width: '84px', sortValue: (r) => r.products, firstDir: 'desc', cell: (r) => <span className="tnum text-ink-2">{r.products}</span>, optional: true, hidden: true },
@@ -151,7 +151,8 @@ function Leaderboard({ brands, d, note }: { brands: BrandSummary[]; d: Insights;
           <strong>{most[0]}</strong> has the most Proven products ({most[1].proven} of {most[1].measured} measured).{' '}
         </>
       ) : null}
-      <strong>{leader.brand}</strong> leads on visible change ({pct(leader.rate)}, n={int(leader.n)});{' '}
+      {/* the rate's base is the people at week 8 (n), not every user (the Users column): both named, so 38 and 52 never read as one count */}
+      <strong>{leader.brand}</strong> leads on visible change ({pct(leader.rate)} of {int(leader.n)} users at week 8{leader.users !== null && leader.users !== leader.n ? `; ${int(leader.users)} use it in all` : ''});{' '}
       {tied.length === 0 ? 'no other brand’s interval reaches it.' : (
         <>
           <strong>{tied.length}</strong> more {tied.length === 1 ? 'brand overlaps' : 'brands overlap'} its interval.

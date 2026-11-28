@@ -443,7 +443,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
           ))}
           <span className="px-1.5 text-[12px] text-ink-2">
             {product.stores.some((s) => s.price) ? 'Each price is what that store’s page showed on the day checked; it may have changed.' : product.price ? 'Store links only: the price above is the catalog’s one checked price.' : 'Store links only: no price has been checked yet.'}{' '}
-            {COMMISSION_NOTE} It never changes what Willow suggests; a sponsored card is always labelled Sponsored.
+            {COMMISSION_NOTE} Ranking is never sold; a sponsored card is always labelled Sponsored.
           </span>
         </div>
       ) : null}

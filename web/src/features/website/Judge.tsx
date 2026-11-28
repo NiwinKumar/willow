@@ -18,6 +18,7 @@ import { evidence, money } from '../evidence/data'
 import { backButton, SoftBackdrop } from './Decor'
 import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH } from './destinations'
 import { journeyLine, journeyUnavailableLine, useJourney } from './hooks'
+import { NoiseDemo } from './NoiseDemo'
 
 const REPO = 'https://github.com/NiwinKumar/willow'
 const ADVISOR_QUESTION = 'Is my routine OK together, and which sunscreen under ₹1,000 would fit it?'
@@ -66,7 +67,7 @@ function faqs(): Faq[] {
       to: '/evidence#cost',
       link: 'Cost per use',
     },
-    { q: 'What happens to my photos?', a: 'Original photos are deleted 30 days after upload, and you can delete everything at any time. Results reach a retailer only if you opt in, and only in groups of 10 or more.', to: '/terms', link: 'Terms and privacy' },
+    { q: 'What happens to my photos?', a: `Stored and measured in Google Cloud’s us-central1 (Iowa, USA), wherever you live; only small spot close-ups, scanned photos, voice and text go to Gemini’s global endpoint. Originals are deleted after 30 days, Delete my data removes everything at once, and results reach a retailer only if you opt in, in groups of 10 or more.`, to: '/terms#where', link: 'Where it is kept' },
     { q: 'Is this medical?', a: 'No. It tracks cosmetic appearance only. No condition is named, nothing is graded, and suggestions are over-the-counter cosmetics.', to: '/terms#safe', link: 'What Willow never does' },
     { q: 'Who pays?', a: 'Shoppers use Willow free. Retailers pay for Proof, and a brand can pay that retailer to promote a product only once its measured evidence passes the bar.', to: PROOF_PATH, link: 'Open Proof' },
     { q: 'Why weekly photos?', a: 'Skin changes over weeks, and a single photo can just be a good-lighting day. The same day and time each week keeps photos comparable.', to: JOURNEY_PATH, link: 'Mei’s eight weeks' },
@@ -366,6 +367,8 @@ export default function Judge() {
             )
           })}
         </div>
+
+        <NoiseDemo />
 
         <ul aria-label="New in this build" className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
           <li className="flex">

@@ -99,7 +99,7 @@ function Rules() {
   return (
     <p className="m-0 flex items-start gap-2 border-t border-line bg-pf-bg2 px-5 py-3 text-proof-small text-ink-2">
       <ShieldCheck size={15} strokeWidth={1.7} aria-hidden className="mt-px shrink-0 text-proof-leaf" />
-      Money buys reach, never rank or eligibility. Shoppers see a Sponsored label and can hide sponsored cards.
+      Money buys reach, never rank or eligibility. Shoppers see sponsored cards only if they switch them on, always labelled Sponsored.
     </p>
   )
 }

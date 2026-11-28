@@ -476,11 +476,12 @@ def attribute_add(store: Store, uid: str, product_id: str) -> None:
 
 
 def sponsored(store: Store, uid: str, guest: bool = False) -> dict[str, Any] | None:
-    """The one sponsored card for this person today, or None (hidden, no goals, nothing that
+    """The one sponsored card for this person today, or None (not turned on: sponsored cards are
+    opt-in, `hide_sponsored` is false only once the person chose it; no goals, nothing that
     matches, or the evidence unavailable: no card rather than an unproven one). Demo campaigns
     (is_demo) reach guests only (`guest`: an anonymous account), never a real signed-in user."""
     profile = (store.user_get(uid) or {}).get("profile") or {}
-    if profile.get("hide_sponsored"):
+    if profile.get("hide_sponsored") is not False:
         return None
     goals = set(cohort.goals_of(profile.get("goals")))
     if not goals:

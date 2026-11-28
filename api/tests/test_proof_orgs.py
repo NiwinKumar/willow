@@ -116,7 +116,8 @@ def test_demo_campaigns_reach_guests_only(client, fake, proven):
     cid = _campaign(client, MINIMALIST).json()["id"]
     shopper = _as("shopper")
     assert shopper.put(
-        "/v1/me/profile", json={"goals": ["dark_spots"], "skin_type": "oily"}
+        "/v1/me/profile",
+        json={"goals": ["dark_spots"], "skin_type": "oily", "hide_sponsored": False},
     ).is_success
     assert campaigns.sponsored(fake.store, "shopper", guest=True)["campaign_id"] == cid
     assert campaigns.sponsored(fake.store, "shopper", guest=False) is None

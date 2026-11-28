@@ -69,11 +69,15 @@ def test_samples_never_block_a_guest_or_reach_a_shopper(monkeypatch: pytest.Monk
     assert res.json()["sample"] is False
     # samples are never served: a matching shopper gets b's real (demo) campaign only
     shopper = _as("shopper")
-    assert shopper.put("/v1/me/profile", json={"goals": ["dark_spots"], "skin_type": "oily"})
+    assert shopper.put(
+        "/v1/me/profile",
+        json={"goals": ["dark_spots"], "skin_type": "oily", "hide_sponsored": False},
+    )
     assert shopper.get("/v1/sponsored").json()["item"]["campaign_id"] == res.json()["id"]
     b.delete(f"/v1/retailer/campaigns/{res.json()['id']}")
     assert _as("shopper2").put(
-        "/v1/me/profile", json={"goals": ["dark_spots"], "skin_type": "oily"}
+        "/v1/me/profile",
+        json={"goals": ["dark_spots"], "skin_type": "oily", "hide_sponsored": False},
     )
     assert _as("shopper2").get("/v1/sponsored").json()["item"] is None
 

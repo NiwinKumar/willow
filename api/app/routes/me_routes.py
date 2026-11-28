@@ -304,7 +304,8 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, max_length=60)
     skin_type: Literal["oily", "combination", "dry", "normal", "sensitive"] | None = None
     checkin: Checkin | None = None
-    # Routine's "Sponsored · Willow Proven" card off (null = back to the default, shown)
+    # Routine's "Sponsored · Willow Proven" card: false turns it on, true off; null = back to the
+    # default, off (sponsored suggestions are opt-in, like sharing)
     hide_sponsored: bool | None = None
     # the places every check-in covers, in capture order (null = the app's default)
     track: list[TrackPlace] | None = Field(default=None, min_length=1, max_length=5)
@@ -337,7 +338,8 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
         "display_name": p.get("display_name"),
         "skin_type": p.get("skin_type"),
         "checkin": p.get("checkin"),
-        "hide_sponsored": bool(p.get("hide_sponsored")),
+        # opt-in: hidden unless the person turned it on (an explicit false)
+        "hide_sponsored": p.get("hide_sponsored") is not False,
         "track": list(p["track"]) if p.get("track") else None,
         "safety": SafetyProfile.model_validate(p["safety"]).model_dump()
         if p.get("safety")
@@ -358,7 +360,6 @@ def put_profile(
     changes = body.model_dump(include=body.model_fields_set)
     profile = {k: saved.get(k) for k in PROFILE_FIELDS} | changes
     profile["goals"] = profile.get("goals") or []
-    profile["hide_sponsored"] = bool(profile.get("hide_sponsored"))
     profile["updated_at"] = datetime.now(UTC)
     store.user_merge(user.uid, {"profile": profile})
     return {"profile": _profile_out(profile)}

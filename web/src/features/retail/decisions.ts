@@ -14,11 +14,12 @@ import { topUnmet } from './ui/insight.ts'
  * Insight types implemented (06 §6.5 numbering): 1 Proven, not promoted · 2 Nearly proven · 3 Claim ready ·
  * 4 Evidence slipped · 5 Expectation gap · 6 Over-shelved, under-delivering · 7 Under-shelved performer ·
  * 8 Unmet group · 9 Demand shift · 10 Losing switchers · 11 Routine clash · 12 Campaign result in ·
- * AutoCampaign proposals (suggest mode) as ordinary cards. A type only appears where its data exists (5 and 11
+ * AutoCampaign proposals (suggest mode) as ordinary cards · Range calls (retailer only: stock more, sample, review
+ * for delisting; rangeCalls below). A type only appears where its data exists (5 and 11
  * need the brand's product pages, 10 the brand's switching, 6 and 7 the shelf check).
  */
 
-export type CardKind = 'proven_not_promoted' | 'nearly_proven' | 'claim_ready' | 'evidence_slipped' | 'expectation_gap' | 'over_shelved' | 'under_shelved' | 'unmet_group' | 'demand_shift' | 'losing_switchers' | 'routine_clash' | 'campaign_result' | 'auto_proposal'
+export type CardKind = 'proven_not_promoted' | 'nearly_proven' | 'claim_ready' | 'evidence_slipped' | 'expectation_gap' | 'over_shelved' | 'under_shelved' | 'unmet_group' | 'demand_shift' | 'losing_switchers' | 'routine_clash' | 'campaign_result' | 'auto_proposal' | 'range_call'
 
 export type CardAction =
   | { kind: 'link'; label: string; to: string }
@@ -47,6 +48,8 @@ export type DecisionCard = {
   /** What an accepted card waits for (the follow-up measurement). */
   waiting: string
   lane: 'decide' | 'result'
+  /** Range calls: what the decision is expected to do, with its uncertainty, and the fields it was worked out from. */
+  effect?: { text: string; basis: string }
 }
 
 export const TYPE_LABEL: Record<CardKind, string> = {
@@ -63,6 +66,7 @@ export const TYPE_LABEL: Record<CardKind, string> = {
   routine_clash: 'Routine clash',
   campaign_result: 'Campaign result in',
   auto_proposal: 'AutoCampaign proposal',
+  range_call: 'Range call',
 }
 
 /** Without the shelf check's flags: shelf gaps of at least this many points (its own flags use 5). */
@@ -321,6 +325,12 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
     }
   }
 
+  if (x.mix === 'retailer') {
+    // Range calls never repeat a product a shelf card already covers.
+    const carded = new Set(cards.flatMap((c) => (c.product ? [c.product.id] : [])))
+    cards.push(...rangeCalls(x, carded))
+  }
+
   // 4 · Evidence slipped (both): a live campaign or a saved claim on a product that no longer holds its tier
   for (const c of live) {
     const r = rowById.get(c.product_id)
@@ -516,6 +526,144 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
 
   return cards.sort((a, b) => b.people - a.people || a.key.localeCompare(b.key))
 }
+
+/** Proof's own bar for Proven (retail_intel.py PROVEN_N): range calls quote it, never a different one. */
+export const PROVEN_N = 30
+
+/** One goal's share of people in the latest month and the month before (needs_by_month), for a product's goals. */
+export function goalTrend(d: Insights['needs_by_month'] | null | undefined, goalIds: string[]) {
+  if (!d || d.months.length < 2) return null
+  const i = d.months.length - 1
+  const people = d.people[i]
+  const before = d.people[i - 1]
+  if (!people || !before) return null
+  const g = d.goals.filter((x) => goalIds.includes(x.goal_id) && x.counts[i] !== null && x.counts[i - 1] !== null).sort((a, b) => (b.counts[i] ?? 0) - (a.counts[i] ?? 0))[0]
+  if (!g) return null
+  const [y, m] = d.months[i].split('-').map(Number)
+  const monthLabel = new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' })
+  return { goal: g.goal, share: (g.counts[i] ?? 0) / people, prev: (g.counts[i - 1] ?? 0) / before, monthLabel }
+}
+
+/**
+ * Range calls (retailer only): at most one "stock more", one "sample" and one "review for delisting", each from the
+ * product rows Proof already serves (tier, n, users, rate, lift and its 95% interval, to_proven, cont8) and goal
+ * demand by month. The expected effect is that arithmetic and nothing else: the lift interval per 100 people for
+ * stocking, to_proven for sampling, the interval below zero for delisting; each says it is observational and what
+ * it rests on. Tiers are retail_intel.tier_of's (Proven already includes the false-discovery check), so a call never
+ * disagrees with the product's own page. Products another card already covers are skipped.
+ */
+export function rangeCalls(x: ComposeInput, skip: Set<string> = new Set()): DecisionCard[] {
+  const w = x.weeks
+  const named = (b: string) => (x.nameOf ?? ((v: string) => v))(b)
+  const pool = x.rows.filter((r) => !skip.has(r.product_id) && (!x.brand || r.brand === x.brand))
+  const out: DecisionCard[] = []
+  const demandLine = (r: ProductRow) => {
+    const t = goalTrend(x.demand, r.goal_ids)
+    if (!t) return { text: '', basis: '' }
+    const move = t.share - t.prev
+    return {
+      text: ` ${t.goal} was the goal of ${pct(t.share)} of people with a reading in ${t.monthLabel}, ${Math.abs(move) < 0.005 ? 'level with' : move > 0 ? `up ${pts(move).slice(1)} on` : `down ${pts(move).slice(1)} on`} the month before.`,
+      basis: `; goal demand by month (${t.monthLabel})`,
+    }
+  }
+
+  // Stock more: the Proven product whose interval promises the most visible changes among the people already using it.
+  const stock = pool
+    .filter((r) => r.tier === 'proven' && r.n !== null && r.lift_lo !== null && r.lift_hi !== null && r.cont8 !== null)
+    .sort((a, b) => b.lift_lo! * (b.users ?? b.n!) - a.lift_lo! * (a.users ?? a.n!) || a.product_id.localeCompare(b.product_id))[0]
+  if (stock) {
+    const lo = Math.round(stock.lift_lo! * 100)
+    const hi = Math.round(stock.lift_hi! * 100)
+    const dm = demandLine(stock)
+    out.push({
+      key: `range_call--stock--${stock.product_id}`,
+      kind: 'range_call',
+      type: 'Range call · stock more',
+      title: `Stock more of ${stock.product}`,
+      trigger: `Proven: ${gapSentence(stock, w)}${dm.text}`,
+      figure: `${lo}–${hi}`,
+      figureNote: 'more visible changes per 100 users',
+      n: stock.n,
+      interval: liftInterval(stock.lift_lo, stock.lift_hi),
+      people: stock.users ?? stock.n!,
+      product: ref(stock),
+      primary: { kind: 'accept', label: 'Add to the range plan' },
+      secondary: { kind: 'link', label: 'View proof', to: productTo(stock.product_id, x.carry) },
+      waiting: 'Its users and lift interval on the next data version',
+      lane: 'decide',
+      effect: {
+        text: `For every 100 more people with these goals who use it to week ${w}, about ${lo} to ${hi} more would see a visible change than people with the same goals who don’t use it, if they resemble today’s users. ${pct(stock.cont8)} of its users still use it at week ${w}.`,
+        basis: `Observational: ${int(stock.n)} users at week ${w} against people with the same goals not using it, 95% interval; continuation to week ${w}${dm.basis}. Not a sales forecast.`,
+      },
+    })
+  }
+
+  // Sample: the Promising product closest to settling (fewest more people needed, then the most users).
+  const sample = pool
+    .filter((r) => r.tier === 'promising' && r.n !== null && r.to_proven !== null && r.to_proven !== undefined && r.to_proven <= NEARLY && r.lift_lo !== null && r.lift_hi !== null)
+    .sort((a, b) => a.to_proven! - b.to_proven! || (b.users ?? 0) - (a.users ?? 0) || a.product_id.localeCompare(b.product_id))[0]
+  if (sample) {
+    const more = sample.to_proven!
+    out.push({
+      key: `range_call--sample--${sample.product_id}`,
+      kind: 'range_call',
+      type: 'Range call · sample',
+      title: `Sample ${sample.product} to settle its evidence`,
+      trigger: `Promising: ${pts(sample.lift)} more than people with the same goals not using it, in ${int(sample.n)} people at week ${w}. ${sample.n! < PROVEN_N ? `Proven needs at least ${PROVEN_N} people at week ${w}.` : 'Proven needs its interval clear of zero, holding up across every product tested.'}`,
+      figure: `+${int(more)}`,
+      figureNote: more === 1 ? 'person needed' : 'people needed',
+      n: sample.n,
+      interval: liftInterval(sample.lift_lo, sample.lift_hi),
+      people: sample.users ?? sample.n!,
+      product: ref(sample),
+      primary: { kind: 'brief', label: 'Sampling brief', file: `proof-sampling-brief-${sample.product_id}.md`, body: samplingBrief(sample, w) },
+      secondary: { kind: 'link', label: 'View proof', to: productTo(sample.product_id, x.carry) },
+      waiting: `People at week ${w}; the card returns when the tier changes`,
+      lane: 'decide',
+      effect: {
+        text: `About ${int(more)} more ${more === 1 ? 'person' : 'people'} using it to week ${w} would settle it as Proven if today’s rates hold; if they don’t, the tier says so. Today’s gap: ${pts(sample.lift)}, 95% interval ${pts(sample.lift_lo)} to ${pts(sample.lift_hi)}.`,
+        basis: `The Promising tier from ${int(sample.n)} people at week ${w}; “people needed” assumes today’s rates hold. Sampling is not a claim.`,
+      },
+    })
+  }
+
+  // Review for delisting: enough people, and even the top of the interval is below people not using it.
+  const delist = pool
+    .filter((r) => r.tier === 'unclear' && r.n !== null && r.n >= PROVEN_N && r.lift !== null && r.lift_hi !== null && r.lift_hi < 0 && r.base_rate !== null)
+    .sort((a, b) => (b.users ?? b.n!) - (a.users ?? a.n!) || a.product_id.localeCompare(b.product_id))[0]
+  if (delist) {
+    const alt = x.rows
+      .filter((r) => r.category === delist.category && r.tier === 'proven' && r.lift_lo !== null && r.product_id !== delist.product_id)
+      .sort((a, b) => b.lift_lo! - a.lift_lo! || (b.n ?? 0) - (a.n ?? 0) || a.product_id.localeCompare(b.product_id))[0]
+    const canAsk = x.brandOrgs.has(delist.brand)
+    out.push({
+      key: `range_call--delist--${delist.product_id}`,
+      kind: 'range_call',
+      type: 'Range call · review for delisting',
+      title: `Review ${delist.product} for delisting`,
+      trigger: `${pct(delist.rate)} of ${int(delist.n)} users saw a visible change by week ${w}, against ${pct(delist.base_rate)} of people with the same goals who don’t use it: ${pts(delist.lift)}, and the whole 95% interval is below zero.`,
+      figure: pts(delist.lift),
+      figureNote: GAP_NOTE.replace('more than', 'against'),
+      n: delist.n,
+      interval: liftInterval(delist.lift_lo, delist.lift_hi),
+      people: delist.users ?? delist.n!,
+      product: ref(delist),
+      primary: { kind: 'accept', label: 'Add to range review' },
+      secondary: canAsk
+        ? { kind: 'request', label: `Ask ${delist.brand} for evidence`, productId: delist.product_id, brand: delist.brand, message: `${delist.product}: ${pct(delist.rate)} of ${int(delist.n)} users saw a visible change by week ${w}, against ${pct(delist.base_rate)} of people with the same goals who don’t use it (95% interval ${pts(delist.lift_lo)} to ${pts(delist.lift_hi)}). Before our range review, can you share evidence for it?` }
+        : { kind: 'link', label: 'View proof', to: productTo(delist.product_id, x.carry) },
+      waiting: 'The brand’s evidence, or the tier on the next data version',
+      lane: 'decide',
+      effect: {
+        text: `On this evidence, delisting is not expected to cost anyone a visible change: even at the top of the interval its users change ${pts(delist.lift_hi).replace(MINUS_RE, '')} less often than people not using it. ${pct(delist.cont8)} of its users still use it at week ${w}, so offer them a swap${alt ? `: ${alt.product} (${named(alt.brand)}), Proven in the same category at ${pts(alt.lift)} (95% interval ${pts(alt.lift_lo)} to ${pts(alt.lift_hi)})` : ''}.`,
+        basis: `Observational: ${int(delist.n)} users at week ${w} against people with the same goals not using it, 95% interval; continuation to week ${w}. Sales and margin are not in Proof.`,
+      },
+    })
+  }
+  return out
+}
+
+const MINUS_RE = /^[−-]/
 
 /** The goal whose share of people rose most from the month before (by DEMAND_RISE or more); null otherwise. */
 export function demandShift(d: Insights['needs_by_month'] | null | undefined) {
