@@ -24,6 +24,7 @@ from app import (
     routine_check,
     routine_log,
     safety,
+    translate,
 )
 from app.auth import AuthUser, current_user
 from app.schedule import Schedule
@@ -476,6 +477,7 @@ def _chat_answer(
     *,
     action: str = "advisor",
     keep: bool = True,
+    lang: str = "en",
 ) -> dict[str, Any]:
     """One answer from `uid`'s own data. `action` is the cap it counted on; `keep` stores the turn
     in the person's history (the demo journey's chat is never stored)."""
@@ -499,6 +501,8 @@ def _chat_answer(
                 "standard": standard,
             },
         ) from exc
+    # validated in English first; then in the person's language, numbers unchanged (translate.py)
+    reply = translate.wisp_reply(reply, lang)
     if keep:
         try:
             advisor.remember(store, uid, body.messages[-1].text, len(images), reply, asked_at)
@@ -512,9 +516,10 @@ def advisor_chat(
     body: ChatRequest,
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
+    lang: str = Depends(translate.lang_header),
 ) -> dict[str, Any]:
     images, used = _chat_start(body, user.uid, store)
-    return _chat_answer(body, user.uid, store, images, used)
+    return _chat_answer(body, user.uid, store, images, used, lang=lang)
 
 
 STREAM_PING_S = 10.0
@@ -529,6 +534,7 @@ def advisor_chat_stream(
     body: ChatRequest,
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
+    lang: str = Depends(translate.lang_header),
 ) -> StreamingResponse:
     """The same turn as /advisor/chat, as Server-Sent Events: reading_context, asking_gemini
     (step tools, then step reply with what the tools found), checking_numbers, then done
@@ -536,7 +542,7 @@ def advisor_chat_stream(
     really starts; the reply is only sent once validated (no partial text). Errors found before
     any work (422, 429) are plain HTTP errors, as on /advisor/chat."""
     images, used = _chat_start(body, user.uid, store)
-    return chat_stream(body, user.uid, store, images, used)
+    return chat_stream(body, user.uid, store, images, used, lang=lang)
 
 
 def chat_stream(
@@ -548,6 +554,7 @@ def chat_stream(
     *,
     action: str = "advisor",
     keep: bool = True,
+    lang: str = "en",
 ) -> StreamingResponse:
     events: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
 
@@ -562,6 +569,7 @@ def chat_stream(
                 on_stage=lambda e, d: events.put((e, d)),
                 action=action,
                 keep=keep,
+                lang=lang,
             )
             events.put(("done", {"reply": reply}))
         except HTTPException as exc:

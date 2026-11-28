@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 
 import { useOwner } from '../../data/hooks'
 import { api, type SessionView } from '../../lib/api'
+import { useLanguage } from '../../lib/language'
 import { getQueryData, useQuery } from '../../lib/query'
 
 const SETTLE_MS = 350
@@ -16,7 +17,8 @@ const STALE_MS = 60 * 60_000
 
 export function useSessionView(sessionId: string | null): SessionView | null {
   const uid = useOwner()
-  const key = ['session-view', uid, sessionId]
+  const lang = useLanguage()
+  const key = ['session-view', uid, sessionId, lang]
   const cached = Boolean(getQueryData<SessionView>(key))
   const [settled, setSettled] = useState<string | null>(null)
   useEffect(() => {

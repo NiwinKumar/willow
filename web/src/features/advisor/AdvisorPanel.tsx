@@ -17,6 +17,7 @@ import { verdictCounts } from '../../lib/verdict'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
 import './advisor.css'
+import { LanguagePicker } from '../../components/willow/LanguagePicker'
 import { ask, DEMO_OWNER, newChat, regenerate, setTokenSource, stopWaiting, takeSeed, useChat, type Attachment, type ChatMessage } from './chatStore'
 import { Answer, ErrorBubble, StandardCard, UserBubble, type AnswerActions } from './Messages'
 import { useComposing, WispMark, wispState } from './Wisp'
@@ -51,6 +52,9 @@ export default function AdvisorPanel({ seed, onClose, full = false, onToggleFull
           </button>
         ) : null}
         {data.mode === 'live' ? <ContextChip /> : null}
+        <span className="ml-auto">
+          <LanguagePicker compact />
+        </span>
       </div>
       <Chat seed={seed} full={full} onExitFull={full ? onToggleFull : undefined} />
     </div>
