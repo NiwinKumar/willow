@@ -1,6 +1,6 @@
 # Proof by Willow: retail brand (owner: Niwin)
 
-Proof by Willow (earlier "Willow Proof") is the retail and brand side of Willow: the dashboard at `/retail/*` that shows which products are linked to a measured, held change for real people (or the labelled synthetic cohort). Descriptor: **Retail intelligence**. It is a sub-brand. It wears Willow's own logo and always reads as Willow, uses Willow's tokens, and never introduces a new data colour. The shopper app and the website stay Willow (favicon included).
+Proof by Willow (earlier "Willow Proof") is the retail and brand side of Willow: the dashboard at `/retail/*` that shows which products are linked to a measured, held change for real people (or the labelled synthetic cohort). Descriptor: **Retail intelligence**. It is a sub-brand. It wears Willow's own logo and always reads as Willow, uses Willow's tokens, and never introduces a new data colour. The shopper app and the website stay Willow. Proof has its own tab icon (Nov 28): the same frosted bud, colours unchanged, on Proof's near-black Geist tile instead of Willow's light one (`web/public/proof-favicon.svg` and its PNGs, switched in by `web/src/lib/favicon.ts` and the boot script in `index.html` on `/retail`).
 
 Code: `web/src/features/retail/brand/` (`ProofMark`, `ProofWordmark`, `ProofLockup`), static mark `web/public/proof-mark.svg`, tokens at the end of `web/src/styles/tokens.css`, Tailwind mapping in `web/src/index.css` (`--color-proof-*`, `--text-proof-*`).
 
