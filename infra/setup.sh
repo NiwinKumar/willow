@@ -136,3 +136,14 @@ echo "Done."
 #
 # # Check: run it now and read the api's answer in the logs ("reminders run: {...}").
 # gcloud scheduler jobs run willow-reminders --location="$REGION"
+
+# ---------------------------------------------------------------------------------------------------
+# Model Armor (Nov 28, 2026): screens each Wisp question before Gemini (api/app/armor.py).
+# gcloud services enable modelarmor.googleapis.com
+# gcloud model-armor templates create wisp-input --location="$REGION" \
+#   --pi-and-jailbreak-filter-settings-enforcement=enabled \
+#   --pi-and-jailbreak-filter-settings-confidence-level=medium-and-above \
+#   --malicious-uri-filter-settings-enforcement=enabled
+# gcloud projects add-iam-policy-binding "$PROJECT_ID" --role=roles/modelarmor.user \
+#   --member="serviceAccount:sa-api@${PROJECT_ID}.iam.gserviceaccount.com" --condition=None
+# Then MODEL_ARMOR_TEMPLATE=wisp-input in infra/api-env.yaml (or --update-env-vars on willow-api).

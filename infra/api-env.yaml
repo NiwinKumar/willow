@@ -17,3 +17,8 @@ ALLOWED_ORIGINS: "http://localhost:5173,https://willow-511508.web.app,https://me
 VAPID_SUBJECT: "https://willow-511508.web.app"
 APP_URL: "https://willow-511508.web.app"
 REMINDERS_AUDIENCE: "https://willow-api-hrlt7lqdwa-uc.a.run.app/v1/internal/reminders"
+
+# Model Armor screens every Wisp question before Gemini (api/app/armor.py). Template `wisp-input`
+# in us-central1: prompt injection and jailbreak (medium and above) plus malicious links. The api
+# service account holds roles/modelarmor.user (Nov 28, 2026).
+MODEL_ARMOR_TEMPLATE: "wisp-input"
