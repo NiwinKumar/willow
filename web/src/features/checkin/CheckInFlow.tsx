@@ -31,7 +31,8 @@ import { FlowBackdrop, SampleBanner } from './parts'
 import { outcomeOf } from './outcome'
 import { ProcessingStep } from './ProcessingStep'
 import { ReviewStep } from './ReviewStep'
-import { SampleStep } from './SampleStep'
+import { SampleStep, sampleBaseline } from './SampleStep'
+import { useSamples } from '../../lib/useSamples'
 import { SiteStep } from './SiteStep'
 import { planTopUp, topUpNeed } from './topup'
 import { useAnalysis } from './useAnalysis'
@@ -207,10 +208,22 @@ export default function CheckInFlow() {
     },
     [user, continueAsGuest, getIdToken, go],
   )
+  // A sample this account has already run as its sample baseline is not run again by the link alone (the
+  // judge tour's stop, opened a second time): the list shows it measured, with the next sample to compare.
+  const sampleRan = Boolean(sampleId && data.mode === 'live' && sampleBaseline(data.all, sampleId))
   useEffect(() => {
     if (exiting || !sampleId || sessionParam || authLoading) return
+    // wait for this person's sessions before deciding (a signed-out visitor has none)
+    if (user && data.mode === 'live' && data.status !== 'ready' && data.status !== 'error') return
+    if (sampleRan && sampleStarted.current !== sampleId) {
+      go({ sample: 'list' }, { replace: true })
+      return
+    }
     void runSample(sampleId)
-  }, [exiting, sampleId, sessionParam, authLoading, runSample])
+  }, [exiting, sampleId, sessionParam, authLoading, runSample, sampleRan, user, data.mode, data.status, go])
+  // The later-week sample that follows the one being run (offered once this run is the sample baseline).
+  const sampleCatalog = useSamples()
+  const followUp = sampleId && sampleCatalog.state === 'ready' ? (sampleCatalog.samples.find((x) => x.after === sampleId) ?? null) : null
 
   // Where a check-in starts: the site step without a place; the guide for a first session (or RAW before
   // the one-time Lightroom setup); otherwise straight to the camera (quick) or the files (RAW).
@@ -360,15 +373,18 @@ export default function CheckInFlow() {
     toast(`${v.session.is_baseline ? 'Baseline set' : analysis.state.fresh ? 'Analysed just now' : 'Result ready'} · ${what}`, {
       description: user?.isAnonymous ? 'Keep it by saving with Google in You.' : undefined,
     })
-    // ?from=check-in lets Result offer its once-per-face-session "Same time tomorrow?" sheet.
-    exitTo(`/result/${v.session.id}?from=check-in`)
+    // ?from=check-in lets Result offer its once-per-face-session "Same time next week?" sheet: after the
+    // person's own check-in only, never after a sample run (someone else's photos, no next check-in).
+    exitTo(v.session.sample_id ? `/result/${v.session.id}` : `/result/${v.session.id}?from=check-in`)
   }, [analysis.state, user, exitTo])
+  // A sample baseline with a second sample to run stays on this step: the comparison is offered there.
+  const offerFollowUp = Boolean(followUp && analysis.state.kind === 'done' && analysis.state.view.session.sample_id && analysis.state.view.session.is_baseline)
   // Results open on their own once measured, but never while "What changed?" is still being answered.
   useEffect(() => {
-    if (outcome !== 'success' || exiting || askChanges) return
+    if (outcome !== 'success' || exiting || askChanges || offerFollowUp) return
     const t = window.setTimeout(handOff, reduce ? 500 : 1900)
     return () => window.clearTimeout(t)
-  }, [outcome, exiting, handOff, reduce, askChanges])
+  }, [outcome, exiting, handOff, reduce, askChanges, offerFollowUp])
 
   const clearShots = () => {
     setShots([])
@@ -472,7 +488,9 @@ export default function CheckInFlow() {
       <SampleStep
         busy={sampleBusy}
         error={sampleError}
+        sessions={data.mode === 'live' ? data.all : []}
         onRun={(id) => void runSample(id)}
+        onView={(id) => exitTo(`/result/${id}`)}
         onOwn={() => {
           setSampleError(null)
           go({ sample: null, site: 'face_full', mode: 'uncalibrated', step: null, n: null }, { replace: true })
@@ -509,6 +527,19 @@ export default function CheckInFlow() {
         n={analysis.meta?.n_frames ?? (usable(upload.rows).length || n)}
         received={uploaded.current || sampleParam !== null || analysis.meta?.status === 'processing' || analysis.meta?.status === 'done'}
         sample={sampleParam !== null}
+        nextSample={
+          followUp
+            ? {
+                title: followUp.title,
+                onRun: () => {
+                  // a new run in this same flow: the finished one stays in the account as the baseline
+                  handedOff.current = false
+                  setHeld(null)
+                  go({ sample: followUp.id, session: null, site: followUp.site, mode: followUp.capture_mode, step: null }, { replace: true })
+                },
+              }
+            : null
+        }
         onRetry={analysis.retry}
         onRetake={() => newAttempt({ ...again(), step: (analysis.meta?.capture_mode ?? mode) === 'calibrated_raw' ? 'files' : 'camera' })}
         onUploadAgain={() => newAttempt({ ...again(), step: 'files' })}

@@ -99,9 +99,10 @@ test('4 · evidence slipped: a live campaign or a saved claim on a product below
   const slipped = row('mine', 'Acme', { tier: 'unclear', tier_label: 'No clear effect yet', lift: 0.02 })
   const keys = kinds(base({ rows: [slipped], campaigns: [campaign('c1', 'mine', 'active')], claimed: new Set(['mine']) }))
   assert.deepEqual(keys.sort(), ['evidence_slipped--campaign-c1', 'evidence_slipped--claim-mine'])
-  // a Promising product still carries its claim (no card), but not a campaign
+  // claims and campaigns both stand on Proven: a Promising product keeps neither, and is never "claim ready"
   const promising = row('mine', 'Acme', { tier: 'promising', to_proven: 200 })
-  assert.deepEqual(kinds(base({ rows: [promising], campaigns: [campaign('c1', 'mine', 'active')], claimed: new Set(['mine']) })), ['evidence_slipped--campaign-c1'])
+  assert.deepEqual(kinds(base({ rows: [promising], campaigns: [campaign('c1', 'mine', 'active')], claimed: new Set(['mine']) })).sort(), ['evidence_slipped--campaign-c1', 'evidence_slipped--claim-mine'])
+  assert.ok(!kinds(base({ rows: [promising] })).some((k) => k.startsWith('claim_ready')))
 })
 
 test('5 · expectation gap needs 10 people and a quarter who changed without saying it works', () => {

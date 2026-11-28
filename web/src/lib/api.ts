@@ -295,6 +295,12 @@ export type AdvisorReply = {
   checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number; photos_read?: number }
   /** A photo of skin or a face was attached: never answered (chat photos are for products only). */
   photos_refused?: boolean
+  /** The one currency this answer's prices are in (api advisor.py); each product carries `shown_price` in it. */
+  price_currency?: string | null
+  /** Products of this answer that the routine check finds in conflict with each other: the card says "Check this" with the reason. */
+  pairings?: Record<string, { issue: string; suggestion: string; with: string[] }>
+  /** The answer's language's own words for measurement names and the fixed verdict and card labels (api translate.py); absent for English. */
+  labels?: { metrics: Record<string, string>; ui: Record<string, string> }
   remaining_today: number
 }
 
@@ -480,7 +486,7 @@ export type RetailerAnswer = {
 }
 
 /** Hosted sample photos for judge mode (api/app/demo.py). */
-export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number }
+export type DemoSample = { id: string; title: string; note: string; site: Site; capture_mode: CaptureMode; credit: string; n_frames: number; /** A later check-in of the same sample person: runs after this sample, whose run is its baseline. */ after?: string | null }
 
 /** waking: the engine sleeps when idle; it was still starting when checked (about 35 s). */
 type ServiceState = { status: 'ok' | 'waking' | 'unreachable' | 'unavailable' | 'degraded'; error?: string }
@@ -778,6 +784,8 @@ export type CampaignStats = {
 export type Campaign = {
   id: string
   workspace: string
+  /** The Proof organisation it was made under (null: before organisations, or the dev seed). Missing from older api builds. */
+  org_id?: string | null
   product_id: string
   goals: string[]
   skin_types: SkinType[]
@@ -923,7 +931,8 @@ export type RetailerProductRow = {
   category: string
   category_label: string
   goal_ids: string[]
-  price_tier: 'budget' | 'mid' | 'premium'
+  /** null: no checked price (most index products). */
+  price_tier: 'budget' | 'mid' | 'premium' | null
   image_url: string | null
   users: number | null
   n: number | null

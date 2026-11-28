@@ -43,9 +43,10 @@ def test_first_reading_and_quality_failure_headlines():
         "label": "Redness",
         "verdict": "no_baseline",
         "confidence": "measured",
+        "value": 12.0,
     }
     first = explain.template({"metrics": [metric], "quality": {"passed": True}})
-    assert first["headline"] == "Your first reading"
+    assert first["headline"] == "This is your baseline"
     failed = explain.template({"metrics": [metric], "quality": {"passed": False}})
     assert failed["headline"] == "These photos could not be measured"
 
@@ -157,6 +158,10 @@ def test_one_photo_baseline_comparison_is_not_called_a_first_reading():
         "mdc95": None,
     }
     assert "needs more photos" in explain.item(m)["summary"]
+    # not judged yet, so the template says no direction either (the rule Gemini is held to)
+    assert not explain._says_it_moved(
+        explain.item({**m, "id": "blemishes", "delta": -1})["summary"]
+    )
     exp = explain.template({"metrics": [m], "quality": {"passed": True}})
     assert exp["headline"] == "Compared with your baseline (it needs more photos to judge changes)"
 
@@ -317,7 +322,7 @@ def test_no_band_change_is_quoted_as_the_app_shows_it():
         "value": 27.21,
     }
     out = explain.item(m, first_reading=False)
-    assert "a shift from your start" in out["summary"] and out["quoted_numbers"] == []
+    assert "needs more photos" in out["summary"] and out["quoted_numbers"] == []
     assert not explain.NUMBER.search(out["summary"])
 
 
@@ -447,3 +452,134 @@ def test_a_metric_with_no_real_change_is_not_described_as_moving():
     assert not [
         i for i in explain.problems(_exp("Calmer skin than at your start."), real) if "words" in i
     ]
+
+
+def _first_reading(ids, unread=()):
+    return {
+        "site": "face_full",
+        "capture_mode": "uncalibrated",
+        "frames_used": 5,
+        "quality": {"passed": True, "reasons": []},
+        "warnings": [],
+        "metrics": [
+            {
+                "id": i,
+                "label": i.replace("_", " ").capitalize(),
+                "verdict": "no_baseline",
+                "direction": "none",
+                "confidence": "indicative",
+                "unit": "index",
+                "value": None if i in unread else 3.0,
+                "delta": None,
+                "mdc95": 1.0,
+            }
+            for i in ids
+        ],
+    }
+
+
+NINE = ("tone_ita", "pigment_spots", "tone_evenness", "redness", "blemishes", "dark_circles",
+        "shine", "glow", "lines")  # fmt: skip
+
+
+def test_a_baseline_is_one_headline_and_at_most_three_grouped_sentences():
+    exp = explain.template(_first_reading(NINE), first_reading=True)
+    assert exp["headline"] == "This is your baseline"
+    summaries = [i["summary"] for i in exp["items"]]
+    assert summaries == [
+        "Your starting point for redness, blemishes and dark spots is recorded.",
+        "Skin tone, tone evenness, under-eye, shine, glow and lines are recorded too.",
+    ]
+    assert not explain.repeated_openings(summaries)
+    # a reading the photos could not give gets the third sentence, never a line of its own each
+    exp = explain.template(_first_reading((*NINE, "pores", "texture"), unread=("pores", "texture")))
+    assert len(exp["items"]) == 3
+    assert exp["items"][2]["summary"] == "Pores and texture could not be read from these photos."
+    # every item still names a real metric, and no number is written
+    assert all(i["metric_id"] in (*NINE, "pores", "texture") for i in exp["items"])
+    assert not _numbers(" ".join(i["summary"] for i in exp["items"]) + exp["headline"])
+    # a later session that compared nothing is not a baseline: it keeps its own wording
+    later = explain.template(_first_reading(NINE), first_reading=False)
+    assert later["headline"] == "Not compared with your baseline this time"
+
+
+def _many(summaries, headline="Welcome to your first check.", steps=()):
+    return explain._Explanation(
+        headline=headline,
+        items=[
+            explain._Item(metric_id=i, summary=t) for i, t in zip(NINE, summaries, strict=False)
+        ],
+        next_steps=list(steps),
+        disclaimer="x",
+    )
+
+
+def test_near_identical_items_are_rejected_and_the_collapsed_template_answers(monkeypatch):
+    from app import gemini
+
+    result = _first_reading(NINE)
+    data = explain.gemini_input(result, {"is_baseline": True, "routine": []})
+    nine = _many([f"This is your first check for {i.replace('_', ' ')}." for i in NINE])
+    issues = explain.problems(nine, data)
+    assert any("repeat the same opening" in i for i in issues)
+    assert any("at most 3 items" in i for i in issues)
+    # two items may share an opening; three may not
+    two = _many(["This is your first check for redness.", "This is your first check for shine."])
+    assert not explain.problems(two, data)
+    grouped = _many(
+        [
+            "Your starting point for redness, blemishes and dark spots is recorded.",
+            "Tone, shine, glow and lines are noted the same way.",
+        ]
+    )
+    assert not explain.problems(grouped, data)
+    # Gemini answering with nine look-alike lines twice: the collapsed template is what is saved
+    monkeypatch.setattr(gemini, "generate_json", lambda *a, **k: nine)
+    exp, source = explain.generate(result, {"is_baseline": True, "routine": []})
+    assert source == "template" and len(exp["items"]) <= 3
+    assert exp["headline"] == "This is your baseline"
+
+
+def test_a_first_reading_never_gets_a_direction_word():
+    data = explain.gemini_input(_first_reading(NINE), {"is_baseline": True, "routine": []})
+    for bad in (
+        "This sets a starting point for calmer skin.",
+        "Your redness is recorded, on the way to a more even tone.",
+    ):
+        issues = explain.problems(_many([bad]), data)
+        assert any("direction words for" in i for i in issues), bad
+    # not in the headline or a next step either: nothing has moved yet
+    step = explain.problems(
+        _many(["Redness is recorded."], steps=["Keep going for calmer skin."]), data
+    )
+    assert any("direction words in a next step" in i for i in step)
+    head = explain.problems(
+        _many(["Redness is recorded."], headline="A start towards smoother skin."), data
+    )
+    assert "change language in headline" in head
+    # the scale may still be explained, and a plain starting point passes
+    ok = _many(["Your starting point for redness is recorded."], steps=["Use the same light."])
+    assert not explain.problems(ok, data)
+
+
+def test_the_template_names_readings_that_held_once_not_one_line_each():
+    result = _first_reading(NINE)
+    for m in result["metrics"]:
+        m.update(verdict="within_noise", delta=0.2, mdc95=1.0)
+    result["metrics"][4].update(verdict="real_change", delta=-7.0, unit="count")  # blemishes
+    exp = explain.template(result, first_reading=False)
+    summaries = [i["summary"] for i in exp["items"]]
+    assert len(summaries) == 2 and summaries[0].startswith("Blemishes: fewer blemishes")
+    assert summaries[1] == (
+        "About the same as at your start: skin tone, dark spots, tone evenness, redness, "
+        "under-eye, shine, glow and lines."
+    )
+    assert not explain.repeated_openings(summaries)
+
+
+def test_an_explanation_never_says_safe():
+    from app.explain import SAFE
+
+    assert SAFE.search("Starting levels for redness have been safely set.")
+    assert SAFE.search("This is safe for your skin.")
+    assert not SAFE.search("Your safety profile is complete.")

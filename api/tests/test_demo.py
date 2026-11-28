@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 
 import pytest
 
@@ -52,9 +53,104 @@ def test_a_sample_run_is_an_ordinary_session_of_the_judge(client, fake, samples)
     view = client.post(f"/v1/sessions/{sid}/analyze").json()
     assert view["session"]["status"] == "done"
     assert view["session"]["sample_id"] == "forearm_base"
-    # someone else's photos: read on their own, never this person's baseline
+    # someone else's photos: never this person's own baseline...
+    assert fake.store.baseline_get("u_test", "forearm_control") is None
+    # ...but the starting point of the sample runs, so the next sample run has a verdict
+    assert view["session"]["is_baseline"] is True
+    assert fake.store.baseline_get("u_test", "forearm_control__sample")["session_id"] == sid
+
+
+FACE_MANIFEST = {
+    "samples": [
+        {
+            "id": "mei_face_week1",
+            "title": "Face check-in, Mei's first week",
+            "site": "face_full",
+            "capture_mode": "uncalibrated",
+            "frames": ["frame_1.jpg", "frame_2.jpg", "frame_3.jpg"],
+        }
+    ]
+}
+
+
+@pytest.fixture
+def face_samples(fake, monkeypatch):
+    """Mei's first week in the manifest, her week-eight photos in the demo journey's uploads."""
+    demo.clear_cache()
+    monkeypatch.setattr(storage, "read_text", lambda name: json.dumps(FACE_MANIFEST))
+    monkeypatch.setattr(storage, "copy_object", lambda src, dst: fake.put(dst))
+    fake.put("uploads/demo_willow/s_20261011_8e0b0021/frame_1.jpg")
+    for sid, day in (("s_20260823_810e21e6", 23), ("s_20261011_8e0b0021", None)):
+        when = datetime(2026, 8, day, tzinfo=UTC) if day else datetime(2026, 10, 11, tzinfo=UTC)
+        fake.store.session_set("demo_willow", sid, {"site": "face_full", "created_at": when})
+    yield
+    demo.clear_cache()
+
+
+def test_a_later_week_sample_is_listed_from_the_journeys_own_photos(client, fake, face_samples):
+    listed = client.get("/v1/demo/samples").json()["samples"]
+    assert [s["id"] for s in listed] == ["mei_face_week1", "mei_face_week8"]
+    assert listed[1]["after"] == "mei_face_week1" and "source_session" not in listed[1]
+    # without her photos in the bucket it is not offered
+    del fake.blobs["uploads/demo_willow/s_20261011_8e0b0021/frame_1.jpg"]
+    demo.clear_cache()
+    assert [s["id"] for s in client.get("/v1/demo/samples").json()["samples"]] == ["mei_face_week1"]
+
+
+def test_the_second_sample_run_is_compared_with_the_first(client, fake, face_samples):
+    # out of order it would be a baseline itself: refused until the first sample has run
+    early = client.post("/v1/demo/samples/mei_face_week8/session")
+    assert early.status_code == 409 and early.json()["detail"]["code"] == "run_first_sample"
+    first = client.post("/v1/demo/samples/mei_face_week1/session").json()["session_id"]
+    base = client.post(f"/v1/sessions/{first}/analyze").json()
+    assert base["session"]["is_baseline"] is True
+    assert base["session"]["baseline"]["session_id"] == first
+
+    second = client.post("/v1/demo/samples/mei_face_week8/session").json()["session_id"]
+    doc = fake.store.session_get("u_test", second)
+    assert doc["frame_uris"][0].endswith(f"uploads/u_test/{second}/frame_1.jpg")
+    view = client.post(f"/v1/sessions/{second}/analyze").json()
     assert view["session"]["is_baseline"] is False
-    assert fake.store.baseline_get("u_test", "forearm_control__calibrated_raw") is None
+    assert view["session"]["baseline"]["session_id"] == first
+    verdicts = {m["verdict"] for m in view["result"]["metrics"] if m["value"] is not None}
+    assert verdicts & {"real_change", "within_noise"}  # a verdict, not nine "could not compare"
+    # the photos are seven weeks apart in the journey, whatever the clock says about the runs
+    assert doc["sample_taken"] == datetime(2026, 10, 11, tzinfo=UTC)
+    # and the list view agrees with the detail view
+    listed = {
+        v["session"]["id"]: v["session"] for v in client.get("/v1/sessions").json()["sessions"]
+    }
+    assert listed[first]["is_baseline"] is True
+    assert listed[second]["baseline"]["session_id"] == first
+
+
+def test_sample_runs_never_touch_the_persons_own_baseline(client, fake, face_samples):
+    from tests.test_analyze_flow import _create, _upload_all  # the person's own selfie
+
+    created = _create(client, site="face_full", mode="uncalibrated", n=3)
+    _upload_all(fake, created)
+    own = created["session_id"]
+    mine = client.post(f"/v1/sessions/{own}/analyze").json()
+    assert mine["session"]["is_baseline"] is True
+    sid = client.post("/v1/demo/samples/mei_face_week1/session").json()["session_id"]
+    view = client.post(f"/v1/sessions/{sid}/analyze").json()
+    # Mei's photos are not compared with the person's own baseline, and do not replace it
+    assert (
+        view["session"]["is_baseline"] is True and view["session"]["baseline"]["session_id"] == sid
+    )
+    assert all(m["delta"] is None for m in view["result"]["metrics"])
+    assert fake.store.baseline_get("u_test", "face_full__uncalibrated")["session_id"] == own
+    assert client.get(f"/v1/sessions/{own}").json()["session"]["is_baseline"] is True
+
+
+def test_sample_explanations_never_read_the_persons_routine(fake, face_samples):
+    from app import analysis
+
+    fake.store.routine_set("u_test", "r1", {"brand": "Brand", "custom_name": "Serum 10%"})
+    base = {"session_id": "s_a", "sample_taken": datetime(2026, 8, 23, tzinfo=UTC), "metrics": {}}
+    doc = {"sample_id": "mei_face_week8", "sample_taken": datetime(2026, 10, 11, tzinfo=UTC)}
+    ctx = analysis.explain_context(fake.store, "u_test", doc, base, "s_b")
+    assert ctx["routine"] == [] and ctx["days_since_baseline"] == 49 and not ctx["is_baseline"]
 
 
 def test_unknown_sample_is_404(client, samples):

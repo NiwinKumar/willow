@@ -160,6 +160,31 @@ async function load(uid: string, ids: string[], getIdToken: () => Promise<string
   }
 }
 
+/**
+ * Every list on a page asks at once (three Wisp answers, the routine, a suggestion: each its own hook). Their
+ * ids are gathered for a moment and asked in ONE request per person, instead of one request per list
+ * (Nov 28: Home made three /v1/safety/check calls on load).
+ */
+const BATCH_MS = 40
+const queued = new Map<string, { ids: Set<string>; getIdToken: () => Promise<string> }>()
+let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+function ask(uid: string, ids: string[], getIdToken: () => Promise<string>) {
+  // pending at once, so a second hook asking for the same product does not queue it again
+  ids.forEach((id) => pending.add(k(uid, id)))
+  const q = queued.get(uid) ?? { ids: new Set<string>(), getIdToken }
+  ids.forEach((id) => q.ids.add(id))
+  q.getIdToken = getIdToken
+  queued.set(uid, q)
+  emit()
+  flushTimer ??= setTimeout(() => {
+    flushTimer = null
+    const batches = [...queued.entries()]
+    queued.clear()
+    for (const [who, b] of batches) void load(who, [...b.ids], b.getIdToken)
+  }, BATCH_MS)
+}
+
 export type ChecksState = {
   /** product id → check, for the ids asked that have an answer. */
   checks: Record<string, ProductCheck>
@@ -182,7 +207,7 @@ export function useChecks(productIds: readonly string[]): ChecksState {
   useEffect(() => {
     if (!uid || !ids.length) return
     const missing = ids.filter((id) => !checks.has(k(uid, id)) && !pending.has(k(uid, id)) && !failed.has(k(uid, id)))
-    if (missing.length) void load(uid, missing, getIdToken)
+    if (missing.length) ask(uid, missing, getIdToken)
     // v: a cleared cache (profile change, retry) asks again.
   }, [uid, ids, getIdToken, v])
 

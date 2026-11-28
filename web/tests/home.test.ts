@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import type { Session } from '../src/data/types.ts'
-import { readHome } from '../src/features/home/derive.ts'
+import type { RoutineEntry, Session } from '../src/data/types.ts'
+import { article, brandedName, distinctNames, readHome, shortName, spanOfUse } from '../src/features/home/derive.ts'
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 const session = (id: string, site: Session['site'], at: string, extra: Partial<Session> = {}) =>
@@ -33,4 +33,29 @@ test('back after a gap counts the latest check-in of any tracked place', () => {
   const places = [{ site: 'face_full' as const, sessions: [face] }, { site: 'cheek_macro' as const, sessions: [cheek] }]
   assert.equal(readHome([face, cheek], places, 14).person, 'active')
   assert.equal(readHome([face], [places[0]], 14).person, 'gap')
+})
+
+// --- Nov 28: rows that can be told apart, and use counted the way the rest of Willow counts weeks ---
+const entry = (id: string, brand: string, custom_name: string, actives: string[] = []) => ({ id, brand, custom_name, category: 'serum', key_actives: actives.map((name) => ({ name, pct: null })) }) as unknown as RoutineEntry
+
+test('two products with the same short name carry their brand; the others stay short', () => {
+  const ordinary = entry('a', 'The Ordinary', 'Niacinamide 10% + Zinc 1%', ['Niacinamide'])
+  const anua = entry('b', 'Anua', 'Niacinamide 10 TXA 4 Serum', ['Niacinamide'])
+  const cream = entry('c', 'Purito Seoul', 'Wonder Releaf Centella Cream Unscented')
+  assert.equal(shortName(ordinary), shortName(anua))
+  const names = distinctNames([ordinary, anua, cream])
+  assert.equal(names.get('a'), 'The Ordinary Niacinamide')
+  assert.equal(names.get('b'), 'Anua Niacinamide')
+  // a variant word is not the product: "Centella Cream", never "Cream Unscented"
+  assert.equal(names.get('c'), 'Centella Cream')
+  assert.equal(brandedName(cream), 'Purito Seoul Centella Cream')
+})
+
+test('use is counted in weeks as the rest of Willow counts them, and the article fits the word', () => {
+  assert.equal(spanOfUse(0), 'day 1')
+  assert.equal(spanOfUse(13), 'day 13')
+  assert.equal(spanOfUse(48), 'week 7') // 48 days in: the start's own week is week 1
+  assert.equal(spanOfUse(49), 'week 8')
+  assert.equal(`${article('azelaic')} azelaic night`, 'an azelaic night')
+  assert.equal(`${article('glycolic')} glycolic night`, 'a glycolic night')
 })

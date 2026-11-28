@@ -47,3 +47,64 @@ def test_a_translation_that_names_a_disease_keeps_the_english(monkeypatch):
     translate._cache.clear()
     got = translate.texts(["2 fewer blemishes", "Calmer redness"], "ja")
     assert got == ["2 fewer blemishes", "赤みが落ち着きました"]
+
+
+def test_every_glossary_word_passes_the_languages_own_word_check():
+    for lang in translate.LANGUAGES:
+        got = translate.labels(lang)
+        if lang == "en":
+            assert got is None
+            continue
+        assert set(got["metrics"]) == set(translate.METRIC_ORDER)
+        assert set(got["ui"]) == set(translate.UI_ORDER)
+        for group in got.values():
+            for key, word in group.items():
+                assert word.strip() and translate.clean_words(word, lang), (lang, key, word)
+                assert not translate.stray_english(word), (lang, key, word)
+
+
+def test_an_english_measurement_name_left_in_a_translation_is_put_into_the_language(monkeypatch):
+    def fake(prompt_id, contents, schema, **kw):
+        assert "redness = 泛红" in kw["instructions"]  # the glossary is told to the translator
+        return schema(
+            texts=["你的redness读数下降了 2 点，[metric:redness] 也是", "CeraVe Glow 精华"]
+        )
+
+    monkeypatch.setattr(translate.gemini, "generate_json", fake)
+    translate._cache.clear()
+    got = translate.texts(
+        ["Your redness reading fell by 2 points, [metric:redness] too", "CeraVe Glow serum"], "zh"
+    )
+    assert got[0] == "你的泛红读数下降了 2 点，[metric:redness] 也是"
+    assert not translate.stray_english(got[0])
+    assert got[1] == "CeraVe Glow 精华"  # a product's own name is left as it is written
+
+
+def test_a_translated_answer_carries_its_labels_pairings_and_translated_names(monkeypatch):
+    def fake(prompt_id, contents, schema, **kw):
+        return schema(texts=["你的 [metric:redness] 稳定", "下一步？", "两者同晚使用", "隔晚使用"])
+
+    monkeypatch.setattr(translate.gemini, "generate_json", fake)
+    translate._cache.clear()
+    reply = {
+        "message": "Your redness is steady",
+        "blocks": [{"type": "answer", "text": "Your [metric:redness] is steady"}],
+        "follow_up_suggestions": ["What next?"],
+        "pairings": {"p1": {"issue": "Both on one night", "suggestion": "Alternate", "with": []}},
+        "products": [],
+    }
+    out = translate.wisp_reply(reply, "zh")
+    assert out["lang"] == "zh" and out["message"] == "你的 泛红 稳定"
+    assert out["labels"]["metrics"]["redness"] == "泛红"
+    assert out["labels"]["ui"]["not_compared"] == "无法比较"
+    assert out["pairings"]["p1"] == {"issue": "两者同晚使用", "suggestion": "隔晚使用", "with": []}
+
+
+def test_an_answer_whose_translation_failed_stays_english_throughout(monkeypatch):
+    def down(*a, **k):
+        raise RuntimeError("503")
+
+    monkeypatch.setattr(translate.gemini, "generate_json", down)
+    translate._cache.clear()
+    reply = {"message": "Steady", "blocks": [{"type": "answer", "text": "Steady by 2"}]}
+    assert translate.wisp_reply(reply, "zh") is reply  # no lang, no labels: one language

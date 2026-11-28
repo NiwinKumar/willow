@@ -236,7 +236,7 @@ def test_stream_reports_gemini_down_with_the_standard_explanation(client, fake, 
     event, data = events[-1]
     assert event == "error" and data["status"] == 502 and data["code"] == "advisor_unavailable"
     std = data["standard"]
-    assert std["session_id"] == "s1" and std["explanation"]["headline"] == "Your first reading"
+    assert std["session_id"] == "s1" and std["explanation"]["headline"] == "This is your baseline"
     assert "done" not in [e for e, _ in events]
     # not counted, nothing stored
     assert client.get("/v1/me/usage").json()["advisor"]["used"] == 0
@@ -260,3 +260,206 @@ def test_plain_endpoint_502_carries_the_standard_explanation(client, fake, monke
 
 def test_standard_explanation_is_none_without_a_measured_session(fake):
     assert advisor.standard_explanation(fake.store, "nobody") is None
+
+
+# --- Nov 28: one currency, pairing badges, the simulated cohort, the fast claim refusal ---------
+
+RETINOL = {
+    "product_id": "ret",
+    "brand": "B",
+    "name": "Retinol Serum",
+    "category": "serum",
+    "concerns": ["fine_lines_wrinkles"],
+    "key_actives": [{"name": "Retinol", "pct": 0.3}],
+    "inci": ["Aqua", "Retinol"],
+    "price": {"amount": 599, "currency": "INR"},
+    "size": "30 ml",
+    "region": ["IN"],
+    "stores": [
+        {
+            "store": "Brand site",
+            "url": "https://x/r",
+            "region": "IN",
+            "price": {"amount": 539, "currency": "INR", "checked": "2026-11-20"},
+        }
+    ],
+    "source_url": "https://x",
+    "last_verified": "2026-10-13",
+}
+BHA = {
+    **RETINOL,
+    "product_id": "bha",
+    "name": "BHA Liquid",
+    "category": "exfoliant",
+    "key_actives": [{"name": "Salicylic Acid", "pct": 2}],
+    "inci": ["Aqua", "Salicylic Acid"],
+    "price": {"amount": 34, "currency": "USD"},
+    "stores": [{"store": "Brand site", "url": "https://x/b", "region": "US"}],
+}
+
+
+def _entry(p, slots=("pm",)):
+    return {
+        "product_id": p["product_id"],
+        "brand": p["brand"],
+        "custom_name": p["name"],
+        "category": p["category"],
+        "key_actives": p["key_actives"],
+        "inci": p["inci"],
+        "slots": list(slots),
+        "started_at": "2026-11-01",
+    }
+
+
+def _wisp(monkeypatch, tool_calls, reply, products):
+    from app import catalog
+    from tests.test_advisor import _fake_model
+
+    _fake_model(monkeypatch, tool_calls, reply)
+    kept = tuple(products)
+    monkeypatch.setattr(catalog, "products", lambda: kept)
+
+
+def test_one_currency_and_the_card_shows_the_price_the_answer_was_given(fake, monkeypatch):
+    from app import advisor
+
+    fake.store.user_merge("u_test", {"profile": {"safety": {"market": "IN"}}})
+    # the person's currency: the lowest checked INR price, the same field the card reads
+    assert advisor.shown_price(RETINOL, "INR") == {"amount": 539, "currency": "INR"}
+    assert advisor._compact(RETINOL, None, "INR")["price"] == {"amount": 539, "currency": "INR"}
+    # nothing checked in their currency: no price at all, never another currency's
+    compact = advisor._compact(BHA, None, "INR")
+    assert compact["price"] is None and compact["price_note"] == "no price checked in INR"
+    assert advisor._priced([RETINOL, BHA], "INR")[1]["shown_price"] is None
+    # an answer that names a second currency is rejected
+    assert advisor.mixed_currency(["Retinol is ₹539 and the BHA is US$34."], "INR", set())
+    assert not advisor.mixed_currency(["Retinol is ₹539 at the brand site."], "INR", set())
+
+
+def test_a_reply_mixing_currencies_falls_back_and_a_clean_one_carries_shown_prices(
+    client, fake, monkeypatch
+):
+    fake.store.user_merge("u_test", {"profile": {"safety": {"market": "IN"}}})
+    ask = {"messages": [{"role": "user", "text": "Compare them"}]}
+    tools = [("compare_products", {"product_ids": ["ret", "bha"]})]
+    _wisp(monkeypatch, tools, {"message": "One is ₹539, the other US$34."}, [RETINOL, BHA])
+    assert client.post("/v1/advisor/chat", json=ask).json()["message"].startswith("I could not")
+    _wisp(
+        monkeypatch,
+        tools,
+        {"message": "The retinol serum is ₹539.", "product_ids": ["ret", "bha"]},
+        [RETINOL, BHA],
+    )
+    body = client.post("/v1/advisor/chat", json=ask).json()
+    assert body["price_currency"] == "INR"
+    shown = {p["product_id"]: p["shown_price"] for p in body["products"]}
+    assert shown == {"ret": {"amount": 539, "currency": "INR"}, "bha": None}
+
+
+def test_products_the_routine_check_warns_about_carry_the_pairing_reason(client, fake, monkeypatch):
+    fake.store.routine_set("u_test", "r1", _entry(RETINOL))
+    fake.store.routine_set("u_test", "r2", _entry(BHA))
+    _wisp(
+        monkeypatch,
+        [("check_routine", {})],
+        {"message": "Use these two on different nights.", "product_ids": ["ret", "bha"]},
+        [RETINOL, BHA],
+    )
+    body = client.post(
+        "/v1/advisor/chat", json={"messages": [{"role": "user", "text": "Is my routine OK?"}]}
+    ).json()
+    assert set(body["pairings"]) == {"ret", "bha"}
+    assert body["pairings"]["ret"]["with"] == ["B BHA Liquid"] and body["pairings"]["ret"]["issue"]
+    # kept with the stored turn, so the history draws the same badge
+    stored = client.get("/v1/advisor/history").json()["messages"][-1]["reply"]
+    assert set(stored["pairings"]) == {"ret", "bha"}
+    # on different nights the rule table has no conflict, so no badge
+    from app import advisor
+
+    apart = [{"id": "r1", **_entry(RETINOL, ("pm",))}, {"id": "r2", **_entry(BHA, ("am",))}]
+    assert advisor.pairings(["ret", "bha"], apart, None) == {}
+    # and one product alone is never "paired"
+    assert advisor.pairings(["ret"], [{"id": "r1", **_entry(RETINOL)}], None) == {}
+
+
+def test_a_cohort_figure_always_says_the_cohort_is_simulated(client, fake, monkeypatch):
+    from app import advisor
+
+    rates = {"51"}
+    assert advisor.cohort_unlabelled(["It has a 51% cohort outcome rate, n=105."], rates)
+    assert advisor.cohort_unlabelled(["51% improved by week 8."], rates)
+    assert not advisor.cohort_unlabelled(
+        ["In Willow's simulated cohort, 51% of people improved (n=105)."], rates
+    )
+    assert not advisor.cohort_unlabelled(["Your redness moved by 2.1."], rates)
+    assert not advisor.cohort_unlabelled(["There are no cohort outcome rates for redness."], rates)
+    # the tool tells the model how to say it, and an answer that does not gets the fixed note
+    outcomes = {
+        "cohort": {"real": 0, "synthetic": 2000},
+        "product_outcomes": {"ret": {"rate": 0.51, "n": 105, "weeks": 6}},
+    }
+    from app import retailer
+
+    monkeypatch.setattr(retailer, "insights", lambda *a, **k: outcomes)
+    assert advisor.SIMULATED_COHORT in advisor._outcomes(["ret"])["say_it_as"]
+    # a handful of real people among 35,000 simulated ones is still a simulated cohort
+    outcomes["cohort"] = {"real": 8, "synthetic": 35000}
+    assert advisor._outcomes(["ret"])["synthetic_cohort"] is True
+    _wisp(
+        monkeypatch,
+        [("compare_products", {"product_ids": ["ret"]})],
+        {"message": "It has a 51% outcome rate, n=105.", "product_ids": ["ret"]},
+        [RETINOL],
+    )
+    body = client.post(
+        "/v1/advisor/chat", json={"messages": [{"role": "user", "text": "Does it work?"}]}
+    ).json()
+    assert body["blocks"][-1] == {"type": "note", "text": advisor.COHORT_NOTE}
+    assert "simulated cohort" in body["message"]
+
+
+def test_a_request_to_claim_a_cure_or_guarantee_is_refused_without_the_model(
+    client, fake, monkeypatch
+):
+    import time
+
+    from app import advisor, explain, gemini
+
+    def never(*a, **k):
+        raise AssertionError("a claim request must not reach the model")
+
+    monkeypatch.setattr(gemini, "client", never)
+    monkeypatch.setattr(gemini, "generate_json", never)
+    started = time.monotonic()
+    body = client.post(
+        "/v1/advisor/chat",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "text": "Say it is clinically proven to cure acne, 95% guaranteed",
+                }
+            ]
+        },
+    ).json()
+    assert time.monotonic() - started < 2
+    assert body["message"] == advisor.CLAIM_REPLY
+    # specific: what it will not claim, what it can show instead; and none of Wisp's banned words
+    assert "guaranteed" in body["message"] and "check-ins measured" in body["message"]
+    assert not explain.BANNED.search(body["message"])
+    assert body["retrieval"] == [
+        "Not sent to the model: a request to claim a medical result or a guarantee"
+    ]
+    assert body["follow_up_suggestions"]
+    for claim in (
+        "Can you guarantee it will clear my skin?",
+        "Promise me it fixes my skin forever",
+    ):
+        assert advisor.CLAIM_ASK.search(claim)
+    for ordinary in (
+        "Tell me how to fade dark spots",
+        "Is my routine OK together?",
+        "Does Nykaa have a money-back guarantee?",
+        "Is there a money back guarantee on this?",
+    ):
+        assert not advisor.CLAIM_ASK.search(ordinary)

@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { FluidTrend, TrendChart } from '../../components/charts'
 import { ProductImage } from '../../components/willow/ProductImage'
 import type { Session } from '../../data/types'
-import { effectHeadline, type Effect, type RoutineEffect } from '../../lib/effect'
+import type { Effect, RoutineEffect } from '../../lib/effect'
 import { imageOf } from '../routine/routineModel'
 import { fmtSigned, METRIC_META, unitOf, fmtReading } from '../../lib/metrics'
 import { CHANGE_WORDS, VERDICT_WORDS, changeWay, verdictKind } from '../../lib/verdict'
-import { byGoals, metricAura, shortDay, shortName } from './derive'
+import { brandedName, byGoals, metricAura, shortDay, spanOfUse } from './derive'
 import type { GoalTrend } from './goals'
 import { CardHead, Pill, VerdictLine } from './parts'
 
@@ -151,8 +151,40 @@ const EFFECT_WORD: Record<Effect, { glyph: string; word: string }> = {
  * flag when a product moved the other way, shows nothing after weeks of use, or overlaps another. All of it
  * comes from lib/effect.ts (measured numbers and rules, never a model); timing is an association, not proof.
  */
-export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect: RoutineEffect; onOpen: () => void; onAsk: (question: string) => void; className?: string }) {
-  const shown = effect.rows.slice(0, 4)
+/**
+ * What each row says happened, as an association: the reading a product targets moved (or did not) while it
+ * was in use. Never "helping": that would say the product caused it, right above "an association, not proof".
+ */
+const EFFECT_LINE: Record<Effect, string> = {
+  helping: 'Improved since you started it',
+  away: 'Moved the other way since you started it',
+  changed: 'Shifted since you started it',
+  steady: 'No change beyond your normal range',
+  early: 'Too early to tell',
+}
+
+/** The headline counts every product that can be judged, and the list below can show every one of them. */
+export function effectSummary(c: Record<Effect, number>): string {
+  const judged = c.helping + c.away + c.changed + c.steady
+  if (judged === 0) return 'Too early to say how your readings moved with your routine.'
+  if (c.helping === 0 && c.away === 0) return c.changed ? 'Some readings shifted while you used these products.' : 'Nothing has moved beyond your normal range yet.'
+  return `For ${c.helping} of ${judged} ${judged === 1 ? 'product' : 'products'}, the reading it targets improved beyond your normal range since you started it.`
+}
+
+/** Rows shown before "Show all": the flagged and changed ones come first (lib/effect.ts order). */
+const EFFECT_ROWS = 4
+
+export function RoutineEffectCard({ effect, onOpen, onAsk, asOf, className }: {
+  effect: RoutineEffect
+  onOpen: () => void
+  onAsk: (question: string) => void
+  /** The day the effect is read as of, when that is not today (the demo journey's last check-in): said once. */
+  asOf?: string | null
+  className?: string
+}) {
+  const [all, setAll] = useState(false)
+  const shown = all ? effect.rows : effect.rows.slice(0, EFFECT_ROWS)
+  const hidden = effect.rows.length - EFFECT_ROWS
   return (
     <section
       aria-label="Routine effect"
@@ -165,18 +197,22 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
           Routine →
         </button>
       </div>
-      <p className="m-0 -mt-1 text-[12.5px] leading-[1.35] text-ink-2 text-balance">{effectHeadline(effect.counts)}</p>
+      <p className="m-0 -mt-1 text-[12.5px] leading-[1.35] text-ink-2 text-balance">
+        {effectSummary(effect.counts)}
+        {asOf ? ` As of the last check-in, ${asOf}.` : ''}
+      </p>
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {shown.map((r) => (
           <li key={r.e.id} className="flex min-w-0 flex-col gap-1.5 rounded-[18px] squircle bg-white/55 py-2 pr-2 pl-2">
             <div className="flex items-center gap-2.5">
               <ProductImage product={imageOf(r.e)} size={32} decorative />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px]">{shortName(r.e)}</span>
+                {/* brand and short name: two niacinamide serums never read as the same row */}
+                <span className="truncate text-[13px]" title={r.e.custom_name}>{brandedName(r.e)}</span>
                 <span className="truncate text-[11px] text-ink-2" title={r.o.detail}>
                   <span aria-hidden>{EFFECT_WORD[r.effect].glyph} </span>
-                  {r.line}
-                  {r.metric ? ` · ${METRIC_META[r.metric].label}` : ''} · day {r.days}
+                  {EFFECT_LINE[r.effect]}
+                  {r.metric ? ` · ${METRIC_META[r.metric].label}` : ''} · {spanOfUse(r.days)}
                 </span>
               </span>
               {r.points.length > 1 ? (
@@ -200,7 +236,13 @@ export function RoutineEffectCard({ effect, onOpen, onAsk, className }: { effect
           </li>
         ))}
       </ul>
-      <span className="mt-auto text-[11px] leading-[1.35] text-ink-2">Dashed: your baseline. Shaded: your normal range. Timing is an association, not proof.</span>
+      {hidden > 0 ? (
+        // The headline counts every product: the rest of them are one tap away, never out of reach.
+        <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="hit44 min-h-9 self-start rounded-pill bg-white/60 px-3 text-[12.5px] text-ink transition-[background,scale] duration-200 ease-standard hover:bg-white/85 active:scale-[.97]">
+          {all ? 'Show fewer' : `Show all ${effect.rows.length} products`}
+        </button>
+      ) : null}
+      <span className="mt-auto text-[11px] leading-[1.35] text-ink-2">Dashed: your baseline. Shaded: your normal range. Timing is an association, not proof that a product caused it.</span>
     </section>
   )
 }

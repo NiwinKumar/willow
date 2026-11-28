@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app import (
     analysis,
-    baselines,
     changes,
     changes_ai,
     engine,
@@ -460,7 +459,7 @@ def _detail_view(store: Store, uid: str, session_id: str, doc: dict) -> dict[str
         uid,
         session_id,
         doc,
-        baseline=baselines.get(store, uid, doc["site"], doc["capture_mode"]),
+        baseline=analysis.baseline_of(store, uid, doc),
         signed=signed,
         media=media,
     )
@@ -493,9 +492,10 @@ def list_views(store: Store, uid: str, site: str | None = None) -> list[dict[str
     baseline_by_key: dict[str, dict | None] = {}
     out = []
     for sid, d in rows:
-        k = baselines.key(d["site"], d["capture_mode"])
+        # sample runs have a baseline of their own (analysis.baseline_of)
+        k = f"{analysis.baseline_key(d)}:{analysis.sample_person(d.get('sample_id'))}"
         if k not in baseline_by_key:
-            baseline_by_key[k] = baselines.get(store, uid, d["site"], d["capture_mode"])
+            baseline_by_key[k] = analysis.baseline_of(store, uid, d)
         out.append(views.session_view(uid, sid, d, baseline=baseline_by_key[k], signed=signed))
     return out
 

@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { interval, pct, pts, slugOf, SUPPRESSED, weeks } from '../src/features/retail/ui/format.ts'
+import { article, interval, pct, pts, slugOf, SUPPRESSED, weeks } from '../src/features/retail/ui/format.ts'
+import { cohortSizeText, mixedLabel } from '../src/features/retail/ui/cohort.ts'
 import { parseWorkspace, sectionPath } from '../src/features/retail/state.ts'
 
 test('rates and lifts use a true minus and signed points', () => {
@@ -33,4 +34,18 @@ test('workspace and section paths round-trip the URL', () => {
   assert.deepEqual(parseWorkspace('brand:cerave'), { kind: 'brand', slug: 'cerave' })
   assert.equal(sectionPath('overview'), '/retail')
   assert.equal(sectionPath('categories', 'serum'), '/retail/categories/serum')
+})
+
+test('the cohort is never called mixed: its size says how many are simulated and how many real', () => {
+  const c = { synthetic: 35000, real: 8, weeks: 8, dropout: 0.13, seed: 7 }
+  assert.equal(cohortSizeText(c), '35,000 simulated + 8 real people')
+  assert.equal(cohortSizeText({ ...c, real: 0 }), '35,000 simulated people')
+  assert.equal(cohortSizeText({ ...c, synthetic: 0, real: 1 }), '1 real person')
+  assert.equal(mixedLabel(c), 'Simulated + 8 real')
+  assert.equal(mixedLabel({ ...c, real: 0 }), 'Simulated')
+  assert.equal(mixedLabel(null), 'Simulated + real')
+})
+
+test('a or an before a goal name', () => {
+  assert.deepEqual(['under-eye', 'redness', 'Oil and glow'].map(article), ['an', 'a', 'an'])
 })

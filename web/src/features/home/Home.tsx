@@ -23,7 +23,7 @@ import { fmtSigned, METRIC_META, qualityCopy, unitOf } from '../../lib/metrics'
 import { useAuth } from '../../lib/useAuth'
 import { CHANGE_WORDS, VERDICT_WORDS, changeLines, changeTitle, changeWay, type VerdictKind } from '../../lib/verdict'
 import { ChangedCard, GoalsCard, RoutineEffectCard, SetupCard, WeekBand, type SetupRow } from './cards'
-import { BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, today, usable, verdictSentence, type HomeRead, type Place } from './derive'
+import { article, distinctNames, BAND_FRAMES, cap, clock, countWord, dayOf, daysSince, latest, listOf, lowerFirst, readHome, runOf, SITE_SHORT, shortDay, shortName, splitVerdicts, today, usable, verdictSentence, type HomeRead, type Place } from './derive'
 import { useProductTests } from '../routine/productTests'
 import { useOutcomeSessions } from '../routine/routineModel'
 import { restsOn } from '../routine/schedule'
@@ -153,7 +153,11 @@ function HomeBody() {
   const saveCalendar = (c: Checkin) => addToCalendar(getIdToken, c).catch(() => toast.error("Couldn't make the calendar file. Try again."))
   // Routine effect: how each product's target measurement moved since it started (lib/effect.ts).
   const outcomeSessions = useOutcomeSessions()
-  const effect = useMemo(() => routineEffect(entries ?? [], outcomeSessions, check.data), [entries, outcomeSessions, check.data])
+  // The demo journey is a finished recording: it is read as of its last measured check-in, not as of today
+  // (a product "in use for 13 weeks" in a journey whose last check-in was in its eighth week).
+  const asOfSession = demo ? outcomeSessions.filter(usable).reduce<Session | null>((a, b) => (!a || b.created_at > a.created_at ? b : a), null) : null
+  const asOf = asOfSession ? new Date(asOfSession.created_at).getTime() : undefined
+  const effect = useMemo(() => routineEffect(entries ?? [], outcomeSessions, check.data, asOf), [entries, outcomeSessions, check.data, asOf])
   const forearm = readForearm(data.series('forearm_treated')?.sessions ?? EMPTY, data.series('forearm_control')?.sessions ?? EMPTY, demo ? null : tests.running)
   const latestRead = latest(series, (s) => s.status === 'done')
   const showChanged = Boolean(read.lead && !read.lead.is_baseline)
@@ -224,11 +228,13 @@ function HomeBody() {
   // what you're aiming for (goals or setup, over the routine's effect); the last check-in (how its photos came
   // out, what changed since the baseline); the daily one (Routine today, with the product test and baseline under it).
   type Slot = { key: string; node: ReactNode; grow?: boolean }
-  const lastPhotos = latest(own, (s) => s.status === 'done' && Boolean(s.result))
+  // How the last check-in's photos came out. On the demo journey, the last one whose photos were used: a
+  // retake that found no face is not what the showcase account is there to show.
+  const lastPhotos = latest(own, (s) => s.status === 'done' && Boolean(s.result) && (!demo || usable(s)))
   const aims: Slot[] = []
   if (measured && trends.length) aims.push({ key: 'goals', node: goalsNode('flex-1') })
   if (showSetup) aims.push({ key: 'setup', node: <SetupCard className="flex-1" rows={setupRows} /> })
-  if (effect?.rows.length) aims.push({ key: 'effect', node: <RoutineEffectCard className="flex-1" effect={effect} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
+  if (effect?.rows.length) aims.push({ key: 'effect', node: <RoutineEffectCard className="flex-1" effect={effect} asOf={asOfSession ? shortDay(asOfSession.created_at) : null} onOpen={() => navigate('/routine')} onAsk={(q) => ask(q, 'Routine effect')} /> })
   const last: Slot[] = []
   if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} onOpen={() => openResult(lastPhotos)} /> })
   if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
@@ -242,6 +248,8 @@ function HomeBody() {
   const pm = activeIn(entries, 'pm')
   const conflict = check.data?.conflicts[0]
   const conflictNames = conflict ? conflict.products.map((id) => byId.get(id)).filter((e): e is RoutineEntry => Boolean(e)) : []
+  // two products with the same short name (two niacinamide serums) carry their brand in the tip too
+  const routineNames = distinctNames((entries ?? []).filter((e) => !e.ended_at))
   const short = conflict ? /^([^:.]{3,24}):/.exec(conflict.suggestion)?.[1] : undefined
   const missingSunscreen = Boolean(check.data?.gaps.some((g) => /sunscreen/i.test(g.need)))
 
@@ -268,7 +276,7 @@ function HomeBody() {
         used={used}
         onToggle={toggle}
         missingSunscreen={missingSunscreen}
-        conflict={conflictNames.length ? { names: conflictNames.map(shortName), fix: short ?? null, title: conflict!.issue } : null}
+        conflict={conflictNames.length ? { names: conflictNames.map((e) => routineNames.get(e.id) ?? shortName(e)), fix: short ?? null, title: conflict!.issue } : null}
         onRoutine={() => navigate('/routine')}
       />
     )
@@ -546,7 +554,7 @@ function tonightLine(pm: RoutineEntry[]): HeroLine | null {
   const on = pm.find((e) => e.schedule?.kind === 'alternate' && !restsOn(e))
   if (!on || !pm.some((e) => restsOn(e))) return null
   const name = shortName(on).toLowerCase()
-  return /\d/.test(name) ? null : { g: '☾', t: `Tonight is a ${name} night.` }
+  return /\d/.test(name) ? null : { g: '☾', t: `Tonight is ${article(name)} ${name} night.` }
 }
 
 /** The tonight line goes last, in place of a "→" hint when the three lines are taken. */

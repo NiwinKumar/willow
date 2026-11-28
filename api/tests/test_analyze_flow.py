@@ -36,7 +36,7 @@ def test_first_calibrated_five_frame_session_becomes_the_baseline(client, fake):
     assert view["session"]["hours_since_baseline"] == 0.0
     assert view["result"]["session_id"] == sid
     assert {m["verdict"] for m in view["result"]["metrics"]} == {"no_baseline"}
-    assert view["explanation"]["headline"] == "Your first reading"
+    assert view["explanation"]["headline"] == "This is your baseline"
     assert view["session"]["explanation_source"] == "template"
     baseline = fake.store.baseline_get("u_test", "forearm_treated")
     assert baseline["session_id"] == sid
@@ -601,7 +601,7 @@ def test_gemini_past_its_deadline_falls_back_to_the_template(client, fake, monke
     assert took < 2  # neither the explanation nor the labels are waited for past the budget
     assert calls == ["explanation"]
     assert doc["status"] == "done" and doc["explanation_source"] == "template"
-    assert doc["explanation"]["headline"] == "Your first reading"
+    assert doc["explanation"]["headline"] == "This is your baseline"
     assert doc["labels"] == {} and doc["label_details"] == {}
 
 

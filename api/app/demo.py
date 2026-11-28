@@ -52,6 +52,12 @@ class Sample(BaseModel):
     # Shown to judges: whose photos and that they agreed (docs/CAPTURE_PROTOCOL.md consent note).
     credit: str = ""
     order: int = 0
+    # A later check-in of the same sample person: run after this sample, whose run is the
+    # baseline it is compared with (start_sample refuses it until that baseline exists).
+    after: str | None = None
+    # Its frames are the demo journey's own stored photos of this session (no second copy in
+    # the bucket), instead of demo/samples/{id}/.
+    source_session: str | None = None
 
     @model_validator(mode="after")
     def _frames_fit_the_mode(self) -> "Sample":
@@ -112,6 +118,36 @@ def clear_cache() -> None:
     _ttl.clear()
 
 
+# A later week of the sample person, read from the demo journey's own uploads: after the
+# first-week sample has become the baseline of the judge's sample runs, this one is compared with
+# it, so the live run ends in verdicts ("changed beyond your normal range" or "within it") rather
+# than a baseline alone. Listed only while its first-week sample is in the manifest and its photos
+# are in the bucket; a manifest entry with the same id wins.
+JOURNEY_SAMPLES: tuple[dict[str, Any], ...] = (
+    {
+        "id": "mei_face_week8",
+        "title": "Face check-in, Mei seven weeks later",
+        "note": "three front photos from her eighth weekly check-in, compared with the "
+        "first-week sample as its baseline",
+        "site": "face_full",
+        "capture_mode": "uncalibrated",
+        "frames": ["frame_1.jpg", "frame_2.jpg", "frame_3.jpg"],
+        "credit": "Mei is simulated: generated photos, real measurements",
+        "order": 0,
+        "after": "mei_face_week1",
+        "source_session": "s_20261011_8e0b0021",
+    },
+)
+
+
+def source_name(s: Sample, index: int, frame: str) -> str:
+    """Where a sample's frame is read from: demo/samples/{id}/, or the demo journey's upload."""
+    if s.source_session:
+        ext = frame.rsplit(".", 1)[-1].lower()
+        return sessions.frame_object_name(get_settings().demo_user_id, s.source_session, index, ext)
+    return f"{SAMPLES_PREFIX}{s.id}/{frame}"
+
+
 def samples() -> list[Sample]:
     def load() -> list[Sample]:
         raw = storage.read_text(MANIFEST)
@@ -123,6 +159,18 @@ def samples() -> list[Sample]:
                 items.append(Sample.model_validate(entry))
             except ValueError as exc:  # one bad entry hides itself, not the whole list
                 log.error("demo manifest: skipped %s: %s", entry.get("id"), exc)
+        ids = {s.id for s in items}
+        for entry in JOURNEY_SAMPLES:
+            if entry["id"] in ids or entry["after"] not in ids:
+                continue
+            s = Sample.model_validate(entry)
+            try:
+                found = storage.object_info(source_name(s, 1, s.frames[0])).exists
+            except Exception as exc:  # the bucket cannot be read: the manifest samples still list
+                log.warning("demo: could not check %s: %s", s.id, exc)
+                found = False
+            if found:
+                items.append(s)
         return sorted(items, key=lambda s: (s.order, s.id))
 
     return _cached("samples", CACHE_SECONDS, load)
@@ -130,6 +178,32 @@ def samples() -> list[Sample]:
 
 def sample(sample_id: str) -> Sample | None:
     return next((s for s in samples() if s.id == sample_id), None)
+
+
+def sample_taken(store: Store, s: Sample) -> datetime | None:
+    """When the sample's photos were taken in the demo journey (its source check-in's time), so
+    two sample runs minutes apart still say how far apart the photos are. None when unknown."""
+    source = s.source_session or next(
+        (sid for sid, sample_id in STARTER_SESSIONS.items() if sample_id == s.id), None
+    )
+    if not source:
+        return None
+    try:
+        taken = (store.session_get(get_settings().demo_user_id, source) or {}).get("created_at")
+    except Exception:  # only wording depends on it
+        return None
+    return taken if isinstance(taken, datetime) else None
+
+
+def ready_to_run(store: Store, uid: str, s: Sample) -> bool:
+    """A later-week sample runs only once the sample it follows is this person's sample baseline
+    (app/analysis.py): compared with nothing it would be the baseline itself, out of order."""
+    if not s.after:
+        return True
+    from app import analysis
+
+    base = analysis.baseline_of(store, uid, {**s.model_dump(), "sample_id": s.id})
+    return bool(base and base.get("sample_id") == s.after)
 
 
 def create_sample_session(store: Store, uid: str, s: Sample) -> str:
@@ -140,7 +214,7 @@ def create_sample_session(store: Store, uid: str, s: Sample) -> str:
     uris = []
     for i, (frame, ct) in enumerate(zip(s.frames, content_types, strict=True), start=1):
         dest = sessions.frame_object_name(uid, session_id, i, ext_for[ct])
-        storage.copy_object(f"{SAMPLES_PREFIX}{s.id}/{frame}", dest)
+        storage.copy_object(source_name(s, i, frame), dest)
         uris.append(storage.object_uri(dest))
     doc = sessions.new_doc(
         {
@@ -150,6 +224,7 @@ def create_sample_session(store: Store, uid: str, s: Sample) -> str:
             "frame_uris": uris,
             "content_types": content_types,
             "sample_id": s.id,
+            "sample_taken": sample_taken(store, s),
         }
     )
     preview = f"{SAMPLES_PREFIX}{s.id}/preview.jpg"
@@ -162,8 +237,9 @@ def create_sample_session(store: Store, uid: str, s: Sample) -> str:
 
 # A new guest's starter check-ins: Mei's first week (face, then the cheek close-up), already
 # measured, copied with their photos and results so the app is not empty on day one. They are
-# sample sessions (sample_id): read on their own, never a baseline, hidden from Home once the
-# guest's own check-ins exist.
+# sample sessions (sample_id): never this person's own baseline, hidden from Home once the
+# guest's own check-ins exist. Among sample runs they are the starting point (the sample
+# baseline, app/analysis.py), so a later-week sample run is compared with them.
 STARTER_SESSIONS = {
     "s_20260823_810e21e6": "mei_face_week1",
     "s_20260823_d31f4642": "mei_cheek_week1",
@@ -229,8 +305,15 @@ def add_starter_sessions(store: Store, uid: str) -> int:
             compared_with=None,
             counts_compared_with=None,
             sample_id=sample_id,
+            sample_taken=src.get("created_at"),
         )
         store.session_set(uid, sid, doc)
+        try:
+            from app import analysis
+
+            analysis.start_sample_series(store, uid, sid, doc)
+        except Exception:  # the check-in is there either way; it only reads "not compared"
+            log.exception("could not make starter %s/%s the sample baseline", uid, sid)
     return len(todo)
 
 

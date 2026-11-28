@@ -180,10 +180,37 @@ export function shortName(e: Pick<RoutineEntry, 'custom_name' | 'brand' | 'key_a
     if (/[\d%+]/.test(w)) break
     words.push(w)
   }
+  // A trailing variant word says nothing about what the product is ("… Centella Cream Unscented").
+  while (words.length > 2 && /^(unscented|scented|fragrance-?free|refill|mini|original)$/i.test(words[words.length - 1])) words.pop()
   // A name that starts with its strength ("1% Hyaluronic Sunscreen … & PA++++"): its first plain words.
   const out = (words.length ? words.slice(-2) : name.split(/\s+/).filter((w) => /^[\p{L}'-]+$/u.test(w)).slice(0, 2)).join(' ')
   return out || e.category || 'Product'
 }
+
+/**
+ * A product's name in a list where two products may share a short name (two niacinamide serums both read
+ * "Niacinamide"): the brand first, so every row can be told apart ("The Ordinary Niacinamide").
+ */
+export function brandedName(e: Pick<RoutineEntry, 'custom_name' | 'brand' | 'key_actives' | 'category'>): string {
+  const short = shortName(e)
+  const brand = e.brand?.trim()
+  return brand && !short.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${short}` : short
+}
+
+/** Short names for these entries, with the brand added only where two of them would otherwise read the same. */
+export function distinctNames<T extends Pick<RoutineEntry, 'id' | 'custom_name' | 'brand' | 'key_actives' | 'category'>>(entries: T[]): Map<string, string> {
+  const seen = new Map<string, number>()
+  for (const e of entries) seen.set(shortName(e).toLowerCase(), (seen.get(shortName(e).toLowerCase()) ?? 0) + 1)
+  return new Map(entries.map((e) => [e.id, (seen.get(shortName(e).toLowerCase()) ?? 0) > 1 ? brandedName(e) : shortName(e)]))
+}
+
+/** "week 7" of use, counted as everywhere else in Willow (the start's own week is week 1); days under two weeks. */
+export function spanOfUse(days: number): string {
+  return days < 14 ? `day ${Math.max(1, days)}` : `week ${Math.floor(days / 7) + 1}`
+}
+
+/** "a" or "an" before a word ("an azelaic night", "a glycolic night"). */
+export const article = (word: string) => (/^[aeiou]/i.test(word.trim()) ? 'an' : 'a')
 
 /** Orb colours by category (the design's palette: cleanser sky, serum leaf, moisturiser pink, treatment ember-free coral, acids violet). */
 const ORB: Record<string, [string, string, string]> = {
