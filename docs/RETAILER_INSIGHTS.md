@@ -59,7 +59,7 @@ The retailer view has an "Ask the aggregates" box: Gemini answers from the aggre
 Live: `GET /v1/retailer/insights` with filters, the retail page (`/retail`) with the design's range and cohort filters, goal demand by month, category flows, skin-profile split, all products with evidence, and Ask with provenance. Until someone opts in and `export_bq.py` runs, the view is synthetic only and says so.
 
 ## Willow Proof views (Oct 16)
-The business product ("Proof by Willow", formerly "Willow Proof") reads six more aggregate views, all computed in `api/app/retail_intel.py` from the same BigQuery rows, filters (`cohort`, `range`), cache (one read, then one index per filter, data version and day) and outcome definition as `/v1/retailer/insights`. Public, aggregates only, 503 when the rows are unavailable. Shapes: CONTRACT section 3.
+The business product ("Proof by Willow", formerly "Willow Proof") reads six more aggregate views, all computed in `api/app/retail_intel.py` from the same BigQuery rows, filters (`cohort`, `range`), cache (one read, then one index per filter, data version and day; Nov 28: a re-read with the same rows keeps the data version, at the day change the previous day's numbers are served while today's are built in the background, and a Cloud Scheduler job, `willow-proof-warm` at 00:02 UTC, prebuilds them) and outcome definition as `/v1/retailer/insights`. Public, aggregates only, 503 when the rows are unavailable. Shapes: CONTRACT section 3.
 
 Definitions
 - **Eligible person**: reached the week-8 reading. **Outcome**: a lasting change (still improved beyond the person's own noise band at week 8) in any metric the product targets (its concerns' metrics). Goal views use that goal's metrics (narrowed to the ones the product targets).

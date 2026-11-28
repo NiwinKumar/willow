@@ -19,14 +19,16 @@ import { useAuth } from '../../lib/useAuth'
 import { SoftBackdrop } from './Decor'
 import { FIRST_CHECKIN, hasConsent } from './entry'
 import { MeetWisp } from './MeetWisp'
+import { SafetyForm } from '../you/SafetyForm'
+import { useSafety } from '../../lib/safety'
 
 const BACKDROP = 'radial-gradient(40% 40% at 15% 20%, rgba(255,178,122,.55), transparent 70%), radial-gradient(40% 45% at 85% 80%, rgba(156,211,255,.6), transparent 70%), radial-gradient(35% 35% at 80% 15%, rgba(216,184,255,.5), transparent 70%), var(--bg-canvas)'
 
-type Step = 'consent' | 'goals' | 'places' | 'about' | 'routine' | 'wisp'
-const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Routine', 'Meet Wisp', 'Capture']
-const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3, routine: 4, wisp: 5 }
-const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places', routine: '/welcome/about', wisp: '/welcome/routine' }
-const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places', routine: 'about you', wisp: 'your routine' }
+type Step = 'consent' | 'goals' | 'places' | 'about' | 'safety' | 'routine' | 'wisp'
+const STEPS = ['Consent', 'Goals', 'Places', 'About you', 'Reactions', 'Routine', 'Meet Wisp', 'Capture']
+const STEP_INDEX: Record<Step, number> = { consent: 0, goals: 1, places: 2, about: 3, safety: 4, routine: 5, wisp: 6 }
+const PREV: Record<Step, string | null> = { consent: null, goals: '/welcome', places: '/welcome/goals', about: '/welcome/places', safety: '/welcome/about', routine: '/welcome/safety', wisp: '/welcome/routine' }
+const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places: 'goals', about: 'places', safety: 'about you', routine: 'reactions', wisp: 'your routine' }
 
 /**
  * Onboarding: /welcome = consent, /welcome/goals = goals, /welcome/places = places to track (every check-in covers
@@ -38,7 +40,7 @@ const PREV_NAME: Record<Step, string> = { consent: '', goals: 'consent', places:
 export default function Welcome() {
   const { step: raw } = useParams()
   const { search } = useLocation()
-  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' || raw === 'routine' || raw === 'wisp' ? raw : 'consent'
+  const step: Step = raw === 'goals' || raw === 'places' || raw === 'about' || raw === 'safety' || raw === 'routine' || raw === 'wisp' ? raw : 'consent'
   const { user } = useAuth()
   // Onboarding shows (and saves) the account's profile and consent.
   useActivateData()
@@ -58,7 +60,7 @@ export default function Welcome() {
         <Stepper current={STEP_INDEX[step]} />
         <span className="hidden rounded-pill bg-white/55 px-3.5 py-2 font-mono text-[12px] sm:inline">{user && !user.isAnonymous ? 'SIGNED IN' : 'GUEST · THIS BROWSER'}</span>
       </header>
-      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : step === 'routine' ? <RoutineChoice key="routine" /> : step === 'wisp' ? <Wisp key="wisp" /> : <Consent key="consent" />}
+      {step === 'goals' ? <Goals key="goals" /> : step === 'places' ? <Places key="places" /> : step === 'about' ? <About key="about" /> : step === 'safety' ? <Reactions key="safety" /> : step === 'routine' ? <RoutineChoice key="routine" /> : step === 'wisp' ? <Wisp key="wisp" /> : <Consent key="consent" />}
     </div>
   )
 }
@@ -488,7 +490,7 @@ function About() {
         return setError('Could not start a guest session. Check your connection and try again.')
       }
     }
-    navigate(`/welcome/routine${search}`)
+    navigate(`/welcome/safety${search}`)
   }
 
   return (
@@ -540,6 +542,34 @@ function About() {
             })}
           </div>
         </Field>
+      </div>
+    </StepFrame>
+  )
+}
+
+/**
+ * Reactions (optional, Nov 28): allergies, ingredients to avoid, past reactions and breakouts (with the note
+ * Gemini reads into ingredient names), life stage and prescriptions, asked once for everyone, not only in the
+ * routine builder. The same form and saved profile as You and the builder (SafetyForm, PUT /v1/me/profile), so
+ * nothing is asked twice: the builder starts from these answers. Skippable; every product is then checked.
+ */
+function Reactions() {
+  const navigate = useNavigate()
+  const { search } = useLocation()
+  const safety = useSafety()
+  const next = () => navigate(`/welcome/routine${search}`)
+  return (
+    <StepFrame
+      title="Anything your skin reacts to?"
+      sub="Optional. Willow checks every product against your answers and leaves out what clashes. Private to your account."
+      actions={
+        <button type="button" onClick={next} className="min-h-11 rounded-pill px-4 text-[14px] text-ink-2 transition-colors hover:text-ink">
+          Skip for now
+        </button>
+      }
+    >
+      <div className={`${card} p-[clamp(14px,2.2vw,22px)]`} style={cardStyle}>
+        {safety.status === 'loading' ? <div aria-hidden className="h-40 animate-pulse rounded-[18px] bg-ink/5" /> : <SafetyForm key={safety.data ? 'saved' : 'new'} initial={safety.data ?? null} onSaved={next} submit="Save and continue" />}
       </div>
     </StepFrame>
   )
