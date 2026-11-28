@@ -1,0 +1,40 @@
+{
+  "label": "line on (ENGINE_SLOTS=2, API_THREADS=256)",
+  "date": "2026-11-28",
+  "people": 200,
+  "succeeded": 200,
+  "failed": 0,
+  "errors": {},
+  "e2e_s": {
+    "p50": 516.4,
+    "p95": 899.2,
+    "p99": 931.8,
+    "max": 939.4
+  },
+  "wall_s": 939.4,
+  "throughput_per_min": 12.77,
+  "asks_per_person": {
+    "mean": 10.97,
+    "max": 21
+  },
+  "saw_in_line": 198,
+  "max_place_in_line": 198,
+  "poll_latency_s": {
+    "n": 44764,
+    "p50": 0.0,
+    "p95": 0.9,
+    "max": 10.94
+  },
+  "engine": {
+    "analyses": 200,
+    "engine_s_p50": 9.4,
+    "engine_s_p95": 11.2,
+    "engine_s_mean": 9.37,
+    "answered_429": 0,
+    "engine_errors": 0,
+    "per_worker": {
+      "18126": 100,
+      "18127": 100
+    }
+  }
+}

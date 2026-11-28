@@ -1,0 +1,42 @@
+{
+  "label": "no line (as deployed)",
+  "date": "2026-11-28",
+  "people": 200,
+  "succeeded": 14,
+  "failed": 186,
+  "errors": {
+    "504:engine_timeout": 186
+  },
+  "e2e_s": {
+    "p50": 50.5,
+    "p95": 68.4,
+    "p99": 68.4,
+    "max": 68.4
+  },
+  "wall_s": 68.4,
+  "throughput_per_min": 12.28,
+  "asks_per_person": {
+    "mean": 1,
+    "max": 1
+  },
+  "saw_in_line": 0,
+  "max_place_in_line": null,
+  "poll_latency_s": {
+    "n": 136,
+    "p50": 30.2,
+    "p95": 30.3,
+    "max": 30.31
+  },
+  "engine": {
+    "analyses": 14,
+    "engine_s_p50": 9.4,
+    "engine_s_p95": 12.9,
+    "engine_s_mean": 9.74,
+    "answered_429": 186,
+    "engine_errors": 0,
+    "per_worker": {
+      "18126": 7,
+      "18127": 7
+    }
+  }
+}

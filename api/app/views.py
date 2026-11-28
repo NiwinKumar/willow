@@ -245,6 +245,10 @@ def session_view(
             "label_details": (doc.get("label_details") or {}) if measured else {},
             # Live analysis stage while processing (received -> engine -> explaining), else None.
             "stage": doc.get("stage") if doc["status"] == "processing" else None,
+            # While stage is "queued" (app/engine_gate.py): {position, eta_s}, else None.
+            "queue": doc.get("queue")
+            if doc["status"] == "processing" and doc.get("stage") == "queued"
+            else None,
             **(
                 {
                     "frame_urls": [signed.get(n) if n else None for n in media[0]],

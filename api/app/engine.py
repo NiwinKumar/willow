@@ -86,11 +86,13 @@ _FIXTURE_EXTRA_METRICS: list[dict[str, Any]] = [
 
 
 class EngineError(Exception):
-    def __init__(self, code: str, message: str, status: int = 502) -> None:
+    def __init__(self, code: str, message: str, status: int = 502, busy: bool = False) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status = status
+        # every engine instance was taken (429/503): worth asking again (app/engine_gate.py)
+        self.busy = busy
 
     @property
     def public_message(self) -> str:
@@ -140,9 +142,10 @@ def _http_analyze(request: dict[str, Any]) -> dict[str, Any]:
     except httpx.HTTPError as exc:
         raise EngineError("engine_unreachable", str(exc)) from exc
     if res.status_code in (429, 503, 504):
-        # every engine instance busy (concurrency 1, max 3), or Cloud Run's own timeout: the
+        # every engine instance busy (concurrency 1, max 8), or Cloud Run's own timeout: the
         # answer is not the engine's JSON; say "took too long", which invites a retry
-        raise EngineError("engine_timeout", f"engine HTTP {res.status_code}", 504)
+        busy = res.status_code in (429, 503)
+        raise EngineError("engine_timeout", f"engine HTTP {res.status_code}", 504, busy=busy)
     if res.status_code >= 400:
         try:
             err = res.json().get("error", {})
