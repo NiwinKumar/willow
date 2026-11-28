@@ -13,7 +13,7 @@ import { useOwner, useRoutine } from '../../data/hooks'
 import type { Product, RoutineEntry, RoutineSchedule, StorePrice } from '../../data/types'
 import { api, localDay } from '../../lib/api'
 import { CONCERN_LABEL, hasFullFacts, NO_PRICE } from '../../lib/catalog'
-import { fmtDate, fmtPrice, plural } from '../../lib/format'
+import { aNum, fmtDate, fmtPrice, plural } from '../../lib/format'
 import { outcomeFor, type Outcome } from '../../lib/outcome'
 import { useQuery } from '../../lib/query'
 import { COMMISSION_NOTE, useStoreClick, type ClickSurface } from '../../lib/clicks'
@@ -181,7 +181,7 @@ function Body({ target, onClose, onAdd, surface }: { target: ProductTarget; onCl
         )}
         {due ? (
           <span className="text-[13.5px] text-ink-2" style={{ animation: 'wRise .4s 120ms both' }}>
-            Verdict due {fmtDate(localDay(due.due), { day: 'numeric', month: 'long' })} · {due.row.grade === 'C' ? `a ${due.weeks}-week window for ${due.active.toLowerCase()}` : `trials of ${due.active.toLowerCase()} usually run ${due.weeks} weeks`}
+            Verdict due {fmtDate(localDay(due.due), { day: 'numeric', month: 'long' })} · {due.row.grade === 'C' ? `${aNum(due.weeks)} ${due.weeks}-week window for ${due.active.toLowerCase()}` : `trials of ${due.active.toLowerCase()} usually run ${due.weeks} weeks`}
             {due.row.source?.url ? (
               <>
                 {' · '}

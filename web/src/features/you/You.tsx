@@ -27,6 +27,18 @@ import { SafetyRows } from './SafetyRows'
 import { Group, GroupIndex, Row, ToggleRow } from './settings'
 import { chip, outline } from './settingsClasses'
 
+/** A time zone in words: "India Standard Time (GMT+5:30)" for Asia/Calcutta. Falls back to the zone id. */
+function tzName(tz: string): string {
+  try {
+    const part = (style: 'longGeneric' | 'shortOffset') => new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: style }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value
+    const name = part('longGeneric')
+    const offset = part('shortOffset')
+    return name ? (offset && offset !== name ? `${name} (${offset})` : name) : tz
+  } catch {
+    return tz
+  }
+}
+
 /**
  * You: the person's settings, one column of labelled groups (Account, What Willow tracks, Check-ins, Privacy,
  * Photo setup and help, Delete my data), each a card of rows: the setting on the left, its control on the right.
@@ -317,7 +329,7 @@ function CheckinRows() {
       .catch(() => toast.error(offline))
   return (
     <>
-      <Row stack label="Check-in days" hint={`${days.length ? `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} at ${time}. ` : ''}Once a week is enough; the same day and time keeps photos comparable. Times are in ${tz}${saved && saved.tz !== browserTz() ? `; this browser is in ${browserTz()}, and the next change uses it` : ''}.`}>
+      <Row stack label="Check-in days" hint={`${days.length ? `${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} at ${time}. ` : ''}Once a week is enough; the same day and time keeps photos comparable. Times are in ${tzName(tz)}${saved && saved.tz !== browserTz() ? `; this browser is in ${tzName(browserTz())}, and the next change uses it` : ''}.`}>
         <div className="flex flex-wrap items-center gap-1.5">
           {/* a phone gets seven equal columns (the week on one line); a laptop a row of chips */}
           <div role="group" aria-label="Check-in days" className="grid w-full grid-cols-7 gap-1 sm:flex sm:w-auto sm:flex-wrap sm:gap-1.5">
@@ -335,6 +347,7 @@ function CheckinRows() {
             at
             <input
               type="time"
+              aria-label="Check-in time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               onBlur={() => {

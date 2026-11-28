@@ -112,7 +112,10 @@ function Hero({ grow }: { grow: boolean }) {
           <p className="m-0 max-w-[520px] text-[clamp(17px,1.4vw,20px)] font-light leading-normal">
             Willow compares each standardized photo with your own baseline and tells you when a change is bigger than your normal photo-to-photo variation. Computer vision measures. AI explains. Cosmetic appearance tracking only, never a diagnosis.
           </p>
-          <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ COSMETIC TRACKING · NOT A MEDICAL DEVICE</span>
+          <div className="flex flex-col gap-2.5">
+            <p className="m-0 text-[clamp(16px,1.3vw,18px)]">Free for shoppers. Retailers pay for Proof.</p>
+            <span className="font-mono text-[12px] tracking-[.08em] text-ink-2">■ COSMETIC TRACKING · NOT A MEDICAL DEVICE</span>
+          </div>
         </div>
         {/* The ways in: four big buttons, the first thing a judge sees. */}
         <nav data-garden-calm aria-label="Ways in" className="relative flex w-full max-w-[500px] animate-[wRiseLg_.9s_.15s_cubic-bezier(.2,.7,.2,1)_both] flex-col gap-3.5 justify-self-center md:justify-self-end">
@@ -209,6 +212,7 @@ const FOOTER: { title: string; links: FooterLink[] }[] = [
       { label: 'The problem', to: 'problem', anchor: true },
       { label: 'How it works', to: 'how', anchor: true },
       { label: 'Science and limits', to: 'science', anchor: true },
+      { label: 'How we know', to: '/evidence' },
       { label: 'Judge tour', to: '/judge' },
     ],
   },

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useChat } from '../../features/advisor/chatStore'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { AssistantAvatar, type AvatarState } from '../assistant/AssistantAvatar'
+import { MODE_BANNER_EVENT } from './ModeBanner'
 
 // No input anywhere for this long (panel closed, nothing pending): the cat dozes off. Any input wakes it.
 const DOZE_MS = 90_000
@@ -15,7 +16,7 @@ const HAPPY_MS = 1600
  *   thinking while a question is out → speaking while the answer is revealed → a happy hop when it lands,
  *   listening while the pointer is on it or the person is typing a question, sleepy after a long quiet spell,
  *   idle otherwise.
- * Bottom right on wide screens; on phones, in the header's right corner (never over content or the tab bar). Opening: the cat shrinks away as the advisor grows out of its spot;
+ * Bottom right on wide screens; on phones, in the header's right corner (never over content, the mode banner or the tab bar). Opening: the cat shrinks away as the advisor grows out of its spot;
  * closing: the advisor folds back into the corner and the cat pops out again (AppShell's AdvisorHost does the
  * panel's half). Reduced motion: both only fade.
  */
@@ -83,10 +84,42 @@ export function AdvisorFab({ open, onToggle, wide, covered }: { open: boolean; o
   const size = wide ? 64 : 46
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const hidden = covered
+  // Phones: the header starts below the mode banner (judge tour, demo) until the page scrolls past it, so the
+  // cat moves down with the header instead of sitting on the banner's words. Set on the element, once a frame.
+  const holder = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = holder.current
+    if (!el) return
+    if (wide) {
+      el.style.translate = ''
+      return
+    }
+    let raf = 0
+    const place = () => {
+      raf = 0
+      const banner = document.querySelector('[data-mode-banner]')
+      const below = banner ? Math.max(0, Math.round(banner.getBoundingClientRect().bottom)) : 0
+      el.style.translate = below ? `0 ${below}px` : ''
+    }
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(place)
+    }
+    place()
+    window.addEventListener('scroll', queue, { passive: true })
+    window.addEventListener('resize', queue)
+    window.addEventListener(MODE_BANNER_EVENT, queue)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', queue)
+      window.removeEventListener('resize', queue)
+      window.removeEventListener(MODE_BANNER_EVENT, queue)
+    }
+  }, [wide])
   return (
     // The holder shows and hides the cat: it shrinks away as the advisor grows out of its spot, and pops back
     // (a little overshoot) once the advisor has folded back into it. The button inside keeps hover and press.
     <div
+      ref={holder}
       className="fixed z-[36]"
       style={{
         width: size,

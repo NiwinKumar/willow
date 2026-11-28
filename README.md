@@ -53,6 +53,8 @@ No sign-in needed. Every path runs on the live system: the measurement engine on
 
 The landing page also runs [sample photos through the real pipeline](https://meetwillow.web.app/judge) in a guest account of your own, or starts your own baseline.
 
+**How we know.** [meetwillow.web.app/evidence](https://meetwillow.web.app/evidence) shows the checks behind every claim with their results, failures included: the Gemini evals, what each validator does, cost per use from production logs, what is simulated, and four prompts to try to break Wisp. Its figures are generated from results files (`api/scripts/evidence_export.py`, [docs/EVIDENCE.md](docs/EVIDENCE.md)). Willow is free for shoppers; retailers pay for Proof.
+
 **About Mei.** Mei is 26, lives in Singapore and has blemish-prone skin, with breakouts along her cheeks, jaw and chin around her cycle. Her photos are generated and show no real person, so there is no consent question and nobody's skin is on display. Every number in her story was measured from those photos by Willow's live engine and explained by Gemini, exactly as for anyone. Every surface that shows her says she is simulated.
 
 <p align="center">
@@ -80,7 +82,7 @@ Three rules run through the whole product. They are what make the numbers worth 
 
 **1. Classical computer vision measures every number.** A Python engine (`engine/`) decodes RAW DNG or camera photos, corrects colour when a reference is in frame, finds the face with MediaPipe's 478 landmarks, masks out hair, glare and shadow, and measures 11 cosmetic parameters with documented formulas: skin tone (ITA°), dark spots, tone evenness, redness, blemishes, pores, texture, under-eye, lines, shine and glow. No model is trained, and every reading is marked *measured* or *indicative*. Formulas: [`docs/METRICS.md`](docs/METRICS.md).
 
-**2. Each reading is compared with *your* normal range, not with anyone else.** A place's first check-in is its baseline: five photos, each set up from scratch. Their spread gives a personal noise band, the minimum detectable change at 95%:
+**2. Each reading is compared with *your* normal range, not with anyone else.** A place's first check-in is its baseline: five photos, each set up from scratch (at least three usable ones are needed). Their spread gives a personal noise band, the minimum detectable change at 95%:
 
 ```
 mdc95 = max( 1.96 · √2 · sd ,  t(0.975, n−1) · sd · √(1 + 1/n) )
@@ -143,9 +145,9 @@ Retailers see sales. Proof shows **outcomes**: which products produce a measured
 
 ---
 
-## Gemini: many jobs, never a measurement
+## Gemini: 13 jobs and 2 agents, never a measurement
 
-Model `gemini-3.8-flash` on Gemini Enterprise Agent Platform (formerly Vertex AI). Each job has a schema, a validator and a fallback that is not Gemini.
+Model `gemini-3.8-flash` on Gemini Enterprise Agent Platform (formerly Vertex AI), with `gemini-3.5-flash-lite` for second tries and as a hedge when a call is slow. Each job has a schema, a validator and a fallback that is not Gemini. Measured against adversarial cases in [docs/EVALS.md](docs/EVALS.md); the results are shown in the app at [/evidence](https://meetwillow.web.app/evidence).
 
 | Job | Where | How it is kept honest |
 |---|---|---|
@@ -157,6 +159,11 @@ Model `gemini-3.8-flash` on Gemini Enterprise Agent Platform (formerly Vertex AI
 | Wisp | Everywhere | Function calling; products only from tool results; every number checked |
 | Ask the data | Proof | Sees aggregates only; answer, chart labels and values must exist in them; refuses individual-level questions |
 | Brief summary, next steps, claim drafts, AutoCampaign rules | Proof | Gemini picks, words, or reads a rule written in plain words; numbers, tiers and claims come from code; overclaims rejected |
+| Read "Anything else?" at a check-in | Check-in | Tags only from a fixed list; a product only when its words are in the note; nothing is saved until the person confirms |
+| Read a note about past reactions | You, *Product checks* | Gemini only picks from names the code found in the note; flags are still computed by the rule file |
+| AutoCampaign agent, Shelf agent | Proof | Gemini reads the evidence and acts through tools; code refuses any act outside the rule, the evidence or the limits |
+
+**Voice and languages.** Wisp can be asked aloud and answers in 11 languages. Gemini transcribes the question, the answer is written and checked in English, then translated; a translation is used only if its numbers and references match the English and it brings in no banned word for that language (`api/app/translate.py`). Only that checked text is spoken (`api/app/voice.py`). Questions can be screened by Model Armor before Gemini sees them (`api/app/armor.py`, ready, off until a template is configured).
 
 Daily caps per person and across everyone keep cost bounded (`api/app/limits.py`).
 
@@ -192,6 +199,20 @@ flowchart LR
 | **Cloud Scheduler** | Check-in reminders (Web Push) |
 
 The engine ↔ api interface is a versioned JSON contract: [`docs/CONTRACT.md`](docs/CONTRACT.md) and [`schemas/`](schemas/).
+
+---
+
+## How Willow differs
+
+| | What it does | What it does not do |
+|---|---|---|
+| Haut.AI SkinGPT | Simulates how skin could look after a product | Measure what happened to a person over time |
+| Perfect Corp YouCam (skin analysis) | Scores one selfie | Compare a person with their own repeat photos and noise band |
+| Revieve | Advisor and recommendation widgets for retailers | Report measured outcomes back to the retailer |
+| Retail-media incrementality vendors | Measure purchases against a holdout | Measure whether the product changed anything on skin |
+| **Willow** | Measures change against the person's own noise band, across every brand in the routine, and tests each campaign against a randomised holdout | Diagnose, score or rank people; it is not clinically validated |
+
+This is the team's reading of each company's public materials, not a tested comparison; products change, so check their own pages. The app names no company: its table compares kinds of product only.
 
 ---
 

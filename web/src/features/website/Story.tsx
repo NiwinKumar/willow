@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Cloud } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { PROBLEM_STATS, UNUSED_SKINCARE } from '../journey/problem'
 import { BriefPoints, Point } from '../journey/value'
@@ -106,7 +107,7 @@ const STEPS: Step[] = [
   {
     title: 'Capture',
     line: 'Standardized phone photos, in the browser.',
-    body: 'Five photos on day one, repositioned between each, and three at every check-in after. The screen guides light, pose and distance so photos stay comparable. Nothing to install.',
+    body: 'Five photos on day one, set up from scratch each time, and three at every check-in after. At least three usable baseline photos are needed to set your normal range. The screen guides light, pose and distance so photos stay comparable. Nothing to install.',
     fixes: ['photos'],
     cloud: [
       ['Firebase Hosting', 'serves the web app to any phone'],
@@ -127,7 +128,7 @@ const STEPS: Step[] = [
   {
     title: 'Compare with yourself',
     line: 'A change counts only when it beats your own noise.',
-    body: 'The spread across your five baseline photos is your normal range, at 95% confidence. A later reading is called a real change only when it lands outside that range, in the same kind of photo. Never against anyone else.',
+    body: 'The spread across your baseline photos (five taken, at least three usable) is your normal range, at 95% confidence. A later reading is called a real change only when it lands outside that range, in the same kind of photo. Never against anyone else.',
     fixes: ['slow', 'photos'],
     cloud: [
       ['Firestore', 'your baseline, check-ins, routine and spot diary, kept per person'],
@@ -197,11 +198,12 @@ export function How() {
   )
 }
 
+/** The alternatives, named by kind (never by company; README.md has the named table with its caveat). */
 const VERSUS: [string, string, string][] = [
-  ['Compared with', 'Other people: a skin score, a skin age, a ranking', 'Only you: your own baseline and normal range. No scores, no skin age, no ranking'],
-  ['Where numbers come from', 'An AI model’s estimate', 'Computer vision measures. Gemini only explains, and every number it writes is checked'],
-  ['Over time', 'A one-off scan, or a before-and-after by eye', 'Weekly check-ins, so a good-lighting day is never called a breakthrough'],
-  ['What the business sees', 'Sales and reviews', 'Measured outcomes per product and skin type, across every brand'],
+  ['Compared with', 'Single-selfie skin scores: you against other people, as a score, a skin age or a ranking', 'Only you: your own baseline and normal range. No scores, no skin age, no ranking'],
+  ['Where numbers come from', 'An AI model’s estimate from one photo', 'Computer vision measures. Gemini only explains, and every number it writes is checked'],
+  ['Over time', 'A one-off scan, or a simulated “after” picture of a result that has not happened', 'Weekly check-ins of what did happen, so a good-lighting day is never called a breakthrough'],
+  ['What the business sees', 'Purchase-based retail media: sales, clicks and reviews', 'Measured outcomes per product and skin type, across every brand, with each campaign tested against a holdout'],
 ]
 
 const LIMITS = [
@@ -218,7 +220,7 @@ export function Unique() {
       <SectionHead
         tag="WHAT MAKES WILLOW DIFFERENT"
         title="Built to answer one question honestly: did it really change?"
-        lead="The usual ways to judge skincare compare you with other people, or guess. Willow measures, and compares you only with yourself."
+        lead="The usual ways to judge skincare score one selfie against other people, or simulate a result. Willow measures what happened, and compares you only with yourself."
       />
       <div tabIndex={0} role="region" aria-label="Willow compared with the usual ways" className="overflow-x-auto rounded-[30px] bg-surface">
         <table className="w-full min-w-[560px] border-collapse text-left text-[14.5px] leading-[1.45]">
@@ -252,6 +254,13 @@ export function Unique() {
           </div>
         ))}
       </div>
+      <Link to="/evidence" className="mt-3 flex min-h-[64px] flex-wrap items-center justify-between gap-x-6 gap-y-1 rounded-[30px] bg-surface px-6 py-4 text-ink no-underline transition-colors duration-200 hover:bg-white">
+        <span className="flex flex-col gap-0.5">
+          <span className="text-[18px] tracking-[-0.01em]">How we know</span>
+          <span className="text-[14px] text-ink-2">The eval results with their failures, what each check does, and what a check-in costs to run.</span>
+        </span>
+        <span aria-hidden className="text-[20px]">→</span>
+      </Link>
     </section>
   )
 }
