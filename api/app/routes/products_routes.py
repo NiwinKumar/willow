@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app import (
     advisor,
+    armor,
     brand_logos,
     campaigns,
     catalog,
@@ -484,6 +485,22 @@ def _chat_answer(
     """One answer from `uid`'s own data. `action` is the cap it counted on; `keep` stores the turn
     in the person's history (the demo journey's chat is never stored)."""
     asked_at = datetime.now(UTC)
+    # Model Armor screens the question before Gemini sees it (app/armor.py; off unless configured)
+    if armor.blocked(body.messages[-1].text):
+        limits.refund(store, uid, action)
+        refused = {
+            "message": armor.REFUSAL,
+            "blocks": [{"type": "answer", "text": armor.REFUSAL}],
+            "product_ids": [],
+            "products": [],
+            "follow_up_suggestions": [],
+            "retrieval": ["Screened by Model Armor: not a question Wisp answers"],
+            "checks": {"screened": "model_armor"},
+        }
+        return {
+            **translate.wisp_reply(refused, lang),
+            "remaining_today": max(0, limits.cap(action)[0] - used + 1),
+        }
     try:
         reply = advisor.chat(
             [m.model_dump() for m in body.messages], store, uid, images=images, on_stage=on_stage
