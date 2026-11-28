@@ -181,7 +181,7 @@ def previous_session(store: Store, uid: str, sid: str, doc: dict[str, Any]):
         and o.get("site") == doc.get("site")
         and o.get("created_at")
         and o["created_at"] < at
-        and o.get("status") != "failed"
+        and _passed(o)
     ]
     return max(earlier, key=lambda r: r[1]["created_at"], default=None)
 
@@ -228,15 +228,22 @@ def prefill(store: Store, uid: str, sid: str, doc: dict[str, Any]) -> dict[str, 
 # Patterns
 
 
-def _readings(doc: dict[str, Any], metric_id: str) -> tuple[float, float | None, dict] | None:
-    """(value, mdc95, by_zone values) of one metric on a measured session."""
+def _passed(doc: dict[str, Any]) -> bool:
+    """A finished, measured check-in whose photos passed the quality check (as advisor.context):
+    a rejected, abandoned or failed one is neither "your last check-in" nor a pattern's reading."""
+    if doc.get("status") != "done":
+        return False
     result = measured_result(doc)
-    if not result:
-        return None
+    return bool(result and (result.get("quality") or {}).get("passed"))
+
+
+def _readings(result: dict[str, Any], metric_id: str) -> tuple[float, float | None, dict] | None:
+    """(value, mdc95, by_zone values) of one metric in a measured result. Areas are the metric's
+    own `extras.by_zone` (engine 0.4.1+, docs/CONTRACT.md 2.5)."""
     m = next((x for x in result.get("metrics", []) if x["id"] == metric_id), None)
     if not m or m.get("value") is None:
         return None
-    zones = (((result.get("extras") or {}).get("by_zone") or {}).get(metric_id)) or {}
+    zones = ((m.get("extras") or {}).get("by_zone")) or {}
     by_zone = {
         z: float(v["value"])
         for z, v in zones.items()
@@ -251,25 +258,22 @@ def _comparable(sessions: list[tuple[str, dict[str, Any]]]) -> list[tuple[str, d
     rows = [
         (sid, d)
         for sid, d in sessions
-        if d.get("site") == "face_full"
-        and d.get("status") == "done"
-        and groups_of(d) is not None
-        and measured_result(d)
+        if d.get("site") == "face_full" and groups_of(d) is not None and _passed(d)
     ]
     if not rows:
         return []
-    modes = [d.get("capture_mode") for _, d in rows]
-    main = max(set(modes), key=modes.count)
+    modes = [d.get("capture_mode") or "" for _, d in rows]
+    # most used; a tie goes to the mode of the latest check-in (the same on every instance)
+    latest = max(rows, key=lambda r: r[1]["created_at"])[1].get("capture_mode") or ""
+    main = max(sorted(set(modes)), key=lambda m: (modes.count(m), m == latest))
     rows = [(s, d) for s, d in rows if d.get("capture_mode") == main]
     return sorted(rows, key=lambda r: r[1]["created_at"])
 
 
-def _label(rows: list[tuple[str, dict[str, Any]]], metric_id: str) -> str:
+def _label(results: list[dict[str, Any]], metric_id: str) -> str:
     """The reading's name as the app shows it, from the latest check-in that has it."""
-    for _, d in reversed(rows):
-        m = next(
-            (x for x in (measured_result(d) or {}).get("metrics", []) if x["id"] == metric_id), None
-        )
+    for result in reversed(results):
+        m = next((x for x in result.get("metrics", []) if x["id"] == metric_id), None)
         if m:
             return explain.label_of(m)
     return metric_id
@@ -303,27 +307,30 @@ def patterns_in(sessions: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
     check-ins on both sides and showed no clear difference (a real finding, said plainly), else
     `learning` (not enough check-ins yet; the app lists these without numbers)."""
     rows = _comparable(sessions)
+    # each result parsed once (patterns run on every Wisp message, story and Progress load)
+    results = [measured_result(d) or {} for _, d in rows]
+    tags = [groups_of(d) or set() for _, d in rows]
     patterns, same, learning = [], [], []
     for group, metric_ids in WATCH.items():
-        noted_n = sum(1 for _, d in rows if group in (groups_of(d) or set()))
+        noted_n = sum(1 for t in tags if group in t)
         found_any = False
         compared: list[str] = []  # readings with enough check-ins on both sides
         for metric_id in metric_ids:
             cheeks = None
             if metric_id in baselines.CONFIRMED_COUNTS and rows:
-                cheeks = baselines.with_cheeks(measured_result(rows[-1][1]) or {})
+                cheeks = baselines.with_cheeks(results[-1])
             tagged, others, band = [], [], None
-            for _, d in rows:
-                if cheeks is not None and baselines.with_cheeks(measured_result(d) or {}) != cheeks:
+            for result, t in zip(results, tags, strict=True):
+                if cheeks is not None and baselines.with_cheeks(result) != cheeks:
                     continue
-                r = _readings(d, metric_id)
+                r = _readings(result, metric_id)
                 if r is None:
                     continue
                 band = r[1] if r[1] is not None else band
-                (tagged if group in (groups_of(d) or set()) else others).append(r)
+                (tagged if group in t else others).append(r)
             if len(tagged) < MIN_EACH or len(others) < MIN_EACH or not band:
                 continue
-            compared.append(_label(rows, metric_id))
+            compared.append(_label(results, metric_id))
             gap = mean(v for v, _, _ in tagged) - mean(v for v, _, _ in others)
             if abs(gap) <= band:
                 continue
@@ -333,7 +340,7 @@ def patterns_in(sessions: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
                 continue
             higher = gap > 0
             way = explain.way_of({"id": metric_id}, gap)
-            label = _label(rows, metric_id)
+            label = _label(results, metric_id)
             areas = _areas([b for *_, b in tagged], [b for *_, b in others], higher)
             found_any = True
             patterns.append(

@@ -75,7 +75,7 @@ export function ChangesPanel(props: { sessionId: string; edit?: boolean; onDone:
       setReadFor(t)
       setTags((cur) => addTags(cur, got.tags))
     } catch {
-      setError('Could not read that just now. Your words are still saved with your answer.')
+      setError('Could not read that just now. Pick the chips yourself; your words are kept when you save.')
     } finally {
       setReading(false)
     }
@@ -208,7 +208,7 @@ export function ChangesPanel(props: { sessionId: string; edit?: boolean; onDone:
           ) : null}
         </div>
       </div>
-      <p className="m-0 text-[12.5px] leading-[1.45] text-ink-2">Only you see these answers: never brands or Proof. What you type is read by Google’s Gemini to suggest chips.</p>
+      <p className="m-0 text-[12.5px] leading-[1.45] text-ink-2">Only you see these answers: never brands or Proof. Google’s Gemini reads what you type to suggest chips, and the chips you pick when it explains your readings or answers in Wisp.</p>
     </section>
   )
 }

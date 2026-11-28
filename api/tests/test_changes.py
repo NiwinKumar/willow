@@ -27,10 +27,19 @@ def _blemishes(value, mdc95=4.0, zones=None):
     return m
 
 
-def _session(store, sid, day, metrics, tags=None, answered=True, zones=None, mode="uncalibrated"):
-    result = {"site": "face_full", "capture_mode": mode, "metrics": metrics}
-    if zones:
-        result["extras"] = {"by_zone": {"blemishes": {z: {"value": v} for z, v in zones.items()}}}
+def _session(
+    store, sid, day, metrics, tags=None, answered=True, zones=None, mode="uncalibrated", passed=True
+):
+    result = {
+        "site": "face_full",
+        "capture_mode": mode,
+        "metrics": metrics,
+        "quality": {"passed": passed},
+    }
+    if zones:  # the metric's own extras.by_zone (engine 0.4.1+)
+        for m in metrics:
+            if m["id"] == "blemishes":
+                m["extras"] = {"by_zone": {z: {"value": v} for z, v in zones.items()}}
     doc = {
         "site": "face_full",
         "capture_mode": mode,
@@ -296,3 +305,17 @@ def test_wisp_reads_the_noted_changes_and_the_patterns():
     latest = ctx["latest_sessions"]["face_full (uncalibrated)"]
     assert latest["noted_since_last_check_in"] == ["slept badly"]
     assert ctx["life_patterns"][0].startswith("Blemishes were higher on 3 of the 3")
+
+
+def test_check_ins_that_failed_the_quality_check_count_nowhere():
+    store = MemoryStore()
+    _weeks(
+        store, [(40, ["period"], 12), (22, [], 3), (41, ["period"], 11), (20, [], 3), (23, [], 4)]
+    )
+    # a third noted week, but its photos were rejected: no pattern from two good weeks
+    _session(store, "s_20261020_rejected", "2026-10-20", [_blemishes(39)], ["period"], passed=False)
+    assert changes.find(store, UID)["patterns"] == []
+    # and a retake after a rejected check-in still asks since the last good one
+    doc = {"site": "face_full", "created_at": datetime.fromisoformat("2026-10-21T12:00:00+00:00")}
+    prev = changes.previous_session(store, UID, "s_new", doc)
+    assert prev is not None and prev[0] != "s_20261020_rejected"

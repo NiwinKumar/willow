@@ -22,9 +22,9 @@ Template:
   - `PATCH /v1/sessions/{id}` accepts `changes` (null clears it). `SessionView.session.changes` returns it with `words` (the tags in plain words).
   - new `GET /v1/sessions/{id}/changes` (the answer so far, the last check-in's day, routine products started, stopped and ticked in between), `POST /v1/sessions/{id}/changes/read` (free text read into tags by Gemini, else a word list; saves nothing), `GET /v1/patterns` (what lines up with the person's readings, found by code).
   - `GET /v1/sessions/{id}/story/{metric}` adds `this_week` and `patterns`.
-- Privacy: the answers stay in the person's account. They are not in the BigQuery export (`scripts/export_bq.py` reads metrics only), not in Proof, and are deleted with the account. Free text goes to Gemini only to suggest tags; the app says so.
+- Privacy: the answers stay in the person's account. They are not in the BigQuery export (`scripts/export_bq.py` reads metrics only), not in Proof, and are deleted with the account. Free text goes to Gemini only to suggest tags; the app says so. The chosen chips (their plain words, never the typed text) also reach Gemini as context for the metric story (`this_week`) and Wisp (`noted_since_last_check_in`, `life_patterns`); the app's note says so. Only check-ins whose photos passed the quality check are compared or count as the last check-in.
 - Impact on engine / api / web: engine none; api new module `app/changes.py` (+ `changes_ai.py`); web asks the question as its own step after the photos, shows it on the day's result, in each reading's story and as "What else moves your skin" on Progress.
-- Approved by: [x] Harshini [ ] Niwin
+- Approved by: [x] Harshini [x] Niwin (Nov 28)
 
 ## 2026-10-13: Aligned preview image in AnalysisResult (proposed by Niwin)
 - Why: browsers cannot render DNG. The Report overlay toggle, the before/after slider and the timeline compare all need a viewable image in the same pixel frame as `overlays[]` and `rois[]`.
