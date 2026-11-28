@@ -639,6 +639,10 @@ export const api = {
   advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
   clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
   advisorChatStream,
+  /** Talk to Wisp: the spoken question as text and its language (api app/voice.py). */
+  voiceHear: (token: string, audio_base64: string, mime_type: string) => request<{ text: string; lang: string }>(token, '/v1/advisor/voice/hear', { method: 'POST', body: JSON.stringify({ audio_base64, mime_type }) }, LONG_TIMEOUT_MS),
+  /** Wisp's checked answer read aloud in the person's language: a WAV, base64. */
+  voiceSpeak: (token: string, text: string) => request<{ audio_base64: string; mime_type: string }>(token, '/v1/advisor/voice/speak', { method: 'POST', body: JSON.stringify({ text }) }, LONG_TIMEOUT_MS),
   /** Proof-gated promotion (api campaign_routes.py): the consumer's sponsored card and its events. */
   sponsored: (token: string, placement: SponsoredPlacement = 'routine') => request<{ item: SponsoredItem | null }>(token, `/v1/sponsored?placement=${placement}`),
   sponsoredEvent: (token: string, campaignId: string, kind: SponsoredEventKind) => request<void>(token, `/v1/sponsored/${encodeURIComponent(campaignId)}/events`, { method: 'POST', ...json({ kind }) }),

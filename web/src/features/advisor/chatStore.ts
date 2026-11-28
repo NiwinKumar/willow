@@ -12,6 +12,7 @@
 import { useSyncExternalStore } from 'react'
 
 import { ApiError, StreamUnavailable, api, type AdvisorHistoryMessage, type AdvisorReply, type AdvisorStage, type AnswerBlock, type ChatImage, type StandardExplanation, type UsageCount } from '../../lib/api'
+import { readAloud, takeSpeakNext } from './voice'
 
 /** A photo attached to a question: what is sent, plus a local thumbnail for this tab only (never stored). */
 export type Attachment = ChatImage & { name: string; meta: string; thumb: string }
@@ -53,6 +54,8 @@ let abort: AbortController | null = null
 // Questions asked while an answer is on its way (from Home, Routine or a result), in order; none is dropped.
 let queued: { text: string; context?: string; images?: Attachment[] }[] = []
 let tokenFn: (() => Promise<string>) | null = null
+/** A token for the advisor's own calls (voice.ts). */
+export const advisorToken = () => (tokenFn ? tokenFn() : Promise.reject(new Error('not signed in')))
 let lastSeed: unknown = null
 let capDay = ''
 const utcDay = () => new Date().toISOString().slice(0, 10)
@@ -239,6 +242,8 @@ function reveal(reply: AdvisorReply) {
   const usage = state.usage ? { ...state.usage, remaining: reply.remaining_today, used: Math.min(state.usage.cap, state.usage.cap - reply.remaining_today) } : null
   set({ messages: [...state.messages, msg], phase: msg.shown >= blocks.length ? 'idle' : 'revealing', thinkingSince: null, stages: [], aiDown: false, remaining: reply.remaining_today, usage, capMessage: capped ? 'That is all of today’s questions.' : state.capMessage })
   if (!state.usage) void refreshUsage()
+  // a spoken question: read the checked answer aloud (voice.ts)
+  if (takeSpeakNext() && tokenFn) void tokenFn().then((t) => readAloud(t, reply.message)).catch(() => undefined)
   if (msg.shown >= blocks.length) return next()
   // One block after another, each given time in proportion to what it says (the checked answer is already
   // complete: this is only how it appears).
