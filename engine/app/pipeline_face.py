@@ -614,6 +614,27 @@ def _photo_marks(refs: list[dict], sides: set[str]) -> dict[str, list[dict]]:
     return out
 
 
+MESH_POINTS = 468  # face-mesh landmarks (the iris points after them are left out)
+
+
+def _face_points(refs: list[dict]) -> list[dict]:
+    """Each view's reference photo's face-mesh landmarks at photo pixels (Nov 28): the same
+    point of the face has the same index in every photo, so an app can carry a place from one
+    check-in's photo to the same place on another's (the spot diary's "this spot, week by
+    week"). extras.face_points of blemishes."""
+    out = []
+    for f in refs:
+        pts = np.asarray(f["face"].points, dtype=np.float64)[:MESH_POINTS]
+        out.append(
+            {
+                "view": f["view"],
+                "frame_index": f["index"],
+                "points": np.round(pts, 1).tolist(),
+            }
+        )
+    return out
+
+
 def _combine_views(front: list[dict], side_refs: dict[str, dict]) -> None:
     """A session with front and side photos: each front photo's blemish count and dark-spot area
     become its own zones' plus the side photos' cheeks and jaws, so the noise band still comes
@@ -1259,6 +1280,7 @@ def analyze_face(
         _combine_views(good, side_refs)
     _zone_marks(good, side_refs)
     marks = _photo_marks([good[0], *side_refs.values()], set(side_refs)) if good else {}
+    face_points = _face_points([good[0], *side_refs.values()]) if good else []
 
     metrics = []
     _session_lines(good)
@@ -1281,6 +1303,8 @@ def analyze_face(
                 extras["by_zone"] = zones
             if metric_id in MARK_KIND:  # every counted mark, placed on its photo
                 extras["marks"] = marks.get(MARK_KIND[metric_id], [])
+            if metric_id == "blemishes" and face_points:
+                extras["face_points"] = face_points
         else:
             summary = {
                 "value": None,

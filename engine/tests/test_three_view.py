@@ -12,6 +12,7 @@ from app import config, facemap
 from app.pipeline_face import (
     _assign_views,
     _combine_views,
+    _face_points,
     _keeps,
     _mark_depth_mm,
     _owned_zone_px,
@@ -284,3 +285,12 @@ def test_every_counted_mark_is_placed_on_its_photo_not_only_the_candidates():
         {"view": "right", "frame_index": 3, "x": 109.0, "y": 59.0, "r": 3.0, "zone": "chin"}
     ]
     assert len(marks["blemish"]) == sum(_keeps(side, {"right"})[:4])
+
+
+def test_each_photo_gives_its_face_mesh_points_for_carrying_a_place_between_check_ins():
+    pts = np.arange(478 * 2, dtype=float).reshape(478, 2) / 3
+    f = {"view": "left", "index": 4, "face": M(points=pts)}
+    (got,) = _face_points([f])
+    assert got["view"] == "left" and got["frame_index"] == 4
+    assert len(got["points"]) == 468  # the mesh, without the iris points
+    assert got["points"][1] == [round(2 / 3, 1), 1.0]
