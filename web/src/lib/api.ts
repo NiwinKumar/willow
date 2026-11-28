@@ -42,6 +42,8 @@ export type SessionView = {
     baseline: { session_id: string; frames: number | null; has_noise_band: boolean } | null
     note: string | null
     deviation: boolean
+    /** What else was different since the last check-in, as the person said (null: not answered). */
+    changes?: CheckInChanges | null
     error: { code: string; message: string } | null
     explanation_source: 'template' | 'gemini' | null
     preview: { url: string; width: number | null; height: number | null } | null
@@ -189,8 +191,69 @@ export type MetricStory = {
   source: 'gemini' | 'facts'
   products: StoryProduct[]
   has_previous: boolean
+  /** What the person noted as different since their last check-in (their tags, in words). */
+  this_week?: string[]
+  /** Patterns found by code across their check-ins for this reading ("Blemishes were higher on 4 of the 5…"). */
+  patterns?: string[]
   areas?: StoryArea[]
   spots?: { check_ins: number; days_covered: number; areas: StorySpotArea[] } | null
+}
+
+/** The tags a person can note at a check-in (api app/changes.py TAGS). */
+export type ChangeTag =
+  | 'period'
+  | 'stress_work'
+  | 'stress_study'
+  | 'sleep_poor'
+  | 'travel'
+  | 'travel_hot'
+  | 'travel_cold'
+  | 'travel_humid'
+  | 'sport_gym'
+  | 'sport_swim'
+  | 'sport_outdoor'
+  | 'sun'
+  | 'diet'
+  | 'diet_sugar'
+  | 'diet_dairy'
+  | 'diet_spicy'
+  | 'diet_alcohol'
+  | 'diet_less_water'
+  | 'routine_skipped'
+  | 'routine_new'
+  | 'makeup_new'
+  | 'clinic'
+  | 'picked'
+  | 'unwell'
+  | 'new_medicine'
+
+/** What else was different since the last check-in (kept on the session; private to the person). */
+export type CheckInChanges = { tags: ChangeTag[]; words: string[]; other: string | null; nothing: boolean; answered_at: string | null }
+
+/** GET /v1/sessions/{id}/changes: the answer so far, the last check-in's day, routine products in between. */
+export type ChangesPrefill = {
+  changes: CheckInChanges | null
+  since: string | null
+  routine: { name: string; brand: string; started: string | null; stopped: string | null; use: { days_used: number; of_days: number } | null }[]
+}
+
+/** POST /v1/sessions/{id}/changes/read: "Anything else?" read into tags for the person to confirm. */
+export type ChangesRead = {
+  tags: ChangeTag[]
+  words: string[]
+  products: { text: string; match: { product_id: string; brand: string; name: string } | null }[]
+  reaction: boolean
+  source: 'gemini' | 'words'
+}
+
+/** GET /v1/patterns: what else lines up with the person's readings (found by code, never a cause). */
+export type ChangePatterns = {
+  answered: number
+  patterns: { group: string; about: string; metric_id: string; metric: string; higher: boolean; way: string | null; noted: number; same_way: number; others: number; areas: string[]; text: string }[]
+  /** Enough check-ins on both sides and no clear difference (a finding, worded by the api). */
+  same: { group: string; about: string; text: string }[]
+  /** Noted, but not enough check-ins yet to compare: listed without numbers. */
+  learning: { group: string; about: string }[]
 }
 
 /** One ingredient as read off the label: `low` when part of it was hard to read. Plain strings: older api answers. */
@@ -462,8 +525,14 @@ export const api = {
   getSession: (token: string, sessionId: string) => request<SessionView>(token, `/v1/sessions/${sessionId}`),
   /** What changed for one metric since the previous check-in, in points (api app/metric_story.py). */
   metricStory: (token: string, sessionId: string, metricId: string) => request<MetricStory>(token, `/v1/sessions/${sessionId}/story/${metricId}`, undefined, LONG_TIMEOUT_MS),
-  patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean }) =>
+  patchSession: (token: string, sessionId: string, body: { note?: string | null; deviation?: boolean; changes?: { tags: ChangeTag[]; other: string | null; nothing: boolean } | null }) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}`, { method: 'PATCH', ...json(body) }),
+  /** What changed since the last check-in: the answer so far and the routine in between (api app/changes.py). */
+  checkInChanges: (token: string, sessionId: string) => request<ChangesPrefill>(token, `/v1/sessions/${sessionId}/changes`),
+  /** "Anything else?" read into tags (Gemini, else a word list); saves nothing. */
+  readChanges: (token: string, sessionId: string, text: string) => request<ChangesRead>(token, `/v1/sessions/${sessionId}/changes/read`, { method: 'POST', ...json({ text }) }, LONG_TIMEOUT_MS),
+  /** What else lines up with the person's readings, across their answered check-ins. */
+  patterns: (token: string) => request<ChangePatterns>(token, '/v1/patterns'),
   /** `force`: measure a done session again with every frame (counts as an analysis). */
   analyze: (token: string, sessionId: string, force = false) =>
     request<SessionView>(token, `/v1/sessions/${sessionId}/analyze${force ? '?force=1' : ''}`, { method: 'POST' }, ANALYZE_TIMEOUT_MS),

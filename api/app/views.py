@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
 
-from app import previews, storage
+from app import changes, previews, storage
 from app.results import measured_result
 from app.store import iso
 
@@ -227,6 +227,8 @@ def session_view(
             ),
             "note": doc.get("note"),
             "deviation": bool(doc.get("deviation")),
+            # what else was different since the last check-in, as the person said (app/changes.py)
+            "changes": changes.view(doc),
             "error": doc.get("error"),
             "explanation_source": doc.get("explanation_source"),
             "preview": preview,

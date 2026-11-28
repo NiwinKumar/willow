@@ -144,6 +144,17 @@ function StoryDetails({ story, unit }: { story: MetricStory; unit: string }) {
           ) : null}
         </div>
       ) : null}
+      {story.this_week?.length || story.patterns?.length ? (
+        <div className={block}>
+          <span className={head}>What else was going on · lines up with, never a cause</span>
+          {story.this_week?.length ? <p className="m-0 text-[15px] leading-[1.5]">Since your last check-in you noted: {story.this_week.join(', ')}.</p> : null}
+          {story.patterns?.map((p) => (
+            <p key={p} className="m-0 text-[15px] leading-[1.5]">
+              {p}
+            </p>
+          ))}
+        </div>
+      ) : null}
       {products.length ? (
         <div className={block}>
           <span className={head}>Your routine for this · timing is an association, not proof</span>

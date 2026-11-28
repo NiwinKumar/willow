@@ -7,7 +7,18 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app import analysis, baselines, engine, limits, metric_story, sessions, storage, views
+from app import (
+    analysis,
+    baselines,
+    changes,
+    changes_ai,
+    engine,
+    limits,
+    metric_story,
+    sessions,
+    storage,
+    views,
+)
 from app.auth import AuthUser, current_user
 from app.models import (
     CONTENT_TYPES,
@@ -19,6 +30,7 @@ from app.models import (
     DuplicateOf,
     ObjectStatus,
     PatchSessionRequest,
+    ReadChangesRequest,
     SessionObjectsResponse,
     Site,
     UploadTarget,
@@ -522,9 +534,37 @@ def patch_session(
     user: AuthUser = Depends(current_user),
     store: Store = Depends(get_store),
 ) -> dict[str, Any]:
-    """The person's own note and the "something was different" flag on a session."""
+    """The person's own note, the "something was different" flag, and what else changed since
+    the last check-in (`changes`, app/changes.py) on a session."""
     _load(store, user.uid, session_id)
     fields = body.model_dump(exclude_unset=True)
+    if "changes" in fields:
+        fields["changes"] = changes.stored(body.changes) if body.changes is not None else None
     if fields:
         store.session_update(user.uid, session_id, fields)
     return _detail_view(store, user.uid, session_id, _load(store, user.uid, session_id))
+
+
+@router.get("/{session_id}/changes")
+def get_changes(
+    session_id: str,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """What changed since the last check-in: the answer so far, the last check-in's day, and the
+    routine products started, stopped and ticked in between, for the app to pre-fill."""
+    doc = _load(store, user.uid, session_id)
+    return changes.prefill(store, user.uid, session_id, doc)
+
+
+@router.post("/{session_id}/changes/read")
+def read_changes(
+    session_id: str,
+    body: ReadChangesRequest,
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """ "Anything else?" in the person's words, read into tags for them to confirm (Gemini, else a
+    word list). Saves nothing (app/changes_ai.py)."""
+    _load(store, user.uid, session_id)
+    return changes_ai.read(store, user.uid, body.text)
