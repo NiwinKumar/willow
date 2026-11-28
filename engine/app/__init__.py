@@ -1,4 +1,7 @@
-__version__ = "0.4.3"  # bump on every change that can move a number: baselines record it
+__version__ = "0.4.4"  # bump on every change that can move a number: baselines record it
+# 0.4.4: extras.marks on blemishes and pigment_spots (every counted mark placed on its photo;
+# candidates stop at max_candidates) and blemishes.extras.face_points (each view's face-mesh
+# landmarks at photo pixels); no number moved, 0.4.x baselines compare
 # 0.4.3: face colour and light readings get a between-room floor on their normal range
 # (config.ROOM_LIGHT_FLOOR): their mdc95 can be wider, values do not move, so 0.4.x baselines still
 # compare; a baseline measured before keeps its old band until it is measured again

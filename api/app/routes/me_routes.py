@@ -7,7 +7,7 @@ from zoneinfo import available_timezones
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app import baselines, campaigns, changes, storage, tracks, views
+from app import baselines, campaigns, changes, spot_diary, storage, tracks, views
 from app.auth import AuthUser, current_user
 from app.models import SetBaselineRequest, Site
 from app.results import measured_result
@@ -66,6 +66,17 @@ def patterns(
     """What else moves this person's skin: each kind of change they noted at check-ins against
     their readings, found by code against their own normal range (app/changes.py)."""
     return changes.find(store, user.uid)
+
+
+@router.get("/spots/check-ins")
+def spots_by_check_in(
+    user: AuthUser = Depends(current_user),
+    store: Store = Depends(get_store),
+) -> dict[str, Any]:
+    """Spot diary: each face check-in's photos (front, cheeks) with every mark it counted and
+    the counts Progress shows, in the order the person checked in; nothing is matched across
+    check-ins (app/spot_diary.py)."""
+    return spot_diary.check_ins(store, user.uid)
 
 
 @router.get("/spots")
