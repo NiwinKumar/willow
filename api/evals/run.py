@@ -95,12 +95,16 @@ class SchemaFailures(logging.Handler):
             self.counts[self.model][f"call_error_{code}"] += 1
 
 
-def load_cases(only: list[str] | None) -> dict[str, list[dict[str, Any]]]:
+def load_cases(
+    only: list[str] | None, ids: list[str] | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """The cases per job; `only`: these jobs; `ids`: these case ids (a quick look at a few)."""
     out = {}
     for name in jobs.JOBS:
         if only and name not in only:
             continue
-        out[name] = json.loads((CASES / f"{name}.json").read_text())["cases"]
+        cases = json.loads((CASES / f"{name}.json").read_text())["cases"]
+        out[name] = [c for c in cases if not ids or c["id"] in ids]
     return out
 
 
@@ -172,6 +176,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default=f"gemini-3.8-flash,{PRODUCTION_FALLBACK}")
     ap.add_argument("--jobs", default="", help="comma list; default all")
+    ap.add_argument("--cases", default="", help="comma list of case ids; default all")
     ap.add_argument("--out", default=f"evals/results/{datetime.now(UTC).date()}.json")
     ap.add_argument("--max-calls", type=int, default=380)
     ap.add_argument("--workers", type=int, default=4)
@@ -197,7 +202,9 @@ def main() -> int:
     wlog.addHandler(handler)
     wlog.propagate = False
 
-    cases = load_cases([j for j in args.jobs.split(",") if j] or None)
+    cases = load_cases(
+        [j for j in args.jobs.split(",") if j] or None, [c for c in args.cases.split(",") if c]
+    )
     path = Path(args.out)
     started = datetime.now(UTC)
     out: dict[str, Any] = {
@@ -246,6 +253,9 @@ def main() -> int:
     table = report.eval_table(out)
     print(table)
     print(f"\n{meter.total()} model calls this run; results in {path}")
+    for model, n in meter.calls.items():
+        # a probe call (a dozen tokens) is in the count: the mean is a little low
+        print(f"{model}: {round(meter.tokens[model]['input'] / n):,} input tokens per call")
     if args.docs:
         head = (
             f"Run {out['started_at'][:16]} UTC"
