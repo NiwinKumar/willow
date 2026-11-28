@@ -80,9 +80,9 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
         {conflict ? (
           // The routine check's first finding, said as the tip it is ("Alternate nights for Retinol and Skin
           // Perfecting"): two products that are better not used together, and how to space them.
-          <button type="button" onClick={onRoutine} title={conflict.title} aria-label={`Routine tip: ${conflict.title}`} className="hit44 flex items-center gap-1.5 rounded-pill bg-sunken px-3 py-1.5 text-left text-[12.5px] text-ink transition-colors hover:bg-muted sm:ml-auto">
+          <button type="button" onClick={onRoutine} title={conflict.title} className="hit44 flex items-center gap-1.5 rounded-pill bg-sunken px-3 py-1.5 text-left text-[12.5px] text-ink transition-colors hover:bg-muted sm:ml-auto">
             <Lightbulb size={14} strokeWidth={1.8} aria-hidden className="shrink-0 text-ink-2" />
-            <span className="text-pretty">{tipText(conflict)}</span>
+            <span className="text-pretty"><span className="sr-only">Routine tip: </span>{tipText(conflict)}</span>
           </button>
         ) : null}
       </div>
@@ -135,7 +135,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                     <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
-                    <button type="button" onClick={onRoutine} aria-label="Morning is missing a sunscreen. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
+                    <button type="button" onClick={onRoutine} aria-label="Sunscreen missing in Morning. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
                       <span aria-hidden className="grid place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-white/50 text-[16px]" style={{ width: px, height: px }}>
                         +
                       </span>

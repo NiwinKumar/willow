@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from app import advisor, demo, limits, routine_check
+from app import advisor, demo, limits, routine_check, translate
 from app.auth import AuthUser, current_user
 from app.routes.products_routes import (
     ChatRequest,
@@ -177,21 +177,29 @@ def journey_advisor_history(store: Store = Depends(get_store)) -> dict[str, Any]
 
 
 @router.post("/advisor/chat")
-def journey_advisor_chat(body: ChatRequest, store: Store = Depends(get_store)) -> dict[str, Any]:
+def journey_advisor_chat(
+    body: ChatRequest,
+    store: Store = Depends(get_store),
+    lang: str = Depends(translate.lang_header),
+) -> dict[str, Any]:
     """Ask Wisp about the demo journey: answered from Mei's data, never stored, one shared cap."""
     uid = get_settings().demo_user_id
     images, used = _chat_start(body, uid, store, "demo_advisor")
-    return _chat_answer(body, uid, store, images, used, action="demo_advisor", keep=False)
+    return _chat_answer(
+        body, uid, store, images, used, action="demo_advisor", keep=False, lang=lang
+    )
 
 
 @router.post("/advisor/chat/stream")
 def journey_advisor_chat_stream(
-    body: ChatRequest, store: Store = Depends(get_store)
+    body: ChatRequest,
+    store: Store = Depends(get_store),
+    lang: str = Depends(translate.lang_header),
 ) -> StreamingResponse:
     """The streamed form of /advisor/chat (the same events as /v1/advisor/chat/stream)."""
     uid = get_settings().demo_user_id
     images, used = _chat_start(body, uid, store, "demo_advisor")
-    return chat_stream(body, uid, store, images, used, action="demo_advisor", keep=False)
+    return chat_stream(body, uid, store, images, used, action="demo_advisor", keep=False, lang=lang)
 
 
 @router.get("/status")

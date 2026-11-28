@@ -212,7 +212,7 @@ function NoSpotlight({ brand }: { brand: string | null }) {
     <EmptyState
       icon={<Sparkles size={18} strokeWidth={1.6} />}
       title={brand ? `Next for ${brand}: grow the number of people measured` : 'Next: grow the number of people measured'}
-      body={`A product gets a Proof tier once 10 people reach week 8, and is Proven at ${MIN_GROUP * 3}+ with a lift over people with the same goals who don’t use it, above zero across its 95% interval. Your range shows which products are collecting and which have no users yet.`}
+      body={`A product gets a Proof tier once 10 people reach week 8, and is Proven at ${MIN_GROUP * 3}+ with a lift over people with the same goals who don’t use it, above zero across its 95% interval and passing a false-discovery check across all products tested. Your range shows which products are collecting and which have no users yet.`}
       action={{ label: 'Open your range', to: `${sectionPath('range')}${carry}` }}
       secondary={{ label: 'See every product', to: `${sectionPath('products')}${carry}` }}
     />

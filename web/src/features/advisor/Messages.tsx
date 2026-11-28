@@ -172,7 +172,7 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions, que
         <WispMark size={34} state={revealing ? 'speaking' : 'idle'} still={!revealing} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex min-w-0 flex-col gap-3 rounded-[8px_28px_28px_28px] bg-surface px-4 pt-3.5 pb-2 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
+        <div lang={r.lang} className="flex min-w-0 flex-col gap-3 rounded-[8px_28px_28px_28px] bg-surface px-4 pt-3.5 pb-2 shadow-[0_30px_60px_-44px_rgba(0,0,0,.35)]">
           {/* Screen readers get each block once, as it appears; the reveal is only visual. */}
           {m.blocks.slice(0, m.shown).map((b, i) => (
             <div key={i} style={{ animation: 'advIn .55s cubic-bezier(.2,.7,.2,1) both' }}>
@@ -214,15 +214,6 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions, que
             </span>
           ) : null}
         </div>
-        {!revealing && last && r.follow_up_suggestions.length ? (
-          <span className="flex flex-wrap gap-1.5 pt-1.5">
-            {r.follow_up_suggestions.map((f, i) => (
-              <button key={f} type="button" disabled={busy || capped} onClick={() => actions.onAsk(f)} className="min-h-10 rounded-pill border border-ink/12 bg-white/90 px-3.5 text-left text-[13px] transition-colors hover:bg-sunken" style={{ animation: `wRise .4s ${i * 80}ms both` }}>
-                {f}
-              </button>
-            ))}
-          </span>
-        ) : null}
         <Stamp at={m.at} align="left" />
       </div>
     </div>

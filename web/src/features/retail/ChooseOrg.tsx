@@ -182,9 +182,9 @@ export function ChooseOrg({ view, memberships, onPick, onSignOut, onCancel, lock
             )}
           </div>
           {!searching && letters.length > 6 ? (
-            <nav aria-label="Jump to letter" className="hidden w-7 shrink-0 flex-col items-center justify-center gap-px border-l border-line py-2 sm:flex">
+            <nav aria-label="Jump to letter" className="hidden w-7 shrink-0 flex-col items-center justify-center overflow-y-auto border-l border-line py-2 sm:flex">
               {letters.map((l) => (
-                <button key={l} type="button" onClick={() => jump(l)} className="grid h-[17px] w-6 place-items-center rounded-[4px] border-0 bg-transparent text-[10.5px] font-medium leading-none text-ink-2 transition-colors hover:bg-pf-hover hover:text-ink" aria-label={`Brands starting with ${l}`}>
+                <button key={l} type="button" onClick={() => jump(l)} className="grid h-6 w-6 shrink-0 place-items-center rounded-[4px] border-0 bg-transparent text-[10.5px] font-medium leading-none text-ink-2 transition-colors hover:bg-pf-hover hover:text-ink" aria-label={`Brands starting with ${l}`}>
                   {l}
                 </button>
               ))}

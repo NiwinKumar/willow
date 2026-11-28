@@ -124,7 +124,9 @@ function Body({ d }: { d: Insights }) {
   const people = d.needs_by_month?.people ?? []
   const peopleChange = people.length > 1 && people.at(-2) ? ((people.at(-1) ?? 0) - (people.at(-2) ?? 0)) / (people.at(-2) ?? 1) : null
   const name = org?.kind === 'brand' ? (brand ?? org.name) : (org?.name ?? brand ?? 'Your range')
-  const sentences = weekBrief({ mix, name: mix === 'brand' ? (brand ?? name) : name, p, rate, market, rising: risingGoal(demand.rows), camp })
+  const briefLines = weekBrief({ mix, name: mix === 'brand' ? (brand ?? name) : name, p, rate, market, rising: risingGoal(demand.rows), camp })
+  // simulated people in the numbers: the headline says so in its first words (the notice above says why)
+  const sentences = d.cohort.synthetic && briefLines.length ? [`In the simulated cohort, ${briefLines[0].charAt(0).toLowerCase()}${briefLines[0].slice(1)}`, ...briefLines.slice(1)] : briefLines
 
   const guide = useGuide({ mix, rangeConnected: Boolean(range) || mix === 'brand', decided: Object.keys(items).length > 0, campaigns: campaigns.length > 0 })
   const ask = (q: string) => setParam({ ask: '1', q }, { push: true })
@@ -154,7 +156,7 @@ function Body({ d }: { d: Insights }) {
             value: rate ? pct(rate.rate) : '—',
             unit: rate ? `of ${int(rate.n)}` : undefined,
             note: market ? `Market: ${pct(market.rate)}` : 'No measured products yet',
-            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name} against the market: ${pct(rate.rate)} of ${int(rate.n)} people using ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against ${pct(market.rate)} of ${int(market.n)} across every measured product.` } : null,
+            delta: rate && market ? { text: pts(rate.rate - market.rate), tone: rate.rate - market.rate > 0.005 ? 'up' : rate.rate - market.rate < -0.005 ? 'down' : 'flat', title: `${brand ?? name} against the market: ${pct(rate.rate)} of ${int(rate.n)} product uses across ${rate.products} measured ${rate.products === 1 ? 'product' : 'products'}, against ${pct(market.rate)} of ${int(market.n)} product uses across every measured product (one person can use several).` } : null,
             to: `${sectionPath('market')}${carry}`,
           },
           campaignTile,

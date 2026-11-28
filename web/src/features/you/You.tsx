@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { LanguagePicker } from '../../components/willow/LanguagePicker'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Sheet } from '../../components/ui/Sheet'
 import { Toggle } from '../../components/ui/Toggle'
@@ -70,6 +71,11 @@ export default function You() {
           <PrivacyRows />
         </Group>
       )}
+      <Group id="language" title="Language">
+        <Row label="Willow’s answers in your language" hint="Explanations, what changed, and Wisp. Gemini writes and checks them in English first, then translates; a translation is used only if every number stays the same.">
+          <LanguagePicker />
+        </Row>
+      </Group>
       <Group id="setup" title="Photo setup and help">
         <CaptureSetupRow />
         <Row label="How Willow measures" hint="The science behind the readings, and what they can't tell you.">

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { CaptureMode, Site } from '../../data/types'
@@ -21,7 +22,8 @@ import { ModeBanner } from './ModeBanner'
 import { ShellContext, type AdvisorSeed, type ShellApi } from './ShellContext'
 import { Sidebar, type Destination } from './Sidebar'
 
-const AdvisorPanel = lazy(() => import('../../features/advisor/AdvisorPanel'))
+const loadAdvisor = () => import('../../features/advisor/AdvisorPanel')
+const AdvisorPanel = lazy(loadAdvisor)
 const CheckInPicker = lazy(() => import('../../features/checkin/CheckInPicker'))
 
 function destinationOf(path: string): Destination {
@@ -67,10 +69,10 @@ export function AppShell() {
   const me = identity(user)
 
   const openAdvisor = useCallback((text?: string, context?: string) => {
-    setAdvisor((a) => ({ open: true, ever: true, seed: text ? { id: (a.seed?.id ?? 0) + 1, text, context } : a.seed }))
+    morph(() => setAdvisor((a) => ({ open: true, ever: true, seed: text ? { id: (a.seed?.id ?? 0) + 1, text, context } : a.seed })))
   }, [])
   const closeAdvisor = useCallback(() => {
-    setAdvisor((a) => ({ ...a, open: false }))
+    morph(() => setAdvisor((a) => ({ ...a, open: false })))
     setAdvisorFull(false)
   }, [])
   const startCheckIn = useCallback(
@@ -151,6 +153,13 @@ export function AppShell() {
     [checkIn.open, startCheckIn, openAdvisor, closeAdvisor, advisor.open, advisor.seed, data],
   )
 
+  // Wisp loads and renders (hidden) while the app is idle, so its first open is the panel itself, not a
+  // loader that pops in step by step.
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1500))
+    idle(() => void loadAdvisor().then(() => setAdvisor((a) => (a.ever ? a : { ...a, ever: true }))))
+  }, [])
+
   if (data.mode === 'live') {
     if (loading) return <WillowLoader label="Opening Willow" />
     if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
@@ -164,7 +173,7 @@ export function AppShell() {
   const pad = wide ? { paddingLeft: collapsed ? 101 : 248, paddingRight: panelOpen ? 468 : 16, paddingTop: 16 } : undefined
   return (
     <ShellContext.Provider value={api}>
-      <div className="relative min-h-dvh overflow-x-clip pb-[calc(140px+env(safe-area-inset-bottom))] transition-[padding] duration-[450ms] ease-spring min-[900px]:pb-28" style={pad}>
+      <div className="relative min-h-dvh overflow-x-clip pb-[calc(140px+env(safe-area-inset-bottom))] min-[900px]:pb-28" style={pad}>
         <CanvasBlobs />
         <div inert={covered || undefined}>
         <ModeBanner />
@@ -174,7 +183,7 @@ export function AppShell() {
             collapsed={collapsed}
             onToggle={() => {
               prefs.setSidebarCollapsed(!collapsed)
-              setCollapsed(!collapsed)
+              morph(() => setCollapsed(!collapsed), true)
             }}
             onCheckIn={() => setCheckIn({ open: true })}
             checkIn={checkInState}
@@ -184,7 +193,7 @@ export function AppShell() {
         ) : (
           <Header />
         )}
-        <div className="relative z-[1]">
+        <div className="relative z-[1] [view-transition-name:willow-page]">
           <Outlet />
         </div>
         {wide ? null : <Dock current={current} checkIn={checkInState} onCheckIn={() => setCheckIn({ open: true })} />}
@@ -213,14 +222,6 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
   const panel = useRef<HTMLDivElement>(null)
   const back = useRef<HTMLElement | null>(null)
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
-  // Scale about the cat button's centre (the panel's layout box, offsetLeft/Top, ignores the scale itself).
-  useLayoutEffect(() => {
-    const el = panel.current
-    const cat = document.querySelector<HTMLElement>('button[aria-label="Wisp"]')?.parentElement
-    if (!el || !cat) return
-    const r = cat.getBoundingClientRect()
-    el.style.transformOrigin = `${r.left + r.width / 2 - el.offsetLeft}px ${r.top + r.height / 2 - el.offsetTop}px`
-  }, [open, phone, full])
   const wasOpen = useRef(false)
   useEffect(() => {
     const el = panel.current
@@ -262,24 +263,25 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
       aria-hidden={!open}
       inert={!open}
       tabIndex={-1}
-      className="fixed z-[45] flex flex-col overflow-hidden squircle outline-none backdrop-blur-[28px] backdrop-saturate-[1.5]"
+      className="fixed z-[45] flex flex-col overflow-hidden squircle outline-none [view-transition-name:wisp-panel]"
       style={{
         top: inset || 'var(--kb-top, 0px)',
         right: inset,
         bottom: inset || 'var(--kb, 0px)',
         width: phone || full ? '100vw' : 'min(440px, calc(100vw - 24px))',
-        borderRadius: !open && !reduced ? 160 : phone || full ? 0 : 32,
-        background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.92)',
+        borderRadius: phone || full ? 0 : 32,
+        background: 'radial-gradient(120% 30% at 100% 0%, rgba(156,211,255,.4), transparent 70%), radial-gradient(140% 30% at 0% 100%, rgba(216,184,255,.35), transparent 70%), rgba(250,250,248,.97)',
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.75), 0 40px 80px -30px rgba(0,0,0,.4)',
-        scale: open || reduced ? '1' : '0.3',
+        // slides in from the right edge (phones: up from the bottom), transform and opacity only
+        transform: open || reduced ? 'none' : phone || full ? 'translateY(24px) scale(.985)' : 'translateX(28px) scale(.985)',
         opacity: open ? 1 : 0,
         visibility: open ? 'visible' : 'hidden',
         pointerEvents: open ? 'auto' : 'none',
         // Opening springs out of the cat; closing is quicker and accelerates into it. Hidden only after the
         // fold, so closing animates too.
         transition: open
-          ? 'scale .55s var(--ease-spring), opacity .22s ease, border-radius .45s var(--ease-spring), visibility 0s, width .45s var(--ease-spring), top .45s var(--ease-spring), right .45s var(--ease-spring), bottom .45s var(--ease-spring)'
-          : 'scale .34s cubic-bezier(.55,0,.8,.3), opacity .2s ease .14s, border-radius .34s ease-in, visibility 0s linear .34s',
+          ? 'transform .42s var(--ease-spring), opacity .26s ease, visibility 0s, width .42s var(--ease-spring), top .42s var(--ease-spring), right .42s var(--ease-spring), bottom .42s var(--ease-spring)'
+          : 'transform .26s cubic-bezier(.4,0,1,1), opacity .2s ease .04s, visibility 0s linear .26s',
       }}
     >
       {mounted ? (
@@ -289,4 +291,17 @@ function AdvisorHost({ open, mounted, phone, onClose, seed, full, onToggleFull }
       ) : null}
     </div>
   )
+}
+
+/**
+ * The page making room for Wisp's panel, or for the sidebar: one layout step, morphed by the browser's view
+ * transition (index.css `willow-page`): the old page stays crisp and is uncovered as the new one fades in,
+ * composited, so nothing re-lays out frame by frame. Only where the layout really changes (the panel sits
+ * beside the page from 1280px; the sidebar from 900px); elsewhere, and with reduced motion, it just updates.
+ */
+function morph(update: () => void, sidebar = false) {
+  const d = document as Document & { startViewTransition?: (cb: () => void) => unknown }
+  const changesLayout = window.matchMedia(sidebar ? '(min-width: 900px)' : '(min-width: 1280px)').matches
+  if (!d.startViewTransition || !changesLayout || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return update()
+  d.startViewTransition(() => flushSync(update))
 }

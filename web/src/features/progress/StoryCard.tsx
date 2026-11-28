@@ -4,6 +4,7 @@ import type { Session } from '../../data/types'
 import { useData } from '../../data/useData'
 import { api, type MetricStory } from '../../lib/api'
 import { unitOf } from '../../lib/metrics'
+import { useLanguage } from '../../lib/language'
 import { useAuth } from '../../lib/useAuth'
 import { areaStatus, productLine, productStatus, sentence, spotLine, typicalLine, type Status } from './storyParts'
 
@@ -16,7 +17,8 @@ import { areaStatus, productLine, productStatus, sentence, spotLine, typicalLine
 export function StoryCard({ session, metricId }: { session: Session; metricId: string }) {
   const { getIdToken } = useAuth()
   const { mode } = useData()
-  const key = `${session.id}/${metricId}`
+  const lang = useLanguage()
+  const key = `${session.id}/${metricId}/${lang}`
   // The answer for one session and metric; anything else (a different key) means still loading.
   const [got, setGot] = useState<{ key: string; story: MetricStory | null } | null>(null)
 

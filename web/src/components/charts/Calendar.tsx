@@ -163,7 +163,7 @@ export function Calendar({
             )
           if (isToday && onToday)
             return (
-              <button key={iso} type="button" onClick={onToday} aria-label={todayLabel} aria-current="date" className={`${cell} ${tap} border-[1.5px] border-dashed border-ink bg-white/40`} style={delay}>
+              <button key={iso} type="button" onClick={onToday} aria-label={`${d}, ${todayLabel}`} aria-current="date" className={`${cell} ${tap} border-[1.5px] border-dashed border-ink bg-white/40`} style={delay}>
                 <span className="text-[clamp(12px,1.3vw,15px)] font-semibold">{d}</span>
                 {dotRow(dots[iso])}
               </button>

@@ -23,7 +23,7 @@ html[data-proof][data-theme="light"] {
   --pf-hover: rgba(0, 0, 0, .04);
   --text-primary: #171717;
   --text-secondary: #5F5F5F;
-  --text-disabled: #8F8F8F;
+  --text-disabled: #666666; /* 4.8:1 on muted (was #8F8F8F) */
   --text-inverse: #FFFFFF;
   --line-subtle: #EAEAEA;
   --line-strong: #D4D4D4;
@@ -60,7 +60,7 @@ html[data-proof][data-theme="dark"] {
   --pf-hover: rgba(255, 255, 255, .06);
   --text-primary: #EDEDED;
   --text-secondary: #A1A1A1;
-  --text-disabled: #707070;
+  --text-disabled: #8C8C8C; /* 4.7:1 on dark muted (was #707070) */
   --text-inverse: #0A0A0A;
   --line-subtle: #242424;
   --line-strong: #3A3A3A;

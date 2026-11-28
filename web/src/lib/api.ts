@@ -2,6 +2,7 @@
 
 import type { AnalysisResult, Explanation, FeelTag, FeelVerdict, Product, ProductTest, RoutineCheck, RoutineEntry, RoutineLogDay, RoutineSchedule, ViewName } from '../data/types'
 import { DEV_UID } from './devAuth'
+import { langHeader } from './language'
 import type { LabelDetail } from './spotLabels'
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
@@ -283,6 +284,8 @@ export type AnswerBlock =
 export type AdvisorReply = {
   /** Plain text of the answer (older api builds send only this). */
   message: string
+  /** The language the words were translated into (api app/translate.py); absent for English. */
+  lang?: string
   /** The structured answer, answer first; absent from older api builds. */
   blocks?: AnswerBlock[]
   product_ids: string[]
@@ -436,6 +439,7 @@ export async function request<T>(token: string, path: string, init?: RequestInit
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}),
+      ...langHeader(),
       ...(init?.headers ?? {}),
     },
   }, timeoutMs)
@@ -629,7 +633,7 @@ export const api = {
   /** Wisp on the demo journey: Mei's stored chat, and questions answered from her data (never stored, no sign-in). */
   demoAdvisorHistory: () => publicGet<{ messages: AdvisorHistoryMessage[]; keep: number }>('/v1/demo/advisor/history'),
   demoAdvisorChat: async (messages: { role: 'user' | 'willow'; text: string }[], images: ChatImage[] = []) => {
-    const res = await fetch(`${API_URL}/v1/demo/advisor/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(images.length ? { messages, images } : { messages }) })
+    const res = await fetch(`${API_URL}/v1/demo/advisor/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(images.length ? { messages, images } : { messages }) })
     const body = (await res.json().catch(() => null)) as { detail?: { message?: string; code?: string } } | null
     if (!res.ok) throw new ApiError(res.status, body?.detail?.message ?? 'Wisp is unavailable right now.', body?.detail?.code ?? null, (body?.detail as Record<string, unknown>) ?? null)
     return body as unknown as AdvisorReply
@@ -637,6 +641,10 @@ export const api = {
   advisorHistory: (token: string) => request<{ messages: AdvisorHistoryMessage[]; keep: number }>(token, '/v1/advisor/history'),
   clearAdvisorHistory: (token: string) => request<void>(token, '/v1/advisor/history', { method: 'DELETE' }),
   advisorChatStream,
+  /** Talk to Wisp: the spoken question as text and its language (api app/voice.py). */
+  voiceHear: (token: string, audio_base64: string, mime_type: string) => request<{ text: string; lang: string }>(token, '/v1/advisor/voice/hear', { method: 'POST', body: JSON.stringify({ audio_base64, mime_type }) }, LONG_TIMEOUT_MS),
+  /** Wisp's checked answer read aloud in the person's language: a WAV, base64. */
+  voiceSpeak: (token: string, text: string) => request<{ audio_base64: string; mime_type: string }>(token, '/v1/advisor/voice/speak', { method: 'POST', body: JSON.stringify({ text }) }, LONG_TIMEOUT_MS),
   /** Proof-gated promotion (api campaign_routes.py): the consumer's sponsored card and its events. */
   sponsored: (token: string, placement: SponsoredPlacement = 'routine') => request<{ item: SponsoredItem | null }>(token, `/v1/sponsored?placement=${placement}`),
   sponsoredEvent: (token: string, campaignId: string, kind: SponsoredEventKind) => request<void>(token, `/v1/sponsored/${encodeURIComponent(campaignId)}/events`, { method: 'POST', ...json({ kind }) }),
@@ -814,7 +822,7 @@ async function advisorChatStream(
     res = await fetch(`${API_URL}${demo ? '/v1/demo/advisor/chat/stream' : '/v1/advisor/chat/stream'}`, {
       method: 'POST',
       signal,
-      headers: { ...(demo ? {} : { Authorization: `Bearer ${token}` }), 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}) },
+      headers: { ...(demo ? {} : { Authorization: `Bearer ${token}` }), 'Content-Type': 'application/json', Accept: 'text/event-stream', ...(DEV_UID ? { 'X-Dev-Uid': DEV_UID } : {}), ...langHeader() },
       body: JSON.stringify(images.length ? { messages, images } : { messages }),
     })
   } catch (e) {

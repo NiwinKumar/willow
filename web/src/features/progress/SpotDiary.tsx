@@ -564,7 +564,7 @@ function PhotoMap({ place, tracks, selected, onPick }: { place: Placed; tracks: 
                   onPick(tr)
                 }
               }}
-              className="cursor-pointer animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both] outline-none"
+              className="cursor-pointer animate-[wDotIn_.45s_cubic-bezier(.2,.8,.2,1)_both] outline-none focus-visible:[filter:drop-shadow(0_0_0_2px_var(--focus-ring))_drop-shadow(0_0_3px_var(--focus-ring))]"
               style={{ animationDelay: `${150 + Math.min(i, 30) * 30}ms`, transformBox: 'fill-box', transformOrigin: 'center' }}
             >
               <circle cx={x} cy={y} r={Math.max(r * 2, 6 * k)} fill="transparent" />

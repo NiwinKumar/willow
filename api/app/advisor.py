@@ -566,7 +566,9 @@ def chat(
         "Write the reply to the last USER message as blocks, answer first. Product ids (in "
         "[product:ID], products blocks, product widgets and product_ids): only ids from TOOL "
         "RESULTS or the routine in CONTEXT that you actually recommend or discuss. "
-        "follow_up_suggestions: up to 3 short questions the person might ask next."
+        "follow_up_suggestions: 3 short follow-up questions (under 8 words each) that build on "
+        "this reply: about a product, reading, finding or step you just named, or the next "
+        "thing to check. Written as the person would ask them. Never generic questions."
         + (
             f"\nThe last USER message came with {len(images)} attached photo(s), above. "
             "photos_show: what they show."
