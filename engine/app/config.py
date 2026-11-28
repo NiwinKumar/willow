@@ -315,14 +315,20 @@ FRAME_WORKERS = int(os.environ.get("ENGINE_FRAME_WORKERS", "2"))
 CV_THREADS = int(os.environ.get("ENGINE_CV_THREADS", "2"))  # cv2.setNumThreads at startup
 
 # Redness overlay (overlays/redness.png, engine 0.3.4): where the camera sees more red than
-# this person's own skin median, on the skin the redness metric measures (face: cheeks and
-# nose; cheek close-up: its skin), and on a session's side photo the cheek and jaw it faces
-# (Nov 27). Descriptive only: it moves no number. Drawn at the size of preview.jpg, pixel for
-# pixel. The ramp runs from the skin's own median a* (clear) to its
+# this person's own nearby skin. Face photos (Nov 28): the skin each photo measures in its
+# session, so a front photo draws the forehead, nose, around the mouth and chin (all of the
+# face when there are no side photos) and a side photo its cheek, jaw and side of the chin;
+# each pixel against the skin within OVERLAY_LOCAL_MM. Cheek close-up: its skin against its
+# median. Descriptive only: it moves no number. Drawn at the size of preview.jpg, pixel for
+# pixel. The ramp runs from the skin's own median (clear) to its
 # OVERLAY_HIGH_PCT percentile, but over at least OVERLAY_MIN_SPAN_A a* units, so an even
 # face's camera noise is not stretched into a full-strength map.
 OVERLAY_SMOOTH_MM = 1.0  # Gaussian sigma: pores and grain out, a 3 mm red patch stays
 OVERLAY_HIGH_PCT = 98.0
+# The layer draws each pixel's a* against the skin within about this distance (pipeline_face
+# _local_a): an area redder or more shaded as a whole is not painted as a block, and the marks
+# do not depend on skin tone or light. 25 mm keeps a cheek-sized patch (15 mm thinned it).
+OVERLAY_LOCAL_MM = 25.0
 OVERLAY_MIN_SPAN_A = 4.0
 OVERLAY_ALPHA = (0.0, 0.7)  # opacity at the median (skin left as it is) and at the top
 # ramp colours in CIELAB (L*, a*, b*), interpolated in Lab so lightness falls evenly. Rose to
