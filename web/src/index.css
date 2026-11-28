@@ -494,9 +494,12 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
 
 /* Page morph (components/shell/morph.ts): the page making room for Wisp or the sidebar. Each card in view is
    its own shared element: its box glides and resizes to its new place on the panel's spring curve, and its
-   contents (drawn at the box's width) cross-fade early and quickly from the old layout to the new one, so the
-   double image is brief and nothing jumps. The cut to the card's rounded box keeps a taller old layout from
-   showing below it. The rest of the page (headings, gaps) cross-fades in place, unscaled. Closing is a
+   contents (drawn at the box's width) hand over from the old layout to the new one in a short, steep swap
+   (80ms, both on the same curve: the pair is blended plus-lighter, so the card's surface stays solid while
+   its two images trade places). Both copies of its text are legible together for a frame or two at the
+   very start, before the box has moved; through the slide (a card passing another) there is one copy, the new
+   one, with no fading ghost of the old. The cut to the card's rounded box keeps a taller old layout
+   from showing below it. The rest of the page (headings, gaps) hands over in place, unscaled. Closing is a
    little quicker, like the panel. */
 ::view-transition-group(willow-page),
 ::view-transition-group(*.willow-card) {
@@ -516,11 +519,11 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
 }
 ::view-transition-old(willow-page),
 ::view-transition-old(*.willow-card) {
-  animation: 180ms ease-out both vt-fade-out;
+  animation: 80ms cubic-bezier(.45, 0, .55, 1) both vt-fade-out;
 }
 ::view-transition-new(willow-page),
 ::view-transition-new(*.willow-card) {
-  animation: 180ms ease-out both vt-fade-in;
+  animation: 80ms cubic-bezier(.45, 0, .55, 1) both vt-fade-in;
 }
 :root[data-morph="close"]::view-transition-group(willow-page),
 :root[data-morph="close"]::view-transition-group(*.willow-card) {
@@ -529,6 +532,20 @@ html[data-touring] dialog::backdrop { backdrop-filter: none !important; -webkit-
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
+}
+/* The grain (body::before) lies over everything, cards included. Left in the page's root snapshot it would sit
+   under the moving cards, so every card would draw a shade lighter for the morph and darken in one frame as it
+   ends: while a morph runs it is its own layer, painted last (it is the last thing the page paints), so it
+   stays on top. It never moves: no animation, and one image (old and new are the same grain). */
+:root[data-morph] body::before {
+  view-transition-name: willow-grain;
+}
+::view-transition-group(willow-grain),
+::view-transition-new(willow-grain) {
+  animation: none;
+}
+::view-transition-old(willow-grain) {
+  display: none;
 }
 /* Wisp's panel and button stay live through the morph (their own transitions keep playing), above the cards. */
 ::view-transition-group(wisp-panel),

@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -121,16 +121,32 @@ function Frame({ children, busy, fit = false }: { children: ReactNode; busy?: bo
 /**
  * Home fills the screen when the window is a desktop one at least 640px tall (760px with goals) and the cards sit in one row
  * (the grid at least 960px wide: narrower, with Wisp open beside a laptop-sized page, the cards stack in
- * pairs and the page scrolls as before). Tells the shell to drop its bottom padding while it does.
+ * pairs and the page scrolls as before), and every column under the hero holds its cards at their least
+ * height (below). Tells the shell to drop its bottom padding while it does.
+ *
+ * The least height is each card's own: a card that grows with its column keeps its header, its foot and room
+ * for one row of its list (cards.tsx), a card that doesn't keeps its natural height. When a column can't hold
+ * its cards at that (measured after every render and whenever a card changes size), Home scrolls instead, and
+ * keeps scrolling until the page is wider or the window taller than when it didn't fit (never flipping back
+ * and forth at one size). Measured in a layout effect, so the switch lands before paint (and inside a page
+ * morph's update: components/shell/morph.ts).
+ *
+ * The Wisp button sits over the bottom-right corner of the last column: the card there (whichever it is) keeps
+ * its content left of the button, by that much more padding on its right (HomeBody).
  */
-function useFitScreen(dense: boolean) {
+function useFitScreen(dense: boolean, wispOpen: boolean) {
   // A person with goals has six cards under the hero: they need a taller window (760px) to fit without
   // squeezing every list to one row; fewer cards fit from 640px.
   const tall = useMediaQuery(`(min-width: 900px) and (min-height: ${dense ? 760 : 640}px)`)
   const [width, setWidth] = useState(0)
+  const [vh, setVh] = useState(() => (typeof window === 'undefined' ? 900 : window.innerHeight))
+  const [blocked, setBlocked] = useState<{ w: number; h: number } | null>(null)
+  const [corner, setCorner] = useState<number | null>(null)
+  const grid = useRef<HTMLDivElement | null>(null)
   const ro = useRef<ResizeObserver | null>(null)
   const gridRef = useCallback((el: HTMLDivElement | null) => {
     ro.current?.disconnect()
+    grid.current = el
     if (!el) return
     // flushSync: when Wisp or the sidebar moves the page (a view transition, components/shell/morph.ts), the
     // switch between fitted and scrolling lands before the transition captures the new layout, so it is
@@ -139,10 +155,15 @@ function useFitScreen(dense: boolean) {
     // the page (main) around the grid: its full width, padding included
     if (el.parentElement) ro.current.observe(el.parentElement)
   }, [])
+  useEffect(() => {
+    const onResize = () => setVh(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   // The grid's width once fitted (its side padding is clamp(16px, 2vw, 32px) then, 3vw scrolling): measured on
   // the page itself, so being fitted or not never changes the answer.
   const fitPad = Math.min(32, Math.max(16, (typeof window === 'undefined' ? 1440 : window.innerWidth) * 0.02))
-  const fit = tall && width - 2 * fitPad >= 960
+  const fit = tall && width - 2 * fitPad >= 960 && !(blocked && width <= blocked.w && vh <= blocked.h)
   useLayoutEffect(() => {
     if (!fit) return
     const html = document.documentElement
@@ -151,7 +172,58 @@ function useFitScreen(dense: boolean) {
       delete html.dataset.homeFit
     }
   }, [fit])
-  return { fit, gridRef }
+  // Every render while fitted: do the columns hold their cards, and where is the Wisp button's corner? (Each
+  // state is set only when its value changed, so this settles in one pass.)
+  useLayoutEffect(() => {
+    const el = grid.current
+    if (!fit || !el) {
+      setCorner((c) => (c ? null : c))
+      return
+    }
+    const cols = Array.from(el.querySelectorAll<HTMLElement>(':scope > [data-fit-col]'))
+    const check = () => {
+      // The page may already have its new width (Wisp opening re-renders Home through the shell before the
+      // resize observer reports it): decide only on the width this render was laid out for.
+      const live = el.parentElement ? Math.round(el.parentElement.getBoundingClientRect().width) : width
+      if (live !== width) {
+        setWidth(live)
+        return
+      }
+      for (const col of cols) {
+        const last = col.lastElementChild
+        if (!last) continue
+        if (last.getBoundingClientRect().bottom > col.getBoundingClientRect().bottom + 1) {
+          setBlocked({ w: width, h: window.innerHeight })
+          return
+        }
+      }
+      const next = fabCorner(cols.at(-1)?.lastElementChild ?? null, wispOpen)
+      setCorner((c) => (c === next ? c : next))
+    }
+    check()
+    // a card that grows after this render (a font, a photo, a list re-fit) is checked again in the same frame
+    const watch = new ResizeObserver(() => flushSync(check))
+    for (const col of cols) for (const c of Array.from(col.children)) watch.observe(c)
+    return () => watch.disconnect()
+  })
+  return { fit, gridRef, corner }
+}
+
+/** Card padding that already keeps content off the card's edge (p-4). */
+const CARD_PAD = 16
+
+/** How far the Wisp button (resting, bottom right) reaches into a card from its right, with a little air, past the card's padding; null when it doesn't. */
+function fabCorner(card: Element | null, wispOpen: boolean): number | null {
+  const fab = document.querySelector<HTMLElement>('[data-wisp-fab]')
+  if (!card || !fab || wispOpen) return null
+  // its resting circle (its own scale while it hides or hops is left out)
+  const f = fab.getBoundingClientRect()
+  const size = fab.offsetWidth
+  const left = f.left + f.width / 2 - size / 2
+  const top = f.top + f.height / 2 - size / 2
+  const r = card.getBoundingClientRect()
+  if (!size || left >= r.right || top >= r.bottom) return null
+  return Math.max(0, Math.round(r.right - left + 8 - CARD_PAD))
 }
 
 function HomeBody() {
@@ -307,7 +379,7 @@ function HomeBody() {
   // together) and the baseline tile under the goals: two tall cards never share one column while another holds
   // Routine today alone, which then stretched its panels into empty space (the demo journey). Without goals (a
   // first check-in) the effect keeps the left column.
-  const { fit, gridRef } = useFitScreen(Boolean(measured && trends.length))
+  const { fit, gridRef, corner } = useFitScreen(Boolean(measured && trends.length), shell.advisorOpen)
   // A tall window has room for Routine today's full panels even when it shares its column: 940px beside the
   // baseline tile, 1100px beside the routine's effect (a person with goals).
   const roomy = useMediaQuery(`(min-height: ${measured && trends.length ? 1100 : 940}px)`)
@@ -408,12 +480,19 @@ function HomeBody() {
           <LeadCard lead={lead} />
         </div>
         {columns.map((col, i) => (
-          <div key={col[0].key} className={`flex min-w-0 flex-col gap-3.5 ${fit ? 'min-h-0' : ''} ${spans[i]}`}>
+          <div key={col[0].key} data-fit-col className={`flex min-w-0 flex-col gap-3.5 ${fit ? 'min-h-0' : ''} ${spans[i]}`}>
             {col.map((c, k) => {
               const grow = col.some((x) => x.grow) ? c.grow : k === col.length - 1
-              // Fitted: a growing card takes the column's rest (its lists show what fits), the others their own height.
+              // Fitted: a growing card takes the column's rest (its lists show what fits) but never less than its
+              // least height (no min-h-0: useFitScreen falls back to scrolling instead); the others their own height.
+              // The card under the Wisp button: its content keeps left of the button (its padding, 16px, plus how far the button reaches in).
+              const inCorner = corner && i === columns.length - 1 && k === col.length - 1
               return (
-                <div key={c.key} className={`flex min-w-0 ${fit ? (grow ? 'min-h-0' : 'min-h-0 flex-none') : grow ? 'flex-1' : ''}`} style={fit && grow ? { flex: '1 1 0' } : undefined}>
+                <div
+                  key={c.key}
+                  className={`flex min-w-0 ${fit ? (grow ? '' : 'min-h-0 flex-none') : grow ? 'flex-1' : ''} ${inCorner ? '[&>*]:pr-[calc(16px+var(--fab-x))]!' : ''}`}
+                  style={{ ...(fit && grow ? { flex: '1 1 0' } : null), ...(inCorner ? ({ '--fab-x': `${corner}px` } as CSSProperties) : null) }}
+                >
                   {c.node}
                 </div>
               )
@@ -498,6 +577,10 @@ function leadFor({
     }
   }
   const f = read.baselineFrames ?? 0
+  // Beside "Last check-in · Face · 26 Nov" a bare "Cheek close-up" chip read as the last check-in's place:
+  // the eyebrow names the last one's place, and the chip says it lists the next one's.
+  const lastLine = read.last ? `Last check-in · ${SITE_SHORT[read.last.site]} · ${shortDay(read.last.created_at)}` : undefined
+  const nextChips = placeChips.length ? [`Next: ${placeChips.join(' + ')}`] : undefined
   switch (read.person) {
     case 'new':
       return { title: 'Take your baseline', sub: `Your first check-in: ${todayLine}, by a window. ${countWord(BAND_FRAMES)} photos of each place need to pass the quality check. Later check-ins are compared with them.`, big: `0/${BAND_FRAMES}`, bigLabel: 'usable photos needed, from 5 taken', prog: 0, chips: placeChips, cta: { label: 'Start baseline', onClick: checkIn }, aura: 'coral' }
@@ -534,23 +617,23 @@ function leadFor({
     }
     case 'gap':
       return {
-        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
+        eyebrow: lastLine,
         title: 'Welcome back',
         sub: 'Your baseline still holds. One check-in picks up where you left off.',
         big: read.last ? String(daysSince(read.last.created_at)) : undefined,
         bigLabel: 'days since your last check-in',
-        chips: placeChips,
+        chips: nextChips,
         cta: { label: 'Check in now', onClick: checkIn },
         aura: 'sky',
       }
     default:
       return {
-        eyebrow: read.last ? `Last check-in · ${shortDay(read.last.created_at)}` : undefined,
+        eyebrow: lastLine,
         title: 'Your check-in',
         sub: `${cap(todayLine)}. Same window light as last time keeps results comparable.`,
         big: read.baseline ? String(daysSince(read.baseline.created_at)) : undefined,
         bigLabel: 'days since your baseline',
-        chips: placeChips,
+        chips: nextChips,
         cta: { label: 'Check in', onClick: checkIn },
         aura: 'violet',
       }

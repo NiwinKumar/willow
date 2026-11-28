@@ -4,6 +4,7 @@ import { test } from 'node:test'
 
 import type { RoutineEntry, Session } from '../src/data/types.ts'
 import { article, brandedName, checkInsSince, distinctNames, firstRead, readHome, shortName, spanOfUse } from '../src/features/home/derive.ts'
+import { scaledPlot } from '../src/features/home/trendScale.ts'
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 const session = (id: string, site: Session['site'], at: string, extra: Partial<Session> = {}) =>
@@ -80,4 +81,19 @@ test('the first read needs two weeks and two check-ins; progress never runs past
   assert.deepEqual(firstRead(1, 0), { days: 1, checkIns: 0, share: 0, daysLeft: 13 })
   assert.deepEqual(firstRead(30, 5), { days: 14, checkIns: 2, share: 1, daysLeft: 0 })
   assert.equal(firstRead(14, 1).share, 0.5) // the slower of the two
+})
+
+// --- Nov 29: a small trend never makes a tiny change look big ---
+const pts = (...v: number[]) => v.map((x, i) => ({ t: i, v: x }))
+
+test('blemishes going 7, 6, 6, 7, 6 is a ripple, not a full-height wave', () => {
+  // a count's scale covers at least four steps: one blemish is a quarter of the plot (88px between the paddings)
+  assert.deepEqual(scaledPlot(pts(7, 6, 6, 7, 6), 7, null, 100), { top: 33, height: 34 })
+  // a reading that stays inside its normal range draws the range at two thirds of the height, never all of it
+  const inRange = scaledPlot(pts(3.28, 2.93, 3.13, 3.12, 3.28), 3.28, 0.5, 100)
+  assert.equal(inRange.height, Math.round(12 + (88 * 1.0) / 1.5))
+})
+
+test('a change bigger than the least scale keeps the whole height', () => {
+  assert.deepEqual(scaledPlot(pts(13, 13.2, 17.5), 13, 0.86, 120), { top: 0, height: 120 })
 })
