@@ -214,15 +214,6 @@ export const Answer = memo(function Answer({ m, last, busy, capped, actions, que
             </span>
           ) : null}
         </div>
-        {!revealing && last && r.follow_up_suggestions.length ? (
-          <span className="flex flex-wrap gap-1.5 pt-1.5">
-            {r.follow_up_suggestions.map((f, i) => (
-              <button key={f} type="button" disabled={busy || capped} onClick={() => actions.onAsk(f)} className="min-h-10 rounded-pill border border-ink/12 bg-white/90 px-3.5 text-left text-[13px] transition-colors hover:bg-sunken" style={{ animation: `wRise .4s ${i * 80}ms both` }}>
-                {f}
-              </button>
-            ))}
-          </span>
-        ) : null}
         <Stamp at={m.at} align="left" />
       </div>
     </div>

@@ -15,6 +15,7 @@ import { api, type AdvisorStage } from '../../lib/api'
 import { toJpegBase64 } from '../../lib/image'
 import { language, setLanguage, type LangCode } from '../../lib/language'
 import { useMediaQuery } from '../../lib/useMediaQuery'
+import { GOALS, METRIC_META } from '../../lib/metrics'
 import { verdictCounts } from '../../lib/verdict'
 import { ProductSheet } from '../routine/ProductSheet'
 import { findingsOf } from '../routine/routineModel'
@@ -153,6 +154,11 @@ function ContextRows({ dots, latest, products }: { dots: string[]; latest: Sessi
 }
 
 /** Starter questions from the person's own data (no numbers in them), else plain generic ones. */
+/**
+ * A new chat's suggestions, from the person's own data so each one leads to an insight: the latest check-in,
+ * the reading that moved most beyond its normal range, the routine check's clash and gap, a product being
+ * judged, and their goals. Shown in one scrolling row (SuggestionRow), up to six.
+ */
 function useStarters(): string[] {
   const data = useData()
   const routine = useRoutine()
@@ -160,17 +166,46 @@ function useStarters(): string[] {
   return useMemo(() => {
     const out: string[] = []
     const face = data.series('face_full')?.sessions.filter(usable).at(-1)
-    if (face && !face.is_baseline) out.push(verdictCounts(face).changed > 0 ? `What changed in my ${fmtDate(face.created_at)} face check-in?` : `What does my ${fmtDate(face.created_at)} face check-in show?`)
+    if (face && !face.is_baseline) out.push(verdictCounts(face).changed > 0 ? `What changed in my ${fmtDate(face.created_at)} check-in?` : `What does my ${fmtDate(face.created_at)} check-in show?`)
+    // the reading that moved most beyond its own normal range, in words
+    const moved = (face?.result?.metrics ?? [])
+      .filter((m) => m.id !== 'tone_ita' && m.verdict === 'real_change' && m.delta != null && m.mdc95)
+      .sort((a, b) => Math.abs(b.delta! / b.mdc95!) - Math.abs(a.delta! / a.mdc95!))[0]
+    if (moved && METRIC_META[moved.id]) out.push(`Why did my ${METRIC_META[moved.id].label.toLowerCase()} change?`)
     const findings = check.data && routine.data ? findingsOf(check.data, routine.data) : []
     const conflict = findings.find((f) => f.kind === 'Conflict')
     const gap = findings.find((f) => f.kind === 'Gap')
     if (conflict) out.push(conflict.question)
     if (gap) out.push(gap.question)
-    if (!conflict && (routine.data ?? []).filter((e) => !e.ended_at).length >= 2) out.push('Is my routine OK together?')
+    const active = (routine.data ?? []).filter((e) => !e.ended_at)
+    const judged = active.find((e) => e.custom_name)
+    if (judged?.custom_name) out.push(`Is ${judged.custom_name.split(' ').slice(0, 4).join(' ')} working for me?`)
+    if (!conflict && active.length >= 2) out.push('Is my routine OK together?')
+    const goal = GOALS.find((g) => data.goals.includes(g.id))
+    if (goal) out.push(`What helps most with ${goal.label.toLowerCase()}?`)
     out.push('How should I take my next photos?')
-    if (out.length < 3) out.push('What can you help me with?')
-    return out.slice(0, 4)
+    if (out.length < 4) out.push('What can you help me with?')
+    return [...new Set(out)].slice(0, 6)
   }, [data, routine.data, check.data])
+}
+
+/**
+ * Suggested questions in one row that scrolls sideways (soft edges where it continues), so they never take
+ * more than one line: a new chat's starters, or the latest answer's follow-ups.
+ */
+function SuggestionRow({ items, disabled, label }: { items: string[]; disabled: boolean; label: string }) {
+  if (!items.length) return null
+  return (
+    <div role="group" aria-label={label} className="w-full max-w-[756px]">
+      <div className="no-scrollbar flex snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain px-1.5 py-0.5 [mask-image:linear-gradient(90deg,transparent_0,#000_14px,#000_calc(100%-24px),transparent)]">
+        {items.map((t, i) => (
+          <button key={t} type="button" disabled={disabled} onClick={() => ask(t)} className="min-h-10 shrink-0 snap-start whitespace-nowrap rounded-pill border border-ink/[.08] bg-surface/90 px-4 text-[13px] backdrop-blur-[12px] transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-white disabled:opacity-50" style={{ animation: `wRise .35s ${Math.min(i, 5) * 50}ms both` }}>
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: boolean; onExitFull?: () => void }) {
@@ -350,14 +385,13 @@ function Chat({ seed, full, onExitFull }: { seed: AdvisorSeed | null; full: bool
       </div>
 
       <div className="relative z-[2] flex flex-none flex-col items-center gap-2.5 pt-1" style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}>
-        {!started && !capped ? (
-          <div className="flex flex-wrap justify-center gap-2">
-            {starters.map((t, i) => (
-              <button key={t} type="button" onClick={() => ask(t)} className="min-h-11 rounded-pill border border-ink/[.08] bg-surface/90 px-[18px] text-[13px] backdrop-blur-[12px] transition-transform hover:-translate-y-0.5" style={{ animation: `wRise .45s ${i * 70}ms both` }}>
-                {t}
-              </button>
-            ))}
-          </div>
+        {!capped ? (
+          !started ? (
+            <SuggestionRow items={starters} disabled={busy} label="Suggested questions" />
+          ) : last?.role === 'willow' && chat.phase === 'idle' ? (
+            // the latest answer's follow-ups (Gemini writes them to build on that answer), same row
+            <SuggestionRow key={last.id} items={last.reply.follow_up_suggestions} disabled={busy} label="Follow-up questions" />
+          ) : null
         ) : null}
         <Composer busy={busy} thinking={chat.phase === 'thinking'} capped={capped} />
       </div>
