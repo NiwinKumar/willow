@@ -26,6 +26,8 @@ const PREV: Record<StepId, StepId | null> = { skin: null, goals: 'skin', care: '
 const STAGE_NAME: Record<StepId, string> = { skin: 'Question 1 of 4', goals: 'Question 2 of 4', care: 'Question 3 of 4', budget: 'Question 4 of 4', brewing: 'Brewing', profile: 'Your skin profile', routine: 'Your routine' }
 
 const EASE = [0.2, 0.8, 0.2, 1] as const
+/** How the step change moves: its direction, and whether it is a calm dissolve (into or out of the brew). */
+type Move = { d: number; calm: boolean }
 
 /**
  * The routine builder at /plan and /plan/:step: four questions (skin, goals, good to know, budget and range),
@@ -100,10 +102,12 @@ export default function Plan() {
   const go = useCallback((s: StepId, opts?: { replace?: boolean }) => navigate(`${s === 'skin' ? '/plan' : `/plan/${s}`}${search}`, opts), [navigate, search])
   const state: PlanState = useMemo(() => ({ draft, set, result, setResult, request, go, exit }), [draft, set, result, setResult, request, go, exit])
 
-  // Which way the steps move: forward slides in from the right, back from the left.
+  // Which way the steps move: forward slides in from the right, back from the left. Into and out of the
+  // brew there is no slide: the page dissolves into the dish and the dish into the profile (calm).
   const index = STEP_IDS.indexOf(step)
-  const [nav, setNav] = useState({ at: index, dir: 1 })
-  if (nav.at !== index) setNav({ at: index, dir: index > nav.at ? 1 : -1 })
+  const [nav, setNav] = useState({ at: index, dir: 1, from: index })
+  if (nav.at !== index) setNav({ at: index, dir: index > nav.at ? 1 : -1, from: nav.at })
+  const move: Move = { d: nav.dir, calm: step === 'brewing' || STEP_IDS[nav.from] === 'brewing' }
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -115,9 +119,10 @@ export default function Plan() {
   if ((step === 'profile' || step === 'routine') && !result) return <Navigate to={`/plan/brewing${search}`} replace />
 
   const variants: Variants = {
-    enter: (d: number) => (reduce ? { opacity: 0 } : { opacity: 0, x: d * 48, filter: 'blur(8px)' }),
-    center: { opacity: 1, x: 0, filter: 'blur(0px)', transition: { duration: reduce ? 0.15 : 0.42, ease: EASE } },
-    exit: (d: number) => (reduce ? { opacity: 0, transition: { duration: 0.1 } } : { opacity: 0, x: d * -36, filter: 'blur(6px)', transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }),
+    enter: ({ d, calm }: Move) => (reduce ? { opacity: 0 } : calm ? { opacity: 0, x: 0, scale: 0.97, filter: 'blur(10px)' } : { opacity: 0, x: d * 48, scale: 1, filter: 'blur(8px)' }),
+    center: ({ calm }: Move) => ({ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)', transition: { duration: reduce ? 0.15 : calm ? 0.6 : 0.42, ease: EASE } }),
+    exit: ({ d, calm }: Move) =>
+      reduce ? { opacity: 0, transition: { duration: 0.1 } } : calm ? { opacity: 0, x: 0, scale: 1.015, filter: 'blur(8px)', transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } } : { opacity: 0, x: d * -36, filter: 'blur(6px)', transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } },
   }
 
   return (
@@ -131,8 +136,8 @@ export default function Plan() {
             {params.get('next') ? 'Skip for now' : 'Close'}
           </Link>
         </header>
-        <AnimatePresence mode="wait" initial={false} custom={nav.dir}>
-          <motion.main key={step} custom={nav.dir} variants={variants} initial="enter" animate="center" exit="exit" className="relative flex min-h-0 flex-1 flex-col">
+        <AnimatePresence mode="wait" initial={false} custom={move}>
+          <motion.main key={step} custom={move} variants={variants} initial="enter" animate="center" exit="exit" className="relative flex min-h-0 flex-1 flex-col">
             {step === 'goals' ? <GoalsStep /> : step === 'care' ? <CareStep /> : step === 'budget' ? <BudgetStep /> : step === 'brewing' ? <Brewing /> : step === 'profile' ? <ProfileStep /> : step === 'routine' ? <PlanRoutineStep /> : <SkinStep />}
           </motion.main>
         </AnimatePresence>
