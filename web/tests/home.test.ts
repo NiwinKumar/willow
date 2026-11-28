@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import type { RoutineEntry, Session } from '../src/data/types.ts'
-import { article, brandedName, distinctNames, readHome, shortName, spanOfUse } from '../src/features/home/derive.ts'
+import { article, brandedName, checkInsSince, distinctNames, firstRead, readHome, shortName, spanOfUse } from '../src/features/home/derive.ts'
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 const session = (id: string, site: Session['site'], at: string, extra: Partial<Session> = {}) =>
@@ -58,4 +58,26 @@ test('use is counted in weeks as the rest of Willow counts them, and the article
   assert.equal(spanOfUse(49), 'week 8')
   assert.equal(`${article('azelaic')} azelaic night`, 'an azelaic night')
   assert.equal(`${article('glycolic')} glycolic night`, 'a glycolic night')
+})
+
+// --- Nov 28: Is your routine working? shows how far a product too new to judge is toward its first read ---
+test('check-ins since a product started count measured, non-baseline photos on its best place, up to an end day', () => {
+  const start = daysAgo(10).slice(0, 10)
+  const sessions = [
+    baseline('b', 'face_full', daysAgo(10)), // the baseline itself is never a check-in "since"
+    session('f1', 'face_full', daysAgo(7)),
+    session('f2', 'face_full', daysAgo(1)),
+    session('old', 'face_full', daysAgo(20)), // before the start
+    session('bad', 'face_full', daysAgo(3), { result: { quality: { passed: false, reasons: ['blurry'] }, frames_used: 0, metrics: [] } } as Partial<Session>),
+    session('c1', 'cheek_macro', daysAgo(2)),
+  ]
+  assert.equal(checkInsSince(start, ['face_full', 'cheek_macro'], sessions), 2)
+  assert.equal(checkInsSince(start, ['cheek_macro'], sessions), 1)
+  assert.equal(checkInsSince(start, ['face_full'], sessions, Date.parse(daysAgo(4))), 1) // the demo journey ends on its last day
+})
+
+test('the first read needs two weeks and two check-ins; progress never runs past either', () => {
+  assert.deepEqual(firstRead(1, 0), { days: 1, checkIns: 0, share: 0, daysLeft: 13 })
+  assert.deepEqual(firstRead(30, 5), { days: 14, checkIns: 2, share: 1, daysLeft: 0 })
+  assert.equal(firstRead(14, 1).share, 0.5) // the slower of the two
 })

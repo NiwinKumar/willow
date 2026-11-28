@@ -1,4 +1,5 @@
 import { DotNumber } from '../../components/willow/DotNumber'
+import { useHomeFit } from './fit'
 import { ArrowCircle } from './parts'
 
 /** The design's lead-card auras (Willow App.dc.html appVals AURA), plus a quiet grey for checks that didn't finish. */
@@ -78,11 +79,13 @@ function ScanField() {
 /** Today's check-in: one aura card whose variant comes from the person's real sessions (see Home.tsx). */
 export function LeadCard({ lead }: { lead: Lead }) {
   const a = AURA[lead.aura]
+  // Home fitted to the screen: the card follows the window's height (padding, gaps and numerals scale with it).
+  const fit = useHomeFit()
   return (
     <section
       aria-label="Today's check-in"
-      className="relative flex min-h-[260px] min-w-0 animate-[wRise_.55s_.06s_both] flex-col gap-3.5 overflow-hidden rounded-[36px] squircle text-ink transition-[background] duration-[600ms]"
-      style={{ padding: 'clamp(20px,2.4vw,28px)', background: a.bg, boxShadow: `inset 0 0 0 1px rgba(255,255,255,.35), inset 0 0 70px 18px rgba(255,255,255,.28), 0 34px 70px -46px ${a.shadow}` }}
+      className={`relative flex min-w-0 animate-[wRise_.55s_.06s_both] flex-col overflow-hidden rounded-[36px] squircle text-ink transition-[background] duration-[600ms] ${fit ? 'min-h-0 gap-[clamp(6px,1.4vh,14px)]' : 'min-h-[260px] gap-3.5'}`}
+      style={{ padding: fit ? 'clamp(14px,2.3vh,28px) clamp(20px,2.4vw,28px)' : 'clamp(20px,2.4vw,28px)', background: a.bg, boxShadow: `inset 0 0 0 1px rgba(255,255,255,.35), inset 0 0 70px 18px rgba(255,255,255,.28), 0 34px 70px -46px ${a.shadow}` }}
     >
       <span aria-hidden className="pointer-events-none absolute -top-[50px] -right-[50px] size-[220px] animate-[wBreathe_6s_ease-in-out_infinite] rounded-full blur-[8px]" style={{ background: 'radial-gradient(circle, rgba(255,255,255,.75), rgba(255,255,255,0) 68%)' }} />
       <div className="relative flex flex-wrap items-center justify-between gap-2">
@@ -102,7 +105,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
         {lead.steps ? <ScanField /> : null}
         {lead.big ? (
           <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-            <DotNumber text={lead.big} className="text-[clamp(64px,6vw,88px)] leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)]" />
+            <DotNumber text={lead.big} className={`leading-[.85] [text-shadow:0_0_30px_rgba(255,255,255,.45)] ${fit ? 'text-[clamp(40px,min(6vw,7vh),88px)]' : 'text-[clamp(64px,6vw,88px)]'}`} />
             {lead.bigLabel ? <span className="max-w-[140px] pb-1 text-[12px] leading-[1.3]">{lead.bigLabel}</span> : null}
           </div>
         ) : null}
@@ -133,10 +136,10 @@ export function LeadCard({ lead }: { lead: Lead }) {
       ) : null}
       <div className="relative flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-2">
-          <h2 className="m-0 text-[clamp(26px,2.4vw,32px)] leading-[1.02] font-normal tracking-[-0.02em]">{lead.title}</h2>
+          <h2 className={`m-0 leading-[1.02] font-normal tracking-[-0.02em] ${fit ? 'text-[clamp(21px,min(2.4vw,3.2vh),32px)]' : 'text-[clamp(26px,2.4vw,32px)]'}`}>{lead.title}</h2>
           <p className="m-0 max-w-[46ch] text-[14px] leading-[1.45]">{lead.sub}</p>
         </div>
-        {lead.cta || lead.note || lead.secondary ? (
+        {lead.cta || (lead.note && !fit) || lead.secondary ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             {lead.cta ? (
               <button
@@ -153,7 +156,8 @@ export function LeadCard({ lead }: { lead: Lead }) {
                 {lead.secondary.label}
               </button>
             ) : null}
-            {lead.note ? <span className="rounded-pill bg-white/60 px-3.5 py-2.5 text-[13px] backdrop-blur-[10px]">{lead.note}</span> : null}
+            {/* Fitted to the screen, the demo's note gives way: the demo banner over the page already says it is read-only. */}
+            {lead.note && !fit ? <span className="rounded-pill bg-white/60 px-3.5 py-2.5 text-[13px] backdrop-blur-[10px]">{lead.note}</span> : null}
           </div>
         ) : null}
       </div>

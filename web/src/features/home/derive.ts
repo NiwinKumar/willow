@@ -269,3 +269,26 @@ export function shortDay(iso: string): string {
 }
 
 export const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+/** A product gets its first read once it has been in use two weeks and has two check-ins since it started (lib/outcome.ts outcomeFor). */
+export const FIRST_READ_DAYS = 14
+export const FIRST_READ_CHECKINS = 2
+
+/**
+ * Measured check-ins since a product started, on the place that has the most of them among `sites` (the
+ * places that measure what it targets): the count lib/outcome.ts waits for before a first read. Baselines
+ * and photos that failed the quality check do not count; `asOf` ends the count (the demo journey's last day).
+ */
+export function checkInsSince(startedAt: string, sites: Site[], sessions: Session[], asOf?: number): number {
+  const start = parseDate(startedAt).getTime()
+  const end = asOf ?? Infinity
+  const counts = sites.map((site) => sessions.filter((s) => s.site === site && usable(s) && !s.is_baseline && Date.parse(s.created_at) >= start && Date.parse(s.created_at) <= end).length)
+  return counts.length ? Math.max(...counts) : 0
+}
+
+/** How far a product is toward its first read: days and check-ins, each capped at what is needed, and the share done (0 to 1, the slower of the two). */
+export function firstRead(days: number, checkIns: number): { days: number; checkIns: number; share: number; daysLeft: number } {
+  const d = Math.min(Math.max(0, days), FIRST_READ_DAYS)
+  const c = Math.min(Math.max(0, checkIns), FIRST_READ_CHECKINS)
+  return { days: d, checkIns: c, share: Math.min(d / FIRST_READ_DAYS, c / FIRST_READ_CHECKINS), daysLeft: FIRST_READ_DAYS - d }
+}

@@ -37,7 +37,13 @@ const PANEL: Record<Slot, { name: string; bg: string; fg: string; line: string; 
  * card keeps the height of its neighbour however many products are added, and the orbs shrink with the columns.
  * Past ten the names drop (they stay in the tooltip and the accessible label) so three rows still fit.
  */
-function fit(n: number): { rows: number; cols: number; px: number } {
+function fit(n: number, narrow = false): { rows: number; cols: number; px: number } {
+  // Home fitted to the screen: the two panels sit side by side in a third of the row, so more than two
+  // products wrap into two rows of smaller orbs (three past eight).
+  if (narrow) {
+    const rows = n <= 2 ? 1 : n <= 8 ? 2 : 3
+    return { rows, cols: Math.max(1, Math.ceil(n / rows)), px: rows === 3 ? 24 : 30 }
+  }
   const rows = n <= 4 ? 1 : n <= 10 ? 2 : 3
   const cols = Math.max(1, Math.ceil(n / rows))
   const px = rows === 3 ? 32 : cols <= 3 ? 48 : cols === 4 ? 42 : 36
@@ -56,7 +62,7 @@ function tipText(c: { names: string[]; fix: string | null }): string {
   return c.fix ? `${c.fix.charAt(0).toUpperCase()}${c.fix.slice(1)} for ${names}` : `${names}: see how to pair them`
 }
 
-export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflict, onRoutine, className }: {
+export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflict, onRoutine, className, compact = false }: {
   am: RoutineEntry[]
   pm: RoutineEntry[]
   used: (entryId: string, slot: Slot) => boolean
@@ -65,19 +71,23 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   conflict: { names: string[]; fix: string | null; title: string } | null
   onRoutine: () => void
   className?: string
+  /** Home fitted to the screen, sharing its column: the two panels side by side, orbs in two rows. */
+  compact?: boolean
 }) {
   const navigate = useNavigate()
+  const fitted = compact
   // The guest starter routine (api demo.py marks it): say so, and offer a real one.
   const sample = [...am, ...pm].some(isSample)
   // Two products with the same short name (two niacinamide serums) carry their brand, so they can be told apart.
   const names = distinctNames([...new Map([...am, ...pm].map((e) => [e.id, e])).values()])
   return (
-    <HomeCard label="Routine today" className={`gap-3 p-4 ${className ?? ''}`} delay={160}>
+    <HomeCard label="Routine today" className={`p-4 ${fitted ? "gap-2.5" : "gap-3"} ${className ?? ''}`} delay={160}>
       {/* Title and hint on the left; the routine check's first finding as quiet text in the right corner. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
         <div className="flex flex-wrap items-baseline gap-x-2.5">
           <h2 className="m-0 text-h3 font-normal">Routine today</h2>
-          <span className="text-caption text-ink-2">Tap a product when you use it</span>
+          {/* compact (Home fitted to the screen, sharing a column): the hint gives way; each orb says it in its label */}
+          {fitted ? null : <span className="text-caption text-ink-2">Tap a product when you use it</span>}
         </div>
         {conflict ? (
           // The routine check's first finding, said as the tip it is ("Alternate nights for Retinol and Skin
@@ -94,17 +104,18 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
         <button
           type="button"
           onClick={() => navigate('/plan')}
-          className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[22px] py-2.5 pr-2.5 pl-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,.7),0_10px_24px_-18px_rgba(122,92,255,.45)] transition-[scale,box-shadow] duration-200 ease-standard hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,.9),0_14px_28px_-16px_rgba(122,92,255,.5)] active:scale-[.985]"
+          className={`group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[22px] pr-2.5 pl-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,.7),0_10px_24px_-18px_rgba(122,92,255,.45)] transition-[scale,box-shadow] duration-200 ease-standard hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,.9),0_14px_28px_-16px_rgba(122,92,255,.5)] active:scale-[.985] ${fitted ? 'py-1.5' : 'py-2.5'}`}
           style={{ background: 'linear-gradient(115deg, #FFF0E4 0%, #FCE8F3 48%, #ECE6FF 100%)', animation: 'wRise .5s .2s both' }}
         >
-          <span aria-hidden className="grid size-10 place-items-center rounded-full bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,.9)] transition-transform duration-300 ease-standard group-hover:-translate-y-0.5">
-            <LogoMark size={26} />
+          <span aria-hidden className={`grid place-items-center rounded-full bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,.9)] transition-transform duration-300 ease-standard group-hover:-translate-y-0.5 ${fitted ? 'size-8' : 'size-10'}`}>
+            <LogoMark size={fitted ? 20 : 26} />
           </span>
+          {/* compact: one line, the sample said and the way out (the button says what it does) */}
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-[14px] font-medium text-ink">This is a sample</span>
-            <span className="text-[12.5px] leading-[1.4] text-ink-2 text-pretty">Let Willow build yours</span>
+            <span className={`font-medium text-ink ${fitted ? 'text-[13px] whitespace-nowrap' : 'text-[14px]'}`}>This is a sample</span>
+            {fitted ? null : <span className="text-[12.5px] leading-[1.4] text-ink-2 text-pretty">Let Willow build yours</span>}
           </span>
-          <span className="flex min-h-10 items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[13px] text-inverse transition-[gap] duration-200 ease-standard group-hover:gap-2">
+          <span className={`flex items-center gap-1.5 rounded-pill bg-selected px-3.5 text-[13px] whitespace-nowrap text-inverse transition-[gap] duration-200 ease-standard group-hover:gap-2 ${fitted ? 'min-h-9' : 'min-h-10'}`}>
             Build mine
             <ArrowRight size={14} strokeWidth={1.8} aria-hidden />
           </span>
@@ -117,9 +128,9 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
           const ticked = list.filter((e) => used(e.id, slot)).length
           // Due today: everything not resting on its schedule (a resting product used anyway counts too).
           const due = list.filter((e) => !restsOn(e) || used(e.id, slot)).length
-          const { rows, cols, px } = fit(list.length + (slot === 'am' && missingSunscreen ? 1 : 0))
+          const { rows, cols, px } = fit(list.length + (slot === 'am' && missingSunscreen ? 1 : 0), fitted)
           return (
-            <div key={slot} className={`relative flex min-w-0 flex-[1_1_250px] flex-col gap-2.5 overflow-hidden rounded-[24px] squircle px-3.5 pt-3.5 pb-3 ${p.fg}`} style={{ background: p.bg }}>
+            <div key={slot} className={`relative flex min-w-0 flex-col overflow-hidden rounded-[24px] squircle ${fitted ? 'flex-[1_1_116px] gap-1.5 px-3 pt-2 pb-2' : 'flex-[1_1_250px] gap-2.5 px-3.5 pt-3.5 pb-3'} ${p.fg}`} style={{ background: p.bg }}>
               <div className="flex items-baseline justify-between">
                 <span className="text-[13px] font-medium">{p.name}</span>
                 <span className="font-dot text-[17px]" aria-label={`${ticked} of ${due} used today`}>
@@ -134,7 +145,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                 <div className="relative my-auto grid justify-items-center gap-x-1 gap-y-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
                   {rows === 1 ? <span aria-hidden className="absolute h-[1.5px]" style={{ background: p.line, top: px / 2 - 1, left: `${50 / cols}%`, right: `${50 / cols}%` }} /> : null}
                   {list.map((e) => (
-                    <Orb key={e.id} entry={e} name={names.get(e.id) ?? ''} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
+                    <Orb key={e.id} entry={e} name={names.get(e.id) ?? ''} slot={slot} on={used(e.id, slot)} px={px} named={fitted ? rows === 1 : rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
                     // Named by its own visible words ("Sunscreen missing"), with where and what to do after them for
@@ -143,8 +154,8 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                       <span aria-hidden className="grid place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-white/50 text-[16px]" style={{ width: px, height: px }}>
                         +
                       </span>
-                      <span className="text-center text-[11px] leading-[1.2]">Sunscreen</span>{' '}
-                      <span className="text-[10.5px] leading-none opacity-75">Missing</span>
+                      <span className={fitted && rows > 1 ? 'sr-only' : 'text-center text-[11px] leading-[1.2]'}>Sunscreen</span>{' '}
+                      <span className={fitted && rows > 1 ? 'sr-only' : 'text-[10.5px] leading-none opacity-75'}>Missing</span>
                       <span className="sr-only"> in Morning. Find one</span>
                     </button>
                   ) : null}
