@@ -195,6 +195,7 @@ function Shell({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) =
 
       <main id="proof-main" tabIndex={-1} className="px-4 pb-24 pt-8 outline-none sm:px-6">
         <div className="mx-auto w-full max-w-[1200px]">
+          <SimulatedNotice d={d} real={filters.cohort === 'real'} />
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<SectionFallback />}>
               <div key={`${org?.id ?? ''}|${page.id}`} className="animate-[proofPage_.2s_var(--ease-standard)_both]">
@@ -612,5 +613,23 @@ function SectionTabs() {
         )}
       </Menu>
     </nav>
+  )
+}
+
+/**
+ * On every Proof page while simulated people are in the numbers (finals, Nov 28): the brand and product
+ * names are real catalog entries, their outcomes here are simulated. Said once, plainly, above every
+ * page, so no figure can be read as a real result for a named brand. Not dismissible.
+ */
+function SimulatedNotice({ d, real }: { d: Insights | null; real: boolean }) {
+  if (!d || real || !d.cohort.synthetic) return null
+  return (
+    <p role="note" className="mb-6 flex items-start gap-2.5 rounded-card border border-line bg-surface px-4 py-2.5 text-proof-small text-ink-2">
+      <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-pf-amber" />
+      <span>
+        <span className="font-medium text-ink">Simulated cohort.</span> {int(d.cohort.synthetic)} simulated people
+        {d.cohort.real ? ` and ${int(d.cohort.real)} real consented ${d.cohort.real === 1 ? 'person' : 'people'}` : ''}. Brand and product names are real catalog entries; the results shown for them are simulated, not measured outcomes of those brands.
+      </span>
+    </p>
   )
 }

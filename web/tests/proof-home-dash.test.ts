@@ -76,7 +76,7 @@ test('demand trends lead with focus goals, then the latest month; change is agai
 test('the weekly brief states only the figures it is given, in plain sentences', () => {
   const p = { total: 21, measured: 2, collecting: 0, noUsers: 14, proven: 0, promising: 0 }
   const s = weekBrief({ mix: 'brand', name: 'CeraVe', p, rate: { rate: 0.63, n: 213 }, market: { rate: 0.65, n: 9000 }, rising: null, camp: { live: 0, best: null } })
-  assert.deepEqual(s, ['2 of 21 CeraVe products are measured; none is Proven yet.', '63% of people using them saw a visible change (n=213), 2 points below the market’s 65%.'])
+  assert.deepEqual(s, ['2 of 21 CeraVe products are measured; none is Proven yet.', '63% of uses saw a visible change by week 8 (213 product uses), 2 points below the market’s 65%.'])
   const r = weekBrief({ mix: 'retailer', name: 'Northside', p: { ...p, measured: 1, proven: 1 }, rate: null, market: null, rising: demandTrends(nbm).rows[0], camp: { live: 1, best: { lift: 0.13, lo: 0.1, hi: 0.16, product: 'Glow Serum', n: 300, sample: true } } })
   assert.equal(r[0], '1 of 21 products is measured; 1 is Proven.')
   assert.equal(r[1], 'Best campaign lift: +13 pts against its holdout, for Glow Serum (a sample campaign, simulated).')
