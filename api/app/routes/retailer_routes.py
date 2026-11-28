@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app import brand_logos, limits, proof_ai, retail_intel, retailer, retailer_ask
+from app import brand_logos, campaigns, limits, proof_ai, retail_intel, retailer, retailer_ask
 from app.auth import AuthUser, current_user
 from app.routes import reminders_routes
 from app.store import Store, get_store
@@ -40,7 +40,7 @@ class AskRequest(BaseModel):
 # Errors and refusals (including "could not put together an answer") are never kept, and fresh
 # BigQuery rows (a new data version) start over.
 ANSWER_TTL_S = 3600
-_answers: dict[tuple[str, str, str, int | None], tuple[float, dict[str, Any]]] = {}
+_answers: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 
 
 def _data_version() -> int | None:
@@ -52,8 +52,12 @@ def _data_version() -> int | None:
         return None
 
 
-def _answer_key(body: AskRequest) -> tuple[str, str, str, int | None]:
-    return (" ".join(body.question.lower().split()), body.cohort, body.range, _data_version())
+def _answer_key(body: AskRequest, uid: str | None = None) -> tuple[Any, ...]:
+    """`uid`: the asker, for a question that may read their own campaigns (retailer_ask.personal):
+    that answer is theirs alone, kept under their uid and never served to someone else."""
+    q = " ".join(body.question.lower().split())
+    key = (q, body.cohort, body.range, _data_version())
+    return (*key, uid) if uid and retailer_ask.personal(q) else key
 
 
 @router.post("/ask")
@@ -61,13 +65,13 @@ def ask(
     body: AskRequest, user: AuthUser = Depends(current_user), store: Store = Depends(get_store)
 ) -> dict[str, Any]:
     """Gemini answers from the same aggregates as /insights; every number is checked."""
-    key = _answer_key(body)
+    key = _answer_key(body, user.uid)
     hit = _answers.get(key)
     if hit and time.time() - hit[0] < ANSWER_TTL_S:
         return hit[1]
     limits.take(store, user.uid, "retailer_ask")
     try:
-        data = _ask_inputs(body.cohort, body.range)
+        data = _ask_inputs(body.cohort, body.range, store, user.uid)
     except Exception as exc:
         limits.refund(store, user.uid, "retailer_ask")
         raise HTTPException(
@@ -89,9 +93,33 @@ def ask(
     return answer
 
 
-def _ask_inputs(cohort: str, range_: str) -> dict[str, Any]:
+def _ask_inputs(
+    cohort: str,
+    range_: str,
+    store: Store | None = None,
+    uid: str | None = None,
+    org_id: str | None = None,
+) -> dict[str, Any]:
+    """The aggregates, what people said, and `proof`: the Proof pages' own views, read slice by
+    slice as a question needs them (retailer_ask.Source). With `store` and `uid`, the asker's
+    campaigns too (those of `org_id` inside an organisation), as their Campaigns page shows them.
+    """
     data = retailer.insights(cohort, range_)
-    return {**data, "perception": proof_ai.perception_rows(cohort, range_)}
+
+    def mine() -> list[dict[str, Any]]:
+        owned = store.campaigns_of(uid)
+        return [
+            campaigns.view(store, cid, d)
+            for cid, d in owned
+            if org_id is None or d.get("org_id") == org_id
+        ]
+
+    known = store is not None and uid is not None
+    return {
+        **data,
+        "perception": proof_ai.perception_rows(cohort, range_),
+        "proof": retailer_ask.Source(cohort, range_, campaigns=mine if known else None),
+    }
 
 
 def warm_answer(question: str, cohort: str = "mixed", range_: str = "all") -> bool:

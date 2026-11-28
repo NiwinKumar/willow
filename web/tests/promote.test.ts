@@ -2,17 +2,17 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, nextMove, portfolioOf, reachRange, ctrText, dateRange, durationText, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
+import { answerLine, audienceText, barHeights, blockedReasons, campaignSummary, createTarget, liftWords, nextMove, orgCampaigns, portfolioOf, workspaceCampaigns, reachRange, ctrText, dateRange, durationText, exampleWhy, listText, notEligibleOrder, previewItem, promoError, runningCount, skinText, timeLeft, wilson, workspaceId, DISCLOSURE } from '../src/features/retail/promote.ts'
 
 const p = (brand: string, eligible: boolean) => ({ brand, eligible })
 
 test('the answer line counts eligible products and, in brand view, yours', () => {
   const all = [p('COSRX', true), p('COSRX', true), p('Plum', true), p('Plum', false)]
-  assert.equal(answerLine(all, null), '3 of 4 products clear the evidence bar and can be promoted.')
-  assert.equal(answerLine(all, 'COSRX'), '3 products clear the evidence bar; 2 of them are yours.')
-  assert.equal(answerLine(all, 'Plum'), '3 products clear the evidence bar; 1 of them is yours.')
-  assert.equal(answerLine(all, 'Minimalist'), '3 products clear the evidence bar; none of them are Minimalist’s yet.')
-  assert.equal(answerLine([p('Plum', true)], 'Plum'), '1 product clears the evidence bar; it is yours.')
+  assert.equal(answerLine(all, null), '3 of 4 products can be promoted (Proven, with a goal of their own to target).')
+  assert.equal(answerLine(all, 'COSRX'), '3 products can be promoted (Proven, with a goal of their own to target); 2 of them are yours.')
+  assert.equal(answerLine(all, 'Plum'), '3 products can be promoted (Proven, with a goal of their own to target); 1 of them is yours.')
+  assert.equal(answerLine(all, 'Minimalist'), '3 products can be promoted (Proven, with a goal of their own to target); none of them are Minimalist’s yet.')
+  assert.equal(answerLine([p('Plum', true)], 'Plum'), '1 product can be promoted (Proven, with a goal of their own to target); it is yours.')
   assert.equal(answerLine([p('Plum', false)], null), 'None of the 1 product clears the evidence bar yet, so nothing can be promoted.')
 })
 
@@ -196,4 +196,19 @@ test('the portfolio sums delivery and counts clear holdout results', () => {
   assert.deepEqual([p.measured, p.clear, p.collecting], [2, 1, 1])
   assert.deepEqual(p.best, { product: 'Best', lift: 0.14, id: 'z' })
   assert.equal(portfolioOf([]).ctr, null)
+})
+
+test('every surface counts the same campaigns: the organisation in use, then the workspace viewed', () => {
+  // one person, three seats: counting them all gave Home, the Campaigns header and its tab different totals
+  const c = (id: string, org_id: string | null | undefined, workspace: string, reach: number) => ({ id, org_id, workspace, status: 'active' as const, stats: { reach, impressions: reach * 2, clicks: 0, adds: 0, ctr: null, daily: [], incrementality: null, incrementality_note: '' } })
+  const all = [c('a', 'retail', 'retailer', 100), c('b', 'retail', 'CeraVe', 10), c('c', 'cerave', 'CeraVe', 40), c('d', null, 'retailer', 7)]
+  assert.deepEqual(orgCampaigns(all, 'retail').map((x) => x.id), ['a', 'b'])
+  assert.deepEqual(orgCampaigns(all, 'cerave').map((x) => x.id), ['c'])
+  assert.equal(orgCampaigns(all, null).length, 4) // legacy mode: no organisation to scope to
+  assert.equal(orgCampaigns([{ org_id: undefined }], 'retail').length, 1) // an api build without org_id
+  const listed = workspaceCampaigns(orgCampaigns(all, 'retail'), 'retailer')
+  assert.deepEqual(listed.map((x) => x.id), ['a'])
+  // people reached and times shown are different counts of the same campaigns, and the portfolio carries both
+  assert.equal(campaignSummary(listed).reach, 100)
+  assert.deepEqual([portfolioOf(listed).reach, portfolioOf(listed).impressions], [100, 200])
 })

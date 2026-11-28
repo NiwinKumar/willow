@@ -13,7 +13,8 @@ import { useData } from '../../data/useData'
 import { NO_PRICE } from '../../lib/catalog'
 import { fmtDate, fmtPrice } from '../../lib/format'
 import { METRIC_META, SITE_LABEL, fmtValue, unitOf } from '../../lib/metrics'
-import { CHANGE_WORDS, VERDICT_WORDS, changeLines, verdictCounts, wordsFor, type VerdictKind } from '../../lib/verdict'
+import { metricWord, uiWord, type AnswerLabels, type UiWord } from '../../lib/language'
+import { CHANGE_WORDS, VERDICT_WORDS, changeLines, changeWay, verdictCounts, verdictKind, wordsFor, type ChangeWay, type VerdictKind } from '../../lib/verdict'
 import { CategoryOrb } from '../routine/productUi'
 import { entryName, metaLine, slotWords } from '../routine/routineModel'
 
@@ -24,7 +25,17 @@ export type WidgetLinks = {
   onProduct: (p: Product) => void
   onAdd: (p: Product) => void
   product: (id: string) => Product | null
+  /** A translated answer's own words for measurement names, verdicts and card links (absent: English). */
+  labels?: AnswerLabels | null
 }
+
+/** Verdict and change words as keys of the answer's label set (lib/language.ts). */
+const KIND_WORD: Record<VerdictKind, UiWord> = { changed: 'beyond_range', normal: 'within_range', baseline: 'baseline', notEnough: 'not_enough', notCompared: 'not_compared' }
+const WAY_WORD: Record<ChangeWay, UiWord> = { improved: 'improved', otherWay: 'other_way', shifted: 'shifted' }
+
+/** A product as an answer carries it: `shown_price` is the one price the answer quoted (null: none checked in the person's currency). */
+export type AnswerProduct = Product & { shown_price?: { amount: number; currency: string } | null }
+export const shownPrice = (p: AnswerProduct) => (p.shown_price !== undefined ? p.shown_price : p.price)
 
 const usable = (s: Session) => s.status === 'done' && s.measured !== false && Boolean(s.result?.quality.passed)
 
@@ -47,11 +58,15 @@ function Empty({ children }: { children: ReactNode }) {
 }
 
 /** A check-in's verdicts as counts; its changes by direction ("2 improved", "1 moved the other way"). */
-function VerdictLine({ session, only }: { session: Session; only?: VerdictKind[] }) {
+function VerdictLine({ session, only, labels }: { session: Session; only?: VerdictKind[]; labels?: AnswerLabels | null }) {
   const counts = verdictCounts(session)
   const kinds = (only ?? (Object.keys(counts) as VerdictKind[])).filter((k) => counts[k] > 0)
   if (!kinds.length) return <Empty>No measurements in this check-in.</Empty>
-  const items = kinds.flatMap((k): { key: string; text: string }[] => (k === 'changed' ? changeLines(session).map((l) => ({ key: l.way, text: `${CHANGE_WORDS[l.way].glyph} ${l.text}` })) : [{ key: k, text: `${VERDICT_WORDS[k].glyph} ${counts[k]} ${VERDICT_WORDS[k].short.toLowerCase()}` }]))
+  const items = kinds.flatMap((k): { key: string; text: string }[] =>
+    k === 'changed'
+      ? changeLines(session).map((l) => ({ key: l.way, text: `${CHANGE_WORDS[l.way].glyph} ${labels ? `${l.n} ${uiWord(labels, WAY_WORD[l.way], '')}` : l.text}` }))
+      : [{ key: k, text: `${VERDICT_WORDS[k].glyph} ${counts[k]} ${uiWord(labels, KIND_WORD[k], VERDICT_WORDS[k].short.toLowerCase())}` }],
+  )
   return (
     <span className="flex flex-wrap gap-1.5">
       {items.map((it) => (
@@ -74,8 +89,12 @@ function MetricTrend({ metricId, site, links }: { metricId: MetricId; site?: Sit
   const last = sessions.at(-1)
   const lastMetric = last?.result?.metrics.find((m) => m.id === metricId)
   const where = best ? SITE_LABEL[best.site] : SITE_LABEL[sites[0]]
+  const name = metricWord(links.labels, metricId, meta.label)
+  // the verdict in the answer's language (a real change by its direction), else the app's own words
+  const kind = last && lastMetric ? verdictKind(lastMetric, last) : null
+  const verdict = last && lastMetric && kind ? uiWord(links.labels, kind === 'changed' ? WAY_WORD[changeWay(lastMetric)] : KIND_WORD[kind], wordsFor(lastMetric, last).label) : ''
   return (
-    <Frame title={`${meta.label} · ${where}`} link="Progress" onLink={() => links.go(`/progress?site=${best?.site ?? sites[0]}&metric=${metricId}`)}>
+    <Frame title={`${name} · ${where}`} link={uiWord(links.labels, 'progress', 'Progress')} onLink={() => links.go(`/progress?site=${best?.site ?? sites[0]}&metric=${metricId}`)}>
       {last && lastMetric ? (
         <span className="flex items-center gap-4">
           <span className="text-sky">
@@ -86,7 +105,7 @@ function MetricTrend({ metricId, site, links }: { metricId: MetricId; site?: Sit
               {fmtValue(lastMetric.value, lastMetric)} <span className="text-[12px] text-ink-2">{unitOf(lastMetric)}</span>
             </span>
             <span className="text-[12px] text-ink-2">
-              {wordsFor(lastMetric, last).glyph} {wordsFor(lastMetric, last).label} · {fmtDate(last.created_at)}
+              {wordsFor(lastMetric, last).glyph} {verdict} · {fmtDate(last.created_at)}
             </span>
           </span>
         </span>
@@ -101,8 +120,8 @@ function SessionSummary({ sessionId, site, links }: { sessionId: string; site?: 
   const data = useData()
   const s = sessionId === 'latest' ? [...data.all].reverse().find((x) => usable(x) && (!site || x.site === site)) : data.all.find((x) => x.id === sessionId)
   return (
-    <Frame title={s ? `${SITE_LABEL[s.site]} check-in · ${fmtDate(s.created_at)}` : 'Check-in'} link="Open" onLink={() => links.go(s ? `/result/${s.id}` : '/progress')}>
-      {s ? <VerdictLine session={s} /> : <Empty>No measured check-in yet.</Empty>}
+    <Frame title={s ? `${SITE_LABEL[s.site]} check-in · ${fmtDate(s.created_at)}` : 'Check-in'} link={uiWord(links.labels, 'open', 'Open')} onLink={() => links.go(s ? `/result/${s.id}` : '/progress')}>
+      {s ? <VerdictLine session={s} labels={links.labels} /> : <Empty>No measured check-in yet.</Empty>}
     </Frame>
   )
 }
@@ -113,7 +132,7 @@ function RoutineWidget({ slot, links }: { slot?: 'am' | 'pm'; links: WidgetLinks
   const used = log.data?.[0]?.used ?? {}
   const slots: ('am' | 'pm')[] = slot ? [slot] : ['am', 'pm']
   return (
-    <Frame title={slot ? `${slotWords([slot])} routine` : 'Your routine today'} link="Routine" onLink={() => links.go('/routine')}>
+    <Frame title={slot ? `${slotWords([slot])} routine` : 'Your routine today'} link={uiWord(links.labels, 'routine', 'Routine')} onLink={() => links.go('/routine')}>
       {routine.data ? (
         slots.map((sl) => {
           const items = activeIn(routine.data, sl)
@@ -168,14 +187,15 @@ function ProductWidget({ productId, links }: { productId: string; links: WidgetL
   const entry = routine.data?.find((e) => e.product_id === productId && !e.ended_at)
   if (!p) return null
   return (
-    <Frame title="Product" link="Details" onLink={() => links.onProduct(p)}>
+    <Frame title="Product" link={uiWord(links.labels, 'details', 'Details')} onLink={() => links.onProduct(p)}>
       <span className="flex items-center gap-3">
         <ProductThumb product={p} category={p.category} size={52} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[12px] text-ink-2">{metaLine(p.brand, p.category, p.size)}</span>
           <span className="text-[14px]">{p.name}</span>
           <span className="text-[12px] text-ink-2">
-            {p.price ? `${fmtPrice(p.price)} · checked ${fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}` : NO_PRICE}
+            {/* the price the answer was given for it (api advisor.py shown_price), in the person's currency */}
+            {shownPrice(p) ? `${fmtPrice(shownPrice(p))} · checked ${fmtDate(p.last_verified, { day: 'numeric', month: 'short', year: 'numeric' })}` : NO_PRICE}
           </span>
         </span>
       </span>
@@ -208,7 +228,7 @@ function ProductTestWidget({ links }: { links: WidgetLinks }) {
         rows.map(([label, s]) => (
           <span key={label} className="flex flex-wrap items-center gap-2">
             <span className="w-[120px] text-[12.5px]">{label}</span>
-            {s ? <VerdictLine session={s} only={['changed', 'normal', 'baseline', 'notEnough']} /> : <Empty>no check-in yet</Empty>}
+            {s ? <VerdictLine session={s} only={['changed', 'normal', 'baseline', 'notEnough']} labels={links.labels} /> : <Empty>no check-in yet</Empty>}
           </span>
         ))
       ) : (

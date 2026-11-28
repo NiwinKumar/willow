@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { actionsProvenance, actionTarget, ANCHOR, channelOf, CHANNELS, prefillSkins, sourceLabel } from '../src/features/retail/proofAi.ts'
+import { actionsProvenance, actionTarget, ANCHOR, channelOf, CHANNELS, CLAIM_TIERS, claimGap, prefillSkins, sourceLabel } from '../src/features/retail/proofAi.ts'
 
 const ID = 'the-derma-co-1-hyaluronic-sunscreen-aqua-gel-spf-50'
 
@@ -61,4 +61,15 @@ test('the campaign sheet ticks the requested skin types the evidence covers, els
   assert.deepEqual(prefillSkins(['dry', 'oily', 'sensitive'], ['sensitive']), ['sensitive'])
   assert.deepEqual(prefillSkins(['dry', 'oily'], ['sensitive']), ['dry', 'oily'])
   assert.deepEqual(prefillSkins(['dry', 'oily'], []), ['dry', 'oily'])
+})
+
+test('only a Proven product is claim-ready; anything else gets what it would take', () => {
+  assert.deepEqual([...CLAIM_TIERS], ['proven'])
+  assert.equal(claimGap({ tier: 'proven' }), '')
+  const promising = claimGap({ tier: 'promising', to_proven: 41 })
+  assert.match(promising, /once a product is Proven/)
+  assert.match(promising, /About 41 more people at week 8/)
+  assert.match(claimGap({ tier: 'promising', to_proven: 1 }), /1 more person /)
+  // an unclear product says why in the api's words (its rate is not above the comparison group)
+  assert.match(claimGap({ tier: 'unclear' }, ['No clear effect yet: its rate is not above non-users with the same goals.']), /No clear effect yet/)
 })

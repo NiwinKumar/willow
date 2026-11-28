@@ -234,7 +234,9 @@ def cohort_label(counts: dict[str, Any]) -> str:
         return "Simulated cohort"
     if counts.get("synthetic", 0) == 0:
         return "Consented users"
-    return "Mixed"
+    # never "Mixed": a handful of real people among the simulated ones must not read as real data
+    real = counts["real"]
+    return f"Simulated cohort plus {real} real {'person' if real == 1 else 'people'}"
 
 
 def build_facts(
@@ -599,10 +601,20 @@ def _metric_words(pid: str) -> str:
     return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " or " + words[-1]
 
 
+def _article(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
 def _evidence(f: Facts, pid: str) -> list[dict[str, Any]]:
-    """Claim-ready statements: measured, cosmetic, observational; numbers only from the row."""
-    row, segs = _stats(f, pid)["row"], _segments(f, pid)
-    if row["tier"] == "too_few":
+    """Claim-ready statements: measured, cosmetic, observational; numbers only from the row.
+    Only a Proven product has any (the tier, which includes false-discovery control): a claim on a
+    Promising or unclear product would rest on a difference that may be chance. Every statement
+    of a rate carries the comparison group's rate and both group sizes, and is only made where
+    the product's users did better than that group (finals, Nov 28: a statement was listed at
+    n=19, another where non-users did better, and the comparator was missing from the goals)."""
+    s = _stats(f, pid)
+    row, segs = s["row"], _segments(f, pid)
+    if row["tier"] != "proven":
         return []
     label = cohort_label(f.cohort)
 
@@ -618,33 +630,37 @@ def _evidence(f: Facts, pid: str) -> list[dict[str, Any]]:
             "caveat": CAVEAT,
         }
 
-    out = []
-    base = (
-        f" (non-users with the same goals {_pct(row['base_rate'])}%)"
-        if row["base_rate"] is not None
-        else ""
-    )
-    out.append(
+    def lifted(cells: list[dict[str, Any]], attr: str) -> list[dict[str, Any]]:
+        """Shown cells whose rate is above their own comparison group's, with that group's n."""
+        out = []
+        for c in cells:
+            if c["suppressed"] or c["base_rate"] is None or c["rate"] <= c["base_rate"]:
+                continue
+            metrics = _goal_metrics(c["id"], pid) if attr == "goal" else s["metrics"]
+            base_n, _ = _base_nk(f, pid, metrics, f.group(attr, c["id"]))
+            out.append({**c, "base_n": base_n})
+        return out
+
+    out = [
         item(
             "efficacy",
             "efficacy",
             f"Measured in {row['n']} Willow users: {_pct(row['rate'])}% had a visible change in "
-            f"{_metric_words(pid)} held to week 8{base}. {label}.",
+            f"{_metric_words(pid)} held to week 8, against {_pct(row['base_rate'])}% of "
+            f"{s['base_n']} people with the same goals who do not use it. {label}.",
             row["n"],
         )
-    )
-    for g in sorted(
-        (c for c in segs["goal"] if not c["suppressed"]), key=lambda c: (-c["n"], c["id"])
-    )[:2]:
-        vs = f" (non-users {_pct(g['base_rate'])}%)" if g["base_rate"] is not None else ""
+    ]
+    for g in sorted(lifted(segs["goal"], "goal"), key=lambda c: (-c["n"], c["id"]))[:2]:
         goal = g["label"].lower()
-        article = "an" if goal[:1] in "aeiou" else "a"
         out.append(
             item(
                 f"efficacy_{g['id']}",
                 "efficacy",
-                f"Measured in {g['n']} Willow users with {article} {goal} goal: "
-                f"{_pct(g['rate'])}% had a visible change held to week 8{vs}. {label}.",
+                f"Measured in {g['n']} Willow users with {_article(goal)} {goal} goal: "
+                f"{_pct(g['rate'])}% had a visible change held to week 8, against "
+                f"{_pct(g['base_rate'])}% of {g['base_n']} people with that goal who do not use "
+                f"it. {label}.",
                 g["n"],
             )
         )
@@ -659,23 +675,21 @@ def _evidence(f: Facts, pid: str) -> list[dict[str, Any]]:
                 wins,
             )
         )
-    lifted = [
-        c
-        for c in segs["skin"]
-        if not c["suppressed"] and c["base_rate"] is not None and c["rate"] > c["base_rate"]
-    ]
-    if lifted:
-        c = max(lifted, key=lambda c: (c["rate"] - c["base_rate"], c["n"]))
+    skins = lifted(segs["skin"], "skin_type")
+    if skins:
+        c = max(skins, key=lambda c: (c["rate"] - c["base_rate"], c["n"]))
+        skin = c["label"].lower()
         out.append(
             item(
                 f"segment_{c['id']}",
                 "segment",
-                f"Measured in {c['n']} Willow users with {c['label'].lower()} skin: "
-                f"{_pct(c['rate'])}% had a visible change held to week 8 (non-users with "
-                f"{c['label'].lower()} skin {_pct(c['base_rate'])}%). {label}.",
+                f"Measured in {c['n']} Willow users with {skin} skin: {_pct(c['rate'])}% had a "
+                f"visible change held to week 8, against {_pct(c['base_rate'])}% of "
+                f"{c['base_n']} people with {skin} skin who do not use it. {label}.",
                 c["n"],
             )
         )
+    # how many kept using it: a share of its own users, so there is no comparison group
     out.append(
         item(
             "retention",
@@ -1941,6 +1955,11 @@ def facts(
         while len(_facts) > FACTS_KEEP:  # the least recently used filter goes first
             del _facts[next(iter(_facts))]
         return f, version, today
+
+
+def loaded(cohort_: str = "mixed", range_: str = "all") -> bool:
+    """This filter's facts are in memory (any day): a view of them answers without BigQuery."""
+    return (cohort_, range_) in _facts
 
 
 def rebuild_day(cohort_: str = "mixed", range_: str = "all") -> None:

@@ -13,8 +13,10 @@ is "unknown" ("Not checked yet"), never "clear".
 
 import json
 import re
+from collections import OrderedDict
 from functools import lru_cache
 from pathlib import Path
+from threading import Lock
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -150,6 +152,7 @@ def _compiled(pattern: str) -> re.Pattern[str]:
     return re.compile(pattern, re.I)
 
 
+@lru_cache(maxsize=32768)
 def _forms(name: str) -> tuple[str, str]:
     """The name as written (lower case) and without its brackets: "melaleuca alternifolia (tea
     tree) leaf oil" also reads "melaleuca alternifolia leaf oil"; "retinol(0.1%)" reads
@@ -162,6 +165,21 @@ def _forms(name: str) -> tuple[str, str]:
 def _term(term: str, forms: tuple[str, str]) -> bool:
     pat = _compiled(rf"(?<![a-z]){re.escape(term)}(?![a-z])")
     return any(pat.search(f) for f in forms)
+
+
+@lru_cache(maxsize=4096)
+def _any_of(terms: tuple[str, ...]) -> re.Pattern[str] | None:
+    """One pattern for a rule's whole term list (the same match as _term for each term in turn,
+    in one pass over the name instead of one per term)."""
+    if not terms:
+        return None
+    alternatives = "|".join(re.escape(t) for t in terms)
+    return re.compile(rf"(?<![a-z])(?:{alternatives})(?![a-z])", re.I)
+
+
+def _any_term(terms: list[str], forms: tuple[str, str]) -> bool:
+    pat = _any_of(tuple(terms))
+    return pat is not None and any(pat.search(f) for f in forms)
 
 
 def _pct_text(pct: Any) -> str:
@@ -191,7 +209,7 @@ def _hits(rule: Rule, product: dict[str, Any]) -> list[str]:
         out = []
         for a in actives:
             forms = _forms(a["name"])
-            if not any(_term(t, forms) for t in terms):
+            if not _any_term(terms, forms):
                 continue
             pct = a.get("pct")
             if m.pct_min is not None and (pct is None or float(pct) < m.pct_min):
@@ -204,7 +222,7 @@ def _hits(rule: Rule, product: dict[str, Any]) -> list[str]:
         return [
             raw
             for raw, forms in inci_forms
-            if any(_term(t, forms) for t in terms)
+            if _any_term(terms, forms)
             or any(_compiled(r).search(f) for r in regexes for f in forms)
         ]
 
@@ -330,11 +348,36 @@ def flags(product: dict[str, Any], profile: dict[str, Any] | None) -> list[dict[
     return sorted(out.values(), key=lambda f: (f["level"] != "avoid", f["grade"], f["rule"]))
 
 
-def _not_sold(product: dict[str, Any], market: str | None) -> bool:
+def _not_sold_uncached(product: dict[str, Any], market: str | None) -> bool:
     if market in regulatory.MARKETS:
         return regulatory.classify(product, market) in ("rx", "pharmacy")
     # unknown market: only what is a medicine everywhere
     return all(regulatory.classify(product, m) in ("rx", "pharmacy") for m in regulatory.MARKETS)
+
+
+# How a product is sold in a market does not depend on the person, so every person's check
+# shares it. Someone with no market set (a new guest) is classified in every market: about
+# 12 ms a product, which made a 60-product check take seconds (Nov 28).
+_sold: dict[tuple[str, str | None], tuple[dict[str, Any], bool, dict[str, Any]]] = {}
+_SOLD_KEEP = 100_000
+
+
+def _sold_as(product: dict[str, Any], market: str | None) -> tuple[bool, dict[str, Any]]:
+    """(not sold as a cosmetic there, regulatory.of), kept per catalog product and market."""
+    pid = product.get("product_id")
+    hit = _sold.get((pid, market)) if pid else None
+    if hit is not None and hit[0] is product:
+        return hit[1], dict(hit[2])
+    not_sold, reg = _not_sold_uncached(product, market), regulatory.of(product, market)
+    if pid:
+        if len(_sold) >= _SOLD_KEEP:
+            _sold.clear()
+        _sold[(pid, market)] = (product, not_sold, reg)
+    return not_sold, dict(reg)
+
+
+def _not_sold(product: dict[str, Any], market: str | None) -> bool:
+    return _sold_as(product, market)[0]
 
 
 def _check_without_label(
@@ -351,9 +394,9 @@ def _check_without_label(
             "regulatory": None,
             "explanation": NO_LABEL,
         }
-    reg = regulatory.of(product, market)
+    not_sold, reg = _sold_as(product, market)
     return {
-        "status": "not_sold" if _not_sold(product, market) else "unknown",
+        "status": "not_sold" if not_sold else "unknown",
         "flags": [],
         "regulatory": reg if reg["class"] != "cosmetic" else None,
         "explanation": NO_LABEL,
@@ -365,11 +408,51 @@ def has_label(product: dict[str, Any]) -> bool:
     return bool(product.get("inci"))
 
 
+# Checks already made, per product and profile (the profile's own content is the key, so a
+# changed profile simply asks again). Home, the routine and Wisp ask about the same products on
+# every load; a repeat is a dictionary read instead of the whole rule table (Nov 28: 3 s).
+_CHECK_KEEP = 20_000
+_checked: OrderedDict[tuple[str, str | None, str], tuple[dict[str, Any], dict[str, Any]]] = (
+    OrderedDict()
+)
+_checked_lock = Lock()
+
+
+def _copy(result: dict[str, Any]) -> dict[str, Any]:
+    """A caller may add to its answer; the kept one stays as it was made."""
+    reg = result.get("regulatory")
+    return {
+        **result,
+        "flags": [dict(f) for f in result["flags"]],
+        "regulatory": dict(reg) if isinstance(reg, dict) else reg,
+    }
+
+
 def check(
     product: dict[str, Any], profile: dict[str, Any] | None, market: str | None = None
 ) -> dict[str, Any]:
     """{status, flags, regulatory}, plus `explanation` when there is no ingredient list.
-    `market` overrides the profile's."""
+    `market` overrides the profile's. Kept per product and profile (see _checked)."""
+    pid = product.get("product_id")
+    if not pid:
+        return _check(product, profile, market)
+    key = (pid, market, json.dumps(profile, sort_keys=True, default=str))
+    with _checked_lock:
+        hit = _checked.get(key)
+        if hit is not None and hit[0] is product:  # the same catalog object, not a newer one
+            _checked.move_to_end(key)
+            return _copy(hit[1])
+    result = _check(product, profile, market)
+    with _checked_lock:
+        _checked[key] = (product, result)
+        while len(_checked) > _CHECK_KEEP:
+            _checked.popitem(last=False)
+    return _copy(result)
+
+
+def _check(
+    product: dict[str, Any], profile: dict[str, Any] | None, market: str | None = None
+) -> dict[str, Any]:
     market = market or (profile or {}).get("market")
     if not has_label(product):
         return _check_without_label(product, profile, market)
@@ -382,7 +465,7 @@ def check(
         status = "check"
     else:
         status = "clear"
-    return {"status": status, "flags": found, "regulatory": regulatory.of(product, market)}
+    return {"status": status, "flags": found, "regulatory": _sold_as(product, market)[1]}
 
 
 def is_complete(profile: dict[str, Any] | None) -> bool:

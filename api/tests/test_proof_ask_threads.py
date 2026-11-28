@@ -284,3 +284,24 @@ def test_the_fallback_instance_reads_as_a_demo():
     assert inst["label"] == "Demo catalog · every brand"
     northside = TestClient(app).get("/v1/proof/instance?slug=northside").json()["instance"]
     assert northside["name"] == "Northside Beauty" and northside["label"] is None
+
+
+def test_a_campaign_question_reads_the_askers_own_campaigns_and_is_not_shared(
+    gemini_says, monkeypatch
+):
+    from app.routes import retailer_routes
+
+    calls: list[tuple] = []
+    real = retailer_routes._ask_inputs
+
+    def spy(cohort, range_, store=None, uid=None, org_id=None):
+        calls.append((uid, org_id))
+        return real(cohort, range_, store, uid, org_id)
+
+    monkeypatch.setattr(retailer_routes, "_ask_inputs", spy)
+    a, b = _as("ask-camp-a"), _as("ask-camp-b")
+    _join(a, "minimalist")
+    _join(b, "minimalist")
+    _ask(a, "minimalist", "How did our last campaign do?")
+    _ask(b, "minimalist", "How did our last campaign do?")
+    assert calls == [("ask-camp-a", "minimalist"), ("ask-camp-b", "minimalist")]

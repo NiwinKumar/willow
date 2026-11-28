@@ -37,7 +37,10 @@ ROUTINE_CHECK_RETRY_S = 60  # the rules-only fallback: Gemini is asked again aft
 def list_samples() -> dict[str, Any]:
     return {
         "samples": [
-            {**s.model_dump(exclude={"frames", "order"}), "n_frames": len(s.frames)}
+            {
+                **s.model_dump(exclude={"frames", "order", "source_session"}),
+                "n_frames": len(s.frames),
+            }
             for s in demo.samples()
         ]
     }
@@ -53,6 +56,16 @@ def start_sample(
     s = demo.sample(sample_id)
     if s is None:
         raise HTTPException(404, {"code": "not_found", "message": "sample not found"})
+    if not demo.ready_to_run(store, user.uid, s):
+        first = demo.sample(s.after or "")
+        raise HTTPException(
+            409,
+            {
+                "code": "run_first_sample",
+                "message": f"Run “{first.title if first else 'the first sample'}” first: it "
+                "becomes the baseline this one is compared with.",
+            },
+        )
     limits.take(store, user.uid, "sample_runs")
     try:
         session_id = demo.create_sample_session(store, user.uid, s)

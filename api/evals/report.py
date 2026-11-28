@@ -32,6 +32,7 @@ JOB_NAMES = {
     "routine_check": "Routine check",
     "proof_claims": "Proof claim drafts",
     "retailer_ask": "Retailer Ask",
+    "retailer_ask_seats": "Ask, brand and retailer seats",
 }
 
 

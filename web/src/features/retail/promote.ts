@@ -32,17 +32,22 @@ export function listText(items: string[]): string {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-/** The section's one-line answer: how many products clear the bar, and (brand view) how many are this brand's. */
+/**
+ * The section's one-line answer: how many products can be promoted, and (brand view) how many are this brand's.
+ * The bar is said in full (Proven, and a goal of its own above the comparison group), because it can be one or two
+ * fewer than the count of Proven products shown on Home and Products.
+ */
+const BAR = 'can be promoted (Proven, with a goal of their own to target)'
 export function answerLine(all: Pick<PromoEligibility, 'eligible' | 'brand'>[], brand: string | null): string {
   const eligible = all.filter((p) => p.eligible)
   const e = eligible.length
   if (brand === null) {
     if (!e) return `None of the ${plural(all.length, 'product')} clears the evidence bar yet, so nothing can be promoted.`
-    return `${e} of ${plural(all.length, 'product')} ${e === 1 ? 'clears' : 'clear'} the evidence bar and can be promoted.`
+    return `${e} of ${plural(all.length, 'product')} ${BAR}.`
   }
   const mine = eligible.filter((p) => p.brand === brand).length
   if (!e) return 'No product clears the evidence bar yet, so nothing can be promoted.'
-  const head = `${plural(e, 'product')} ${e === 1 ? 'clears' : 'clear'} the evidence bar`
+  const head = `${plural(e, 'product')} ${BAR}`
   if (!mine) return `${head}; none of them are ${brand}’s yet.`
   return `${head}; ${mine === e ? (e === 1 ? 'it is' : 'all of them are') : `${mine} of them ${mine === 1 ? 'is' : 'are'}`} yours.`
 }
@@ -83,6 +88,20 @@ export function wilson(k: number, n: number): [number, number] | null {
   const h = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d
   const r = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 100) / 100
   return [r(c - h), r(c + h)]
+}
+
+/**
+ * The campaigns every Proof surface counts and lists: the ones made under the organisation in use. A person who
+ * tried several seats owns each seat's campaigns (samples included); counting them all gave Home, the Campaigns
+ * header and its tab three different totals. No organisation (legacy mode) or an api build without `org_id`: all.
+ */
+export function orgCampaigns<T extends Pick<Campaign, 'org_id'>>(list: T[], orgId: string | null | undefined): T[] {
+  return orgId ? list.filter((c) => c.org_id === undefined || c.org_id === orgId) : list
+}
+
+/** Of those, the ones in the workspace being viewed ('retailer' or the brand's name): what Home and Campaigns total. */
+export function workspaceCampaigns<T extends Pick<Campaign, 'workspace'>>(list: T[], wsId: string | null): T[] {
+  return list.filter((c) => c.workspace === wsId)
 }
 
 /** Running campaigns count against the cap (ended, paused and sample ones don't, as campaigns.active_count). */
@@ -232,7 +251,7 @@ export function runDay(c: Pick<Campaign, 'status' | 'days' | 'starts_at' | 'ends
 export function funnelSteps(s: Pick<Campaign['stats'], 'impressions' | 'clicks' | 'adds'>): { id: 'impressions' | 'clicks' | 'adds'; label: string; value: number; share: number | null }[] {
   const of = s.impressions
   return [
-    { id: 'impressions', label: 'Card shown', value: s.impressions, share: of ? 1 : null },
+    { id: 'impressions', label: 'Times card shown', value: s.impressions, share: of ? 1 : null },
     { id: 'clicks', label: 'Clicked through', value: s.clicks, share: of ? s.clicks / of : null },
     { id: 'adds', label: 'Added to routine', value: s.adds, share: of ? s.adds / of : null },
   ]
@@ -310,6 +329,9 @@ export function ownRecordInsight(row: { rate: number | null; base_rate: number |
 
 /** The portfolio at a glance (Campaigns, P2B): the delivery funnel summed over campaigns, and the holdout results. */
 export type Portfolio = {
+  /** People shown the card, each once per campaign (campaignSummary's reach: the figure Home and the header give); null on an api build without it. */
+  reach: number | null
+  /** Times the card was shown (a person counts once a day), so it is larger than reach. */
   impressions: number
   clicks: number
   adds: number
@@ -335,6 +357,7 @@ export function portfolioOf(cs: Pick<Campaign, 'id' | 'status' | 'stats' | 'prod
   const measured = cs.filter((c) => c.stats.incrementality)
   const top = [...measured].sort((a, b) => b.stats.incrementality!.lift - a.stats.incrementality!.lift)[0]
   return {
+    reach: campaignSummary(cs).reach,
     impressions,
     clicks,
     adds,

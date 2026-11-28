@@ -95,17 +95,21 @@ const PHOTO_CHECKS: { label: string; bad: QualityReason[] }[] = [
   { label: 'Steady pose', bad: ['pose_out_of_range', 'face_not_found', 'occlusion_suspected'] },
 ]
 
-/** Last photos: how the latest check-in's photos came out (photos used, the four capture checks) and one tip for the next one. */
+/** Last photos: how a check-in's photos came out (photos used, the capture checks that apply to its kind) and one tip for the next one. */
 export function PhotosTile({ session, onOpen, className = '' }: { session: Session; onOpen: () => void; className?: string }) {
   const q = session.result?.quality
   const frames = q?.per_frame ?? []
   const total = frames.length || session.result?.frames_used || 0
   const used = session.result?.frames_used ?? 0
   const reasons = new Set<QualityReason>([...(q?.reasons ?? []), ...frames.flatMap((f) => f.reasons)])
-  if (q && !q.card_detected) reasons.add('card_not_found')
-  const checks = PHOTO_CHECKS.map((c) => ({ label: c.label, ok: !c.bad.some((r) => reasons.has(r)) }))
-  const first = PHOTO_CHECKS.flatMap((c) => c.bad).find((r) => reasons.has(r))
-  const tip = (first && qualityCopy(first, session.site)?.text) ?? 'All four checks passed. The same spot, light and time next check-in keeps readings comparable.'
+  // A colour card belongs to calibrated (RAW) check-ins only: a camera photo never has one, and is never
+  // told it is missing.
+  const calibrated = session.capture_mode === 'calibrated_raw'
+  if (calibrated && q && !q.card_detected) reasons.add('card_not_found')
+  const asked = PHOTO_CHECKS.filter((c) => calibrated || c.label !== 'Colour card')
+  const checks = asked.map((c) => ({ label: c.label, ok: !c.bad.some((r) => reasons.has(r)) }))
+  const first = asked.flatMap((c) => c.bad).find((r) => reasons.has(r))
+  const tip = (first && qualityCopy(first, session.site)?.text) ?? `All ${checks.length === 4 ? 'four' : 'three'} checks passed. The same spot, light and time next check-in keeps readings comparable.`
   const place = SITE_SHORT[session.site] ?? 'Check-in'
   return (
     <button

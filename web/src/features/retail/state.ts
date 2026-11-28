@@ -17,7 +17,8 @@ export const RANGES: { value: Range; label: string; caps: string }[] = [
 ]
 export const COHORTS: { value: Cohort; label: string }[] = [
   { value: 'simulated', label: 'Simulated' },
-  { value: 'mixed', label: 'Mixed' },
+  // the api's `mixed` value; never called "Mixed" on screen (ui/cohort.ts mixedLabel adds the real count)
+  { value: 'mixed', label: 'Simulated + real' },
   { value: 'real', label: 'Real only' },
 ]
 /** The api's defaults: every row, all time. */

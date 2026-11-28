@@ -66,3 +66,14 @@ export function useLanguage(): LangCode {
     () => 'en',
   )
 }
+
+/**
+ * The fixed words an answer leans on, in the answer's own language: measurement names and the verdict and
+ * card labels drawn around Wisp's words (api app/translate.py `labels`, sent with each translated answer).
+ * English answers carry none, and the app's own words are used.
+ */
+export type AnswerLabels = { metrics: Record<string, string>; ui: Record<string, string> }
+export type UiWord = 'within_range' | 'beyond_range' | 'not_compared' | 'baseline' | 'not_enough' | 'improved' | 'other_way' | 'shifted' | 'progress' | 'open' | 'routine' | 'details' | 'no_flags' | 'check_this'
+
+export const uiWord = (labels: AnswerLabels | null | undefined, key: UiWord, english: string): string => labels?.ui[key] ?? english
+export const metricWord = (labels: AnswerLabels | null | undefined, id: string, english: string): string => labels?.metrics[id] ?? english

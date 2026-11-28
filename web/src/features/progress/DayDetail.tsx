@@ -11,6 +11,8 @@ import { Sheet } from '../../components/ui/Sheet'
 import { Disclaimer } from '../../components/willow/Disclaimer'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import { useOwner } from '../../data/hooks'
+import { useCheckin } from '../../data/useCheckin'
+import { nextScheduled } from '../../lib/schedule'
 import { SITE_ORDER, stalled } from '../../data/live'
 import type { Metric, MetricId, RoutineEntry, Session } from '../../data/types'
 import { useData } from '../../data/useData'
@@ -31,6 +33,7 @@ import { Page, StatusCard, TomorrowSheet } from './parts'
 import { PhotoFrame } from './PhotoFrame'
 import { PhotoPanel } from './PhotoPanel'
 import { RejectedPhotos, UnmeasuredPhotos } from './photos'
+import { SampleNext } from './SampleNext'
 import { useAnyPhotoLoads } from './useImageStatus'
 import { NOTE_DOT, productName, rejectNote, sessionNotes } from './timeline'
 import { useSessionView } from './useSessionView'
@@ -107,10 +110,13 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
       )
   }
 
-  // "Same time tomorrow?" once after a face check-in (the check-in flow lands on ?from=check-in).
+  // "Same time next week?" once after a face check-in of the person's own (the check-in flow lands on
+  // ?from=check-in). Never after a sample run: those are someone else's photos, with no next check-in.
   const [tomorrow, setTomorrow] = useState(false)
   const fromCheckIn = params.get('from') === 'check-in'
-  const face = shown.find((s) => s.site === 'face_full') ?? null
+  const face = shown.find((s) => s.site === 'face_full' && !s.sample_id) ?? null
+  const schedule = useCheckin()
+  const nextCheckIn = useMemo(() => (schedule ? nextScheduled(schedule, new Date(), true) : null), [schedule])
   useEffect(() => {
     if (!fromCheckIn) return
     let seen: string[] = []
@@ -202,10 +208,16 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
         ...baselines.map((s) => ({ g: 'baseline' as const, t: `${placeOf(s)}: your starting point` })),
       ]
     : baselines.length
-      ? [
-          { g: 'baseline', t: multi && baselines.length < shown.length ? `${baselines.map(placeOf).join(', ')}: your starting point` : 'Your starting point' },
-          { g: null, t: 'Later days compare with this one' },
-        ]
+      ? baselines.every((s) => s.sample_id)
+        ? [
+            // sample photos (someone else's skin): the baseline of the sample runs, never the person's own
+            { g: 'baseline', t: 'Sample baseline: measured, nothing to compare yet' },
+            { g: null, t: 'The second sample is compared with this one' },
+          ]
+        : [
+            { g: 'baseline', t: multi && baselines.length < shown.length ? `${baselines.map(placeOf).join(', ')}: your starting point` : 'Your starting point' },
+            { g: null, t: 'Later days compare with this one' },
+          ]
       : states.every((x) => x.st === 'rejected')
         ? [{ g: 'notCompared', t: 'Not measured' }]
         : [{ g: 'notCompared', t: firstState === 'former' ? 'An earlier baseline, not compared' : firstState === 'pending' ? 'Still measuring' : firstState === 'failed' ? 'Did not finish measuring' : 'Not measured' }]
@@ -220,14 +232,16 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
         ? 'reading moved beyond your normal range'
         : 'readings moved beyond your normal range'
     : baselines.length
-      ? 'photos in your baseline'
+      ? baselines.every((s) => s.sample_id)
+        ? 'photos in the sample baseline'
+        : 'photos in your baseline'
       : states.every((x) => x.st === 'rejected')
         ? 'usable photos'
         : 'not compared'
 
   const started = entries.filter((e) => e.started_at.slice(0, 10) === day)
   // What else was different (asked at face check-ins): shown on the day of a measured face check-in.
-  const faceCheckIn = shown.find((s) => s.site === 'face_full' && s.live && s.status === 'done') ?? null
+  const faceCheckIn = shown.find((s) => s.site === 'face_full' && s.live && s.status === 'done' && !s.sample_id) ?? null
   const notes = [
     ...started.map((e) => ({
       text: `Started ${productName(e)}`,
@@ -272,6 +286,8 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
   const measureAgain = (s: Session) => navigate(`/check-in?session=${s.id}`, { state: { background: location } })
   // Under the insights: what to do next. "Check in again" once for the day, not once per place.
   const nextFor = (s: Session, st: string, first: boolean): ReactNode[] => {
+    // Sample photos: the next step is the next sample (a comparison), or the person's own check-in.
+    if (s.sample_id && (st === 'baseline' || st === 'compared')) return first ? [<SampleNext key="s" session={s} onOwn={checkIn} />] : []
     const again = (text: string) =>
       first ? [
         <NextAction key="c" onClick={checkIn}>
@@ -508,7 +524,7 @@ export function DayDetail({ day, byDay, entries }: { day: string; byDay: Map<str
           shell.openAdvisor(metricQuestion(m, sheetSession, sheetBase), `${METRIC_META[m.id].label} · ${fmtDate(sheetSession.created_at)}`)
         }}
       />
-      <TomorrowSheet open={tomorrow} onClose={() => setTomorrow(false)} />
+      <TomorrowSheet open={tomorrow} onClose={() => setTomorrow(false)} next={nextCheckIn} />
     </Page>
   )
 }

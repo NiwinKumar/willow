@@ -187,7 +187,8 @@ export function counts(s: Session): Record<VerdictKind, number> & { values: numb
 
 /** The current baseline of a site and mode. */
 export function currentBaseline(sessions: Session[], mode: CaptureMode): Session | null {
-  return sessions.find((s) => s.is_baseline && s.capture_mode === mode) ?? null
+  // the person's own baseline; a sample run's baseline (someone else's photos) only when there is no other
+  return sessions.find((s) => s.is_baseline && s.capture_mode === mode && !s.sample_id) ?? sessions.find((s) => s.is_baseline && s.capture_mode === mode) ?? null
 }
 
 /** Session label in lists: "15 Oct 2026, 13:59 · baseline · not usable". */
@@ -224,6 +225,8 @@ export function siteHasSpots(site: Site): boolean {
 
 /** A session can become the baseline when it was analysed, measured and passed the quality check (api 409 otherwise). */
 export function canBeBaseline(s: Session): boolean {
+  // never a sample run: those are someone else's photos
+  if (s.sample_id) return false
   const st = sessionState(s)
   return st === 'compared' || st === 'former'
 }

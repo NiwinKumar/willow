@@ -34,6 +34,12 @@ export function weeksAfter(day: string, weeks: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** "a" or "an" before a number said aloud: an 8-week, an 11-product, an 18-week; a 7-week. */
+export function aNum(n: number): 'a' | 'an' {
+  const s = String(Math.round(Math.abs(n)))
+  return s.startsWith('8') || ((s.startsWith('11') || s.startsWith('18')) && s.length % 3 === 2) ? 'an' : 'a'
+}
+
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }

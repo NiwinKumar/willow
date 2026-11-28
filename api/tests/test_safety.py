@@ -247,3 +247,32 @@ def test_sunscreen_gap_with_any_active_and_azelaic_duplicates(entries, why):
     assert why in found["gaps"][0]["why"]
     if len(entries) == 2:
         assert found["duplicates"][0]["active"] == "azelaic acid"
+
+
+def test_a_repeated_check_is_answered_from_the_kept_one_and_follows_the_profile(monkeypatch):
+    """Home, the routine and Wisp ask about the same products on every load (Nov 28: 3 s each)."""
+    from app import regulatory, safety
+
+    product = {
+        "product_id": "kept-1",
+        "category": "serum",
+        "name": "Serum",
+        "inci": ["Aqua", "Parfum"],
+        "key_actives": [],
+    }
+    calls = []
+    real = regulatory.classify
+    monkeypatch.setattr(regulatory, "classify", lambda p, m: calls.append(m) or real(p, m))
+    first = safety.check(product, None)
+    asked = len(calls)
+    assert asked > 0
+    again = safety.check(product, None)
+    assert again == first and len(calls) == asked  # no second pass over the rules or markets
+    again["flags"].append("mine")  # a caller's change never reaches the kept answer
+    assert safety.check(product, None) == first
+    # another person: the market classification is shared, their own flags are their own
+    avoids = safety.check(product, {"avoid": ["fragrance"], "reactive": False})
+    assert len(calls) == asked and avoids["status"] != first["status"]
+    # a newer catalog object under the same id is checked again
+    newer = {**product, "inci": ["Aqua"]}
+    assert safety.check(newer, {"avoid": ["fragrance"], "reactive": False})["status"] == "clear"

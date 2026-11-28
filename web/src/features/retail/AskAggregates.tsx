@@ -12,7 +12,7 @@ import { useCompetitorNames } from './orgData'
 import { fallbackSuggestions, proofApi, type AskThread, type OrgAnswer } from './proofApi'
 import { COHORTS, RANGES } from './state'
 import type { Filters, Insights } from './types'
-import { BrandLogo, cohortKind, copyText, Menu, MenuDivider, MIN_GROUP, SidePanel } from './ui'
+import { BrandLogo, cohortKind, copyText, Menu, MenuDivider, MIN_GROUP, mixedLabel, SidePanel } from './ui'
 
 /*
  * Ask: a chat over the same aggregates as the screen (GEMINI_SPEC §6). Gemini writes, the api checks every number
@@ -39,6 +39,8 @@ import { BrandLogo, cohortKind, copyText, Menu, MenuDivider, MIN_GROUP, SidePane
 const MIN_Q = 3
 const MAX_Q = 300
 
+/** What the api adds to an answer since the sliced Ask (api retailer_ask.py): why nothing was given, the tables read, who drew the chart. */
+type AskExtras = { reason?: 'not_tracked' | 'individual' | 'policy' | 'names_hidden' | 'no_draft' | null; checks: (NonNullable<RetailerAnswer['checks']> & { read?: string[]; chart_by?: 'model' | 'code' | null }) | null }
 type Turn = { id: number; q: string; reply?: RetailerAnswer; error?: { title: string; message: string } }
 type LocalThread = { id: string; title: string; updated_at: string; turns: { q: string; reply?: RetailerAnswer }[] }
 
@@ -201,7 +203,7 @@ export function AskAggregates({ d, filters, scope = '', focusBrand = null, prefi
   }, [])
   useEffect(() => {
     if (!busy) return
-    const t = window.setTimeout(() => setSlow(true), 12_000)
+    const t = window.setTimeout(() => setSlow(true), 8_000)
     return () => {
       window.clearTimeout(t)
       setSlow(false)
@@ -432,7 +434,7 @@ export function AskAggregates({ d, filters, scope = '', focusBrand = null, prefi
                   <span key={delay} className="size-1.5 rounded-full bg-ink-2 animate-[wBounce_1.1s_infinite]" style={{ animationDelay: `${delay}s` }} />
                 ))}
               </span>
-              <span className="text-proof-small text-ink-2">{slow ? 'Still checking the numbers: an answer can take up to a minute.' : 'Reading the aggregates…'}</span>
+              <span className="text-proof-small text-ink-2">{slow ? 'Still checking the numbers: this one is taking longer than usual.' : 'Reading the tables this question needs…'}</span>
             </div>
           ) : null}
           <div ref={end} />
@@ -497,15 +499,23 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled, onRe
   }, [done])
 
   const kind = cohortKind(d.cohort)
-  const checked = reply.checks
+  const { reason, checks: checked } = reply as RetailerAnswer & AskExtras
   const refused = reply.refused ?? !checked
   const chart = refused ? null : reply.chart
   const sources = reply.source ?? []
-  const prov = !checked
-    ? 'Validator: no draft used only numbers from the aggregates · no numbers returned'
-    : refused
-      ? `Policy · aggregates only · n≥${MIN_GROUP} · ${checked.model}`
-      : `From ${sources.length ? sources.map((x) => x.replace(/_/g, ' ')).join(', ') : 'the retailer aggregates'} · n≥${MIN_GROUP} · ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''} · ${checked.model}`
+  // Why nothing was given: a rule in code (not tracked, names hidden) reads as policy, never as a failed check.
+  const prov =
+    reason === 'not_tracked'
+      ? 'Policy · Proof measures skin outcomes; sales, revenue, prices and stock are not tracked · no model call'
+      : reason === 'individual'
+        ? `Policy · Proof shows groups of ${MIN_GROUP} or more, never one person · no model call`
+        : reason === 'names_hidden'
+        ? 'Policy · other brands stay anonymised for brand teams · no numbers returned'
+        : !checked
+          ? 'Validator: no draft used only numbers from the aggregates · no numbers returned'
+          : refused
+            ? `Policy · aggregates only · n≥${MIN_GROUP} · ${checked.model}`
+            : `From ${sources.length ? sources.map((x) => x.replace(/_/g, ' ')).join(', ') : 'the retailer aggregates'} · n≥${MIN_GROUP} · ${checked.numbers_checked} ${checked.numbers_checked === 1 ? 'number' : 'numbers'} checked against the aggregates${checked.rejected_attempts ? ` · ${checked.rejected_attempts} ${checked.rejected_attempts === 1 ? 'draft' : 'drafts'} rejected first` : ''}${chart && checked.chart_by === 'code' ? ' · chart drawn from the same rows' : ''} · ${checked.model}`
   const copy = async () => {
     const ok = await copyText(`${reply.answer}\n\n— Proof by Willow, ${kind} aggregates (${prov})`, 'Answer copied')
     if (!ok) return
@@ -517,7 +527,7 @@ function Answer({ d, reply, reveal, onRevealed, followUps, onAsk, disabled, onRe
       <div className="flex flex-col gap-2 rounded-card border border-line bg-pf-bg2 p-3.5">
         <span className="flex items-center gap-1.5 text-proof-small font-medium text-ink-2">
           <Sparkles size={13} strokeWidth={1.7} aria-hidden className="text-proof-leaf" />
-          {refused ? 'No numbers returned' : `Gemini, from the ${kind === 'real' ? 'real-people' : kind} aggregates`}
+          {refused ? 'No numbers returned' : `Gemini · ${kind === 'real' ? 'Real people' : mixedLabel(d.cohort)}`}
         </span>
         <p className="m-0 text-proof-answer text-ink [text-wrap:pretty]">
           <span className="sr-only">{reply.answer}</span>

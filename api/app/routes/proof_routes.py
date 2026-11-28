@@ -98,8 +98,10 @@ def get_me(
 ) -> dict[str, Any]:
     """The caller's memberships (of one instance when given); current = the one used last."""
     rows = proof_orgs.memberships(store, user.uid, instance)
-    # the org in use first: older memberships get their sample campaigns (once) on the way in
-    proof_orgs.ensure_samples(store, user.uid, rows[:1])
+    # Every membership, not only the one used last: the web remembers its own pick of org, so
+    # an older portfolio on any of them would still be shown (CeraVe "2 live" with no Proven
+    # product, Nov 28). Once per membership and version.
+    proof_orgs.ensure_samples(store, user.uid, rows)
     current = {"org_id": rows[0]["org_id"], "role": rows[0]["role"]} if rows else None
     return {"memberships": [proof_orgs.member_view(m) for m in rows], "current": current}
 
@@ -845,13 +847,16 @@ def org_ask(
         tuple(history),
         retailer_routes._data_version(),
     )
+    # a question that may read the asker's own campaigns is theirs alone
+    if retailer_ask.personal(question):
+        key = (*key, m.uid, m.org_id)
     hit = _answers.get(key)
     if hit and time.time() - hit[0] < ASK_TTL_S:
         answer = hit[1]
     else:
         limits.take(store, m.uid, "retailer_ask")
         try:
-            data = retailer_routes._ask_inputs(body.cohort, body.range)
+            data = retailer_routes._ask_inputs(body.cohort, body.range, store, m.uid, m.org_id)
         except Exception as exc:
             limits.refund(store, m.uid, "retailer_ask")
             raise HTTPException(503, retailer_routes.UNAVAILABLE) from exc

@@ -47,7 +47,9 @@ OVERCLAIM = re.compile(
     re.I,
 )
 SAID = re.compile(r"\b(said|say|says|agreed|reported|self-reported|told us)\b", re.I)
-CLAIMS_TIERS = ("proven", "promising")
+# Claims only on Proven (retail_intel._evidence gives no statements below it): a Promising lift
+# may still be chance, so there is nothing to draft from, only what it would take.
+CLAIMS_TIERS = ("proven",)
 PERCEPTION_MIN = 0.5
 # the evidence pack's caveat says no self-reported results are included; drafts may cite one
 CLAIMS_CAVEAT = (
@@ -122,6 +124,9 @@ to week 8) and possibly one self-reported line. Write 3 drafts for CHANNEL, each
 - Each draft lists in sources the ids of the statements it rests on (1 to 3).
 - Use only numbers that appear in those statements, exactly as written there. Keep each number
   with what it counts: a percent with its group ("78% of 46 Willow users"), never a bare percent.
+- A rate is never quoted without its comparison: when a statement says "against B% of M people",
+  a draft that uses its rate also gives B% and both group sizes ("44% of 50 users, against 39% of
+  1200 people with the same goals who do not use it").
 - Measured wording: "had a visible change", "measured in N Willow users". The self-reported line
   may only be used as what people said ("said it is working for them"), never as a measurement,
   and never in the same sentence as a measured number.
@@ -130,6 +135,21 @@ to week 8) and possibly one self-reported line. Write 3 drafts for CHANNEL, each
   dermatologist-approved, miracle, instant, permanent, 100%, everyone, anti-ageing, any skin
   condition or disease name, or anything about skin tone or lightness.
 - Cosmetic, observational, plain British English. Stay within the channel's length."""
+
+
+# A rate with its comparison group, as retail_intel._evidence writes it: n, rate, base rate, base n.
+COMPARED = re.compile(r"Measured in (\d+) Willow users[^:]*: (\d+)% .*? against (\d+)% of (\d+) ")
+
+
+def _drops_comparison(text: str, cited: list[dict[str, Any]]) -> bool:
+    """The draft quotes a statement's rate without the comparison group's rate and both group
+    sizes: "44% of 50" alone reads as an effect when the comparison group had 39%."""
+    said = numbers.in_text(text)
+    for c in cited:
+        m = COMPARED.search(c["text"]) if c["measured"] else None
+        if m and m.group(2) in said and not set(m.groups()) <= said:
+            return True
+    return False
 
 
 def _draft_problem(d: Draft, src: dict[str, dict[str, Any]], limit: int) -> str | None:
@@ -143,6 +163,8 @@ def _draft_problem(d: Draft, src: dict[str, dict[str, Any]], limit: int) -> str 
         return "a number that is not in its statements"
     if OVERCLAIM.search(text) or BANNED.search(text):
         return "an overclaim or banned word"
+    if _drops_comparison(text, cited):
+        return "a rate without its comparison group's rate and both group sizes"
     said = [c for c in cited if not c["measured"]]
     if said and not SAID.search(text):
         return "self-reported result written as a measurement"
@@ -182,11 +204,18 @@ def claims(view: dict[str, Any], channel: str) -> dict[str, Any]:
         "export_note": None if who["kind"] == "real" else EXPORT_REFUSED,
     }
     if row["tier"] not in CLAIMS_TIERS or not any(s["measured"] for s in src):
+        need = row.get("to_proven")
         return base | {
             "drafts": [],
             "source": "none",
-            "blocked": "Claims need a Proven or Promising product: the evidence does not show a "
-            "visible change above non-users yet.",
+            "blocked": "Claims need a Proven product: a visible change above people with the "
+            "same goals who do not use it, clear of chance."
+            + (
+                f" About {need} more {'person' if need == 1 else 'people'} at week 8 would "
+                "get it there if the rates hold."
+                if need
+                else ""
+            ),
         }
     by_id = {s["id"]: s for s in src}
     payload = {

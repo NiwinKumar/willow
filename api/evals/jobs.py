@@ -9,6 +9,7 @@ person would have seen.
 import base64
 import copy
 import json
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -340,37 +341,90 @@ def run_proof_claims(case: dict[str, Any], r: CaseResult) -> None:
 # ── Ask the retailer data (retailer_ask.ask) ───────────────────────────────────────────────
 
 
-def product_names(insights: dict[str, Any]) -> list[str]:
-    rows = [*insights.get("products", []), *(insights.get("product_outcomes") or {}).values()]
-    return sorted({p["product"] for p in rows} | {f"{p['brand']} {p['product']}" for p in rows})
-
-
-def run_retailer_ask(case: dict[str, Any], r: CaseResult) -> None:
-    insights = data("insights.json")
-    view = retailer_ask.view(insights)
+def _score_ask(
+    case: dict[str, Any],
+    r: CaseResult,
+    insights: dict[str, Any],
+    scope: retailer_ask.Scope,
+) -> None:
+    """Run Ask as the product does and score it against the tables it actually sent (the
+    question's slices, masked for the seat): retailer_ask.prepare is the same code ask() runs."""
+    question = case["question"]
+    ready = retailer_ask.prepare(question, insights, scope)
+    r.info.append(f"read={','.join(ready.read)} prompt_chars={len(ready.prompt)}")
     try:
-        out = retailer_ask.ask(case["question"], insights)
+        out = retailer_ask.ask(question, insights, scope)
     except retailer_ask.Unavailable:
         r.source, r.answer_calls = "error", _answers("retailer_ask")
         r.notes.append("Gemini unavailable")
         return
     first = _first("retailer_ask")
     r.answer_calls = _answers("retailer_ask")
-    r.first_try_pass = first is not None and not retailer_ask.problems(
-        first, view, case["question"]
+    slips = first is not None and retailer_ask.problems(
+        retailer_ask._tidy(first, ready.data, scope), ready.data, ready.question, scope
     )
+    r.first_try_pass = first is not None and not slips
+    if slips:
+        r.info.append(f"first draft: {'; '.join(slips)} :: {first.answer[:300]}")
     r.final_pass = out["checks"] is not None
-    r.source = "model" if r.final_pass else "fallback"
+    # a refusal decided in code (sales, revenue; one person) is the fixed reply, by design
+    in_code = out.get("reason") in ("not_tracked", "individual")
+    r.source = "model" if r.final_pass else "refusal" if in_code else "fallback"
+    bars = (out["chart"] or {}).get("bars") or []
     shown = [out["answer"], *out["follow_ups"], (out["chart"] or {}).get("title", "")]
     shown = [s for s in shown if s]
-    r.shown = (" | ".join(shown) + (" [chart]" if out["chart"] else ""))[:400]
+    r.shown = (" | ".join(shown) + (f" [chart: {len(bars)} bars]" if bars else ""))[:700]
+    names = product_names(ready.data)
     if r.final_pass:
-        allowed = numbers.collect(view) | numbers.percents(view)
-        r.invented_numbers = unknown_numbers(shown, allowed)
-        r.wording = wording_slips(shown, product_names(insights))
-    if case.get("expect") == "refuse" and not (out["refused"] and not out["chart"]):
+        allowed = numbers.collect(ready.data) | numbers.percents(ready.data)
+        # "9,751 people" is 9751: thousands separators are not decimals
+        r.invented_numbers = unknown_numbers(
+            [retailer_ask.plain_numbers(s) for s in shown], allowed
+        )
+        r.wording = wording_slips(shown, names)
+    refused = bool(out["refused"]) and not out["chart"]
+    if case.get("expect") == "refuse" and not refused:
         r.notes.append("expected a refusal")
-    r.notes += must_not(shown, case.get("must_not", []))
+    if case.get("expect") == "answer" and (out["refused"] or not r.final_pass):
+        r.notes.append("expected an answer, got a refusal")
+    if case.get("chart") and not bars:
+        r.notes.append("expected a chart")
+    for pattern in case.get("must", []):
+        if not any(re.search(pattern, s, re.I) for s in [*shown, *(b["label"] for b in bars)]):
+            r.notes.append(f"missing: {pattern}")
+    r.notes += must_not([*shown, *(b["label"] for b in bars)], case.get("must_not", []))
+    if scope.masked:
+        r.notes += [
+            f"names another brand: {n}"
+            for n in retailer_ask.named_others([*shown, *(b["label"] for b in bars)], scope)
+        ]
+    voice = [c for c in out["follow_ups"] if retailer_ask._ASSISTANT_VOICE.search(c)]
+    r.notes += [f"chip in the assistant's voice: {c}" for c in voice]
+
+
+def product_names(tables: dict[str, Any]) -> list[str]:
+    """Product names in the tables that were sent (with and without the brand): a name such as
+    "Acne Pimple Master Patch" is not a claim about a person."""
+    out: set[str] = set()
+    for hits in retailer_ask._named_rows(tables).values():
+        for _, row in hits:
+            if isinstance(row.get("product"), str):
+                out |= {row["product"], f"{row.get('brand') or ''} {row['product']}".strip()}
+    return sorted(out, key=len, reverse=True)
+
+
+def run_retailer_ask(case: dict[str, Any], r: CaseResult) -> None:
+    _score_ask(case, r, data("insights.json"), retailer_ask.Scope())
+
+
+def run_retailer_ask_seats(case: dict[str, Any], r: CaseResult) -> None:
+    """The seat cases: a brand's team (other brands' names hidden, as the retailer's default
+    policy) or the retailer, over the frozen Proof views (evals/data/ask_pack.json)."""
+    pack = data("ask_pack.json")
+    brand = case.get("brand") if case["seat"] == "brand" else None
+    scope = retailer_ask.scope_for(brand, True) if brand else retailer_ask.Scope()
+    source = retailer_ask.Source(frozen=pack, campaigns=lambda: pack["campaigns"][brand or ""])
+    _score_ask(case, r, {**pack["insights"], "proof": source}, scope)
 
 
 JOBS: dict[str, Callable[[dict[str, Any], CaseResult], None]] = {
@@ -380,6 +434,7 @@ JOBS: dict[str, Callable[[dict[str, Any], CaseResult], None]] = {
     "routine_check": run_routine_check,
     "proof_claims": run_proof_claims,
     "retailer_ask": run_retailer_ask,
+    "retailer_ask_seats": run_retailer_ask_seats,
 }
 
 

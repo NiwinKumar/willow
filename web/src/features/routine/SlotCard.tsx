@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { useSetRoutineUse } from '../../data/hooks'
 import type { RoutineEntry, Session } from '../../data/types'
 import { ApiError, localDay } from '../../lib/api'
-import { fmtDate } from '../../lib/format'
+import { aNum, fmtDate } from '../../lib/format'
 import { METRIC_META } from '../../lib/metrics'
 import { outcomeFor } from '../../lib/outcome'
 import { CHANGE_WORDS } from '../../lib/verdict'
@@ -121,7 +121,7 @@ export function SlotCard({ slot, entries, ticked, sessions, clock = null, checks
                   {/* on the evening panel the chip's translucent colours sit on white, so they read the same as in the morning */}
                   {check ? <span className={`inline-flex rounded-pill ${t.dark ? 'bg-white' : ''}`}><ProductChecked check={check} /></span> : null}
                   {dueDay ? (
-                    <span className="opacity-75" title={`A ${due!.weeks}-week window for ${due!.active.toLowerCase()}, from the start date.`}>
+                    <span className="opacity-75" title={`${aNum(due!.weeks) === 'an' ? 'An' : 'A'} ${due!.weeks}-week window for ${due!.active.toLowerCase()}, from the start date.`}>
                       {dueDay <= today ? 'Verdict window passed' : `Verdict due ${fmtDate(dueDay)}`}
                     </span>
                   ) : null}

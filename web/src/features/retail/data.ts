@@ -66,7 +66,7 @@ export function gapTier(g: Gap): { tier: Tier; reason: 'missing' | 'low' | 'thin
 
 const COHORT_LINE: Record<CohortKind, string> = {
   simulated: 'SIMULATED EVIDENCE',
-  mixed: 'MIXED COHORT',
+  mixed: 'SIMULATED EVIDENCE WITH A FEW REAL USERS',
   real: 'REAL CONSENTED USERS',
 }
 

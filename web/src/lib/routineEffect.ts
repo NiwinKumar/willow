@@ -16,4 +16,4 @@ const deps: EffectDeps = {
 }
 
 /** The app's routine effect: lib/effect.ts wired to the real outcome rule, concern map and metric wording. */
-export const routineEffect = (entries: RoutineEntry[], sessions: Session[], check: RoutineCheck | undefined) => effectOf(entries, sessions, check, deps)
+export const routineEffect = (entries: RoutineEntry[], sessions: Session[], check: RoutineCheck | undefined, now?: number) => effectOf(entries, sessions, check, deps, now)

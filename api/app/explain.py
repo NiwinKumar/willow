@@ -112,9 +112,10 @@ def item(metric: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
     quoted: list[str] = []
     # one number at most (the size of a real change), the rest in words
     if verdict == "no_baseline" and delta is not None:
+        # no direction words: the reading is not judged yet (the rule Gemini is held to, problems())
         summary = (
-            f"{label}: {since_start(metric, delta)}{trend}. Your baseline needs more photos before "
-            "Willow can say if this is a real change."
+            f"{label}{trend}: your baseline needs more photos before Willow can say if this is a "
+            "real change."
         )
     elif verdict == "no_baseline" and first_reading:
         summary = f"{label}: first reading. Future photos are compared to it."
@@ -155,7 +156,80 @@ RETAKE = {
 RETAKE_DEFAULT = "Retake in the same light, holding the phone steady."
 
 
+# Everyday names for a sentence that lists several readings ("redness, blemishes and dark spots").
+PLAIN_NAME = {
+    "tone_ita": "skin tone",
+    "pigment_spots": "dark spots",
+    "tone_evenness": "tone evenness",
+    "dark_circles": "under-eye",
+}
+# Named first on a starting point: the marks people most often follow.
+MARKS_FIRST = ("redness", "blemishes", "pigment_spots")
+BASELINE_HEADLINE = "This is your baseline"
+BASELINE_STEP = "Later check-ins are compared with this one: take them in the same spot and light."
+MAX_BASELINE_ITEMS = 3
+# From this many readings that held within the usual range, the template names them in one item.
+SAME_GROUP_MIN = 3
+
+
+def plain_name(metric: dict[str, Any]) -> str:
+    return PLAIN_NAME.get(metric["id"]) or label_of(metric).lower()
+
+
+def _listed(names: list[str]) -> str:
+    """'redness', 'redness and blemishes', 'redness, blemishes and dark spots'."""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+def is_starting_point(result: dict[str, Any], first_reading: bool) -> bool:
+    """A baseline session: photos that passed, nothing compared with anything yet."""
+    metrics = result["metrics"]
+    return bool(
+        first_reading
+        and metrics
+        and result["quality"]["passed"]
+        and all(m["verdict"] in ("no_baseline", "low_quality") for m in metrics)
+        and all(m.get("delta") is None for m in metrics)
+    )
+
+
+def baseline_template(result: dict[str, Any]) -> dict[str, Any]:
+    """A baseline in one headline and at most three sentences: the readings are grouped, never
+    one "first reading" line per metric (nine near-identical sentences, Nov 28)."""
+    metrics = result["metrics"]
+    read = [m for m in metrics if m["verdict"] == "no_baseline" and m.get("value") is not None]
+    unread = [m for m in metrics if m not in read]
+    marks = sorted(
+        (m for m in read if m["id"] in MARKS_FIRST), key=lambda m: MARKS_FIRST.index(m["id"])
+    )
+    rest = [m for m in read if m["id"] not in MARKS_FIRST]
+    if not marks:
+        marks, rest = rest, []
+    items = []
+    if marks:
+        names = _listed([plain_name(m) for m in marks])
+        items.append((marks[0], f"Your starting point for {names} is recorded."))
+    if rest:
+        names = _listed([plain_name(m) for m in rest])
+        names = names[0].upper() + names[1:]
+        items.append((rest[0], f"{names} {'is' if len(rest) == 1 else 'are'} recorded too."))
+    if unread:
+        names = _listed([plain_name(m) for m in unread])
+        names = names[0].upper() + names[1:]
+        items.append((unread[0], f"{names} could not be read from these photos."))
+    return {
+        "headline": BASELINE_HEADLINE,
+        "items": [
+            {"metric_id": m["id"], "summary": text, "quoted_numbers": []} for m, text in items
+        ],
+        "next_steps": [BASELINE_STEP],
+        "disclaimer": DISCLAIMER,
+    }
+
+
 def template(result: dict[str, Any], first_reading: bool = True) -> dict[str, Any]:
+    if is_starting_point(result, first_reading):
+        return baseline_template(result)
     metrics = result["metrics"]
     real = [m for m in metrics if m["verdict"] == "real_change"]
     if not result["quality"]["passed"]:
@@ -177,10 +251,30 @@ def template(result: dict[str, Any], first_reading: bool = True) -> dict[str, An
     else:
         headline = "No clear change since your baseline yet"
         steps = ["Most changes take a few weeks to show. Keep the same light and distance."]
-    ordered = real + [m for m in metrics if m["verdict"] != "real_change"]
+    # Readings that held are said once, by name, never as a row of look-alike sentences.
+    same = [
+        m
+        for m in metrics
+        if m["verdict"] == "within_noise"
+        and m.get("delta") is not None
+        and m.get("mdc95") is not None
+    ]
+    grouped = same if len(same) >= SAME_GROUP_MIN else []
+    rest = [m for m in metrics if m["verdict"] != "real_change" and m not in grouped]
+    items = [item(m, first_reading) for m in real]
+    if grouped:
+        names = _listed([plain_name(m) for m in grouped])
+        items.append(
+            {
+                "metric_id": grouped[0]["id"],
+                "summary": f"About the same as at your start: {names}.",
+                "quoted_numbers": [],
+            }
+        )
+    items += [item(m, first_reading) for m in rest]
     return {
         "headline": headline,
-        "items": [item(m, first_reading) for m in ordered],
+        "items": items,
         "next_steps": steps,
         "disclaimer": DISCLAIMER,
     }
@@ -201,6 +295,8 @@ BANNED = re.compile(
     r"inflammation|irritation|condition|case|form|scarring|pigmentation|hyperpigmentation))\b",
     re.I,
 )
+# Willow never calls skin, a reading or a product "safe" ("have been safely set", Nov 28).
+SAFE = re.compile(r"\bsafe(?:ly|r|st)?\b", re.I)
 CHANGE_WORDS = re.compile(r"\b(real change|improv\w*|worse\w*|better)\b", re.I)
 # "cannot be called a real change yet" or "no noise band yet to confirm a real change" is the
 # hedge we ask for, not a claim: within a sentence, a mention of "real (change)" after a negation
@@ -213,6 +309,7 @@ REAL = re.compile(r"\breal(?:\s+change)?\b", re.I)
 # within the usual range, or no band yet) they would describe noise as a result.
 MOVED_WORDS = re.compile(
     r"\b(calmer|clearer|brighter|smoother|softer|fainter|fewer|more even|less visible|"
+    r"healthier|firmer|tighter|plumper|evener|"
     r"less (?:shine|glow|redness)|reduc\w*|increas\w*|decreas\w*|improv\w*|better|worse\w*)\b",
     re.I,
 )
@@ -275,8 +372,15 @@ Rules:
 - is_baseline in the session data tells you which kind of session this is: true means the first
   reading (say so); false means a later session compared with the baseline, so never call it
   "initial" or "first". A delta of 0 or 0.0 means no measurable difference; never write "-0.0".
+- When is_baseline is true, nothing has changed yet, so do NOT write one item per metric. Write
+  at most 3 items, each a different sentence that groups several readings by name ("Your starting
+  point for redness, blemishes and dark spots is recorded."), with metric_id set to the first
+  reading it names. Never start two items with the same words. Never say which way a reading
+  might go ("for calmer skin", "towards a more even tone"): a starting point has no direction.
+- Never use the word "safe" or "safely" (a reading is recorded or saved, never "safely set").
 - British spelling (colour, centre), as in the rest of the app.
-- headline: one short sentence. items: one per metric, most important first. next_steps: up to 3
+- headline: one short sentence. items: one per metric (grouped, at most 3, when is_baseline is
+  true), most important first, no two starting with the same words. next_steps: up to 3
   short practical capture or routine tips. disclaimer: "Cosmetic appearance tracking, not a
   diagnosis.\""""
 
@@ -494,6 +598,8 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"banned wording in: {text}")
         if JARGON.search(text):
             found.append(f"jargon in: {text}")
+        if SAFE.search(text):
+            found.append(f"'safe' in: {text}")
         if HARSH.search(text):
             found.append(f"harsh wording in: {text}")
     if too_many_numbers(exp.headline, 1):
@@ -516,11 +622,48 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"improvement claimed for a change the other way: {item.summary}")
         elif verdicts[item.metric_id] != "real_change" and _says_it_moved(item.summary):
             found.append(f"direction words for {item.metric_id} ({verdicts[item.metric_id]})")
-    if not any(v == "real_change" for v in verdicts.values()) and (
-        _claims_change(exp.headline) or _says_it_moved(exp.headline)
-    ):
-        found.append("change language in headline")
+    if not any(v == "real_change" for v in verdicts.values()):
+        if _claims_change(exp.headline) or _says_it_moved(exp.headline):
+            found.append("change language in headline")
+        # nothing moved, so no sentence anywhere may say which way ("for calmer skin")
+        for step in exp.next_steps:
+            if _says_it_moved(step):
+                found.append(f"direction words in a next step: {step}")
+    if repeated := repeated_openings([i.summary for i in exp.items]):
+        found.append(f"items repeat the same opening: {repeated}")
+    if _is_starting_point(data) and len(exp.items) > MAX_BASELINE_ITEMS:
+        found.append(f"a baseline is said in at most {MAX_BASELINE_ITEMS} items")
     return found
+
+
+OPENING_WORDS = 4
+MAX_SAME_OPENING = 2
+
+
+def repeated_openings(summaries: list[str]) -> str | None:
+    """The first words more than MAX_SAME_OPENING items start with ("this is your first" nine
+    times reads as a form letter), or None."""
+    seen: dict[str, int] = {}
+    for text in summaries:
+        words = re.findall(r"[^\W\d_]+(?:['’][^\W\d_]+)?", text.lower())[:OPENING_WORDS]
+        if len(words) < OPENING_WORDS:
+            continue
+        opening = " ".join(words)
+        seen[opening] = seen.get(opening, 0) + 1
+        if seen[opening] > MAX_SAME_OPENING:
+            return opening
+    return None
+
+
+def _is_starting_point(data: dict[str, Any]) -> bool:
+    """gemini_input of a baseline session (is_starting_point for the data Gemini saw)."""
+    metrics = data.get("metrics") or []
+    return bool(
+        data.get("is_baseline")
+        and metrics
+        and all(m["verdict"] in ("no_baseline", "low_quality") for m in metrics)
+        and all(m.get("delta") is None for m in metrics)
+    )
 
 
 # One call's own deadline when nobody gives a shorter one (scripts/reexplain.py).

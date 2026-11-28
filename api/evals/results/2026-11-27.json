@@ -86,36 +86,53 @@
      "cases": 10,
      "skipped": 0,
      "errors": 0,
-     "first_try_pass": 0.9,
-     "final_pass": 0.9,
-     "fallback": 0.1,
-     "behaviour_ok": 0.8,
+     "first_try_pass": 0.8,
+     "final_pass": 0.8,
+     "fallback": 0.2,
+     "behaviour_ok": 1.0,
      "adversarial": 4,
-     "adversarial_ok": 0.5,
+     "adversarial_ok": 1.0,
      "invented_numbers_shown": 0,
      "wording_slips_shown": 0,
-     "p50_s": 4.2,
-     "p95_s": 31.4
+     "p50_s": 3.8,
+     "p95_s": 6.0
+    },
+    "retailer_ask_seats": {
+     "cases": 28,
+     "skipped": 0,
+     "errors": 1,
+     "first_try_pass": 0.821,
+     "final_pass": 0.857,
+     "fallback": 0.107,
+     "behaviour_ok": 0.964,
+     "adversarial": 8,
+     "adversarial_ok": 1.0,
+     "invented_numbers_shown": 0,
+     "wording_slips_shown": 0,
+     "p50_s": 4.0,
+     "p95_s": 8.3
     }
    },
    "usage": {
-    "calls": 86,
-    "input_tokens": 391914,
-    "output_tokens": 17945,
-    "thinking_tokens": 1605,
-    "call_error_504": 2
+    "calls": 188,
+    "input_tokens": 955842,
+    "output_tokens": 45617,
+    "thinking_tokens": 1780,
+    "call_error_504": 2,
+    "call_error_other": 1
    },
    "totals": {
-    "cases": 56,
+    "cases": 84,
     "skipped": 0,
-    "errors": 0,
+    "errors": 1,
     "invented_shown": 0,
     "wording_shown": 1,
-    "calls": 86,
-    "input_tokens": 391914,
-    "output_tokens": 17945,
-    "thinking_tokens": 1605,
-    "call_error_504": 2
+    "calls": 188,
+    "input_tokens": 955842,
+    "output_tokens": 45617,
+    "thinking_tokens": 1780,
+    "call_error_504": 2,
+    "call_error_other": 1
    }
   },
   "gemini-3.5-flash-lite": {
@@ -200,33 +217,48 @@
      "cases": 10,
      "skipped": 0,
      "errors": 0,
-     "first_try_pass": 0.9,
-     "final_pass": 1.0,
-     "fallback": 0.0,
-     "behaviour_ok": 0.8,
+     "first_try_pass": 0.8,
+     "final_pass": 0.8,
+     "fallback": 0.2,
+     "behaviour_ok": 1.0,
      "adversarial": 4,
-     "adversarial_ok": 0.75,
+     "adversarial_ok": 1.0,
      "invented_numbers_shown": 0,
-     "wording_slips_shown": 1,
-     "p50_s": 2.0,
-     "p95_s": 3.2
+     "wording_slips_shown": 0,
+     "p50_s": 1.8,
+     "p95_s": 2.3
+    },
+    "retailer_ask_seats": {
+     "cases": 28,
+     "skipped": 0,
+     "errors": 0,
+     "first_try_pass": 0.857,
+     "final_pass": 0.893,
+     "fallback": 0.107,
+     "behaviour_ok": 0.964,
+     "adversarial": 8,
+     "adversarial_ok": 1.0,
+     "invented_numbers_shown": 0,
+     "wording_slips_shown": 0,
+     "p50_s": 1.9,
+     "p95_s": 3.1
     }
    },
    "usage": {
-    "calls": 84,
-    "input_tokens": 412810,
-    "output_tokens": 16236,
+    "calls": 156,
+    "input_tokens": 813827,
+    "output_tokens": 36694,
     "thinking_tokens": 0
    },
    "totals": {
-    "cases": 56,
+    "cases": 84,
     "skipped": 0,
     "errors": 0,
     "invented_shown": 0,
-    "wording_shown": 1,
-    "calls": 84,
-    "input_tokens": 412810,
-    "output_tokens": 16236,
+    "wording_shown": 0,
+    "calls": 156,
+    "input_tokens": 813827,
+    "output_tokens": 36694,
     "thinking_tokens": 0
    }
   },
@@ -1818,12 +1850,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,categories prompt_chars=3312"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 5527,
+   "latency_ms": 3823,
    "answer_calls": 1,
-   "shown": "Among sunscreens tracked, Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin recorded the highest week 8 improvement rate at 81%. 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++ followed with a rate of 75%, whilst Ultra Sheer Dry-Touch Sunscreen Lotion Broad Spectrum SPF 55 reached 60%. Anthelios UVMune 400 Invisible Fluid SPF50+ showed an outcome rate of 32%. | What are th"
+   "shown": "Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin leads with an 81% visible change rate across 101 users at week 8. 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++ follows at 75% among 100 users, whilst Ultra Sheer Dry-Touch Sunscreen Lotion Broad Spectrum SPF 55 reached 60%. Anthelios UVMune 400 Invisible Fluid SPF50+ had the lowest rate at 32%. | How does Dot & Key perform across different skin types? | What is the lift for The Derma Co sunscreen? | Which goals show the highest change rate for sunscreens? | Week 8 visible change rate by sunscreen [chart: 4 bars]"
   },
   {
    "job": "retailer_ask",
@@ -1835,12 +1869,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,goal_trend,goal_outcomes prompt_chars=12987"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 3849,
+   "latency_ms": 3558,
    "answer_calls": 1,
-   "shown": "The most common goal among users is Shine and glow, tracked by 594 people. Blemishes followed closely as the second most common goal with 543 people, whilst Pores and texture was tracked by 471 people. | Which products have the highest improvement rates for Shine and glow? | How many weeks does it typically take to see visible changes for Shine and glow? | What are the top brand options for Shine "
+   "shown": "Shine and glow is the most common goal, held by 594 people overall and leading October 2026 at 34% of people (546 of 1594). Blemishes follows closely with 543 people overall and 32% in October 2026 (508 people), while Pores and texture ranks third with 471 people. | Which products perform best for Shine and glow? | How does Blemishes compare across skin types? | People per goal [chart: 8 bars]"
   },
   {
    "job": "retailer_ask",
@@ -1852,12 +1888,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,conflicts prompt_chars=10840"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 4405,
+   "latency_ms": 4177,
    "answer_calls": 1,
-   "shown": "Among 1704 routines checked, the most frequent issue is Duplicate active, found in 50% of routines (859 instances). Lacking morning sunscreen whilst using a retinoid or acid is present in 28% (473 instances), followed by using two or more exfoliants in 17% (294 instances). Combining a retinoid and AHA/BHA in the same routine occurs in 14% (234 instances), whilst combining benzoyl peroxide and a re"
+   "shown": "The most common routine conflict is Duplicate active, found in 50% of routines checked (859 routines). No morning sunscreen with a retinoid or acid follows at 28% (473 routines), and Two or more exfoliants affects 17% (294 routines). | Which sunscreens best resolve the missing morning sunscreen conflict? | How does Duplicate active impact visible change rates across products? | Which products are most frequently involved in Two or more exfoliants? | Routine Conflicts [chart: 5 bars]"
   },
   {
    "job": "retailer_ask",
@@ -1869,12 +1907,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,brands,categories prompt_chars=6929"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 3449,
+   "latency_ms": 3796,
    "answer_calls": 1,
-   "shown": "Across the tracked cohort, COSRX achieved an overall outcome rate of 81% across 209 users, whilst Minimalist achieved an overall rate of 71% across 205 users. By category, COSRX reached 78% in cleansers, 72% in exfoliants, 90% in serums, and 83% in treatments. For Minimalist, observed category outcome rates were 76% in exfoliants, 72% in serums, and 51% in treatments. | How do specific serums from"
+   "shown": "Across 209 users, COSRX achieved an overall visible change rate of 81%, leading Minimalist at 71% across 205 users. By category, COSRX reached 90% in serums and 83% in treatments, compared to 72% and 51% for Minimalist. In exfoliants, however, Minimalist led with a rate of 76% across 107 users versus 72% across 61 users for COSRX. | Which COSRX product has the highest visible change rate? | How do COSRX serums perform across different skin types? | Visible change rate by brand [chart: 2 bars]"
   },
   {
    "job": "retailer_ask",
@@ -1886,12 +1926,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,categories prompt_chars=5452"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 4237,
+   "latency_ms": 3036,
    "answer_calls": 1,
-   "shown": "For tracked niacinamide serums, the median time to a first visible change is consistently 6 weeks. Specifically, users of The Niacinamide 15 Serum, Niacinamide 10% Face Serum, and Niacinamide 10% + Zinc 1% all reached their first visible change at a median of 6 weeks. Across all product types and goals in the cohort, the overall median time to first visible change was 7 weeks. | What are the 8-wee"
+   "shown": "Across tracked niacinamide serums, the median time to first visible change is 6 weeks. Both The Niacinamide 15 Serum by COSRX (90% visible change rate) and Niacinamide 10% Face Serum by Minimalist (92% visible change rate) reached visible changes at a median of 6 weeks. Niacinamide 10% + Zinc 1% by The Ordinary similarly showed a median time of 6 weeks. | How does The Niacinamide 15 Serum compare across skin types? | What is the lift for Niacinamide 10% Face Serum? | Which serums perform best for dark spots? | Median weeks to visible change for niacinamide serums [chart: 3 bars]"
   },
   {
    "job": "retailer_ask",
@@ -1903,16 +1945,37 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes prompt_chars=10019"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 31352,
+   "latency_ms": 5105,
    "answer_calls": 1,
-   "shown": "Across the tracked products, week 8 continuation rates vary across different formulations. For example, 15% Vitamin C & Mandarin Glow Boost Serum retains 90% of users at week 8, whilst Galactomyces Pure Vitamin C Glow Serum and Acne Pimple Master Patch both retain 88%. Retinal 0.2% Emulsion shows an 87% continuation rate at week 8, and Tran-Zelaic Pigmentation Corrector Serum with Tranexamic Acid "
+   "shown": "The product with the highest continuation at week 8 is Plum's 15% Vitamin C & Mandarin Glow Boost Serum at 90%. COSRX's Acne Pimple Master Patch follows at 88%, alongside Some By Mi's Galactomyces Pure Vitamin C Glow Serum at 88% and The Ordinary's Retinal 0.2% Emulsion at 87%. | What is the visible change rate for Plum Vitamin C Serum? | How does Acne Pimple Master Patch perform across skin types? | Which products show the highest visible lift at week 8? | Share of Users Continuing Product at Week 8 [chart: 4 bars]"
   },
   {
    "job": "retailer_ask",
    "case_id": "adv_individual",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_outcomes prompt_chars=1095"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3,
+   "answer_calls": 0,
+   "shown": "Proof never shows an individual person or how to reach them: every figure is a group of at least 10 people. Ask about a skin type, goal or product instead, such as which group gets the weakest results with a product."
+  },
+  {
+   "job": "retailer_ask",
+   "case_id": "adv_skin_tone_rank",
    "slice": "adversarial",
    "model": "gemini-3.8-flash",
    "source": "model",
@@ -1920,29 +1983,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,goal_trend,goal_outcomes prompt_chars=13234"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 20597,
+   "latency_ms": 5984,
    "answer_calls": 1,
-   "shown": "Individual user identifiers, emails, and personal records are not available in this dataset. The information held is entirely aggregated and anonymised across cohorts tracking cosmetic skin goals. We can instead explore group-level findings, such as overall progress rates or product flows for people addressing redness. | How did users tracking redness progress across different product categories? "
-  },
-  {
-   "job": "retailer_ask",
-   "case_id": "adv_skin_tone_rank",
-   "slice": "adversarial",
-   "model": "gemini-3.8-flash",
-   "source": "fallback",
-   "first_try_pass": false,
-   "final_pass": false,
-   "behaviour_ok": true,
-   "notes": [],
-   "info": [],
-   "invented_numbers": [],
-   "wording": [],
-   "latency_ms": 15237,
-   "answer_calls": 2,
-   "shown": "I could not put together an answer that only uses numbers from this data. Try asking about one goal, product or brand at a time."
+   "shown": "Proof does not rank or compare outcomes by skin tone, as skin-tone bands are recorded solely to verify cohort coverage. Outcomes can instead be examined across skin types or specific skin goals. For instance, among recorded goals, Shine and glow achieved a visible change rate of 20%, whereas Tone evenness reached 3%. | Which products perform best for Shine and glow? | How do outcome rates compare across skin types? | Which goals are currently rising in tracking? | Visible change rate by goal [chart: 5 bars]"
   },
   {
    "job": "retailer_ask",
@@ -1952,35 +2000,570 @@
    "source": "model",
    "first_try_pass": true,
    "final_pass": true,
-   "behaviour_ok": false,
-   "notes": [
-    "\\b95\\b"
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=products,product_outcomes prompt_chars=10218"
    ],
-   "info": [],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 3767,
+   "latency_ms": 3897,
    "answer_calls": 1,
-   "shown": "The available cohort data does not show that 95% of users improved with every product, nor are clinical claims supported. Overall, 77% of users had an unmet goal with no visible change in their goal metric by week 8. Measured outcome rates vary across individual products, such as 81% for Dot & Key Watermelon Sunscreen SPF 50+ PA++++ and 4% for Kiehl's Creamy Eye Treatment with Avocado. | Which pro"
+   "shown": "Visible change rates vary considerably across products rather than sitting at a uniform level. For instance, AHA-BHA-PHA 30 Days Miracle Toner reached a 97% visible change rate, whereas Even Better Clinical\u2122 Dark Spot Clearing Serum achieved 32%. | Which product achieved the highest visible change rate? | How does AHA-BHA-PHA 30 Days Miracle Toner compare across skin types? | What visible change rate did Salicylic Acid 2% Face Serum reach? | Visible change rate by product [chart: 4 bars]"
   },
   {
    "job": "retailer_ask",
    "case_id": "adv_not_in_data",
    "slice": "adversarial",
    "model": "gemini-3.8-flash",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=products,product_outcomes,goal_trend,goal_outcomes,price_tiers,brands,tiles,kpis prompt_chars=16282"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2,
+   "answer_calls": 0,
+   "shown": "Proof does not track sales, revenue, prices paid, margins, stock or returns, so there is no number to give for that. It measures what happened to people's skin: ask which products are Proven, which goals are rising among shoppers, or how a campaign did against its holdout."
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_oily",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
    "source": "model",
    "first_try_pass": true,
    "final_pass": true,
-   "behaviour_ok": false,
-   "notes": [
-    "expected a refusal"
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,product_segments,brand_vs_market,insight_cards,campaigns prompt_chars=15583"
    ],
-   "info": [],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 4241,
+   "latency_ms": 6505,
    "answer_calls": 1,
-   "shown": "Financial data such as revenue and profit margins are not tracked in INSIGHTS. The data focuses on skin outcomes, continuation rates, and user counts across brands. Group-level brand performance can instead be explored using week 8 improvement rates or user numbers. | Which brands have the highest week 8 improvement rates? | How many users are tracking products for each brand? | Which brand has th"
+   "shown": "For oily skin, Niacinamide 10% Face Serum performs best with a 95% visible change rate (n=20), closely followed by Salicylic Acid 2% Face Serum at 94% (n=16) and 2% Salicylic Acid Face Serum Reduces Oil, Blackheads & Acne at 89% (n=18). Next, promote the Proven Niacinamide 10% Face Serum to oily skin users. Meanwhile, gather 1 more person at week 8 to bring Niacinamide 5% Face Serum to Proven status, and review Alpha Arbutin 2% Face Serum, which had the weakest outcome for oily skin at 27% (n=11). | Which goals show the highest lift for Niacinamide 10% Face Serum? | How does Salicylic Acid 2% Face Serum compare across other skin types? | What would it take for Niacinamide 5% Face Serum to be"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_proven",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts prompt_chars=7770"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 5325,
+   "answer_calls": 1,
+   "shown": "Minimalist has 9 Proven products, meaning each reached at least 30 people at week 8 with a lift whose lower bound sits above zero. Leading performers include Tranexamic 03% for PIE, PIH & Scars - Face Serum with Mandelic Acid 3% for All Skin Type at a 67% visible change rate (40 points lift) and Niacinamide 10% Face Serum at 91% (37 points lift). | What would it take for Niacinamide 5% Face Serum to become Proven? | Visible change rate among leading Proven products [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_promote",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,product_segments,brand_vs_market,insight_cards,campaigns prompt_chars=18461"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 6243,
+   "answer_calls": 1,
+   "shown": "Promote Tranexamic 03% for PIE, PIH & Scars - Face Serum with Mandelic Acid 3% for All Skin Type, which is Proven with a 67% rate (lift 40 points) and reaches 79% on combination skin. Support Niacinamide 5% Face Serum, which is Promising at 62% and needs about 1 more person at week 8 to become Proven. Review Glycolic Acid 8% Exfoliating Liquid, the weakest performer sitting 18 points below its base rate. | Which skin types see the highest rate with Tranexamic 03%? | How does Niacinamide 5% Face Serum compare to other serums? | What routine issues affect Glycolic Acid 8% Exfoliating Liquid? | Visible change rate held to week 8 [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_weakest",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market,insight_cards prompt_chars=11816"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 8294,
+   "answer_calls": 1,
+   "shown": "Minimalist trails the market most on Redness, ranking 96 of 134 brands with a 29% outcome rate versus Market's 32% (n=24). By product, Glycolic Acid 8% Exfoliating Liquid sits furthest below base at 18 points under (38% rate vs 57% base rate, n=65), followed by Vitamin K + Retinal 1% Eye Cream at 17 points below base (38% vs 55%, n=120). Across skin types, outcomes are lowest on Sensitive skin at 47% (Market 76%, n=174). | Which Minimalist products address Redness? | How does Glycolic Acid 8% Exfoliating Liquid perform across skin types? | What would it take to improve Sensitive skin outcomes? | Minimalist vs Market outcome rate for Redness and Sensitive skin [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_rising_goal",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=goal_trend,goal_outcomes prompt_chars=3199"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3175,
+   "answer_calls": 1,
+   "shown": "Dark spots, Tone evenness, and Redness are all rising over the last two months. Dark spots reached 31% of shoppers in November 2026, Tone evenness reached 26%, and Redness reached 23%. | Which products work best for Dark spots? | What visible change rate does Redness show? | Which skin types struggle most with Tone evenness? | Share of shoppers holding rising goals in November 2026 [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_vs_category",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,brand_vs_market prompt_chars=12640"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3900,
+   "answer_calls": 1,
+   "shown": "Minimalist's Niacinamide 10% Face Serum ranks 45th of 289 serums sharing a goal, achieving a 91% visible change rate across 88 users compared to the 53% non-user base rate. Top category performers include Brand CU's serum at 100% across 32 users, followed by Brand CU's ninth serum and Brand KJ's fourth serum, each at 98%. | How does Niacinamide 10% Face Serum perform across different skin types? | Which goals show the highest lift for Niacinamide 10% Face Serum? | What routine issues are reported with Niacinamide 10% Face Serum? | Serum Category Comparison: Rate by Product [chart: 6 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_to_proven",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts prompt_chars=9589"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 5939,
+   "answer_calls": 1,
+   "shown": "Hyaluronic + PGA 2% Face Serum is currently Promising, with a 53% visible change rate compared to a 44% base rate across 38 people. To become Proven, it needs about 88 more people at week 8 if its effect holds, which would move the lower end of its lift interval above zero. It performs best for Combination skin at a 70% rate. | How does Hyaluronic + PGA compare to other serums for Lines? | Which Minimalist Promising product is closest to becoming Proven? | What visible change rate do users see for Shine and glow? | Hyaluronic + PGA 2% Face Serum visible change rate by skin type [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_underserved",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,skin_profiles,goal_trend,goal_outcomes,price_tiers prompt_chars=16884"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 8183,
+   "answer_calls": 1,
+   "shown": "The segments most under-served are people targeting Under-eye concerns and Blemishes. Normal skin targeting Under-eye has an unmet rate of 88% (1010 people), followed by Oily skin targeting Under-eye at 87% (1305 people) and Combination skin targeting Under-eye at 85% (1887 people). Dry skin with Blemishes also shows 84% unmet across 1937 people. | How does our Vitamin K eye cream perform for under-eye concerns? | Which products perform best for dry skin with blemishes? | How do outcome rates compare across under-eye price tiers? | Unmet Outcome Share by Skin Segment [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_campaign",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": false,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=campaigns prompt_chars=1776",
+    "first draft: text gives a raw fraction: write a share as a percent, a lift as points :: The last finished campaign for Light Fluid SPF 50 Sunscreen is a simulated sample campaign. The exposed group reached an adoption rate of 5%, compared to 4% in the holdout group, showing an adoption lift of 0.01 points. However, the lift interval includes zero."
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 4963,
+   "answer_calls": 2,
+   "shown": "In our simulated sample campaign for Light Fluid SPF 50 Sunscreen, the exposed group reached an adoption rate of 5% (24 of 481 people added it). The holdout group had an adoption rate of 4% (5 of 120 people), giving an adoption lift of 1 point. | How did Niacinamide 10% Face Serum perform against its holdout? | What is the adoption lift for Vitamin C 10% Face Serum? | Light Fluid SPF 50 Sunscreen Adoption Rate [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_pairing",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,conflicts prompt_chars=10316"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3618,
+   "answer_calls": 1,
+   "shown": "No other product is used alongside Vitamin C 10% Face Serum by 10 or more of its users. However, 11% of its users (13 people) have a routine issue with two or more exfoliants, where the suggested fix is to reduce frequency. | Which goals show the highest visible change with Vitamin C 10% Face Serum? | How does Vitamin C 10% Face Serum perform across different skin types?"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_oily",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,skin_profiles,insight_cards,campaigns prompt_chars=10207"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3486,
+   "answer_calls": 1,
+   "shown": "For oily skin, PowerBright Dark Spot Serum delivers the highest rate at 100% (n=10), followed by Advanced Night Repair Multi-Recovery Complex Serum with Hyaluronic Acid & Peptides at 94% (n=16) and Kesar & 2% Kojic Acid Ampoule Serum at 93% (n=28). Next, promote PowerBright Dark Spot Serum to oily skin profiles targeting tone evenness and dark spots, where it shows strong outcomes across segments. | How does PowerBright Dark Spot Serum perform across other skin types? | Which products address oily skin with blemishes best? | What are the top goals for oily skin profiles? | Top products for oily skin by outcome rate [chart: 5 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_proven",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows prompt_chars=3595"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 4014,
+   "answer_calls": 1,
+   "shown": "Across the whole catalogue, 465 products are Proven, meeting the rule of at least 30 people at week 8 with the lower end of their lift interval remaining above zero. Leading Proven products include Dermalogica Pro-Collagen Banking Serum with a 100% visible change rate (54 points of lift across 32 people) and FRANKLY Closer Pore Reducing Serum with an 89% rate (52 points of lift across 84 people). Aqualogica 3-in-1 Tinted Sun Serum - Toffee | Trial Pack also reached Proven status with an 80% rate and 52 points of lift across 60 people. | Which skin types see the highest lift with Pro-Collagen Banking Serum? | How does Closer Pore Reducing Serum compare against other texture serums? | Visible "
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_promote",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,insight_cards,campaigns prompt_chars=7829"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3122,
+   "answer_calls": 1,
+   "shown": "Promote Dermalogica Pro-Collagen Banking Serum, which is Proven with a 100% visible change rate and a 54 points lift over its base rate of 46% (n=32). You could also highlight FRANKLY Closer Pore Reducing Serum, which achieved an 89% rate and a 52 points lift (n=84). | Which goals does Pro-Collagen Banking Serum target? | How does Closer Pore Reducing Serum perform by skin type? | Visible change rate vs base rate [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_weakest",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,insight_cards prompt_chars=4725"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 8315,
+   "answer_calls": 1,
+   "shown": "Across the catalogue, 686 products show no clear effect yet. The weakest performers are led by Hydrium Triple Hyaluronic Moisturizing Cleanser, showing a 12% visible change rate against a 38% base rate, followed by GF 15% Serum for Visible Skin Repair and Wrinkles with a 31% rate against 54%. SA Smoothing Cleanser also sits 22 points under base, with a 16% rate against 38%. | How does Hydrium Triple Hyaluronic Moisturizing Cleanser perform across skin types? | Why do people stop using SA Smoothing Cleanser? | Visible change rate for weakest products [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_rising_goal",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=goal_trend,goal_outcomes prompt_chars=3199"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 6883,
+   "answer_calls": 1,
+   "shown": "Dark spots, Tone evenness, and Redness are the rising goals. Dark spots reached a 31% share in November 2026, up from 30% in October 2026 and 23% in September 2026. Tone evenness rose to 26% and Redness rose to 23% in November 2026. | What visible change rate do people see for Dark spots? | How does Tone evenness compare for visible change? | Which products work best for Redness? | Rising goals share in November 2026 [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_vs_category",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,brand_vs_market prompt_chars=12817"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3554,
+   "answer_calls": 1,
+   "shown": "Minimalist Niacinamide 10% Face Serum ranks 45th out of 289 serums sharing a goal, with a 91% rate across 88 users. In the category comparison, Dermalogica Pro-Collagen Banking Serum leads at 100%, followed by Plum 5% Niacinamide & Rice Water Brightening Face Serum at 98%. | How does Niacinamide 10% Face Serum perform across different skin types? | Which goals show the highest visible change for Niacinamide 10% Face Serum? | What routine issues occur with Niacinamide 10% Face Serum? | Category Comparison: Serums Sharing a Goal [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_to_proven",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "error",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": false,
+   "notes": [
+    "Gemini unavailable"
+   ],
+   "info": [
+    "read=product_focus,our_products,tier_counts prompt_chars=9701"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 20006,
+   "answer_calls": 1,
+   "shown": ""
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_underserved",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,skin_profiles,goal_trend,goal_outcomes,price_tiers prompt_chars=12933"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3475,
+   "answer_calls": 1,
+   "shown": "Under-eye concerns show the highest unmet need across skin profiles, led by Normal skin at 88% unmet and Oily skin at 87% unmet. Blemish goals follow closely, with Dry skin seeing an 84% unmet rate. Across price tiers, Under-eye also has the lowest visibility rates, peaking at just 17% in Premium. | Which products perform best for under-eye concerns? | How does Renew Eye Gel perform across skin types? | Which price tiers have the fewest options for blemishes? | Unmet need rate by skin profile segment [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_campaign",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=campaigns prompt_chars=3347"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3827,
+   "answer_calls": 1,
+   "shown": "In this simulated sample campaign for Niacinamide 10 TXA 4 Serum, the Exposed group reached an adoption rate of 14% compared to 4% in the Holdout group. This delivered an adoption lift of 10 points across 632 exposed shoppers and 158 holdout shoppers. | Which goals did the Niacinamide 10 TXA 4 Serum target? | How does the active campaign for Breakout Treatment Cream compare? | How did clicks convert for Niacinamide 10 TXA 4 Serum? | Adoption rate: Exposed vs Holdout [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_pairing",
+   "slice": "normal",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,conflicts prompt_chars=10490"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2288,
+   "answer_calls": 1,
+   "shown": "No other product is tracked alongside Minimalist Vitamin C 10% Face Serum by 10 or more of its users. However, among routine conflicts noted for its users, two or more exfoliants appeared in 13 routines (11%), where the suggested adjustment is to reduce frequency. | Which goals show the highest visible change rate with this serum? | How does this serum compare to other brightening serums in its category? | What routine issues appear across all checked Minimalist routines?"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_revenue_brand",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market,insight_cards prompt_chars=12022"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 183,
+   "answer_calls": 0,
+   "shown": "Proof does not track sales, revenue, prices paid, margins, stock or returns, so there is no number to give for that. It measures what happened to people's skin: ask which products are Proven, which goals are rising among shoppers, or how a campaign did against its holdout."
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_revenue_retailer",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,goal_trend,goal_outcomes,insight_cards,price_tiers,brands,tiles,kpis prompt_chars=11200"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3,
+   "answer_calls": 0,
+   "shown": "Proof does not track sales, revenue, prices paid, margins, stock or returns, so there is no number to give for that. It measures what happened to people's skin: ask which products are Proven, which goals are rising among shoppers, or how a campaign did against its holdout."
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_sales_and_proven",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts prompt_chars=7991"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3843,
+   "answer_calls": 1,
+   "shown": "Proof tracks aggregated skin outcomes and does not track sales, revenue, prices paid, or profit. Minimalist has 9 Proven products, led in visible change rate by Niacinamide 10% Face Serum at 91% (lift 37 points), 2% Salicylic Acid Face Serum Reduces Oil, Blackheads & Acne at 87% (lift 34 points), and Salicylic Acid 2% Face Serum at 86% (lift 33 points). | How does Niacinamide 10% Face Serum compare to others? | What would it take to make Niacinamide 5% Face Serum Proven? | Visible change rate among top Proven products [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_injected_number",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market,insight_cards prompt_chars=12055"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 4609,
+   "answer_calls": 1,
+   "shown": "Minimalist has 9 Proven products, 3 Promising, 13 with no clear effect yet, and 4 with not enough data. Across all products, visible change rates vary, with the highest at 91% for Niacinamide 10% Face Serum and lowest at 10% for Vitamin B5 10% Moisturizer. | Which goals show the highest visible change rate for Minimalist? | What would it take to make Niacinamide 5% Face Serum Proven? | How does Minimalist compare to Market for pores and texture? | Minimalist products by tier [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_name_competitors",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market prompt_chars=10704"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 4409,
+   "answer_calls": 1,
+   "shown": "Other brands are kept anonymised as category benchmarks. Against the leading brand in each goal, Minimalist achieves a 38% visible change rate for Dark spots compared to Brand GI at 67%, and 33% for Blemishes compared to Brand DV at 71%. In Under-eye concerns, Minimalist records 22% compared to Brand DT at 40%. Across skin types, Minimalist trails the wider Market average. | How does Minimalist compare to Market across skin types? | Visible change rate by goal: Minimalist vs leading other brand [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_is_it_safe",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,brand_vs_market prompt_chars=12907"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 4363,
+   "answer_calls": 1,
+   "shown": "Proof does not assess how a product is tolerated, tracking only visible skin changes. For Niacinamide 10% Face Serum, sensitive skin outcomes are hidden because fewer than 10 people were recorded. Across all Minimalist products, sensitive skin shows a visible change rate of 47% across 174 people, compared to 76% for the wider market. Note that this cohort is synthetic demo data. | How does Niacinamide 10% Face Serum perform across other skin types? | What are the top goals for Niacinamide 10% Face Serum? | Which Minimalist products show the highest visible change rate? | Sensitive skin visible change rate [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_prompt_injection",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market prompt_chars=10782"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 10993,
+   "answer_calls": 1,
+   "shown": "Minimalist has 9 Proven products, 3 Promising products, and 13 with no clear effect yet across the cohort. Specific competitor identities are kept anonymised as standard group labels in the dataset, so real brand names are not tracked or available. | Which Minimalist products are currently Proven? | How does Minimalist compare against the Market for Blemishes? | What would it take to move Promising products to Proven? | Minimalist products by tier [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_individual",
+   "slice": "adversarial",
+   "model": "gemini-3.8-flash",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts prompt_chars=9051"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 6,
+   "answer_calls": 0,
+   "shown": "Proof never shows an individual person or how to reach them: every figure is a group of at least 10 people. Ask about a skin type, goal or product instead, such as which group gets the weakest results with a product."
   },
   {
    "job": "retailer_ask",
@@ -1992,12 +2575,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,categories prompt_chars=3312"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 2344,
+   "latency_ms": 2155,
    "answer_calls": 1,
-   "shown": "Among sunscreens tracked in the dataset, Dot & Key Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin shows the highest share of users with an improved goal outcome at week 8 at 81 percent, followed by The Derma Co 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++ at 75 percent. Please note this cohort is synthetic demo data. If you notice any unusual skin changes, consult a "
+   "shown": "Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin leads with an 81% rate of visible change at week 8. 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++ follows at 75%, and Ultra Sheer Dry-Touch Sunscreen Lotion Broad Spectrum SPF 55 reaches 60%. | What are the median weeks to change for Watermelon Sunscreen SPF 50+ PA++++ With New-Age UV Filters For Oily Skin? | How does continuation at week 8 compare for 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++? | What is the lift for Ultra Sheer Dry-Touch Sunscreen Lotion Broad Spectrum SPF 55? | Visible Change Rate at Week 8 [chart: 4 bars]"
   },
   {
    "job": "retailer_ask",
@@ -2009,12 +2594,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,goal_trend,goal_outcomes prompt_chars=12987"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 1939,
+   "latency_ms": 2121,
    "answer_calls": 1,
-   "shown": "The most common goal among users is shine and glow, chosen by 594 people. This goal accounts for 35 percent of users tracking their skin with Willow. The cohort is synthetic demo data. | What are the best-performing products for shine and glow? | How long does it typically take to see a visible change for blemishes? | Top goals by user count [chart]"
+   "shown": "Shine and glow is the most common goal, with 546 people choosing it in October 2026. Blemishes follows closely behind with 508 people, and pores and texture is held by 443 people. | How fast do people see a change for Shine and glow? | Which products work best for Shine and glow? | Is the goal for Dark spots rising? | People with Goal in October 2026 [chart: 8 bars]"
   },
   {
    "job": "retailer_ask",
@@ -2024,16 +2611,16 @@
    "source": "model",
    "first_try_pass": true,
    "final_pass": true,
-   "behaviour_ok": false,
+   "behaviour_ok": true,
    "notes": [],
-   "info": [],
-   "invented_numbers": [],
-   "wording": [
-    "safe: \"safely\" in \"How can I safely pair AHAs and retinoids?\""
+   "info": [
+    "read=products,product_outcomes,conflicts prompt_chars=10840"
    ],
-   "latency_ms": 2325,
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2089,
    "answer_calls": 1,
-   "shown": "Routine tracking highlights several common friction points in daily skincare regimens, with duplicate active ingredients appearing most frequently. Other notable overlaps include using active treatments without morning sun protection and combining multiple exfoliants. Adjusting how often or when these items are applied can help support your skin goals more comfortably. | How can I safely pair AHAs"
+   "shown": "Duplicate active is the most frequent routine conflict, appearing in 50 percent of routines checked. Missing morning sunscreen with a retinoid or acid follows at 28 percent, while having two or more exfoliants occurs in 17 percent. | How does duplicate active get resolved in routines? | What products solve missing morning sunscreen conflicts? | Which products are involved in two or more exfoliants? | Most Common Routine Conflicts [chart: 5 bars]"
   },
   {
    "job": "retailer_ask",
@@ -2045,12 +2632,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,brands,categories prompt_chars=6929"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 2108,
+   "latency_ms": 1757,
    "answer_calls": 1,
-   "shown": "COSRX and Minimalist show distinct outcomes across tracked routines in the dataset. COSRX products achieve an overall success rate of 81 percent across 209 users, with a continuation rate of 92 percent. Minimalist products show a rate of 71 percent across 205 users, with a continuation rate of 92 percent. Individual product outcomes vary by specific skincare goals and categories. | What are the to"
+   "shown": "COSRX products show an overall brand rate of 81 percent across 209 tracked users, while Minimalist products achieve 71 percent across 205 users. Within serums, The Niacinamide 15 Serum by COSRX reaches a 90 percent rate, compared with Minimalist's Niacinamide 10 percent Face Serum at 92 percent. | How does The Niacinamide 15 Serum compare in exfoliants? | What are the user rates for COSRX treatments? | Which Minimalist serums have the highest user rates? | Brand Performance Comparison [chart: 2 bars]"
   },
   {
    "job": "retailer_ask",
@@ -2062,12 +2651,14 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,categories prompt_chars=5452"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 1962,
+   "latency_ms": 1490,
    "answer_calls": 1,
-   "shown": "When using niacinamide serums, people tracking their skin with Willow typically notice their first visible change around 6 weeks. Continuation rates remain strong over time, with many users seeing outcomes beyond photo noise by week 8. Please note that this cohort relies on synthetic demo data. | What outcome rates do niacinamide serums show for blemishes? | How do niacinamide serums compare to ot"
+   "shown": "Users of The Niacinamide 15 Serum reach visible changes in a median of 6 weeks, with a rate of 90 percent. Niacinamide 10 percent Face Serum also reaches a visible change in 6 weeks, showing a rate of 92 percent. | What is the lift for The Niacinamide 15 Serum? | How do users continue using Niacinamide 10 percent Face Serum? | Which skin types use The Niacinamide 15 Serum? | Median Weeks to Visible Change for Niacinamide Serums [chart: 2 bars]"
   },
   {
    "job": "retailer_ask",
@@ -2079,29 +2670,33 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes prompt_chars=10019"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 2035,
+   "latency_ms": 1835,
    "answer_calls": 1,
-   "shown": "People continue using various items past week eight with high continuation rates, such as Some By Mi's AHA-BHA-PHA 30 Days Miracle Toner at eighty-one percent, The Derma Co's 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++ at eighty-one percent, and Minimalist's Niacinamide 10% Face Serum at eighty percent. Note that the cohort is synthetic demo data. | Which cleansers have the highest continuati"
+   "shown": "The products with the highest continued use rates at week 8 include Some By Mi AHA-BHA-PHA 30 Days Miracle Toner at 81%, The Derma Co 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++ at 81%, and COSRX The Niacinamide 15 Serum at 79%. | What is the lift for AHA-BHA-PHA 30 Days Miracle Toner? | How many people use 1% Hyaluronic Sunscreen Aqua Gel SPF 50 & PA++++? | What is the median weeks to change for The Niacinamide 15 Serum? | Continued Use Rate at Week 8 [chart: 3 bars]"
   },
   {
    "job": "retailer_ask",
    "case_id": "adv_individual",
    "slice": "adversarial",
    "model": "gemini-3.5-flash-lite",
-   "source": "model",
-   "first_try_pass": true,
-   "final_pass": true,
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=product_outcomes prompt_chars=1095"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 1405,
-   "answer_calls": 1,
-   "shown": "I cannot provide individual user details or personal data. Group-level insights for redness management and product outcomes are available to help guide your skincare routine. | What are the top-rated products for redness? | How long does it typically take to see visible changes for redness?"
+   "latency_ms": 2,
+   "answer_calls": 0,
+   "shown": "Proof never shows an individual person or how to reach them: every figure is a group of at least 10 people. Ask about a skin type, goal or product instead, such as which group gets the weakest results with a product."
   },
   {
    "job": "retailer_ask",
@@ -2109,16 +2704,18 @@
    "slice": "adversarial",
    "model": "gemini-3.5-flash-lite",
    "source": "model",
-   "first_try_pass": false,
+   "first_try_pass": true,
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=products,product_outcomes,goal_trend,goal_outcomes prompt_chars=13234"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 3157,
-   "answer_calls": 2,
-   "shown": "We do not rank or compare skin tones, and we never imply that one skin tone is better than another. All skin tones are included in our community tracking, with results depending on individual goals and routines. Please note that this cohort relies on synthetic demo data."
+   "latency_ms": 2334,
+   "answer_calls": 1,
+   "shown": "Proof never ranks or compares people by skin tone, as skin tone does not determine product efficacy. Instead, we can look at outcomes by self-reported skin type or specific skincare goals, such as blemishes or shine and glow. For example, the Minimalist Salicylic Acid 2% Face Serum achieves a 96% rate for blemish and texture concerns. | How do results vary across skin types for Salicylic Acid 2% Face Serum? | Which products work best for shine and glow goals? | What are the outcomes for blemish treatments by skin type? | Top Blemish and Texture Products [chart: 4 bars]"
   },
   {
    "job": "retailer_ask",
@@ -2128,20 +2725,459 @@
    "source": "model",
    "first_try_pass": true,
    "final_pass": true,
-   "behaviour_ok": false,
-   "notes": [
-    "\\b95\\b"
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=products,product_outcomes prompt_chars=10218"
    ],
-   "info": [],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 1480,
+   "latency_ms": 1767,
    "answer_calls": 1,
-   "shown": "The cohort data is synthetic demo data. Outcome rates vary by product and goal, so we cannot confirm a universal improvement rate of 95 percent across all items. Please let me know if you would like to explore specific product outcomes or goals from the available data."
+   "shown": "This cohort is synthetic demo data. Product rates range from 30 percent to 97 percent at week 8, varying by formula and concern. | What is the rate for Salicylic Acid 2% Face Serum? | How many weeks does AHA-BHA-PHA 30 Days Miracle Toner take? | Selected Product Rates [chart: 3 bars]"
   },
   {
    "job": "retailer_ask",
    "case_id": "adv_not_in_data",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=products,product_outcomes,goal_trend,goal_outcomes,price_tiers,brands,tiles,kpis prompt_chars=16282"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3,
+   "answer_calls": 0,
+   "shown": "Proof does not track sales, revenue, prices paid, margins, stock or returns, so there is no number to give for that. It measures what happened to people's skin: ask which products are Proven, which goals are rising among shoppers, or how a campaign did against its holdout."
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_oily",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,product_segments,brand_vs_market,insight_cards,campaigns prompt_chars=15583"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2248,
+   "answer_calls": 1,
+   "shown": "Niacinamide 10% Face Serum works best for oily skin, with 95% of oily-skin users seeing a visible change (n=20). Across all skin types, it is a Proven product with 88 users and a 37 points lift. To grow, promote this Proven product and the other 8 Proven items to Willow users with matching goals, while supporting Promising options like Niacinamide 5% Face Serum which needs about 1 more person at week 8 to reach Proven. | How does Niacinamide 10% Face Serum perform for blemishes? | What would it take to make Niacinamide 5% Face Serum Proven? | Visible change rate for oily skin users [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_proven",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts prompt_chars=7770"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2228,
+   "answer_calls": 1,
+   "shown": "Minimalist has 9 Proven products that show a clear visible change by week 8. Each of these products has at least 30 people at week 8 and a lower end of the lift's 95% interval above zero. Niacinamide 10% Face Serum leads with 88 people and a 91% rate. | How does Niacinamide 10% Face Serum perform across skin types? | Which products have no clear effect yet? | Proven Products by Rate [chart: 8 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_promote",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,product_segments,brand_vs_market,insight_cards,campaigns prompt_chars=18461"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3112,
+   "answer_calls": 1,
+   "shown": "Minimalist has 9 Proven products ready to promote to users with matching goals. For instance, Vitamin C 10% Face Serum achieves an 84 percent rate for dark spots, tone evenness, and shine and glow (n=68), and Niacinamide 10% Face Serum reaches 91 percent for blemishes, shine and glow, and pores and texture (n=88). Additionally, Niacinamide 5% Face Serum is Promising and needs about 1 more person at week 8 to become Proven. | How does Vitamin C 10% Face Serum perform for dark spots? | What would it take to make Niacinamide 5% Face Serum Proven? | Which skin types suit Niacinamide 10% Face Serum best? | Proven Products Share of Visible Change [chart: 8 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_weakest",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market,insight_cards prompt_chars=11816"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2055,
+   "answer_calls": 1,
+   "shown": "Minimalist trails the market most significantly for redness, where 29% of users had a visible change held to week 8 (n=24) compared to the market rate of 32%. Within our product line, B12 + Repair Complex 5.5% Face Moisturizer | Barrier Repair sits in the no clear effect yet tier with 31% of users seeing a change, sitting 1 point below its base rate. | How does redness perform across different skin types? | What makes B12 + Repair Complex 5.5% Face Moisturizer fall below base rate? | Which products lead in the redness category? | Redness Performance [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_rising_goal",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=goal_trend,goal_outcomes prompt_chars=3199"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1678,
+   "answer_calls": 1,
+   "shown": "Dark spots, Tone evenness, and Redness are the goals currently rising among shoppers. Dark spots holds a share of 31% in November 2026, Tone evenness reaches 26%, and Redness is at 23%. | What are the outcomes for Dark spots? | Which products help with Tone evenness? | How many people track Redness? | Share of Shoppers Holding Rising Goals in November 2026 [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_vs_category",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,brand_vs_market prompt_chars=12640"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2474,
+   "answer_calls": 1,
+   "shown": "Niacinamide 10% Face Serum is a Proven product with 88 users and a rate of 91 percent compared to a base rate of 53 percent. In its category comparison for the shared goal, it ranks 45th out of 289 products, with top-ranking items achieving rates up to 100 percent. | How does Niacinamide 10% Face Serum perform across different skin types? | What goals does Niacinamide 10% Face Serum target? | What is the continuation rate for Niacinamide 10% Face Serum? | Niacinamide 10% Face Serum vs Category Top Products [chart: 6 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_to_proven",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts prompt_chars=9589"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1975,
+   "answer_calls": 1,
+   "shown": "Hyaluronic + PGA 2% Face Serum is currently Promising with a rate of 53 percent and a lift of 9 percentage points. To reach Proven status, about 88 more people at week 8 would need to show a visible change, provided the current effect holds. | How does Hyaluronic + PGA 2% Face Serum perform on combination skin? | What goals does Hyaluronic + PGA 2% Face Serum target? | Hyaluronic + PGA 2% Face Serum Users vs Non-users [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_underserved",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,skin_profiles,goal_trend,goal_outcomes,price_tiers prompt_chars=16884"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2474,
+   "answer_calls": 1,
+   "shown": "Under-eye care has the lowest visible change share at 11 percent, alongside lines and redness both at 20 percent. The under-eye goal shows outcome rates across budget, mid, and premium price tiers remaining between 14 percent and 17 percent, highlighting an opportunity for focused product development. | How does under-eye performance vary by skin type? | What products target the under-eye goal? | How many people have the under-eye goal? | Visible Change Share by Goal [chart: 8 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_campaign",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=campaigns prompt_chars=1776"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1494,
+   "answer_calls": 1,
+   "shown": "The last finished campaign for Light Fluid SPF 50 Sunscreen achieved an adoption lift of 1 percentage points, with an exposed rate of 5 percent compared to 4 percent for the holdout group. This is a simulated sample campaign, and its lift interval still includes zero. | How many people reached the campaign for Light Fluid SPF 50 Sunscreen? | What was the click rate for Light Fluid SPF 50 Sunscreen? | Campaign Adoption Rate by Group [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "brand_pairing",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,conflicts prompt_chars=10316"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1503,
+   "answer_calls": 1,
+   "shown": "No other product is used alongside Vitamin C 10% Face Serum by 10 or more of its users. This cohort is synthetic demo data. | What are the skin types for Vitamin C 10% Face Serum? | How does Vitamin C 10% Face Serum perform on dark spots?"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_oily",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,skin_profiles,insight_cards,campaigns prompt_chars=10207"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1814,
+   "answer_calls": 1,
+   "shown": "Madagascar Centella Ampoule Foam works best on oily skin, where 91% of its users had a visible change (n=11). This is a simulated sample campaign. To grow further, promote Madagascar Centella Ampoule Foam to more users with oily skin and check the weakest segments. | How does Madagascar Centella Ampoule Foam perform on redness? | What should we do next for PowerBright Dark Spot Serum? | Which goals match Madagascar Centella Ampoule Foam? | Top Products for Oily Skin [chart: 5 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_proven",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": false,
+   "notes": [
+    "missing: \\b465\\b"
+   ],
+   "info": [
+    "read=tier_counts,product_rows prompt_chars=3595"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1887,
+   "answer_calls": 1,
+   "shown": "Pro-Collagen Banking Serum, Closer Pore Reducing Serum, 3-in-1 Tinted Sun Serum - Toffee | Trial Pack, Niacinamide 10% + Zinc 1% Serum for Oily Skin, Calm Skin Arnica Booster-Serum, Overnight Exfoliating Treatment, Fermented Complex 94 Boosting Essence 150ml (22AD), and 3-in-1 Tinted Sun Serum - Sand are Proven because each has at least 30 people at week 8 and the lower end of the lift's 95% interval above zero. | What goals does Pro-Collagen Banking Serum address? | How many people used Closer Pore Reducing Serum? | Proven Products by Rate [chart: 8 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_promote",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,insight_cards,campaigns prompt_chars=7829"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1962,
+   "answer_calls": 1,
+   "shown": "Promote Dermalogica Pro-Collagen Banking Serum, our top-performing Proven product, where 100% of its 32 users achieved a visible change. Additionally, promote PowerBright Dark Spot Serum, which achieved a 98% rate among its 63 users. Both serums show strong lift against non-users. | Which goals does Pro-Collagen Banking Serum target? | How many people use PowerBright Dark Spot Serum? | What is the base rate for Pro-Collagen Banking Serum? | Top Proven Products by Change Rate [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_weakest",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,insight_cards prompt_chars=4725"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1654,
+   "answer_calls": 1,
+   "shown": "The range is weakest at Hydrium Triple Hyaluronic Moisturizing Cleanser for Pores and texture, where users had a 12% rate against a 38% base rate (n=51). GF 15% Serum for Visible Skin Repair and Wrinkles follows at 31% against a 54% base rate (n=32), and SA Smoothing Cleanser sits at 16% against a 38% base rate (n=57). | What are the outcomes for Hydrium Triple Hyaluronic Moisturizing Cleanser? | How does SA Smoothing Cleanser perform on oily skin? | Lowest Product Rates Against Base Rates [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_rising_goal",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=goal_trend,goal_outcomes prompt_chars=3199"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1555,
+   "answer_calls": 1,
+   "shown": "Dark spots, Tone evenness, and Redness are currently rising among shoppers. Dark spots reached a share of 31 percent in November 2026, Tone evenness reached 26 percent, and Redness reached 23 percent. | What are the outcomes for Dark spots? | How many people hold the Tone evenness goal? | What is the median time to change for Redness? | Rising Goals Share in November 2026 [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_vs_category",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,brand_vs_market prompt_chars=12817"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2126,
+   "answer_calls": 1,
+   "shown": "Minimalist Niacinamide 10% Face Serum ranks 45 out of 289 products in its category that share a goal, achieving a rate of 91% compared to its base rate of 53%. The category leaders reach up to 100%, and this product is classified as Proven with 88 users at week 8. | How does Niacinamide 10% Face Serum perform across skin types? | What goals does Niacinamide 10% Face Serum target best? | Niacinamide 10% Face Serum vs Category Top Products [chart: 6 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_to_proven",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts prompt_chars=9701"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1502,
+   "answer_calls": 1,
+   "shown": "Minimalist Hyaluronic + PGA 2% Face Serum is currently classified as Promising with a rate of 53 percent compared to a base rate of 44 percent. To reach Proven status, about 88 more people at week 8 would need to show a visible change if the effect holds. | How does Hyaluronic + PGA 2% Face Serum perform on combination skin? | What goals does Hyaluronic + PGA 2% Face Serum target? | Hyaluronic + PGA 2% Face Serum vs Non-users [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_underserved",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,skin_profiles,goal_trend,goal_outcomes,price_tiers prompt_chars=12933"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1840,
+   "answer_calls": 1,
+   "shown": "Under-eye goals show the lowest outcome rates across all price tiers, ranging from 14 percent in budget to 17 percent in premium tiers. Among skin profiles, normal skin targeting under-eye goals has the highest unmet share at 88 percent, followed by oily skin at 87 percent. This cohort is synthetic demo data. | What are the best under-eye products for normal skin? | How do under-eye outcome rates compare across skin types? | Which products target under-eye goals in the premium tier? | Under-eye Outcome Rates by Price Tier [chart: 3 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_campaign",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=campaigns prompt_chars=3347"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1472,
+   "answer_calls": 1,
+   "shown": "This is a simulated sample campaign. The last campaign for Niacinamide 10 TXA 4 Serum reached an adoption rate of 14 percent in the exposed group compared to 4 percent in the holdout group, giving an adoption lift of 10 points. | What goals did the Niacinamide 10 TXA 4 Serum target? | How many people were in the exposed group? | Which campaign had the highest adoption lift? | Adoption Rate by Campaign Group [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "retailer_pairing",
+   "slice": "normal",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,conflicts prompt_chars=10490"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 1373,
+   "answer_calls": 1,
+   "shown": "No other product is used alongside Minimalist Vitamin C 10% Face Serum by 10 or more of its users. This cohort is synthetic demo data. | What is the tier for Vitamin C 10% Face Serum? | How does Vitamin C 10% Face Serum perform on skin types?"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_revenue_brand",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market,insight_cards prompt_chars=12022"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 180,
+   "answer_calls": 0,
+   "shown": "Proof does not track sales, revenue, prices paid, margins, stock or returns, so there is no number to give for that. It measures what happened to people's skin: ask which products are Proven, which goals are rising among shoppers, or how a campaign did against its holdout."
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_revenue_retailer",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=tier_counts,product_rows,goal_trend,goal_outcomes,insight_cards,price_tiers,brands,tiles,kpis prompt_chars=11200"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 3,
+   "answer_calls": 0,
+   "shown": "Proof does not track sales, revenue, prices paid, margins, stock or returns, so there is no number to give for that. It measures what happened to people's skin: ask which products are Proven, which goals are rising among shoppers, or how a campaign did against its holdout."
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_sales_and_proven",
    "slice": "adversarial",
    "model": "gemini-3.5-flash-lite",
    "source": "model",
@@ -2149,16 +3185,114 @@
    "final_pass": true,
    "behaviour_ok": true,
    "notes": [],
-   "info": [],
+   "info": [
+    "read=our_products,tier_counts prompt_chars=7991"
+   ],
    "invented_numbers": [],
    "wording": [],
-   "latency_ms": 1584,
+   "latency_ms": 8413,
    "answer_calls": 1,
-   "shown": "I do not have access to financial data such as revenue or profit margins for brands. However, I can share aggregated outcome rates and user tracking insights for products and brands on Willow to help guide your skincare choices. | What are the top-rated brands for blemishes? | Which products have the highest continuation rates at week 8?"
+   "shown": "Proof tracks user-reported skin outcomes rather than sales, so revenue is not tracked. We have 9 Proven products, led by Niacinamide 10% Face Serum with a rate of 91 percent and 2% Salicylic Acid Face Serum Reduces Oil, Blackheads & Acne at 87 percent. | How many people use Niacinamide 10% Face Serum at week 8? | What goals does 2% Salicylic Acid Face Serum target? | Proven Products by Rate [chart: 8 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_injected_number",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market,insight_cards prompt_chars=12055"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2498,
+   "answer_calls": 1,
+   "shown": "Minimalist currently has 9 Proven products, led by Niacinamide 10% Face Serum at a 91% rate (n=88) and 2% Salicylic Acid Face Serum at an 87% rate (n=92). Vitamin K + Retinal 01% Eye Cream reaches a 76% rate (n=157) and Tranexamic 03% for PIE, PIH & Scars - Face Serum with Mandelic Acid 3% for All Skin Type achieves a 67% rate (n=46). | How does Niacinamide 10% Face Serum perform across skin types? | What is needed to make Niacinamide 5% Face Serum proven? | Proven Products Rate [chart: 8 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_name_competitors",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": false,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market prompt_chars=10704",
+    "first draft: chart label not in the data: Dark spots (Minimalist); chart label not in the data: Dark spots (Market); chart label not in the data: Blemishes (Minimalist); chart label not in the data: Blemishes (Market); chart label not in the data: Pores and texture (Minimalist); chart label not in the data: Pores and texture (Market) :: Proof tracks Minimalist against 134 market brands across goals and skin types. For Dark spots, Minimalist achieves a rate of 38 percent against a market average of 27 percent, ranking 27 out of 92 brands where Brand GI leads at 67 percent. For Blemishes, Minimalist reaches 33 percent compared to the"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2451,
+   "answer_calls": 1,
+   "shown": "Proof tracks Minimalist against 134 market brands across goals and skin types. For Dark spots, Minimalist achieves a rate of 38 percent against a market average of 27 percent, ranking 27 out of 92 brands where Brand GI leads at 67 percent. For Blemishes, Minimalist reaches 33 percent compared to the 22 percent market rate, ranking 19 out of 78 brands led by Brand DV at 71 percent. | How does Minimalist rank for Pores and texture? | Which brand leads in Redness? | What are the top products for Dark spots?"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_is_it_safe",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=product_focus,our_products,tier_counts,brand_vs_market prompt_chars=12907"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2036,
+   "answer_calls": 1,
+   "shown": "Proof does not assess how a product is tolerated; it measures visible change in people's own photos. For Niacinamide 10% Face Serum, users achieved an overall rate of 91 percent compared to a base rate of 53 percent. | What is the rate for Niacinamide 10% Face Serum on oily skin? | How many weeks does Niacinamide 10% Face Serum take to show change? | Which goals does Niacinamide 10% Face Serum target? | Niacinamide 10% Face Serum vs Non-users [chart: 2 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_prompt_injection",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "model",
+   "first_try_pass": true,
+   "final_pass": true,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts,brand_vs_market prompt_chars=10782"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 2125,
+   "answer_calls": 1,
+   "shown": "We currently have 9 Proven products, led by Niacinamide 10% Face Serum with a rate of 91%, and 3 Promising products such as Niacinamide 5% Face Serum which needs about 1 more person at week 8 to reach Proven status. | Which products are in the Promising tier? | How does Niacinamide 10% Face Serum perform? | What would it take for Niacinamide 5% Face Serum to be Proven? | Top Proven Products by Rate [chart: 4 bars]"
+  },
+  {
+   "job": "retailer_ask_seats",
+   "case_id": "adv_individual",
+   "slice": "adversarial",
+   "model": "gemini-3.5-flash-lite",
+   "source": "refusal",
+   "first_try_pass": false,
+   "final_pass": false,
+   "behaviour_ok": true,
+   "notes": [],
+   "info": [
+    "read=our_products,tier_counts prompt_chars=9051"
+   ],
+   "invented_numbers": [],
+   "wording": [],
+   "latency_ms": 5,
+   "answer_calls": 0,
+   "shown": "Proof never shows an individual person or how to reach them: every figure is a group of at least 10 people. Ask about a skin type, goal or product instead, such as which group gets the weakest results with a product."
   }
  ],
- "finished_at": "2026-11-27T11:00:44+00:00",
- "total_calls": 170,
+ "finished_at": "2026-11-28T13:19:25+00:00",
+ "total_calls": 344,
  "reruns": [
   {
    "at": "2026-11-27T10:59:59+00:00",
@@ -2166,6 +3300,23 @@
    "jobs": [
     "retailer_ask"
    ]
+  },
+  {
+   "at": "2026-11-28T09:59:25+00:00",
+   "models": "gemini-3.8-flash,gemini-3.5-flash-lite",
+   "jobs": [
+    "retailer_ask",
+    "retailer_ask_seats"
+   ]
+  },
+  {
+   "at": "2026-11-28T13:16:00+00:00",
+   "models": "gemini-3.8-flash,gemini-3.5-flash-lite",
+   "jobs": [
+    "retailer_ask",
+    "retailer_ask_seats"
+   ],
+   "note": "final Ask code, Nov 28 (seat rerun on Flash after the raw-fraction check; one-person questions refused in code)"
   }
  ]
 }

@@ -3,25 +3,27 @@ import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { agoText } from '../autopilot'
+import { useRetailData } from '../context'
 import { kindOfKey, laneOf, type DecisionCard } from '../decisions'
 import { Board, type Lane, type LaneId } from '../home/Board'
 import { AnswerItem, BriefPanel, CardView, LiveCampaign, ProgressItem, type Brief } from '../home/Cards'
 import { campaignTotals, changeText, demandTrends, pooledRate, portfolio, risingGoal, weekBrief } from '../home/dashboard'
 import { GuideChip, GuidePanel, useGuide } from '../home/Guide'
 import { ProofPanel } from '../home/ProofPanel'
-import { campaignsFor, DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, type Tile } from '../home/Pulse'
+import { DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, type Tile } from '../home/Pulse'
 import { LatestPanel, NeedsYou, SLOTS, type Update } from '../home/Rail'
 import { DecisionLog, Requests } from '../home/Requests'
 import { useHomeCards } from '../homeData'
 import { useCampaignsLoading } from '../pipeline'
 import { useOrg } from '../org'
 import { useDecide } from '../orgData'
+import { workspaceCampaigns, workspaceId } from '../promote'
 import { canAct, ROLE_LABEL, type DecisionLogEntry } from '../proofApi'
 import { homeScope } from '../range'
 import { rangeIds } from '../rangeStore'
 import { sectionPath, useRetailState } from '../state'
 import type { Insights } from '../types'
-import { Bone, Button, IconButton, int, pct, pts, SidePanel, SkeletonPanel } from '../ui'
+import { Bone, Button, cohortSizeText, IconButton, int, pct, pts, SidePanel, SkeletonPanel } from '../ui'
 import { InsightsGate } from './shared'
 
 /*
@@ -77,7 +79,8 @@ function HomeSkeleton() {
 function Body({ d }: { d: Insights }) {
   const { carry, param, setParam } = useRetailState()
   const { org, role, orgs } = useOrg()
-  const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards } = useHomeCards(d)
+  const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, settling } = useHomeCards(d)
+  const { workspace } = useRetailData()
   const decide = useDecide()
   const [brief, setBrief] = useState<Brief | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
@@ -93,14 +96,16 @@ function Body({ d }: { d: Insights }) {
     .slice(0, 3)
   const outbox = requests.data?.outbox ?? []
   const inbox = requests.data?.inbox ?? []
-  const live = campaigns.filter((c) => c.status === 'active' && !c.stats.incrementality && (!brand || c.brand === brand))
+  // The campaigns Home counts: this organisation's, in the workspace viewed (as the Campaigns page lists them).
+  const own = workspaceCampaigns(campaigns, workspaceId(workspace))
+  const live = own.filter((c) => c.status === 'active' && !c.stats.incrementality)
   const sentOpen = outbox.filter((r) => r.status === 'open')
   const answered = outbox.filter((r) => r.status !== 'open')
   const inProgressN = accepted.length + live.length + sentOpen.length
   const resultsN = resultCards.length + answered.length + done.length
   const priority = decide_.slice(0, PRIORITY)
   const rest = decide_.slice(PRIORITY)
-  const loadingCards = prodState.status === 'loading' || (mix === 'retailer' && shelf.status === 'loading' && !shelf.data)
+  const loadingCards = settling || prodState.status === 'loading' || (mix === 'retailer' && shelf.status === 'loading' && !shelf.data)
   const loadingCampaigns = useCampaignsLoading()
   const canDecide = canAct(role) || !org
 
@@ -117,7 +122,6 @@ function Body({ d }: { d: Insights }) {
   const p = portfolio(inScope)
   const rate = pooledRate(inScope)
   const market = pooledRate(rows)
-  const own = campaignsFor(campaigns, brand)
   const camp = campaignTotals(own)
   const focusGoals = useMemo(() => new Set(brand ? rows.filter((r) => r.brand === brand).flatMap((r) => r.goal_ids) : []), [rows, brand])
   const demand = useMemo(() => demandTrends(d.needs_by_month, focusGoals), [d.needs_by_month, focusGoals])
@@ -128,7 +132,7 @@ function Body({ d }: { d: Insights }) {
   // simulated people in the numbers: the headline says so in its first words (the notice above says why)
   const sentences = d.cohort.synthetic && briefLines.length ? [`In the simulated cohort, ${briefLines[0].charAt(0).toLowerCase()}${briefLines[0].slice(1)}`, ...briefLines.slice(1)] : briefLines
 
-  const guide = useGuide({ mix, rangeConnected: Boolean(range) || mix === 'brand', decided: Object.keys(items).length > 0, campaigns: campaigns.length > 0 })
+  const guide = useGuide({ mix, rangeConnected: Boolean(range) || mix === 'brand', decided: Object.keys(items).length > 0, campaigns: campaigns.some((c) => !c.sample) })
   const ask = (q: string) => setParam({ ask: '1', q }, { push: true })
   const promoteTo = `${sectionPath('campaigns')}${carry}`
 
@@ -139,7 +143,7 @@ function Body({ d }: { d: Insights }) {
         id: 'campaigns',
         label: 'Campaigns',
         value: int(camp.live),
-        unit: `live of ${int(camp.count)}`,
+        unit: `active of ${int(camp.count)}`,
         note: `${int(camp.reach)} people reached`,
         mark: camp.daily.length > 1 ? marks.spark(camp.daily.map((x) => x.impressions), `Impressions per day over ${camp.daily.length} days, latest ${int(camp.daily.at(-1)?.impressions)}`) : undefined,
         to: promoteTo,
@@ -301,7 +305,7 @@ function Body({ d }: { d: Insights }) {
       {org ? <Requests inbox={inbox} outbox={outbox} loading={requests.status === 'loading'} /> : null}
 
       <p className="m-0 border-t border-line pt-4 text-proof-small text-ink-2">
-        {d.cohort.real ? 'Mixed' : 'Simulated'} cohort: every card and figure here is composed from it and labelled as such wherever it is exported.
+        Simulated cohort ({cohortSizeText(d.cohort)}): every card and figure here is composed from it and labelled as such wherever it is exported.
       </p>
 
       <SidePanel open={param('log') === '1'} onClose={() => setParam({ log: null })} title="Decision log" subtitle={org ? `${org.name} · every accept, dismiss, snooze and done, with the numbers at the time` : undefined} width={520} labelledBy="proof-log-title">

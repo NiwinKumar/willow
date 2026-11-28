@@ -145,7 +145,7 @@ function Method() {
       <Panel title="How a change is measured" id="m-change-h" description="Each person against their own baseline, never against other people.">
         <dl className="m-0 grid gap-5 md:grid-cols-2">
           <Fact k="Own baseline" v={r.method ?? '—'} />
-          <Fact k="Noise band (MDC95)" v={<>{r.noise?.rule}{r.noise?.band_photos ? ` The band comes from ${r.noise.band_photos} repeated baseline photos, at ${Math.round((r.noise.confidence ?? 0.95) * 100)}% confidence.` : ''}</>} />
+          <Fact k="Noise band (MDC95)" v={<>{r.noise?.rule}{r.noise?.band_photos ? ` The band comes from the spread of five baseline photos (at least ${r.noise.band_photos} usable), at ${Math.round((r.noise.confidence ?? 0.95) * 100)}% confidence.` : ''}</>} />
           <Fact k="Minimum window" v={r.window ?? `${r.weeks ?? 8} weeks`} />
           <Fact k="Comparison" v="People with the same goals who did not use the product, measured the same way. Lift = the difference in the share with a visible change, in points, with a 95% Wilson interval." />
         </dl>
@@ -267,7 +267,7 @@ function Claims() {
         </Panel>
       </div>
       <Panel title="Exports" id="cl-exp-h">
-        <p className="m-0 text-proof-small text-ink-2">Claims and evidence packs built on the simulated or mixed cohort can’t be exported for external use: the export is refused on the server and disabled here, with the reason. Only claims saved under the real cohort, citing statements that exist there, can be approved for export.</p>
+        <p className="m-0 text-proof-small text-ink-2">Claims and evidence packs built on the simulated cohort, with or without the few real people, can’t be exported for external use: the export is refused on the server and disabled here, with the reason. Only claims saved under the real cohort, citing statements that exist there, can be approved for export.</p>
       </Panel>
     </>
   )
@@ -340,9 +340,10 @@ function Packs() {
   const ids = rangeIds(range)
   const brand = workspace.kind === 'brand' ? workspace.brand : null
   if (state.status !== 'ready') return <Bone className="h-40 w-full" />
-  const rows = state.d.products.filter((r) => r.rate !== null && (brand ? r.brand === brand : ids ? ids.has(r.product_id) : true)).sort((a, b) => (b.n ?? 0) - (a.n ?? 0))
+  // statements exist only for Proven products (the api gives none below it)
+  const rows = state.d.products.filter((r) => r.tier === 'proven' && (brand ? r.brand === brand : ids ? ids.has(r.product_id) : true)).sort((a, b) => (b.n ?? 0) - (a.n ?? 0))
   return (
-    <Panel title="Evidence packs" id="packs-h" description="Each measured product’s claim-ready statements with n, window, method and cohort, as a print-ready page, Markdown or CSV." flush>
+    <Panel title="Evidence packs" id="packs-h" description="Each Proven product’s claim-ready statements, every rate with its comparison group and both group sizes, with window, method and cohort, as a print-ready page, Markdown or CSV." flush>
       {rows.length ? (
         <ul className="m-0 flex list-none flex-col p-0">
           {rows.map((r) => (
@@ -362,7 +363,7 @@ function Packs() {
           ))}
         </ul>
       ) : (
-        <EmptyState compact title="No measured product yet" body="A product gets an evidence pack once 10 people reach week 8 with it." />
+        <EmptyState compact title="No Proven product yet" body="A product gets an evidence pack once it is Proven: a visible change above people with the same goals who do not use it, clear of chance." />
       )}
     </Panel>
   )

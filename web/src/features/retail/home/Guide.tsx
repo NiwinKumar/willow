@@ -24,7 +24,8 @@ export function useGuide({ mix, rangeConnected, decided, campaigns }: { mix: 're
     {
       title: 'Connect your range',
       body: mix === 'brand' ? 'Your products arrive from the retailer’s item file, matched to the measured catalog.' : 'Upload your item file once; Proof matches it to the measured catalog.',
-      items: [{ label: mix === 'brand' ? 'Your products are in the catalog' : 'Item file connected', done: rangeConnected, to: `${sectionPath('range')}${carry}` }],
+      // labels are the action, so "To do: …" and "Done: …" both read right
+      items: [{ label: mix === 'brand' ? 'Find your products in the catalog' : 'Connect your item file', done: rangeConnected, to: `${sectionPath('range')}${carry}` }],
     },
     {
       title: 'See what works',
@@ -43,12 +44,14 @@ export function useGuide({ mix, rangeConnected, decided, campaigns }: { mix: 're
   const all = steps.flatMap((s) => s.items)
   const done = all.filter((i) => i.done).length
   const next = all.find((i) => !i.done) ?? null
-  return { steps, done, total: all.length, next, hidden: hidden || done === all.length, hide, compact: done >= 2 }
+  // The count shown is steps (the three numbered ones on screen), not their checklist items: "1 of 4" beside three steps read as a mistake.
+  const stepsDone = steps.filter((s) => s.items.every((i) => i.done)).length
+  return { steps, done, total: all.length, stepsDone, next, hidden: hidden || done === all.length, hide, compact: done >= 2 }
 }
 
 export type Guide = ReturnType<typeof useGuide>
 
-/** The folded guide: a ring and "Getting started · 2 of 4"; opens the full guide. */
+/** The folded guide: a ring and "Getting started · 2 of 3" (steps); opens the full guide. */
 export function GuideChip({ g, open, onToggle }: { g: Guide; open: boolean; onToggle: () => void }) {
   const r = 7
   const c = 2 * Math.PI * r
@@ -56,11 +59,11 @@ export function GuideChip({ g, open, onToggle }: { g: Guide; open: boolean; onTo
     <button type="button" onClick={onToggle} aria-expanded={open} aria-controls="guide-h" className="hit44 inline-flex h-9 items-center gap-2 rounded-pill border border-line bg-surface pl-2 pr-3 text-proof-small text-ink transition-colors hover:border-line-strong hover:bg-pf-hover">
       <svg aria-hidden width={18} height={18} viewBox="0 0 18 18" className="-rotate-90">
         <circle cx={9} cy={9} r={r} fill="none" stroke="var(--bg-sunken)" strokeWidth={2.5} />
-        <circle cx={9} cy={9} r={r} fill="none" stroke="var(--proof-leaf)" strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(c * g.done) / g.total} ${c}`} className="transition-[stroke-dasharray] duration-500" />
+        <circle cx={9} cy={9} r={r} fill="none" stroke="var(--proof-leaf)" strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(c * g.stepsDone) / g.steps.length} ${c}`} className="transition-[stroke-dasharray] duration-500" />
       </svg>
       <span>Getting started</span>
       <span className="text-ink-2 tnum">
-        {g.done} of {g.total}
+        {g.stepsDone} of {g.steps.length}
       </span>
       <ChevronDown size={14} strokeWidth={1.7} aria-hidden className={`text-ink-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
     </button>
@@ -76,7 +79,7 @@ export function GuidePanel({ g, onClose }: { g: Guide; onClose?: () => void }) {
         </h2>
         <span className="flex items-center gap-1">
           <span className="mr-2 text-proof-small text-ink-2 tnum">
-            {g.done} of {g.total} done
+            {g.stepsDone} of {g.steps.length} steps done
           </span>
           <button type="button" onClick={g.hide} className="hit44 rounded-ctl border-0 bg-transparent px-2 py-1 text-proof-small text-ink-2 hover:bg-pf-hover hover:text-ink">
             Hide guide

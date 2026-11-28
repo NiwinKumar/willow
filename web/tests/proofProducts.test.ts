@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { packCsv, packHtml, packMarkdown, packName, statementLine } from '../src/features/retail/evidencePack.ts'
-import { bestSeg, brandShares, categorySpot, filterRows, hintOf, productsLead, promoHistory, promoNote, leaderOf, money, noDataReason, parseIds, rivalOf, segInterval, toggleId, verdictLine, wilson } from '../src/features/retail/productModel.ts'
+import { bestSeg, brandShares, categorySpot, filterRows, hintOf, lastWeekStep, productsLead, promoHistory, promoNote, leaderOf, money, noDataReason, parseIds, priceTierWord, productFacts, rivalOf, segInterval, toggleId, verdictLine, wilson } from '../src/features/retail/productModel.ts'
 import type { ProductDetail, ProductRow } from '../src/features/retail/types.ts'
 
 function row(p: Partial<ProductRow> & { product_id: string }): ProductRow {
@@ -185,4 +185,19 @@ test('promotion history: running beats paused beats the latest finished; samples
   assert.equal(promoNote(m.get('z')), 'Campaign paused')
   assert.equal(promoNote({ state: 'ended', lift: null, campaignId: '3', sample: true }), 'Promoted before')
   assert.equal(promoNote(undefined), null)
+})
+
+test('a product with no checked price still has a facts line (most index products: price and price tier are null)', () => {
+  // the product page crashed on price_tier null ("Cannot read properties of null (reading '0')")
+  const p = { ...row({ product_id: 'p' }), price_tier: null, size: '', price: null }
+  assert.equal(productFacts(p), 'Serums')
+  assert.equal(priceTierWord(null), null)
+  assert.equal(productFacts({ ...p, price_tier: 'mid', size: '30 ml', price: { amount: 17, currency: 'USD' } }), 'Serums · Mid price · 30 ml · US$17')
+})
+
+test('the curve says how much of the last week is a change first seen at that reading', () => {
+  // Ursa Major, Nov 28: 55% at week 7, 97% at week 8 (the comparison group 34% to 55%)
+  assert.deepEqual(lastWeekStep({ users: [0, 0, 0.16, 0.21, 0.32, 0.47, 0.55, 0.97], base: [0, 0.01, 0.05, 0.1, 0.17, 0.24, 0.34, 0.55] }), { users: 42, base: 21 })
+  assert.equal(lastWeekStep({ users: [null, null], base: [null, null] }), null)
+  assert.equal(lastWeekStep({ users: [0.5, 0.5], base: [0.2, 0.3] }), null) // no step, nothing to explain
 })

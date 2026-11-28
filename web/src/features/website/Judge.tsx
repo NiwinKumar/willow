@@ -6,12 +6,15 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '../../data/types'
 import { enterDemo, leaveDemo, useActivateData, useData } from '../../data/useData'
 import { api } from '../../lib/api'
+import { aNum } from '../../lib/format'
 import { identity } from '../../lib/identity'
 import { judge, JUDGE_STOPS, type JudgeStop } from '../../lib/judge'
+import { LANGUAGES } from '../../lib/language'
 import { useAuth } from '../../lib/useAuth'
 import { CHIP_DOT, serviceChips, useDemoStatus } from '../../lib/useDemoStatus'
 import { useJudge } from '../../lib/useJudge'
 import { useSamples } from '../../lib/useSamples'
+import { evidence, money } from '../evidence/data'
 import { backButton, SoftBackdrop } from './Decor'
 import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH } from './destinations'
 import { journeyLine, journeyUnavailableLine, useJourney } from './hooks'
@@ -37,6 +40,44 @@ const HONEST = [
   ['Routine clashes come from a rule table in code.', 'Gemini may add a finding, marked as AI-suggested, never remove one.'],
   ['The retailer assistant sees aggregates only.', 'No rows, groups under 10 people hidden; chart labels and values must exist in the data.'],
 ] as const
+
+/** A cost row of evidence.json by its unit name, as "2.5¢" (cost_report.py writes them from production logs). */
+const costOf = (unit: string) => {
+  const row = evidence.cost?.rows.find((r) => r.unit === unit)
+  return row ? money(row.usd) : null
+}
+
+type Faq = { q: string; a: string; to: string; link: string }
+/**
+ * The eight questions a judge is likely to ask, each answered in a sentence or two with a link to the live
+ * evidence. Sources: docs/PRODUCT.md (who pays, cosmetic only), docs/DECISIONS.md (proof-gated promotion,
+ * 30-day photos, consent), docs/METRICS.md (noise band), docs/EVALS.md and evidence.json (the figures).
+ */
+function faqs(): Faq[] {
+  const checkIn = costOf('Face check-in')
+  const answer = costOf('Wisp answer')
+  const e = evidence.evals?.headline
+  return [
+    { q: 'Is the data real?', a: 'The measurements are: every number is computed from a photo by the engine. Mei’s photos are generated and Proof’s cohort is simulated, and both are labelled wherever they appear.', to: '/evidence#simulated', link: 'What is simulated' },
+    { q: 'How was the measurement validated?', a: 'Against itself. Each reading is judged against the spread of your own baseline photos. It is not clinically validated, and a test on real skin across skin tones is planned, not done.', to: '/evidence#bands', link: 'The noise band' },
+    {
+      q: 'What does it cost to run?',
+      a: checkIn && answer ? `About ${checkIn} for a face check-in and ${answer} for a Wisp answer, from medians in the production logs at list prices.` : 'Cost per check-in and per answer is measured from the production logs.',
+      to: '/evidence#cost',
+      link: 'Cost per use',
+    },
+    { q: 'What happens to my photos?', a: 'Original photos are deleted 30 days after upload, and you can delete everything at any time. Results reach a retailer only if you opt in, and only in groups of 10 or more.', to: '/terms', link: 'Terms and privacy' },
+    { q: 'Is this medical?', a: 'No. It tracks cosmetic appearance only. No condition is named, nothing is graded, and suggestions are over-the-counter cosmetics.', to: '/terms#safe', link: 'What Willow never does' },
+    { q: 'Who pays?', a: 'Shoppers use Willow free. Retailers pay for Proof, and a brand can pay that retailer to promote a product only once its measured evidence passes the bar.', to: PROOF_PATH, link: 'Open Proof' },
+    { q: 'Why weekly photos?', a: 'Skin changes over weeks, and a single photo can just be a good-lighting day. The same day and time each week keeps photos comparable.', to: JOURNEY_PATH, link: 'Mei’s eight weeks' },
+    {
+      q: 'Why not let Gemini look at the photo and score it?',
+      a: `A language model writes a plausible number whether or not it measured anything. So code measures and Gemini only explains${e ? `; in our evals a check had to reject ${e.first_try_rejected} of its ${e.answers} first answers` : ''}.`,
+      to: '/evidence#checked',
+      link: 'The eval results',
+    },
+  ]
+}
 
 /**
  * The setup adds the routine only once (to an empty routine), so a second visit is told 0. What the first
@@ -150,7 +191,7 @@ export default function Judge() {
     title: ready ? (me.guest ? '✓ Guest access ready' : `✓ Signed in as ${me.email ?? me.name}`) : setup === 'no-guest' ? 'Could not make a guest account' : setup === 'failed' ? 'Tour setup failed' : 'Setting up guest access…',
     body: ready
       ? me.guest
-        ? `A guest account of your own on this browser. Every stop runs the real api, engine and Gemini${routineAdded ? `; a ${routineAdded}-product routine was added for stop 04` : ''}.`
+        ? `A guest account of your own on this browser. Every stop runs the real api, engine and Gemini${routineAdded ? `; ${aNum(routineAdded)} ${routineAdded}-product routine was added for stop 04` : ''}.`
         : 'The stops use your own account and routine.'
       : setup === 'no-guest'
         ? 'The sign-in service didn’t respond. Retry, or open the retailer insights, which need no account.'
@@ -211,7 +252,7 @@ export default function Judge() {
       id: 'retailer',
       title: 'Retailer insights',
       tag: 'SYNTHETIC COHORT',
-      body: `What ${status.status?.bigquery.synthetic ? `${status.status.bigquery.synthetic} simulated people` : 'a simulated cohort'} were trying to change, which products reached real change, and where the gaps are. Groups under 10 people are never shown.`,
+      body: `What ${status.status?.bigquery.synthetic ? `${status.status.bigquery.synthetic.toLocaleString('en')} simulated people` : 'a simulated cohort'} were trying to change, which products reached real change, and where the gaps are. Groups under 10 people are never shown.`,
       cta: 'Open dashboard',
       act: () => go('retailer', PROOF_PATH),
     },
@@ -326,6 +367,45 @@ export default function Judge() {
           })}
         </div>
 
+        <ul aria-label="New in this build" className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
+          <li className="flex">
+            <button
+              type="button"
+              onClick={() => go('advisor', '/home?advisor=1')}
+              disabled={!ready}
+              className="glass flex min-h-[76px] w-full flex-col items-start justify-center gap-1 rounded-[28px] px-5 py-3.5 text-left transition-[scale] duration-200 ease-standard active:scale-[.985] disabled:opacity-60"
+            >
+              <span className="text-[17px]">Talk to Wisp in your language <span aria-hidden>→</span></span>
+              <span className="text-[13px] leading-[1.4] text-ink-2">{ready ? `Ask aloud or type, in any of ${LANGUAGES.length} languages. Only the checked answer is spoken.` : needsGuest}</span>
+            </button>
+          </li>
+          <li className="flex">
+            <Link to="/evidence" className="glass flex min-h-[76px] w-full flex-col justify-center gap-1 rounded-[28px] px-5 py-3.5 text-ink no-underline transition-[scale] duration-200 ease-standard active:scale-[.985]">
+              <span className="text-[17px]">How we know <span aria-hidden>→</span></span>
+              <span className="text-[13px] leading-[1.4] text-ink-2">The eval results with their failures, what each check does, cost per use, and four ways to try to break Wisp.</span>
+            </Link>
+          </li>
+        </ul>
+
+        <section aria-labelledby="faq" className="glass mt-2 flex flex-col gap-5 rounded-[36px] p-[clamp(20px,3vw,32px)]">
+          <h2 id="faq" className="m-0 font-serif text-[clamp(28px,3vw,40px)] font-normal leading-[1.05]">
+            Eight fair questions, answered.
+          </h2>
+          <dl className="m-0 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            {faqs().map((f) => (
+              <div key={f.q} className="flex flex-col gap-1">
+                <dt className="text-[15px]">{f.q}</dt>
+                <dd className="m-0 text-[13px] leading-[1.45] text-ink-2">
+                  {f.a}{' '}
+                  <Link to={f.to} className="whitespace-nowrap text-ink underline underline-offset-2">
+                    {f.link}
+                  </Link>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <section aria-labelledby="honest" className="glass mt-2 grid gap-6 rounded-[36px] p-[clamp(20px,3vw,32px)] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <div className="flex flex-col items-start gap-3">
             <h2 id="honest" className="m-0 font-serif text-[clamp(28px,3vw,40px)] font-normal leading-[1.05]">
@@ -334,6 +414,9 @@ export default function Judge() {
             <a href={REPO} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center rounded-pill bg-white/70 px-4 text-[14px] text-ink no-underline hover:bg-white">
               Source code on GitHub ↗
             </a>
+            <Link to="/evidence" className="inline-flex min-h-11 items-center rounded-pill bg-white/70 px-4 text-[14px] text-ink no-underline transition-colors duration-200 hover:bg-white">
+              How we know: results and failures →
+            </Link>
           </div>
           <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2">
             {HONEST.map(([t, d]) => (

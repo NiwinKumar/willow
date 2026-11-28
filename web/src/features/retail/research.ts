@@ -21,7 +21,7 @@ export const CLAIMS_CANNOT = [
   '“Clinically proven”, “dermatologist proven” or anything that reads as a controlled trial: Proof is observational.',
   '“Treats”, “cures”, “heals”, “repairs” or any condition or disease name: Proof measures cosmetic appearance only.',
   '“Causes”, “guaranteed” or a promise to an individual: outcomes are rates in a group.',
-  'Anything from the simulated cohort, or a mixed one, in external copy: those claims cannot be exported.',
+  'Anything from the simulated cohort, with or without the few real people, in external copy: those claims cannot be exported.',
   'A ranking of people or skin tones: tone bands are buckets for “works for whom”, never an order.',
 ]
 export const CLAIM_LINE = (n: string, weeks: string) => `Measured in ${n} users over ${weeks} weeks, observational.`

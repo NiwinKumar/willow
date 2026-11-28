@@ -12,6 +12,8 @@ export type MarkupLinks = {
   productName: (id: string) => string | null
   onProduct: (id: string) => void
   onMetric: (id: MetricId) => void
+  /** The measurement's name in the answer's language (a translated answer); absent: the app's English label. */
+  metricName?: (id: string) => string | null
 }
 
 export function Markup({ text, links }: { text: string; links: MarkupLinks }) {
@@ -40,7 +42,8 @@ export function Markup({ text, links }: { text: string; links: MarkupLinks }) {
           </button>
         )
       }
-      const label = metricLabel(n.id)
+      const english = metricLabel(n.id)
+      const label = english ? (links.metricName?.(n.id) ?? english) : null
       if (!label) return <span key={k}>{n.id.replace(/_/g, ' ')}</span>
       return (
         <button key={k} type="button" onClick={() => links.onMetric(n.id as MetricId)} className="inline font-medium underline decoration-ink/30 decoration-dotted underline-offset-[3px] hover:decoration-ink">

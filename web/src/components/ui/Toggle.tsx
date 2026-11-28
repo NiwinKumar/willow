@@ -1,15 +1,20 @@
-/** 44×26 switch: off grey, on ink (never green). role=switch; the whole row is the label. */
+import { useId } from 'react'
+
+/** 44×26 switch: off grey, on ink (never green). role=switch; the whole row is the label (the switch is named by the label line and described by the help line). */
 export function Toggle({ label, checked, onChange, description, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; description?: string; disabled?: boolean }) {
+  const id = useId()
   return (
     <label className={`flex min-h-11 items-center justify-between gap-4 ${disabled ? 'opacity-55' : 'cursor-pointer'}`}>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[15px]">{label}</span>
-        {description ? <span className="text-[13px] text-ink-2">{description}</span> : null}
+        <span id={`${id}-l`} className="text-[15px]">{label}</span>
+        {description ? <span id={`${id}-d`} className="text-[13px] text-ink-2">{description}</span> : null}
       </span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-labelledby={`${id}-l`}
+        aria-describedby={description ? `${id}-d` : undefined}
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`relative h-[26px] w-11 shrink-0 rounded-pill transition-colors ${checked ? 'bg-selected' : 'bg-ink/20'}`}

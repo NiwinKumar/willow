@@ -7,7 +7,7 @@ import type { RoutineEntry } from '../../data/types'
 import { imageOf } from '../routine/routineModel'
 import { dayNote, restsOn } from '../routine/schedule'
 import { isSample } from '../routine/actives'
-import { orbColours, shortName } from './derive'
+import { distinctNames, orbColours } from './derive'
 import { HomeCard } from './cards'
 import { Pill } from './parts'
 
@@ -69,6 +69,8 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   const navigate = useNavigate()
   // The guest starter routine (api demo.py marks it): say so, and offer a real one.
   const sample = [...am, ...pm].some(isSample)
+  // Two products with the same short name (two niacinamide serums) carry their brand, so they can be told apart.
+  const names = distinctNames([...new Map([...am, ...pm].map((e) => [e.id, e])).values()])
   return (
     <HomeCard label="Routine today" className={`gap-3 p-4 ${className ?? ''}`} delay={160}>
       {/* Title and hint on the left; the routine check's first finding as quiet text in the right corner. */}
@@ -132,15 +134,18 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
                 <div className="relative my-auto grid justify-items-center gap-x-1 gap-y-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
                   {rows === 1 ? <span aria-hidden className="absolute h-[1.5px]" style={{ background: p.line, top: px / 2 - 1, left: `${50 / cols}%`, right: `${50 / cols}%` }} /> : null}
                   {list.map((e) => (
-                    <Orb key={e.id} entry={e} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
+                    <Orb key={e.id} entry={e} name={names.get(e.id) ?? ''} slot={slot} on={used(e.id, slot)} px={px} named={rows < 3} ring={p.ring} badgeRing={p.badgeRing} onToggle={(on) => onToggle(e, slot, on)} />
                   ))}
                   {slot === 'am' && missingSunscreen ? (
-                    <button type="button" onClick={onRoutine} aria-label="Sunscreen missing in Morning. Find one" title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
+                    // Named by its own visible words ("Sunscreen missing"), with where and what to do after them for
+                    // screen readers: the accessible name starts with the visible label (WCAG 2.5.3 label in name).
+                    <button type="button" onClick={onRoutine} title="Add a sunscreen" className="relative flex w-full min-w-0 flex-col items-center gap-1.5 p-0 text-inherit">
                       <span aria-hidden className="grid place-items-center rounded-full border-[1.5px] border-dashed border-ink/35 bg-white/50 text-[16px]" style={{ width: px, height: px }}>
                         +
                       </span>
-                      <span className="text-center text-[11px] leading-[1.2]">Sunscreen</span>
+                      <span className="text-center text-[11px] leading-[1.2]">Sunscreen</span>{' '}
                       <span className="text-[10.5px] leading-none opacity-75">Missing</span>
+                      <span className="sr-only"> in Morning. Find one</span>
                     </button>
                   ) : null}
                 </div>
@@ -153,7 +158,7 @@ export function RoutineToday({ am, pm, used, onToggle, missingSunscreen, conflic
   )
 }
 
-function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry: RoutineEntry; slot: Slot; on: boolean; px: number; named: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
+function Orb({ entry, name, slot, on, px, named, ring, badgeRing, onToggle }: { entry: RoutineEntry; name: string; slot: Slot; on: boolean; px: number; named: boolean; ring: string; badgeRing: string; onToggle: (on: boolean) => void }) {
   const [c0, c1, c2] = orbColours(entry)
   const full = [entry.custom_name, entry.brand].filter(Boolean).join(' · ')
   const rest = restsOn(entry)
@@ -198,7 +203,7 @@ function Orb({ entry, slot, on, px, named, ring, badgeRing, onToggle }: { entry:
           ✓
         </span>
       </span>
-      {named ? <span className={`line-clamp-2 text-center leading-[1.2] ${px >= 42 ? 'text-[11.5px]' : 'text-[10.5px]'}`}>{shortName(entry)}</span> : null}
+      {named ? <span className={`line-clamp-2 text-center leading-[1.2] ${px >= 42 ? 'text-[11.5px]' : 'text-[10.5px]'}`}>{name}</span> : null}
       {note && named ? <span className="min-h-[11px] font-mono text-[9.5px] tracking-[.05em] opacity-75">{note}</span> : null}
     </button>
   )

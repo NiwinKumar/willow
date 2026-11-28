@@ -119,7 +119,8 @@ export const PRESETS: { id: string; label: string; query: Query }[] = [
 /** Labels the rows don't carry (goal ids, statuses, price tiers). Missing ids fall back to the id itself. */
 export type Labels = { goal?: Record<string, string>; status?: Partial<Record<ProofTier, string>>; price?: Record<string, string> }
 
-const PRICE_ORDER = ['budget', 'mid', 'premium']
+// 'none': products with no checked price, their own group, listed last
+const PRICE_ORDER = ['budget', 'mid', 'premium', 'none']
 
 /** The groups a product falls in for a grouping (several for Goal: a product counts in each of its goals). */
 export function groupsOf(row: ProductRow, g: GroupId, labels: Labels = {}): { key: string; label: string }[] {
@@ -131,7 +132,7 @@ export function groupsOf(row: ProductRow, g: GroupId, labels: Labels = {}): { ke
     case 'category':
       return [{ key: row.category, label: row.category_label }]
     case 'price':
-      return [{ key: row.price_tier, label: labels.price?.[row.price_tier] ?? row.price_tier }]
+      return row.price_tier ? [{ key: row.price_tier, label: labels.price?.[row.price_tier] ?? row.price_tier }] : [{ key: 'none', label: 'No price listed' }]
     case 'status':
       return [{ key: row.tier, label: labels.status?.[row.tier] ?? row.tier }]
     case 'goal':

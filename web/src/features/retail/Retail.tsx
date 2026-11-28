@@ -20,7 +20,7 @@ import { isFallbackInstance, ROLE_LABEL, verifiedText } from './proofApi'
 import { ADVANCED, COHORTS, LEGACY_PATHS, RANGES, SECTIONS, sectionPath, useRetailState } from './state'
 import type { Insights, Range } from './types'
 import { setExportFilter } from './ui/format'
-import { BrandLogo, cohortKind, Combobox, type ComboOption, int, Menu, MenuDivider, MenuItem, MenuLabel, Segmented, SkeletonHeader, SkeletonKpis, SkeletonTable, useTooltip } from './ui'
+import { BrandLogo, cohortKind, cohortSizeText, Combobox, type ComboOption, int, Menu, MenuDivider, MenuItem, MenuLabel, mixedLabel, Segmented, SkeletonHeader, SkeletonKpis, SkeletonTable, useTooltip } from './ui'
 
 /*
  * Willow Proof (docs/RETAIL_BRAND.md, docs/RETAILER_INSIGHTS.md "App structure"): the business app at
@@ -457,7 +457,9 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
   }, [open])
   const kind = d ? cohortKind(d.cohort) : null
   const range = RANGES.find((r) => r.value === filters.range)!.label
-  const data = filters.cohort === 'real' ? 'Real users' : filters.cohort === 'simulated' ? 'Simulated' : 'Mixed data'
+  // `mixed` (the default) is the simulated cohort plus the few real people: said exactly, never "Mixed data"
+  const mixed = mixedLabel(d && filters.cohort === 'mixed' ? d.cohort : null)
+  const data = filters.cohort === 'real' ? 'Real users' : filters.cohort === 'simulated' ? 'Simulated' : mixed
   // A period with no readings is left out (the one picked stays, so the control never hides the current state).
   const ranges = RANGES.filter((r) => !withData || withData.has(r.value) || r.value === filters.range)
   const hidden = withData ? RANGES.filter((r) => !withData.has(r.value) && r.value !== filters.range) : []
@@ -468,7 +470,7 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
     : kind === 'real'
       ? `${int(d.cohort.real)} real consented people.`
       : kind === 'mixed'
-        ? `${int(d.cohort.synthetic)} simulated people and ${int(d.cohort.real)} real consented ${d.cohort.real === 1 ? 'person' : 'people'}, counted together.`
+        ? `${cohortSizeText(d.cohort)} (real: consented), counted together.`
         : `${int(d.cohort.synthetic)} simulated people, generated from measured photo noise. Not real customers.`
   return (
     <div ref={box} className="relative">
@@ -495,10 +497,10 @@ function DataScope({ d, loading }: { d: Insights | null; loading: boolean }) {
           </div>
           <div className="flex flex-col gap-2">
             <span className="text-proof-small font-medium text-ink">People</span>
-            <Segmented label="People" options={COHORTS} value={filters.cohort} onChange={(cohort) => setFilters({ cohort })} />
+            <Segmented label="People" options={COHORTS.map((c) => (c.value === 'mixed' ? { ...c, label: mixed } : c))} value={filters.cohort} onChange={(cohort) => setFilters({ cohort })} />
           </div>
           <p className="m-0 border-t border-line pt-3 text-proof-small text-ink-2">
-            {who} {d ? `${int(totalUsers(d.cohort))} in total.` : ''} Aggregates only; any group under 10 people is hidden.
+            {who} Aggregates only; any group under 10 people is hidden.
           </p>
         </div>
       ) : null}

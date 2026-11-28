@@ -34,6 +34,7 @@ from app import (
     routine_check,
     routine_log,
     safety,
+    translate,
 )
 from app.results import measured_result
 from app.settings import get_settings
@@ -58,8 +59,11 @@ own measurements, check their routine and find products from Willow's facts-only
 - Only recommend products returned by search_catalog or compare_products, by product_id. The
   catalog has facts (ingredients, price, stores), not efficacy; never claim a product works.
   measured_outcomes in tool results are cohort outcome rates; write a rate as a whole percent
-  (0.61 -> 61%), quote it only with its n and, when
-  synthetic_cohort is true, say they come from a synthetic demo cohort.
+  (0.61 -> 61%), quote it only with its n and, when synthetic_cohort is true, always with the
+  words "in Willow's simulated cohort" in the same sentence (never as if real shoppers saw it).
+- price in a tool result is the one price to quote for that product, in the person's currency;
+  price null means no price is checked in their currency: say so, never quote another currency
+  and never convert. One currency per answer.
 - verdict real_change = changed by more than the person's photos usually vary; within_noise =
   about the same as at their start; no_baseline = first reading, or the baseline needs more
   photos; a metric marked indicative is a trend.
@@ -227,6 +231,35 @@ MEDICINE_ASK = re.compile(
     r"antibiotics?|metronidazole|ivermectin|minoxidil|birth control pills?)\b",
     re.I,
 )
+# Asked to state a medical or guarantee claim ("say it is clinically proven", "promise it will
+# fix my skin", "95% guaranteed"): refused by this fixed reply before any model call, so it
+# answers at once and says what Wisp will not claim and what it can show instead (Nov 28: the
+# model's own refusal failed the wording check twice, 15 s, then a generic line).
+CLAIM_REPLY = (
+    "I won't say a product is proven by doctors, that it fixes a skin problem for good, or that "
+    "a result is guaranteed, and I won't put a percentage on a promise. Willow makes no medical "
+    "or guarantee claims. What I can do is show what your check-ins measured against your own "
+    "baseline, and the facts on a product's label."
+)
+CLAIM_FOLLOW_UPS = ["What did my last check-in measure?", "Is my routine OK together?"]
+_CLAIM_WORDS = (
+    r"(?:clinically|medically|scientifically|dermatologist|doctor)[- ]?"
+    r"(?:proven|tested|approved|recommended|backed)|\bproven to\b|\bcur(?:e|es|ed|ing)\b|"
+    r"\bheal(?:s|ed|ing)?\b|(?<!back )(?<!back-)\bguarantee\w*|\bmiracle\b|"
+    r"\bpermanent(?:ly)?\b|\b100\s?%|"
+    r"\bfor good\b|\bforever\b"
+)
+# an instruction to say it ("say", "tell me", "write", "confirm", "promise"), or a demand for a
+# guarantee or a "clinically proven" in any wording
+CLAIM_ASK = re.compile(
+    r"\b(?:say|state|claim|write|confirm|promise|admit|repeat|tell (?:me|us|them))\b"
+    rf"[^.?!]{{0,160}}(?:{_CLAIM_WORDS})"
+    # a guaranteed result ("95% guaranteed", "guarantee it works"), not a money-back guarantee
+    r"|\b\d+(?:\.\d+)?\s?%\s*guarantee\w*|(?<!back )\bguarantee[sd]?\s+(?:to|that|it|this|"
+    r"results?|you|me|us|my)\b|\bguaranteed\s+(?:to|results?|cure|fix)\b"
+    r"|(?:clinically|medically|scientifically)[- ]proven",
+    re.I,
+)
 PHOTO_REFUSAL = (
     "Willow reads product and label photos only, so I have not looked at this photo. To follow "
     "your skin, take a check-in: those photos are measured by Willow, not by Wisp."
@@ -237,9 +270,35 @@ PHOTO_REFUSAL = (
 NOT_IN_WILLOW = "not in Willow yet: never suggest it; say its ingredient list isn't in Willow yet"
 
 
-def _compact(p: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[str, Any]:
+def currency_of(profile: dict[str, Any] | None) -> str | None:
+    """The currency of where the person shops (None: no market set)."""
+    return regions.MARKET_CURRENCY.get((profile or {}).get("market") or "")
+
+
+def shown_price(p: dict[str, Any], currency: str | None) -> dict[str, Any] | None:
+    """The one price of a product that an answer quotes and its card shows: the lowest checked
+    price in the person's currency (the reference price or a store's; never converted), None
+    when none is checked in it. No currency known: the catalog's reference price."""
+    if not currency:
+        return p.get("price")
+    amount = plan.price_in(p, currency)
+    return None if amount is None else {"amount": amount, "currency": currency}
+
+
+def _common_currency(products: list[dict[str, Any]]) -> str | None:
+    """The currency most of these products are priced in (their reference prices)."""
+    seen = [p["price"]["currency"] for p in products if p.get("price")]
+    return max(set(seen), key=seen.count) if seen else None
+
+
+def _compact(
+    p: dict[str, Any], profile: dict[str, Any] | None = None, currency: str | None = None
+) -> dict[str, Any]:
     check = safety.check(p, profile)
     extra = {} if catalog.is_full(p) else {"ingredient_list": NOT_IN_WILLOW}
+    price = shown_price(p, currency)
+    if currency and price is None:
+        extra["price_note"] = f"no price checked in {currency}"
     return {
         "product_id": p["product_id"],
         "brand": p["brand"],
@@ -249,7 +308,7 @@ def _compact(p: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[s
         "concerns": [_words(c) for c in p["concerns"]],
         "check": {"status": check["status"], "flags": [f["title"] for f in check["flags"]]},
         "key_actives": p["key_actives"],
-        "price": p["price"],
+        "price": price,
         "size": p["size"],
         "stores": [s["store"] for s in p["stores"]],
         **extra,
@@ -362,12 +421,116 @@ def _outcomes(ids: list[str]) -> dict[str, Any]:
     except Exception:
         return {"note": "outcome data unavailable right now"}
     found = {i: data["product_outcomes"][i] for i in ids if i in data.get("product_outcomes", {})}
+    # Simulated whenever simulated people make up the cohort or most of it (Nov 28: 35,000
+    # simulated and 8 real read as "not synthetic", so the figures went out unlabelled).
+    cohort = data["cohort"]
+    synthetic = cohort.get("real", 0) == 0 or cohort.get("synthetic", 0) >= cohort["real"]
     return {
-        "synthetic_cohort": data["cohort"]["real"] == 0,
+        "synthetic_cohort": synthetic,
+        **(
+            {"say_it_as": f"{SIMULATED_COHORT} (simulated people, not real shoppers)"}
+            if synthetic
+            else {}
+        ),
         "definition": "rate = share of people with this goal still improved beyond their own "
         "photo noise at week 8; n = people; weeks = median weeks to first real change",
         "by_product": found,
     }
+
+
+SIMULATED_COHORT = "in Willow's simulated cohort"
+# Appended when an answer quotes a cohort figure without saying it is simulated.
+COHORT_NOTE = (
+    "Cohort figures are from Willow's simulated cohort: simulated people, not real shoppers."
+)
+_COHORT_WORDS = re.compile(
+    r"\bcohort\b|\boutcome rate\b|\bn\s*=\s*\d|\b\d+(?:\.\d+)?\s?% of (?:people|users|shoppers)\b"
+    r"|\bpeople (?:with|who)\b[^.]{0,60}\d+(?:\.\d+)?\s?%",
+    re.I,
+)
+_SAYS_SIMULATED = re.compile(r"\b(?:simulated|synthetic)\b", re.I)
+
+
+def cohort_unlabelled(written: list[str], rates: set[str]) -> bool:
+    """An answer text quotes a cohort figure (a rate from measured_outcomes as a percent, or a
+    number beside cohort words) without saying in that text that the cohort is simulated. Cohort
+    words with no figure ("there are no cohort rates for this") quote nothing."""
+    for text in written:
+        percents = {m.replace(",", ".") for m in re.findall(r"(\d+(?:[.,]\d+)?)\s?%", text)}
+        figure = bool(_COHORT_WORDS.search(text) and re.search(r"\d", text)) or percents & rates
+        if figure and not _SAYS_SIMULATED.search(text):
+            return True
+    return False
+
+
+# Currency marks an answer may carry: the person's own, or one they wrote themselves.
+_CURRENCY_MARKS = (
+    ("INR", r"₹|\bRs\.?(?=\s?\d)|\bINR\b"),
+    ("SGD", r"(?<![A-Za-z])S\$|\bSGD\b"),
+    ("AUD", r"(?<![A-Za-z])A\$|\bAUD\b"),
+    ("NZD", r"NZ\$|\bNZD\b"),
+    ("HKD", r"HK\$|\bHKD\b"),
+    ("TWD", r"NT\$|\bTWD\b"),
+    ("USD", r"US\$|(?<![A-Za-z])\$|\bUSD\b"),
+    ("GBP", r"£|\bGBP\b"),
+    ("EUR", r"€|\bEUR\b"),
+    ("JPY", r"(?<!CN)¥|\bJPY\b"),
+    ("CNY", r"CN¥|\bCNY\b|\bRMB\b"),
+    ("KRW", r"₩|\bKRW\b"),
+    ("MYR", r"\bRM(?=\s?\d)|\bMYR\b"),
+    ("THB", r"฿|\bTHB\b"),
+    ("IDR", r"\bRp\.?(?=\s?\d)|\bIDR\b"),
+    ("PHP", r"₱|\bPHP\b"),
+    ("VND", r"₫|\bVND\b"),
+    ("AED", r"\bAED\b"),
+)
+
+
+def currencies_in(text: str) -> set[str]:
+    """The currencies a text names by sign or code (S$ is not also $)."""
+    found: set[str] = set()
+    for code, pattern in _CURRENCY_MARKS:
+        if re.search(pattern, text):
+            found.add(code)
+            text = re.sub(pattern, " ", text)
+    return found
+
+
+def mixed_currency(written: list[str], currency: str | None, asked: set[str]) -> bool:
+    """The answer names a currency other than the person's (or one they wrote themselves); with
+    no currency known, more than one."""
+    used = set().union(*(currencies_in(t) for t in written)) if written else set()
+    if currency:
+        return bool(used - {currency} - asked)
+    return len(used - asked) > 1
+
+
+def pairings(
+    shown_ids: list[str], entries: list[dict[str, Any]], profile: dict[str, Any] | None
+) -> dict[str, dict[str, Any]]:
+    """{product_id: {issue, suggestion, with}} for products of the answer that the routine check
+    (the rule table, never the model) finds in conflict with each other in the person's routine:
+    their cards then say "Check this" with this reason instead of "No flags"."""
+    active = {e["id"]: e for e in entries if not e.get("ended_at") and e.get("product_id")}
+    if sum(1 for e in active.values() if e["product_id"] in shown_ids) < 2:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for c in routine_check.findings_for(entries, profile).get("conflicts", []):
+        both = [active[i] for i in c.get("products", []) if i in active]
+        hit = [e for e in both if e["product_id"] in shown_ids]
+        if len({e["product_id"] for e in hit}) < 2:
+            continue
+        for e in hit:
+            others = [
+                f"{o.get('brand', '')} {o.get('custom_name', '')}".strip()
+                for o in both
+                if o["product_id"] != e["product_id"]
+            ]
+            out.setdefault(
+                e["product_id"],
+                {"issue": c["issue"], "suggestion": c.get("suggestion") or "", "with": others},
+            )
+    return out
 
 
 def suggestible(p: dict[str, Any], profile: dict[str, Any] | None) -> bool:
@@ -386,8 +549,13 @@ def suggestible(p: dict[str, Any], profile: dict[str, Any] | None) -> bool:
 MAX_NOT_CHECKED = 3
 
 
-def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[str, Any]:
+def run_tool(
+    name: str, args: dict[str, Any], store: Store, uid: str, currency: str | None = None
+) -> dict[str, Any]:
+    """`currency`: the one currency this turn's prices are in (the person's market, or what an
+    earlier tool call of the turn settled on); a product tool's answer says which it used."""
     profile = safety.profile_of(store.user_get(uid))
+    currency = currency or currency_of(profile)
     if name == "search_catalog":
         # search is where suggestions come from: only products Willow may suggest to this person
         market = (profile or {}).get("market")
@@ -403,10 +571,14 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
         found = [p for p in every if suggestible(p, profile)]
         # nearest to where the person shops first (app/regions.py); the search's order within
         found = regions.nearest_first(found, market)[:6]
+        # no market set: the currency the person asked in, else the one most results are priced in
+        currency = currency or args.get("currency") or _common_currency(found)
         out: dict[str, Any] = {
             "products": [
-                {**_compact(p, profile), "sold_here": plan.sold_in(p, market)} for p in found
+                {**_compact(p, profile, currency), "sold_here": plan.sold_in(p, market)}
+                for p in found
             ],
+            "price_currency": currency,
             "measured_outcomes": _outcomes([p["product_id"] for p in found]),
         }
         # A product the person named may be one Willow knows only by name: Wisp may find it and
@@ -414,14 +586,16 @@ def run_tool(name: str, args: dict[str, Any], store: Store, uid: str) -> dict[st
         if args.get("query"):
             named = [p for p in every if not catalog.is_full(p)][:MAX_NOT_CHECKED]
             if named:
-                out["not_checked"] = [_compact(p, profile) for p in named]
+                out["not_checked"] = [_compact(p, profile, currency) for p in named]
         return out
     if name == "compare_products":
         # what the person asked about, flags and all (never a suggestion by itself)
-        found = [catalog.by_id(i) for i in (args.get("product_ids") or [])[:4]]
+        found = [p for i in (args.get("product_ids") or [])[:4] if (p := catalog.by_id(i))]
+        currency = currency or _common_currency(found)
         return {
-            "products": [_compact(p, profile) for p in found if p],
-            "measured_outcomes": _outcomes([p["product_id"] for p in found if p]),
+            "products": [_compact(p, profile, currency) for p in found],
+            "price_currency": currency,
+            "measured_outcomes": _outcomes([p["product_id"] for p in found]),
         }
     if name == "check_routine":
         entries = [{"id": eid, **e} for eid, e in store.routine_list(uid)]
@@ -495,6 +669,13 @@ def chat(
     if MEDICINE_ASK.search(asked):
         # a question about a prescription medicine gets the fixed reply, never the model's
         return _fixed(MEDICINE_REPLY, ["Not sent to the model: a question about a medicine"])
+    if CLAIM_ASK.search(asked):
+        # asked to state a medical or guarantee claim: refused at once, in code
+        return _fixed(
+            CLAIM_REPLY,
+            ["Not sent to the model: a request to claim a medical result or a guarantee"],
+            CLAIM_FOLLOW_UPS,
+        )
     stage("reading_context", {})
     ctx = context(store, uid)
     instructions = INSTRUCTIONS + (PHOTO_RULES if images else "")
@@ -523,6 +704,9 @@ def chat(
         n = len(images)
         retrieval.append(f"Read {n} product photo{'s' if n != 1 else ''} you attached")
     product_ids: set[str] = set()
+    # one currency for the whole turn: the person's market, else what the first product tool used
+    profile = (ctx.get("profile") or {}).get("safety") or None
+    currency = currency_of(profile)
     started = time.monotonic()
     stage("asking_gemini", {"step": "tools", "photos": len(images)})
     for _ in range(MAX_TOOL_CALLS):
@@ -537,7 +721,8 @@ def chat(
         for call in calls:
             args = dict(call.args or {})
             stage("asking_gemini", {"step": "tool", "tool": call.name})
-            out = run_tool(call.name, args, store, uid)
+            out = run_tool(call.name, args, store, uid, currency)
+            currency = currency or out.get("price_currency")
             tool_outputs.append({"tool": call.name, "args": args, "result": out})
             retrieval.append(_retrieval_line(call.name, args, out))
             product_ids |= {
@@ -581,9 +766,13 @@ def chat(
     # Outcome rates may be written as percents; measurements may not be rescaled.
     rates = [t["result"].get("measured_outcomes") for t in tool_outputs]
     allowed = numbers.collect(ctx) | numbers.collect(tool_outputs) | numbers.percents(rates)
+    simulated = any((r or {}).get("synthetic_cohort") for r in rates)
+    rate_percents = numbers.percents([(r or {}).get("by_product") for r in rates])
+    asked_currencies: set[str] = set()
     for m in messages:
         if m["role"] == "user":
             allowed |= numbers.in_text(m["text"])
+            asked_currencies |= currencies_in(m["text"])
     # sessions a session_summary widget may name: the ones in CONTEXT
     session_ids = {s["session_id"] for s in ctx["latest_sessions"].values()}
     stage("asking_gemini", {"step": "reply", "retrieval": retrieval})
@@ -632,19 +821,30 @@ def chat(
             and not any(explain.BANNED.search(t) for t in unnamed)
             and not bad_ids
             and not bad_metrics
+            and not mixed_currency(unnamed, currency, asked_currencies)
         ):
             out_blocks = blocks_mod.normalize(reply.blocks, session_ids, product_ids)
+            if simulated and cohort_unlabelled(written, rate_percents):
+                # a cohort figure never reaches a shopper without saying the cohort is simulated
+                out_blocks.append({"type": "note", "text": COHORT_NOTE})
             # every product the answer names, in the order it first names them
             shown_ids = list(
                 dict.fromkeys([*blocks_mod.ordered_product_refs(reply.blocks), *reply.product_ids])
             )[:6]
             products = [p for i in shown_ids if (p := catalog.by_id(i))]
             names = {p["product_id"]: f"{p['brand']} {p['name']}" for p in products}
+            # no market and no product tool: still one currency on the cards
+            currency = currency or _common_currency(products)
+            entries = [{"id": eid, **e} for eid, e in store.routine_list(uid)]
+            paired = pairings(shown_ids, entries, profile)
             return {
                 "message": blocks_mod.message_of(out_blocks, names, blocks_mod.METRIC_LABELS),
                 "blocks": out_blocks,
                 "product_ids": shown_ids,
-                "products": products,
+                # each with the price the answer was given for it (the card shows the same one)
+                "products": _priced(products, currency),
+                "price_currency": currency,
+                **({"pairings": paired} if paired else {}),
                 "follow_up_suggestions": follow_ups,
                 "retrieval": retrieval or ["Checked your results and routine"],
                 # What the validator checked, shown in the answer's info popover.
@@ -666,15 +866,21 @@ def chat(
     return _fixed(fixed, retrieval)
 
 
-def _fixed(text: str, retrieval: list[str]) -> dict[str, Any]:
+def _fixed(text: str, retrieval: list[str], follow_ups: list[str] | None = None) -> dict[str, Any]:
     return {
         "message": text,
         "blocks": [{"type": "answer", "text": text}],
         "product_ids": [],
         "products": [],
-        "follow_up_suggestions": [],
+        "follow_up_suggestions": list(follow_ups or []),
         "retrieval": retrieval,
     }
+
+
+def _priced(products: list[dict[str, Any]], currency: str | None) -> list[dict[str, Any]]:
+    """Catalog products as an answer carries them: with `shown_price`, the same figure the
+    answer's tool results had (shown_price), for the card to show."""
+    return [{**p, "shown_price": shown_price(p, currency)} for p in products]
 
 
 def _without_names(text: str, ids: set[str]) -> str:
@@ -694,7 +900,18 @@ def _without_names(text: str, ids: set[str]) -> str:
 
 HISTORY_KEEP = 200
 # Stored with a willow turn so it can be drawn again (products are looked up again on read).
-REPLY_FIELDS = ("message", "blocks", "product_ids", "follow_up_suggestions", "retrieval", "checks")
+REPLY_FIELDS = (
+    "message",
+    "blocks",
+    "product_ids",
+    "follow_up_suggestions",
+    "retrieval",
+    "checks",
+    # drawn again as it was answered: its language, its one currency, its pairing reasons
+    "lang",
+    "price_currency",
+    "pairings",
+)
 
 
 def _turn_id(at: datetime, role: str) -> str:
@@ -753,10 +970,17 @@ def history(store: Store, uid: str) -> list[dict[str, Any]]:
                 blocks=list(reply.get("blocks") or [])
                 or [{"type": "answer", "text": reply.get("message") or row["text"]}],
                 product_ids=ids,
-                products=[p for i in ids if (p := catalog.by_id(i))],
+                products=_priced(
+                    [p for i in ids if (p := catalog.by_id(i))], reply.get("price_currency")
+                )
+                if "price_currency" in reply
+                else [p for i in ids if (p := catalog.by_id(i))],
                 follow_up_suggestions=list(reply.get("follow_up_suggestions") or []),
                 retrieval=list(reply.get("retrieval") or []),
             )
+            own = translate.labels(reply.get("lang"))
+            if own:
+                reply["labels"] = own
             row["reply"] = reply
         out.append(row)
     return out

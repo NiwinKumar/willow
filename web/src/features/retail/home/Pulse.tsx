@@ -2,7 +2,6 @@ import { ArrowRight, Megaphone } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import type { Campaign } from '../../../lib/api'
 import { Button, int, Meter, pct, ProofRing, pts, Sparkline, useTooltip } from '../ui'
 import { changeText, monthShort, type CampaignTotals, type GoalTrend, type Portfolio } from './dashboard'
 
@@ -205,6 +204,3 @@ export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = ''
     </section>
   )
 }
-
-/** Campaigns a viewer counts on Home: a brand's own, the retailer's all. */
-export const campaignsFor = (list: Campaign[], brand: string | null) => (brand ? list.filter((c) => c.brand === brand) : list)

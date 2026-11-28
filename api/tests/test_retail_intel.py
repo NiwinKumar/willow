@@ -10,7 +10,7 @@ from functools import lru_cache
 import pytest
 from fastapi.testclient import TestClient
 
-from app import catalog, cohort, gemini, numbers, retail_intel, retailer
+from app import catalog, cohort, gemini, numbers, proof_ai, retail_intel, retailer
 from app.main import app
 
 TODAY = date(2026, 10, 15)
@@ -374,7 +374,34 @@ def test_evidence_is_measured_cosmetic_and_quotes_only_computed_numbers():
         assert "not a controlled trial" in e["caveat"] and e["n"] >= M
         assert " a under-eye" not in e["text"] and " a oil" not in e["text"], e["text"]
     assert retail_intel.cohort_label({"real": 3, "synthetic": 0}) == "Consented users"
-    assert retail_intel.cohort_label({"real": 3, "synthetic": 9}) == "Mixed"
+    # never "Mixed": a few real people among the simulated must not read as real data
+    mixed = retail_intel.cohort_label({"real": 3, "synthetic": 9})
+    assert mixed == "Simulated cohort plus 3 real people"
+    assert retail_intel.cohort_label({"real": 1, "synthetic": 9}).endswith("1 real person")
+
+
+def test_only_a_proven_product_is_claim_ready_and_every_rate_carries_its_comparison():
+    f = _facts()
+    rows = retail_intel.rows(f)
+    for r in rows:
+        ev = retail_intel.product_view(f, r["product_id"])["evidence"]
+        if r["tier"] != "proven":
+            assert ev == [], (r["tier"], r["n"])  # nothing but what it would take
+            continue
+        base_n = retail_intel._stats(f, r["product_id"])["base_n"]
+        for e in ev:
+            if e["kind"] not in ("efficacy", "segment"):
+                continue
+            # "Measured in N ...: R% ..., against B% of M people ...": both rates, both sizes,
+            # and never a statement where the comparison group did as well or better
+            m = proof_ai.COMPARED.search(e["text"])
+            assert m, e["text"]
+            n, rate, base, m_n = map(int, m.groups())
+            assert n == e["n"] >= M and m_n >= M and rate > base, e["text"]
+            if e["id"] == "efficacy":
+                assert (n, m_n) == (r["n"], base_n)
+                assert (rate, base) == (round(r["rate"] * 100), round(r["base_rate"] * 100))
+    assert any(r["tier"] == "promising" for r in rows) and any(r["tier"] == "proven" for r in rows)
 
 
 # ── segments and brands ────────────────────────────────────────────────────────────────────

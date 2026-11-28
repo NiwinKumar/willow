@@ -50,7 +50,7 @@ export function packMarkdown(d: PackInput): string {
   ]
   if (method) lines.push(`**Method.** ${method}`, '')
   lines.push('## Statements', '')
-  if (!d.evidence.length) lines.push('No statement: fewer than 10 people reached week 8 with this product.')
+  if (!d.evidence.length) lines.push('No statement: this product is not Proven. Statements are made only for Proven products, each with its comparison group.')
   d.evidence.forEach((e, i) => {
     lines.push(`${i + 1}. **${KIND_LABEL[e.kind]}.** ${e.text}`, `   - n=${e.n}${e.window ? ` · window ${e.window}` : ''}${e.cohort_label ? ` · ${e.cohort_label}` : ''}`)
   })
@@ -85,7 +85,7 @@ ol{padding-left:20px}li{margin:0 0 14px;break-inside:avoid}.k{font-size:11px;let
 <p class="caveat"><strong>Caveat.</strong> ${esc(caveat)}</p>
 ${method ? `<p class="method"><strong>Method.</strong> ${esc(method)}</p>` : ''}
 <h2>Statements</h2>
-${d.evidence.length ? `<ol>\n${items}\n</ol>` : '<p>No statement: fewer than 10 people reached week 8 with this product.</p>'}
+${d.evidence.length ? `<ol>\n${items}\n</ol>` : '<p>No statement: this product is not Proven. Statements are made only for Proven products, each with its comparison group.</p>'}
 <footer>Proof by Willow · Retail intelligence. Aggregates only; groups under 10 people are suppressed. Cosmetic measurements, not a medical assessment.</footer>
 </body></html>
 `
@@ -103,5 +103,5 @@ export function packCsv(d: PackInput): { header: string[]; rows: (string | numbe
 export function exportBlock(cohort: ProductDetail['cohort']): string | null {
   const kind = cohortKind(cohort)
   if (kind === 'real') return null
-  return kind === 'simulated' ? 'Built on the simulated cohort, so it can’t be copied or exported for external use.' : 'Built on a mixed cohort (simulated and real), so it can’t be copied or exported for external use.'
+  return kind === 'simulated' ? 'Built on the simulated cohort, so it can’t be copied or exported for external use.' : 'Built on a mostly simulated cohort (a few real people among them), so it can’t be copied or exported for external use.'
 }

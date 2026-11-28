@@ -70,7 +70,12 @@ export function journeyUnavailableLine(j: Extract<Journey, { state: 'unavailable
   return j.reason === 'empty' ? 'Not available right now: the demo journey has no measured sessions yet.' : 'Not available right now: the journey could not be read. Try again in a moment.'
 }
 
-/** "6 check-ins over 4 days · Face · Treated forearm" */
+/**
+ * "16 check-ins across 8 weeks · Face · Cheek close-up". Weeks are counted as everywhere else (week 1 is the
+ * baseline's week, lib/share.ts), so Mei's 49 days read as her eight weeks, never as seven. A journey under a
+ * week says its days.
+ */
 export function journeyLine(j: Extract<Journey, { state: 'ready' }>): string {
-  return `${plural(j.checkIns, 'check-in', 'check-ins')} over ${plural(j.days, 'day', 'days')} · ${j.places}`
+  const span = j.days >= 7 ? plural(Math.floor(j.days / 7) + 1, 'week', 'weeks') : plural(j.days, 'day', 'days')
+  return `${plural(j.checkIns, 'check-in', 'check-ins')} across ${span} · ${j.places}`
 }

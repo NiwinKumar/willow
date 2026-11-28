@@ -88,18 +88,29 @@ export function StatusCard({ place, title, body, action, busy }: { place?: strin
   )
 }
 
+/** When the next check-in is, in the sheet's words: the person's own schedule, else weekly (Willow's rhythm). */
+export function nextCheckInWords(next: Date | null, now: Date = new Date()): { title: string; photo: string } {
+  if (!next) return { title: 'Same time next week?', photo: 'next week’s photo' }
+  const days = Math.round((new Date(next.getFullYear(), next.getMonth(), next.getDate()).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000)
+  if (days <= 1) return { title: 'Same time tomorrow?', photo: 'tomorrow’s photo' }
+  const day = next.toLocaleDateString('en-GB', { weekday: 'long' })
+  return days >= 6 ? { title: 'Same time next week?', photo: `next ${day}’s photo` } : { title: `Same time on ${day}?`, photo: `${day}’s photo` }
+}
+
 /**
- * "Same time tomorrow?" (design tomorrow sheet), shown once after a face check-in. No reminder: Willow has
- * none to set.
+ * "Same time next week?" (design tomorrow sheet), shown once after a face check-in of the person's own. It
+ * names their next scheduled check-in (`next`), or next week when they have no schedule: never "tomorrow"
+ * for someone who checks in weekly. No reminder is set here.
  */
-export function TomorrowSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function TomorrowSheet({ open, onClose, next = null }: { open: boolean; onClose: () => void; next?: Date | null }) {
   const fine = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches
+  const words = nextCheckInWords(next)
   return (
-    <Sheet open={open} onClose={onClose} title="Same time tomorrow?" hideTitle variant="modal" size="sm">
+    <Sheet open={open} onClose={onClose} title={words.title} hideTitle variant="modal" size="sm">
       <div className="relative flex flex-col gap-[18px]">
         <span aria-hidden className="pointer-events-none absolute -top-[90px] -right-[80px] size-[220px] animate-[wBreathe_6s_ease-in-out_infinite] rounded-full opacity-75 blur-[18px]" style={{ background: 'radial-gradient(circle at 40% 40%, var(--aura-apricot), var(--aura-coral) 45%, transparent 70%)' }} />
-        <h2 className="relative m-0 font-serif text-[clamp(28px,3.9vw,36px)] leading-[.95] font-normal">Same time tomorrow?</h2>
-        <p className="relative m-0 text-[16px] leading-[1.55] text-ink-2">Each check-in is compared with your baseline, so tomorrow’s photo works best taken the same way:</p>
+        <h2 className="relative m-0 font-serif text-[clamp(28px,3.9vw,36px)] leading-[.95] font-normal">{words.title}</h2>
+        <p className="relative m-0 text-[16px] leading-[1.55] text-ink-2">Each check-in is compared with your baseline, so {words.photo} works best taken the same way:</p>
         <ol className="relative m-0 flex list-none flex-col gap-2 p-0">
           {['Same room and light, facing the window', 'Clean face, nothing applied', 'Hair back, face the camera straight on'].map((t, i) => (
             <li key={t} className="flex animate-[wRise_.45s_both] items-center gap-3.5 rounded-[20px] bg-sunken px-4 py-3 text-[15px]" style={{ animationDelay: `${200 + i * 80}ms` }}>

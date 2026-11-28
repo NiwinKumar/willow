@@ -34,6 +34,80 @@ class SessionGone(Exception):
     """The session was deleted while it was being measured."""
 
 
+# Sample runs (a judge's "Run it", a guest's starter check-ins) are someone else's skin: never
+# compared with this person's own baseline and never made it. Among themselves they follow the
+# same rule as anyone's photos, under a baseline key of their own: the first sample run that
+# passes is the sample baseline, and a later sample run (a later week of the same sample person)
+# is compared with it. So the live sample run ends in real verdicts, measured both times.
+SAMPLE_SUFFIX = "__sample"
+SAMPLE_COUNTS_NOT_COMPARED = (
+    "blemish and dark-spot counts are not compared this time: one of the two samples includes "
+    "side photos of the cheeks and the other does not, so their counts cover different areas"
+)
+
+
+def baseline_key(doc: dict[str, Any]) -> str:
+    k = baselines.key(doc["site"], doc["capture_mode"])
+    return f"{k}{SAMPLE_SUFFIX}" if doc.get("sample_id") else k
+
+
+def sample_person(sample_id: str | None) -> str:
+    """mei_face_week1 -> mei: sample runs are compared only within one sample person."""
+    return (sample_id or "").split("_", 1)[0]
+
+
+def baseline_of(store: Store, uid: str, doc: dict[str, Any]) -> dict[str, Any] | None:
+    """The baseline a session's kind is compared with: the person's own, or for a sample run the
+    sample baseline of the same sample person (its session still there)."""
+    if not doc.get("sample_id"):
+        return baselines.get(store, uid, doc["site"], doc["capture_mode"])
+    base = store.baseline_get(uid, baseline_key(doc))
+    if not base or sample_person(base.get("sample_id")) != sample_person(doc["sample_id"]):
+        return None
+    return base if store.session_get(uid, base["session_id"]) is not None else None
+
+
+def start_sample_series(store: Store, uid: str, session_id: str, doc: dict[str, Any]) -> bool:
+    """Make a measured sample session the sample baseline, when it passed and none exists yet."""
+    result = json.loads(doc.get("result_json") or "null")
+    if not result or "quality" not in result or "metrics" not in result:
+        return False
+    if engine.is_placeholder(result) or not baselines.qualifies(result):
+        return False
+    current = baseline_of(store, uid, doc)
+    if current is not None and current["session_id"] != session_id:
+        return False
+    store.baseline_set(
+        uid,
+        baseline_key(doc),
+        {
+            **baselines.build(session_id, doc, result),
+            "sample_id": doc["sample_id"],
+            "sample_taken": doc.get("sample_taken"),
+        },
+    )
+    store.session_update(uid, session_id, {"is_baseline": True})
+    return True
+
+
+def _sample_counts(result: dict[str, Any], baseline: dict[str, Any]) -> None:
+    """Counts of a sample run against the sample baseline: compared only when both were taken
+    the same way (with or without cheek photos), as for anyone's check-ins (baselines.match_counts,
+    which keeps a second reference per person; sample runs keep none)."""
+    if result.get("site") != "face_full":
+        return
+    same_way = bool(baseline.get("cheeks")) == baselines.with_cheeks(result)
+    if same_way and not baselines.side_only(result):
+        return
+    touched = False
+    for m in result.get("metrics", []):
+        if m["id"] in baselines.CONFIRMED_COUNTS and m.get("verdict") != "low_quality":
+            m.update(delta=None, verdict="no_baseline", direction="none")
+            touched = True
+    if touched:
+        result.setdefault("warnings", []).append(SAMPLE_COUNTS_NOT_COMPARED)
+
+
 def _stage(store: Store, uid: str, session_id: str, stage: str) -> None:
     """Best effort: a stage the check-in shows never fails the analysis (a deleted session is
     caught after the engine answers, as before)."""
@@ -88,9 +162,9 @@ def run(
         },
     )
     # Sample photos (a judge's "Run it", a guest's starter check-ins) are someone else's skin:
-    # read on their own, never compared with this person's baseline and never made one.
+    # never compared with this person's baseline and never made it; they have their own.
     sample = bool(doc.get("sample_id"))
-    current = None if sample else baselines.get(store, uid, doc["site"], doc["capture_mode"])
+    current = baseline_of(store, uid, doc)
     baseline_map = None
     if current and current["session_id"] != session_id:
         baseline_map = baselines.for_request(current)
@@ -128,8 +202,11 @@ def run(
     counts_with = None
     if measured and baseline_map:
         baselines.guard_engine_version(result, current)
-        # with and without cheek photos: counts compare with a check-in taken the same way
-        counts_with = baselines.match_counts(store, uid, session_id, doc, result, current)
+        if sample:
+            _sample_counts(result, current)
+        else:
+            # with and without cheek photos: counts compare with a check-in taken the same way
+            counts_with = baselines.match_counts(store, uid, session_id, doc, result, current)
         baselines.guard_counts(result, counts_with or current)
     explanation, source, details = (None, None, {})
     if measured:
@@ -184,6 +261,13 @@ def run(
     )
     doc = store.session_get(uid, session_id) or doc
     if sample:
+        if measured:
+            try:
+                # the first passing sample run is what later sample runs are compared with
+                if start_sample_series(store, uid, session_id, doc):
+                    doc = store.session_get(uid, session_id) or doc
+            except Exception:
+                log.exception("could not set the sample baseline for %s/%s", uid, session_id)
         return doc
     if measured:
         try:
@@ -219,15 +303,20 @@ def explain_context(
     is_baseline = baseline is None or baseline["session_id"] == session_id
     days = None
     created, base_created = doc.get("created_at"), (baseline or {}).get("session_created_at")
+    sample = bool(doc.get("sample_id"))
+    if sample:
+        # two sample runs are minutes apart; their photos are as far apart as in the journey
+        created, base_created = doc.get("sample_taken"), (baseline or {}).get("sample_taken")
     if not is_baseline and isinstance(created, datetime) and isinstance(base_created, datetime):
         days = (created - base_created).days
+    # the sample person's photos have nothing to do with this person's routine
     routine = [
         {
             "product": f"{e.get('brand', '')} {e.get('custom_name', '')}".strip(),
             "started_at": e.get("started_at"),
             "ended_at": e.get("ended_at"),
         }
-        for _, e in store.routine_list(uid)
+        for _, e in ([] if sample else store.routine_list(uid))
     ]
     return {
         "is_baseline": is_baseline,

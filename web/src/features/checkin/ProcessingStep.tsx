@@ -52,14 +52,15 @@ function resultLines(view: SessionView): [string, string, string, string] {
   const usable = r.metrics.filter((m) => m.value !== null).length
   const indicative = r.metrics.filter((m) => m.value !== null && m.confidence === 'indicative').length
   const count = plural(usable, 'reading')
+  const whose = view.session.sample_id ? 'the sample' : 'your'
   const measured =
     usable === 0
       ? 'Nothing measured'
       : view.session.is_baseline
-        ? `${count} measured · this is your baseline`
+        ? `${count} measured · this is ${whose} baseline`
         : view.session.baseline?.has_noise_band === false
-          ? `${count} compared with your baseline · no normal range yet`
-          : `${count} compared with your baseline${indicative ? ` · ${indicative} indicative` : ''}`
+          ? `${count} compared with ${whose} baseline · no normal range yet`
+          : `${count} compared with ${whose} baseline${indicative ? ` · ${indicative} indicative` : ''}`
   const named = Object.keys(view.session.label_details ?? {}).length
   const spots = named ? ` · ${plural(named, 'spot')} named by AI` : ''
   const explained = usable === 0 ? 'Nothing to explain' : (view.session.explanation_source === 'gemini' ? 'Written by Gemini · every number checked' : 'Written from your numbers') + spots
@@ -107,6 +108,14 @@ function leftOutPhotos(view: SessionView): { n: number; url: string; why: string
     .map((f) => ({ n: f.index + 1, url: urls[f.index]!, why: frameReasons(f).join(', ') }))
 }
 
+/**
+ * How long measuring takes, said as it is (production, Nov 2026: a face check-in about 40 s at the median and
+ * 52 s at the 95th percentile, close-ups longer; the first of the day waits for the engine to wake).
+ */
+export const WAIT_LINE = { face: 'ABOUT A MINUTE', other: 'A MINUTE OR TWO' }
+/** Past this the run is slower than nearly all of them: say so, and that leaving is fine. */
+export const SLOW_AFTER_S = 90
+
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
 /**
@@ -123,6 +132,8 @@ export function ProcessingStep(props: {
   n: number | null
   received: boolean
   sample: boolean
+  /** A sample baseline's next step: the later-week sample that is compared with it (api demo.py `after`). */
+  nextSample?: { title: string; onRun: () => void } | null
   onRetry: () => void
   onRetake: () => void
   onUploadAgain: () => void
@@ -179,7 +190,7 @@ export function ProcessingStep(props: {
     outcome === 'run' || (answered && shown < 4)
       ? `Analysing ${where ? `${where} ` : ''}photos`
       : {
-          success: view?.session.is_baseline ? 'Your baseline is ready' : 'Your results are ready',
+          success: view?.session.is_baseline ? (sample ? 'The sample baseline is ready' : 'Your baseline is ready') : 'Your results are ready',
           rejected: 'No usable photos',
           unmeasured: 'Photos saved',
           timeout: 'Analysis timed out',
@@ -211,12 +222,12 @@ export function ProcessingStep(props: {
       if (live && engineDone) {
         // The api says the engine answered: its three stages ran (their outcome lands with the result).
         if (i < 3) return { name, detail: i === 0 ? 'Checked · the outcome lands with the result' : 'Done', glyph: '✓', tone: 'done' }
-        return { name, detail: 'Writing the explanation · every number is checked against your measurement', glyph: '◌', tone: 'run' }
+        return { name, detail: 'Gemini is writing the explanation · every number is checked against the measurement', glyph: '◌', tone: 'run' }
       }
       if (live && i === 0 && (received || state.kind === 'running'))
         return {
           name,
-          detail: stage === 'engine' ? 'On the measurement engine now · quality, colour and measuring land together when it answers' : stage === 'received' ? 'Starting the measurement…' : 'On the measurement engine now · every stage lands when it answers',
+          detail: stage === 'engine' ? 'On the measurement engine now · the longest stage: quality, colour and measuring land together when it answers' : stage === 'received' ? 'Starting the measurement…' : 'On the measurement engine now · every stage lands when it answers',
           glyph: '◌',
           tone: 'run',
         }
@@ -249,7 +260,10 @@ export function ProcessingStep(props: {
       : outcome === 'offline'
         ? 'The connection dropped while waiting for the result. Nothing was lost: Willow keeps measuring, and this page picks it up when you’re back online.'
         : ''
-  const slow = state.kind === 'running' && elapsed > 45
+  const slow = state.kind === 'running' && elapsed > SLOW_AFTER_S
+  const waitLine = !site || site === 'face_full' ? WAIT_LINE.face : WAIT_LINE.other
+  // A sample baseline with a later-week sample to run: the comparison is one more run away, so it is offered here.
+  const offerNext = Boolean(sample && props.nextSample && view?.session.is_baseline)
 
   // While "What changed?" is asked, the measuring shows as one quiet line above it, so the question is the screen.
   if (props.changes)
@@ -277,9 +291,13 @@ export function ProcessingStep(props: {
           <span className="font-dot text-[34px]" aria-hidden>
             {mmss(elapsed)}
           </span>
-          <span className="font-mono text-[12px] text-ink-2">ELAPSED · {outcome === 'run' ? 'USUALLY 10–30 S, LONGER FOR THE FIRST OF THE DAY' : failedRun || outcome === 'rejected' ? 'STOPPED' : 'FINISHED'}</span>
-          {slow ? <p className="m-0 mt-2 max-w-[340px] text-[14px] leading-[1.45] text-ink-2">Taking longer than usual (the engine may be waking up). Your photos are saved; you can leave, and the result lands in Home.</p> : null}
-          {outcome === 'run' && !slow ? <p className="m-0 mt-2 text-[13px] text-ink-2">You can leave; the measurement keeps going and the result lands in Home.</p> : null}
+          <span className="font-mono text-[12px] text-ink-2">ELAPSED · {outcome === 'run' ? `USUALLY ${waitLine}` : failedRun || outcome === 'rejected' ? 'STOPPED' : 'FINISHED'}</span>
+          {slow ? <p className="m-0 mt-2 max-w-[340px] text-[14px] leading-[1.45] text-ink-2">Taking longer than usual (the engine may be waking up). {sample ? 'The sample photos are saved' : 'Your photos are saved'}; you can leave, and the result lands in {sample ? 'Progress' : 'Home'}.</p> : null}
+          {outcome === 'run' && !slow ? (
+            <p className="m-0 mt-2 max-w-[340px] text-[13px] leading-[1.45] text-ink-2">
+              {stage === 'explaining' ? 'Measured. Gemini is writing the explanation now.' : 'Most of the wait is the measurement engine reading every photo.'} You can leave; it keeps going and the result lands in {sample ? 'Progress' : 'Home'}.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -385,9 +403,23 @@ export function ProcessingStep(props: {
           </div>
         ) : null}
 
-        {outcome === 'success' && shown >= 4 ? (
+        {outcome === 'success' && shown >= 4 && offerNext && props.nextSample ? (
+          <div className="mt-3 flex animate-rise flex-col gap-2.5">
+            <p className="m-0 text-[15px] leading-[1.5]">
+              This is the baseline: measured, with nothing to compare it with yet. Run the second sample ({props.nextSample.title}) to see a comparison.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={props.nextSample.onRun} className="min-h-[52px] flex-1 rounded-pill bg-selected px-[22px] text-[16px] text-inverse">
+                Run the second sample →
+              </button>
+              <button type="button" onClick={props.onSeeResult} className="min-h-[52px] rounded-pill border border-ink/15 bg-white px-[22px]">
+                See the baseline
+              </button>
+            </div>
+          </div>
+        ) : outcome === 'success' && shown >= 4 ? (
           <button type="button" onClick={props.onSeeResult} className="mt-3 flex min-h-[60px] animate-rise items-center justify-center rounded-[24px] bg-selected text-[17px] text-inverse">
-            {view?.session.is_baseline ? 'See your baseline' : 'See your results'} →
+            {view?.session.is_baseline ? (sample ? 'See the baseline' : 'See your baseline') : 'See your results'} →
           </button>
         ) : null}
       </div>

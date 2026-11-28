@@ -24,6 +24,7 @@ const CheckInReplay = lazy(() => import('./features/journey/CheckInReplay'))
 const AvatarLab = lazy(() => import('./features/lab/AvatarLab'))
 const Terms = lazy(() => import('./features/website/Terms'))
 const Checks = lazy(() => import('./features/website/Checks'))
+const Evidence = lazy(() => import('./features/evidence/Evidence'))
 const Retail = lazy(() => import('./features/retail/Retail'))
 const Home = lazy(() => import('./features/home/Home'))
 const Progress = lazy(() => import('./features/progress/Progress'))
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/journey/brand" element={<BrandJourney />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/checks" element={<Checks />} />
+            <Route path="/evidence" element={<Evidence />} />
             {/* The assistant avatar in every state (not linked; for checking the motion). */}
             <Route path="/lab/avatar" element={<AvatarLab />} />
             <Route path="/retail/*" element={<Retail />} />

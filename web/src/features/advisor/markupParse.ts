@@ -48,8 +48,8 @@ export function parse(src: string): MarkupNode[] {
 export const metricLabel = (id: string) => (id in METRIC_META ? METRIC_META[id as MetricId].label : null)
 
 /** The words without markup (copying an answer). */
-export function plainText(src: string, productName: (id: string) => string | null): string {
+export function plainText(src: string, productName: (id: string) => string | null, metricName?: (id: string) => string | null): string {
   const walk = (nodes: MarkupNode[]): string =>
-    nodes.map((n) => (n.kind === 'text' ? n.text : n.kind === 'product' ? (productName(n.id) ?? 'this product') : n.kind === 'metric' ? (metricLabel(n.id)?.toLowerCase() ?? n.id.replace(/_/g, ' ')) : walk(n.children))).join('')
+    nodes.map((n) => (n.kind === 'text' ? n.text : n.kind === 'product' ? (productName(n.id) ?? 'this product') : n.kind === 'metric' ? (metricName?.(n.id) ?? metricLabel(n.id)?.toLowerCase() ?? n.id.replace(/_/g, ' ')) : walk(n.children))).join('')
   return walk(parse(src))
 }

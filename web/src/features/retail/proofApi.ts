@@ -205,10 +205,11 @@ export function verifiedText(o: Pick<ProofOrg, 'verified'>): string | null {
   return typeof o.verified === 'string' ? o.verified : 'Verified by the retailer'
 }
 
-/** A saved claim's cohort in words ("Simulated cohort", "Mixed cohort"…). */
+/** A saved claim's cohort in words ("Simulated cohort", "Simulated + real cohort"…): never "Mixed". */
 export function claimCohortText(c: SavedClaim['cohort']): string {
-  if (typeof c === 'string') return `${c} cohort`
-  return c.label ?? `${c.kind ?? c.filter ?? 'unknown'} cohort`
+  const word = (k: string) => (k === 'mixed' ? 'Simulated + real cohort' : `${k} cohort`)
+  if (typeof c === 'string') return word(c)
+  return c.label ?? word(c.kind ?? c.filter ?? 'unknown')
 }
 
 /** The demo catalog instance (a `label`, e.g. "Demo catalog · every brand"; id `willow`): its name adds nothing to the org's, so it stays out of the bar. */

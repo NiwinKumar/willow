@@ -9,8 +9,8 @@ import { exportBlock, KIND_LABEL, packCsv, packHtml, packMarkdown, packName, sta
 import { campaignFor, pipelineSteps, ProofPipeline, useCampaigns } from '../pipeline'
 import { ProductImage } from '../../routine/productUi'
 import { useProductDetail } from '../productData'
-import { money, promoHistory, segInterval } from '../productModel'
-import { ANCHOR, channelOf, CLAIM_TIERS, DEFAULT_CHANNEL, type ActionTarget } from '../proofAi'
+import { productFacts, promoHistory, segInterval } from '../productModel'
+import { ANCHOR, channelOf, CLAIM_TIERS, claimGap, DEFAULT_CHANNEL, type ActionTarget } from '../proofAi'
 import { sectionPath, useRetailState } from '../state'
 import type { Actions, BrandFlow, Filters, Insights, ProductDetail as Detail, Seg } from '../types'
 import { useView } from '../useView'
@@ -76,8 +76,6 @@ const CTX_TABS = [
 ] as const
 type CtxTab = (typeof CTX_TABS)[number]['id']
 
-const tierWord = (t: string) => `${t[0].toUpperCase()}${t.slice(1)}`
-
 function Body({ d }: { d: Insights }) {
   const { productId = '' } = useParams()
   const { filters, workspace } = useRetailData()
@@ -113,7 +111,7 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
   const rivalOk = rival && !(names.anonymise && rival.brand !== names.own) ? rival : null
   const compareTo = `/retail/compare${carry}${carry ? '&' : '?'}ids=${[p.product_id, ...(rivalOk ? [rivalOk.product_id] : [])].map(encodeURIComponent).join(',')}`
   const promoteTo = `${sectionPath('campaigns')}${carry}${carry ? '&' : '?'}new=${encodeURIComponent(p.product_id)}`
-  const facts = [p.category_label, `${tierWord(p.price_tier)} price`, p.size, money(p.price)].filter(Boolean).join(' · ')
+  const facts = productFacts(p)
   const allCampaigns = useCampaigns()
   const campaign = campaignFor(allCampaigns, p.product_id)
   const promo = promoHistory(allCampaigns).get(p.product_id)
@@ -158,7 +156,8 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
               <ProductImage product={{ image_url: p.image_url, category: p.category, name: p.product }} size={56} />
             </span>
           }
-          title={p.product}
+          // catalog names run past 100 characters: two lines, the whole name on hover
+          title={<span className="line-clamp-2" title={p.product}>{p.product}</span>}
           description={
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="inline-flex items-center gap-1.5 font-medium text-ink">
@@ -252,7 +251,7 @@ function Page({ x, weeksN, brandView, filters }: { x: Detail; weeksN: number; br
             <CategoryStrip x={x} />
             <Competitors x={x} brandView={brandView} carry={carry} />
           </Panel>
-          <Panel title="In people’s routines" id="ctx-h" description={p.users ? `Among its ${int(p.users)} users. Groups under ${MIN_GROUP} people are left out.` : undefined}>
+          <Panel title="In people’s routines" id="ctx-h" description={p.users ? `Among all ${int(p.users)} people who have used it${p.n !== null && p.n !== p.users ? ` (${int(p.n)} of them have reached week ${weeksN}: the n behind the rates above)` : ''}. Groups under ${MIN_GROUP} people are left out.` : undefined}>
             <div className="flex flex-col gap-4">
               <Tabs label="Routine context" tabs={CTX_TABS.map((t) => ({ id: t.id, label: t.label }))} value={ctx} onChange={(v) => setParam({ ctx: v === 'co' ? null : v })} panelId="ctx-panel" />
               <div id="ctx-panel" role="tabpanel" aria-labelledby="ctx-h">
@@ -300,7 +299,7 @@ function Facts({ x, weeksN }: { x: Detail; weeksN: number }) {
         </div>
         <Stat label="Time to change" value={weeks(p.weeks)} sub="median, of those who changed" />
         <Stat label={`Still using at week ${weeksN}`} value={pct(p.cont8)} sub={p.n ? `of ${int(p.n)}` : undefined} />
-        <Stat label="Share of routines" value={p.routine_share === 0 && p.users ? 'under 1%' : pct(p.routine_share)} sub={`of the category’s, ${int(p.users)} users`} />
+        <Stat label="Share of routines" value={p.routine_share === 0 && p.users ? 'under 1%' : pct(p.routine_share)} sub={`of the category’s · ${int(p.users)} people have used it`} />
         <Stat label="Rank in category" value={x.competitors.rank && x.competitors.of >= 2 ? `${x.competitors.rank} of ${x.competitors.of}` : '—'} sub={x.competitors.rank && x.competitors.of >= 2 ? 'by visible change' : x.competitors.of === 1 ? 'only one measured' : 'not ranked'} />
         <div className="flex min-w-0 flex-col gap-0.5">
           <dt className="truncate text-proof-small text-ink-2">Same goals, not using it</dt>
@@ -382,7 +381,8 @@ function EvidenceMethod({ x }: { x: Detail }) {
 }
 
 function EvidenceList({ x }: { x: Detail }) {
-  if (!x.evidence.length) return <EmptyState compact title="No statements yet" body={`Claim-ready statements appear once ${MIN_GROUP} or more people reach week 8 with it. ${reasonText(x.product)}`} />
+  // Only a Proven product has statements; anything else gets what it would take, never a weaker statement.
+  if (!x.evidence.length) return <EmptyState compact title="No statements yet" body={x.product.rate === null ? `Statements open once a product is Proven. ${reasonText(x.product)}` : claimGap(x.product, x.eligibility.reasons)} />
   return (
     <ol className="m-0 flex list-none flex-col p-0">
       {x.evidence.map((e) => (
@@ -502,7 +502,7 @@ function Switching({ x, carry }: { x: Detail; carry: string }) {
     <div className="flex flex-col gap-4">
       {s.stopped !== null ? (
         <p className="m-0 text-proof-body text-ink-2">
-          <span className="font-medium text-ink tnum">{int(s.stopped)}</span> of {int(x.product.users)} users stopped it.
+          <span className="font-medium text-ink tnum">{int(s.stopped)}</span> of the {int(x.product.users)} people who have used it stopped it.
           {!any(from) && !any(to) ? ' No destination reaches 10 people yet.' : ''}
         </p>
       ) : null}

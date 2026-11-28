@@ -24,7 +24,9 @@ const POP_W = 300
  * it joins the top layer above any dialog and is fixed to the viewport, so a scroll box never clips it.
  * Browsers without popovers get the same fixed panel in place.
  */
-export function CheckedChip({ check, loading = false, profileComplete = null, short = false, className = '' }: {
+export function CheckedChip({ check, loading = false, profileComplete = null, short = false, className = '', wordsFor }: {
+  /** The chip's words in another language (a translated Wisp answer); absent: the app's own (CHECK_WORDS). */
+  wordsFor?: (status: CheckStatus) => string | null | undefined
   check: ProductCheck | null | undefined
   loading?: boolean
   /** false: the check used an incomplete profile (the panel says how to finish it). */
@@ -104,7 +106,8 @@ export function CheckedChip({ check, loading = false, profileComplete = null, sh
     return loading ? <span aria-hidden className={`inline-block h-[22px] w-[92px] animate-[wShimmer_1.4s_linear_infinite] rounded-pill bg-[linear-gradient(90deg,var(--bg-sunken),var(--bg-muted),var(--bg-sunken))] bg-[length:200%_100%] ${className}`} /> : null
   }
 
-  const words = CHECK_WORDS[check.status]
+  const own = wordsFor?.(check.status)
+  const words = own ? { ...CHECK_WORDS[check.status], label: own, short: own } : CHECK_WORDS[check.status]
   const look = LOOK[check.status]
   // Mouse: open on hover, close shortly after leaving the chip and its panel (so the pointer can cross the gap).
   const hover = (on: boolean) => (e: RPointerEvent) => {

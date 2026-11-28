@@ -109,3 +109,6 @@ export async function copyText(text: string, what = 'Copied'): Promise<boolean> 
     return false
   }
 }
+
+/** "a" or "an" for the word that follows ("an under-eye goal", "a redness goal"). */
+export const article = (word: string): 'a' | 'an' => (/^[aeiou]/i.test(word.trim()) ? 'an' : 'a')
