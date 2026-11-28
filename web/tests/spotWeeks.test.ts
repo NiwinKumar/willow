@@ -89,3 +89,23 @@ test('a place is found again from the area\'s steadiest edge, and the mark there
   const chin = view('front', [{ name: 'chin', polygon: [[0, 700], [200, 700], [200, 900], [0, 900]] }])
   assert.deepEqual(areaFrame(chin, 'chin'), { x: 100, y: 700, s: 200 })
 })
+
+test('a place is carried to another photo through the face landmarks around it', async () => {
+  const { carry, markNear, boxAround } = await import('../src/lib/spotWeeks.ts')
+  // the same face, next week: 1.25x closer, shifted, and turned a little (a rotation)
+  const from: [number, number][] = []
+  for (let gx = 0; gx < 6; gx++) for (let gy = 0; gy < 6; gy++) from.push([200 + gx * 60, 200 + gy * 60])
+  const a = 0.1
+  const move = ([x, y]: [number, number]): [number, number] => [1.25 * (Math.cos(a) * x - Math.sin(a) * y) + 40, 1.25 * (Math.sin(a) * x + Math.cos(a) * y) - 30]
+  const to = from.map(move)
+  const got = carry(from, to, 333, 287)!
+  const want = move([333, 287])
+  assert.ok(Math.hypot(got.x - want[0], got.y - want[1]) < 0.01)
+  assert.equal(carry(from, null, 1, 1), null)
+  const v = view('front', [])
+  v.marks = [{ kind: 'blemish', x: want[0] + 3, y: want[1], r: 4, zone: 'forehead' }]
+  assert.equal(markNear(v, got.x, got.y, 10)?.kind, 'blemish')
+  assert.equal(markNear(v, got.x + 40, got.y, 10), null)
+  const b = boxAround(v, 5, 5, 100)
+  assert.deepEqual([b.x, b.y], [0, 0]) // kept inside the photo
+})

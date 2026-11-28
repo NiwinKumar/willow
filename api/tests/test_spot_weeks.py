@@ -36,7 +36,10 @@ def _result(sid, with_marks=True):
         _mark("right", 320, 420, "right_cheek"),
     ]
     spot_marks = [_mark("right", 350, 450, "right_cheek")]
-    blem = {"by_zone": {"forehead": {"value": 1.0}, "right_cheek": {"value": 2.0}}}
+    blem = {
+        "by_zone": {"forehead": {"value": 1.0}, "right_cheek": {"value": 2.0}},
+        "face_points": [{"view": "front", "frame_index": 0, "points": [[1.0, 2.0], [3.0, 4.0]]}],
+    }
     spots = {"count": 1}
     if with_marks:
         blem["marks"], spots["marks"] = blem_marks, spot_marks
@@ -106,6 +109,7 @@ def test_every_mark_on_its_photo_with_the_counts_progress_shows(client, fake):
     assert w["by_zone"]["right_cheek"] == {"blemishes": 2, "dark_spots": 1}
     front, right = w["views"]
     assert front["photo"]["url"].endswith("views/front.jpg") and front["photo"]["width"] == 1000
+    assert front["landmarks"] == [[1.0, 2.0], [3.0, 4.0]] and right["landmarks"] is None
     assert (front["blemishes"], right["blemishes"]) == (1, 2)
     # the right cheek's dark spot sits where Gemini saw a mole: never drawn
     assert right["dark_spots"] == 0 and all(m["kind"] == "blemish" for m in right["marks"])

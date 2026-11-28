@@ -7,7 +7,7 @@ import { useOwner, useSpotWeeks } from '../../data/hooks'
 import type { ViewName } from '../../data/types'
 import type { SpotWeek, SpotWeekView } from '../../lib/api'
 import { MOLE_NOTE } from '../../lib/spotLabels'
-import { AREA_LABEL, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areasOf, countLine, dayLabel, fromAreaPoint, markAt, shownWeeks, spotBox, startPoint, toAreaPoint, viewOf, viewWithArea, viewsOf, type AreaPoint, type Box } from '../../lib/spotWeeks'
+import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areasOf, boxAround, carry, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewWithArea, viewsOf, type Box } from '../../lib/spotWeeks'
 import { Crumb, Page, StatusCard } from './parts'
 
 const RING = { blemish: 'var(--willow-400)', spot: 'var(--aura-apricot)' } as const
@@ -259,15 +259,31 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
     .filter((r): r is NonNullable<typeof r> => r !== null)
   const start = Math.max(0, rows.findIndex((r) => r.w.id === current))
   const [at, setAt] = useState<number | null>(null)
-  const [point, setPoint] = useState<AreaPoint | null>(null)
+  // the place followed, at photo pixels of the check-in it was picked on
+  const [picked, setPicked] = useState<{ id: string; x: number; y: number } | null>(null)
   const i = Math.min(at ?? start, Math.max(rows.length - 1, 0))
   if (!rows.length) return null
   const row = rows[i]
   // the place followed: the person's pick, else the biggest mark in the area on the latest check-in shown
   const latest = rows[Math.min(start, rows.length - 1)]
-  const p = point ?? startPoint(latest.view, area, latest.frame)
-  const near = (r: (typeof rows)[number]) => markAt(r.view, r.frame, p)
-  const ring = (r: (typeof rows)[number]) => ({ ...fromAreaPoint(r.frame, p), r: r.frame.s * SPOT_NEAR * 1.4 })
+  type Row = (typeof rows)[number]
+  const src = (picked && rows.find((r) => r.w.id === picked.id)) || latest
+  const at0 = picked && src.w.id === picked.id ? picked : { ...fromAreaPoint(latest.frame, startPoint(latest.view, area, latest.frame)) }
+  // where that place is on each check-in's photo: through the face landmarks around it (same view), else the area
+  const placeOn = (r: Row) => {
+    if (r === src) return { x: at0.x, y: at0.y }
+    const viaFace = r.view.view === src.view.view ? carry(src.view.landmarks, r.view.landmarks, at0.x, at0.y) : null
+    return viaFace ?? fromAreaPoint(r.frame, toAreaPoint(src.frame, at0.x, at0.y))
+  }
+  const near = (r: Row) => {
+    const q = placeOn(r)
+    return markNear(r.view, q.x, q.y, r.frame.s * SPOT_NEAR)
+  }
+  const ring = (r: Row) => ({ ...placeOn(r), r: r.frame.s * SPOT_NEAR * 1.4 })
+  const closeUp = (r: Row) => {
+    const q = placeOn(r)
+    return boxAround(r.view, q.x, q.y, r.frame.s * SPOT_CLOSE_UP)
+  }
   const marked = rows.filter((r) => near(r)).length
   return (
     <section aria-label={`${AREA_LABEL[area]} across your check-ins`} className="flex flex-col gap-4 rounded-[32px] bg-surface/80 p-[clamp(16px,2.4vw,24px)] squircle">
@@ -277,7 +293,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
       </div>
       <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-1.5">
-          <MarkedPhoto view={row.view} area={area} box={row.box} label={`${AREA_LABEL[area]}, ${dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })}. Tap a spot to follow it.`} rounded="rounded-[24px]" target={ring(row)} onPick={(x, y) => setPoint(toAreaPoint(row.frame, x, y))} dim />
+          <MarkedPhoto view={row.view} area={area} box={row.box} label={`${AREA_LABEL[area]}, ${dayLabel(row.w.created_at, { day: 'numeric', month: 'long' })}. Tap a spot to follow it.`} rounded="rounded-[24px]" target={ring(row)} onPick={(x, y) => setPicked({ id: row.w.id, x, y })} dim />
           <span className="text-[12.5px] text-ink-2">Tap any spot on this photo to follow it across your check-ins.</span>
         </div>
         <div className="flex flex-col gap-3">
@@ -316,7 +332,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
             return (
               <li key={r.w.id} className="w-[104px] shrink-0">
                 <button type="button" onClick={() => setAt(k)} className="flex w-full flex-col gap-1 rounded-[16px] p-1 text-left">
-                  <MarkedPhoto view={r.view} box={spotBox(r.view, r.frame, p)} label={`The spot on ${dayLabel(r.w.created_at)}: ${m ? (m.kind === 'spot' ? 'a dark spot counted' : 'a blemish counted') : 'nothing counted'}`} rounded="rounded-[14px]" target={ring(r)} />
+                  <MarkedPhoto view={r.view} box={closeUp(r)} label={`The spot on ${dayLabel(r.w.created_at)}: ${m ? (m.kind === 'spot' ? 'a dark spot counted' : 'a blemish counted') : 'nothing counted'}`} rounded="rounded-[14px]" target={ring(r)} />
                   <span className="px-1 text-[12px] leading-tight">{dayLabel(r.w.created_at)}</span>
                   <span className="flex items-center gap-1 px-1 text-[11px] leading-tight text-ink-2">
                     <span aria-hidden style={{ color: m ? RING[m.kind] : 'var(--line-strong, #bbb)' }}>{m ? '●' : '○'}</span>
@@ -327,7 +343,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
             )
           })}
         </ol>
-        <p className="m-0 text-[12.5px] leading-snug text-ink-2">The same place on your face each week, found from the area's outline. Whether it is the very same spot, the close-ups show; Willow does not decide that.</p>
+        <p className="m-0 text-[12.5px] leading-snug text-ink-2">The same place on your face each week, found from the face points around it (brows, nose, hairline…), so it stays put when your head turns or the photo is framed differently. Whether it is the very same spot, the close-ups show; Willow does not decide that.</p>
       </div>
     </section>
   )

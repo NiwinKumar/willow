@@ -148,6 +148,11 @@ def weeks(store: Store, uid: str) -> dict[str, Any]:
     out = []
     for sid, d, result, photos in plans:
         marks, complete = marks_of(result, d.get("labels") or {})
+        # each photo's face-mesh landmarks (engine extras.face_points): carry a place between weeks
+        landmarks = {
+            p["view"]: p["points"]
+            for p in (_metric(result, "blemishes").get("extras") or {}).get("face_points") or []
+        }
         shown = []
         for v, name in photos:
             if not name or name not in signed:
@@ -163,6 +168,7 @@ def weeks(store: Store, uid: str) -> dict[str, Any]:
                         "height": size.get("height"),
                     },
                     "rois": v.get("rois") or [],
+                    "landmarks": landmarks.get(v["view"]),
                     "marks": [{k: m[k] for k in ("kind", "x", "y", "r", "zone")} for m in mine],
                     # this photo's counts, only when every mark is listed (else they would be
                     # the candidates', not the check-in's)

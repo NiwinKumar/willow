@@ -142,3 +142,65 @@ export function startPoint(view: SpotWeekView, area: string, f: AreaFrame): Area
   const big = view.marks.filter((m) => m.zone === area).sort((a, b) => b.r - a.r)[0]
   return big ? toAreaPoint(f, big.x, big.y) : { u: 0, v: 0 }
 }
+
+/**
+ * The same place of the face on another photo: fitted from the face-mesh landmarks nearest to it (a small affine fit,
+ * nearer landmarks weighing more), so a spot is carried with the skin around it, whatever the head's angle, distance
+ * or framing that week. Null when either photo has no landmarks.
+ */
+export function carry(from: [number, number][] | null | undefined, to: [number, number][] | null | undefined, x: number, y: number, k = 10): { x: number; y: number } | null {
+  if (!from || !to || from.length !== to.length || from.length < 3) return null
+  const near = from
+    .map((p, i) => ({ i, d: Math.hypot(p[0] - x, p[1] - y) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, k)
+  // weighted least squares for [x' y'] = [x y 1] M: normal equations (3x3), one solve per output coordinate
+  const A = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ]
+  const bx = [0, 0, 0]
+  const by = [0, 0, 0]
+  for (const { i, d } of near) {
+    const w = 1 / (d * d + 1)
+    const r = [from[i][0], from[i][1], 1]
+    for (let a = 0; a < 3; a++) {
+      for (let b = 0; b < 3; b++) A[a][b] += w * r[a] * r[b]
+      bx[a] += w * r[a] * to[i][0]
+      by[a] += w * r[a] * to[i][1]
+    }
+  }
+  const mx = solve3(A, bx)
+  const my = solve3(A, by)
+  if (!mx || !my) return null
+  return { x: mx[0] * x + mx[1] * y + mx[2], y: my[0] * x + my[1] * y + my[2] }
+}
+
+function solve3(A: number[][], b: number[]): number[] | null {
+  const det = (m: number[][]) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+  const D = det(A)
+  if (Math.abs(D) < 1e-9) return null
+  return [0, 1, 2].map((c) => det(A.map((row, r) => row.map((v, j) => (j === c ? b[r] : v)))) / D)
+}
+
+/** The counted mark nearest a photo point within `radius` (plus the mark's own size), or null. */
+export function markNear(view: SpotWeekView, x: number, y: number, radius: number): SpotWeekView['marks'][number] | null {
+  let best: SpotWeekView['marks'][number] | null = null
+  let bestD = Infinity
+  for (const m of view.marks) {
+    const d = Math.hypot(m.x - x, m.y - y)
+    if (d <= radius + m.r && d < bestD) {
+      best = m
+      bestD = d
+    }
+  }
+  return best
+}
+
+/** A square of side `size` around a photo point, kept inside the photo. */
+export function boxAround(view: SpotWeekView, x: number, y: number, size: number): Box {
+  const W = view.photo.width ?? Infinity
+  const H = view.photo.height ?? Infinity
+  return { x: Math.min(Math.max(x - size / 2, 0), W - size), y: Math.min(Math.max(y - size / 2, 0), H - size), w: size, h: size }
+}

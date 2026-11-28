@@ -189,6 +189,8 @@ export type SpotWeekView = {
   view: ViewName
   photo: { url: string; width: number | null; height: number | null }
   rois: { name: string; polygon: [number, number][] }[]
+  /** The photo's face-mesh landmarks (same index = same point of the face in every photo); null on older check-ins. */
+  landmarks?: [number, number][] | null
   marks: SpotMark[]
   /** This photo's counts; null on a check-in measured before every mark was listed. */
   blemishes: number | null
