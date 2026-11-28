@@ -292,3 +292,7 @@ export function firstRead(days: number, checkIns: number): { days: number; check
   const c = Math.min(Math.max(0, checkIns), FIRST_READ_CHECKINS)
   return { days: d, checkIns: c, share: Math.min(d / FIRST_READ_DAYS, c / FIRST_READ_CHECKINS), daysLeft: FIRST_READ_DAYS - d }
 }
+
+/** The greeting for a local hour: morning from 5:00, afternoon from 12:00, evening from 18:00 until 5:00
+ * (00:40 is still the evening before, never "Good morning"). */
+export const greetingAt = (hour: number) => (hour >= 5 && hour < 12 ? 'Good morning' : hour >= 12 && hour < 18 ? 'Good afternoon' : 'Good evening')

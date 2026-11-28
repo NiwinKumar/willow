@@ -602,6 +602,14 @@ def problems(exp: _Explanation, data: dict[str, Any]) -> list[str]:
             found.append(f"'safe' in: {text}")
         if HARSH.search(text):
             found.append(f"harsh wording in: {text}")
+    for text in [exp.headline, *exp.next_steps]:
+        if claim := numbers.false_comparison(text, data["metrics"]):
+            found.append(f"comparison the numbers contradict ({claim}): {text}")
+    for item in exp.items:
+        if claim := numbers.false_comparison(
+            item.summary, data["metrics"], by_id.get(item.metric_id)
+        ):
+            found.append(f"comparison the numbers contradict ({claim}): {item.summary}")
     if too_many_numbers(exp.headline, 1):
         found.append(f"numbers in headline: {exp.headline}")
     for item in exp.items:

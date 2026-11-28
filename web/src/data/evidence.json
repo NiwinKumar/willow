@@ -105,6 +105,7 @@
         "unit": "Proof Ask answer",
         "what": "One question over the aggregates",
         "usd": 0.1446,
+        "note": "Measured before slicing: an answer now reads only the slices a question needs, ~5.5k tokens per question in the evals (was ~191k). No sliced calls in production logs yet.",
         "parts": [
           {
             "job": "retailer_ask",

@@ -768,6 +768,8 @@ def chat(
     allowed = numbers.collect(ctx) | numbers.collect(tool_outputs) | numbers.percents(rates)
     simulated = any((r or {}).get("synthetic_cohort") for r in rates)
     rate_percents = numbers.percents([(r or {}).get("by_product") for r in rates])
+    # the changes and bands a comparison ("within the 0.25 your photos usually vary") must match
+    compared = numbers.compared(ctx) + numbers.compared(tool_outputs)
     asked_currencies: set[str] = set()
     for m in messages:
         if m["role"] == "user":
@@ -812,8 +814,11 @@ def chat(
         follow_ups = [
             q
             for q in reply.follow_up_suggestions
-            if numbers.only_known(q, allowed) and not explain.BANNED.search(q)
+            if numbers.only_known(q, allowed)
+            and not explain.BANNED.search(q)
+            and not numbers.false_comparison(q, compared)
         ]
+        false_claims = [c for t in written if (c := numbers.false_comparison(t, compared))]
         has_answer = any(b.type == "answer" and (b.text or "").strip() for b in reply.blocks)
         if (
             has_answer
@@ -822,6 +827,7 @@ def chat(
             and not bad_ids
             and not bad_metrics
             and not mixed_currency(unnamed, currency, asked_currencies)
+            and not false_claims
         ):
             out_blocks = blocks_mod.normalize(reply.blocks, session_ids, product_ids)
             if simulated and cohort_unlabelled(written, rate_percents):
@@ -857,10 +863,11 @@ def chat(
                 },
             }
         log.warning(
-            "advisor reply rejected (ids %s, metrics %s, answer %s)",
+            "advisor reply rejected (ids %s, metrics %s, answer %s, comparisons %s)",
             sorted(bad_ids),
             sorted(bad_metrics),
             has_answer,
+            false_claims,
         )
     fixed = SCOPE_REPLY if explain.BANNED.search(asked) else NO_ANSWER
     return _fixed(fixed, retrieval)

@@ -189,6 +189,7 @@ export default function Evidence() {
                   </span>
                   <span className="text-[13.5px] leading-[1.45] text-ink-2">{r.what}</span>
                   <span className="text-[12.5px] leading-[1.45] text-ink-2">{r.parts.map(partLine).join(' · ')}</span>
+                  {r.note ? <span className="text-[12.5px] leading-[1.45] text-ink">{r.note}</span> : null}
                 </li>
               ))}
             </ul>

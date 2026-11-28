@@ -126,9 +126,9 @@ function Frame({ children, busy, fit = false }: { children: ReactNode; busy?: bo
  *
  * The least height is each card's own: a card that grows with its column keeps its header, its foot and room
  * for one row of its list (cards.tsx), a card that doesn't keeps its natural height. When a column can't hold
- * its cards at that (measured after every render and whenever a card changes size), Home scrolls instead, and
- * keeps scrolling until the page is wider or the window taller than when it didn't fit (never flipping back
- * and forth at one size). Measured in a layout effect, so the switch lands before paint (and inside a page
+ * its cards at that (measured after every render and whenever a card changes size), Home first sheds what it
+ * can spare, one step at a time (`shed`, SHED_STEPS), and only then scrolls; either way it keeps that until the
+ * page is wider or the window taller than when it didn't fit (never flipping back and forth at one size). Measured in a layout effect, so the switch lands before paint (and inside a page
  * morph's update: components/shell/morph.ts).
  *
  * The Wisp button sits over the bottom-right corner of the last column: the card there (whichever it is) keeps
@@ -140,7 +140,8 @@ function useFitScreen(dense: boolean, wispOpen: boolean) {
   const tall = useMediaQuery(`(min-width: 900px) and (min-height: ${dense ? 760 : 640}px)`)
   const [width, setWidth] = useState(0)
   const [vh, setVh] = useState(() => (typeof window === 'undefined' ? 900 : window.innerHeight))
-  const [blocked, setBlocked] = useState<{ w: number; h: number } | null>(null)
+  // How many shedding steps this size needed (SHED_STEPS), for this width and height or smaller; past the last, Home scrolls.
+  const [shedAt, setShedAt] = useState<{ w: number; h: number; n: number } | null>(null)
   const [corner, setCorner] = useState<number | null>(null)
   const grid = useRef<HTMLDivElement | null>(null)
   const ro = useRef<ResizeObserver | null>(null)
@@ -163,7 +164,8 @@ function useFitScreen(dense: boolean, wispOpen: boolean) {
   // The grid's width once fitted (its side padding is clamp(16px, 2vw, 32px) then, 3vw scrolling): measured on
   // the page itself, so being fitted or not never changes the answer.
   const fitPad = Math.min(32, Math.max(16, (typeof window === 'undefined' ? 1440 : window.innerWidth) * 0.02))
-  const fit = tall && width - 2 * fitPad >= 960 && !(blocked && width <= blocked.w && vh <= blocked.h)
+  const shed = shedAt && width <= shedAt.w && vh <= shedAt.h ? shedAt.n : 0
+  const fit = tall && width - 2 * fitPad >= 960 && shed <= SHED_STEPS
   useLayoutEffect(() => {
     if (!fit) return
     const html = document.documentElement
@@ -193,7 +195,7 @@ function useFitScreen(dense: boolean, wispOpen: boolean) {
         const last = col.lastElementChild
         if (!last) continue
         if (last.getBoundingClientRect().bottom > col.getBoundingClientRect().bottom + 1) {
-          setBlocked({ w: width, h: window.innerHeight })
+          setShedAt({ w: width, h: window.innerHeight, n: shed + 1 })
           return
         }
       }
@@ -206,8 +208,21 @@ function useFitScreen(dense: boolean, wispOpen: boolean) {
     for (const col of cols) for (const c of Array.from(col.children)) watch.observe(c)
     return () => watch.disconnect()
   })
-  return { fit, gridRef, corner }
+  return { fit, gridRef, corner, shed: fit ? shed : 0 }
 }
+
+/**
+ * What a fitted Home gives up, in order, when its columns can't hold their cards (a 13-inch laptop's default
+ * window, 1440x790 or 1366x768, with goals: six cards need about 490px under the hero and get about 420).
+ *  1. The week band: its sentence is the greeting's first line, and "See progress" is on the goals card too.
+ *  2. The spot diary and the routine's effect, each a link in a "More" card under Routine today: both have pages
+ *     of their own (Spots, Routine), while the goals, the last photos, what changed and today's routine are
+ *     what Home is for. Merging "Since your baseline" into the goals card was the other choice; it would hide
+ *     every reading that isn't a goal, which is what that card is there to show.
+ * Past the last step Home scrolls, as it did before.
+ */
+const SHED_STEPS = 2
+const SHED_TO_MORE = new Set(['spots', 'effect'])
 
 /** Card padding that already keeps content off the card's edge (p-4). */
 const CARD_PAD = 16
@@ -379,7 +394,7 @@ function HomeBody() {
   // together) and the baseline tile under the goals: two tall cards never share one column while another holds
   // Routine today alone, which then stretched its panels into empty space (the demo journey). Without goals (a
   // first check-in) the effect keeps the left column.
-  const { fit, gridRef, corner } = useFitScreen(Boolean(measured && trends.length), shell.advisorOpen)
+  const { fit, gridRef, corner, shed } = useFitScreen(Boolean(measured && trends.length), shell.advisorOpen)
   // A tall window has room for Routine today's full panels even when it shares its column: 940px beside the
   // baseline tile, 1100px beside the routine's effect (a person with goals).
   const roomy = useMediaQuery(`(min-height: ${measured && trends.length ? 1100 : 940}px)`)
@@ -450,6 +465,17 @@ function HomeBody() {
   }
 
   daily[0].node = routineCard
+  // Shedding (SHED_STEPS): the spot diary and the routine's effect become links in one small card under Routine today.
+  const more: { key: string; label: string; to: string }[] = []
+  if (shed >= 2) {
+    for (const col of [aims, last, daily]) {
+      for (const c of col.filter((x) => SHED_TO_MORE.has(x.key))) {
+        more.push(c.key === 'spots' ? { key: c.key, label: 'Spot diary', to: '/spots' } : { key: c.key, label: 'Is your routine working?', to: '/routine' })
+        col.splice(col.indexOf(c), 1)
+      }
+    }
+    if (more.length) daily.push({ key: 'more', node: <MoreCard links={more} onOpen={navigate} /> })
+  }
   const columns = [aims, last, daily].filter((c) => c.length)
   const spans = rowSpans(columns.length)
 
@@ -466,7 +492,7 @@ function HomeBody() {
           </button>
         </div>
       ) : null}
-      {week ? <WeekBand {...week} onProgress={() => navigate('/progress')} /> : null}
+      {week && shed < 1 ? <WeekBand {...week} onProgress={() => navigate('/progress')} /> : null}
       <div ref={gridRef} className={`@container grid grid-cols-12 items-stretch gap-3.5 ${fit ? 'min-h-0 flex-[1_1_0] grid-rows-[max-content_minmax(0,1fr)]' : ''}`}>
         <div className="col-span-12 flex min-w-0 @min-[720px]:col-span-6 [&>section]:flex-1">
           <HeroCard
@@ -503,6 +529,20 @@ function HomeBody() {
       </div>
     </Frame>
     </HomeFit.Provider>
+  )
+}
+
+/** The cards a tight fitted Home moved off the screen (SHED_STEPS), one link each to where they live. */
+function MoreCard({ links, onOpen }: { links: { key: string; label: string; to: string }[]; onOpen: (to: string) => void }) {
+  return (
+    <nav aria-label="More on Home" className="card flex min-w-0 flex-1 flex-wrap content-center items-center gap-2 p-4">
+      <h2 className="m-0 mr-1 text-[13px] font-normal text-ink-2">More</h2>
+      {links.map((l) => (
+        <button key={l.key} type="button" onClick={() => onOpen(l.to)} className="inline-flex min-h-9 items-center gap-1 rounded-pill bg-white/60 px-3 text-[12.5px] whitespace-nowrap text-ink shadow-[inset_0_0_0_1px_rgba(18,18,18,.08)] transition-[background,scale] duration-200 ease-standard hover:bg-white/85 active:scale-[.97]">
+          {l.label} <span aria-hidden>→</span>
+        </button>
+      ))}
+    </nav>
   )
 }
 
