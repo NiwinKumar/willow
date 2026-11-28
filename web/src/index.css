@@ -293,6 +293,13 @@
   .squircle {
     corner-shape: squircle;
   }
+  /* Safari leaves blurred and blended children (the hero's bloom and grain) unclipped by overflow + radius, so a
+     square of them shows past the rounded corners: clip to the same rounded box where squircles are not drawn. */
+  @supports not (corner-shape: squircle) {
+    .clip-card {
+      clip-path: inset(0 round var(--clip-r, 36px));
+    }
+  }
   /* Standard card: #FAFAF8, radius 30, inset highlight + long soft shadow. */
   .card {
     background: var(--bg-surface);

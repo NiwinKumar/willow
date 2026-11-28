@@ -145,7 +145,7 @@ export function SkinPanel({ row, onClose, onGoal, mine }: { row: SkinRow | null;
                 })}
               </ul>
             )}
-            <p className="m-0 text-proof-label text-ink-2">Visible-change rate among each product’s users with {v.label.toLowerCase()} skin, and lift over non-users with the same skin type. Ordered by lift.</p>
+            <p className="m-0 text-proof-label text-ink-2">Visible-change rate among each product’s users with {v.label.toLowerCase()} skin, and lift over people with that skin type who don’t use it. Ordered by lift.</p>
           </Block>
           {v.conflict_share !== null ? (
             <p className="m-0 text-proof-body text-ink-2">

@@ -212,7 +212,7 @@ function NoSpotlight({ brand }: { brand: string | null }) {
     <EmptyState
       icon={<Sparkles size={18} strokeWidth={1.6} />}
       title={brand ? `Next for ${brand}: grow the number of people measured` : 'Next: grow the number of people measured'}
-      body={`A product gets a Proof tier once 10 people reach week 8, and is Proven at ${MIN_GROUP * 3}+ with a lift over non-users above zero across its 95% interval. Your range shows which products are collecting and which have no users yet.`}
+      body={`A product gets a Proof tier once 10 people reach week 8, and is Proven at ${MIN_GROUP * 3}+ with a lift over people with the same goals who don’t use it, above zero across its 95% interval. Your range shows which products are collecting and which have no users yet.`}
       action={{ label: 'Open your range', to: `${sectionPath('range')}${carry}` }}
       secondary={{ label: 'See every product', to: `${sectionPath('products')}${carry}` }}
     />
@@ -417,7 +417,7 @@ function TopProducts({ rows, brand, className }: { rows: ProductRow[]; brand: st
       id="top-h"
       className={className}
       flush
-      description="Ranked by extra people with a visible change per 100 users, against non-users with the same goals."
+      description="Ranked by extra people with a visible change per 100 users, against people with the same goals who don’t use it."
       actions={
         <Link to={`${sectionPath('products')}${carry}`} className="inline-flex items-center gap-1 text-proof-small text-ink-2 no-underline hover:text-ink">
           View all <ArrowRight size={14} strokeWidth={1.6} aria-hidden />
@@ -439,7 +439,7 @@ function TopProducts({ rows, brand, className }: { rows: ProductRow[]; brand: st
                     </span>
                   </span>
                 </span>
-                <span className="flex flex-col items-end" title={`${int(r.n)} people; ${pts(r.lift)} over non-users, 95% interval ${pts(r.lift_lo)} to ${pts(r.lift_hi)}`}>
+                <span className="flex flex-col items-end" title={`${int(r.n)} people; ${pts(r.lift)} over the comparison group, 95% interval ${pts(r.lift_lo)} to ${pts(r.lift_hi)}`}>
                   <span className={`text-proof-body font-semibold leading-5 tnum ${(r.lift ?? 0) > 0 ? 'text-proof-leaf' : 'text-ink-2'}`}>{extraPer100(r.lift)}</span>
                   <span className="text-proof-label text-ink-2">per 100 users</span>
                 </span>

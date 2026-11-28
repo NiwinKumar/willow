@@ -305,7 +305,7 @@ export function ownRecordInsight(row: { rate: number | null; base_rate: number |
   if (row.rate === null || row.base_rate === null || row.n === null) return null
   const a = Math.round(row.rate * 100)
   const b = Math.round(row.base_rate * 100)
-  return `${a} in 100 of its users had a visible change by week 8, against ${b} in 100 non-users with the same goals. The campaign promotes something that works on its own.`
+  return `${a} in 100 of its users had a visible change by week 8, against ${b} in 100 people with the same goals who don’t use it. The campaign promotes something that works on its own.`
 }
 
 /** The portfolio at a glance (Campaigns, P2B): the delivery funnel summed over campaigns, and the holdout results. */

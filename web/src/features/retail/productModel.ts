@@ -206,7 +206,7 @@ export function verdictLine(p: Pick<ProductRow, 'tier' | 'rate' | 'base_rate' | 
     const more = p.to_proven ? ` About ${p.to_proven} more ${p.to_proven === 1 ? 'person' : 'people'} at week 8 would settle it, if the rates hold.` : ''
     return `Ahead of people with the same goals${vs}, but the interval still reaches zero.${more}`
   }
-  return `Users and non-users with the same goals change at about the same rate${vs}.`
+  return `People using it change at about the same rate as people with the same goals who don’t${vs}.`
 }
 
 /** Where a product sits among the other measured products of its category (the api's competitor rows). */

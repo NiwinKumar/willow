@@ -268,7 +268,7 @@ function HomeBody() {
         used={used}
         onToggle={toggle}
         missingSunscreen={missingSunscreen}
-        conflict={conflictNames.length ? { label: `${conflictNames.map(shortName).join(' & ')}${short ? `: ${short.toLowerCase()}` : ''}`, title: conflict!.issue } : null}
+        conflict={conflictNames.length ? { names: conflictNames.map(shortName), fix: short ?? null, title: conflict!.issue } : null}
         onRoutine={() => navigate('/routine')}
       />
     )

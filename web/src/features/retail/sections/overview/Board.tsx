@@ -125,10 +125,10 @@ export function WidgetBoard({ d, all, rows, brand, summary, spotlight }: { d: In
               value={pct(last).replace('%', '')}
               unit="%"
               lead={lift !== null ? pts(lift) : undefined}
-              sub={lift !== null ? `more than non-users with the same goals (${pct(curve.base)}), across ${int(curve.people)} goals people chose.` : `of ${int(curve.people)} goals people chose in a category, across the market.`}
+              sub={lift !== null ? `more than people with the same goals not using it (${pct(curve.base)}), across ${int(curve.people)} goals people chose.` : `of ${int(curve.people)} goals people chose in a category, across the market.`}
               points={points}
               chipOf={(i) => ({ text: i === 0 ? 'Start · 0%' : `Week ${points[i].x} · ${pct(points[i].y)}`, tone: i === 0 ? 'flat' : 'up' })}
-              ariaLabel={`Visible change by week ${points.at(-1)!.x}: ${pct(last)} of ${int(curve.people)} goals${lift !== null ? `, ${pts(lift)} against non-users` : ''}`}
+              ariaLabel={`Visible change by week ${points.at(-1)!.x}: ${pct(last)} of ${int(curve.people)} goals${lift !== null ? `, ${pts(lift)} against the comparison group` : ''}`}
               menu={{ label: 'Open the market view', to: to('market') }}
             />
           </div>
