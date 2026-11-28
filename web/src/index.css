@@ -257,8 +257,11 @@
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
+  /* Text fields: a soft ring instead of the outline (WCAG 2.4.7: keyboard focus is always visible). */
   :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit']), textarea, select, [contenteditable]):focus-visible {
     outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 60%, transparent);
+    border-radius: 12px;
   }
   h1,
   h2,

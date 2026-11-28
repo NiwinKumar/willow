@@ -220,7 +220,7 @@ export function Unique() {
         title="Built to answer one question honestly: did it really change?"
         lead="The usual ways to judge skincare compare you with other people, or guess. Willow measures, and compares you only with yourself."
       />
-      <div className="overflow-x-auto rounded-[30px] bg-surface">
+      <div tabIndex={0} role="region" aria-label="Willow compared with the usual ways" className="overflow-x-auto rounded-[30px] bg-surface">
         <table className="w-full min-w-[560px] border-collapse text-left text-[14.5px] leading-[1.45]">
           <thead>
             <tr className="text-[13px] text-ink-2">

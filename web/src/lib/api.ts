@@ -284,6 +284,8 @@ export type AnswerBlock =
 export type AdvisorReply = {
   /** Plain text of the answer (older api builds send only this). */
   message: string
+  /** The language the words were translated into (api app/translate.py); absent for English. */
+  lang?: string
   /** The structured answer, answer first; absent from older api builds. */
   blocks?: AnswerBlock[]
   product_ids: string[]

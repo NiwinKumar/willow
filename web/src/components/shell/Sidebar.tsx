@@ -81,7 +81,7 @@ export function Sidebar({ current, collapsed, onToggle, onCheckIn, checkIn, name
       </button>
       </Tooltip>
       <Tooltip content={`${name} · goals, privacy`} disabled={!collapsed}>
-      <Link to="/you" aria-current={current === 'you' ? 'page' : undefined} aria-label="You" className={`flex shrink-0 items-center gap-[11px] rounded-[25px] squircle py-0.5 pr-3 pl-[4.5px] no-underline transition-colors ${current === 'you' ? 'bg-white' : ''}`}>
+      <Link to="/you" aria-current={current === 'you' ? 'page' : undefined} className={`flex shrink-0 items-center gap-[11px] rounded-[25px] squircle py-0.5 pr-3 pl-[4.5px] no-underline transition-colors ${current === 'you' ? 'bg-white' : ''}`}>
         <span className="rounded-full shadow-[0_0_0_2px_rgba(255,255,255,.8)]">
           <Avatar initials={initials} size={36} />
         </span>

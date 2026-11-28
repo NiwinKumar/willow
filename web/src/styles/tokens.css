@@ -12,7 +12,7 @@
   --bg-scrim: rgba(18,18,18,.32);
   --text-primary: #121212;
   --text-secondary: #5E5B56;
-  --text-disabled: #8A867F;
+  --text-disabled: #67635D; /* 5.0:1 on canvas (was #8A867F, 3.0:1; Nov 28 audit) */
   --text-inverse: #FFFFFF;
   --line-subtle: rgba(18,18,18,.12);
   --line-strong: rgba(18,18,18,.24);
