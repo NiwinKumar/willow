@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ApiError, retailerSegments } from '../../lib/api'
 import { useRetailData } from './context'
 import { useCompetitorNames } from './orgData'
+import { retrying } from './retry'
 import type { Segments } from './types'
 
 /**
@@ -23,7 +24,7 @@ export function useView<T>(key: string | null, load: () => Promise<T>): ViewStat
     let alive = true
     let p = cache.get(k) as Promise<T> | undefined
     if (!p) {
-      p = load()
+      p = retrying(load)
       p.catch(() => cache.delete(k))
       cache.set(k, p)
     }

@@ -4,11 +4,12 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { ApiError } from '../../lib/api'
-import { setQueryData, useQuery } from '../../lib/query'
+import { invalidate, setQueryData, useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { ProofMark } from './brand'
 import { ChooseOrg } from './ChooseOrg'
 import { proofApi, ROLE_LABEL, type InstanceView, type Membership, type MeView, type ProofInstance, type ProofOrg, type Role } from './proofApi'
+import { retrying } from './retry'
 import { Bone, Button, ErrorState, primeBrandLogos, Select } from './ui'
 import { slugOf } from './ui/format'
 
@@ -80,7 +81,7 @@ function useInstance(): InstanceLoad {
     let alive = true
     let p = instanceCache.get(key)
     if (!p) {
-      p = proofApi.instance(host, slug)
+      p = retrying(() => proofApi.instance(host, slug))
       p.catch(() => instanceCache.delete(key))
       instanceCache.set(key, p)
     }
@@ -104,7 +105,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const inst = useInstance()
   const uid = auth.user?.uid ?? null
   const instanceId = inst.status === 'ready' ? inst.v.instance.id : null
-  const me = useQuery<MeView>(['proof-me', uid, instanceId], (t) => proofApi.me(t, instanceId!), { enabled: Boolean(uid && instanceId), staleMs: 5 * 60_000 })
+  const me = useQuery<MeView>(['proof-me', uid, instanceId], (t) => retrying(() => proofApi.me(t, instanceId!)), { enabled: Boolean(uid && instanceId), staleMs: 5 * 60_000 })
   const [pick, setPick] = useState<string | null>(null)
   useEffect(() => {
     if (instanceId) setPick(readPick(instanceId))
@@ -134,6 +135,11 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         const t = await auth.getIdToken()
         const joined = await proofApi.join(t, { instance: instanceId, org_id: orgId, role: target?.kind === 'brand' ? 'analyst' : 'admin' })
         setQueryData<MeView>(['proof-me', uid, instanceId], (prev) => ({ memberships: [...(prev?.memberships ?? []).filter((m) => m.org_id !== orgId), { org_id: orgId, role: joined?.membership?.role ?? 'analyst', demo: true }], current: prev?.current ?? null }))
+        // The join seeded this seat's sample campaigns (api proof_orgs.join): the campaign list is keyed by
+        // organisation (pipeline.tsx campaignsKey), so the new seat reads it fresh; the per-person reads that
+        // can change with it are read again too, instead of showing the last seat's answer until a reload.
+        invalidate(['campaigns', uid, orgId])
+        invalidate(['autopilot', uid])
       }
       savePick(instanceId, orgId)
       setPick(orgId)

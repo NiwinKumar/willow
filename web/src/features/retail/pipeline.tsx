@@ -7,6 +7,7 @@ import { useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { useOrgMaybe } from './org'
 import { orgCampaigns } from './promote'
+import { retrying } from './retry'
 import type { ProductRow } from './types'
 import { int, pts } from './ui'
 
@@ -20,26 +21,43 @@ import { int, pts } from './ui'
 export type StepState = 'done' | 'partial' | 'todo'
 export type Step = { id: string; title: string; state: StepState; detail: ReactNode; to?: string; cta?: string }
 
+export type CampaignList = { list: Campaign[]; at: number | null }
+
+/**
+ * The campaign list's cache key. The api lists every campaign of this person; the organisation is in the key so
+ * switching seat reads the list again after the join, which seeds that organisation's sample campaigns: the
+ * previous seat's list would show "No campaigns yet" until a reload (juror, Nov 29).
+ */
+export const campaignsKey = (uid: string | null, orgId: string | null) => ['campaigns', uid, orgId] as const
+
+/** The one campaign-list query every surface reads (Home, Campaigns, a campaign's page); retried when the connection drops. */
+export function useCampaignList() {
+  const { user } = useAuth()
+  const uid = user?.uid ?? null
+  const orgId = useOrgMaybe()?.org?.id ?? null
+  const q = useQuery<CampaignList>(campaignsKey(uid, orgId), (t) => retrying(() => api.listCampaigns(t)).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
+  return { ...q, key: campaignsKey(uid, orgId) }
+}
+
 /**
  * This organisation's campaigns (shares the Campaigns page's cache; promote.ts orgCampaigns is the one scope every
  * surface uses); empty when there is no session yet.
  */
 export function useCampaigns(): Campaign[] {
-  const { user } = useAuth()
-  const uid = user?.uid ?? null
   const orgId = useOrgMaybe()?.org?.id ?? null
-  const q = useQuery<{ list: Campaign[]; at: number | null }>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
-  const list = q.data?.list
+  const list = useCampaignList().data?.list
   return useMemo(() => orgCampaigns(list ?? [], orgId), [list, orgId])
 }
 
 /** The campaign list hasn't arrived yet (same cached query as useCampaigns): panels show a skeleton, never
- *  "No campaigns yet", while it loads. */
+ *  "No campaigns yet", while it loads. `failed`: it could not be read; panels say so instead of "none". */
+export function useCampaignsState(): { loading: boolean; failed: boolean; retry: () => Promise<void> } {
+  const q = useCampaignList()
+  return { loading: !q.data && q.status !== 'error', failed: !q.data && q.status === 'error', retry: q.refetch }
+}
+
 export function useCampaignsLoading(): boolean {
-  const { user } = useAuth()
-  const uid = user?.uid ?? null
-  const q = useQuery<{ list: Campaign[]; at: number | null }>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
-  return !q.data && q.status !== 'error'
+  return useCampaignsState().loading
 }
 
 /** The most relevant campaign for a product: running first, then the latest. */

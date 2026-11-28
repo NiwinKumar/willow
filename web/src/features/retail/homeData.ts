@@ -30,7 +30,7 @@ export function useHomeCards(d: Insights) {
   const uid = user?.uid ?? null
   const brand = workspace.kind === 'brand' ? workspace.brand : null
   const mix: 'retailer' | 'brand' = org ? org.kind : workspace.kind
-  const { state: prodState } = useProducts(filters)
+  const { state: prodState, retry: retryProducts } = useProducts(filters)
   const rows = useMemo(() => (prodState.status === 'ready' ? prodState.d.products : []), [prodState])
   const campaigns = useCampaigns()
   const campaignsLoading = useCampaignsLoading()
@@ -84,5 +84,5 @@ export function useHomeCards(d: Insights) {
     waiting(auto, Boolean(uid)) ||
     details.some((x) => x.status === 'loading') ||
     (mix === 'brand' && Boolean(brand) && brandDetail.status === 'loading')
-  return { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, segments, settling }
+  return { mix, brand, rows, prodState, retryProducts, campaigns, shelf, decisions, requests, range, cards, segments, settling }
 }

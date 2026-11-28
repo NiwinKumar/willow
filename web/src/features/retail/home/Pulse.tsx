@@ -2,7 +2,7 @@ import { ArrowRight, Megaphone } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Button, int, Meter, pct, ProofRing, pts, Sparkline, useTooltip } from '../ui'
+import { Button, ErrorState, int, Meter, pct, ProofRing, pts, Sparkline, useTooltip } from '../ui'
 import { changeText, monthShort, type CampaignTotals, type GoalTrend, type Portfolio } from './dashboard'
 
 /*
@@ -117,7 +117,7 @@ export function DemandPanel({ months, rows, brand, className = '', loading }: { 
 
 /* ───────────── campaign funnel ───────────── */
 
-export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = '', canPromote, loading = false }: { t: CampaignTotals; samples: number; promoteTo: string; campaignsTo: string; className?: string; canPromote: boolean; loading?: boolean }) {
+export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = '', canPromote, loading = false, onRetry }: { t: CampaignTotals; samples: number; promoteTo: string; campaignsTo: string; className?: string; canPromote: boolean; loading?: boolean; /** the campaign list could not be read: say so, never "No campaigns yet" */ onRetry?: () => void }) {
   const steps = [
     { id: 'reach', label: 'Reached', value: t.reach, note: 'people shown the card' },
     { id: 'clicks', label: 'Clicked', value: t.clicks, note: 'opened the product' },
@@ -145,6 +145,8 @@ export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = ''
             </span>
           ))}
         </div>
+      ) : onRetry ? (
+        <ErrorState compact title="Campaigns couldn’t load" body="No figures are shown rather than none." onRetry={onRetry} />
       ) : !t.count ? (
         <div className="flex flex-1 flex-col items-start justify-center gap-3 px-5 pb-5 pt-2">
           <span aria-hidden className="grid size-9 place-items-center rounded-ctl bg-sunken text-ink-2">

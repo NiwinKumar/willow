@@ -24,6 +24,7 @@ import json
 import logging
 import math
 import re
+import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -107,6 +108,9 @@ Rules:
   returns, stock levels, anything per person); then give no numbers and no chart, say plainly
   that it is not tracked and what group-level view could answer instead. Otherwise false: when
   DATA only lacks a detail, answer what it supports and say what is not shown.
+- "Best", "works best", "top", "strongest", "highest" or "leading" only for a row or group of at
+  least 30 people (the Proven threshold); for a smaller group, say its n plainly in the same
+  sentence ("92% of 13 people").
 - "What should we do next / promote": recommend from the rows, naming the product and the number
   behind each step: promote a Proven product to the skin types or goals where it does best; get a
   Promising one the people it still needs ("to_proven"); look at the weakest row. Never call a
@@ -1028,6 +1032,10 @@ def _skin_profiles(seg: dict[str, Any], route: Route) -> dict[str, Any]:
         ]
     }
     by_skin = [s for s in seg.get("by_skin") or [] if not route.skins or s["skin"] in route.skins]
+    if route.goals:
+        # a skin type's top goals and products are over every goal: for "sensitive skin and
+        # redness" they would answer a different question; the segments above hold that one
+        return out
     out["skin_types"] = [
         {
             "skin_type": s["label"],
@@ -1241,6 +1249,9 @@ def slices(
             # the splits the product pages show ("Works best for"), most-used products first;
             # for what to promote, only the products that can be or nearly can be
             pick = [r for r in measured if "skin" in it or r.get("tier") in ("proven", "promising")]
+            if route.goals:
+                # "sensitive skin and redness": only the products made for that goal
+                pick = [r for r in pick if set(r.get("goal_ids") or []) & set(route.goals)]
             for r in sorted(pick, key=lambda r: -r["n"])[:30]:
                 view = source.splits(r["product_id"])
                 cells = _cells(view, route) if view else {}
@@ -1449,6 +1460,40 @@ def _without_names(text: str, insights: dict[str, Any]) -> str:
     return text
 
 
+# A ranking word ("best", "works best", "top") stands on a group of at least this many people (the
+# Proven threshold), or the sentence says the group's n (the juror, Nov 29: "works best for oily
+# skin" on 13 people).
+SUPERLATIVE_N = 30
+_SUPERLATIVE = re.compile(r"\b(?:best|top|strongest|highest|leading)\b", re.IGNORECASE)
+_PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s?(?:%|percent)")
+
+
+def thin_superlatives(text: str, insights: dict[str, Any]) -> list[str]:
+    """Products a sentence ranks with "best" or "top" on fewer than SUPERLATIVE_N people without
+    saying how many. The group is the one whose rate the sentence quotes (a skin type, a goal),
+    else the product's own row."""
+    named = _named_rows(insights)
+    out: list[str] = []
+    for sentence in _SENTENCE.split(plain_numbers(text)):
+        if not _SUPERLATIVE.search(sentence):
+            continue
+        low = sentence.lower()
+        rest = _without_products(sentence, insights)
+        quoted = [float(v) for v in _PERCENT.findall(rest)]
+        said = {m.lstrip("+-") for m in numbers.NUMBER.findall(rest)}
+        for name, hits in named.items():
+            rows = [row for _, row in hits if isinstance(row.get("product"), str)]
+            if len(name) < 8 or name not in low or not rows:
+                continue
+            ns = [n for row in rows for v in quoted for hit, n in [_n_for(row, v, True)] if hit]
+            if not ns:  # no rate of it quoted: the product's own n
+                ns = [row["n"] for row in rows if isinstance(row.get("n"), int)][:1]
+            thin = [n for n in ns if isinstance(n, int) and n < SUPERLATIVE_N]
+            if thin and not any(str(n) in said for n in thin):
+                out.append(rows[0]["product"])
+    return sorted(set(out))
+
+
 def problems(
     reply: Answer, insights: dict[str, Any], question: str, scope: Scope | None = None
 ) -> list[str]:
@@ -1481,6 +1526,11 @@ def problems(
         found.append("banned wording")
     if reply.refused and reply.chart:
         found.append("a refusal has no chart")
+    if thin := thin_superlatives(reply.answer, insights):
+        found.append(
+            f"calls a product best or top on fewer than {SUPERLATIVE_N} people without saying "
+            f"its n: {', '.join(thin)}"
+        )
     if scope and scope.masked:
         labels = [b.label for b in reply.chart.bars] if reply.chart else []
         if named := named_others([*texts, *labels], scope):
@@ -1497,14 +1547,59 @@ def problems(
     return found
 
 
+_catalog_names: dict[int, frozenset[str]] = {}
+
+
+def _catalog_product_names() -> frozenset[str]:
+    """Every catalog product name (lower case) long enough to identify one: two words or more,
+    10 characters or more ("Serum" alone names nothing)."""
+    products = catalog.products()
+    key = id(products)
+    if key not in _catalog_names:
+        _catalog_names.clear()
+        _catalog_names[key] = frozenset(
+            n
+            for n in (" ".join(str(p.get("name") or "").lower().split()) for p in products)
+            if len(n) >= 10 and " " in n
+        )
+    return _catalog_names[key]
+
+
+def _names_outside(chip: str, reply: Answer, insights: dict[str, Any]) -> list[str]:
+    """Products and goals a chip names that are neither in the answer (text and bars) nor in
+    the tables it was written from: a chip may only take a step from what is on screen."""
+    low = " ".join(chip.lower().split())
+    shown = " ".join(
+        [reply.answer, *(b.label for b in (reply.chart.bars if reply.chart else []))]
+    ).lower()
+    tables = _names(insights)
+    out = [
+        n
+        for n in _catalog_product_names()
+        if n in low
+        and re.search(rf"(?<![\w]){re.escape(n)}(?![\w])", low)
+        and n not in shown
+        and n not in tables
+        and not any(n in t for t in tables if len(t) > len(n))
+    ]
+    dumped = json.dumps(insights, default=str)
+    for g, rx in GOAL_RX.items():
+        if rx.search(chip) and not rx.search(shown) and not rx.search(dumped):
+            out.append(_goal(g))
+    return out
+
+
 def chip_ok(chip: str, reply: Answer, insights: dict[str, Any], scope: Scope) -> bool:
     """A follow-up chip is kept when it is a question in the person's voice, passes the checks
-    of the text (no banned words, no number that is not in the data, no hidden name) and builds
-    on the answer it sits under: it shares a name or a telling word with it."""
+    of the text (no banned words, no number that is not in the data, no hidden name), names no
+    product or goal that is outside the answer and its tables, and builds on the answer it sits
+    under: it shares a name or a telling word with it."""
     if not 8 <= len(chip) <= 140 or _ASSISTANT_VOICE.search(chip):
         return False
     alone = Answer(answer=chip)
     if problems(alone, insights, "", scope):
+        return False
+    if _names_outside(chip, reply, insights):
         return False
     if reply.refused:
         return True  # a refusal's chips say what can be asked instead
@@ -1624,6 +1719,21 @@ def auto_chart(reply: Answer, insights: dict[str, Any]) -> Chart | None:
     return Chart(title=title, unit="percent", bars=ordered[:8])
 
 
+def segment_title(chart: Chart | None, route: Route) -> Chart | None:
+    """A question about a skin type and a goal ("sensitive skin and redness") gets a chart whose
+    title says both, so the bars are never read as about the whole skin type or goal."""
+    if not chart or not route.skins or not route.goals:
+        return chart
+    low = chart.title.lower()
+    skins = [retailer.SKIN_LABEL.get(k, k) for k in route.skins]
+    goals = [_goal(g) for g in route.goals]
+    if all(w.lower() in low for w in [*skins, *goals]):
+        return chart
+    tail = f" ({', '.join(f'{k} skin' for k in skins)}; {', '.join(goals).lower()})"
+    head = chart.title.rstrip(" .")[: max(0, 120 - len(tail))].rstrip()
+    return chart.model_copy(update={"title": f"{head}{tail}"[:120]})
+
+
 NAMES_HIDDEN = (
     "I could not answer without naming other brands, which the retailer's policy keeps hidden "
     "from brands. Ask about your own products, or compare them with the category."
@@ -1637,6 +1747,11 @@ NO_DRAFT = (
 HISTORY_TURNS = 2  # earlier turns of a conversation given as context to a follow-up
 # The main model answers a slice pack in 2 to 4 s; past this the fallback model is asked too.
 ASK_HEDGE_S = 3.5
+# Both drafts of a sliced question share this budget (the juror, Nov 29: the headline question
+# waited over 35 s, two drafts of up to 20 s each). A second draft is only asked for when at
+# least ASK_SECOND_DRAFT_S of it is left; otherwise the answer is the "no draft" refusal.
+ASK_BUDGET_S = 15.0
+ASK_SECOND_DRAFT_S = 4.0
 
 
 def masked_text(text: str, scope: Scope) -> str:
@@ -1778,6 +1893,7 @@ def ask(
     scope: Scope | None = None,
     history: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
+    started = time.monotonic()  # the budget counts the slices too
     scope = scope or Scope()
     ready = prepare(question, insights, scope, history)
     data, asked = ready.data, ready.question
@@ -1788,7 +1904,13 @@ def ask(
         # about one person: never answered, whatever else the question asks
         return _refusal(INDIVIDUAL_ANSWER, "individual")
     found: list[str] = []
+    # a small cohort's whole aggregates (sent as they are) can take longer than a slice pack
+    budget_s = ASK_BUDGET_S if ready.sliced else 50.0
     for attempt in range(2):
+        left_s = budget_s - (time.monotonic() - started)
+        if attempt and left_s < ASK_SECOND_DRAFT_S:
+            log.warning("retailer answer: no time left for a second draft (%.1f s)", left_s)
+            break
         try:
             reply = gemini.generate_json(
                 "retailer_ask",
@@ -1799,9 +1921,9 @@ def ask(
                 max_output_tokens=2048,
                 attempts=1,
                 keep=lambda r: not problems(_tidy(r, data, scope), data, asked, scope),
-                # A pack is a few thousand tokens and answers in seconds; the whole aggregates
-                # of a small cohort (sent as they are) can take longer.
-                timeout_ms=20_000 if ready.sliced else 50_000,
+                # A pack is a few thousand tokens and answers in seconds: what is left of the
+                # budget is this draft's deadline.
+                timeout_ms=round(left_s * 1000),
                 hedge_after_s=ASK_HEDGE_S if ready.sliced else gemini.HEDGE_AFTER_S,
             )
         except gemini.GeminiError as exc:
@@ -1823,6 +1945,7 @@ def ask(
                 chart = auto_chart(reply, data)
                 by_code = chart is not None
                 reply = reply.model_copy(update={"chart": chart})
+            reply = reply.model_copy(update={"chart": segment_title(reply.chart, ready.route)})
             if NOT_TRACKED.search(question):
                 # asked (in part) for what Proof does not hold: a refusal with the badge when
                 # no figure was given, an answer when the part it does hold was answered

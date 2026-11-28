@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { retailerBrands, retailerProduct, retailerProducts } from '../../lib/api'
+import { retrying } from './retry'
 import type { Filters, ProductDetail, Products } from './types'
 
 /**
@@ -27,9 +28,9 @@ function cached<T>(cache: Map<string, Promise<T>>, key: string, make: () => Prom
 }
 
 const fkey = (f: Filters) => `${f.cohort}|${f.range}`
-export const fetchProducts = (f: Filters) => cached(listCache, fkey(f), () => retailerProducts(f))
-export const fetchProduct = (id: string, f: Filters) => cached(detailCache, `${id}|${fkey(f)}`, () => retailerProduct(id, f))
-export const fetchBrandList = (f: Filters) => cached(brandsCache, fkey(f), () => retailerBrands(f))
+export const fetchProducts = (f: Filters) => cached(listCache, fkey(f), () => retrying(() => retailerProducts(f)))
+export const fetchProduct = (id: string, f: Filters) => cached(detailCache, `${id}|${fkey(f)}`, () => retrying(() => retailerProduct(id, f)))
+export const fetchBrandList = (f: Filters) => cached(brandsCache, fkey(f), () => retrying(() => retailerBrands(f)))
 
 const fail = (e: unknown): Load<never> => ((e as { status?: number })?.status === 404 ? { status: 'missing' } : { status: 'failed' })
 

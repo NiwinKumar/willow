@@ -14,7 +14,7 @@ import { DemandPanel, FunnelPanel, KpiBand, marks, portfolioNote, type Tile } fr
 import { LatestPanel, NeedsYou, SLOTS, type Update } from '../home/Rail'
 import { DecisionLog, Requests } from '../home/Requests'
 import { useHomeCards } from '../homeData'
-import { useCampaignsLoading } from '../pipeline'
+import { useCampaignsState } from '../pipeline'
 import { useOrg } from '../org'
 import { useDecide } from '../orgData'
 import { workspaceCampaigns, workspaceId } from '../promote'
@@ -79,7 +79,7 @@ function HomeSkeleton() {
 function Body({ d }: { d: Insights }) {
   const { carry, param, setParam } = useRetailState()
   const { org, role, orgs } = useOrg()
-  const { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, settling } = useHomeCards(d)
+  const { mix, brand, rows, prodState, retryProducts, campaigns, shelf, decisions, requests, range, cards, settling } = useHomeCards(d)
   const { workspace } = useRetailData()
   const decide = useDecide()
   const [brief, setBrief] = useState<Brief | null>(null)
@@ -106,7 +106,8 @@ function Body({ d }: { d: Insights }) {
   const priority = decide_.slice(0, PRIORITY)
   const rest = decide_.slice(PRIORITY)
   const loadingCards = settling || prodState.status === 'loading' || (mix === 'retailer' && shelf.status === 'loading' && !shelf.data)
-  const loadingCampaigns = useCampaignsLoading()
+  const campaignsState = useCampaignsState()
+  const loadingCampaigns = campaignsState.loading
   const canDecide = canAct(role) || !org
 
   const snapshotOf = (c: DecisionCard) => ({ title: c.title.slice(0, 200), figure: `${c.figure} ${c.figureNote}`.trim().slice(0, 120), n: c.n })
@@ -269,7 +270,7 @@ function Body({ d }: { d: Insights }) {
         </div>
 
         <div>{loadingCards ? <SkeletonPanel height={116} /> : <KpiBand tiles={tiles} label={`${name} at a glance`} />}</div>
-        <ProofPanel className="flex-1" loading={loadingCards} rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} />
+        <ProofPanel className="flex-1" loading={loadingCards} rows={inScope} mix={mix} scopeWord={scope === 'range' ? 'your range' : 'the catalog'} weeks={d.cohort.weeks} brand={brand} onRetry={prodState.status === 'failed' ? retryProducts : undefined} />
         </div>
 
         <NeedsYou
@@ -295,7 +296,7 @@ function Body({ d }: { d: Insights }) {
 
       <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-12">
         <DemandPanel className="md:col-span-2 xl:col-span-5" months={demand.months} rows={demand.rows} brand={mix === 'brand' ? brand : null} />
-        <FunnelPanel className="xl:col-span-4" loading={loadingCampaigns} t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} />
+        <FunnelPanel className="xl:col-span-4" loading={loadingCampaigns} t={camp} samples={own.filter((c) => c.sample).length} promoteTo={promoteTo} campaignsTo={promoteTo} canPromote={canDecide} onRetry={campaignsState.failed ? () => void campaignsState.retry() : undefined} />
         <LatestPanel className="xl:col-span-3" loading={loadingCards || loadingCampaigns || requests.status === 'loading'} updates={updates} total={updates.length} onAll={() => openLane('results')} />
       </div>
       </div>

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { api, type Campaign } from '../../../lib/api'
 import { setQueryData, useQuery } from '../../../lib/query'
+import { type CampaignList, useCampaignList } from '../pipeline'
 import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
 import { fetchProducts } from '../productData'
@@ -35,7 +36,7 @@ import { useCampaignPoll } from './promote/useCampaignPoll'
  */
 
 /** My campaigns and when the api answered (ms; null after only local edits). */
-type Listed = { list: Campaign[]; at: number | null }
+type Listed = CampaignList
 
 export default function Campaigns() {
   const { user, loading, continueAsGuest } = useAuth()
@@ -119,8 +120,8 @@ function Body({ uid }: { uid: string }) {
 
   const elig = useQuery(['promo-eligibility', uid], (t) => api.eligibility(t).then((r) => r.products), { enabled: Boolean(uid), staleMs: 5 * 60_000 })
   // Each answer carries the time it arrived; local edits keep that time.
-  const camps = useQuery<Listed>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
-  const editList = (f: (l: Campaign[]) => Campaign[]) => setQueryData<Listed>(['campaigns', uid], (prev) => ({ list: f(prev?.list ?? []), at: prev?.at ?? null }))
+  const camps = useCampaignList()
+  const editList = (f: (l: Campaign[]) => Campaign[]) => setQueryData<Listed>(camps.key, (prev) => ({ list: f(prev?.list ?? []), at: prev?.at ?? null }))
 
   // The same evidence as eligibility (mixed, all time), for packshots, rates and lifts. Optional: without it the
   // lists still work, with category orbs and dashes.

@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import { useOrgMaybe } from './org'
 import { fetchBrandList } from './productData'
 import { totalUsers } from './data'
+import { retrying } from './retry'
 import { useRetailState } from './state'
 import type { BrandSummary, Filters, Insights, Workspace } from './types'
 import { MIN_GROUP, slugOf } from './ui/format'
@@ -34,7 +35,7 @@ export function fetchInsights(f: Filters, attempt = 0): Promise<Insights> {
   const key = `${f.cohort}|${f.range}|${attempt}`
   let p = insightsCache.get(key)
   if (!p) {
-    p = api.retailerInsights(f)
+    p = retrying(() => api.retailerInsights(f))
     p.catch(() => insightsCache.delete(key))
     insightsCache.set(key, p)
   }

@@ -245,3 +245,89 @@ def test_a_question_about_one_person_is_refused_in_code(monkeypatch):
     # a question about a group of people is not one about a person
     for group in ("Which users are under-served?", "Which customer segment does best?"):
         assert not retailer_ask.prepare(group, _inputs(None)).route.individual
+
+
+def test_best_or_top_rests_on_thirty_people_or_says_the_n():
+    # the juror: "works best for oily skin" stood on the 20 oily-skinned users of the serum
+    ready = retailer_ask.prepare(OILY, _inputs(), _brand_seat())
+    thin = Answer(answer="Niacinamide 10% Face Serum works best for oily skin, at 95%.")
+    found = retailer_ask.problems(thin, ready.data, OILY, _brand_seat())
+    assert found == [
+        "calls a product best or top on fewer than 30 people without saying its n: "
+        "Niacinamide 10% Face Serum"
+    ]
+    said = Answer(answer="Niacinamide 10% Face Serum works best for oily skin: 95% of 20 people.")
+    assert retailer_ask.problems(said, ready.data, OILY, _brand_seat()) == []
+    # the product's own row (88 people) can carry "top" without a figure for a small group
+    whole = Answer(answer="Niacinamide 10% Face Serum is our top Proven product at 91%.")
+    assert retailer_ask.problems(whole, ready.data, OILY, _brand_seat()) == []
+
+
+def test_a_skin_type_and_goal_question_reads_that_goal_and_its_chart_says_both(monkeypatch):
+    q = "Which of our products work best for sensitive skin and redness?"
+    ready = retailer_ask.prepare(q, _inputs(), _brand_seat())
+    # only products made for redness (the eye cream's sensitive-skin cell answered another question)
+    assert ready.data["product_segments"]
+    assert all("Eye Cream" not in p["product"] for p in ready.data["product_segments"])
+    assert all(p.get("goals") for p in ready.data["product_segments"])
+    retailer = retailer_ask.prepare(q, _inputs(None), retailer_ask.Scope())
+    assert "skin_types" not in retailer.data["skin_profiles"]  # over every goal, not redness
+    assert [s["segment"] for s in retailer.data["skin_profiles"]["segments"]] == [
+        "Sensitive skin, redness"
+    ]
+    chart = Chart(
+        title="Rate with a visible change",
+        unit="percent",
+        bars=[
+            Bar(label="B12 + Repair Complex 5.5% Face Moisturizer | Barrier Repair", value=31),
+            Bar(label="B12 + Oat Extract 6.5% Gentle Cleanser", value=27),
+        ],
+    )
+    text = (
+        "On redness, B12 + Repair Complex 5.5% Face Moisturizer | Barrier Repair reaches 31% of "
+        "13 people and B12 + Oat Extract 6.5% Gentle Cleanser 27% of 11."
+    )
+    _says(monkeypatch, Answer(answer=text, chart=chart))
+    out = retailer_ask.ask(q, _inputs(), _brand_seat())
+    title = out["chart"]["title"]
+    assert "Sensitive skin" in title and "redness" in title
+
+
+def test_a_chip_names_only_products_and_goals_from_the_answer_or_its_tables():
+    tables = {
+        "product_rows": [
+            {"product": "Niacinamide 10% Face Serum", "brand": "Minimalist", "goals": ["Blemishes"]}
+        ]
+    }
+    reply = Answer(answer="Niacinamide 10% Face Serum reaches 95% of 20 people on oily skin.")
+    seat = retailer_ask.Scope()
+    assert retailer_ask.chip_ok(
+        "How does Niacinamide 10% Face Serum do on blemishes?", reply, tables, seat
+    )
+    # a catalog product that is neither in the answer nor in the tables it was written from
+    assert not retailer_ask.chip_ok(
+        "How does Niacinamide 10% Face Serum compare with Madagascar Centella Ampoule?",
+        reply,
+        tables,
+        seat,
+    )
+    # a goal that is neither in the answer nor in its tables
+    assert not retailer_ask.chip_ok(
+        "Does Niacinamide 10% Face Serum help redness?", reply, tables, seat
+    )
+
+
+def test_the_two_drafts_share_one_time_budget(monkeypatch):
+    # the headline question once waited over 35 s: two drafts of up to 20 s each
+    clock = iter([0.0, 0.5, 12.5])  # start, first draft, after the rejected first draft
+    monkeypatch.setattr(retailer_ask.time, "monotonic", lambda: next(clock))
+    timeouts: list[int] = []
+
+    def gen(prompt_id, contents, schema, **kw):
+        timeouts.append(kw["timeout_ms"])
+        return Answer(answer="It beats the others by 4321 points.")
+
+    monkeypatch.setattr(gemini, "generate_json", gen)
+    out = retailer_ask.ask(OILY, _inputs(), _brand_seat())
+    assert timeouts == [14_500]  # what was left of 15 s; no second draft with 2.5 s left
+    assert out["refused"] is True and out["reason"] == "no_draft"

@@ -72,13 +72,59 @@ def _tidy_store(s: dict[str, Any]) -> dict[str, Any]:
     return {**s, "price": {**price, "amount": _whole(price["amount"])} if price else None}
 
 
+# One brand written several ways by the stores the catalog was gathered from: each spelling here
+# reads (and groups) as the brand's main spelling. Only spellings checked by hand (Nov 29, the
+# juror saw "DEAR KLAIRS DEAR KLAIRS" next to "Dear, Klairs" in Proof's brand picker); the seed
+# file is left as gathered. Not here on purpose: "Holika Holika" (the brand's real name), "Allie"
+# and "Allies of Skin", "Herbar" and "Herbario" (different brands).
+BRAND_ALIASES = {
+    "DEAR KLAIRS DEAR KLAIRS": "Dear, Klairs",
+    "ILSO ILSO": "ILSO",
+    "UAU UAU": "UAU",
+    "Purito": "Purito Seoul",
+    "Kiku-Masamune Sake Brewing": "Kikumasamune",
+    "Black Friday I'm from": "I'm From",
+    "Dr. Dennis Gross Skincare": "Dr. Dennis Gross",
+    "D'ALBA": "d'Alba Piedmont",
+}
+
+
+def brand_name(brand: str) -> str:
+    """The brand's main spelling (BRAND_ALIASES), else the name as it is."""
+    return BRAND_ALIASES.get(brand, brand)
+
+
+# A pack size at the very end of a name, with the store's batch code or offer after it
+# ("Fermented Complex 94 Boosting Essence 150ml (22AD)", "... Face Wash - 80ml", "Toner Pad
+# 10ea/"). A size followed by anything else stays: "100ml (2-Pack)" and "(3-Pack)" are
+# different products, "50ml SPF50+" is part of the name.
+_SIZE = r"\d+(?:[.,]\d+)?\s?(?:ml|g|oz|fl\.?\s?oz|l|pcs|ea|sheets)\.?"
+_SKU = r"\((?:\d{2}AD|Worth [^()]{1,20})\)"
+_PACK_TAIL = re.compile(
+    rf"(?:\s*[-,|/]?\s+{_SIZE}(?:\s*{_SKU})?|\s*{_SKU})\s*[/,]?\s*$", re.IGNORECASE
+)
+
+
+def display_name(name: str) -> str:
+    """A product name without the pack size and batch code at its end; never empty."""
+    out = name
+    while (cut := _PACK_TAIL.sub("", out).rstrip(" -,|/")) and cut != out:
+        out = cut
+    if out.count("(") > out.count(")"):  # a bracket the store cut off: "Spot Patch (3sheets,"
+        out = out[: out.rindex("(")].rstrip(" -,|/")
+    return out or name
+
+
 def _tidy(p: dict[str, Any]) -> dict[str, Any]:
     """Whole numbers as integers (prices and percentages read 445, not 445.0). An index record
     may have no price (null), no ingredient list and no actives; `detail` defaults to "full"
-    (records from before Nov 27 have none)."""
+    (records from before Nov 27 have none). The brand reads as its main spelling and the name
+    without a trailing pack size (BRAND_ALIASES, display_name): a product's id never changes."""
     price = p.get("price")
     return {
         **p,
+        "brand": brand_name(str(p.get("brand") or "")) if p.get("brand") else p.get("brand"),
+        "name": display_name(str(p["name"])) if p.get("name") else p.get("name"),
         "detail": p.get("detail") or "full",
         "price": {**price, "amount": _whole(price["amount"])} if price else None,
         "inci": list(p.get("inci") or []),

@@ -62,6 +62,15 @@ test('a running campaign takes "Proven, not promoted" away; a saved claim takes 
   assert.deepEqual(keys, [])
 })
 
+test('"Draft a listing claim" puts the path first, then the query, then the anchor', () => {
+  const to = (carry: string) => {
+    const card = composeCards(base({ rows: [row('p 1', 'Acme')], carry })).find((c) => c.key === 'claim_ready--p 1')
+    return card?.primary.kind === 'link' ? card.primary.to : null
+  }
+  assert.equal(to(''), '/retail/products/p%201?claim=listing#claims-h')
+  assert.equal(to('?as=brand'), '/retail/products/p%201?as=brand&claim=listing#claims-h')
+})
+
 test('a sample campaign (simulated) shows as a labelled result and never slips', () => {
   const inc = { exposed: { n: 260, added: 44, rate: 0.17 }, holdout: { n: 66, added: 9, rate: 0.14 }, lift: 0.03, lift_lo: -0.07, lift_hi: 0.13 }
   const done = { ...campaign('s1', 'mine', 'ended'), sample: true, stats: { reach: 260, impressions: 900, adds: 44, incrementality: inc } } as unknown as Campaign
