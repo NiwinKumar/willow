@@ -169,6 +169,11 @@ def weeks(store: Store, uid: str) -> dict[str, Any]:
                     },
                     "rois": v.get("rois") or [],
                     "landmarks": landmarks.get(v["view"]),
+                    # the front photo's whole areas: with cheek photos, its own outlines (`rois`)
+                    # leave out the chin and mouth skin those photos measure (result.rois does not)
+                    "full_rois": (result.get("rois") or [])
+                    if v["view"] == "front" and result.get("views")
+                    else None,
                     "marks": [{k: m[k] for k in ("kind", "x", "y", "r", "zone")} for m in mine],
                     # this photo's counts, only when every mark is listed (else they would be
                     # the candidates', not the check-in's)

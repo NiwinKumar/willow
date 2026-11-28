@@ -204,3 +204,29 @@ export function boxAround(view: SpotWeekView, x: number, y: number, size: number
   const H = view.photo.height ?? Infinity
   return { x: Math.min(Math.max(x - size / 2, 0), W - size), y: Math.min(Math.max(y - size / 2, 0), H - size), w: size, h: size }
 }
+
+/** Areas read from the front photo when following one; cheeks and jawlines are followed on their own photos. */
+const FRONT_AREAS = new Set(['forehead', 'nose', 'around_mouth', 'chin'])
+
+/**
+ * The photo an area is followed on. For the front's areas: the front photo with the area's whole outline, and the
+ * marks the cheek photos counted in that area carried onto it through the face landmarks, so the area shows every
+ * mark its count is made of (with cheek photos, the front measures only the middle of the chin and mouth skin).
+ */
+export function areaPhoto(w: SpotWeek, area: string, prefer: ViewName): SpotWeekView | undefined {
+  const front = viewOf(w, 'front')
+  const rois = front?.full_rois ?? front?.rois
+  if (!front || !FRONT_AREAS.has(area) || !rois?.some((r) => r.name === area)) return viewWithArea(w, area, prefer)
+  const carried = w.views
+    .filter((v) => v.view !== 'front')
+    .flatMap((v) =>
+      v.marks
+        .filter((m) => m.zone === area)
+        .map((m) => {
+          const q = carry(v.landmarks, front.landmarks, m.x, m.y)
+          return q ? { ...m, x: q.x, y: q.y } : null
+        })
+        .filter((m): m is NonNullable<typeof m> => m !== null),
+    )
+  return { ...front, rois, marks: [...front.marks, ...carried] }
+}

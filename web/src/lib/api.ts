@@ -191,6 +191,8 @@ export type SpotWeekView = {
   rois: { name: string; polygon: [number, number][] }[]
   /** The photo's face-mesh landmarks (same index = same point of the face in every photo); null on older check-ins. */
   landmarks?: [number, number][] | null
+  /** Front photo only: its whole areas (its own `rois` leave out the chin and mouth skin the cheek photos measure). */
+  full_rois?: { name: string; polygon: [number, number][] }[] | null
   marks: SpotMark[]
   /** This photo's counts; null on a check-in measured before every mark was listed. */
   blemishes: number | null

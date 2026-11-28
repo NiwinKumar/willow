@@ -64,6 +64,7 @@ def _result(sid, with_marks=True):
                 "features": {"view": 1.0, "frame_index": 3.0, "zone": 3.0},
             },
         ],
+        "rois": [{"name": "chin", "polygon": [[0, 0], [9, 0], [9, 9]]}],  # the front's, whole
         "views": [
             {
                 "view": v,
@@ -110,6 +111,8 @@ def test_every_mark_on_its_photo_with_the_counts_progress_shows(client, fake):
     front, right = w["views"]
     assert front["photo"]["url"].endswith("views/front.jpg") and front["photo"]["width"] == 1000
     assert front["landmarks"] == [[1.0, 2.0], [3.0, 4.0]] and right["landmarks"] is None
+    assert front["full_rois"] == [{"name": "chin", "polygon": [[0, 0], [9, 0], [9, 9]]}]
+    assert right["full_rois"] is None
     assert (front["blemishes"], right["blemishes"]) == (1, 2)
     # the right cheek's dark spot sits where Gemini saw a mole: never drawn
     assert right["dark_spots"] == 0 and all(m["kind"] == "blemish" for m in right["marks"])

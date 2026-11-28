@@ -109,3 +109,26 @@ test('a place is carried to another photo through the face landmarks around it',
   const b = boxAround(v, 5, 5, 100)
   assert.deepEqual([b.x, b.y], [0, 0]) // kept inside the photo
 })
+
+test('a front area is followed on the front photo, whole, with the cheek photos\' marks in it carried over', async () => {
+  const { areaPhoto } = await import('../src/lib/spotWeeks.ts')
+  const grid: [number, number][] = []
+  for (let gx = 0; gx < 6; gx++) for (let gy = 0; gy < 6; gy++) grid.push([gx * 100, gy * 100])
+  const front = view('front', [{ name: 'chin', polygon: [[200, 400], [300, 400], [300, 500]] }])
+  front.full_rois = [{ name: 'chin', polygon: [[100, 400], [400, 400], [400, 500]] }]
+  front.landmarks = grid
+  front.marks = [{ kind: 'blemish', x: 250, y: 450, r: 4, zone: 'chin' }]
+  const right = view('right', [])
+  right.landmarks = grid.map(([x, y]) => [x + 1000, y] as [number, number]) // the same face, elsewhere in its photo
+  right.marks = [
+    { kind: 'blemish', x: 1150, y: 450, r: 4, zone: 'chin' },
+    { kind: 'blemish', x: 1300, y: 200, r: 4, zone: 'right_cheek' },
+  ]
+  const w = week('9', [front, right])
+  const got = areaPhoto(w, 'chin', 'front')!
+  assert.equal(got.view, 'front')
+  assert.deepEqual(got.rois, front.full_rois) // the whole chin
+  assert.equal(got.marks.length, 2) // its own, and the right photo's chin mark (not its cheek mark)
+  assert.ok(Math.abs(got.marks[1].x - 150) < 0.01 && Math.abs(got.marks[1].y - 450) < 0.01)
+  assert.equal(areaPhoto(w, 'right_cheek', 'front'), undefined) // cheeks: on their own photos only
+})

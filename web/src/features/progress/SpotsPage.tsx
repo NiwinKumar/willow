@@ -7,7 +7,7 @@ import { useOwner, useSpotWeeks } from '../../data/hooks'
 import type { ViewName } from '../../data/types'
 import type { SpotWeek, SpotWeekView } from '../../lib/api'
 import { MOLE_NOTE } from '../../lib/spotLabels'
-import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areasOf, boxAround, carry, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewWithArea, viewsOf, type Box } from '../../lib/spotWeeks'
+import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areaPhoto, areasOf, boxAround, carry, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewsOf, type Box } from '../../lib/spotWeeks'
 import { Crumb, Page, StatusCard } from './parts'
 
 const RING = { blemish: 'var(--willow-400)', spot: 'var(--aura-apricot)' } as const
@@ -142,7 +142,7 @@ export default function SpotsPage() {
 
       <div className={`grid w-full gap-4 ${selected.length > 1 ? 'max-w-[980px] grid-cols-2' : 'max-w-[520px] grid-cols-1'}`}>
         {selected.map((w) => (
-          <WeekPhoto key={w.id} week={w} view={viewOf(w, v)} viewName={v} area={shownArea} compact={selected.length > 1} />
+          <WeekPhoto key={w.id} week={w} view={viewOf(w, v)} viewName={v} area={null} compact={selected.length > 1} />
         ))}
       </div>
       {selected.length > 1 ? <CompareLine a={selected[0]} b={selected[1]} view={v} /> : null}
@@ -252,7 +252,7 @@ function MarkedPhoto({ view, area, box, label, rounded = 'rounded-[28px]', targe
 function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; area: string; prefer: ViewName; current: string | undefined }) {
   const rows = weeks
     .map((w) => {
-      const view = viewWithArea(w, area, prefer)
+      const view = areaPhoto(w, area, prefer)
       const frame = view && areaFrame(view, area)
       return view && frame ? { w, view, box: areaBox(view, area)!, frame, counts: areaCounts(w, area) } : null
     })
