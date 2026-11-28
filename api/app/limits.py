@@ -35,6 +35,8 @@ CAPS: dict[str, tuple[int, int]] = {
     "metric_story": (60, 3000),  # one Gemini call per new story; past it, the facts version
     "sample_runs": (12, 600),
     "routine_check": (100, 5000),  # re-run on every routine change; past it, rules only
+    "routine_fix": (50, 5000),  # proposals for a flagged pair (app/routine_fix.py); past it, none
+    "note_tags": (30, 3000),  # a routine note read into tags (app/note_tags.py); past it, untagged
     # Proof-gated promotion (app/campaigns.py): Firestore writes, not paid calls; bounded anyway.
     "campaign_create": (20, 2000),
     "shelf_upload": (20, 2000),  # Shelf vs results stock files (app/shelf.py)

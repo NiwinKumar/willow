@@ -23,10 +23,12 @@ from app import (
     explain,
     gemini,
     label_scan,
+    note_tags,
     numbers,
     proof_ai,
     retailer_ask,
     routine_check,
+    routine_fix,
 )
 from app import advisor_blocks as blocks_mod
 from app.store import MemoryStore
@@ -427,6 +429,48 @@ def run_retailer_ask_seats(case: dict[str, Any], r: CaseResult) -> None:
     _score_ask(case, r, {**pack["insights"], "proof": source}, scope)
 
 
+# ── routine fixes (routine_fix.propose) ────────────────────────────────────────────────────
+
+
+def run_routine_fix(case: dict[str, Any], r: CaseResult) -> None:
+    """`expect_fix`: the conflicts (as product index pairs) a proposal should clear."""
+    entries = routine_entries(case)
+    routine_fix.clear()
+    fixes, complete = routine_fix.propose(entries, None, datetime.now(UTC).date())
+    first = _first("routine_fix")
+    r.answer_calls = _answers("routine_fix")
+    r.first_try_pass = bool(first and first.fixes and len(fixes) == len(first.fixes))
+    r.final_pass = complete and bool(fixes)
+    r.source = "model" if fixes else "fallback"
+    shown = [f["reason"] for f in fixes]
+    r.shown = " | ".join(shown)[:400] or "(no fixes)"
+    listing = routine_check._listing(routine_check._active(entries))
+    r.invented_numbers = unknown_numbers(shown, numbers.in_text(listing))
+    r.wording = wording_slips(shown, [routine_check._name(e) for e in entries])
+    want = {frozenset(f"r_{i + 1}" for i in pair) for pair in case.get("expect_fix", [])}
+    got = {frozenset(f["products"]) for f in fixes}
+    if want - got:
+        r.notes.append(f"no checked fix for {sorted(map(sorted, want - got))}")
+
+
+# ── note tags (note_tags.read) ─────────────────────────────────────────────────────────────
+
+
+def run_note_tags(case: dict[str, Any], r: CaseResult) -> None:
+    """`expect`: tags that must be read; `must_not_tag`: tags that must not."""
+    tags, source = note_tags.read(MemoryStore(), "eval", case["note"])
+    r.answer_calls = _answers("note_tags")
+    r.first_try_pass = r.final_pass = source == "gemini"
+    r.source = "model" if source == "gemini" else "fallback"
+    r.shown = ", ".join(tags) or "(no tags)"
+    missing = set(case.get("expect", [])) - set(tags)
+    extra = set(case.get("must_not_tag", [])) & set(tags)
+    if missing:
+        r.notes.append(f"missed {sorted(missing)}")
+    if extra:
+        r.notes.append(f"read {sorted(extra)} that the note does not say")
+
+
 JOBS: dict[str, Callable[[dict[str, Any], CaseResult], None]] = {
     "explanation": run_explanation,
     "advisor": run_advisor,
@@ -435,6 +479,8 @@ JOBS: dict[str, Callable[[dict[str, Any], CaseResult], None]] = {
     "proof_claims": run_proof_claims,
     "retailer_ask": run_retailer_ask,
     "retailer_ask_seats": run_retailer_ask_seats,
+    "routine_fix": run_routine_fix,
+    "note_tags": run_note_tags,
 }
 
 

@@ -23,7 +23,7 @@ export type Evals = {
   production: { since: string; rejected: number; by_validators: number; by_schema: number; logged_calls: number } | null
 }
 type CostPart = { job?: string; engine_site?: string; calls_seen?: number; runs_seen?: number; median_seconds?: number; median_input_tokens?: number; median_output_tokens?: number; model?: string; per_unit?: number }
-export type Cost = { generated_at: string; window_days: number; priced_on: string; note?: string; rows: { unit: string; what: string; usd: number; parts: CostPart[] }[] }
+export type Cost = { generated_at: string; window_days: number; priced_on: string; note?: string; rows: { unit: string; what: string; usd: number; parts: CostPart[]; /** Why a row's figure is out of date (hand-written; cost_report.py drops it on its next run). */ note?: string }[] }
 export type A11yCell = { lighthouse: number | null; serious: number; other: number }
 export type A11y = { audited_on: string; tools: string; against: string; rows: { page: string; desktop?: A11yCell; mobile?: A11yCell }[] }
 /** Test and retest on real skin (api/scripts/retest_report.py): two check-ins within a day, nothing changed. */

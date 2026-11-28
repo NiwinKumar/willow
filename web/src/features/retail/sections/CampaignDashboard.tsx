@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { api, type Campaign } from '../../../lib/api'
 import { setQueryData, useQuery } from '../../../lib/query'
+import { type CampaignList, useCampaignList } from '../pipeline'
 import { useAuth } from '../../../lib/useAuth'
 import { ProductImage } from '../../routine/productUi'
 import { boostedAdds, campaignInsight, cumulativeDays, dateRange, durationText, goalLabel, HOLDOUT_MIN, nextMove, ownRecordInsight, runDay, skinLabel, timeLeft } from '../promote'
@@ -26,7 +27,7 @@ import { useCampaignPoll } from './promote/useCampaignPoll'
  * URL: ?confirm=end|delete asks before ending or deleting (the Campaigns table's menu links here).
  */
 
-type Listed = { list: Campaign[]; at: number | null }
+type Listed = CampaignList
 
 export default function CampaignDashboard() {
   const { user, loading, continueAsGuest } = useAuth()
@@ -70,7 +71,7 @@ function Body({ uid }: { uid: string }) {
   const { carry, param, setParam } = useRetailState()
   const back = `${sectionPath('campaigns')}${carry}`
 
-  const camps = useQuery<Listed>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
+  const camps = useCampaignList()
   const elig = useQuery(['promo-eligibility', uid], (t) => api.eligibility(t).then((r) => r.products), { enabled: Boolean(uid), staleMs: 5 * 60_000 })
   // Live numbers: every 30 s while a campaign runs and the tab is visible (promote/useCampaignPoll).
   const refetch = camps.refetch
@@ -92,7 +93,7 @@ function Body({ uid }: { uid: string }) {
       />
     )
 
-  const editList = (f: (l: Campaign[]) => Campaign[]) => setQueryData<Listed>(['campaigns', uid], (prev) => ({ list: f(prev?.list ?? []), at: prev?.at ?? null }))
+  const editList = (f: (l: Campaign[]) => Campaign[]) => setQueryData<Listed>(camps.key, (prev) => ({ list: f(prev?.list ?? []), at: prev?.at ?? null }))
   const confirm = (['end', 'delete'] as const).find((k) => k === param('confirm')) ?? null
 
   return (

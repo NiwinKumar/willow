@@ -73,7 +73,7 @@ MIN_SD = {
 # and on all nine face readings from 126 of 356 (35%) to 24 (7%). The cost: a real
 # change smaller than the floor is not called. Face photos only, whatever the capture mode: a
 # face never carries a colour reference (RAW included), so its colours follow the room's light.
-# Forearm sessions correct colour with white paper and close-ups were not tested: no floor.
+# Forearm sessions correct colour with white paper: no floor. Close-ups: CLOSEUP_LIGHT_FLOOR.
 ROOM_LIGHT_FLOOR = {
     "tone_ita": 33.93,  # degrees
     "redness": 3.63,  # a*
@@ -82,6 +82,15 @@ ROOM_LIGHT_FLOOR = {
     "tone_evenness": 2.87,
     "dark_circles": 2.42,  # delta L*
 }
+# The same floor on a close-up's colour readings (Nov 29, engine 0.4.5): a close-up carries no
+# colour reference either, so its colours follow the room's light as a face's do. Interim values:
+# the face floors above, not learned on close-ups (research/finals/macro-capture.md, Prototype A).
+# On the 15 real cheek close-ups of the week-9 sample set, retaken in simulation under the same
+# room model, an unchanged cheek was called "changed" in 37.5% of check-ins for redness and 75%
+# for ITA with the 5-photo spread alone; with these floors 6% and 0% (n = 16 check-ins from the
+# 5 sources that gave a baseline). Replace with a close-up floor once a close-up retest exists.
+# Only the colour readings: pigment spots, blemishes, pores and texture have no face floor.
+CLOSEUP_LIGHT_FLOOR = {k: ROOM_LIGHT_FLOOR[k] for k in ("tone_ita", "redness")}
 ROI_MIN_SKIN_FRAC = 0.5  # a region keeps its hair-free skin only if at least this much is left
 ZONE_MIN_MM2 = 50.0  # a face-map zone needs this much skin in a photo for a by-zone reading
 UNDER_EYE_MIN_MM2 = 20.0  # less visible under-eye skin (hair, glasses): no dark-circles reading

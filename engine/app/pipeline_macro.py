@@ -502,7 +502,11 @@ def analyze_macro(
         have = [f for f in good if f["values"].get(metric_id) is not None]
         if have:
             summary = summarize(
-                [f["values"][metric_id] for f in have], base, config.MIN_SD.get(metric_id, 0.0)
+                [f["values"][metric_id] for f in have],
+                base,
+                config.MIN_SD.get(metric_id, 0.0),
+                # a new room's light moves colour readings more than five photos in one room
+                config.CLOSEUP_LIGHT_FLOOR.get(metric_id, 0.0),
             )
             extras = _mean_extras([f["extras"][metric_id] for f in have])
             if metric_id == "tone_ita":

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import type { RoutineEntry, Session } from '../src/data/types.ts'
-import { article, brandedName, checkInsSince, distinctNames, firstRead, readHome, shortName, spanOfUse } from '../src/features/home/derive.ts'
+import { article, brandedName, checkInsSince, distinctNames, firstRead, greetingAt, readHome, shortName, spanOfUse } from '../src/features/home/derive.ts'
 import { scaledPlot } from '../src/features/home/trendScale.ts'
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
@@ -96,4 +96,12 @@ test('blemishes going 7, 6, 6, 7, 6 is a ripple, not a full-height wave', () => 
 
 test('a change bigger than the least scale keeps the whole height', () => {
   assert.deepEqual(scaledPlot(pts(13, 13.2, 17.5), 13, 0.86, 120), { top: 0, height: 120 })
+})
+
+test('the greeting follows the local hour: after midnight is still evening, never morning', () => {
+  assert.equal(greetingAt(0), 'Good evening') // 00:40 on the live site said "Good morning"
+  assert.equal(greetingAt(4), 'Good evening')
+  assert.equal(greetingAt(5), 'Good morning')
+  assert.equal(greetingAt(12), 'Good afternoon')
+  assert.equal(greetingAt(22), 'Good evening')
 })

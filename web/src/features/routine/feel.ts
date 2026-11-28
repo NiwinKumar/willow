@@ -1,4 +1,4 @@
-import type { FeelAnswer, FeelTag, FeelVerdict, RoutineEntry } from '../../data/types'
+import type { FeelAnswer, FeelTag, FeelVerdict, NoteTag, RoutineEntry } from '../../data/types'
 import type { Outcome } from '../../lib/outcome'
 
 /**
@@ -26,6 +26,19 @@ export const TAGS: { id: FeelTag; label: string; good: boolean }[] = [
   { id: 'breakouts', label: 'More breakouts', good: false },
 ]
 export const MAX_TAGS = 4
+
+/** Tags Gemini reads from the person's own note (api/app/note_tags.py), never free-form. */
+export const NOTE_TAG_LABEL: Record<NoteTag, string> = {
+  stinging: 'Stinging',
+  dryness: 'Dryness',
+  tightness: 'Tightness',
+  breakouts: 'Breakouts',
+  oiliness: 'Oiliness',
+  redness_flare: 'Redness flare-up',
+  pleasant_texture: 'Pleasant texture',
+  scent_issue: 'Scent bothers me',
+}
+export const NOTE_MAX = 140
 
 /** The nudge first asks about a product once it has been in use this long. */
 export const NUDGE_DAYS = 7

@@ -5,7 +5,7 @@ import { DotNumber } from '../../components/willow/DotNumber'
 import { Sheet } from '../../components/ui/Sheet'
 import { VerdictGlyph } from '../../components/willow/Verdict'
 import type { Metric, Session } from '../../data/types'
-import { METRIC_META, fmtValue, unitOf } from '../../lib/metrics'
+import { METRIC_META, fmtValue, isCloseUp, unitOf } from '../../lib/metrics'
 import { changeWay, confidenceOf, verdictKind, wordsFor } from '../../lib/verdict'
 import { METRIC_LOOK } from './metricLook'
 import { bandOf, bandText, deltaText, metricOf, sessionState, valueText } from './model'
@@ -14,9 +14,11 @@ import { metricSeries } from './series'
 
 /**
  * Face colour and light readings whose normal range includes the between-room floor (engine 0.4.3,
- * engine/app/config.py ROOM_LIGHT_FLOOR): a baseline measured before keeps its old band, so it is not said for it.
+ * engine/app/config.py ROOM_LIGHT_FLOOR), and close-up colour readings from engine 0.4.5 (CLOSEUP_LIGHT_FLOOR):
+ * a baseline measured before keeps its old band, so it is not said for it.
  */
 const ROOM_LIGHT = new Set(['tone_ita', 'redness', 'glow', 'shine', 'tone_evenness', 'dark_circles'])
+const CLOSE_UP_LIGHT = new Set(['tone_ita', 'redness'])
 const atLeast = (v: string | undefined, min: number[]) => {
   const p = (v ?? '').split('.').map(Number)
   for (let i = 0; i < min.length; i++) if ((p[i] ?? 0) !== min[i]) return (p[i] ?? 0) > min[i]
@@ -27,7 +29,9 @@ const ROOM_LINE = ' For colour and light, your range also allows for a change of
 /** Why this verdict, in one sentence, from the same numbers the stats show. */
 function why(m: Metric, s: Session, band: number | null, baseline: Session | null): string {
   const kind = verdictKind(m, s)
-  const room = baseline?.site === 'face_full' && ROOM_LIGHT.has(m.id) && atLeast(baseline.result?.engine_version, [0, 4, 3]) ? ROOM_LINE : ''
+  const v = baseline?.result?.engine_version
+  const floored = baseline?.site === 'face_full' ? ROOM_LIGHT.has(m.id) && atLeast(v, [0, 4, 3]) : !!baseline && isCloseUp(baseline.site) && CLOSE_UP_LIGHT.has(m.id) && atLeast(v, [0, 4, 5])
+  const room = floored ? ROOM_LINE : ''
   if (kind === 'changed' && band !== null) return `The change (${deltaText(m)}) is larger than your normal range of ${bandText(m, band)}.${room}`
   if (kind === 'normal' && band !== null) return `The change (${deltaText(m)}) is inside your normal range of ${bandText(m, band)}.${room}`
   if (kind === 'baseline') return 'This check-in is your baseline. Later check-ins are compared with it.'

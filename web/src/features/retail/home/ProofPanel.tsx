@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { statusOf } from '../range'
 import { sectionPath, useRetailState } from '../state'
 import type { ProductRow } from '../types'
-import { int, pct, pts, TierDot } from '../ui'
+import { ErrorState, int, pct, pts, TierDot } from '../ui'
 import { proofRows } from './dashboard'
 
 /*
@@ -21,7 +21,7 @@ import { proofRows } from './dashboard'
 /** Rows the panel always has: blank rows hold the frame when fewer products are compared (Home is a fixed layout). */
 const ROWS = 5
 
-export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '', loading = false }: { rows: ProductRow[]; mix: 'brand' | 'retailer'; scopeWord: string; weeks: number; brand: string | null; className?: string; loading?: boolean }) {
+export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '', loading = false, onRetry }: { rows: ProductRow[]; mix: 'brand' | 'retailer'; scopeWord: string; weeks: number; brand: string | null; className?: string; loading?: boolean; /** the products could not be read: say so, never "none of your products" */ onRetry?: () => void }) {
   const { carry } = useRetailState()
   const { rows: shown, count } = proofRows(rows, ROWS)
   const title = mix === 'brand' ? 'How your products compare' : `Strongest in ${scopeWord}`
@@ -48,6 +48,8 @@ export function ProofPanel({ rows, mix, scopeWord, weeks, brand, className = '',
             </li>
           ))}
         </ul>
+      ) : onRetry ? (
+        <ErrorState compact title="Products couldn’t load" body="No figures are shown rather than none." onRetry={onRetry} />
       ) : shown.length ? (
         <>
           <p className="m-0 flex flex-wrap items-center gap-x-4 gap-y-1 px-5 pb-3 text-proof-small text-ink-2">

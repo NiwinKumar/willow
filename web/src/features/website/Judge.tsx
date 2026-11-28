@@ -78,6 +78,7 @@ function faqs(): Faq[] {
       to: '/evidence#checked',
       link: 'The eval results',
     },
+    { q: 'Where else does Gemini work?', a: 'In the background, unasked: it reads spot labels twice, explains readings, checks translations, proposes routine fixes, writes reminder text, tags your notes and slices Proof Ask. Code checks each one first.', to: '/evidence#invisible-ai', link: 'AI working for you' },
   ]
 }
 
@@ -190,7 +191,7 @@ export default function Judge() {
   }
 
   const guest = {
-    title: ready ? (me.guest ? '✓ Guest access ready' : `✓ Signed in as ${me.email ?? me.name}`) : setup === 'no-guest' ? 'Could not make a guest account' : setup === 'failed' ? 'Tour setup failed' : 'Setting up guest access…',
+    title: ready ? (me.guest ? '✓ Guest access ready' : `✓ Signed in as ${me.email ?? me.name}`) : setup === 'no-guest' ? 'Could not make a guest account' : setup === 'failed' ? 'Tour setup failed' : user ? 'Adding a sample routine…' : 'Making a guest account…',
     body: ready
       ? me.guest
         ? `A guest account of your own on this browser. Every stop runs the real api, engine and Gemini${routineAdded ? `; ${aNum(routineAdded)} ${routineAdded}-product routine was added for stop 04` : ''}.`
@@ -199,7 +200,10 @@ export default function Judge() {
         ? 'The sign-in service didn’t respond. Retry, or open the retailer insights, which need no account.'
         : setup === 'failed'
           ? 'The api did not answer; it may still be waking up. Retry in a moment.'
-          : 'Creating a guest account for this browser',
+          : // the step it is on: the sign-in, then the api's routine writes
+            user
+            ? 'Step 2 of 2: a small routine for stop 04, so the routine check has something real to read'
+            : 'Step 1 of 2: a guest account of your own on this browser',
     bg: failed ? 'bg-coral text-ink' : ready ? 'bg-selected text-inverse' : 'bg-surface text-ink',
   }
 

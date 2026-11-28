@@ -2,12 +2,13 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 
 import { refreshRoutine, useOwner, useRoutine, useRoutineLog, useRoutineReader } from '../../data/hooks'
-import type { FeelTag, FeelVerdict, RoutineEntry, RoutineSchedule } from '../../data/types'
+import type { FeelTag, FeelVerdict, RoutineEntry, RoutineFix, RoutineSchedule } from '../../data/types'
 import { ApiError, api, localDay, type NewRoutineEntry } from '../../lib/api'
 import { fmtDate } from '../../lib/format'
 import { getQueryData, setQueryData } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
 import { weekOf } from './feel'
+import { fixPatches } from './fixes'
 import { entryName, slotWords } from './routineModel'
 import { alternatePair, scheduleWords } from './schedule'
 
@@ -44,6 +45,16 @@ const demoWrites = {
     const feel = { verdict, tags, week: weekOf(e.started_at, localDay()), at: new Date().toISOString() }
     patchDemo(e.id, { feel })
     return { ...e, feel }
+  },
+  applyFix: async (fix: RoutineFix, entries: RoutineEntry[]) => {
+    for (const p of fixPatches(fix, entries)) patchDemo(p.entry.id, p.apply)
+    toast(`Applied${inTab}: ${fix.reason}`)
+  },
+  // Mei's account never changes: the note is kept in this tab, untagged (tags are read on your own account)
+  setNote: async (e: RoutineEntry, text: string) => {
+    const note = text.trim() ? { text: text.trim(), tags: [], source: 'none' as const, at: new Date().toISOString() } : null
+    patchDemo(e.id, { note })
+    return { ...e, note }
   },
 }
 
@@ -173,7 +184,37 @@ export function useRoutineWrites() {
     [uid, getIdToken, refresh],
   )
 
-  return demo ? demoWrites : { add, stop, remove, setSlots, setSchedule, alternate, setFeel }
+  /** A routine check fix (fixes.ts): each product's PATCH in turn; on a failure the ones already made are put back. */
+  const applyFix = useCallback(
+    async (fix: RoutineFix, entries: RoutineEntry[]) => {
+      const token = await getIdToken()
+      const done: ReturnType<typeof fixPatches> = []
+      try {
+        for (const p of fixPatches(fix, entries)) {
+          await api.patchRoutine(token, p.entry.id, p.apply)
+          done.push(p)
+        }
+      } catch (e) {
+        await Promise.all(done.map((p) => api.patchRoutine(token, p.entry.id, p.undo).catch(() => undefined)))
+        throw e
+      }
+      await refresh()
+      toast(`Applied: ${fix.reason}`)
+    },
+    [getIdToken, refresh],
+  )
+
+  /** The one-line note (Gemini reads it into tags on the api); an empty text clears it. */
+  const setNote = useCallback(
+    async (e: RoutineEntry, text: string) => {
+      const saved = await api.putNote(await getIdToken(), e.id, text)
+      setQueryData<RoutineEntry[]>(['routine', uid], (list) => (list ?? []).map((x) => (x.id === e.id ? { ...x, note: saved.note ?? null, updated_at: saved.updated_at ?? x.updated_at } : x)))
+      return saved
+    },
+    [uid, getIdToken],
+  )
+
+  return demo ? demoWrites : { add, stop, remove, setSlots, setSchedule, alternate, setFeel, applyFix, setNote }
 }
 
 /** Honest words for a failed write or read. */

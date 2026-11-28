@@ -14,7 +14,7 @@ import { identity } from '../../lib/identity'
 import type { PhotoTime, ProfilePatch } from '../../lib/api'
 import { GOALS, MAX_GOALS } from '../../lib/metrics'
 import { browserTz, localProfile, PHOTO_TIME_CLOCK, PHOTO_TIMES, placesOf, SKIN_TYPES, WEEKDAYS } from '../../lib/profile'
-import { CHOICE_COPY, choicesOf, minutesFor, TRACK_CHOICES, trackOf } from '../../lib/track'
+import { CHOICE_COPY, choicesOf, minutesFor, TRACK_CHOICES, TRACK_ORDER, trackOf, type TrackPlace } from '../../lib/track'
 import { LANGUAGES, setLanguage, useLanguage } from '../../lib/language'
 import { invalidate } from '../../lib/query'
 import { prefs, type Consent } from '../../lib/prefs'
@@ -292,9 +292,19 @@ function GoalsRows({ demo }: { demo: boolean }) {
 
 /** "Places to track" (profile.track): every check-in walks through these, in this order. At least one stays on. */
 function PlacesRow() {
-  const { profile, saveProfile } = useData()
+  const { profile, saveProfile, all } = useData()
   const { hash } = useLocation()
-  const picked = choicesOf(placesOf(profile))
+  // Until the person chooses, the places are the default plus every place this account has checked in (a
+  // guest's face check-in left Places on "Cheek close-up" alone). Saved once, so the next check-in covers them too.
+  const checked = useMemo(() => all.filter((s) => s.status === 'done').map((s): string => s.site).filter((p): p is TrackPlace => TRACK_ORDER.includes(p as TrackPlace)), [all])
+  const chosen = Boolean(profile.track?.length)
+  const picked = chosen ? choicesOf(placesOf(profile)) : choicesOf([...placesOf(profile), ...checked])
+  const adopted = useRef(false)
+  useEffect(() => {
+    if (chosen || adopted.current || picked.length <= choicesOf(placesOf(profile)).length) return
+    adopted.current = true
+    saveProfile({ track: trackOf(picked) }).catch(() => undefined) // kept on this device, sent on the next load
+  }, [chosen, picked, profile, saveProfile])
   // "Change places" in the check-in sheet links here.
   useEffect(() => {
     if (hash === '#places') document.getElementById('places')?.scrollIntoView({ block: 'center' })
@@ -307,7 +317,7 @@ function PlacesRow() {
       .then(() => toast(`Places saved · ${CHOICE_COPY[c].title} ${on ? 'off' : 'on'}`))
       .catch(() => toast.error(offline))
   }
-  const places = placesOf(profile)
+  const places = trackOf(picked)
   return (
     <Row id="places" stack label="Places" hint={`Every check-in covers ${places.length === 1 ? 'this place' : `these ${places.length} places`}, about ${minutesFor(places)} min. Close-ups use the back camera.`}>
       <div className="flex flex-wrap gap-1.5">

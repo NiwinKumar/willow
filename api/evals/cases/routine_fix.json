@@ -1,0 +1,10 @@
+{
+  "job": "routine_fix",
+  "about": "routine_fix.propose: Gemini proposes a schedule change for each flagged pair; code applies it to a copy of the routine and keeps it only if the conflict clears with no new conflict, duplicate or gap, no retinoid moved to the morning, and a reason with no new numbers or banned words.",
+  "cases": [
+    {"id": "retinol_plus_aha_same_night", "routine": [{"product_id": "minimalist-retinol-0-3-face-serum", "slots": ["pm"]}, {"product_id": "the-ordinary-glycolic-acid-7-exfoliating-toner", "slots": ["pm"]}], "expect_fix": [[0, 1]]},
+    {"id": "bpo_and_retinol_at_night", "routine": [{"product_id": "cerave-acne-foaming-cream-cleanser", "slots": ["pm"]}, {"product_id": "minimalist-retinol-0-3-face-serum", "slots": ["pm"]}], "expect_fix": [[0, 1]]},
+    {"id": "vitamin_c_and_bpo_in_the_morning", "routine": [{"product_id": "paulas-choice-c15-super-booster", "slots": ["am"]}, {"product_id": "cerave-acne-foaming-cream-cleanser", "slots": ["am"]}], "expect_fix": [[0, 1]]},
+    {"id": "two_pairs_one_routine", "routine": [{"product_id": "minimalist-retinol-0-3-face-serum", "slots": ["pm"]}, {"product_id": "the-inkey-list-salicylic-acid-cleanser", "slots": ["pm"]}, {"product_id": "paulas-choice-c15-super-booster", "slots": ["am"]}, {"product_id": "cerave-acne-foaming-cream-cleanser", "slots": ["am"]}], "expect_fix": [[0, 1], [2, 3]]}
+  ]
+}

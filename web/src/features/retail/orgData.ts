@@ -7,6 +7,7 @@ import { useRetailData } from './context'
 import { brandAlias, brandOrder } from './masking'
 import { useOrg } from './org'
 import { proofApi, proofError, type DecisionItem, type DecisionsView, type DecisionSnapshot, type DecisionStatus, type OrgSettings, type RequestsView, type SavedClaim } from './proofApi'
+import { retrying } from './retry'
 
 /*
  * The organisation's shared state (decisions, evidence requests, saved claims), read through the app's query
@@ -20,19 +21,19 @@ const claimsKey = (org: string) => ['proof-claims', org] as const
 export function useDecisions() {
   const { org } = useOrg()
   const id = org?.id ?? ''
-  return useQuery<DecisionsView>(decisionsKey(id), (t) => proofApi.decisions(t, id), { enabled: Boolean(org), staleMs: 30_000 })
+  return useQuery<DecisionsView>(decisionsKey(id), (t) => retrying(() => proofApi.decisions(t, id)), { enabled: Boolean(org), staleMs: 30_000 })
 }
 
 export function useRequests() {
   const { org } = useOrg()
   const id = org?.id ?? ''
-  return useQuery<RequestsView>(requestsKey(id), (t) => proofApi.requests(t, id), { enabled: Boolean(org), staleMs: 20_000 })
+  return useQuery<RequestsView>(requestsKey(id), (t) => retrying(() => proofApi.requests(t, id)), { enabled: Boolean(org), staleMs: 20_000 })
 }
 
 export function useSavedClaims() {
   const { org } = useOrg()
   const id = org?.id ?? ''
-  return useQuery<SavedClaim[]>(claimsKey(id), (t) => proofApi.claims(t, id), { enabled: Boolean(org), staleMs: 30_000 })
+  return useQuery<SavedClaim[]>(claimsKey(id), (t) => retrying(() => proofApi.claims(t, id)), { enabled: Boolean(org), staleMs: 30_000 })
 }
 
 /** Run a state change inside a view transition when the browser has one (lane moves glide), else at once. */
@@ -83,7 +84,7 @@ const settingsKey = (org: string) => ['proof-settings', org] as const
 export function useOrgSettings() {
   const { org } = useOrg()
   const id = org?.id ?? ''
-  return useQuery<OrgSettings>(settingsKey(id), (t) => proofApi.settings(t, id), { enabled: Boolean(org), staleMs: 60_000 })
+  return useQuery<OrgSettings>(settingsKey(id), (t) => retrying(() => proofApi.settings(t, id)), { enabled: Boolean(org), staleMs: 60_000 })
 }
 export const setSettings = (org: string, v: OrgSettings) => setQueryData<OrgSettings>(settingsKey(org), v)
 

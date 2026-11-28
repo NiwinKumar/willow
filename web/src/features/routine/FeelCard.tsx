@@ -7,7 +7,7 @@ import type { FeelTag, FeelVerdict, RoutineEntry } from '../../data/types'
 import { localDay } from '../../lib/api'
 import type { Outcome } from '../../lib/outcome'
 import { addDays } from './schedule'
-import { MAX_TAGS, PRIVACY_LINE, SNOOZE_DAYS, TAGS, VERDICTS, VERDICT_LABEL, feelNudge, feelVsReadings, type FeelNudge as FeelNudgeT, nudgeQuestion, orderTags, saidLine, snoozed, toggleTag } from './feel'
+import { MAX_TAGS, NOTE_MAX, NOTE_TAG_LABEL, PRIVACY_LINE, SNOOZE_DAYS, TAGS, VERDICTS, VERDICT_LABEL, feelNudge, feelVsReadings, type FeelNudge as FeelNudgeT, nudgeQuestion, orderTags, saidLine, snoozed, toggleTag } from './feel'
 import { ProductImage } from './productUi'
 import { entryName, imageOf } from './routineModel'
 import { failureText, useRoutineWrites } from './writes'
@@ -95,8 +95,75 @@ export function FeelCard({ entry, outcome, ref }: { entry: RoutineEntry; outcome
           {error}
         </p>
       ) : null}
+      {/* keyed on the saved note: a new saved note (or another product) starts the field from it */}
+      <NoteField key={`${entry.id}:${entry.note?.at ?? ''}`} entry={entry} />
       <p className="text-[12px] leading-[1.45] text-ink-2">{PRIVACY_LINE}</p>
     </section>
+  )
+}
+
+/**
+ * An optional one-line note in the person's own words. Saved on Enter or blur; the api asks Gemini to read it
+ * into tags from a fixed list (stinging, dryness...), shown as small chips. No tags when none were read.
+ */
+function NoteField({ entry }: { entry: RoutineEntry }) {
+  const writes = useRoutineWrites()
+  const saved = entry.note?.text ?? ''
+  const [text, setText] = useState(saved)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const id = useId()
+  const save = async () => {
+    if (text.trim() === saved || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await writes.setNote(entry, text)
+    } catch (e) {
+      setError(failureText(e, "Couldn't save the note. Nothing changed; try again."))
+    } finally {
+      setSaving(false)
+    }
+  }
+  const tags = entry.note?.tags ?? []
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-[13px] text-ink-2">
+        A note in your own words · optional
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={text}
+        maxLength={NOTE_MAX}
+        placeholder="e.g. tingles a little, smells nice"
+        disabled={saving}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void save()
+        }}
+        className="h-11 rounded-pill bg-surface px-4 text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line-strong)] outline-none disabled:opacity-60"
+      />
+      {saving ? (
+        <span className="text-[12px] text-ink-2" aria-live="polite">
+          Saving…
+        </span>
+      ) : tags.length ? (
+        <ul aria-label="Read from your note" className="m-0 flex list-none flex-wrap gap-1.5 p-0" style={{ animation: 'wRise .35s both' }}>
+          {tags.map((t) => (
+            <li key={t} className="rounded-pill bg-surface px-2.5 py-0.5 text-[12px] text-ink-2 shadow-[inset_0_0_0_1px_var(--line)]">
+              {NOTE_TAG_LABEL[t]}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-[13px] text-avoid">
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }
 

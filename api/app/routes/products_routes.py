@@ -329,7 +329,9 @@ def add_routine_entry(
         doc["sample"] = True
     entry_id = entry_id or f"r_{secrets.token_hex(4)}"
     store.routine_set(uid, entry_id, doc)
-    if body.product_id:
+    # A sample entry is Willow's, not an adoption: no campaign counts it (and skipping it saves
+    # the judge setup a query over every active campaign per entry)
+    if body.product_id and not sample:
         attribute_add(store, uid, body.product_id)
     return entry_id, doc
 

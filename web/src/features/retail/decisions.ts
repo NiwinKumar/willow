@@ -119,7 +119,8 @@ export type ComposeInput = {
 /** A count with a true minus sign (−13). */
 const signed = (n: number) => (n < 0 ? `−${int(-n)}` : int(n))
 const q = (carry: string) => (carry ? '&' : '?')
-const productTo = (id: string, carry: string, hash = '') => `/retail/products/${encodeURIComponent(id)}${carry}${hash}`
+/** Product page link. `query` (e.g. 'claim=listing') joins the carried ?brand=… with & so the path always comes first. */
+const productTo = (id: string, carry: string, hash = '', query = '') => `/retail/products/${encodeURIComponent(id)}${carry}${query ? `${q(carry)}${query}` : ''}${hash}`
 const promoteTo = (id: string, carry: string) => `/retail/campaigns${carry}${q(carry)}new=${encodeURIComponent(id)}`
 const ref = (r: ProductRow) => ({ id: r.product_id, name: r.product, brand: r.brand, image_url: r.image_url, category: r.category })
 const liftInterval = (lo: number | null, hi: number | null) => (lo === null || hi === null ? null : `95% interval ${pts(lo)} to ${pts(hi)}`)
@@ -221,7 +222,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
         interval: r.rate_lo !== null && r.rate_hi !== null ? `95% interval ${pct(r.rate_lo)} to ${pct(r.rate_hi)}` : null,
         people: Math.round((r.users ?? r.n) * 0.5),
         product: ref(r),
-        primary: { kind: 'link', label: 'Draft a listing claim', to: `${productTo(r.product_id, x.carry).replace(x.carry, `${x.carry}${q(x.carry)}claim=listing`)}#claims-h` },
+        primary: { kind: 'link', label: 'Draft a listing claim', to: productTo(r.product_id, x.carry, '#claims-h', 'claim=listing') },
         secondary: { kind: 'link', label: 'See the statements', to: productTo(r.product_id, x.carry, '#ev-h') },
         waiting: 'A saved claim; re-checked if the tier slips',
         lane: 'decide',

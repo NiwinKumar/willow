@@ -3,6 +3,7 @@ journey and live status. Sample runs and the routine need a sign-in (a guest is 
 judge works in an account of their own; the journey and status are public."""
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -86,8 +87,11 @@ def judge_setup(
     fixed entry ids, so two tabs at once cannot add it twice."""
     if not user.is_anonymous and get_settings().auth_mode != "dev":
         return {"routine_added": 0}
-    added = _starter_routine(store, user.uid)
-    store.user_merge(user.uid, {"judge": True})
+    # the judge flag and the routine are independent writes: made at the same time
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        flagged = pool.submit(store.user_merge, user.uid, {"judge": True})
+        added = _starter_routine(store, user.uid)
+        flagged.result()
     return {"routine_added": added}
 
 
@@ -115,19 +119,29 @@ def _starter_routine(store: Store, uid: str) -> int:
     cannot add it twice."""
     if store.routine_list(uid):
         return 0
-    added = 0
-    for i, (product, slots) in enumerate(demo.judge_routine_entries(), start=1):
-        # started yesterday (UTC): someone west of UTC can tick their own "today" in the
-        # evening, which is already tomorrow in UTC
-        body = RoutineEntryIn(
-            product_id=product["product_id"],
-            slots=slots,
-            source="catalog",
-            started_at=datetime.now(UTC).date() - timedelta(days=1),
+    # started yesterday (UTC): someone west of UTC can tick their own "today" in the evening,
+    # which is already tomorrow in UTC
+    started = datetime.now(UTC).date() - timedelta(days=1)
+    bodies = [
+        RoutineEntryIn(
+            product_id=product["product_id"], slots=slots, source="catalog", started_at=started
         )
-        add_routine_entry(store, uid, body, entry_id=f"r_judge{i}", sample=True)
-        added += 1
-    return added
+        for product, slots in demo.judge_routine_entries()
+    ]
+    if not bodies:
+        return 0
+    # One Firestore write per entry, all at once: in turn they made a judge wait for each
+    # round trip (the setup is on the judge tour's critical path)
+    with ThreadPoolExecutor(max_workers=len(bodies)) as pool:
+        list(
+            pool.map(
+                lambda ib: add_routine_entry(
+                    store, uid, ib[1], entry_id=f"r_judge{ib[0]}", sample=True
+                ),
+                enumerate(bodies, start=1),
+            )
+        )
+    return len(bodies)
 
 
 @router.get("/journey")

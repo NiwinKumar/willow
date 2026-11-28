@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { greetingAt } from './derive'
 import { useHomeFit } from './fit'
 import { ArrowCircle, Glyph } from './parts'
 
@@ -12,8 +13,7 @@ export type HeroLine = { g: string; t: string }
 export function HeroCard({ name, lines, onAsk, askLabel = 'Ask about today', next }: { name: string | null; lines: HeroLine[]; onAsk?: () => void; askLabel?: string; next?: string | null }) {
   // The greeting and date are read once per visit (they do not tick while the page is open).
   const [now] = useState(() => new Date())
-  const hr = now.getHours()
-  const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening'
+  const greet = greetingAt(now.getHours())
   // Home fitted to the screen: the card follows the window's height (padding, gaps and greeting scale with it).
   const fit = useHomeFit()
   return (
