@@ -8,10 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from app import __version__, storage
+from app import __version__, engine_gate, storage
 from app.routes.autopilot_routes import router as autopilot_router
 from app.routes.campaign_routes import router as campaign_router
 from app.routes.demo_routes import router as demo_router
+from app.routes.live_routes import router as live_router
 from app.routes.me_routes import router as me_router
 from app.routes.plan_routes import router as plan_router
 from app.routes.product_requests_routes import router as product_requests_router
@@ -48,6 +49,10 @@ def _dev_seed() -> None:
             dev_seed.seed_demo_campaigns(get_store())
         except dev_seed.SamplesUnavailable as exc:  # no BigQuery rows: start without samples
             log.warning("dev sample campaigns skipped: %s", exc)
+
+
+# API_THREADS: room for every check-in waiting on the engine plus the polls (app/engine_gate.py)
+app.on_event("startup")(engine_gate.threads_from_env)
 
 
 @app.on_event("startup")
@@ -119,6 +124,7 @@ app.include_router(waitlist_router)
 app.include_router(plan_router)
 app.include_router(proof_router)
 app.include_router(similar_router)
+app.include_router(live_router)
 if storage.dev_uploads_enabled():
     from app.routes.dev_routes import router as dev_router
 

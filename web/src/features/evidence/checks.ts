@@ -8,7 +8,7 @@ export const CHECKS: { title: string; line: string; path: string }[] = [
   { title: 'Direction words only for real changes', line: 'A reading inside your normal range may not be called better, worse, calmer or fewer, and words may not contradict the measured direction.', path: 'api/app/explain.py' },
   { title: 'Two runs must agree on spot labels', line: 'Each batch of spots is labelled twice, in reverse order the second time. A label is kept only when both runs agree and neither is unsure.', path: 'api/app/labeller.py' },
   { title: 'Translations are checked again', line: 'Answers are written and checked in English, then translated. A translation is used only if its numbers and references match the English and it brings in no word from that language’s banned list.', path: 'api/app/translate.py' },
-  { title: 'Voice reads only checked text', line: 'A spoken question is transcribed, answered through the same checks, and only that checked answer is spoken.', path: 'api/app/voice.py' },
+  { title: 'Live voice is checked while it speaks', line: 'Talking to Wisp is a live Gemini conversation. Every reading, product and price comes from a tool that reads your own data, Model Armor screens what you say before any reply is played, and what Wisp says is checked as it speaks: a number not in its tool results, or a banned word, stops the audio and Wisp corrects itself aloud.', path: 'api/app/live.py' },
   { title: 'Retry, then a fixed reply', line: 'A rejected answer is asked for once more. If that fails too, the person gets a plain template written in code.', path: 'api/app/gemini.py' },
 ]
 

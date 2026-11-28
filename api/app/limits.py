@@ -40,7 +40,9 @@ CAPS: dict[str, tuple[int, int]] = {
     "shelf_upload": (20, 2000),  # Shelf vs results stock files (app/shelf.py)
     "sponsored_event": (60, 100000),  # a person counts once a day per campaign and kind
     "product_request": (10, 2000),  # requests for products the catalog lacks (Firestore + photo)
-    "voice": (40, 3000),  # Wisp hearing a spoken question and reading its answer aloud
+    # Talking to Wisp (app/live.py): one count per voice session, each up to live.MAX_S long
+    "voice_live": (20, 1500),
+    "demo_voice_live": (200, 1500),  # the public demo journey: one shared count, like its Wisp
     "changes_read": (
         30,
         3000,
@@ -55,6 +57,8 @@ MESSAGES = {
     "campaign_create": "That is {n} new campaigns for today.",
     "proof_claims": "That is {n} sets of claim drafts for today.",
     "product_request": "That is {n} product requests for today.",
+    "voice_live": "That is {n} voice chats for today. You can still type to Wisp.",
+    "demo_voice_live": "The demo's voice chats for today are used up. You can still type to Wisp.",
 }
 
 DEMO_WISP_ENV = "DEMO_WISP_DAILY_CAP"
