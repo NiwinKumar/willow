@@ -75,7 +75,7 @@ export function NeedsYou({ count, loading, cards, empty, actions, className = ''
 }
 
 /** "Latest": one line per thing that moved, always LATEST_ROWS rows tall, beside demand and the funnel. */
-export function LatestPanel({ updates, total, onAll, className = '' }: { updates: Update[]; total: number; onAll: () => void; className?: string }) {
+export function LatestPanel({ updates, total, onAll, className = '', loading = false }: { updates: Update[]; total: number; onAll: () => void; className?: string; loading?: boolean }) {
   const shown = updates.slice(0, LATEST_ROWS)
   return (
     <section aria-labelledby="latest-h" className={`flex min-w-0 flex-col rounded-card border border-line bg-surface ${className}`}>
@@ -95,7 +95,14 @@ export function LatestPanel({ updates, total, onAll, className = '' }: { updates
         ))}
         {Array.from({ length: LATEST_ROWS - shown.length }, (_, k) => (
           <li key={`blank-${k}`} className="flex flex-1 items-center border-t border-line px-2 py-2.5 text-proof-small text-ink-2 first:border-t-0">
-            {k === 0 ? (shown.length ? 'Nothing else new' : 'Nothing new yet: results, requests and live campaigns show here') : null}
+            {loading ? (
+              <span aria-hidden className="flex w-full flex-col gap-2">
+                <span className="retail-shimmer h-3 w-4/5 rounded-pill" />
+                <span className="retail-shimmer h-2.5 w-1/2 rounded-pill" />
+              </span>
+            ) : k === 0 ? (
+              shown.length ? 'Nothing else new' : 'Nothing new yet: results, requests and live campaigns show here'
+            ) : null}
           </li>
         ))}
       </ul>

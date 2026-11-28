@@ -1850,9 +1850,14 @@ _facts: dict[tuple[str, str], tuple[int, date, Facts]] = {}  # least recently us
 _lock = threading.Lock()
 
 
-def facts(cohort_: str = "mixed", range_: str = "all") -> tuple[Facts, int, date]:
+def facts(
+    cohort_: str = "mixed", range_: str = "all", fresh: bool = False
+) -> tuple[Facts, int, date]:
     """One filter's facts, built once per data version and day (raises when BigQuery is
-    unavailable and nothing is cached, like retailer.insights)."""
+    unavailable and nothing is cached, like retailer.insights). At the day change, with the same
+    data, yesterday's facts are served while today's are built in the background (they took 45 s
+    on one vCPU, and the first visit after midnight UTC waited for them, Nov 28); `fresh` waits
+    for today's instead (the midnight warm run)."""
     if cohort_ not in ("simulated", "mixed", "real") or range_ not in retailer.RANGE_DAYS:
         raise ValueError(f"unknown filter {cohort_}/{range_}")
     raw, version = retailer._rows()
@@ -1861,6 +1866,9 @@ def facts(cohort_: str = "mixed", range_: str = "all") -> tuple[Facts, int, date
     if hit and hit[0] == version and hit[1] == today:
         _facts[(cohort_, range_)] = _facts.pop((cohort_, range_))  # most recently used last
         return hit[2], version, today
+    if hit and hit[0] == version and not fresh:
+        retailer._later(("facts", cohort_, range_), lambda: rebuild_day(cohort_, range_))
+        return hit[2], version, hit[1]
     with _lock:
         hit = _facts.get((cohort_, range_))
         if hit and hit[0] == version and hit[1] == today:
@@ -1880,6 +1888,18 @@ def facts(cohort_: str = "mixed", range_: str = "all") -> tuple[Facts, int, date
         while len(_facts) > FACTS_KEEP:  # the least recently used filter goes first
             del _facts[next(iter(_facts))]
         return f, version, today
+
+
+def rebuild_day(cohort_: str = "mixed", range_: str = "all") -> None:
+    """Today's facts for a filter, and for the default filter the views Home and the lists open
+    with (as warm._proof_lists), so they are ready before anyone asks."""
+    facts(cohort_, range_, fresh=True)
+    if (cohort_, range_) == ("mixed", "all"):
+        products(cohort_, range_)
+        brands_list(cohort_, range_)
+        eligibility_all()
+        segments(cohort_, range_)
+        brief(cohort_, range_)
 
 
 def _memo(f: Facts, name: str, build, *extra: Any) -> Any:
