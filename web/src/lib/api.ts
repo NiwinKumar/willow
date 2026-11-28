@@ -292,7 +292,7 @@ export type AdvisorReply = {
   products: Product[]
   follow_up_suggestions: string[]
   retrieval: string[]
-  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number; photos_read?: number }
+  checks?: { model?: string; tool_calls?: number; numbers_checked?: number; products_from_tools?: number; photos_read?: number; /** "model_armor": the question was screened out before any model call (api armor.py). */ screened?: string }
   /** A photo of skin or a face was attached: never answered (chat photos are for products only). */
   photos_refused?: boolean
   /** The one currency this answer's prices are in (api advisor.py); each product carries `shown_price` in it. */
