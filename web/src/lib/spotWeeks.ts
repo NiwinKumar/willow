@@ -230,3 +230,70 @@ export function areaPhoto(w: SpotWeek, area: string, prefer: ViewName): SpotWeek
     )
   return { ...front, rois, marks: [...front.marks, ...carried] }
 }
+
+/** One check-in of a followed place: the mark counted there (kind and size), or none. */
+export type SpotStep = { at: string; mark: { kind: 'blemish' | 'spot'; r: number } | null }
+/** A routine product with its dates (YYYY-MM-DD…). */
+export type SpotProduct = { name: string; started: string; ended: string | null }
+
+const KIND_WORD = { blemish: 'a blemish', spot: 'a dark spot' } as const
+/** Shrunk to this share of its largest size reads as "smaller". */
+const SMALLER = 0.75
+
+/**
+ * A few plain sentences on what happened at one place across the check-ins, from the marks counted there only: when it
+ * was first counted, when it was largest, when it started to settle, how it looks at the latest check-in, and the
+ * routine products started or stopped meanwhile, as timing only (never a cause). Sizes are the engine's own.
+ */
+export function spotStory(steps: SpotStep[], products: SpotProduct[] = []): string[] {
+  const d = (iso: string) => dayLabel(iso)
+  const seen = steps.map((s, i) => (s.mark ? i : -1)).filter((i) => i >= 0)
+  if (!steps.length) return []
+  if (!seen.length) return ['No blemish or dark spot was counted here at any of your check-ins.']
+  const out: string[] = []
+  const first = seen[0]
+  const firstMark = steps[first].mark!
+  out.push(first === 0 ? `Already there at your first check-in (${d(steps[0].at)}), as ${KIND_WORD[firstMark.kind]}.` : `First counted on ${d(steps[first].at)}, as ${KIND_WORD[firstMark.kind]}.`)
+  // largest: blemishes first (a dark spot is what a blemish can leave behind)
+  const blem = seen.filter((i) => steps[i].mark!.kind === 'blemish')
+  const pool = blem.length ? blem : seen
+  const peak = pool.reduce((a, b) => (steps[b].mark!.r > steps[a].mark!.r ? b : a))
+  const peakR = steps[peak].mark!.r
+  if (seen.length > 1 && peak !== first) out.push(`Largest on ${d(steps[peak].at)}.`)
+  // settling: the first check-in after the peak where it is smaller, a dark spot instead, or not counted
+  const settle = steps.findIndex((s, i) => i > peak && (!s.mark || s.mark.r <= peakR * SMALLER || (steps[peak].mark!.kind === 'blemish' && s.mark.kind === 'spot')))
+  if (settle > 0 && settle < steps.length - 1) {
+    const s = steps[settle].mark
+    out.push(`From ${d(steps[settle].at)} it ${!s ? 'was no longer counted' : s.kind === 'spot' && steps[peak].mark!.kind === 'blemish' ? 'showed as a dark spot' : 'looked smaller'}.`)
+  }
+  // came back: not counted, then counted again
+  let back = 0
+  for (let i = first + 1; i < steps.length; i++) if (steps[i].mark && !steps[i - 1].mark) back++
+  if (back) out.push(`It cleared and came back ${back === 1 ? 'once' : `${back} times`}.`)
+  const last = steps[steps.length - 1]
+  out.push(
+    !last.mark
+      ? `Nothing was counted here on ${d(last.at)}.`
+      : last.mark.kind === 'spot' && blem.length
+        ? `On ${d(last.at)} it shows as a dark spot.`
+        : `On ${d(last.at)} it is still counted as ${KIND_WORD[last.mark.kind]}${last.mark.r <= peakR * SMALLER ? ', smaller than at its largest' : ''}.`,
+  )
+  // routine changes while it was there (timing only)
+  const from = steps[first].at.slice(0, 10)
+  const to = last.at.slice(0, 10)
+  const and = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0])
+  const moves = new Map<string, { at: string; verb: 'started' | 'stopped'; names: string[] }>()
+  const add = (at: string, verb: 'started' | 'stopped', name: string) => {
+    const key = `${at.slice(0, 10)} ${verb}`
+    const m = moves.get(key) ?? { at, verb, names: [] }
+    m.names.push(name)
+    moves.set(key, m)
+  }
+  for (const p of products) {
+    if (p.started.slice(0, 10) > from && p.started.slice(0, 10) <= to) add(p.started, 'started', p.name)
+    if (p.ended && p.ended.slice(0, 10) > from && p.ended.slice(0, 10) <= to) add(p.ended, 'stopped', p.name)
+  }
+  const list = [...moves.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(0, 3)
+  if (list.length) out.push(`Meanwhile you ${and(list.map((m) => `${m.verb} ${m.names.length > 2 ? `${m.names.length} products` : and(m.names)} on ${d(m.at)}`))} (timing only, not proof of an effect).`)
+  return out
+}

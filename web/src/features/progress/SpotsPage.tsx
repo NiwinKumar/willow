@@ -3,12 +3,13 @@ import { useMemo, useState } from 'react'
 import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { WillowLoader } from '../../components/willow/WillowLoader'
-import { useOwner, useSpotWeeks } from '../../data/hooks'
+import { useOwner, useRoutine, useSpotWeeks } from '../../data/hooks'
 import type { ViewName } from '../../data/types'
 import type { SpotWeek, SpotWeekView } from '../../lib/api'
 import { MOLE_NOTE } from '../../lib/spotLabels'
-import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areaPhoto, areasOf, boxAround, carry, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewsOf, type Box } from '../../lib/spotWeeks'
+import { AREA_LABEL, SPOT_CLOSE_UP, SPOT_NEAR, VIEW_LABEL, areaBox, areaCounts, areaFrame, areaPhoto, areasOf, boxAround, carry, spotStory, countLine, dayLabel, fromAreaPoint, markNear, shownWeeks, startPoint, toAreaPoint, viewOf, viewsOf, type Box } from '../../lib/spotWeeks'
 import { Crumb, Page, StatusCard } from './parts'
+import { productName } from './timeline'
 
 const RING = { blemish: 'var(--willow-400)', spot: 'var(--aura-apricot)' } as const
 
@@ -258,6 +259,7 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
   const start = Math.max(0, rows.findIndex((r) => r.w.id === current))
+  const routine = useRoutine()
   const [at, setAt] = useState<number | null>(null)
   // the place followed, at photo pixels of the check-in it was picked on
   const [picked, setPicked] = useState<{ id: string; x: number; y: number } | null>(null)
@@ -285,6 +287,13 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
     return boxAround(r.view, q.x, q.y, r.frame.s * SPOT_CLOSE_UP)
   }
   const marked = rows.filter((r) => near(r)).length
+  const story = spotStory(
+    rows.map((r) => {
+      const m = near(r)
+      return { at: r.w.created_at, mark: m ? { kind: m.kind, r: m.r } : null }
+    }),
+    (routine.data ?? []).map((e) => ({ name: productName(e), started: e.started_at, ended: e.ended_at })),
+  )
   return (
     <section aria-label={`${AREA_LABEL[area]} across your check-ins`} className="flex flex-col gap-4 rounded-[32px] bg-surface/80 p-[clamp(16px,2.4vw,24px)] squircle">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -343,6 +352,11 @@ function AreaTimeline({ weeks, area, prefer, current }: { weeks: SpotWeek[]; are
             )
           })}
         </ol>
+        {story.length ? (
+          <p aria-live="polite" className="m-0 rounded-[20px] bg-white/70 px-4 py-3 text-[15px] leading-[1.5]">
+            {story.join(' ')}
+          </p>
+        ) : null}
         <p className="m-0 text-[12.5px] leading-snug text-ink-2">The same place on your face each week, found from the face points around it (brows, nose, hairline…), so it stays put when your head turns or the photo is framed differently. Whether it is the very same spot, the close-ups show; Willow does not decide that.</p>
       </div>
     </section>

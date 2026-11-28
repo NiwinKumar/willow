@@ -132,3 +132,48 @@ test('a front area is followed on the front photo, whole, with the cheek photos\
   assert.ok(Math.abs(got.marks[1].x - 150) < 0.01 && Math.abs(got.marks[1].y - 450) < 0.01)
   assert.equal(areaPhoto(w, 'right_cheek', 'front'), undefined) // cheeks: on their own photos only
 })
+
+test('a spot\'s story: first counted, largest, settling, now, and the routine meanwhile', async () => {
+  const { spotStory } = await import('../src/lib/spotWeeks.ts')
+  const at = (day: number) => `2026-10-${String(day).padStart(2, '0')}T10:00:00Z`
+  const steps = [
+    { at: at(2), mark: null },
+    { at: at(9), mark: { kind: 'blemish' as const, r: 6 } },
+    { at: at(16), mark: { kind: 'blemish' as const, r: 10 } },
+    { at: at(23), mark: { kind: 'blemish' as const, r: 6 } },
+    { at: at(30), mark: { kind: 'spot' as const, r: 5 } },
+  ]
+  const story = spotStory(steps, [
+    { name: 'Mandelic Serum', started: '2026-10-12', ended: null },
+    { name: 'Old toner', started: '2026-01-01', ended: '2026-09-01' }, // before: not mentioned
+  ])
+  // products changed the same day are said together
+  const same = spotStory(steps, [
+    { name: 'A', started: '2026-10-23', ended: null },
+    { name: 'B', started: '2026-10-23', ended: null },
+  ])
+  assert.equal(same[same.length - 1], 'Meanwhile you started A and B on 23 Oct (timing only, not proof of an effect).')
+  const many = spotStory(steps, ['A', 'B', 'C'].map((name) => ({ name, started: '2026-10-23', ended: null })))
+  assert.equal(many[many.length - 1], 'Meanwhile you started 3 products on 23 Oct (timing only, not proof of an effect).')
+  assert.deepEqual(story, [
+    'First counted on 9 Oct, as a blemish.',
+    'Largest on 16 Oct.',
+    'From 23 Oct it looked smaller.',
+    'On 30 Oct it shows as a dark spot.',
+    'Meanwhile you started Mandelic Serum on 12 Oct (timing only, not proof of an effect).',
+  ])
+  assert.ok(!story.join(' ').match(/caus|because|thanks|worse|better/i))
+})
+
+test('a spot that comes and goes, and a place with nothing', async () => {
+  const { spotStory } = await import('../src/lib/spotWeeks.ts')
+  const at = (day: number) => `2026-11-${String(day).padStart(2, '0')}T10:00:00Z`
+  const b = { kind: 'blemish' as const, r: 5 }
+  assert.deepEqual(spotStory([{ at: at(1), mark: b }, { at: at(8), mark: null }, { at: at(15), mark: b }, { at: at(22), mark: null }]), [
+    'Already there at your first check-in (1 Nov), as a blemish.',
+    'From 8 Nov it was no longer counted.',
+    'It cleared and came back once.',
+    'Nothing was counted here on 22 Nov.',
+  ])
+  assert.deepEqual(spotStory([{ at: at(1), mark: null }]), ['No blemish or dark spot was counted here at any of your check-ins.'])
+})
