@@ -2,7 +2,7 @@
 
 USERS simulated people, every row `is_synthetic = true`, fixed seed. What is simulated, stated
 plainly (the retailer page's "About this data" panel repeats it):
-- People and products: USERS people (30,000) using the 1,500 best-known catalog products in
+- People and products: USERS people (35,000) using the 1,500 best-known catalog products in
   api/seed/cohort_products.json (scripts/pick_cohort_products.py: the 48 products of the first
   cohort, every full product with a measured concern, then index products of famous brands by
   hero-product rank, balanced across categories and regions). Most products carry the
