@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Willow Architecture Set</title>
+<meta name="description" content="Six diagrams of how Willow works: overview, image pipeline, api, Wisp and voice, Proof, and trust and infrastructure.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap">
+<style>
+  :root { --bg: #F5F4F0; --ink: #121212; --ink2: #5E5B56; --line: rgba(18,18,18,.12); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Outfit, system-ui, sans-serif; }
+  main { max-width: 1440px; margin: 0 auto; padding: 48px 16px 80px; }
+  header h1 { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(40px, 6vw, 64px); margin: 0 0 8px; letter-spacing: -.01em; }
+  header p { color: var(--ink2); margin: 0 0 12px; font-size: 18px; max-width: 760px; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 40px; }
+  nav a { font-family: 'Geist Mono', monospace; font-size: 13px; color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: #fff; }
+  section { margin: 0 0 56px; }
+  .cap { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+  .cap > div { flex: 1; }
+  .num { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-weight: 600; margin-top: 2px; }
+  h2 { font-size: 24px; font-weight: 500; margin: 0 0 4px; }
+  .cap p { margin: 0; color: var(--ink2); font-size: 16px; line-height: 1.5; max-width: 900px; }
+  .dl { font-family: 'Geist Mono', monospace; font-size: 12.5px; color: var(--ink2); margin-left: 12px; white-space: nowrap; }
+  img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: 0 1px 2px rgba(18,18,18,.06), 0 8px 32px rgba(18,18,18,.07); }
+  footer { color: var(--ink2); font-size: 14px; }
+  @media (max-width: 640px) { .dl { display: none; } }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>How Willow works</h1>
+  <p>Six diagrams, from the overview down to the image pipeline, the api, Wisp, Proof and the evidence. Every figure comes from the repo.</p>
+</header>
+<nav><a href="#d0">0 · How Willow works</a><a href="#d1">1 · The check-in image pipeline</a><a href="#d2">2 · willow-api</a><a href="#d3">3 · Wisp, live voice and the routine tools</a><a href="#d4">4 · Proof by Willow: data and statistics</a><a href="#d5">5 · Trust, scale and infrastructure</a></nav>
+<section id="d0">
+  <div class="cap"><span class="num">0</span><div><h2>How Willow works</h2><p>People use the Willow app and Proof by Willow; Google Cloud measures and stores; Gemini explains behind guards; results go back to people.</p></div>
+  <a class="dl" href="willow-arch-0-overview.svg">SVG</a><a class="dl" href="willow-arch-0-overview@2x.png">PNG 2x</a></div>
+  <img src="willow-arch-0-overview.png" srcset="willow-arch-0-overview.png 1x, willow-arch-0-overview@2x.png 2x" width="1920" height="1080" alt="How Willow works" loading="lazy">
+</section>
+<section id="d1">
+  <div class="cap"><span class="num">1</span><div><h2>The check-in image pipeline</h2><p>Capture and signed upload, the engine's quality gates, landmarks and skin mask, eleven readings each with its method, the noise band and room-light floor, the verdict, then Gemini's explanation and spot labels.</p></div>
+  <a class="dl" href="willow-arch-1-pipeline.svg">SVG</a><a class="dl" href="willow-arch-1-pipeline@2x.png">PNG 2x</a></div>
+  <img src="willow-arch-1-pipeline.png" srcset="willow-arch-1-pipeline.png 1x, willow-arch-1-pipeline@2x.png 2x" width="1920" height="1080" alt="The check-in image pipeline" loading="lazy">
+</section>
+<section id="d2">
+  <div class="cap"><span class="num">2</span><div><h2>willow-api</h2><p>Sign-in, daily caps and the engine line on every request; the route groups; Firestore; and the Gemini layer every call goes through: Model Armor, kept answers, the hedge, validators, translate-then-verify.</p></div>
+  <a class="dl" href="willow-arch-2-api.svg">SVG</a><a class="dl" href="willow-arch-2-api@2x.png">PNG 2x</a></div>
+  <img src="willow-arch-2-api.png" srcset="willow-arch-2-api.png 1x, willow-arch-2-api@2x.png 2x" width="1920" height="1080" alt="willow-api" loading="lazy">
+</section>
+<section id="d3">
+  <div class="cap"><span class="num">3</span><div><h2>Wisp, live voice and the routine tools</h2><p>Typed Wisp and live voice step by step with their guards; the routine builder (rules only), the routine check's rule table and label scan.</p></div>
+  <a class="dl" href="willow-arch-3-wisp.svg">SVG</a><a class="dl" href="willow-arch-3-wisp@2x.png">PNG 2x</a></div>
+  <img src="willow-arch-3-wisp.png" srcset="willow-arch-3-wisp.png 1x, willow-arch-3-wisp@2x.png 2x" width="1920" height="1080" alt="Wisp, live voice and the routine tools" loading="lazy">
+</section>
+<section id="d4">
+  <div class="cap"><span class="num">4</span><div><h2>Proof by Willow: data and statistics</h2><p>Opted-in and simulated outcomes in BigQuery, Proof tiers with Benjamini-Hochberg control, cached facts, Ask over slices, and how brands and retailers act on the evidence.</p></div>
+  <a class="dl" href="willow-arch-4-proof.svg">SVG</a><a class="dl" href="willow-arch-4-proof@2x.png">PNG 2x</a></div>
+  <img src="willow-arch-4-proof.png" srcset="willow-arch-4-proof.png 1x, willow-arch-4-proof@2x.png 2x" width="1920" height="1080" alt="Proof by Willow: data and statistics" loading="lazy">
+</section>
+<section id="d5">
+  <div class="cap"><span class="num">5</span><div><h2>Trust, scale and infrastructure</h2><p>Evals, the instrument retest, cost per use, the 200-at-once load test with its projection, quality gates in CI, and the Google Cloud services underneath.</p></div>
+  <a class="dl" href="willow-arch-5-trust.svg">SVG</a><a class="dl" href="willow-arch-5-trust@2x.png">PNG 2x</a></div>
+  <img src="willow-arch-5-trust.png" srcset="willow-arch-5-trust.png 1x, willow-arch-5-trust@2x.png 2x" width="1920" height="1080" alt="Trust, scale and infrastructure" loading="lazy">
+</section>
+<footer>A single detailed poster is also kept: <a href="willow-architecture-detailed.html">willow-architecture-detailed.html</a>.</footer>
+</main>
+</body>
+</html>
