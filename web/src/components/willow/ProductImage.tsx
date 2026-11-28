@@ -21,7 +21,9 @@ export function ProductImage({ product, size, muted = false, rest = false, breat
   fallback?: ReactNode
   className?: string
 }) {
-  const src = product.image_url || null
+  // A few catalog packshots are http:// links: asked for over https (mixed-content warnings otherwise); one whose
+  // host has no https fails to load and falls back to the category orb below.
+  const src = product.image_url ? product.image_url.replace(/^http:\/\//i, 'https://') : null
   const [failed, setFailed] = useState<string | null>(null)
   if (!src || failed === src) return <>{fallback ?? <CategoryOrb category={product.category} size={size} muted={muted} rest={rest} breathe={breathe} />}</>
   return (

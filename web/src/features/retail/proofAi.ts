@@ -74,8 +74,19 @@ export function actionTarget(link: RetailerAction['link'], campaigns: string, cl
   }
 }
 
-/** The tiers the api drafts claims for (proof_ai.CLAIMS_TIERS); others get `blocked` without a Gemini call. */
-export const CLAIM_TIERS: readonly string[] = ['proven', 'promising']
+/** The tiers the api drafts claims for (proof_ai.CLAIMS_TIERS): Proven only. Others get `blocked` without a Gemini call. */
+export const CLAIM_TIERS: readonly string[] = ['proven']
+
+/**
+ * Why a product has no claim-ready statements, and what it would take: claims rest on Proven (a visible change
+ * above people with the same goals who do not use it, clear of chance). The api's own reasons carry the numbers.
+ */
+export function claimGap(p: { tier: string; to_proven?: number | null }, reasons: string[] = []): string {
+  if (p.tier === 'proven') return ''
+  const need = p.tier === 'promising' && p.to_proven ? ` About ${p.to_proven} more ${p.to_proven === 1 ? 'person' : 'people'} at week 8 would make it Proven if the rates hold.` : ''
+  const why = p.tier === 'promising' ? 'It is Promising: its lift could still be chance.' : (reasons[0] ?? 'It is not Proven yet.')
+  return `Statements and claims open once a product is Proven. ${why}${need}`
+}
 
 /** The provenance line under the next steps: Gemini picked them, or they are the fixed priority. */
 export function actionsProvenance(source: 'gemini' | 'rules', considered: number): string {

@@ -209,9 +209,9 @@ export default function BrandJourney() {
           </span>
         </div>
         {state === 'ready' ? (
-          <div className="flex gap-1" aria-hidden>
+          <div role="group" aria-label="Slides" className="flex gap-1">
             {slides.map((_, k) => (
-              <button key={k} type="button" tabIndex={-1} onClick={() => go(k)} className="-my-3 flex-1 py-3">
+              <button key={k} type="button" tabIndex={-1} onClick={() => go(k)} aria-label={`Slide ${k + 1} of ${slides.length}`} aria-current={k === i ? 'step' : undefined} className="-my-3 flex-1 py-3">
                 <span className="block h-1 overflow-hidden rounded-full bg-ink/10">
                   <span
                     key={`${k}-${at}`}
@@ -224,6 +224,8 @@ export default function BrandJourney() {
           </div>
         ) : null}
       </header>
+
+      <h1 className="sr-only">A brand’s journey</h1>
 
       <section aria-live="polite" className="mx-auto flex w-full max-w-[1180px] flex-1 items-center px-[clamp(16px,3vw,32px)] py-5">
         {state === 'loading' ? <p className="m-auto text-ink-2">Loading {BRAND}’s proof…</p> : null}
@@ -388,7 +390,7 @@ function Intro({ d }: { d: Data }) {
         ))}
       </div>
       <div className="flex flex-col gap-4">
-        <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">{BRAND}, with proof</h1>
+        <h2 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">{BRAND}, with proof</h2>
         <Lead>
           Retailers and brands see what was bought, never whether it worked. A brand can say what a product is for, but not how often it visibly works, for whom, or how it compares on the shelf. Claims without evidence are hard to trust, and a product bought for the wrong skin often comes back.
         </Lead>

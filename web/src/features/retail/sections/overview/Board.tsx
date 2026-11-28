@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useCompetitorNames } from '../../orgData'
 import { sectionPath, useRetailState } from '../../state'
 import type { BrandSummary, Insights, ProductRow, Products } from '../../types'
-import { cohortKind, int, MIN_GROUP, pct, pts, SkeletonPanel } from '../../ui'
+import { cohortKind, cohortSizeText, int, MIN_GROUP, pct, pts, SkeletonPanel } from '../../ui'
 import { DotMatrix, GlowStat, BrandBars, PillColumns, PillStack, TickGauge, type GlowPoint, type StackSegment, type StackTone } from '../../ui/widgets'
 
 /*
@@ -80,7 +80,6 @@ export function WidgetBoard({ d, all, rows, brand, summary, spotlight }: { d: In
   const names = useCompetitorNames()
   if (!all) return <SkeletonPanel height={560} />
   const kind = cohortKind(d.cohort)
-  const people = d.cohort.synthetic + d.cohort.real
   const to = (section: Parameters<typeof sectionPath>[0]) => `${sectionPath(section)}${carry}`
 
   /* ── visible change over time (glow) ── */
@@ -227,7 +226,7 @@ export function WidgetBoard({ d, all, rows, brand, summary, spotlight }: { d: In
       </div>
 
       <p className="m-0 text-proof-small text-ink-2">
-        {int(people)} people measured · {kind === 'simulated' ? 'a simulated cohort' : kind === 'mixed' ? `${int(d.cohort.real)} real, the rest simulated` : 'consented users'}. Cards show aggregates; groups under {MIN_GROUP} people are hidden.
+        {cohortSizeText(d.cohort)} measured{kind === 'real' ? ', consented' : ''}. Cards show aggregates; groups under {MIN_GROUP} people are hidden.
       </p>
     </section>
   )

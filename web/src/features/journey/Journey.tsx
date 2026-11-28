@@ -46,7 +46,7 @@ const CHAPTERS: { title: string; used: [string, string][]; retail: string }[] = 
   {
     title: 'Her baseline',
     used: [
-      ['Guided check-in', 'Three photos by the window and a cheek close-up, each checked for light and framing before it counts.'],
+      ['Guided check-in', 'Baseline photos by the window and a cheek close-up, each checked for light and framing before it counts.'],
       ['Personal baseline', 'Every later week is read against her own skin and normal range, never anyone else’s.'],
       ['Routine list', 'What she uses, from any brand, lined up with her readings from day one.'],
     ],
@@ -222,9 +222,9 @@ export default function Journey() {
           </button>
         </div>
         {state === 'ready' ? (
-          <div className="flex gap-1" aria-hidden>
+          <div role="group" aria-label="Slides" className="flex gap-1">
             {slides.map((_, k) => (
-              <button key={k} type="button" tabIndex={-1} onClick={() => go(k)} className="-my-3 flex-1 py-3">
+              <button key={k} type="button" tabIndex={-1} onClick={() => go(k)} aria-label={`Slide ${k + 1} of ${slides.length}`} aria-current={k === i ? 'step' : undefined} className="-my-3 flex-1 py-3">
                 <span className="block h-1 overflow-hidden rounded-full bg-ink/10">
                   <span
                     key={`${k}-${i}`}
@@ -238,6 +238,8 @@ export default function Journey() {
         ) : null}
       </header>
 
+      {/* One page heading for every slide; each slide's own title is a level below it. */}
+      <h1 className="sr-only">Mei’s journey</h1>
       <section aria-live="polite" className="mx-auto flex w-full max-w-[1180px] flex-1 items-center px-[clamp(16px,3vw,32px)] py-5">
         {/* the problem needs no data: it shows at once while her journey loads */}
         {state === 'loading' ? i === 0 ? <Problem /> : <IntroSkeleton /> : null}
@@ -324,7 +326,7 @@ function IntroSkeleton() {
     <div role="status" aria-label="Loading Mei’s journey" className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]">
       <span aria-hidden className={`skeleton aspect-[3/4] w-full rounded-[24px] squircle ${INTRO_PHOTO}`} style={SHIMMER} />
       <div aria-hidden className="flex flex-col gap-4">
-        <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h1>
+        <h2 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h2>
         {/* the two paragraphs' lines, so the heading does not move when they arrive */}
         <span className="flex max-w-[520px] flex-col gap-[clamp(10px,1vw,13px)] py-1">
           {['100%', '96%', '100%', '58%'].map((w, k) => (
@@ -352,7 +354,7 @@ function Intro({ face, count, closeUps }: { face: Session; count: number; closeU
     <div className="grid w-full items-center gap-[clamp(20px,4vw,56px)] md:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)]" style={{ animation: 'wRise .5s both' }}>
       <Photo s={face} label="Mei's first check-in selfie" className={INTRO_PHOTO} first />
       <div className="flex flex-col gap-4">
-        <h1 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h1>
+        <h2 className="m-0 font-serif text-[clamp(40px,5vw,72px)] leading-[.95] font-normal">Meet Mei</h2>
         <p className="m-0 max-w-[520px] text-[clamp(16px,1.4vw,19px)] leading-[1.5] text-pretty">
           Mei is 26, lives in Singapore and has blemish-prone skin, with breakouts along her cheeks, jaw and chin around her cycle. She checks in with Willow every Sunday evening: {count} face check-ins and {closeUps} cheek close-ups over eight weeks, while she changes her routine.
         </p>

@@ -7,7 +7,7 @@ import { useRetailData } from '../context'
 import { csvMeta, csvName } from '../data'
 import { feltText } from '../feel'
 import { useProducts } from '../productData'
-import { filterRows, hintOf, MAX_COMPARE, noDataReason, PAGE_ROWS, parseIds, productsLead, promoHistory, promoNote, TIER_ORDER, TIER_TABS, toggleId, type Promo } from '../productModel'
+import { filterRows, hintOf, MAX_COMPARE, noDataReason, PAGE_ROWS, parseIds, priceTierWord, productsLead, promoHistory, promoNote, TIER_ORDER, TIER_TABS, toggleId, type Promo } from '../productModel'
 import { useCompetitorNames } from '../orgData'
 import { rangeIds, useRange } from '../rangeStore'
 import { purposeOf, sectionPath, useRetailState } from '../state'
@@ -76,7 +76,6 @@ const DEFAULT_SORT: Sort = { id: 'lift', dir: 'desc' }
 const VIEW_KEYS = ['tier', 'brand', 'category', 'goal', 'sort', 'scope'] as const
 const TIER_IDS = Object.keys(TIERS) as ProofTier[]
 const PRICE_ORDER = { budget: 0, mid: 1, premium: 2 } as const
-const cap = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}`
 
 function Body({ d }: { d: Insights }) {
   const { filters, workspace } = useRetailData()
@@ -196,7 +195,7 @@ function Body({ d }: { d: Insights }) {
       sortValue: (r) => r.product,
       firstDir: 'asc',
       // "Yours" only where it tells rows apart (All products in a brand workspace).
-      cell: (r) => <ProductCell p={{ ...r, brand: names.name(r.brand) }} logo tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} sub={<PromoNote p={promo.get(r.product_id)} />} />,
+      cell: (r) => <ProductCell p={{ ...r, brand: names.name(r.brand) }} to={`${sectionPath('products', r.product_id)}${carry}`} inRow logo tag={brandView === r.brand && !yoursOnly ? <YoursTag /> : null} sub={<PromoNote p={promo.get(r.product_id)} />} />,
       csv: (r) => `${r.product} (${names.name(r.brand)})`,
     },
     {
@@ -314,10 +313,11 @@ function Body({ d }: { d: Insights }) {
       optional: true,
       hidden: true,
       width: '104px',
-      sortValue: (r) => PRICE_ORDER[r.price_tier],
+      // no checked price: sorts last either way (DataTable keeps nulls at the end) and shows a dash
+      sortValue: (r) => (r.price_tier ? PRICE_ORDER[r.price_tier] : null),
       firstDir: 'asc',
-      cell: (r) => <span className="text-ink-2">{cap(r.price_tier)}</span>,
-      csv: (r) => r.price_tier,
+      cell: (r) => <span className="text-ink-2">{priceTierWord(r.price_tier) ?? '–'}</span>,
+      csv: (r) => r.price_tier ?? '',
     },
   ]
 

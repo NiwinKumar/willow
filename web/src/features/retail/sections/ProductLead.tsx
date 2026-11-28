@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 
-import { bestSeg, categorySpot, hintOf, verdictLine, type Promo } from '../productModel'
+import { bestSeg, categorySpot, hintOf, lastWeekStep, verdictLine, type Promo } from '../productModel'
 import type { ProductDetail as Detail } from '../types'
 import { Button, CurveChart, int, Panel, pct, ProofTierChip, pts, Segmented } from '../ui'
 
@@ -42,7 +42,8 @@ export function ProductVerdict({ x, weeksN, promoteTo, promo, campaignTo }: { x:
           <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5 text-proof-small text-ink-2">
             {skin ? <Fact term="Works best for" value={`${skin.label} skin`} sub={`${pct(skin.rate)} of ${int(skin.n)} changed; ${pct(skin.base_rate)} of that skin type not using it`} /> : null}
             {p.rate !== null && p.weeks !== null ? <Fact term="Change usually begins" value={`by week ${Math.round(p.weeks)}`} sub={`median, of ${weeksN} weeks`} /> : null}
-            {reason ? <Fact term="Not promotable yet" value={reason} /> : null}
+            {/* a running campaign was judged on all-time data: never "not promotable" beside it under a narrower filter */}
+            {reason && !live ? <Fact term="Not promotable yet" value={reason} /> : null}
             {live ? <Fact term={live.state === 'running' ? 'Campaign running' : 'Campaign paused'} value={live.lift !== null ? `${pts(live.lift)} adoption so far` : 'lift once each group has 10 people'} sub={live.sample ? '(sample campaign)' : undefined} /> : null}
             {before ? <Fact term="Promoted before" value={before.lift !== null ? `${pts(before.lift)} adoption against its holdout` : 'ended before a lift was measured'} sub={before.sample ? '(sample campaign)' : undefined} /> : null}
           </dl>
@@ -151,6 +152,7 @@ export function OutcomePanel({ x, weeksN, journey, className = '' }: { x: Detail
   const early = x.journey?.nodes.find((n) => n.id === 'early')?.n ?? null
   const changed = p.rate !== null && p.n ? Math.round(p.rate * p.n) : null
   const kept = p.cont8 !== null && p.n ? Math.round(p.cont8 * p.n) : null
+  const late = lastWeekStep(x.curve)
   const deep = journey !== null
   if (deep && view === 'path') {
     return (
@@ -195,6 +197,12 @@ export function OutcomePanel({ x, weeksN, journey, className = '' }: { x: Detail
             ...(x.curve.base.some((v) => v !== null) ? [{ id: 'base', label: 'Not using it', values: x.curve.base, tone: 'muted' as const, n: non }] : []),
           ]}
         />
+        {late && p.rate !== null ? (
+          <p className="m-0 text-proof-label text-ink-2 [text-wrap:pretty]">
+            The step at week {weeksN}: {late.users} of the {pct(p.rate).replace('%', '')} points are people whose change first showed at the week-{weeksN} reading itself, one reading that has not been seen a second time
+            {late.base !== null && late.base > 0 ? ` (${late.base} points for people not using it)` : ''}. Both groups are counted the same way, so the gap between them is like for like.
+          </p>
+        ) : null}
         <ol aria-label="Path of the people who tried it" className="m-0 mt-auto grid list-none grid-cols-2 gap-px overflow-hidden rounded-ctl border border-line bg-line p-0 sm:grid-cols-4">
           <PathStep i={0} n={p.users} label="tried it" />
           <PathStep i={1} n={p.n} label={`reached week ${weeksN}`} sub={early ? `${int(early)} not yet` : undefined} />

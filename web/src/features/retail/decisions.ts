@@ -1,7 +1,7 @@
 import type { AutopilotActivity, Campaign, ShelfProduct } from '../../lib/api'
 import type { DecisionItem, DecisionStatus } from './proofApi'
 import type { Insights, ProductRow, Segments } from './types'
-import { int, pct, pts } from './ui/format.ts'
+import { article, int, pct, pts } from './ui/format.ts'
 import { topUnmet } from './ui/insight.ts'
 
 /*
@@ -203,13 +203,14 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
     }
     // 3 · Claim ready
     for (const r of mine) {
-      if ((r.tier !== 'proven' && r.tier !== 'promising') || x.claimed.has(r.product_id) || r.n === null) continue
+      // claim-ready means Proven (the api gives no statements below it)
+      if (r.tier !== 'proven' || x.claimed.has(r.product_id) || r.n === null) continue
       cards.push({
         key: `claim_ready--${r.product_id}`,
         kind: 'claim_ready',
         type: TYPE_LABEL.claim_ready,
         title: `${r.product} has claim-ready evidence and no saved claim`,
-        trigger: `${r.tier === 'proven' ? 'Proven' : 'Promising'} in ${int(r.n)} people over ${x.weeks} weeks. A listing claim can quote only its measured statements.`,
+        trigger: `Proven in ${int(r.n)} people over ${x.weeks} weeks${r.base_rate !== null ? `: ${pct(r.rate)} against ${pct(r.base_rate)} of people with the same goals who do not use it` : ''}. A listing claim can quote only its measured statements.`,
         figure: pct(r.rate),
         figureNote: 'saw a visible change',
         n: r.n,
@@ -283,7 +284,7 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
         key: `unmet_group--${unmet.skin}--${unmet.goal}`,
         kind: 'unmet_group',
         type: TYPE_LABEL.unmet_group,
-        title: `${unmet.skinLabel} skin with a ${unmet.goalLabel.toLowerCase()} goal is the least served`,
+        title: `${unmet.skinLabel} skin with ${article(unmet.goalLabel)} ${unmet.goalLabel.toLowerCase()} goal is the least served`,
         trigger: `${pct(unmet.unmet)} of ${int(unmet.users)} people in this group have no visible change yet${best ? `; the best option, ${best.product}, reaches ${pct(best.rate)} of ${int(best.n)}` : '; no product reaches 10 people in it'}.`,
         figure: pct(unmet.unmet),
         figureNote: 'without a change',
@@ -344,13 +345,14 @@ export function composeCards(x: ComposeInput): DecisionCard[] {
   }
   for (const id of x.claimed) {
     const r = rowById.get(id)
-    if (!r || r.tier === 'proven' || r.tier === 'promising' || (x.brand && r.brand !== x.brand)) continue
+    // a claim stands on Proven only (the api gives no statements below it), so a Promising product's saved claim has slipped too
+    if (!r || r.tier === 'proven' || (x.brand && r.brand !== x.brand)) continue
     cards.push({
       key: `evidence_slipped--claim-${id}`,
       kind: 'evidence_slipped',
       type: TYPE_LABEL.evidence_slipped,
       title: `A saved claim on ${r.product} rests on evidence that slipped`,
-      trigger: `It now reads “${r.tier_label ?? r.tier}”${r.n !== null ? ` in ${int(r.n)} people at week ${x.weeks}` : ''}. A claim can only quote a Proven or Promising product’s statements.`,
+      trigger: `It now reads “${r.tier_label ?? r.tier}”${r.n !== null ? ` in ${int(r.n)} people at week ${x.weeks}` : ''}. A claim can only quote a Proven product’s statements.`,
       figure: r.rate !== null ? pct(r.rate) : '—',
       figureNote: r.rate !== null ? 'saw a visible change' : 'no measured outcome now',
       n: r.n,

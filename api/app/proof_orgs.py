@@ -251,9 +251,11 @@ def join(store: Store, uid: str, instance_id: str, org_id: str, role: str) -> Do
 
 
 # The sample portfolio's version, kept on the membership as `samples`. 1 (stored as `true`): the
-# first member-based samples; 2: built from the measured outcomes (dev_seed, Nov 27). A membership
-# below this version is re-seeded: its old samples are deleted first.
-SAMPLES_VERSION = 2
+# first member-based samples; 2: built from the measured outcomes (dev_seed, Nov 27); 3: Proven
+# also needs false-discovery control (Nov 28), so portfolios seeded before it could sit on
+# products that are no longer Proven. A membership below this version is re-seeded: its old
+# samples are deleted first.
+SAMPLES_VERSION = 3
 
 
 def _mark(m: Doc) -> int:
@@ -282,14 +284,38 @@ def _seed_samples(store: Store, uid: str, org_id: str) -> bool:
     return True
 
 
+def _stale_sample_orgs(store: Store, uid: str) -> set[str]:
+    """Orgs where this person has a sample campaign on a product that cannot be promoted any more
+    (the outcomes moved, or Proven got stricter): "promote only Proven" must hold for samples too.
+    Only when the outcomes are already in memory, so opening Proof never waits for them here."""
+    from app import campaigns, retail_intel  # lazy: campaigns -> proof_orgs
+
+    if not retail_intel.loaded():
+        return set()
+    try:
+        ok = {e["product_id"] for e in retail_intel.eligibility_all() if e["eligible"]}
+    except Exception as exc:  # outcomes unavailable: nothing to compare against
+        log.warning("sample campaigns not checked: %s", exc)
+        return set()
+    return {
+        d.get("org_id")
+        for _, d in store.campaigns_of(uid)
+        if campaigns.is_sample(d) and d.get("owner_uid") == uid and d.get("product_id") not in ok
+    }
+
+
 def ensure_samples(store: Store, uid: str, rows: list[Doc]) -> None:
     """Memberships without the current sample portfolio (made before samples existed, an older
-    version, or a join whose seeding could not run) get it the next time the person opens Proof,
-    so every account looks the same. Only demo memberships of demo instances; marked with the
-    version once done, so it runs once per membership and version."""
+    version, a join whose seeding could not run, or one with a sample on a product that is no
+    longer Proven) get it the next time the person opens Proof, so every account looks the same
+    and no sample contradicts the products' statuses. Only demo memberships of demo instances;
+    marked with the version once done, so it runs once per membership and version."""
+    stale = _stale_sample_orgs(store, uid) if rows else set()
     for m in rows:
         inst = instance(m.get("instance", ""))
-        if not needs_samples(m) or not m.get("demo") or not (inst and inst["demo"]):
+        if not (needs_samples(m) or m["org_id"] in stale):
+            continue
+        if not m.get("demo") or not (inst and inst["demo"]):
             continue
         if not _seed_samples(store, uid, m["org_id"]):
             continue  # tried again on the next visit

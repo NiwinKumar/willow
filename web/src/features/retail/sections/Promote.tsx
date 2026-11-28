@@ -9,7 +9,7 @@ import { useAuth } from '../../../lib/useAuth'
 import { useRetailData } from '../context'
 import { fetchProducts } from '../productData'
 import { promoHistory } from '../productModel'
-import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, portfolioOf, runningCount, workspaceId } from '../promote'
+import { answerLine, campaignSummary, createTarget, liftWords, MAX_ACTIVE, notEligibleOrder, orgCampaigns, portfolioOf, runningCount, workspaceCampaigns, workspaceId } from '../promote'
 import { useOrg } from '../org'
 import { purposeOf, sectionPath, useRetailState } from '../state'
 import { ShelfResults } from './market/ShelfResults'
@@ -107,7 +107,7 @@ function Rules() {
 function Body({ uid }: { uid: string }) {
   const { workspace } = useRetailData()
   const { param, setParam, carry } = useRetailState()
-  const { lockedBrand } = useOrg()
+  const { lockedBrand, org } = useOrg()
   const { hash } = useLocation()
   // Sub-views: the campaigns, AutoCampaign (standing rules) and the Shelf check (the retailer's own shelf).
   const shelfOk = !lockedBrand && workspace.kind === 'retailer'
@@ -154,7 +154,9 @@ function Body({ uid }: { uid: string }) {
 
   const navigate = useNavigate()
   const all = elig.data ?? []
-  const campaigns = camps.data?.list ?? []
+  // This organisation's campaigns (the scope Home counts too); the running cap below is per person, across seats.
+  const everySeat = camps.data?.list ?? []
+  const campaigns = orgCampaigns(everySeat, org?.id)
   // A campaign opens on its own page; the older ?campaign=<id> link lands there too.
   const openId = param('campaign')
   if (openId) return <Navigate to={`${sectionPath('campaigns', openId)}${carry}`} replace />
@@ -177,8 +179,8 @@ function Body({ uid }: { uid: string }) {
   const eligible = scope.filter((p) => p.eligible).sort((a, b) => (rows.get(b.product_id)?.lift ?? 0) - (rows.get(a.product_id)?.lift ?? 0) || a.product.localeCompare(b.product))
   const notEligible = scope.filter((p) => !p.eligible).sort(notEligibleOrder)
 
-  const running = runningCount(campaigns)
-  const mine = campaigns.filter((c) => c.workspace === wsId)
+  const running = runningCount(everySeat)
+  const mine = workspaceCampaigns(campaigns, wsId)
   // Another workspace's campaigns are never shown to a brand organisation (a competitor's live marketing).
   const showAll = param('all') === '1' && !lockedBrand
   const listed = showAll ? campaigns : mine
@@ -222,13 +224,8 @@ function Body({ uid }: { uid: string }) {
   const description = listed.length ? (
     <>
       {samples ? 'A sample portfolio (simulated, no shopper sees it): ' : null}
-      {sum.active ? (
-        <>
-          <strong>{sum.active} active</strong> {sum.active === 1 ? 'campaign' : 'campaigns'}
-        </>
-      ) : (
-        'No campaign running'
-      )}
+      {/* the same words and counts as Home's Campaigns tile and the table's status: active of all listed */}
+      <strong>{sum.active} active</strong> of {int(listed.length)} {listed.length === 1 ? 'campaign' : 'campaigns'}
       {sum.reach !== null ? (
         <>
           , <strong>{int(sum.reach)}</strong> {sum.reach === 1 ? 'person' : 'people'} reached so far
@@ -301,7 +298,7 @@ function Body({ uid }: { uid: string }) {
                   Campaigns
                 </h2>
                 <span className="text-proof-small text-ink-2 tnum" title="You can run up to three of your own campaigns at once; sample campaigns don’t take a slot.">
-                  {running} of {MAX_ACTIVE} launch slots in use
+                  {running} of {MAX_ACTIVE} of your own running{listed.some((c) => c.sample) ? ' · samples don’t count' : ''}
                 </span>
               </>
             }

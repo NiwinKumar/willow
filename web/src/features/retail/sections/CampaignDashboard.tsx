@@ -342,7 +342,7 @@ function Story({ c, at, className }: { c: Campaign; at: number | null; className
             height={190}
             days={days.map((d) => ({ label: dayLabel(d.day), values: d.values }))}
             bands={[
-              { id: 'shown', label: 'Card shown' },
+              { id: 'shown', label: 'Times card shown' },
               { id: 'clicked', label: 'Clicked through' },
               { id: 'added', label: 'Added to routine' },
             ]}
@@ -351,7 +351,7 @@ function Story({ c, at, className }: { c: Campaign; at: number | null; className
           </div>
           <ul aria-label="Totals so far" className="m-0 flex list-none flex-wrap justify-center gap-x-6 gap-y-1 p-0 text-proof-small text-ink-2">
             {[
-              { id: 'shown', label: 'Card shown', v: c.stats.impressions, o: 0.5 },
+              { id: 'shown', label: 'Times card shown', v: c.stats.impressions, o: 0.5 },
               { id: 'clicked', label: 'Clicked through', v: c.stats.clicks, o: 0.78 },
               { id: 'added', label: 'Added to routine', v: c.stats.adds, o: 1 },
             ].map((b) => (

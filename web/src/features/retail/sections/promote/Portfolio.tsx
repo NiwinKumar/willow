@@ -22,7 +22,7 @@ export function Portfolio({ p, openTo }: { p: P; openTo: (id: string) => string 
   }, [])
   const max = Math.max(1, p.impressions)
   const steps = [
-    { id: 'shown', label: 'Card shown', value: p.impressions, rate: null as string | null, tone: 'bg-[var(--pf-base)]' },
+    { id: 'shown', label: 'Times card shown', value: p.impressions, rate: null as string | null, tone: 'bg-[var(--pf-base)]' },
     { id: 'clicked', label: 'Clicked', value: p.clicks, rate: p.ctr === null ? null : `${pct(p.ctr)} of shown`, tone: 'bg-[var(--pf-base)]' },
     { id: 'added', label: 'Added to routine', value: p.adds, rate: p.addRate === null ? null : `${pct(p.addRate)} of clicks`, tone: 'bg-proof-leaf' },
   ]
@@ -49,7 +49,11 @@ export function Portfolio({ p, openTo }: { p: P; openTo: (id: string) => string 
             </li>
           ))}
         </ol>
-        <p className="m-0 text-proof-label text-ink-2">Shown counts each person once a day; adds are additions to a Willow routine from the card, not store sales.</p>
+        <p className="m-0 text-proof-label text-ink-2">
+          {/* two different counts, said together so they never read as a disagreement */}
+          {p.reach !== null ? `${int(p.reach)} ${p.reach === 1 ? 'person was' : 'people were'} reached; the card was shown ${int(p.impressions)} ${p.impressions === 1 ? 'time' : 'times'}, since a person can see it on several days (once a day counts). ` : 'Shown counts each person once a day. '}
+          Adds are additions to a Willow routine from the card, not store sales.
+        </p>
       </div>
       <div className="flex min-w-0 flex-col gap-3 px-5 py-4">
         <h2 className="m-0 text-proof-h text-ink">Lift against the holdout</h2>

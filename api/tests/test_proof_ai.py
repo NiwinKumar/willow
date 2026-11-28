@@ -44,8 +44,11 @@ def test_a_draft_must_cite_quote_and_word_its_sources_honestly():
     eff = by_id["efficacy"]["text"]
     n = eff.split("Measured in ")[1].split(" ")[0]
     pct = eff.split(": ")[1].split("%")[0]
+    base, base_n = eff.split("against ")[1].split("% of ")[0], eff.split("% of ")[1].split(" ")[0]
+    versus = f", against {base}% of {base_n} people with the same goals who do not use it."
     good = proof_ai.Draft(
-        text=f"{pct}% of {n} Willow users had a visible change by week 8.", sources=["efficacy"]
+        text=f"{pct}% of {n} Willow users had a visible change by week 8{versus}",
+        sources=["efficacy"],
     )
     assert proof_ai._draft_problem(good, by_id, 320) is None
 
@@ -54,6 +57,11 @@ def test_a_draft_must_cite_quote_and_word_its_sources_honestly():
             proof_ai.Draft(text=text, sources=list(sources)), by_id, limit
         )
 
+    # a rate is never quoted without the comparison group's rate and both group sizes
+    alone = f"{pct}% of {n} Willow users had a visible change by week 8."
+    assert "comparison" in problem(alone)
+    assert "comparison" in problem(f"{alone[:-1]}, against {base}% of people not using it.")
+    assert problem("Willow users saw a visible change that held to week 8.") is None
     assert "unknown" in problem("Loved by many.", sources=())
     assert "unknown" in problem("Loved by many.", sources=("made_up",))
     assert "number" in problem(f"{pct}% of 1000 Willow users had a visible change.")
@@ -68,9 +76,12 @@ def test_a_draft_must_cite_quote_and_word_its_sources_honestly():
     assert "measurement" in problem(plain, sources=("perception",))
     ok = f"{share}% of {people} Willow users said it is working for them."
     assert problem(ok, sources=("perception",)) is None
-    mixed = f"{share}% of {people} users said it works and {pct}% had a visible change."
+    mixed = (
+        f"{share}% of {people} users said it works and {pct}% of {n} had a visible change{versus}"
+    )
     assert "mixes" in problem(mixed, sources=("perception", "efficacy"))
-    apart = f"{pct}% of {n} Willow users had a visible change. {share}% of {people} said it works."
+    measured = f"{pct}% of {n} Willow users had a visible change{versus}"
+    apart = f"{measured} {share}% of {people} said it works."
     assert problem(apart, sources=("perception", "efficacy")) is None
 
 

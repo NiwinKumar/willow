@@ -139,6 +139,17 @@ export function money(p: { amount: number; currency: string } | null | undefined
   }
 }
 
+/** A price tier in words ("Mid"); null when the catalog has no checked price (most index products). */
+export function priceTierWord(t: ProductRow['price_tier'] | undefined): string | null {
+  return t ? `${t[0].toUpperCase()}${t.slice(1)}` : null
+}
+
+/** The facts under a product's name ("Serums · Mid price · 30 ml · US$17"): only the ones the catalog has. */
+export function productFacts(p: Pick<ProductRow, 'category_label' | 'price_tier'> & { size?: string | null; price?: { amount: number; currency: string } | null }): string {
+  const tier = priceTierWord(p.price_tier)
+  return [p.category_label, tier && `${tier} price`, p.size, money(p.price)].filter(Boolean).join(' · ')
+}
+
 /** Why a row has no rate, in the scoreboard's words: nobody used it, its goal isn't measured, or too few people. */
 export function noDataReason(r: Pick<ProductRow, 'rate' | 'reason'>): string | null {
   if (r.rate !== null) return null
@@ -278,3 +289,19 @@ export function productsLead(rows: ProductRow[], promo: ReadonlyMap<string, Pick
 
 /** Rows drawn per step on long tables: enough to scan, small enough to open without a stall. */
 export const PAGE_ROWS = 100
+
+/**
+ * What the last week of the curve adds, in points, for users and the comparison group. The outcome counts a change
+ * that is present at the last reading, so a change first seen at that reading (one reading, not yet seen twice)
+ * counts too: the curve steps up there for both groups, and the chart says how much of each figure that is.
+ * Null when the last two weeks aren't both shown.
+ */
+export function lastWeekStep(curve: { users: (number | null)[]; base: (number | null)[] }): { users: number; base: number | null } | null {
+  const step = (v: (number | null)[]) => {
+    const a = v.at(-1)
+    const b = v.at(-2)
+    return a === null || a === undefined || b === null || b === undefined ? null : Math.round((a - b) * 100)
+  }
+  const users = step(curve.users)
+  return users === null || users <= 0 ? null : { users, base: step(curve.base) }
+}

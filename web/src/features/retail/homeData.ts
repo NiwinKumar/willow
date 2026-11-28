@@ -8,7 +8,7 @@ import { useRetailData } from './context'
 import { composeCards, type ProductSignals } from './decisions'
 import { useOrg } from './org'
 import { useCompetitorNames, useDecisions, useRequests, useSavedClaims } from './orgData'
-import { useCampaigns } from './pipeline'
+import { useCampaigns, useCampaignsLoading } from './pipeline'
 import { useProductDetails, useProducts } from './productData'
 import { useRange } from './rangeStore'
 import { useAutopilot } from './sections/promote/useAutopilot'
@@ -33,6 +33,7 @@ export function useHomeCards(d: Insights) {
   const { state: prodState } = useProducts(filters)
   const rows = useMemo(() => (prodState.status === 'ready' ? prodState.d.products : []), [prodState])
   const campaigns = useCampaigns()
+  const campaignsLoading = useCampaignsLoading()
   const shelf = useQuery(['shelf-home', uid, filters.cohort, filters.range], (t) => retailerShelf(t, filters), { enabled: Boolean(uid) && mix === 'retailer', staleMs: 5 * 60_000 })
   const segments = useSegments()
   const claims = useSavedClaims()
@@ -70,5 +71,18 @@ export function useHomeCards(d: Insights) {
       nameOf: names.name,
     })
   }, [rows, mix, brand, campaigns, shelf.data, segments, d, claims.data, auto.data, brandOrgs, carry, signals, brandDetail, names])
-  return { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, segments }
+  // Every input the cards and counts are composed from has answered (or failed): until then Home shows
+  // skeletons, never a count that changes a second later ("Campaigns 0" then 2, "Needs you 7" then 8).
+  const waiting = (q: { data: unknown; status: string }, on = true) => on && q.data === undefined && (q.status === 'loading' || q.status === 'idle')
+  const settling =
+    prodState.status === 'loading' ||
+    campaignsLoading ||
+    segments.status === 'loading' ||
+    waiting(shelf, Boolean(uid) && mix === 'retailer') ||
+    waiting(claims, Boolean(org)) ||
+    waiting(decisions, Boolean(org)) ||
+    waiting(auto, Boolean(uid)) ||
+    details.some((x) => x.status === 'loading') ||
+    (mix === 'brand' && Boolean(brand) && brandDetail.status === 'loading')
+  return { mix, brand, rows, prodState, campaigns, shelf, decisions, requests, range, cards, segments, settling }
 }

@@ -7,7 +7,7 @@ import { useAuth } from '../../../lib/useAuth'
 import { useOrg } from '../org'
 import { setClaims, useSavedClaims, withTransition } from '../orgData'
 import { canAct, claimCohortText, proofApi, proofError, type SavedClaim } from '../proofApi'
-import { ANCHOR, CHANNELS, CLAIM_TIERS, channelLabel, sourceLabel } from '../proofAi'
+import { ANCHOR, CHANNELS, CLAIM_TIERS, channelLabel, claimGap, sourceLabel } from '../proofAi'
 import type { ClaimChannel, Claims, ClaimSource, Filters, ProductDetail } from '../types'
 import { exportBlock } from '../evidencePack'
 import { Badge, Bone, Button, copyText, EmptyState, int, Panel, Segmented, useTooltip } from '../ui'
@@ -20,7 +20,6 @@ import { Badge, Bone, Button, copyText, EmptyState, int, Panel, Segmented, useTo
  * button only; once run, changing the channel drafts again. Results are kept per channel for the visit.
  */
 
-const BLOCKED_TEXT = 'Claims need a Proven or Promising product: the evidence does not show a visible change above people with the same goals not using it yet.'
 const CHECKED_LINE = 'Every draft cites its evidence; numbers, overclaims (“clinically proven”, condition names) and self-reported wording are checked before you see it.'
 
 type Run = { status: 'loading'; channel: ClaimChannel } | { status: 'ready'; d: Claims } | { status: 'error'; title: string; message: string }
@@ -75,7 +74,7 @@ export function ClaimStudio({ x, filters, channel, onChannel, onNextSteps }: { x
     for (const [k, r] of Object.entries(runs)) if (r.status === 'loading' && !sent.current.has(k)) void send(k, r.channel)
   }, [runs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const blocked = !claimable ? BLOCKED_TEXT : run?.status === 'ready' ? run.d.blocked : null
+  const blocked = !claimable ? claimGap(p, x.eligibility.reasons) || 'Claims need a Proven product.' : run?.status === 'ready' ? run.d.blocked : null
   const caveat = (run?.status === 'ready' ? run.d.caveat : null) ?? x.evidence_caveat ?? null
   const loading = run?.status === 'loading'
 
@@ -83,7 +82,7 @@ export function ClaimStudio({ x, filters, channel, onChannel, onNextSteps }: { x
     <Panel
       title="Claim drafts"
       id={ANCHOR.claims}
-      description={blocked ? undefined : 'Copy for one channel, written by Gemini from the claim-ready statements above.'}
+      description={blocked ? undefined : 'Copy for one channel, written by Gemini from the claim-ready statements above. A rate is always given with its comparison group.'}
       footnote={
         blocked ? undefined : (
           <span className="flex flex-col gap-1">

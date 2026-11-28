@@ -9,10 +9,12 @@ import { BrandLogo } from './BrandLogo'
  * is none or it fails), the name truncated with the full name as a tooltip, and the brand under it. `tag` sits
  * after the brand (e.g. "Yours"); `to` makes the name a link (lists outside a clickable row). `logo` puts the
  * brand's logo (14 px) before the brand line; pass the name as shown (an anonymised "Brand A" gets its monogram).
+ * `inRow`: the cell sits in a row that already opens the same page on click and Enter. The name is still a real
+ * link (open in a new tab, copy the address), but it is not a second tab stop and its click is not handled twice.
  */
-export function ProductCell({ p, size = 32, tag, to, sub, logo = false }: { p: { product: string; brand: string; category: string; image_url?: string | null }; size?: number; tag?: ReactNode; to?: string; sub?: ReactNode; logo?: boolean }) {
+export function ProductCell({ p, size = 32, tag, to, sub, logo = false, inRow = false }: { p: { product: string; brand: string; category: string; image_url?: string | null }; size?: number; tag?: ReactNode; to?: string; sub?: ReactNode; logo?: boolean; inRow?: boolean }) {
   const name = to ? (
-    <Link to={to} className="block min-w-0 truncate font-medium text-ink no-underline hover:underline">
+    <Link to={to} tabIndex={inRow ? -1 : undefined} onClick={inRow ? (e) => e.stopPropagation() : undefined} className="block min-w-0 truncate font-medium text-ink no-underline hover:underline">
       {p.product}
     </Link>
   ) : (

@@ -1,10 +1,12 @@
 import { Check } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api, type Campaign } from '../../lib/api'
 import { useQuery } from '../../lib/query'
 import { useAuth } from '../../lib/useAuth'
+import { useOrgMaybe } from './org'
+import { orgCampaigns } from './promote'
 import type { ProductRow } from './types'
 import { int, pts } from './ui'
 
@@ -18,12 +20,17 @@ import { int, pts } from './ui'
 export type StepState = 'done' | 'partial' | 'todo'
 export type Step = { id: string; title: string; state: StepState; detail: ReactNode; to?: string; cta?: string }
 
-/** This viewer's campaigns (shares the Campaigns page's cache); empty when there is no session yet. */
+/**
+ * This organisation's campaigns (shares the Campaigns page's cache; promote.ts orgCampaigns is the one scope every
+ * surface uses); empty when there is no session yet.
+ */
 export function useCampaigns(): Campaign[] {
   const { user } = useAuth()
   const uid = user?.uid ?? null
+  const orgId = useOrgMaybe()?.org?.id ?? null
   const q = useQuery<{ list: Campaign[]; at: number | null }>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
-  return q.data?.list ?? []
+  const list = q.data?.list
+  return useMemo(() => orgCampaigns(list ?? [], orgId), [list, orgId])
 }
 
 /** The campaign list hasn't arrived yet (same cached query as useCampaigns): panels show a skeleton, never
@@ -77,8 +84,8 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
     },
     saved
       ? (() => {
-          // Claims rest on a visible change above non-users: only Proven and Promising products can have one.
-          const claimable = p.tier === 'proven' || p.tier === 'promising'
+          // Claims rest on a visible change above non-users that is clear of chance: only Proven products have one.
+          const claimable = p.tier === 'proven'
           const ready = claimable ? statements : 0
           return {
           id: 'claims',
@@ -90,7 +97,7 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
               ? `${ready} ${ready === 1 ? 'statement' : 'statements'} ready; no claim saved`
               : claimable
                 ? 'After it is measured'
-                : 'Once it shows a change above people not using it',
+                : 'Opens once Proven',
           ...(!saved.total && ready && claimsTo ? { to: claimsTo, cta: 'Draft a claim' } : {}),
         }
         })()
@@ -98,14 +105,15 @@ export function pipelineSteps({ p, weeksN, statements, eligible, campaign, promo
           id: 'claims',
           title: 'Claims ready',
           state: statements ? 'done' : 'todo',
-          detail: statements ? `${statements} ${statements === 1 ? 'statement' : 'statements'} with n and method` : 'After it is measured',
+          detail: statements ? `${statements} ${statements === 1 ? 'statement' : 'statements'} with n and method` : 'Opens once Proven',
         },
     {
       id: 'promoted',
       title: 'Promoted',
       // An ended campaign was a promotion (its results stay); the product can be promoted again.
       state: campaign?.status === 'active' || ended ? 'done' : campaign ? 'partial' : 'todo',
-      detail: campaign ? `${campaign.status === 'active' ? `Live · ${reachText}` : ended ? `Campaign ended · ${reachText}` : 'Campaign paused'}${campaign.rule ? ` · Auto-promoted by rule “${campaign.rule.name}”` : ''}` : eligible ? 'Ready to promote' : 'Opens once Proven',
+      // A campaign is judged on all-time data: under a narrower filter the tier here can differ, so say which it used.
+      detail: campaign ? `${campaign.status === 'active' ? `Live · ${reachText}` : ended ? `Campaign ended · ${reachText}` : 'Campaign paused'}${p.tier !== 'proven' ? ' · Proven on all-time data when it started' : ''}${campaign.rule ? ` · Auto-promoted by rule “${campaign.rule.name}”` : ''}` : eligible ? 'Ready to promote' : 'Opens once Proven',
       ...(eligible && (!campaign || ended) ? { to: promoteTo, cta: ended ? 'Promote again' : 'Promote' } : campaign?.rule ? { to: `${promoteTo.split('?')[0]}#autocampaign`, cta: 'See the rule' } : {}),
     },
     {
