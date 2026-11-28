@@ -83,7 +83,8 @@ function RunTile({ r, title, note }: { r: Run; title: string; note: string }) {
 /**
  * "200 at once": the load test (api/scripts/loadtest), measured on one laptop with and without the line in front of
  * the engine (api/app/engine_gate.py), and what production's own engine time gives at a few instance counts,
- * labelled as a projection. Left out when evidence.json has no `scale` key.
+ * labelled as a projection. The line is env-gated (ENGINE_SLOTS unset: off) and off in production, which the copy says.
+ * Left out when evidence.json has no `scale` key.
  */
 export function ScaleSection() {
   if (!scale) return null
@@ -101,7 +102,7 @@ export function ScaleSection() {
         <RunTile
           r={line}
           title="With the line"
-          note={`Extra check-ins wait their turn instead of failing${line.max_place_in_line ? ` (places in line up to ${line.max_place_in_line})` : ''}; a wait longer than one request is asked again by the app, keeping its place.`}
+          note={`Built and load-tested locally; off in production until switched on. Extra check-ins wait their turn instead of failing${line.max_place_in_line ? ` (places in line up to ${line.max_place_in_line})` : ''}; a wait longer than one request is asked again by the app, keeping its place.`}
         />
       </div>
       <p className="m-0 text-[13px] leading-[1.5] text-ink-2">
@@ -111,7 +112,7 @@ export function ScaleSection() {
 
       <h3 className="m-0 pt-1 text-[17px] font-normal">In production, projected</h3>
       <p className="m-0 max-w-[640px] text-[13.5px] leading-[1.5] text-ink-2">
-        Not measured on Cloud Run: production’s median of {p.engine_s_median} s per face check-in ({p.runs_seen} runs in the logs) put through the same line. Each instance measures one check-in at a time.
+        Not measured on Cloud Run, where the line is off today: production’s median of {p.engine_s_median} s per face check-in ({p.runs_seen} runs in the logs) put through the same line, as if it were switched on. Each instance measures one check-in at a time.
       </p>
       <div>
         <table className="w-full border-collapse text-left text-[13.5px] tnum">

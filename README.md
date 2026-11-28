@@ -163,7 +163,7 @@ Model `gemini-3.8-flash` on Gemini Enterprise Agent Platform (formerly Vertex AI
 | Read a note about past reactions | You, *Product checks* | Gemini only picks from names the code found in the note; flags are still computed by the rule file |
 | AutoCampaign agent, Shelf agent | Proof | Gemini reads the evidence and acts through tools; code refuses any act outside the rule, the evidence or the limits |
 
-**Voice and languages.** Wisp can be asked aloud and answers in 11 languages. Gemini transcribes the question, the answer is written and checked in English, then translated; a translation is used only if its numbers and references match the English and it brings in no banned word for that language (`api/app/translate.py`). Only that checked text is spoken (`api/app/voice.py`). Questions can be screened by Model Armor before Gemini sees them (`api/app/armor.py`, ready, off until a template is configured).
+**Voice and languages.** Wisp answers in the language a question is written in (11 languages, detected in code): the answer is written and checked in English, then translated, and a translation is used only if its numbers and references match the English and it brings in no banned word for that language (`api/app/translate.py`). Voice mode is a live Gemini conversation (`api/app/live.py`, Gemini Live in us-central1): every reading, product and price comes from a tool, and what Wisp says is checked as it speaks; a number not in its tool results stops the audio and Wisp corrects itself. Model Armor screening (`api/app/armor.py`) is built and tested, and switched off in the live app.
 
 Daily caps per person and across everyone keep cost bounded (`api/app/limits.py`).
 

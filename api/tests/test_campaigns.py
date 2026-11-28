@@ -391,6 +391,22 @@ def test_sponsored_is_off_until_the_person_turns_it_on(client, fake):
     assert shopper.get("/v1/sponsored").json()["item"] is None
 
 
+def test_an_old_stored_false_is_not_an_opt_in(client, fake):
+    """Profile saves before the opt-in wrote hide_sponsored false for everyone: without the
+    person's own choice (sponsored_opt_in_at) that reads as off, in /v1/me and for the card."""
+    _create(client)
+    shopper = _shopper(hide_sponsored=None)
+    profile = fake.store.user_get("shopper")["profile"]
+    fake.store.user_merge("shopper", {"profile": {**profile, "hide_sponsored": False}})
+    assert shopper.get("/v1/me").json()["profile"]["hide_sponsored"] is True
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+    shopper.put("/v1/me/profile", json={"skin_type": "oily"})  # other edits keep it off
+    assert shopper.get("/v1/sponsored").json()["item"] is None
+    shopper.put("/v1/me/profile", json={"hide_sponsored": False})  # the You switch
+    assert fake.store.user_get("shopper")["profile"]["sponsored_opt_in_at"]
+    assert shopper.get("/v1/sponsored").json()["item"]
+
+
 def test_rotation_is_deterministic_per_person_and_day(client, fake):
     owners = [_as(f"brand{i}") for i in range(3)]
     for c, pid in zip(owners, (PROVEN, PROVEN_2, PROVEN_3), strict=True):

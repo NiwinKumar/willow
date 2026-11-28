@@ -120,7 +120,7 @@
     ]
   },
   "evals": {
-    "generated_at": "2026-11-28T13:49:27+00:00",
+    "generated_at": "2026-11-28T19:33:27+00:00",
     "source": "api/evals/results/2026-11-27.json",
     "run_started_at": "2026-11-27T10:55:29+00:00",
     "run_finished_at": "2026-11-28T13:19:25+00:00",
@@ -463,7 +463,7 @@
     }
   },
   "armor": {
-    "configured": true,
+    "configured": false,
     "source": "infra/api-env.yaml"
   },
   "a11y": {

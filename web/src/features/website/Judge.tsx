@@ -16,6 +16,7 @@ import { useJudge } from '../../lib/useJudge'
 import { useSamples } from '../../lib/useSamples'
 import { evidence, money } from '../evidence/data'
 import { backButton, SoftBackdrop } from './Decor'
+import { DATA_LOCATION } from './dataLocation'
 import { BRAND_JOURNEY_PATH, JOURNEY_PATH, PROOF_PATH } from './destinations'
 import { journeyLine, journeyUnavailableLine, useJourney } from './hooks'
 import { NoiseDemo } from './NoiseDemo'
@@ -60,14 +61,14 @@ function faqs(): Faq[] {
   const e = evidence.evals?.headline
   return [
     { q: 'Is the data real?', a: 'The measurements are: every number is computed from a photo by the engine. Mei’s photos are generated and Proof’s cohort is simulated, and both are labelled wherever they appear.', to: '/evidence#simulated', link: 'What is simulated' },
-    { q: 'How was the measurement validated?', a: 'Against itself. Each reading is judged against the spread of your own baseline photos. It is not clinically validated, and a test on real skin across skin tones is planned, not done.', to: '/evidence#bands', link: 'The noise band' },
+    { q: 'How was the measurement validated?', a: 'Against itself. Each reading is judged against the spread of your own baseline photos. It is not clinically validated. An instrument test on real photos across skin tones is done; repeat check-ins on real people over weeks are planned.', to: '/evidence#bands', link: 'The noise band' },
     {
       q: 'What does it cost to run?',
       a: checkIn && answer ? `About ${checkIn} for a face check-in and ${answer} for a Wisp answer, from medians in the production logs at list prices.` : 'Cost per check-in and per answer is measured from the production logs.',
       to: '/evidence#cost',
       link: 'Cost per use',
     },
-    { q: 'What happens to my photos?', a: `Stored and measured in Google Cloud’s us-central1 (Iowa, USA), wherever you live; only small spot close-ups, scanned photos, voice and text go to Gemini’s global endpoint. Originals are deleted after 30 days, Delete my data removes everything at once, and results reach a retailer only if you opt in, in groups of 10 or more.`, to: '/terms#where', link: 'Where it is kept' },
+    { q: 'What happens to my photos?', a: `${DATA_LOCATION.where} ${DATA_LOCATION.leaves} Originals are deleted after 30 days. ${DATA_LOCATION.delete} Results reach a retailer only if you opt in, in groups of 10 or more.`, to: '/terms#where', link: 'Where it is kept' },
     { q: 'Is this medical?', a: 'No. It tracks cosmetic appearance only. No condition is named, nothing is graded, and suggestions are over-the-counter cosmetics.', to: '/terms#safe', link: 'What Willow never does' },
     { q: 'Who pays?', a: 'Shoppers use Willow free. Retailers pay for Proof, and a brand can pay that retailer to promote a product only once its measured evidence passes the bar.', to: PROOF_PATH, link: 'Open Proof' },
     { q: 'Why weekly photos?', a: 'Skin changes over weeks, and a single photo can just be a good-lighting day. The same day and time each week keeps photos comparable.', to: JOURNEY_PATH, link: 'Mei’s eight weeks' },
@@ -379,7 +380,7 @@ export default function Judge() {
               className="glass flex min-h-[76px] w-full flex-col items-start justify-center gap-1 rounded-[28px] px-5 py-3.5 text-left transition-[scale] duration-200 ease-standard active:scale-[.985] disabled:opacity-60"
             >
               <span className="text-[17px]">Talk to Wisp in your language <span aria-hidden>→</span></span>
-              <span className="text-[13px] leading-[1.4] text-ink-2">{ready ? `Ask aloud or type, in any of ${LANGUAGES.length} languages. Only the checked answer is spoken.` : needsGuest}</span>
+              <span className="text-[13px] leading-[1.4] text-ink-2">{ready ? `Ask aloud or type, in any of ${LANGUAGES.length} languages. Spoken answers are checked as they play; a slip stops the audio and Wisp corrects it.` : needsGuest}</span>
             </button>
           </li>
           <li className="flex">

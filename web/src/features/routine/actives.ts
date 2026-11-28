@@ -86,4 +86,4 @@ export function verdictDue(e: Pick<RoutineEntry, 'category' | 'key_actives' | 's
 }
 
 /** A routine entry carries `sample: true` when the guest starter routine made it (api demo.py). */
-export const isSample = (e: RoutineEntry) => Boolean((e as RoutineEntry & { sample?: boolean }).sample)
+export { isSample } from './sampleRoutine'

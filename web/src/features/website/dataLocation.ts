@@ -1,12 +1,11 @@
 /**
  * Where a person's data is kept and processed, in one place so the landing footer, You's privacy receipt, the
- * Terms and the judge FAQ say the same thing. Every clause is true of the running system:
+ * Terms and the judge FAQ (Judge.tsx) say the same thing. Every clause is true of the running system:
  * - stored and measured in us-central1: the captures bucket, Firestore and BigQuery are created there and both Cloud
  *   Run services run there (infra/setup.sh; api/app/retailer.py queries BigQuery in us-central1);
  * - what leaves it: Gemini runs on Vertex AI's global endpoint (api/app/settings.py vertex_location = "global") and
- *   receives spot close-ups (api/app/labeller.py), label and attached photos (label_scan.py, advisor.py), recorded
- *   and text; live voice (live.py) runs in us-central1; whole face photos are never sent
- *   to it by Willow;
+ *   receives spot close-ups (api/app/labeller.py), label and attached photos (label_scan.py, advisor.py) and text;
+ *   live voice (api/app/live.py LOCATION) runs in us-central1; whole face photos are never sent to it by Willow;
  * - deletion: DELETE /v1/me (api/app/routes/me_routes.py) removes the records first, then the photos, results and
  *   pack photos; opted-in rows leave BigQuery at the next full export (api/scripts/export_bq.py replaces every table).
  */

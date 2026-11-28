@@ -7,13 +7,15 @@ import { decimalsFor, fmtValue, METRIC_META, unitOf } from '../../lib/metrics.ts
  *
  * Source (stored results of one engine run, never Gemini): session s_20260823_810e21e6, the demo account's week-one
  * face baseline (uploads/demo_willow/…/frame_1-5.jpg, generated photos of a simulated person), run through
- * engine/app/pipeline_face.analyze_face (engine 0.4.2, Nov 28 2026) with the per-photo values read from the frames it
- * averages; `spread` and `sd` are that same run's session mdc95 and within-session SD (the stored session, engine 0.4.0,
- * agrees to the third decimal on redness and blemishes). `band` is her normal range as engine 0.4.3 reports it (run on
- * the same five files, Nov 29 2026): the spread, or for colour and light readings the between-room floor when that is
- * wider (engine/app/config.py ROOM_LIGHT_FLOOR: redness 3.63, shine 6.69; glow's own spread is already wider). The engine stores only the session mean, so these per-photo
- * values are kept here; re-run the same five files to check them. Skin tone and under-eye are left out: a tone is
- * never framed as a change to chase.
+ * engine/app/pipeline_face.analyze_face with the per-photo values read from the frames it averages. The per-photo
+ * values, `sd` and `spread` (that run's within-session SD and session mdc95) were measured with engine 0.4.2 (Nov 28
+ * 2026; the stored session, engine 0.4.0, agrees to the third decimal on redness and blemishes). Engine 0.4.3 moves no
+ * value, only colour and light bands (engine/app/__init__.py: "values do not move"), so they are also what 0.4.3 gives. `band` is her normal
+ * range as engine 0.4.3 reports it (run on the same five files, Nov 29 2026): the spread, or for colour and light
+ * readings the between-room floor when that is wider (engine/app/config.py ROOM_LIGHT_FLOOR: redness 3.63, shine 6.69; glow's own spread is already
+ * wider). NOISE_SOURCE.engine is therefore 0.4.3. The engine stores only the session mean, so these per-photo values are
+ * kept here; re-run the same five files to check them. Skin tone and under-eye are left out: a tone is never framed as
+ * a change to chase.
  */
 export const NOISE_SOURCE = { session: 's_20260823_810e21e6', engine: '0.4.3', photos: 5 } as const
 

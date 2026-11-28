@@ -16,9 +16,15 @@ import { ScaleSection } from './ScaleSection'
 
 const BACKDROP = 'radial-gradient(42% 42% at 88% 12%, rgba(156,211,255,.5), transparent 70%), radial-gradient(42% 44% at 8% 82%, rgba(216,184,255,.42), transparent 70%), var(--bg-canvas)'
 
-/** What is not shown yet, said plainly (docs/METRICS.md "Validation" lists these as planned work). */
-const RETEST_PLANNED = 'Test and retest on real skin, across skin tones: planned, not done.'
-const NOT_YET = ['A noise band per skin-tone group: planned, not done.', 'Clinical validation: none. Willow checks repeatability against your own photos, nothing more.']
+/** What is tested and what is not yet, said plainly (docs/METRICS.md "Validation" lists the planned work). */
+const INSTRUMENT_DONE = 'Instrument test on real photos across skin tones: done (see “Same photo, retaken” below).'
+const NOT_YET = [
+  'Repeat check-ins on real people over weeks: planned, not done.',
+  'A noise band per skin-tone group: planned, not done.',
+  'Clinical validation: none. Willow checks repeatability against your own photos, nothing more.',
+]
+/** The instrument test's section (InstrumentRetest) is shown only when evidence.json has its key. */
+const instrumentTested = Boolean((evidence as { instrument_retest?: unknown }).instrument_retest)
 const readingName = (id: string) => METRIC_META[id as MetricId]?.label ?? id.replace(/_/g, ' ')
 
 const cell = (c?: A11yCell) => (c ? `${c.lighthouse ?? 'n/a'}` : 'n/a')
@@ -159,9 +165,9 @@ export default function Evidence() {
             </div>
           ) : null}
           <div className={`flex flex-col gap-1.5 ${tile}`}>
-            <h3 className="m-0 text-[15px] font-normal">Not shown yet</h3>
+            <h3 className="m-0 text-[15px] font-normal">{instrumentTested ? 'Done, and not yet' : 'Not shown yet'}</h3>
             <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13.5px] leading-[1.45] text-ink-2">
-              {(retest ? NOT_YET : [RETEST_PLANNED, ...NOT_YET]).map((n) => (
+              {(instrumentTested ? [INSTRUMENT_DONE, ...NOT_YET] : NOT_YET).map((n) => (
                 <li key={n}>{n}</li>
               ))}
             </ul>

@@ -134,6 +134,7 @@ def test_still_in_line_answers_409_and_keeps_the_place_then_measures(client, fak
     assert detail["queued"] is True and detail["position"] == 1
     doc = fake.store.session_get("u_test", sid)
     assert doc["status"] == "uploading"  # put back as it was, never "failed"
+    assert doc.get("queue") is None  # the shown place left with the request
     place = doc["queue_since"]
     day = datetime.now(UTC).date().isoformat()
     assert fake.store.usage_get("u_test", day).get("analyze", 0) == 0  # not a daily analysis
@@ -162,3 +163,22 @@ def test_the_session_shows_its_place_while_queued(client, fake):
     s = client.get(f"/v1/sessions/{sid}").json()["session"]
     assert s["stage"] == "queued"
     assert s["queue"] == {"position": 3, "eta_s": 90}
+
+
+def test_startup_runs_the_old_hooks_in_order(monkeypatch):
+    """The lifespan (replacing app.on_event) runs the dev seed, API_THREADS and the warm-up."""
+    import anyio.to_thread
+    from fastapi.testclient import TestClient
+
+    from app import main
+
+    ran: list[str] = []
+    monkeypatch.setattr(main, "_dev_seed", lambda: ran.append("seed"))
+    monkeypatch.setattr(main, "_warm", lambda: ran.append("warm"))
+    monkeypatch.setenv("API_THREADS", "100")
+    with TestClient(main.app) as c:
+        tokens = c.portal.call(
+            lambda: anyio.to_thread.current_default_thread_limiter().total_tokens
+        )
+    assert ran == ["seed", "warm"]
+    assert tokens == 100

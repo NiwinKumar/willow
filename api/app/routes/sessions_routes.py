@@ -408,11 +408,15 @@ def analyze_session(
         # Still in line when this request's wait ran out (app/engine_gate.py): put the session
         # back as it was and say so. The web re-reads and asks again on a 409 conflict, keeping
         # its place (queue_since). Not a failure: no daily analysis spent, nothing marked failed.
+        # The shown place is cleared: out of this request's line, it is no longer true.
         limits.refund(store, uid, "analyze")
         store.session_update(
             uid,
             session_id,
-            before or {"status": doc["status"], "error": doc.get("error"), "stage": None},
+            {
+                **(before or {"status": doc["status"], "error": doc.get("error"), "stage": None}),
+                "queue": None,
+            },
         )
         raise HTTPException(
             409,

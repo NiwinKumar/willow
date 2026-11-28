@@ -245,6 +245,7 @@ PROFILE_FIELDS = (
     "skin_type",
     "checkin",
     "hide_sponsored",
+    "sponsored_opt_in_at",
     "track",
     "safety",
 )
@@ -338,8 +339,8 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
         "display_name": p.get("display_name"),
         "skin_type": p.get("skin_type"),
         "checkin": p.get("checkin"),
-        # opt-in: hidden unless the person turned it on (an explicit false)
-        "hide_sponsored": p.get("hide_sponsored") is not False,
+        # opt-in: hidden unless the person turned it on (sponsored_opt_in)
+        "hide_sponsored": not campaigns.sponsored_opt_in(p),
         "track": list(p["track"]) if p.get("track") else None,
         "safety": SafetyProfile.model_validate(p["safety"]).model_dump()
         if p.get("safety")
@@ -358,6 +359,12 @@ def put_profile(
     """CONTRACT section 4 users/{uid}.profile. Partial: only the fields sent change."""
     saved = (store.user_get(user.uid) or {}).get("profile") or {}
     changes = body.model_dump(include=body.model_fields_set)
+    if "hide_sponsored" in changes:
+        # the person's own choice (the You switch, the card's Hide or its Undo): only an explicit
+        # false sent now opts in; true or null opts out
+        on = changes["hide_sponsored"] is False
+        was = saved.get("sponsored_opt_in_at") if campaigns.sponsored_opt_in(saved) else None
+        changes["sponsored_opt_in_at"] = (was or datetime.now(UTC)) if on else None
     profile = {k: saved.get(k) for k in PROFILE_FIELDS} | changes
     profile["goals"] = profile.get("goals") or []
     profile["updated_at"] = datetime.now(UTC)

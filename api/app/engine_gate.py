@@ -12,10 +12,11 @@ ask again, so asking again never loses a place to someone who came later.
 
 One request waits at most ENGINE_QUEUE_WAIT_S: the web gives analyze 150 s, and the engine and
 Gemini still need about 90 s of it. Past that the route puts the session back as it was and
-answers 409 "in line"; the web already re-reads the session and asks again on a 409 conflict, so
-it rejoins at its old place without a web change. An engine answering 429/503 (every instance
-taken, for example by another api instance's line) is asked again after a short pause, within the
-same wait.
+answers 409 "in line" (with the place, and the session's shown place cleared); the web re-reads
+the session and asks again on a 409 conflict, so it rejoins at its old place, and keeps showing
+"In line" (never "you can leave": a person who leaves while in line is not measured). An engine
+answering 429/503 (every instance taken, for example by another api instance's line) is asked
+again after a short pause, within the same wait.
 
 ENGINE_SLOTS unset or 0: off, exactly the old behaviour.
 """

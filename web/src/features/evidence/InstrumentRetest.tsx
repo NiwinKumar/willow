@@ -132,14 +132,19 @@ function GroupTable({ caption, rows, metrics }: { caption: string; rows: { key: 
 
 const names = (ids: string[]) => ids.map(readingName).join(', ')
 
+/** The room-light retake range: the largest exposure change in stops, the largest red/blue change as a share. */
+const stops = (ev: [number, number]) => Math.max(...ev.map(Math.abs))
+const share = (g: [number, number]) => `${Math.round(Math.max(...g.map(Math.abs)) * 100)}%`
+
 /** Each floored reading's unit, as the app writes it. */
 const UNIT: Record<string, string> = { tone_ita: '°', redness: ' a*', glow: ' (index)', shine: '% of the T-zone', tone_evenness: ' (index)', dark_circles: ' L*' }
 const pct = (n: number, of: number) => (of ? `${Math.round((100 * n) / of)}%` : '–')
 const sum = (r: Record<string, Rate>, k: 'pairs' | 'before' | 'after') => Object.values(r).reduce((s, x) => s + x[k], 0)
 
 /** "Before and after the fix": the floors (engine config.ROOM_LIGHT_FLOOR), checked on held-out people, with their cost. */
-function FloorFix({ f, order }: { f: FloorCheck; order: string[] }) {
+function FloorFix({ f, order, room }: { f: FloorCheck; order: string[]; room: InstrumentRetestData['retake_ranges']['room'] }) {
   const floored = order.filter((id) => f.floors[id] !== undefined)
+  const toneFloor = f.floors.tone_ita
   return (
     <div className="flex flex-col gap-3 rounded-[22px] bg-white/80 px-3.5 py-3.5">
       <h3 className="m-0 text-[17px] font-normal">The fix, checked on people it never saw</h3>
@@ -202,11 +207,13 @@ function FloorFix({ f, order }: { f: FloorCheck; order: string[] }) {
       <p className="m-0 text-[13px] leading-[1.5] text-ink-2">
         What it gives up: a real change smaller than the floor is no longer called, however steady someone’s photos are. {names(floored)} now need a bigger move to count, which is why the check-in asks for the same light every time. Blemishes, dark spots and lines keep their own band.
       </p>
+      <p className="m-0 text-[13px] leading-[1.5] text-ink-2">
+        The floor was learned and checked on the same simulated room-light changes (exposure up to {stops(room.exposure_ev)} of a stop, colour up to {share(room.wb_gain)}), so “people it never saw” holds for people, not for new kinds of light.
+        {toneFloor !== undefined ? ` Skin tone’s floor is about ${Math.round(toneFloor)}° of ITA, so a change in tone is in effect never called; in Willow a tone is a description, not a goal.` : ''}
+      </p>
     </div>
   )
 }
-const stops = (ev: [number, number]) => Math.max(...ev.map(Math.abs))
-const share = (g: [number, number]) => `${Math.round(Math.max(...g.map(Math.abs)) * 100)}%`
 
 /**
  * "Same photo, retaken": an instrument test, not a people test. Real face photos (MST-E, every Monk tone) are retaken
@@ -222,6 +229,7 @@ export function InstrumentRetest() {
     const g = data.by_band[b]
     return { key: b, label, sub: g.mst ? `Monk ${g.mst[0] === g.mst[1] ? g.mst[0] : `${g.mst[0]} to ${g.mst[1]}`}` : undefined, g }
   })
+  const veryLight = data.by_band.very_light
   const monk = MST.filter(([k]) => data.by_mst?.[k]).map(([k, label]) => ({ key: k, label, g: data.by_mst[k] }))
   // which readings broke their band often after a change of room, and which held near the 5% it is built for
   const often = metrics.filter((id) => (data.metrics[id].false_change_pct ?? 0) > 15)
@@ -272,7 +280,7 @@ export function InstrumentRetest() {
         </p>
       ) : null}
 
-      {data.floor_check ? <FloorFix f={data.floor_check} order={order(data.metrics)} /> : null}
+      {data.floor_check ? <FloorFix f={data.floor_check} order={order(data.metrics)} room={room} /> : null}
 
       <div className="overflow-x-auto rounded-[18px] bg-white/70" tabIndex={0} role="group" aria-label="False alarms by reading">
         <table className="w-full min-w-[520px] border-collapse text-left text-[13.5px]">
@@ -315,7 +323,9 @@ export function InstrumentRetest() {
 
       {monk.length ? <GroupTable caption="Before the fix, by Monk skin tone (the dataset’s expert label), share called a change" rows={monk} metrics={metrics} /> : null}
       <GroupTable caption="Before the fix, by the engine’s own ITA group of each baseline photo, share called a change" rows={bands} metrics={metrics} />
-      <p className="m-0 text-[13px] leading-[1.5] text-ink-2">The two groupings differ: ITA is read from the photo, so one person’s photos in different light land in different ITA groups. The Monk label belongs to the person.</p>
+      <p className="m-0 text-[13px] leading-[1.5] text-ink-2">
+        The two groupings differ: ITA is read from each photo and moves with its light, so one person’s photos in different light land in different ITA groups{veryLight?.mst ? `, and the “Very light” row holds people from Monk ${veryLight.mst[0]} to ${veryLight.mst[1]}` : ''}. The Monk label belongs to the person, whatever the light did, which is why it is the fairness view.
+      </p>
 
       <div className={`flex flex-col gap-1.5 ${tile}`}>
         <h3 className="m-0 text-[15px] font-normal">How it was run, and what it does not show</h3>

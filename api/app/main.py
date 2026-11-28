@@ -1,6 +1,7 @@
 """Willow product API (Cloud Run service `willow-api`). Contract: docs/CONTRACT.md section 3."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -30,14 +31,12 @@ from app.similar import router as similar_router
 
 settings = get_settings()
 
-app = FastAPI(title="Willow api", version=__version__)
 log = logging.getLogger("willow.api")
 if not logging.getLogger().handlers:
     # Uvicorn configures only its own loggers; without this the app's info lines are dropped.
     logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
 
 
-@app.on_event("startup")
 def _dev_seed() -> None:
     """DEV_STORE=memory (with AUTH_MODE=dev): the sample campaign portfolio with history, in
     memory only (needs the BigQuery rows; skipped without them)."""
@@ -51,17 +50,26 @@ def _dev_seed() -> None:
             log.warning("dev sample campaigns skipped: %s", exc)
 
 
-# API_THREADS: room for every check-in waiting on the engine plus the polls (app/engine_gate.py)
-app.on_event("startup")(engine_gate.threads_from_env)
-
-
-@app.on_event("startup")
 def _warm() -> None:
     """Production: load the rows, status and kept Gemini answers before serving (app/warm.py)."""
     if settings.auth_mode != "dev":
         from app import warm
 
         warm.run()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Startup, in the order (and on the event loop, blocking) as the old startup hooks ran.
+    Nothing ran at shutdown."""
+    _dev_seed()
+    # API_THREADS: room for every check-in waiting on the engine plus the polls (engine_gate.py)
+    await engine_gate.threads_from_env()
+    _warm()
+    yield
+
+
+app = FastAPI(title="Willow api", version=__version__, lifespan=lifespan)
 
 
 # Registered before CORS, so it sits inside it: an unexpected error still reaches the browser as

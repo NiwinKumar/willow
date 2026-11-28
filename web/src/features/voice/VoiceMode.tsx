@@ -187,7 +187,7 @@ export function VoiceMode({ initial, make, onClosed }: { initial: VoiceSession; 
             </div>
           </div>
         )}
-        <p className="pt-4 text-center text-[11.5px] leading-snug text-ink-2">Numbers come only from your readings. Cosmetic guidance, not medical advice.</p>
+        <p className="pt-4 text-center text-[11.5px] leading-snug text-ink-2">Numbers come only from your Willow data and the catalog. Cosmetic guidance, not medical advice.</p>
       </div>
     </div>
   )

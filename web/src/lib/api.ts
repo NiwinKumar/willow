@@ -24,8 +24,10 @@ export type ObjectStatus = {
 }
 /** POST /v1/sessions/{id}/frames: targets for the new frames only; `dropped`: left-out frames removed (1-based). */
 export type AddFramesResponse = { session_id: string; n_frames: number; upload_urls: UploadTarget[]; expires_in_seconds: number; dropped: number[] }
-/** Live analysis stage while a session is processing (api analysis.run). */
-export type AnalysisStage = 'received' | 'engine' | 'explaining'
+/** Live analysis stage while a session is processing (api analysis.run); "queued": in line for the engine. */
+export type AnalysisStage = 'received' | 'queued' | 'engine' | 'explaining'
+/** A place in the api's line for the engine (api engine_gate.py): 1 = next, eta_s = seconds until it starts. */
+export type QueuePlace = { position: number; eta_s: number }
 
 /** SessionView as the api returns it: {session, result, labels, explanation}. */
 export type SessionView = {
@@ -59,6 +61,8 @@ export type SessionView = {
     label_details?: Record<string, LabelDetail>
     /** Live analysis stage while processing, else null. */
     stage?: AnalysisStage | null
+    /** While stage is "queued": the place in line, else null. */
+    queue?: QueuePlace | null
     /** Detail views only: signed GET per uploaded frame (null for DNG or a missing photo). */
     frame_urls?: (string | null)[]
     /** Detail views only: signed tight crop per candidate id (crops that exist). */
@@ -292,7 +296,7 @@ export type AdvisorReply = {
   products: Product[]
   follow_up_suggestions: string[]
   retrieval: string[]
-  checks?: { model: string; tool_calls: number; numbers_checked: number; products_from_tools: number; photos_read?: number }
+  checks?: { model?: string; tool_calls?: number; numbers_checked?: number; products_from_tools?: number; photos_read?: number; /** "model_armor": the question was screened out before any model call (api armor.py). */ screened?: string }
   /** A photo of skin or a face was attached: never answered (chat photos are for products only). */
   photos_refused?: boolean
   /** The one currency this answer's prices are in (api advisor.py); each product carries `shown_price` in it. */

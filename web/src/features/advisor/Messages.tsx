@@ -24,7 +24,7 @@ import { mentionsReaction } from '../../lib/reactions'
 import { useGrow } from './motion'
 
 /** "gemini-3.8-flash" -> "Gemini 3.8 Flash" for the info popover. */
-const modelName = (id: string) => id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+const modelName = (id?: string) => (id ?? 'the model').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
 /** Hover time on a message, e.g. "14:05 · 13 Oct". */
 function Stamp({ at, align }: { at: string; align: 'left' | 'right' }) {
@@ -66,11 +66,14 @@ function HowMade({ r }: { r: AdvisorReply }) {
   const c = r.checks
   const lines = [
     ...r.retrieval,
-    ...(c
+    ...(c?.screened
+      ? // Model Armor screened the question out before any model call (api armor.py): a fixed reply
+        ['Screened by Model Armor before any model saw it', 'A fixed reply, written by Willow, not by the model']
+      : c
       ? [
           `Written by ${modelName(c.model)}`,
-          c.numbers_checked > 0 ? `${plural(c.numbers_checked, 'number', 'numbers')} checked against your results and the catalog` : 'No numbers quoted',
-          c.products_from_tools > 0 ? `${plural(c.products_from_tools, 'product', 'products')} from the catalog or your routine` : null,
+          (c.numbers_checked ?? 0) > 0 ? `${plural(c.numbers_checked ?? 0, 'number', 'numbers')} checked against your results and the catalog` : 'No numbers quoted',
+          (c.products_from_tools ?? 0) > 0 ? `${plural(c.products_from_tools ?? 0, 'product', 'products')} from the catalog or your routine` : null,
         ]
       : [
           r.photos_refused

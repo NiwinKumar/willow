@@ -14,7 +14,8 @@ conversation, so the guards move around it:
    reply is passed on; a match drops the reply, starts a fresh session (so the attempt is not in
    its context) and has it say the fixed refusal.
 4. The output transcription is checked as it streams and at the end of each turn: every number
-   must be in a tool result or the person's own words (app/numbers.py), and no banned word in the
+   must be in a tool result or the person's own words (app/numbers.py; spoken English number
+   words such as "seven" or "a dozen" too, see spoken_numbers), and no banned word in the
    language spoken (app/translate.py clean_words). A violation stops the audio in the browser and
    Wisp says a short correction. The transcript leads the audio by a fraction of a second, so the
    check usually lands before the number is heard, but not always: a wrong number may be partly
@@ -50,6 +51,7 @@ VOICE = "Achernar"  # the narration's voice
 MAX_S = int(os.environ.get("VOICE_LIVE_MAX_S") or 270)
 GOODBYE_BEFORE_S = 15
 RECONNECTS = 2  # Vertex closes busy Live sessions with 1011 "Resource exhausted" (Nov 28)
+REOPEN_WAIT_S = 0.8  # a fresh session after a refusal gets one more try after this
 SCREEN_WAIT_S = armor.TIMEOUT_S + 1.0
 
 INSTRUCTIONS = """You are Wisp, Willow's skincare assistant, talking with one person by voice.
@@ -65,7 +67,7 @@ Always answer in the language the person is speaking.
 - Willow gives no skin score, no skin age and never ranks skin tone. Never imply lighter skin is
   better. A change is against the person's own start: verdict real_change = changed by more than
   their photos usually vary; within_noise = about the same; no_baseline = not enough yet. Say it
-  in everyday words ("seven fewer blemishes than at your start"), never delta, noise band or mdc.
+  in everyday words ("7 fewer blemishes than at your start"), never delta, noise band or mdc.
 - Cosmetic language only. Never name a skin condition or disease, never diagnose, never say acne,
   treat, cure or heal; say blemishes or breakouts. For a changing mole, bleeding, pain or a rash,
   suggest seeing a dermatologist. Never advise on a prescription medicine: say to ask a doctor or
@@ -168,6 +170,8 @@ class Guard:
 
     def heard(self, text: str) -> None:
         self.allowed |= numbers.in_text(text)
+        for value in spoken_numbers(text):
+            self.allowed |= numbers.collect(value)
 
     def check(self, said: str, final: bool, lang: str | None = None) -> str | None:
         """'number', 'wording' or None. While streaming (`final` False) only the text up to the
@@ -177,10 +181,87 @@ class Guard:
             return None
         if not numbers.only_known(text, self.allowed):
             return "number"
+        for value in spoken_numbers(text, open_end=not final):
+            if not numbers.collect(value) & self.allowed:
+                return "number"
         for name in sorted(self.names, key=len, reverse=True):
             text = re.sub(re.escape(name), " ", text, flags=re.I)
         code = translate.normalise(lang) if lang else translate.detect(text)
         return None if translate.clean_words(text, code) else "wording"
+
+
+# English number words, so "seven" is held to the same rule as "7" (the transcript writes either).
+_UNIT_WORDS = (
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+    "fifteen sixteen seventeen eighteen nineteen"
+)
+_TENS_WORDS = "twenty thirty forty fifty sixty seventy eighty ninety"
+_UNITS = {w: i for i, w in enumerate(_UNIT_WORDS.split())}
+_TENS = {w: 10 * i for i, w in enumerate(_TENS_WORDS.split(), 2)}
+_TIMES = {"hundred": 100, "dozen": 12}
+_WORD = (
+    "(?:" + "|".join(sorted([*_UNITS, *_TENS, *_TIMES, "thousand"], key=len, reverse=True)) + r")\b"
+)
+# a run of number words: "twenty-one", "a hundred and five", "a dozen", "sixty one percent"
+_RUN = re.compile(
+    rf"\b(?:an?\s+(?=(?:hundred|thousand|dozen)\b))?{_WORD}"
+    rf"(?:(?:\s+|-|(?:(?<=hundred)|(?<=thousand))\s+and\s+){_WORD})*",
+    re.I,
+)
+
+
+def spoken_numbers(text: str, open_end: bool = False) -> list[float]:
+    """The values of the English number words in `text` ("twenty-one" 21, "a dozen" 12, "one
+    hundred and five" 105; "sixty percent" is 60, checked like "60%"). A lone "one" is left out:
+    it is far more often a pronoun ("this one", "one of them") than a quantity. `open_end`: a run
+    at the very end of a still-streaming transcript is skipped ("twenty" may yet become
+    "twenty-one")."""
+    values: list[float] = []
+    for m in _RUN.finditer(text):
+        if open_end and not text[m.end() :].strip(" -"):
+            continue
+        words = [
+            w for w in re.findall(r"[a-z]+", m.group(0).lower()) if w not in ("a", "an", "and")
+        ]
+        if words == ["one"]:
+            continue
+        values.extend(_value(words))
+    return values
+
+
+def _value(words: list[str]) -> list[float]:
+    """Number words to values; "two three" is two numbers (2 and 3), "twenty one" is one (21)."""
+    out: list[float] = []
+    total = current = 0
+    last: str | None = None
+
+    def flush() -> None:
+        nonlocal total, current, last
+        if last is not None:
+            out.append(float(total + current))
+        total = current = 0
+        last = None
+
+    for w in words:
+        if w in _UNITS:
+            v = _UNITS[w]
+            if last in ("unit", "dozen") or (last == "tens" and v >= 10):
+                flush()
+            current += v
+            last = "unit"
+        elif w in _TENS:
+            if last in ("unit", "tens", "dozen"):
+                flush()
+            current += _TENS[w]
+            last = "tens"
+        elif w == "thousand":
+            total += (current or 1) * 1000
+            current, last = 0, "thousand"
+        else:  # hundred, dozen
+            current = (current or 1) * _TIMES[w]
+            last = "dozen" if w == "dozen" else "hundred"
+    flush()
+    return out
 
 
 def _walk(obj: Any):
@@ -263,6 +344,7 @@ class Conversation:
         self._cm: Any = None
         self.generation = 0  # bumped on every new Live session (a reconnect or a fresh start)
         self.ready = asyncio.Event()
+        self.broken = asyncio.Event()  # the session is gone for good: run() ends the call
         self.resume: str | None = None
         self.heard = ""  # what the person said since the last screening
         self.heard_lang: str | None = None
@@ -496,10 +578,28 @@ class Conversation:
         await self.close()
         self.resume, self.said, self.cut, self.correcting = None, "", False, True
         try:
+            try:
+                await self._open_fresh()
+            finally:
+                self.reset_pending = False
+            await self.say(REFUSE.format(language=self.language, line=armor.REFUSAL))
+        except Exception as exc:
+            # No session to speak with (Vertex busy, 1011): end the call now with the busy
+            # message, not silence until the time cap. run() sees `broken` and returns.
+            log.warning("voice live reopen after a refusal failed: %s", type(exc).__name__)
+            _log("reopen_failed", after="refusal")
+            self.broken.set()
+
+    async def _open_fresh(self) -> None:
+        """A new session without resumption; one more try after a moment if Vertex is busy."""
+        try:
             await self.open(None)
-        finally:
-            self.reset_pending = False
-        await self.say(REFUSE.format(language=self.language, line=armor.REFUSAL))
+        except Exception as exc:
+            if not transient(exc):
+                raise
+            await self.close()
+            await asyncio.sleep(REOPEN_WAIT_S)
+            await self.open(None)
 
     @property
     def language(self) -> str:
@@ -592,7 +692,11 @@ async def run(conv: Conversation, browser_events: "asyncio.Queue[Any]") -> str:
         await asyncio.sleep(GOODBYE_BEFORE_S)
         return "time"
 
-    tasks = [asyncio.create_task(c) for c in (upstream(), downstream(), clock())]
+    async def broken() -> str:
+        await conv.broken.wait()
+        return "gemini_error"  # the route tells the browser Wisp's voice is busy
+
+    tasks = [asyncio.create_task(c) for c in (upstream(), downstream(), clock(), broken())]
     done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     for t in pending:
         t.cancel()
