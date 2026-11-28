@@ -118,7 +118,7 @@ export function DemandPanel({ months, rows, brand, className = '', loading }: { 
 
 /* ───────────── campaign funnel ───────────── */
 
-export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = '', canPromote }: { t: CampaignTotals; samples: number; promoteTo: string; campaignsTo: string; className?: string; canPromote: boolean }) {
+export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = '', canPromote, loading = false }: { t: CampaignTotals; samples: number; promoteTo: string; campaignsTo: string; className?: string; canPromote: boolean; loading?: boolean }) {
   const steps = [
     { id: 'reach', label: 'Reached', value: t.reach, note: 'people shown the card' },
     { id: 'clicks', label: 'Clicked', value: t.clicks, note: 'opened the product' },
@@ -137,7 +137,16 @@ export function FunnelPanel({ t, samples, promoteTo, campaignsTo, className = ''
           </Link>
         ) : null}
       </div>
-      {!t.count ? (
+      {loading ? (
+        <div aria-hidden className="flex flex-1 flex-col justify-center gap-5 px-5 pb-5 pt-1">
+          {[0, 1, 2].map((k) => (
+            <span key={k} className="flex flex-col gap-2">
+              <span className="retail-shimmer h-3 w-1/2 rounded-pill" />
+              <span className="retail-shimmer h-2 rounded-pill" />
+            </span>
+          ))}
+        </div>
+      ) : !t.count ? (
         <div className="flex flex-1 flex-col items-start justify-center gap-3 px-5 pb-5 pt-2">
           <span aria-hidden className="grid size-9 place-items-center rounded-ctl bg-sunken text-ink-2">
             <Megaphone size={17} strokeWidth={1.7} />

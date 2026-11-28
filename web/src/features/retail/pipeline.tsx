@@ -26,6 +26,15 @@ export function useCampaigns(): Campaign[] {
   return q.data?.list ?? []
 }
 
+/** The campaign list hasn't arrived yet (same cached query as useCampaigns): panels show a skeleton, never
+ *  "No campaigns yet", while it loads. */
+export function useCampaignsLoading(): boolean {
+  const { user } = useAuth()
+  const uid = user?.uid ?? null
+  const q = useQuery<{ list: Campaign[]; at: number | null }>(['campaigns', uid], (t) => api.listCampaigns(t).then((r) => ({ list: r.campaigns, at: Date.now() })), { enabled: Boolean(uid), staleMs: 30_000 })
+  return !q.data && q.status !== 'error'
+}
+
 /** The most relevant campaign for a product: running first, then the latest. */
 export function campaignFor(list: Campaign[], productId: string): Campaign | null {
   const mine = list.filter((c) => c.product_id === productId)
