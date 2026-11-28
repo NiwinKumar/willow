@@ -604,7 +604,9 @@ def test_eligibility_and_autopilot_signals_are_built_once_per_data_version(monke
 # the catalog's KR/JP/CN brand-origin tags (Nov 28: ten of the 48 products, COSRX, Beauty of
 # Joseon and Round Lab, gained KR, so Korean people's draws moved). It pins the draws: a change
 # that moves them has to say so here.
-BEFORE = "23568b3cc66576245d121c4a9a3e3ea684d707dbe3bbace06d854f8fe14318d6"
+# Nov 28: simulated effects scaled by category (cohort.CATEGORY_EFFECT) move the sessions on
+# purpose; people, goals and routines did not change (asserted below).
+BEFORE = "b39607e296969e371121f791df1c1f88abf14bafbfaf1549b9b424fd94d4f773"
 
 
 def _digest(t):

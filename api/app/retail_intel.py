@@ -13,7 +13,8 @@ Definitions (shared with the web and the campaigns slice):
 - product users `n` = eligible people with a routine row for it; `users` = everyone with a row.
 - base (non-users) = eligible people with an overlapping goal and no row for it (n >= 10).
 - rate CI = Wilson; lift = rate - base_rate, CI = diff +- 1.96 * sqrt(p1 q1 / n1 + p2 q2 / n2).
-- Proof tier: proven (n >= 30 and lift_lo > 0), promising (n >= 10 and lift > 0), unclear
+- Proof tier: proven (n >= 30, lift_lo > 0 and Benjamini-Hochberg at FDR_Q across products),
+  promising (n >= 10 and lift > 0), unclear
   (n >= 10, lift <= 0 or no base), too_few (n < 10: outcome numbers null).
 - switching A -> B: stopped A at week w, started B (same category, B != A) in weeks w-1..w+2.
 Every group of people under 10 is suppressed here (null with `suppressed: true`, or left out).
@@ -282,14 +283,63 @@ def lift_ci(k1: int, n1: int, k2: int, n2: int) -> tuple[float, float, float]:
     return _r2(d), _r2(d - Z * se), _r2(d + Z * se)
 
 
-def tier_of(n: int, lift: float | None, lift_lo: float | None) -> str:
+def tier_of(n: int, lift: float | None, lift_lo: float | None, fdr_ok: bool = True) -> str:
+    """`fdr_ok`: the product's test survives false-discovery control across every product tested
+    (_fdr_cutoff); without it a clear interval is only Promising."""
     if n < MIN:
         return "too_few"
-    if n >= PROVEN_N and lift_lo is not None and lift_lo > 0:
+    if n >= PROVEN_N and lift_lo is not None and lift_lo > 0 and fdr_ok:
         return "proven"
     if lift is not None and lift > 0:
         return "promising"
     return "unclear"
+
+
+# Many products tested at once: at 95% each, dozens of the 1,500 would clear zero by chance. Proven
+# also needs Benjamini-Hochberg at this false-discovery rate across every product tested (finals,
+# Nov 28). The comparison stays observational (people chose the product); the randomised holdout
+# of a campaign is the causal test.
+FDR_Q = 0.05
+
+
+def _p_one_sided(k1: int, n1: int, k2: int, n2: int) -> float:
+    """One-sided p-value that users' rate exceeds the base's (normal approximation, as lift_ci)."""
+    p1, p2 = min(max(k1 / n1, 0.0), 1.0), min(max(k2 / n2, 0.0), 1.0)
+    se = math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    if se == 0:
+        return 0.0 if p1 > p2 else 1.0
+    return 0.5 * math.erfc((p1 - p2) / se / math.sqrt(2))
+
+
+def _counts(f: Facts, pid: str) -> tuple[list[str], list[str], int, int]:
+    """(eligible users, those with an outcome, base people, base with an outcome), memoised."""
+    key = ("counts", pid)
+    if key not in f.memo:
+        metrics = _catalog()[1][pid]
+        el = [uh for uh in f.users_of.get(pid, []) if f.eligible(uh)]
+        wins = [uh for uh in el if f.outcome(uh, metrics) is not None] if metrics else []
+        base_n, base_k = _base_nk(f, pid, metrics) if metrics and len(el) >= MIN else (0, 0)
+        f.memo[key] = (el, wins, base_n, base_k)
+    return f.memo[key]
+
+
+def _fdr_cutoff(f: Facts) -> float:
+    """The Benjamini-Hochberg p-value cutoff at FDR_Q over every product with a test (n >= PROVEN_N
+    and a base of MIN), memoised per facts; -1 when none passes."""
+    key = ("fdr",)
+    if key not in f.memo:
+        ps = []
+        for pid in _catalog()[0]:
+            el, wins, base_n, base_k = _counts(f, pid)
+            if len(el) >= PROVEN_N and base_n >= MIN:
+                ps.append(_p_one_sided(len(wins), len(el), base_k, base_n))
+        ps.sort()
+        m, cut = len(ps), -1.0
+        for i, p in enumerate(ps, start=1):
+            if p <= i / m * FDR_Q:
+                cut = p
+        f.memo[key] = cut
+    return f.memo[key]
 
 
 def to_proven(k1: int, n1: int, k2: int, n2: int) -> int | None:
@@ -385,7 +435,7 @@ def _stats(f: Facts, pid: str) -> dict[str, Any]:
     if len(said) >= MIN:
         row["felt"] = _r2(sum(1 for a in said if a["feel"] == "working") / len(said))
         row["felt_n"] = len(said)
-    el = [uh for uh in members if f.eligible(uh)]
+    el, wins, base_n, base_k = _counts(f, pid)
     out = {"row": row, "el": el, "base_n": 0, "metrics": metrics, "members": members}
     if not metrics:
         row["reason"] = "not_measured"
@@ -394,15 +444,18 @@ def _stats(f: Facts, pid: str) -> dict[str, Any]:
     elif len(el) < MIN:
         row["reason"] = "few"
     else:
-        wins = [uh for uh in el if f.outcome(uh, metrics) is not None]
-        base_n, base_k = _base_nk(f, pid, metrics)
         lo, hi = retailer._wilson(len(wins), len(el))
         lift = lift_lo = lift_hi = None
         if base_n >= MIN:
             lift, lift_lo, lift_hi = lift_ci(len(wins), len(el), base_k, base_n)
             row["base_rate"] = _r2(base_k / base_n)
             out["base_n"] = base_n
-        tier = tier_of(len(el), lift, lift_lo)
+        fdr_ok = (
+            lift_lo is not None
+            and lift_lo > 0
+            and _p_one_sided(len(wins), len(el), base_k, base_n) <= _fdr_cutoff(f)
+        )
+        tier = tier_of(len(el), lift, lift_lo, fdr_ok)
         row.update(
             n=len(el),
             rate=_r2(len(wins) / len(el)),

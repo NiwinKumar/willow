@@ -8,7 +8,7 @@ export const GLOSSARY = {
   },
   proof_tier: {
     term: 'Proof tier',
-    text: 'Proven: 30+ people and the lift’s 95% interval is above zero. Promising: 10+ people and a positive lift, but fewer than 30 people or an interval that still includes zero. No clear effect yet: users change about as often as people with the same goals not using it. Not enough data: fewer than 10 people.',
+    text: 'Proven: 30+ people, the lift’s 95% interval is above zero, and it passes a false-discovery check across every product tested (Benjamini–Hochberg, 5%). Observational, not causal: a campaign’s randomised holdout is the causal test. Promising: 10+ people and a positive lift, but fewer than 30 people or an interval that still includes zero. No clear effect yet: users change about as often as people with the same goals not using it. Not enough data: fewer than 10 people.',
   },
   lift: {
     term: 'Lift',
