@@ -5,6 +5,9 @@ import { useSyncExternalStore } from 'react'
  * and Wisp answer in English first, where the checks read it; the api then translates it and keeps the
  * translation only if every number is unchanged (api app/translate.py). The app's own labels stay
  * English. Kept on this device; sent with every request as `X-Willow-Lang`.
+ * There is no picker: Wisp answers in the language a question is written in (the api tells it from the
+ * question, app/translate.py `detect`), and the app adopts the language of each answer (`adoptLanguage`),
+ * so explanations and stories follow. Until then it is the browser's language, if Willow answers in it.
  */
 export const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -25,13 +28,20 @@ const KEY = 'willow.lang'
 const listeners = new Set<() => void>()
 let current: LangCode = read()
 
+/** One of Willow's languages ("zh-CN" is "zh"), or null. A declaration: `current` reads it at load. */
+function known(code: string | null | undefined): LangCode | null {
+  const base = (code ?? '').trim().toLowerCase().split('-')[0]
+  return LANGUAGES.some((l) => l.code === base) ? (base as LangCode) : null
+}
+
 function read(): LangCode {
+  let kept: string | null = null
   try {
-    const v = localStorage.getItem(KEY)
-    return LANGUAGES.some((l) => l.code === v) ? (v as LangCode) : 'en'
+    kept = localStorage.getItem(KEY)
   } catch {
-    return 'en'
+    // private window: nothing kept
   }
+  return known(kept) ?? known(typeof navigator === 'undefined' ? null : navigator.language) ?? 'en'
 }
 
 export function language(): LangCode {
@@ -49,6 +59,15 @@ export function setLanguage(code: LangCode) {
   // cached views and stories are keyed by language (useSessionView, StoryCard): the new language
   // reads its own; the advisor history keeps each answer in the language it was asked in
   listeners.forEach((l) => l())
+}
+
+/**
+ * The language of Wisp's latest answer becomes the app's (its `lang`; an answer without one is English).
+ * Anything Willow doesn't answer in is ignored.
+ */
+export function adoptLanguage(code: string): void {
+  const got = known(code)
+  if (got) setLanguage(got)
 }
 
 /** The header the api reads (none for English, the default). */

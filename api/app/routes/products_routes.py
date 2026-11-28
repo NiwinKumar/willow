@@ -1,4 +1,3 @@
-import base64
 import json
 import logging
 import queue
@@ -27,7 +26,6 @@ from app import (
     routine_log,
     safety,
     translate,
-    voice,
 )
 from app.auth import AuthUser, current_user
 from app.schedule import Schedule
@@ -483,8 +481,11 @@ def _chat_answer(
     lang: str = "en",
 ) -> dict[str, Any]:
     """One answer from `uid`'s own data. `action` is the cap it counted on; `keep` stores the turn
-    in the person's history (the demo journey's chat is never stored)."""
+    in the person's history (the demo journey's chat is never stored). `lang` is the app's
+    language (X-Willow-Lang); Wisp answers in the language the question is written in, and the
+    app's only where the question can't tell ("ok", a product name, a photo alone)."""
     asked_at = datetime.now(UTC)
+    lang = translate.detect(body.messages[-1].text, fallback=lang)
     # Model Armor screens the question before Gemini sees it (app/armor.py; off unless configured)
     if armor.blocked(body.messages[-1].text):
         limits.refund(store, uid, action)
@@ -642,52 +643,3 @@ def my_usage(
 ) -> dict[str, Any]:
     """Today's counts for the paid actions; caps reset at UTC midnight (resets_at)."""
     return limits.usage(store, user.uid)
-
-
-class VoiceHearRequest(BaseModel):
-    audio_base64: str = Field(max_length=3_500_000)
-    mime_type: str = Field(default="audio/webm", max_length=40)
-
-
-class VoiceSpeakRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=2000)
-
-
-@router.post("/advisor/voice/hear")
-def advisor_voice_hear(
-    body: VoiceHearRequest,
-    user: AuthUser = Depends(current_user),
-    store: Store = Depends(get_store),
-) -> dict[str, Any]:
-    """A spoken question to Wisp as text and its language (app/voice.py). The app then asks it
-    like a typed question, so the answer goes through every check before it is spoken."""
-    if not body.mime_type.startswith("audio/"):
-        raise HTTPException(422, {"code": "bad_audio", "message": "Send an audio recording."})
-    try:
-        audio = base64.b64decode(body.audio_base64, validate=True)
-    except ValueError as exc:
-        raise HTTPException(
-            422, {"code": "bad_audio", "message": "That audio can't be read."}
-        ) from exc
-    limits.take(store, user.uid, "voice")
-    try:
-        return voice.hear(audio, body.mime_type.split(";")[0])
-    except voice.VoiceError as exc:
-        limits.refund(store, user.uid, "voice")
-        raise HTTPException(502, {"code": "voice_unavailable", "message": str(exc)}) from exc
-
-
-@router.post("/advisor/voice/speak")
-def advisor_voice_speak(
-    body: VoiceSpeakRequest,
-    user: AuthUser = Depends(current_user),
-    store: Store = Depends(get_store),
-    lang: str = Depends(translate.lang_header),
-) -> dict[str, Any]:
-    """Wisp's checked answer read aloud (Gemini TTS) in the person's language: a WAV, base64."""
-    limits.take(store, user.uid, "voice")
-    try:
-        return {"audio_base64": voice.b64(voice.speak(body.text, lang)), "mime_type": "audio/wav"}
-    except voice.VoiceError as exc:
-        limits.refund(store, user.uid, "voice")
-        raise HTTPException(502, {"code": "voice_unavailable", "message": str(exc)}) from exc

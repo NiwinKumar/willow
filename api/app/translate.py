@@ -432,6 +432,134 @@ def normalise(lang: str | None) -> str:
     return code if code in LANGUAGES else "en"
 
 
+# --- The language a question was written in (Nov 28: no picker, Wisp answers in kind) --------
+#
+# Decided in code, per question, before any Gemini call: no extra model round trip, the same
+# answer every time, and it also covers replies that never reach Gemini (a Model Armor refusal).
+# Non-Latin scripts are told apart by their Unicode blocks. Latin-script languages use
+# Vietnamese's own letters (ơ ư đ ă and the stacked tone marks), then a count of everyday
+# function words for English, Indonesian or Malay, Filipino and Vietnamese (Indonesian against
+# Malay by the words only one of them uses). Chosen over a `question_language`
+# field on the advisor's Gemini reply because that would change the advisor's schema, trust a
+# model with a label code can read, and be unknown on the refusal path. Its limits: Hindi or
+# Tamil typed in Latin letters, and Vietnamese without its marks, read as English.
+
+# (language, weight, ranges). The weight puts scripts on one scale against Latin letters: one
+# Chinese or Japanese character, or one Hangul syllable, carries about a short English word.
+_SCRIPTS: tuple[tuple[str, int, tuple[tuple[int, int], ...]], ...] = (
+    ("hi", 1, ((0x0900, 0x097F),)),
+    ("ta", 1, ((0x0B80, 0x0BFF),)),
+    ("th", 1, ((0x0E00, 0x0E7F),)),
+    ("ko", 3, ((0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F))),
+    ("ja", 3, ((0x3040, 0x30FF),)),  # kana: only Japanese writes it
+    ("zh", 3, ((0x4E00, 0x9FFF), (0x3400, 0x4DBF))),  # Han: Chinese, or Japanese with kana
+)
+_WEIGHT = {code: weight for code, weight, _ in _SCRIPTS}
+
+
+def _script(c: str) -> str | None:
+    o = ord(c)
+    return next(
+        (code for code, _, ranges in _SCRIPTS if any(lo <= o <= hi for lo, hi in ranges)), None
+    )
+
+
+def _is_latin(c: str) -> bool:
+    o = ord(c)
+    return o < 0x250 or 0x1E00 <= o <= 0x1EFF
+
+
+_VI_LETTERS = re.compile("[ơƠưƯđĐăĂẠ-ỹ]")
+_WORD = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)?")
+_LATIN_WORD = re.compile(r"[A-Za-zÀ-ɏḀ-ỿ]+")
+
+# Everyday function words, lower case. A word two languages share is left out of both (English
+# "at" and "may" are also Filipino; "dapat" is Malay and Filipino). "ok", "yes", "thanks" and
+# the like are in none: alone they say nothing about the language.
+_EN = frozenset((
+    "the", "a", "an", "is", "are", "am", "was", "were", "be", "been", "i", "i'm", "my", "me",
+    "you", "your", "it", "it's", "its", "this", "that", "these", "those", "what", "how", "why",
+    "when", "which", "who", "can", "should", "could", "would", "will", "do", "does", "did",
+    "don't", "use", "using", "with", "for", "of", "to", "in", "on", "and", "or", "but", "not",
+    "have", "has", "any", "some", "much", "many", "more", "too", "after", "before", "than", "if",
+    "there", "their", "they", "we", "our", "so", "also", "just", "still", "really", "very",
+    "about", "into", "from"
+))  # fmt: skip
+# shared by Indonesian and Malay
+_ID_MS = frozenset((
+    "saya", "aku", "ini", "itu", "dan", "yang", "untuk", "apa", "ada", "dengan", "di", "ke",
+    "dari", "pada", "tidak", "sudah", "belum", "lagi", "juga", "atau", "jika", "kalau", "perlu",
+    "sangat", "lebih", "kulit", "muka", "pakai", "malam", "pagi", "sebelum", "berapa", "lama",
+    "mengapa", "bagaimana", "boleh", "produk", "minggu", "hari", "semua", "sekarang", "anda",
+    "baik", "mana", "sebab", "tak", "kenapa", "terima", "kasih"
+))  # fmt: skip
+_ID = frozenset((
+    "bisa", "wajah", "gimana", "kapan", "karena", "saja", "mau", "kamu", "nggak", "gak", "enggak",
+    "banget", "sih", "dong", "aja", "apakah", "harus", "setelah", "sesudah", "pakainya", "cocok"
+))  # fmt: skip
+_MS = frozenset((
+    "guna", "gunakan", "selepas", "macam", "bila", "kerana", "sahaja", "mahu", "nak", "awak",
+    "adakah", "mesti", "ialah"
+))  # fmt: skip
+_TL = frozenset((
+    "ang", "ng", "mga", "sa", "na", "ko", "ako", "ba", "po", "ano", "paano", "bakit", "kailan",
+    "gamitin", "gabi", "umaga", "balat", "mukha", "pwede", "puwede", "lang", "naman", "kasi",
+    "yung", "ito", "iyan", "nito", "ka", "mo", "siya", "hindi", "akin", "ay", "rin", "din",
+    "ninyo", "natin", "kong", "kung"
+))  # fmt: skip
+# Vietnamese words with their marks (a mark-light question: "Mình nên dùng gì?")
+_VI = frozenset((
+    "tôi", "có", "không", "này", "gì", "nên", "dùng", "của", "và", "là", "được", "với", "mình",
+    "bạn", "thế", "nào", "khi", "buổi", "tối", "sáng", "làm", "bị", "mặt", "kem"
+))  # fmt: skip
+
+
+def detect(text: str | None, fallback: str = "en") -> str:
+    """The language `text` is written in, from Willow's list. `fallback` (the language the app is
+    in) answers what the text can't tell: no words ("ok", a product name, a photo alone) or a tie.
+    A language Willow doesn't answer in reads as English."""
+    fallback = normalise(fallback)
+    if not text or not text.strip():
+        return fallback
+    scores = dict.fromkeys([code for code, _, _ in _SCRIPTS], 0)
+    other = 0  # letters of a script Willow doesn't answer in (Arabic, Cyrillic, Bengali...)
+    for c in text:
+        code = _script(c)
+        if code:
+            scores[code] += _WEIGHT[code]
+        elif c.isalpha() and not _is_latin(c):
+            other += 1
+    if scores["ja"]:  # kana with Han: Japanese
+        scores["ja"] += scores.pop("zh")
+    # Latin words that look like names (CeraVe, PM, SPF50) are left out of the weighing, so an
+    # English product name inside a Hindi or Chinese question doesn't outweigh the question.
+    latin = sum(len(w) for w in _LATIN_WORD.findall(text) if w.islower())
+    code, best = max(scores.items(), key=lambda kv: kv[1])
+    if best and best >= latin:
+        return code
+    if other > latin:
+        return "en"
+    if len(_VI_LETTERS.findall(text)) >= 2:
+        return "vi"
+    words = [w.lower().replace("’", "'") for w in _WORD.findall(text)]
+    votes = {
+        "en": sum(w in _EN for w in words),
+        "idms": sum(w in _ID_MS or w in _ID or w in _MS for w in words),
+        "tl": sum(w in _TL for w in words),
+        "vi": sum(w in _VI for w in words),
+    }
+    top = max(votes.values())
+    if not top or list(votes.values()).count(top) > 1:
+        return fallback
+    code = next(c for c, n in votes.items() if n == top)
+    if code != "idms":
+        return code
+    id_, ms = sum(w in _ID for w in words), sum(w in _MS for w in words)
+    if id_ != ms:
+        return "id" if id_ > ms else "ms"
+    return fallback if fallback in ("id", "ms") else "id"
+
+
 def _values(text: str) -> set[float]:
     """The numbers in a text as values (so 8, 8.0 and ८ are the same number)."""
     out: set[float] = set()
