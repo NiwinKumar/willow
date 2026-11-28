@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     # Answers when the main model is slow or failing (app/gemini.py): about 1.3 s a call against
     # about 4 s, checked by the same schemas and validators. Empty: no second model.
     gemini_fallback_model: str = "gemini-3.5-flash-lite"
+    # Wisp reading its checked answer aloud (app/voice.py)
+    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     # Keep Gemini answers in Firestore across instances (app/kept.py). On in production only.
     keep_gemini_answers: bool = False
     vertex_location: str = "global"

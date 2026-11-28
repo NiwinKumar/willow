@@ -40,6 +40,7 @@ CAPS: dict[str, tuple[int, int]] = {
     "shelf_upload": (20, 2000),  # Shelf vs results stock files (app/shelf.py)
     "sponsored_event": (60, 100000),  # a person counts once a day per campaign and kind
     "product_request": (10, 2000),  # requests for products the catalog lacks (Firestore + photo)
+    "voice": (40, 3000),  # Wisp hearing a spoken question and reading its answer aloud
     "changes_read": (
         30,
         3000,
