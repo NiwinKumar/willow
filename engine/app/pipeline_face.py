@@ -1136,10 +1136,21 @@ def _view_redness_map(f: dict) -> dict | None:
 def _local_a(a_star: np.ndarray, skin: np.ndarray, px_per_mm: float) -> np.ndarray:
     """a* minus the mean a* of the skin within about OVERLAY_LOCAL_MM (a normalised blur over the
     skin only, so hair, brows and background never pull it)."""
-    sigma = config.OVERLAY_LOCAL_MM * px_per_mm
-    m = skin.astype(np.float32)
-    num = cv2.GaussianBlur(np.where(skin, a_star, 0).astype(np.float32), (0, 0), sigma)
-    den = cv2.GaussianBlur(m, (0, 0), sigma)
+    # The mean over ~25 mm is smooth, so it is worked out at about 1 px/mm and scaled back up: at a
+    # full photo's ~14 px/mm a blur that wide took 10-30 s per photo; this takes well under one.
+    k = max(1, int(px_per_mm))
+    h, w = a_star.shape
+    num = np.where(skin, a_star, 0).astype(np.float32)
+    den = skin.astype(np.float32)
+    if k > 1:
+        small = (max(1, w // k), max(1, h // k))
+        num = cv2.resize(num, small, interpolation=cv2.INTER_AREA)
+        den = cv2.resize(den, small, interpolation=cv2.INTER_AREA)
+    sigma = config.OVERLAY_LOCAL_MM * px_per_mm / k
+    num, den = cv2.GaussianBlur(num, (0, 0), sigma), cv2.GaussianBlur(den, (0, 0), sigma)
+    if k > 1:  # numerator and denominator scaled up apart, so skin edges stay clean
+        num = cv2.resize(num, (w, h), interpolation=cv2.INTER_LINEAR)
+        den = cv2.resize(den, (w, h), interpolation=cv2.INTER_LINEAR)
     return (a_star - num / np.maximum(den, 1e-6)).astype(np.float32)
 
 

@@ -12,8 +12,8 @@ Template:
 ## 2026-11-28: The face redness layer covers each photo's own skin, against nearby skin (proposed by Harshini)
 - Why: on a front photo the layer only covered the redness metric's cheek and nose patches, so forehead and chin redness was never drawn, and against one median for the whole face a naturally redder or shaded area (the nose, under the lip) showed as a block.
 - Change (what is drawn, not the format): `overlays/redness.png` and `views[].redness_uri` keep their size, colours and opacity rules. A face photo now draws the skin it measures in its session (front: forehead, nose, around the mouth, chin, and the whole face when there are no side photos; side: its cheek, jaw and side of the chin), each pixel against the mean of the skin within about 25 mm instead of the whole face's median. `docs/CONTRACT.md` section on overlays would then read "the skin that photo measures… more red than the person's own nearby skin".
-- Impact on engine / api / web: engine only (`pipeline_face._view_redness_map`, `_local_a`, `config.OVERLAY_LOCAL_MM`); api and web unchanged. No metric moves.
-- Approved by: [x] Harshini [ ] Niwin
+- Impact on engine / api / web: engine only (`pipeline_face._view_redness_map`, `_local_a`, `config.OVERLAY_LOCAL_MM`); api and web unchanged. No metric moves. The nearby-skin mean is worked out at about 1 px/mm and scaled back up (same layer within 0.01 a*, well under a second per photo instead of 10-30 s at full resolution).
+- Approved by: [x] Harshini [x] Niwin (Nov 28; CONTRACT.md overlays updated)
 
 ## 2026-10-13: Aligned preview image in AnalysisResult (proposed by Niwin)
 - Why: browsers cannot render DNG. The Report overlay toggle, the before/after slider and the timeline compare all need a viewable image in the same pixel frame as `overlays[]` and `rois[]`.
