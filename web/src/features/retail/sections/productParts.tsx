@@ -19,7 +19,7 @@ export { HeadTip } from '../ui'
  */
 export function RateInterval({ rate, lo, hi, base, n, weeks, strong = false, wide = false }: { rate: number; lo: number | null; hi: number | null; base: number | null; n: number | null; weeks: number; strong?: boolean; wide?: boolean }) {
   const ci = interval(lo, hi)
-  const text = `${pct(rate)}${n ? ` of ${int(n)} people` : ''} saw a visible change by week ${weeks}${ci ? ` (95% interval ${ci})` : ''}.${base !== null ? ` Non-users with the same goals: ${pct(base)}.` : ''}`
+  const text = `${pct(rate)}${n ? ` of ${int(n)} people` : ''} saw a visible change by week ${weeks}${ci ? ` (95% interval ${ci})` : ''}.${base !== null ? ` Same goals, not using it (changed anyway): ${pct(base)}.` : ''}`
   const tip = useTooltip(text)
   const x = (v: number) => `${Math.max(0, Math.min(100, v * 100))}%`
   return (

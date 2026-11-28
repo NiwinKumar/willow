@@ -12,6 +12,7 @@ import { useAuth } from '../../lib/useAuth'
 import { useResultReady } from '../../features/progress/useResultReady'
 import { WillowLoader } from '../willow/WillowLoader'
 import { CanvasBlobs } from './CanvasBlobs'
+import { CelebrationHost } from './CelebrationHost'
 import { useCheckInState } from './checkInState'
 import { AdvisorFab } from './AdvisorFab'
 import { Dock } from './Dock'
@@ -187,6 +188,7 @@ export function AppShell() {
           <Outlet />
         </div>
         {wide ? null : <Dock current={current} checkIn={checkInState} onCheckIn={() => setCheckIn({ open: true })} />}
+        <CelebrationHost />
         </div>
         <AdvisorFab open={advisor.open} onToggle={() => (advisor.open ? closeAdvisor() : openAdvisor())} wide={wide} covered={advisor.open} />
         <AdvisorHost open={advisor.open} mounted={advisor.ever} phone={phone} onClose={closeAdvisor} seed={advisor.seed} full={advisorFull && !phone} onToggleFull={() => setAdvisorFull((f) => !f)} />

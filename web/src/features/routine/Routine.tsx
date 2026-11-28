@@ -353,7 +353,7 @@ export default function Routine() {
           setInfo({ entry: e })
         }}
       />
-      <AddProductSheet open={sheetPreset !== null} preset={sheetPreset} inRoutine={inRoutine} onClose={closeAdd} />
+      <AddProductSheet open={sheetPreset !== null} preset={sheetPreset} inRoutine={inRoutine} firstOwn={!current.some((e) => !isSample(e))} onClose={closeAdd} />
       <EntryActions entry={more} onClose={() => setMore(null)} onPick={onPick} />
       <TestSheet target={testing} onClose={() => setTesting(null)} />
       <ReactionSheet target={reaction} onClose={() => setReaction(null)} />

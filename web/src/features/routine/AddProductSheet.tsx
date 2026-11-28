@@ -19,6 +19,7 @@ import './routine.css'
 import { ProductImage } from './productUi'
 import { activeLabel } from './routineModel'
 import { RoutineSheet } from './RoutineSheet'
+import { celebrate } from '../../components/shell/CelebrationHost'
 import { failureText, useRoutineWrites } from './writes'
 import { useChecks, type ProductCheck } from '../../lib/safety'
 import { strongActives } from './actives'
@@ -52,7 +53,7 @@ const slotsOf = (w: When): ('am' | 'pm')[] => (w === 'both' ? ['am', 'pm'] : [w]
 type Step = 'pick' | 'confirm' | 'started'
 const TITLE: Record<Step, string> = { pick: 'Add a product', confirm: 'Confirm details', started: 'Added' }
 
-export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: boolean; preset: AddPreset | null; inRoutine: Set<string>; onClose: () => void }) {
+export function AddProductSheet({ open, preset, inRoutine, firstOwn = false, onClose }: { open: boolean; preset: AddPreset | null; inRoutine: Set<string>; firstOwn?: boolean; onClose: () => void }) {
   const [step, setStep] = useState<Step>('pick')
   // Each opening starts where its preset says (a product from the advisor goes straight to confirm).
   const [opened, setOpened] = useState(false)
@@ -62,12 +63,12 @@ export function AddProductSheet({ open, preset, inRoutine, onClose }: { open: bo
   }
   return (
     <RoutineSheet open={open} onClose={onClose} kind="bottom" fixedHeight title={TITLE[step]} onBack={step === 'confirm' && !preset?.product ? () => setStep('pick') : undefined}>
-      {open ? <AddFlow preset={preset ?? {}} inRoutine={inRoutine} onClose={onClose} step={step} setStep={setStep} /> : null}
+      {open ? <AddFlow preset={preset ?? {}} inRoutine={inRoutine} firstOwn={firstOwn} onClose={onClose} step={step} setStep={setStep} /> : null}
     </RoutineSheet>
   )
 }
 
-function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPreset; inRoutine: Set<string>; onClose: () => void; step: Step; setStep: (s: Step) => void }) {
+function AddFlow({ preset, inRoutine, firstOwn, onClose, step, setStep }: { preset: AddPreset; inRoutine: Set<string>; firstOwn: boolean; onClose: () => void; step: Step; setStep: (s: Step) => void }) {
   const writes = useRoutineWrites()
   const [mode, setMode] = useState<'search' | 'request'>(preset.mode ?? 'search')
   // what was typed into search, handed to the request form when the catalog has nothing
@@ -93,6 +94,8 @@ function AddFlow({ preset, inRoutine, onClose, step, setStep }: { preset: AddPre
     setSaveError(null)
     try {
       const saved = await writes.add({ product_id: draft.product.product_id, slots: slotsOf(when), started_at: startedAt, source: draft.source })
+      // The first product of the person's own (no routine yet, or only the sample): the routine garden.
+      if (firstOwn) celebrate({ title: 'Your routine has begun', line: `${draft.product.name} is in. Tick it when you use it, and Willow lines it up with your check-ins.` })
       // A strong active: patch test, start slow and sunscreen before the sheet closes.
       if (strongActives(draft.product.key_actives).length) {
         setStarted(saved?.id ?? null)

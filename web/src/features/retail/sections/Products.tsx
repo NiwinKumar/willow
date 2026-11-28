@@ -201,7 +201,7 @@ function Body({ d }: { d: Insights }) {
     },
     {
       id: 'tier',
-      header: <HeadTip label="Status" tip="Proven: 30+ people and a lift over non-users that stays above zero across its 95% interval. Hover a status for its definition." />,
+      header: <HeadTip label="Status" tip="Proven: 30+ people and a lift over people with the same goals not using it that stays above zero across its 95% interval. Hover a status for its definition." />,
       headerText: 'Status',
       width: '172px',
       sortValue: (r) => TIER_ORDER[r.tier] * 1000 + (r.rate ?? 0) * 100,

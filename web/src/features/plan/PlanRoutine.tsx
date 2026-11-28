@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { CheckedChip } from '../../components/willow/CheckedChip'
 import { ProductImage } from '../../components/willow/ProductImage'
@@ -70,11 +69,8 @@ export function PlanRoutineStep() {
         added++
       }
       refreshRoutine(uid)
-      if (added) setSaved(added)
-      else {
-        toast('These are already in your routine')
-        navigate(exit)
-      }
+      // Confirmed either way: the garden, with words that say whether anything new went in.
+      setSaved(added)
     } catch (e) {
       setBusy(null)
       setError(errorText(e, 'Could not add them just now. Check your connection and try again.'))
@@ -83,7 +79,7 @@ export function PlanRoutineStep() {
 
   return (
     <>
-    {saved !== null ? <Celebration title="Your routine is set" line={`${saved} ${saved === 1 ? 'product' : 'products'} added. Tick each one as you use it, and Willow lines them up with your check-ins.`} onDone={() => navigate(exit)} /> : null}
+    {saved !== null ? <Celebration title="Your routine is set" line={saved ? `${saved} ${saved === 1 ? 'product' : 'products'} added. Tick each one as you use it, and Willow lines them up with your check-ins.` : 'All of these were already in your routine. Tick each one as you use it, and Willow lines them up with your check-ins.'} onDone={() => navigate(exit)} /> : null}
     <Frame
       wide
       title="Your routine"
