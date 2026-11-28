@@ -7,7 +7,7 @@ import { useShell } from '../../components/shell/ShellContext'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpots } from '../../data/hooks'
+import { activeIn, useRoutine, useRoutineCheck, useRoutineLog, useSetRoutineUse, useSpotCheckIns } from '../../data/hooks'
 import { useCheckin, useCheckinDue } from '../../data/useCheckin'
 import type { RoutineEntry, Session, Site } from '../../data/types'
 import { demoUnavailable } from '../../data/demoSource'
@@ -194,7 +194,7 @@ function HomeBody() {
   const setUse = useSetRoutineUse()
   const check = useRoutineCheck(entries)
   const tests = useProductTests()
-  const spots = useSpots()
+  const spotCheckIns = useSpotCheckIns()
   const byId = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e])), [entries])
 
   const day = today()
@@ -330,8 +330,9 @@ function HomeBody() {
   const last: Slot[] = []
   if (lastPhotos) last.push({ key: 'photos', node: <PhotosTile className="flex-1" session={lastPhotos} frameUrls={lastPhotosView?.session.frame_urls ?? null} next={due?.label ?? null} demo={demo} shared={fit && Boolean(measured)} onOpen={() => openResult(lastPhotos)} /> })
   if (measured) last.push({ key: 'changed', node: changedNode('flex-1'), grow: true })
-  const diary = !demo && spots.data?.enough_data ? spots.data : null
-  if (diary) (fitGoals ? aims : last).push({ key: 'spots', node: <SpotDiaryTile className="flex-1" diary={diary} onOpen={() => navigate('/spots')} /> })
+  // The spot diary (every face check-in, with every counted mark): fitted with goals it sits under them.
+  const weeks = !demo ? (spotCheckIns.data?.check_ins ?? []) : []
+  if (weeks.length) (fitGoals ? aims : last).push({ key: 'spots', node: <SpotDiaryTile className="flex-1" weeks={weeks} onOpen={() => navigate('/spots')} /> })
   const daily: Slot[] = [{ key: 'routine', node: null, grow: !(effectNode && goalsShown) }]
   if (effectNode && goalsShown) daily.push({ key: 'effect', node: effectNode, grow: true })
   if (forearm) daily.push({ key: 'test', node: <ProductTestTile className="flex-1" read={forearm} onOpen={() => navigate('/test')} /> })
